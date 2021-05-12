@@ -169,8 +169,9 @@ func (o *Community) initialize() {
 }
 
 type CommunityChatChanges struct {
-	MembersAdded   map[string]*protobuf.CommunityMember
-	MembersRemoved map[string]*protobuf.CommunityMember
+	MembersAdded     map[string]*protobuf.CommunityMember
+	MembersRemoved   map[string]*protobuf.CommunityMember
+	CategoryModified string
 }
 
 type CommunityChanges struct {
@@ -181,6 +182,11 @@ type CommunityChanges struct {
 	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
 	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
 	ChatsModified map[string]*CommunityChatChanges   `json:"chatsModified"`
+
+	CategoriesRemoved       []string                               `json:"categoriesRemoved"`
+	CategoriesAdded         map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
+	CategoriesModified      map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
+	CategoriesOrderModified map[string]uint                        `json:"categoriesOrderModified"`
 
 	// ShouldMemberJoin indicates whether the user should join this community
 	// automatically
@@ -258,6 +264,149 @@ func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, e
 	o.increaseClock()
 
 	return o.config.CommunityDescription, nil
+}
+
+func (o *Community) CreateCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if o.config.CommunityDescription.Categories == nil {
+		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	}
+	if _, ok := o.config.CommunityDescription.Categories[categoryID]; ok {
+		return nil, ErrCategoryAlreadyExists
+	}
+
+	for _, cid := range chatIDs {
+		_, exists := o.config.CommunityDescription.Chats[cid]
+		if !exists {
+			return nil, ErrChatNotFound
+		}
+	}
+
+	o.config.CommunityDescription.Categories[categoryID] = &protobuf.CommunityCategory{
+		CategoryId: categoryID,
+		Name:       categoryName,
+	}
+
+	for _, cid := range chatIDs {
+		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
+	}
+
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.CategoriesAdded[categoryID] = o.config.CommunityDescription.Categories[categoryID]
+	for _, cid := range chatIDs {
+		changes.ChatsModified[cid] = &CommunityChatChanges{
+			MembersAdded:     make(map[string]*protobuf.CommunityMember),
+			MembersRemoved:   make(map[string]*protobuf.CommunityMember),
+			CategoryModified: categoryID,
+		}
+	}
+
+	return changes, nil
+}
+
+func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if o.config.CommunityDescription.Categories == nil {
+		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	}
+	if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
+		return nil, ErrCategoryNotFound
+	}
+
+	for _, cid := range chatIDs {
+		_, exists := o.config.CommunityDescription.Chats[cid]
+		if !exists {
+			return nil, ErrChatNotFound
+		}
+	}
+
+	o.config.CommunityDescription.Categories[categoryID].Name = categoryName
+
+	for _, cid := range chatIDs {
+		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
+	}
+
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.CategoriesModified[categoryID] = o.config.CommunityDescription.Categories[categoryID]
+	for _, cid := range chatIDs {
+		changes.ChatsModified[cid] = &CommunityChatChanges{
+			MembersAdded:     make(map[string]*protobuf.CommunityMember),
+			MembersRemoved:   make(map[string]*protobuf.CommunityMember),
+			CategoryModified: categoryID,
+		}
+	}
+
+	return changes, nil
+}
+
+func (o *Community) SetChatCategory(categoryID string, chatID string, position uint) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	var chat *protobuf.CommunityChat
+	var exists bool
+	if chat, exists = o.config.CommunityDescription.Chats[chatID]; !exists {
+		return nil, ErrChatNotFound
+	}
+
+	if categoryID != "" {
+		if _, exists = o.config.CommunityDescription.Categories[categoryID]; !exists {
+			return nil, ErrCategoryNotFound
+		}
+	}
+
+	chat.CategoryId = categoryID
+
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.ChatsModified[chatID] = &CommunityChatChanges{CategoryModified: categoryID}
+	return changes, nil
+}
+
+func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
+		return nil, ErrCategoryNotFound
+	}
+
+	for _, chat := range o.config.CommunityDescription.Chats {
+		chat.CategoryId = ""
+	}
+
+	delete(o.config.CommunityDescription.Categories, categoryID)
+
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.CategoriesRemoved = append(changes.CategoriesRemoved, categoryID)
+	return changes, nil
 }
 
 func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInvitation, error) {
@@ -570,6 +719,7 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 			if o.config.CommunityDescription.Chats == nil {
 				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
 			}
+
 			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
 				if response.ChatsAdded == nil {
 					response.ChatsAdded = make(map[string]*protobuf.CommunityChat)
@@ -604,6 +754,61 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 						response.ChatsModified[chatID].MembersRemoved[pk] = member
 					}
 				}
+			}
+		}
+
+		// Check for categories that were removed
+		for categoryID, _ := range o.config.CommunityDescription.Categories {
+			if description.Categories == nil {
+				description.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+
+			if description.Chats == nil {
+				description.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := description.Categories[categoryID]; !ok {
+				response.CategoriesRemoved = append(response.CategoriesRemoved, categoryID)
+			}
+
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+		}
+
+		// Check for categories that were added
+		for categoryID, category := range description.Categories {
+			if o.config.CommunityDescription.Categories == nil {
+				o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+			if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
+				if response.CategoriesAdded == nil {
+					response.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
+				}
+
+				response.CategoriesAdded[categoryID] = category
+			} else {
+				if o.config.CommunityDescription.Categories[categoryID].Name != category.Name {
+					response.CategoriesModified[categoryID] = category
+				}
+			}
+		}
+
+		// Check for chat categories that were modified
+		for chatID, chat := range description.Chats {
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if o.config.CommunityDescription.Chats[chatID].CategoryId != chat.CategoryId {
+				if response.ChatsModified[chatID] == nil {
+					response.ChatsModified[chatID] = &CommunityChatChanges{
+						MembersAdded:   make(map[string]*protobuf.CommunityMember),
+						MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					}
+				}
+
+				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
 			}
 		}
 	}
@@ -760,6 +965,17 @@ func (o *Community) Chats() map[string]*protobuf.CommunityChat {
 
 	response := make(map[string]*protobuf.CommunityChat)
 	for k, v := range o.config.CommunityDescription.Chats {
+		response[k] = v
+	}
+	return response
+}
+
+func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	response := make(map[string]*protobuf.CommunityCategory)
+	for k, v := range o.config.CommunityDescription.Categories {
 		response[k] = v
 	}
 	return response
@@ -1015,5 +1231,9 @@ func emptyCommunityChanges() *CommunityChanges {
 		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
 		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
 		ChatsModified: make(map[string]*CommunityChatChanges),
+
+		CategoriesRemoved:  []string{},
+		CategoriesAdded:    make(map[string]*protobuf.CommunityCategory),
+		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
 	}
 }

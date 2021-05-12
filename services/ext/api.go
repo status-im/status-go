@@ -412,6 +412,31 @@ func (api *PublicAPI) RequestToJoinCommunity(request *requests.RequestToJoinComm
 	return api.service.messenger.RequestToJoinCommunity(request)
 }
 
+// CreateCommunityCategory creates a category within a particular community
+func (api *PublicAPI) CreateCommunityCategory(request *requests.CreateCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityCategory(request)
+}
+
+// SetCommunityChatCategory applies a category to an specific chat (if empty, removes a category)
+func (api *PublicAPI) SetCommunityChatCategory(request *requests.SetCommunityChatCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityChatCategory(request)
+}
+
+/*
+func (api *PublicAPI) ReorderCommunityCategories(communityID types.HexBytes, categoryID []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReorderCommunityCategories(communityID, categoryID)
+}*/
+
+// EditCommunityCategory modifies a category within a particular community
+func (api *PublicAPI) EditCommunityCategory(request *requests.EditCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunityCategory(request)
+}
+
+// DeleteCommunityCategory deletes a category within a particular community and removes this category from any chat that has it
+func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteCommunityCategory(request)
+}
+
 type ApplicationMessagesResponse struct {
 	Messages []*common.Message `json:"messages"`
 	Cursor   string            `json:"cursor"`
