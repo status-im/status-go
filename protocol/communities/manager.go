@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

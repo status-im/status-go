@@ -8,11 +8,11 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/vacp2p/mvds/protobuf"
 	"github.com/vacp2p/mvds/state"
 	"github.com/vacp2p/mvds/transport"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 )
@@ -59,12 +59,12 @@ func (t *NodeTransport) Watch() transport.Packet {
 	return <-t.packets
 }
 
-func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload protobuf.Payload) error {
+func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload *protobuf.Payload) error {
 	if t.dispatch == nil {
 		return errNotInitialized
 	}
 
-	payloads := splitPayloadInBatches(&payload, int(t.maxMessageSize))
+	payloads := splitPayloadInBatches(payload, int(t.maxMessageSize))
 	for _, payload := range payloads {
 
 		if !payload.IsValid() {

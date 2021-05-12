@@ -10,6 +10,8 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 
+replace github.com/vacp2p/mvds => /home/richard/status/mvds
+
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
@@ -23,7 +25,6 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golang/mock v1.4.1
-	github.com/golang/protobuf v1.3.4
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -54,7 +55,6 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.0
-	github.com/prometheus/common v0.9.1
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
@@ -82,6 +82,7 @@ require (
 	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect
 	google.golang.org/genproto v0.0.0-20191115221424-83cc0476cb11 // indirect
 	google.golang.org/grpc v1.25.1 // indirect
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

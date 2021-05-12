@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
 	sqlite3 "github.com/mutecomm/go-sqlcipher"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"

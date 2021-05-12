@@ -6,9 +6,9 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -119,8 +119,8 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 		return nil
 	}
 
-	var protocolMessage encryption.ProtocolMessage
-	err := proto.Unmarshal(m.TransportPayload, &protocolMessage)
+	protocolMessage := &encryption.ProtocolMessage{}
+	err := proto.Unmarshal(m.TransportPayload, protocolMessage)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
 	}
@@ -128,7 +128,7 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 	response, err := enc.HandleMessage(
 		myKey,
 		senderKey,
-		&protocolMessage,
+		protocolMessage,
 		m.Hash,
 	)
 
@@ -248,11 +248,12 @@ func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
 	}
 
 	err := proto.Unmarshal(m.UnwrappedPayload, ptr)
+
 	if err != nil {
 		m.ParsedMessage = nil
 		log.Printf("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
 	} else {
-		rv = reflect.ValueOf(ptr)
+		rv = reflect.ValueOf(&ptr)
 		elem := rv.Elem()
 		m.ParsedMessage = &elem
 		return nil

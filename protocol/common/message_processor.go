@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -80,7 +80,8 @@ func NewMessageProcessor(
 		database,
 		dataSyncTransport,
 		datasyncpeer.PublicKeyToPeerID(identity.PublicKey),
-		datasyncnode.BATCH,
+		datasyncnode.BatchMode,
+		datasyncnode.EventualMode,
 		datasync.CalculateSendTime,
 		logger,
 	)
@@ -494,7 +495,6 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
 	var statusMessages []*v1protocol.StatusMessage
-
 	err := statusMessage.HandleTransport(shhMessage)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))

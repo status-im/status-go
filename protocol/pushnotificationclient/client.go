@@ -15,9 +15,9 @@ import (
 	mrand "math/rand"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
@@ -396,7 +396,7 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
-func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, response protobuf.PushNotificationRegistrationResponse) error {
+func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, response *protobuf.PushNotificationRegistrationResponse) error {
 	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
 
 	// Not successful ignore for now
@@ -475,7 +475,7 @@ func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublic
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
-func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response protobuf.PushNotificationQueryResponse) error {
+func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response *protobuf.PushNotificationQueryResponse) error {
 	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
 	if len(response.Info) == 0 {
 		return errors.New("empty response from the server")
@@ -506,7 +506,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 }
 
 // HandleContactCodeAdvertisement checks if there are any info and process them
-func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey, message protobuf.ContactCodeAdvertisement) error {
+func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey, message *protobuf.ContactCodeAdvertisement) error {
 	// nothing to do for our own pubkey
 	if common.IsPubKeyEqual(clientPublicKey, &c.config.Identity.PublicKey) {
 		return nil
@@ -535,7 +535,7 @@ func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey
 }
 
 // HandlePushNotificationResponse should set the request as processed
-func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
+func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response *protobuf.PushNotificationResponse) error {
 	messageID := response.MessageId
 	c.config.Logger.Debug("received response for", zap.Binary("message-id", messageID))
 	for _, report := range response.Reports {

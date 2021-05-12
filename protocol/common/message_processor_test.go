@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/waku"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -35,12 +35,12 @@ type MessageProcessorSuite struct {
 
 	processor   *MessageProcessor
 	tmpDir      string
-	testMessage protobuf.ChatMessage
+	testMessage *protobuf.ChatMessage
 	logger      *zap.Logger
 }
 
 func (s *MessageProcessorSuite) SetupTest() {
-	s.testMessage = protobuf.ChatMessage{
+	s.testMessage = &protobuf.ChatMessage{
 		Text:        "abc123",
 		ChatId:      "testing-adamb",
 		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
@@ -107,7 +107,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
@@ -123,9 +123,9 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -136,18 +136,18 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	dataSyncMessage := datasyncproto.Payload{
+	dataSyncMessage := &datasyncproto.Payload{
 		Messages: []*datasyncproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
-	marshalledDataSyncMessage, err := proto.Marshal(&dataSyncMessage)
+	marshalledDataSyncMessage, err := proto.Marshal(dataSyncMessage)
 	s.Require().NoError(err)
 	message := &types.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
@@ -161,8 +161,8 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -180,18 +180,18 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	dataSyncMessage := datasyncproto.Payload{
+	dataSyncMessage := &datasyncproto.Payload{
 		Messages: []*datasyncproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
-	marshalledDataSyncMessage, err := proto.Marshal(&dataSyncMessage)
+	marshalledDataSyncMessage, err := proto.Marshal(dataSyncMessage)
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
@@ -226,7 +226,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

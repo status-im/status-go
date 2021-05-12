@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 message ContactUpdate {
   uint64 clock = 1;
   string ens_name = 2;

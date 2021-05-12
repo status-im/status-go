@@ -3,7 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )

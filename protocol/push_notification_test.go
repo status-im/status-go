@@ -699,7 +699,7 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	s.Require().NoError(err)
 	s.Require().NotNil(contactCodeAdvertisement)
 
-	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, *contactCodeAdvertisement))
+	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, contactCodeAdvertisement))
 
 	s.Require().NoError(alice.Shutdown())
 	s.Require().NoError(server.Shutdown())
