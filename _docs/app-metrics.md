@@ -49,7 +49,7 @@ The above data can technically be logged, stored and shared. In order to verify 
 Moreover, while we made a best effort to make data collection as privacy-preserving as possible, we cannot guarantee that there are no ways to de-anonymous collected data. **If you find yourself at risk if your identity were to be uncovered: don't enable sharing data.**
 
 ### Purpose of the data
-Aggregated data is used to inform product development. Given our principles, the type of data that is collected and its rudimentary nature, there is no incentive for Status or other parties to use the data for any other purpose.
+Aggregated data is used to inform product development. Given our principles, the type of data that is collected and its rudimentary nature, there is no incentive for Status or other parties to use the data for any other purpose. Status will never use these data for profit.
 
 
 ### Viewing the data
