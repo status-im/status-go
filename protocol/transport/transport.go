@@ -415,7 +415,6 @@ func (t *Transport) SendMessagesRequestForTopics(
 ) (cursor []byte, err error) {
 
 	r := createMessagesRequest(from, to, previousCursor, topics)
-	r.SetDefaults(t.waku.GetCurrentTime())
 
 	events := make(chan types.EnvelopeEvent, 10)
 	sub := t.waku.SubscribeEnvelopeEvents(events)
@@ -475,13 +474,17 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicT
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
+	var topicBytes [][]byte
+	for _, t := range topics {
+		topicBytes = append(topicBytes, t[:])
+	}
 	return types.MessagesRequest{
 		ID:     id,
 		From:   from,
 		To:     to,
-		Limit:  100,
+		Limit:  1000,
 		Cursor: cursor,
-		Bloom:  topicsToBloom(topics...),
+		Topics: topicBytes,
 	}
 }
 

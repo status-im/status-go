@@ -33,7 +33,6 @@ import (
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/static"
@@ -137,11 +136,6 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 	})
 	if err != nil {
 		return fmt.Errorf("failed to register NodeBridge: %v", err)
-	}
-
-	// start Whisper service.
-	if err := activateShhService(stack, config, db); err != nil {
-		return fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
 	// start Waku service
@@ -322,46 +316,6 @@ func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (
 	wakuService.RegisterMailServer(&mailServer)
 
 	return mailServer.Init(wakuService, config)
-}
-
-// activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
-	if !config.WhisperConfig.Enabled {
-		logger.Info("SHH protocol is disabled")
-		return nil
-	}
-
-	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return createShhService(ctx, &config.WhisperConfig, &config.ClusterConfig)
-	})
-	if err != nil {
-		return
-	}
-
-	// Register Whisper eth-node bridge
-	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var ethnode *nodebridge.NodeService
-		if err := ctx.Service(&ethnode); err != nil {
-			return nil, err
-		}
-		w, err := ethnode.Node.GetWhisper(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return &nodebridge.WhisperService{Whisper: w}, nil
-	})
-	if err != nil {
-		return
-	}
-
-	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
-	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var ethnode *nodebridge.NodeService
-		if err := ctx.Service(&ethnode); err != nil {
-			return nil, err
-		}
-		return shhext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
-	})
 }
 
 // activateWakuService configures Waku and adds it to the given node.

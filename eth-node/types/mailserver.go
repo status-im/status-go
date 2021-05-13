@@ -26,6 +26,10 @@ type MessagesRequest struct {
 	Cursor []byte `json:"cursor"`
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
+
+	// Topics is a list of topics. A returned message should
+	// belong to one of the topics from the list.
+	Topics [][]byte `json:"topics"`
 }
 
 // SetDefaults sets the From and To defaults

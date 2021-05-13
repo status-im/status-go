@@ -27,7 +27,7 @@ func New(config params.ShhextConfig, n types.Node, ctx interface{}, handler ext.
 	requestsRegistry := ext.NewRequestsRegistry(delay)
 	mailMonitor := ext.NewMailRequestMonitor(w, handler, requestsRegistry)
 	return &Service{
-		Service: ext.New(config, n, ldb, mailMonitor, requestsRegistry, w),
+		Service: ext.New(config, n, ldb, mailMonitor, w),
 		w:       w,
 	}
 }

@@ -1074,17 +1074,6 @@ func (b *GethStatusBackend) Logout() error {
 
 // cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
 func (b *GethStatusBackend) cleanupServices() error {
-	whisperService, err := b.statusNode.WhisperService()
-	switch err {
-	case node.ErrServiceUnknown: // Whisper was never registered
-	case nil:
-		if err := whisperService.DeleteKeyPairs(); err != nil {
-			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
-		}
-		b.selectedAccountKeyID = ""
-	default:
-		return err
-	}
 	wakuService, err := b.statusNode.WakuService()
 	switch err {
 	case node.ErrServiceUnknown: // Waku was never registered
@@ -1170,37 +1159,10 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 	}
 
 	identity := chatAccount.AccountKey.PrivateKey
-	whisperService, err := b.statusNode.WhisperService()
-
-	switch err {
-	case node.ErrServiceUnknown: // Whisper was never registered
-	case nil:
-		if err := whisperService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
-			return err
-		}
-		b.selectedAccountKeyID, err = whisperService.AddKeyPair(identity)
-		if err != nil {
-			return ErrWhisperIdentityInjectionFailure
-		}
-	default:
-		return err
-	}
 
 	acc, err := b.GetActiveAccount()
 	if err != nil {
 		return err
-	}
-
-	if whisperService != nil {
-		st, err := b.statusNode.ShhExtService()
-		if err != nil {
-			return err
-		}
-
-		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
-			return err
-		}
-		return nil
 	}
 
 	wakuService, err := b.statusNode.WakuService()

@@ -55,23 +55,18 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	messenger        *protocol.Messenger
-	identity         *ecdsa.PrivateKey
-	cancelMessenger  chan struct{}
-	storage          db.TransactionalStorage
-	n                types.Node
-	config           params.ShhextConfig
-	mailMonitor      *MailRequestMonitor
-	requestsRegistry *RequestsRegistry
-	server           *p2p.Server
-	eventSub         mailservers.EnvelopeEventSubscriber
-	peerStore        *mailservers.PeerStore
-	cache            *mailservers.Cache
-	connManager      *mailservers.ConnectionManager
-	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
-	accountsDB       *accounts.Database
-	multiAccountsDB  *multiaccounts.Database
-	account          *multiaccounts.Account
+	messenger       *protocol.Messenger
+	identity        *ecdsa.PrivateKey
+	cancelMessenger chan struct{}
+	storage         db.TransactionalStorage
+	n               types.Node
+	config          params.ShhextConfig
+	mailMonitor     *MailRequestMonitor
+	server          *p2p.Server
+	peerStore       *mailservers.PeerStore
+	accountsDB      *accounts.Database
+	multiAccountsDB *multiaccounts.Database
+	account         *multiaccounts.Account
 }
 
 // Make sure that Service implements node.Service interface.
@@ -82,20 +77,16 @@ func New(
 	n types.Node,
 	ldb *leveldb.DB,
 	mailMonitor *MailRequestMonitor,
-	reqRegistry *RequestsRegistry,
 	eventSub mailservers.EnvelopeEventSubscriber,
 ) *Service {
 	cache := mailservers.NewCache(ldb)
 	peerStore := mailservers.NewPeerStore(cache)
 	return &Service{
-		storage:          db.NewLevelDBStorage(ldb),
-		n:                n,
-		config:           config,
-		mailMonitor:      mailMonitor,
-		requestsRegistry: reqRegistry,
-		peerStore:        peerStore,
-		cache:            mailservers.NewCache(ldb),
-		eventSub:         eventSub,
+		storage:     db.NewLevelDBStorage(ldb),
+		n:           n,
+		config:      config,
+		mailMonitor: mailMonitor,
+		peerStore:   peerStore,
 	}
 }
 
@@ -104,10 +95,6 @@ func (s *Service) NodeID() *ecdsa.PrivateKey {
 		return nil
 	}
 	return s.server.PrivateKey
-}
-
-func (s *Service) RequestsRegistry() *RequestsRegistry {
-	return s.requestsRegistry
 }
 
 func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
@@ -330,11 +317,11 @@ func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
 		log.Info("Setting messenger")
 		s.messenger.SetMailserver(nodes[0].ID().Bytes())
 	}
+	for _, peer := range nodes {
+		s.server.AddPeer(peer)
+	}
 	if err := s.peerStore.Update(nodes); err != nil {
 		return err
-	}
-	if s.connManager != nil {
-		s.connManager.Notify(nodes)
 	}
 	return nil
 }
@@ -352,27 +339,6 @@ func (s *Service) APIs() []rpc.API {
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Start(server *p2p.Server) error {
-	if s.config.EnableConnectionManager {
-		connectionsTarget := s.config.ConnectionTarget
-		if connectionsTarget == 0 {
-			connectionsTarget = defaultConnectionsTarget
-		}
-		maxFailures := s.config.MaxServerFailures
-		// if not defined change server on first expired event
-		if maxFailures == 0 {
-			maxFailures = 1
-		}
-		s.connManager = mailservers.NewConnectionManager(server, s.eventSub, connectionsTarget, maxFailures, defaultTimeoutWaitAdded)
-		s.connManager.Start()
-		if err := mailservers.EnsureUsedRecordsAddedFirst(s.peerStore, s.connManager); err != nil {
-			return err
-		}
-	}
-	if s.config.EnableLastUsedMonitor {
-		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.eventSub)
-		s.lastUsedMonitor.Start()
-	}
-	s.mailMonitor.Start()
 	s.server = server
 	return nil
 }
@@ -380,15 +346,6 @@ func (s *Service) Start(server *p2p.Server) error {
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
 	log.Info("Stopping shhext service")
-	if s.config.EnableConnectionManager {
-		s.connManager.Stop()
-	}
-	if s.config.EnableLastUsedMonitor {
-		s.lastUsedMonitor.Stop()
-	}
-	s.requestsRegistry.Clear()
-	s.mailMonitor.Stop()
-
 	if s.cancelMessenger != nil {
 		select {
 		case <-s.cancelMessenger:

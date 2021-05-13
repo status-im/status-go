@@ -36,7 +36,6 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
-	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wallet"
@@ -628,19 +627,6 @@ func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
 	defer n.mu.RUnlock()
 
 	err = n.gethService(&w)
-	if err == node.ErrServiceUnknown {
-		err = ErrServiceUnknown
-	}
-
-	return
-}
-
-// ShhExtService exposes reference to shh extension service running on top of the node
-func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	err = n.gethService(&s)
 	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
 	}
