@@ -360,7 +360,7 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	return community, changes, nil
 }
 
-func (m *Manager) SetChatCategory(request *requests.SetCommunityChatCategory) (*Community, *CommunityChanges, error) {
+func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -369,7 +369,32 @@ func (m *Manager) SetChatCategory(request *requests.SetCommunityChatCategory) (*
 		return nil, nil, ErrOrgNotFound
 	}
 
-	changes, err := community.SetChatCategory(request.CategoryID, request.ChatID, request.Position)
+	changes, err := community.ReorderCategories(request.CategoryID, request.Position)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
+func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	changes, err := community.ReorderChat(request.CategoryID, request.ChatID, request.Position)
 	if err != nil {
 		return nil, nil, err
 	}

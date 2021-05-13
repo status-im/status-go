@@ -4,6 +4,7 @@ import "errors"
 
 var ErrChatNotFound = errors.New("chat not found")
 var ErrCategoryNotFound = errors.New("category not found")
+var ErrChatAlreadyAssigned = errors.New("chat already assigned to a category")
 var ErrOrgNotFound = errors.New("community not found")
 var ErrChatAlreadyExists = errors.New("chat already exists")
 var ErrCategoryAlreadyExists = errors.New("category already exists")
@@ -14,7 +15,7 @@ var ErrInvalidCommunityDescriptionNoChatPermissions = errors.New("invalid commun
 var ErrInvalidCommunityDescriptionUnknownChatAccess = errors.New("invalid community description unknown chat access")
 var ErrInvalidCommunityDescriptionUnknownOrgAccess = errors.New("invalid community description unknown org access")
 var ErrInvalidCommunityDescriptionMemberInChatButNotInOrg = errors.New("invalid community description member in chat but not in org")
-var ErrInvalidCommunityDescriptionCategoryNoId = errors.New("invalid community category id")
+var ErrInvalidCommunityDescriptionCategoryNoID = errors.New("invalid community category id")
 var ErrInvalidCommunityDescriptionCategoryNoName = errors.New("invalid community category name")
 var ErrInvalidCommunityDescriptionUnknownChatCategory = errors.New("invalid community category in chat")
 var ErrNotAdmin = errors.New("no admin privileges for this community")

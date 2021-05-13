@@ -267,13 +267,29 @@ func (m *Messenger) EditCommunityCategory(request *requests.EditCommunityCategor
 	return &response, nil
 }
 
-func (m *Messenger) SetCommunityChatCategory(request *requests.SetCommunityChatCategory) (*MessengerResponse, error) {
+func (m *Messenger) ReorderCommunityCategories(request *requests.ReorderCommunityCategories) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.SetChatCategory(request)
+	community, changes, err := m.communitiesManager.ReorderCategories(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) ReorderCommunityChat(request *requests.ReorderCommunityChat) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.ReorderChat(request)
 	if err != nil {
 		return nil, err
 	}

@@ -36,7 +36,7 @@ func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.C
 
 func validateCommunityCategory(category *protobuf.CommunityCategory) error {
 	if len(category.CategoryId) == 0 {
-		return ErrInvalidCommunityDescriptionCategoryNoId
+		return ErrInvalidCommunityDescriptionCategoryNoID
 	}
 
 	if len(category.Name) == 0 {

@@ -417,15 +417,15 @@ func (api *PublicAPI) CreateCommunityCategory(request *requests.CreateCommunityC
 	return api.service.messenger.CreateCommunityCategory(request)
 }
 
-// SetCommunityChatCategory applies a category to an specific chat (if empty, removes a category)
-func (api *PublicAPI) SetCommunityChatCategory(request *requests.SetCommunityChatCategory) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityChatCategory(request)
+// ReorderCommunityCategories is used to change the order of the categories of a community
+func (api *PublicAPI) ReorderCommunityCategories(request *requests.ReorderCommunityCategories) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReorderCommunityCategories(request)
 }
 
-/*
-func (api *PublicAPI) ReorderCommunityCategories(communityID types.HexBytes, categoryID []string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.ReorderCommunityCategories(communityID, categoryID)
-}*/
+// ReorderCommunityChat allows changing the order of the chat or switching its category
+func (api *PublicAPI) ReorderCommunityChat(request *requests.ReorderCommunityChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReorderCommunityChat(request)
+}
 
 // EditCommunityCategory modifies a category within a particular community
 func (api *PublicAPI) EditCommunityCategory(request *requests.EditCommunityCategory) (*protocol.MessengerResponse, error) {

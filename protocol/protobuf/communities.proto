@@ -49,11 +49,13 @@ message CommunityChat {
   CommunityPermissions permissions = 2;
   ChatIdentity identity = 3;
   string category_id = 4;
+  int32 position = 5;
 }
 
 message CommunityCategory {
   string category_id = 1;
   string name = 2;
+  int32 position = 3;
 }
 
 message CommunityInvitation {

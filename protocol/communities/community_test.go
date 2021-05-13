@@ -18,6 +18,8 @@ func TestCommunitySuite(t *testing.T) {
 }
 
 const testChatID1 = "chat-id-1"
+const testCategoryID1 = "category-id-1"
+const testCategoryName1 = "category-name-1"
 const testChatID2 = "chat-id-2"
 
 type CommunitySuite struct {
@@ -131,9 +133,9 @@ func (s *CommunitySuite) TestCreateChat() {
 
 	s.Require().NoError(err)
 	s.Require().NotNil(description)
-
 	s.Require().NotNil(description.Chats[newChatID])
 	s.Require().NotEmpty(description.Clock)
+	s.Require().Equal(len(description.Chats)-1, int(description.Chats[newChatID].Position))
 	s.Require().Equal(permissions, description.Chats[newChatID].Permissions)
 	s.Require().Equal(identity, description.Chats[newChatID].Identity)
 
@@ -705,10 +707,12 @@ func (s *CommunitySuite) emptyCommunityDescriptionWithChat() *protobuf.Community
 		Members:     make(map[string]*protobuf.CommunityMember),
 		Clock:       1,
 		Chats:       make(map[string]*protobuf.CommunityChat),
+		Categories:  make(map[string]*protobuf.CommunityCategory),
 		Permissions: &protobuf.CommunityPermissions{},
 	}
 
-	desc.Chats[testChatID1] = &protobuf.CommunityChat{Permissions: &protobuf.CommunityPermissions{}, Members: make(map[string]*protobuf.CommunityMember)}
+	desc.Categories[testCategoryID1] = &protobuf.CommunityCategory{CategoryId: testCategoryID1, Name: testCategoryName1, Position: 0}
+	desc.Chats[testChatID1] = &protobuf.CommunityChat{Position: 0, Permissions: &protobuf.CommunityPermissions{}, Members: make(map[string]*protobuf.CommunityMember)}
 	desc.Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
 	desc.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
 

@@ -12,7 +12,7 @@ var ErrEditCommunityCategoryInvalidName = errors.New("edit-community-category: i
 
 type EditCommunityCategory struct {
 	CommunityID  types.HexBytes `json:"communityId"`
-	CategoryID   string         `json:"cattegoryId"`
+	CategoryID   string         `json:"categoryId"`
 	CategoryName string         `json:"categoryName"`
 	ChatIDs      []string       `json:"chatIds"`
 }
