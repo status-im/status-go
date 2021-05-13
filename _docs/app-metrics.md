@@ -77,7 +77,7 @@ The interesting bit is the validation process, which serves two purposes:
 2. acts as an audit layer: anyone who wishes to check the kind of data being captured, can do so by auditing just one file: https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go
 
 ### Transmission and deletion
-Transmission happens over Waku, and as of now, all data will be deleted locally after transmission, however (in future) we might want to keep a copy of the data locally.
+Transmission happens over Waku, and as of now, all data is deleted locally after transmission, however (in the future) we might want to keep a copy of the data locally. If a batch is not transmitted within 7 days, data is deleted locally.
 
 
 ## Events
