@@ -5,7 +5,7 @@ _______
 
 _______
 
-Starting release 1.14, the Status mobile app asks to share privacy-preserving, end-to-end encrypted data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared over Status' peer-to-peer network (Waku), just like a 1:1 message.
+Starting release 1.14, the Status mobile app asks to share data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared over Status' peer-to-peer network (Waku), just like a 1:1 message.
 
 Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
 
@@ -27,7 +27,7 @@ In detail this means the app can collect and share:
 - Time since last batch sent
 
 For any data to be collected and shared, it needs to meet the rules set in the validator script. By policy of Status' Core Contributors, rules set in the validator script need to be assessed as posing a non-existent to low threat by being in:
-- local storage over time **(Specify what worst case can be and when this occurs)**
+- local storage over time
 - aggregated storage from Status over time
 
 ### What will never be shared
