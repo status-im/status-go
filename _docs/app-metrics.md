@@ -58,7 +58,7 @@ As of writing, we plan to make a Dashboard that shows the aggregated data public
 _________
 
 # How it works
-`appmetrics` is a way to capture and transfer app usage data, anonymously over Waku to a Status managed key.
+`appmetrics` is a way to capture and transfer app usage data, end-to-end encrypted over Waku to a Status managed key.
 
 
 ## History
