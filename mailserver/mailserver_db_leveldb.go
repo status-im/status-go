@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	waku "github.com/status-im/status-go/waku/common"
 )
 
 type LevelDB struct {
@@ -201,7 +201,7 @@ func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	}
 	archivedEnvelopesGauge.WithLabelValues(db.name).Inc()
 	archivedEnvelopeSizeMeter.WithLabelValues(db.name).Observe(
-		float64(whisper.EnvelopeHeaderLength + env.Size()))
+		float64(waku.EnvelopeHeaderLength + env.Size()))
 	return err
 }
 

@@ -13,7 +13,6 @@ import (
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	"github.com/status-im/status-go/whisper"
 )
 
 type gethNodeWrapper struct {
@@ -30,29 +29,6 @@ func (w *gethNodeWrapper) Poll() {
 
 func (w *gethNodeWrapper) NewENSVerifier(logger *zap.Logger) enstypes.ENSVerifier {
 	return gethens.NewVerifier(logger)
-}
-
-func (w *gethNodeWrapper) GetWhisper(ctx interface{}) (types.Whisper, error) {
-	var nativeWhisper *whisper.Whisper
-	if ctx == nil || ctx == w {
-		err := w.stack.Service(&nativeWhisper)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		switch serviceProvider := ctx.(type) {
-		case *node.ServiceContext:
-			err := serviceProvider.Service(&nativeWhisper)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	if nativeWhisper == nil {
-		return nil, errors.New("whisper service is not available")
-	}
-
-	return NewGethWhisperWrapper(nativeWhisper), nil
 }
 
 func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {

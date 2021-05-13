@@ -41,8 +41,8 @@ func (r MessagesRequestPayload) Validate() error {
 	if r.Upper < r.Lower {
 		return errors.New("query range is invalid: lower > upper")
 	}
-	if len(r.Bloom) == 0 {
-		return errors.New("bloom filter is empty")
+	if len(r.Bloom) == 0 && len(r.Topics) == 0 {
+		return errors.New("bloom filter and topics is empty")
 	}
 	if r.Limit > maxMessagesRequestPayloadLimit {
 		return errors.New("limit exceeds the maximum allowed value")

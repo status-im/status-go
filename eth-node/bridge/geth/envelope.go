@@ -6,57 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
 	waku "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper"
 )
-
-type whisperEnvelope struct {
-	env *whisper.Envelope
-}
-
-// NewWhisperEnvelope returns an object that wraps Geth's Whisper Envelope in a types interface.
-func NewWhisperEnvelope(e *whisper.Envelope) types.Envelope {
-	return &whisperEnvelope{env: e}
-}
-
-func (w *whisperEnvelope) Unwrap() interface{} {
-	return w.env
-}
-
-func (w *whisperEnvelope) Hash() types.Hash {
-	return types.Hash(w.env.Hash())
-}
-
-func (w *whisperEnvelope) Bloom() []byte {
-	return w.env.Bloom()
-}
-
-func (w *whisperEnvelope) PoW() float64 {
-	return w.env.PoW()
-}
-
-func (w *whisperEnvelope) Expiry() uint32 {
-	return w.env.Expiry
-}
-
-func (w *whisperEnvelope) TTL() uint32 {
-	return w.env.TTL
-}
-
-func (w *whisperEnvelope) Topic() types.TopicType {
-	return types.TopicType(w.env.Topic)
-}
-
-func (w *whisperEnvelope) Size() int {
-	return len(w.env.Data)
-}
-
-func (w *whisperEnvelope) DecodeRLP(s *rlp.Stream) error {
-	return w.env.DecodeRLP(s)
-}
-
-func (w *whisperEnvelope) EncodeRLP(writer io.Writer) error {
-	return rlp.Encode(writer, w.env)
-}
 
 type wakuEnvelope struct {
 	env *waku.Envelope
