@@ -523,7 +523,6 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	conf.WakuConfig.Enabled = true
-	conf.WhisperConfig.Enabled = false
 
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.

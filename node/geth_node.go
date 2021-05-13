@@ -33,19 +33,16 @@ import (
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper"
 )
 
 // Errors related to node and services creation.
 var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
-	ErrWhisperServiceRegistrationFailure          = errors.New("failed to register the Whisper service")
 	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
@@ -141,11 +138,6 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 	// start Waku service
 	if err := activateWakuService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWakuServiceRegistrationFailure, err)
-	}
-
-	// start status service.
-	if err := activateStatusService(stack, config); err != nil {
-		return fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
 	}
 
 	// start peer service
@@ -281,34 +273,11 @@ func activatePersonalService(stack *node.Node, accs *accounts.Manager, config *p
 	})
 }
 
-func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
-	if !config.EnableStatusService {
-		logger.Info("Status service api is disabled")
-		return nil
-	}
-
-	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var service *nodebridge.WhisperService
-		if err := ctx.Service(&service); err != nil {
-			return nil, err
-		}
-		svc := status.New(service.Whisper)
-		return svc, nil
-	})
-}
-
 func activatePeerService(stack *node.Node) error {
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		svc := peer.New()
 		return svc, nil
 	})
-}
-
-func registerWhisperMailServer(whisperService *whisper.Whisper, config *params.WhisperConfig) (err error) {
-	var mailServer mailserver.WhisperMailServer
-	whisperService.RegisterMailServer(&mailServer)
-
-	return mailServer.Init(whisperService, config)
 }
 
 func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (err error) {
@@ -356,47 +325,6 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 		}
 		return wakuext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
 	})
-}
-
-func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) (*whisper.Whisper, error) {
-	whisperServiceConfig := &whisper.Config{
-		MaxMessageSize:     whisper.DefaultMaxMessageSize,
-		MinimumAcceptedPOW: params.WhisperMinimumPoW,
-	}
-
-	if whisperConfig.MaxMessageSize > 0 {
-		whisperServiceConfig.MaxMessageSize = whisperConfig.MaxMessageSize
-	}
-	if whisperConfig.MinimumPoW > 0 {
-		whisperServiceConfig.MinimumAcceptedPOW = whisperConfig.MinimumPoW
-	}
-
-	whisperService := whisper.New(whisperServiceConfig)
-
-	if whisperConfig.EnableRateLimiter {
-		r := whisperRateLimiter(whisperConfig, clusterConfig)
-		whisperService.SetRateLimiter(r)
-	}
-
-	if timesource, err := timeSource(ctx); err == nil {
-		whisperService.SetTimeSource(timesource)
-	}
-
-	// enable mail service
-	if whisperConfig.EnableMailServer {
-		if err := registerWhisperMailServer(whisperService, whisperConfig); err != nil {
-			return nil, fmt.Errorf("failed to register MailServer: %v", err)
-		}
-	}
-
-	if whisperConfig.LightClient {
-		emptyBloomFilter := make([]byte, 64)
-		if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
-			return nil, err
-		}
-	}
-
-	return whisperService, nil
 }
 
 func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
@@ -491,33 +419,6 @@ func timeSource(ctx *node.ServiceContext) (func() time.Time, error) {
 	return timeSource.Now, nil
 }
 
-func whisperRateLimiter(whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) *whisper.PeerRateLimiter {
-	enodes := append(
-		parseNodes(clusterConfig.StaticNodes),
-		parseNodes(clusterConfig.TrustedMailServers)...,
-	)
-	var (
-		ips     []string
-		peerIDs []enode.ID
-	)
-	for _, item := range enodes {
-		ips = append(ips, item.IP().String())
-		peerIDs = append(peerIDs, item.ID())
-	}
-	return whisper.NewPeerRateLimiter(
-		&whisper.PeerRateLimiterConfig{
-			LimitPerSecIP:      whisperConfig.RateLimitIP,
-			LimitPerSecPeerID:  whisperConfig.RateLimitPeerID,
-			WhitelistedIPs:     ips,
-			WhitelistedPeerIDs: peerIDs,
-		},
-		&whisper.MetricsRateLimiterHandler{},
-		&whisper.DropPeerRateLimiterHandler{
-			Tolerance: whisperConfig.RateLimitTolerance,
-		},
-	)
-}
-
 func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
 	enodes := append(
 		parseNodes(clusterCfg.StaticNodes),
@@ -540,8 +441,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 			WhitelistedIPs:          ips,
 			WhitelistedPeerIDs:      peerIDs,
 		},
-		&whisper.MetricsRateLimiterHandler{},
-		&whisper.DropPeerRateLimiterHandler{
+		&wakucommon.MetricsRateLimiterHandler{},
+		&wakucommon.DropPeerRateLimiterHandler{
 			Tolerance: wakuCfg.RateLimitTolerance,
 		},
 	)

@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper"
 )
 
 // ----------
@@ -64,75 +63,6 @@ type PGConfig struct {
 	Enabled bool
 	// The URI of the server
 	URI string
-}
-
-// ----------
-// WhisperConfig
-// ----------
-
-// WhisperConfig holds SHH-related configuration
-type WhisperConfig struct {
-	// Enabled flag specifies whether protocol is enabled
-	Enabled bool
-
-	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
-	LightClient bool
-
-	// EnableMailServer is mode when node is capable of delivering expired messages on demand
-	EnableMailServer bool
-
-	// DataDir is the file system folder Whisper should use for any data storage needs.
-	// For instance, MailServer will use this directory to store its data.
-	DataDir string
-
-	// MinimumPoW minimum PoW for Whisper messages
-	// We enforce a minimum as a bland spam prevention mechanism.
-	MinimumPoW float64
-
-	// MailServerPassword for symmetric encryption of whisper message history requests.
-	// (if no account file selected, then this password is used for symmetric encryption).
-	MailServerPassword string
-
-	// MailServerAsymKey is an hex-encoded asymmetric key to decrypt messages sent to MailServer.
-	MailServerAsymKey string
-
-	// MailServerRateLimit minimum time between queries to mail server per peer.
-	MailServerRateLimit int
-
-	// MailServerDataRetention is a number of days data should be stored by MailServer.
-	MailServerDataRetention int
-
-	// TTL time to live for messages, in seconds
-	TTL int
-
-	// MaxMessageSize is a maximum size of a devp2p packet handled by the Whisper protocol,
-	// not only the size of envelopes sent in that packet.
-	MaxMessageSize uint32
-
-	// DatabaseConfig is configuration for which datastore we use
-	DatabaseConfig DatabaseConfig
-
-	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
-	EnableRateLimiter bool
-
-	// RateLimitIP sets the limit on the number of messages per second
-	// from a given IP.
-	RateLimitIP int64
-
-	// RateLimitPeerID sets the limit on the number of messages per second
-	// from a given peer ID.
-	RateLimitPeerID int64
-
-	// RateLimitTolerance is a number of how many a limit must be exceeded
-	// in order to drop a peer.
-	// If equal to 0, the peers are never dropped.
-	RateLimitTolerance int64
-}
-
-// String dumps config object as nicely indented JSON
-func (c *WhisperConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
-	return string(data)
 }
 
 // ----------
@@ -424,9 +354,6 @@ type NodeConfig struct {
 	// LightEthConfig extra configuration for LES
 	LightEthConfig LightEthConfig `json:"LightEthConfig," validate:"structonly"`
 
-	// WhisperConfig extra configuration for SHH
-	WhisperConfig WhisperConfig `json:"WhisperConfig," validate:"structonly"`
-
 	// WakuConfig provides a configuration for Waku subprotocol.
 	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
 
@@ -684,10 +611,6 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.WakuConfig.MinimumPoW = WakuMinimumPoW
 	}
 
-	if c.WhisperConfig.Enabled {
-		c.WhisperConfig.MinimumPoW = WhisperMinimumPoW
-	}
-
 	return c.setDefaultPushNotificationsServers()
 }
 
@@ -721,10 +644,6 @@ func (c *NodeConfig) updatePeerLimits() {
 	if c.NoDiscovery && !c.Rendezvous {
 		return
 	}
-	if c.WhisperConfig.Enabled {
-		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
-		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
-	}
 	if c.LightEthConfig.Enabled {
 		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
 	}
@@ -733,11 +652,10 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, wnodeDir, wakuDir string
+	var keyStoreDir, wakuDir string
 
 	if dataDir != "" {
 		keyStoreDir = filepath.Join(dataDir, "keystore")
-		wnodeDir = filepath.Join(dataDir, "wnode")
 		wakuDir = filepath.Join(dataDir, "waku")
 	}
 
@@ -770,12 +688,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			MinimumPoW:     WakuMinimumPoW,
 			TTL:            WakuTTL,
 			MaxMessageSize: wakucommon.DefaultMaxMessageSize,
-		},
-		WhisperConfig: WhisperConfig{
-			DataDir:        wnodeDir,
-			MinimumPoW:     WhisperMinimumPoW,
-			TTL:            WhisperTTL,
-			MaxMessageSize: whisper.DefaultMaxMessageSize,
 		},
 		ShhextConfig: ShhextConfig{
 			BackupDisabledDataDir: dataDir,
@@ -874,18 +786,6 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.WhisperConfig.Enabled && c.WakuConfig.Enabled && c.WhisperConfig.DataDir == c.WakuConfig.DataDir {
-		return fmt.Errorf("both Whisper and Waku are enabled and use the same data dir")
-	}
-
-	// Whisper's data directory must be relative to the main data directory
-	// if EnableMailServer is true.
-	if c.WhisperConfig.Enabled && c.WhisperConfig.EnableMailServer {
-		if !strings.HasPrefix(c.WhisperConfig.DataDir, c.DataDir) {
-			return fmt.Errorf("WhisperConfig.DataDir must start with DataDir fragment")
-		}
-	}
-
 	// Waku's data directory must be relative to the main data directory
 	// if EnableMailServer is true.
 	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
@@ -920,9 +820,6 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 		return err
 	}
 	if err := c.LightEthConfig.Validate(validate); err != nil {
-		return err
-	}
-	if err := c.WhisperConfig.Validate(validate); err != nil {
 		return err
 	}
 	if err := c.SwarmConfig.Validate(validate); err != nil {
@@ -972,34 +869,6 @@ func (c *LightEthConfig) Validate(validate *validator.Validate) error {
 
 	if err := validate.Struct(c); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// Validate validates the WhisperConfig struct and returns an error if inconsistent values are found
-func (c *WhisperConfig) Validate(validate *validator.Validate) error {
-	if !c.Enabled {
-		return nil
-	}
-
-	if err := validate.Struct(c); err != nil {
-		return err
-	}
-
-	if c.EnableMailServer {
-		if c.DataDir == "" {
-			return fmt.Errorf("WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true")
-		}
-
-		if c.MailServerPassword == "" && c.MailServerAsymKey == "" {
-			return fmt.Errorf("WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true")
-		}
-		if c.MailServerAsymKey != "" {
-			if _, err := crypto.HexToECDSA(c.MailServerAsymKey); err != nil {
-				return fmt.Errorf("WhisperConfig.MailServerAsymKey is invalid: %s", c.MailServerAsymKey)
-			}
-		}
 	}
 
 	return nil

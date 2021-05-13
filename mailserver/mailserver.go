@@ -18,11 +18,9 @@ package mailserver
 
 import (
 	"crypto/ecdsa"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"sync"
 	"time"
 
@@ -37,7 +35,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper"
 )
 
 const (
@@ -75,253 +72,6 @@ type Config struct {
 	DataRetention   int
 	PostgresEnabled bool
 	PostgresURI     string
-}
-
-// -----------------
-// WhisperMailServer
-// -----------------
-
-type WhisperMailServer struct {
-	ms            *mailServer
-	shh           *whisper.Whisper
-	minRequestPoW float64
-
-	symFilter  *whisper.Filter
-	asymFilter *whisper.Filter
-}
-
-func (s *WhisperMailServer) Init(shh *whisper.Whisper, cfg *params.WhisperConfig) error {
-	s.shh = shh
-	s.minRequestPoW = cfg.MinimumPoW
-
-	config := Config{
-		DataDir:         cfg.DataDir,
-		Password:        cfg.MailServerPassword,
-		AsymKey:         cfg.MailServerAsymKey,
-		MinimumPoW:      cfg.MinimumPoW,
-		DataRetention:   cfg.MailServerDataRetention,
-		RateLimit:       cfg.MailServerRateLimit,
-		PostgresEnabled: cfg.DatabaseConfig.PGConfig.Enabled,
-		PostgresURI:     cfg.DatabaseConfig.PGConfig.URI,
-	}
-	var err error
-	s.ms, err = newMailServer(
-		config,
-		&whisperAdapter{},
-		&whisperService{Whisper: shh},
-	)
-	if err != nil {
-		return err
-	}
-
-	if err := s.setupDecryptor(config.Password, config.AsymKey); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *WhisperMailServer) Close() {
-	if s.ms != nil {
-		s.ms.Close()
-	}
-}
-
-func (s *WhisperMailServer) Archive(env *whisper.Envelope) {
-	s.ms.Archive(gethbridge.NewWhisperEnvelope(env))
-}
-
-// DEPRECATED; user Deliver instead
-func (s *WhisperMailServer) DeliverMail(peerID []byte, req *whisper.Envelope) {
-	payload, err := s.decodeRequest(peerID, req)
-	if err != nil {
-		log.Debug(
-			"[mailserver:DeliverMail] failed to decode request",
-			"err", err,
-			"peerID", types.BytesToHash(peerID),
-			"requestID", req.Hash().String(),
-		)
-		payload, err = s.decompositeRequest(peerID, req)
-	}
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("validation").Inc()
-		log.Error(
-			"[mailserver:DeliverMail] request failed validaton",
-			"peerID", types.BytesToHash(peerID),
-			"requestID", req.Hash().String(),
-			"err", err,
-		)
-		s.ms.sendHistoricMessageErrorResponse(types.BytesToHash(peerID), types.Hash(req.Hash()), err)
-		return
-	}
-
-	s.ms.DeliverMail(types.BytesToHash(peerID), types.Hash(req.Hash()), payload)
-}
-
-func (s *WhisperMailServer) Deliver(peerID []byte, req whisper.MessagesRequest) {
-	s.ms.DeliverMail(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
-		Lower:  req.From,
-		Upper:  req.To,
-		Bloom:  req.Bloom,
-		Limit:  req.Limit,
-		Cursor: req.Cursor,
-		Batch:  true,
-	})
-}
-
-func (s *WhisperMailServer) SyncMail(peerID []byte, req whisper.SyncMailRequest) error {
-	return s.ms.SyncMail(types.BytesToHash(peerID), MessagesRequestPayload{
-		Lower:  req.Lower,
-		Upper:  req.Upper,
-		Bloom:  req.Bloom,
-		Limit:  req.Limit,
-		Cursor: req.Cursor,
-	})
-}
-
-func (s *WhisperMailServer) setupDecryptor(password, asymKey string) error {
-	s.symFilter = nil
-	s.asymFilter = nil
-
-	if password != "" {
-		keyID, err := s.shh.AddSymKeyFromPassword(password)
-		if err != nil {
-			return fmt.Errorf("create symmetric key: %v", err)
-		}
-
-		symKey, err := s.shh.GetSymKey(keyID)
-		if err != nil {
-			return fmt.Errorf("save symmetric key: %v", err)
-		}
-
-		s.symFilter = &whisper.Filter{KeySym: symKey}
-	}
-
-	if asymKey != "" {
-		keyAsym, err := crypto.HexToECDSA(asymKey)
-		if err != nil {
-			return err
-		}
-		s.asymFilter = &whisper.Filter{KeyAsym: keyAsym}
-	}
-
-	return nil
-}
-
-func (s *WhisperMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
-	var payload MessagesRequestPayload
-
-	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
-		return payload, errors.New("PoW too low")
-	}
-
-	decrypted := s.openEnvelope(request)
-	if decrypted == nil {
-		log.Warn("Failed to decrypt p2p request")
-		return payload, errors.New("failed to decrypt p2p request")
-	}
-
-	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
-		log.Warn("Check message signature failed", "err", err.Error())
-		return payload, fmt.Errorf("check message signature failed: %v", err)
-	}
-
-	if err := rlp.DecodeBytes(decrypted.Payload, &payload); err != nil {
-		return payload, fmt.Errorf("failed to decode data: %v", err)
-	}
-
-	if payload.Upper == 0 {
-		payload.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
-	}
-
-	if payload.Upper < payload.Lower {
-		log.Error("Query range is invalid: lower > upper", "lower", payload.Lower, "upper", payload.Upper)
-		return payload, errors.New("query range is invalid: lower > upper")
-	}
-
-	return payload, nil
-}
-
-// openEnvelope tries to decrypt an envelope, first based on asymmetric key (if
-// provided) and second on the symmetric key (if provided)
-func (s *WhisperMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedMessage {
-	if s.asymFilter != nil {
-		if d := request.Open(s.asymFilter); d != nil {
-			return d
-		}
-	}
-	if s.symFilter != nil {
-		if d := request.Open(s.symFilter); d != nil {
-			return d
-		}
-	}
-	return nil
-}
-
-func (s *WhisperMailServer) decompositeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
-	var (
-		payload MessagesRequestPayload
-		err     error
-	)
-
-	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
-		return payload, fmt.Errorf("PoW() is too low")
-	}
-
-	decrypted := s.openEnvelope(request)
-	if decrypted == nil {
-		return payload, fmt.Errorf("failed to decrypt p2p request")
-	}
-
-	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
-		return payload, err
-	}
-
-	payload.Bloom, err = s.bloomFromReceivedMessage(decrypted)
-	if err != nil {
-		return payload, err
-	}
-
-	payload.Lower = binary.BigEndian.Uint32(decrypted.Payload[:4])
-	payload.Upper = binary.BigEndian.Uint32(decrypted.Payload[4:8])
-
-	if payload.Upper < payload.Lower {
-		err := fmt.Errorf("query range is invalid: from > to (%d > %d)", payload.Lower, payload.Upper)
-		return payload, err
-	}
-
-	lowerTime := time.Unix(int64(payload.Lower), 0)
-	upperTime := time.Unix(int64(payload.Upper), 0)
-	if upperTime.Sub(lowerTime) > maxQueryRange {
-		err := fmt.Errorf("query range too big for peer %s", string(peerID))
-		return payload, err
-	}
-
-	if len(decrypted.Payload) >= requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength {
-		payload.Limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize:])
-	}
-
-	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+DBKeyLength {
-		payload.Cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
-	}
-
-	return payload, nil
-}
-
-// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
-// used bloom filter.
-func (s *WhisperMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
-	payloadSize := len(msg.Payload)
-
-	if payloadSize < 8 {
-		return nil, errors.New("Undersized p2p request")
-	} else if payloadSize == 8 {
-		return whisper.MakeFullNodeBloom(), nil
-	} else if payloadSize < 8+whisper.BloomFilterSize {
-		return nil, errors.New("Undersized bloom filter in p2p request")
-	}
-
-	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
 }
 
 // --------------
@@ -495,44 +245,6 @@ type adapter interface {
 	CreateRawSyncResponse(envelopes []rlp.RawValue, cursor []byte, final bool, err string) interface{}
 }
 
-// --------------
-// whisperAdapter
-// --------------
-
-type whisperAdapter struct{}
-
-var _ adapter = (*whisperAdapter)(nil)
-
-func (whisperAdapter) CreateRequestFailedPayload(reqID types.Hash, err error) []byte {
-	return whisper.CreateMailServerRequestFailedPayload(common.Hash(reqID), err)
-}
-
-func (whisperAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte {
-	return whisper.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
-}
-
-func (whisperAdapter) CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{} {
-	whisperEnvelopes := make([]*whisper.Envelope, len(envelopes))
-	for i, env := range envelopes {
-		whisperEnvelopes[i] = env.Unwrap().(*whisper.Envelope)
-	}
-	return whisper.SyncResponse{
-		Envelopes: whisperEnvelopes,
-		Cursor:    cursor,
-		Final:     final,
-		Error:     err,
-	}
-}
-
-func (whisperAdapter) CreateRawSyncResponse(envelopes []rlp.RawValue, cursor []byte, final bool, err string) interface{} {
-	return whisper.RawSyncResponse{
-		Envelopes: envelopes,
-		Cursor:    cursor,
-		Final:     final,
-		Error:     err,
-	}
-}
-
 // -----------
 // wakuAdapter
 // -----------
@@ -567,30 +279,6 @@ type service interface {
 	MaxMessageSize() uint32
 	SendRawSyncResponse(peerID []byte, data interface{}) error // optional
 	SendSyncResponse(peerID []byte, data interface{}) error    // optional
-}
-
-// --------------
-// whisperService
-// --------------
-
-type whisperService struct {
-	*whisper.Whisper
-}
-
-func (s *whisperService) SendRawSyncResponse(peerID []byte, data interface{}) error {
-	resp, ok := data.(whisper.RawSyncResponse)
-	if !ok {
-		panic(fmt.Sprintf("invalid data type, got %s", reflect.TypeOf(data)))
-	}
-	return s.Whisper.SendRawSyncResponse(peerID, resp)
-}
-
-func (s *whisperService) SendSyncResponse(peerID []byte, data interface{}) error {
-	resp, ok := data.(whisper.SyncResponse)
-	if !ok {
-		panic(fmt.Sprintf("invalid data type, got %s", reflect.TypeOf(data)))
-	}
-	return s.Whisper.SendSyncResponse(peerID, resp)
 }
 
 // -----------
@@ -1149,7 +837,7 @@ func (s *mailServer) sendHistoricMessageErrorResponse(peerID, reqID types.Hash, 
 }
 
 func extractBloomFromEncodedEnvelope(rawValue rlp.RawValue) ([]byte, error) {
-	var envelope whisper.Envelope
+	var envelope wakucommon.Envelope
 	decodeErr := rlp.DecodeBytes(rawValue, &envelope)
 	if decodeErr != nil {
 		return nil, decodeErr
