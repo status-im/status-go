@@ -167,6 +167,7 @@ func (w *gethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesReq
 		Limit:  r.Limit,
 		Cursor: r.Cursor,
 		Bloom:  r.Bloom,
+		Topics: r.Topics,
 	})
 }
 
