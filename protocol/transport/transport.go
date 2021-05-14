@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
-	"math/big"
 	"sync"
 	"time"
 
@@ -475,8 +474,8 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicT
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
 	var topicBytes [][]byte
-	for _, t := range topics {
-		topicBytes = append(topicBytes, t[:])
+	for idx := range topics {
+		topicBytes = append(topicBytes, topics[idx][:])
 	}
 	return types.MessagesRequest{
 		ID:     id,
@@ -486,20 +485,6 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicT
 		Cursor: cursor,
 		Topics: topicBytes,
 	}
-}
-
-func topicsToBloom(topics ...types.TopicType) []byte {
-	i := new(big.Int)
-	for _, topic := range topics {
-		bloom := types.TopicToBloom(topic)
-		i.Or(i, new(big.Int).SetBytes(bloom[:]))
-	}
-
-	combined := make([]byte, types.BloomFilterSize)
-	data := i.Bytes()
-	copy(combined[types.BloomFilterSize-len(data):], data[:])
-
-	return combined
 }
 
 func (t *Transport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {

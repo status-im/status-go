@@ -17,7 +17,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/require"
 
@@ -90,7 +90,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 func TestStatusNodeServiceGetters(t *testing.T) {
 	config := params.NodeConfig{
 		EnableNTPSync: true,
-		WhisperConfig: params.WhisperConfig{
+		WakuConfig: params.WakuConfig{
 			Enabled: true,
 		},
 		LightEthConfig: params.LightEthConfig{
@@ -110,9 +110,9 @@ func TestStatusNodeServiceGetters(t *testing.T) {
 	}{
 		{
 			getter: func() (interface{}, error) {
-				return n.WhisperService()
+				return n.WakuService()
 			},
-			typ: reflect.TypeOf(&whisper.Whisper{}),
+			typ: reflect.TypeOf(&waku.Waku{}),
 		},
 		{
 			getter: func() (interface{}, error) {

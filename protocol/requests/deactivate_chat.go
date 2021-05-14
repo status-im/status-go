@@ -7,7 +7,7 @@ import (
 var ErrDeactivateChatInvalidID = errors.New("deactivate-chat: invalid id")
 
 type DeactivateChat struct {
-	ID string
+	ID string `json:"id"`
 }
 
 func (j *DeactivateChat) Validate() error {

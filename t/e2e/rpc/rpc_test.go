@@ -63,13 +63,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 		}
 		var rpcCalls = []rpcCall{
 			{
-				`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
-				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"6.0"}`
-					s.Equal(expected, resultJSON)
-				},
-			},
-			{
 				`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
 				func(resultJSON string) {
 					expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
@@ -123,22 +116,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 		s.NoError(s.StatusNode.Stop())
 	}
-}
-
-// TestCallRawResult checks if returned response is a valid JSON-RPC response.
-func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
-	s.NoError(err)
-
-	s.NoError(s.StatusNode.Start(nodeConfig, nil))
-
-	client := s.StatusNode.RPCPrivateClient()
-	s.NotNil(client)
-
-	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
-	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
-
-	s.NoError(s.StatusNode.Stop())
 }
 
 // TestCallRawResultGetTransactionReceipt checks if returned response

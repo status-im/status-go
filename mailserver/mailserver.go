@@ -18,6 +18,7 @@ package mailserver
 
 import (
 	"crypto/ecdsa"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -153,6 +154,72 @@ func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
 	}
 
 	s.ms.DeliverMail(types.BytesToHash(peerID), types.Hash(req.Hash()), payload)
+}
+
+// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
+// used bloom filter.
+func (s *WakuMailServer) bloomFromReceivedMessage(msg *wakucommon.ReceivedMessage) ([]byte, error) {
+	payloadSize := len(msg.Payload)
+
+	if payloadSize < 8 {
+		return nil, errors.New("Undersized p2p request")
+	} else if payloadSize == 8 {
+		return wakucommon.MakeFullNodeBloom(), nil
+	} else if payloadSize < 8+wakucommon.BloomFilterSize {
+		return nil, errors.New("Undersized bloom filter in p2p request")
+	}
+
+	return msg.Payload[8 : 8+wakucommon.BloomFilterSize], nil
+}
+
+func (s *WakuMailServer) decompositeRequest(peerID []byte, request *wakucommon.Envelope) (MessagesRequestPayload, error) {
+	var (
+		payload MessagesRequestPayload
+		err     error
+	)
+
+	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
+		return payload, fmt.Errorf("PoW() is too low")
+	}
+
+	decrypted := s.openEnvelope(request)
+	if decrypted == nil {
+		return payload, fmt.Errorf("failed to decrypt p2p request")
+	}
+
+	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
+		return payload, err
+	}
+
+	payload.Bloom, err = s.bloomFromReceivedMessage(decrypted)
+	if err != nil {
+		return payload, err
+	}
+
+	payload.Lower = binary.BigEndian.Uint32(decrypted.Payload[:4])
+	payload.Upper = binary.BigEndian.Uint32(decrypted.Payload[4:8])
+
+	if payload.Upper < payload.Lower {
+		err := fmt.Errorf("query range is invalid: from > to (%d > %d)", payload.Lower, payload.Upper)
+		return payload, err
+	}
+
+	lowerTime := time.Unix(int64(payload.Lower), 0)
+	upperTime := time.Unix(int64(payload.Upper), 0)
+	if upperTime.Sub(lowerTime) > maxQueryRange {
+		err := fmt.Errorf("query range too big for peer %s", string(peerID))
+		return payload, err
+	}
+
+	if len(decrypted.Payload) >= requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength {
+		payload.Limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+wakucommon.BloomFilterSize:])
+	}
+
+	if len(decrypted.Payload) == requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength+DBKeyLength {
+		payload.Cursor = decrypted.Payload[requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength:]
+	}
+
+	return payload, nil
 }
 
 func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {

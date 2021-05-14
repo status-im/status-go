@@ -302,8 +302,6 @@ github.com/mat/besticon/ico
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.10
 github.com/mattn/go-isatty
-# github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
-github.com/mattn/go-pointer
 # github.com/mattn/go-runewidth v0.0.6
 github.com/mattn/go-runewidth
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -408,11 +406,8 @@ github.com/status-im/tcp-shaker
 github.com/steakknife/bloomfilter
 # github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3
 github.com/steakknife/hamming
-# github.com/stretchr/objx v0.1.1
-github.com/stretchr/objx
 # github.com/stretchr/testify v1.5.1
 github.com/stretchr/testify/assert
-github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
 # github.com/syndtr/goleveldb v1.0.0
@@ -528,8 +523,6 @@ golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/publicsuffix
-# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-golang.org/x/sync/syncmap
 # golang.org/x/sys v0.0.0-20200122134326-e047566fdf82
 golang.org/x/sys/cpu
 golang.org/x/sys/unix

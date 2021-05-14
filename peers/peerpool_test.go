@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/whisper"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -62,7 +61,6 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	s.discovery = make([]discovery.Discovery, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()
-		whisper := whisper.New(nil)
 		peer := &p2p.Server{
 			Config: p2p.Config{
 				MaxPeers:         10,
@@ -71,7 +69,6 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 				PrivateKey:       key,
 				NoDiscovery:      true,
 				BootstrapNodesV5: []*discv5.Node{bootnodeV5},
-				Protocols:        whisper.Protocols(),
 			},
 		}
 		s.NoError(peer.Start())

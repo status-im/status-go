@@ -161,7 +161,18 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 		return nil, err
 	}
 
-	m.scheduleSyncFilters(filters)
+	willSync, err := m.scheduleSyncFilters(filters)
+	if err != nil {
+		return nil, err
+	}
+
+	if !willSync {
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		for idx := range chats {
+			chats[idx].SyncedTo = timestamp
+			chats[idx].SyncedFrom = timestamp
+		}
+	}
 
 	response.AddCommunity(community)
 
@@ -308,7 +319,10 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	if err != nil {
 		return nil, err
 	}
-	m.scheduleSyncFilters(filters)
+	_, err = m.scheduleSyncFilters(filters)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChats(chats)
 }

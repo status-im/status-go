@@ -80,10 +80,30 @@ func (s *MessengerMuteSuite) TestSetMute() {
 
 	s.Require().NoError(s.m.MuteChat(chatID))
 
-	s.Require().Len(s.m.Chats(), 1)
-	s.Require().True(s.m.Chats()[0].Muted)
+	allChats := s.m.Chats()
+	s.Require().Len(allChats, 3)
+
+	var actualChat *Chat
+
+	for idx := range allChats {
+		if chat.ID == allChats[idx].ID {
+			actualChat = allChats[idx]
+		}
+	}
+
+	s.Require().NotNil(actualChat)
+	s.Require().True(actualChat.Muted)
 
 	s.Require().NoError(s.m.UnmuteChat(chatID))
-	s.Require().False(s.m.Chats()[0].Muted)
+
+	allChats = s.m.Chats()
+
+	for idx := range allChats {
+		if chat.ID == allChats[idx].ID {
+			actualChat = allChats[idx]
+		}
+	}
+
+	s.Require().False(actualChat.Muted)
 	s.Require().NoError(theirMessenger.Shutdown())
 }

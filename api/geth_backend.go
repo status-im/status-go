@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -86,7 +87,7 @@ type GethStatusBackend struct {
 	account              *multiaccounts.Account
 	accountManager       *account.GethManager
 	transactor           *transactions.Transactor
-	connectionState      connectionState
+	connectionState      connection.State
 	appState             appState
 	selectedAccountKeyID string
 	log                  log.Logger
@@ -967,17 +968,21 @@ func (b *GethStatusBackend) ConnectionChange(typ string, expensive bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	state := connectionState{
-		Type:      newConnectionType(typ),
+	state := connection.State{
+		Type:      connection.NewConnectionType(typ),
 		Expensive: expensive,
 	}
-	if typ == none {
+	if typ == connection.None {
 		state.Offline = true
 	}
 
 	b.log.Info("Network state change", "old", b.connectionState, "new", state)
 
 	b.connectionState = state
+	err := b.statusNode.ConnectionChanged(state)
+	if err != nil {
+		b.log.Error("failed to notify of connection changed", "err", err)
+	}
 
 	// logic of handling state changes here
 	// restart node? force peers reconnect? etc
@@ -1187,6 +1192,9 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
+
+		// Set initial connection state
+		st.ConnectionChanged(b.connectionState)
 	}
 	return nil
 }

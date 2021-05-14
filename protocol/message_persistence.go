@@ -1369,7 +1369,7 @@ func (db sqlitePersistence) ClearHistory(chat *Chat, currentClockValue uint64) (
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
-	err = db.clearHistory(chat, currentClockValue, tx)
+	err = db.clearHistory(chat, currentClockValue, tx, false)
 
 	return
 }
@@ -1403,13 +1403,13 @@ func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64,
 		return err
 	}
 
-	return db.clearHistory(chat, currentClockValue, tx)
+	return db.clearHistory(chat, currentClockValue, tx, true)
 }
 
-func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx, deactivate bool) error {
 	// Set deleted at clock value if it's not a public chat so that
-	// old messages will be discarded
-	if !chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
+	// old messages will be discarded, or if it's a straight clear history
+	if !deactivate || (!chat.Public() && !chat.ProfileUpdates() && !chat.Timeline()) {
 		if chat.LastMessage != nil && chat.LastMessage.Clock != 0 {
 			chat.DeletedAtClockValue = chat.LastMessage.Clock
 		}

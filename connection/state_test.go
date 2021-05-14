@@ -1,56 +1,56 @@
-package api
+package connection
 
 import "testing"
 
 func TestConnectionType(t *testing.T) {
-	c := newConnectionType("wifi")
+	c := NewConnectionType("wifi")
 	if c != connectionWifi {
 		t.Fatalf("Wrong connection type: %v", c)
 	}
-	c = newConnectionType("cellular")
+	c = NewConnectionType("cellular")
 	if c != connectionCellular {
 		t.Fatalf("Wrong connection type: %v", c)
 	}
-	c = newConnectionType("bluetooth")
+	c = NewConnectionType("bluetooth")
 	if c != connectionUnknown {
 		t.Fatalf("Wrong connection type: %v", c)
 	}
 }
 
-func TestConnectionState(t *testing.T) {
+func TestState(t *testing.T) {
 	tests := []struct {
 		name     string
-		state    connectionState
+		state    State
 		expected string
 	}{
 		{
 			"zero value",
-			connectionState{},
+			State{},
 			"unknown",
 		},
 		{
 			"offline",
-			connectionState{Offline: true},
+			State{Offline: true},
 			"offline",
 		},
 		{
 			"wifi",
-			connectionState{Type: connectionWifi},
+			State{Type: connectionWifi},
 			"wifi",
 		},
 		{
 			"wifi tethered",
-			connectionState{Type: connectionWifi, Expensive: true},
+			State{Type: connectionWifi, Expensive: true},
 			"wifi (expensive)",
 		},
 		{
 			"unknown",
-			connectionState{Type: connectionUnknown},
+			State{Type: connectionUnknown},
 			"unknown",
 		},
 		{
 			"cellular",
-			connectionState{Type: connectionCellular},
+			State{Type: connectionCellular},
 			"cellular",
 		},
 	}

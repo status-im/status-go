@@ -9,7 +9,7 @@ import (
 var ErrAcceptRequestToJoinCommunityInvalidID = errors.New("accept-request-to-join-community: invalid id")
 
 type AcceptRequestToJoinCommunity struct {
-	ID types.HexBytes
+	ID types.HexBytes `json:"id"`
 }
 
 func (j *AcceptRequestToJoinCommunity) Validate() error {

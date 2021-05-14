@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/utils"
 )
@@ -31,11 +29,10 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, "/some/data/path/keystore", c.KeyStoreDir)
 	assert.Equal(t, true, c.EnableNTPSync)
 	// assert Whisper
-	assert.Equal(t, true, c.WhisperConfig.Enabled)
-	assert.Equal(t, "/some/data/path/wnode", c.WhisperConfig.DataDir)
+	assert.Equal(t, true, c.WakuConfig.Enabled)
+	assert.Equal(t, "/some/data/path/waku", c.WakuConfig.DataDir)
 	// assert MailServer
-	assert.Equal(t, true, c.WhisperConfig.EnableMailServer)
-	assert.NotEmpty(t, c.WhisperConfig.MailServerPassword)
+	assert.Equal(t, false, c.WakuConfig.EnableMailServer)
 	// assert cluster
 	assert.Equal(t, false, c.NoDiscovery)
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
@@ -45,9 +42,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert LES
 	assert.Equal(t, true, c.LightEthConfig.Enabled)
-	// assert peers limits
-	assert.Contains(t, c.RequireTopics, params.WhisperDiscv5Topic)
-	assert.Contains(t, c.RequireTopics, discv5.Topic(params.LesTopic(int(c.NetworkID))))
 	// assert other
 	assert.Equal(t, false, c.HTTPEnabled)
 	assert.Equal(t, false, c.IPCEnabled)
@@ -217,111 +211,13 @@ func TestNodeConfigValidate(t *testing.T) {
 			Error: "Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty",
 		},
 		{
-			Name: "Validate that WhisperConfig.DataDir is checked to not be empty if mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"MailserverPassword": "foo"
-				}
-			}`,
-			Error: "WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true",
-		},
-		{
-			Name: "Validate that WhisperConfig.DataDir is checked to not be empty if mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"DataDir": "/other/dir",
-					"MailserverPassword": "foo"
-				}
-			}`,
-			Error: "WhisperConfig.DataDir must start with DataDir fragment",
-		},
-		{
-			Name: "Validate that check for WhisperConfig.DataDir passes if it is not empty and mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"DataDir": "/some/dir",
-					"MailserverPassword": "foo"
-				}
-			}`,
-			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
-				require.Equal(t, "foo", config.WhisperConfig.MailServerPassword)
-			},
-		},
-		{
-			Name: "Validate that WhisperConfig.MailserverPassword and WhisperConfig.MailServerAsymKey are checked to not be empty if mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"DataDir": "/some/dir"
-				}
-			}`,
-			Error: "WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true",
-		},
-		{
-			Name: "Validate that WhisperConfig.MailServerAsymKey is checked to not be empty if mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"DataDir": "/some/dir",
-					"MailServerAsymKey": "06c365919f1fc8e13ff79a84f1dd14b7e45b869aa5fc0e34940481ee20d32f90"
-				}
-			}`,
-			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
-				require.Equal(t, "06c365919f1fc8e13ff79a84f1dd14b7e45b869aa5fc0e34940481ee20d32f90", config.WhisperConfig.MailServerAsymKey)
-			},
-		},
-		{
-			Name: "Validate that WhisperConfig.MailServerAsymKey is checked for validity",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"DataDir": "/foo",
-					"MailServerAsymKey": "bar"
-				}
-			}`,
-			Error: "WhisperConfig.MailServerAsymKey is invalid",
-		},
-		{
 			Name: "Validate that PFSEnabled & InstallationID are checked for validity",
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
-				"WhisperConfig": {
+				"WakuConfig": {
 					"Enabled": true,
 					"DataDir": "/foo"
 				},

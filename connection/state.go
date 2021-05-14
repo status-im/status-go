@@ -1,14 +1,14 @@
-package api
+package connection
 
 import (
 	"fmt"
 )
 
-// connectionState represents device connection state and type,
+// State represents device connection state and type,
 // as reported by mobile framework.
 //
 // Zero value represents default assumption about network (online and unknown type).
-type connectionState struct {
+type State struct {
 	Offline   bool           `json:"offline"`
 	Type      connectionType `json:"type"`
 	Expensive bool           `json:"expensive"`
@@ -22,19 +22,19 @@ type connectionState struct {
 type connectionType byte
 
 const (
-	offline  = "offline"
-	wifi     = "wifi"
-	cellular = "cellular"
-	unknown  = "unknown"
-	none     = "none"
+	Offline  = "offline"
+	Wifi     = "wifi"
+	Cellular = "cellular"
+	Unknown  = "unknown"
+	None     = "none"
 )
 
-// newConnectionType creates new connectionType from string.
-func newConnectionType(s string) connectionType {
+// NewConnectionType creates new connectionType from string.
+func NewConnectionType(s string) connectionType {
 	switch s {
-	case cellular:
+	case Cellular:
 		return connectionCellular
-	case wifi:
+	case Wifi:
 		return connectionWifi
 	}
 
@@ -48,20 +48,24 @@ const (
 	connectionWifi                    // WIFI or iOS simulator
 )
 
+func (c State) IsExpensive() bool {
+	return c.Expensive || c.Type == connectionCellular
+}
+
 // string formats ConnectionState for logs. Implements Stringer.
-func (c connectionState) String() string {
+func (c State) String() string {
 	if c.Offline {
-		return offline
+		return Offline
 	}
 
 	var typ string
 	switch c.Type {
 	case connectionWifi:
-		typ = wifi
+		typ = Wifi
 	case connectionCellular:
-		typ = cellular
+		typ = Cellular
 	default:
-		typ = unknown
+		typ = Unknown
 	}
 
 	if c.Expensive {

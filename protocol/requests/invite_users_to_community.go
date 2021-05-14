@@ -10,8 +10,8 @@ var ErrInviteUsersToCommunityInvalidID = errors.New("invite-users-to-community: 
 var ErrInviteUsersToCommunityEmptyUsers = errors.New("invite-users-to-community: empty users")
 
 type InviteUsersToCommunity struct {
-	CommunityID types.HexBytes
-	Users       []types.HexBytes
+	CommunityID types.HexBytes   `json:"communityId"`
+	Users       []types.HexBytes `json:"users"`
 }
 
 func (j *InviteUsersToCommunity) Validate() error {

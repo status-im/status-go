@@ -15,7 +15,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/waku"
 )
 
 // StatusNodeTestSuite defines a test suite with StatusNode.
@@ -167,13 +167,13 @@ func (s *BackendTestSuite) RestartTestNode() {
 	s.True(s.Backend.IsNodeRunning())
 }
 
-// WhisperService returns a reference to the Whisper service.
-func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
-	whisperService, err := s.Backend.StatusNode().WhisperService()
+// WakuService returns a reference to the Waku service.
+func (s *BackendTestSuite) WakuService() *waku.Waku {
+	wakuService, err := s.Backend.StatusNode().WakuService()
 	s.NoError(err)
-	s.NotNil(whisperService)
+	s.NotNil(wakuService)
 
-	return whisperService
+	return wakuService
 }
 
 // Transactor returns a reference to the Transactor.

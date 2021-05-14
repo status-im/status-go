@@ -4,14 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/whisper"
 
 	"github.com/stretchr/testify/suite"
 
@@ -66,20 +64,6 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 			},
 			node.ErrNoRunningNode,
 		},
-		{
-			"non-null manager, no running node, get Whisper",
-			func() (interface{}, error) {
-				return s.StatusNode.WhisperService()
-			},
-			node.ErrNoRunningNode,
-		},
-		{
-			"non-null manager, no running node, get RPC Client",
-			func() (interface{}, error) {
-				return s.StatusNode.RPCClient(), nil
-			},
-			nil,
-		},
 	}
 	for _, tc := range testCases {
 		s.T().Log(tc.name)
@@ -121,20 +105,6 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 				return s.StatusNode.LightEthereumService()
 			},
 			&les.LightEthereum{},
-		},
-		{
-			"node is running, get Whisper",
-			func() (interface{}, error) {
-				return s.StatusNode.WhisperService()
-			},
-			&whisper.Whisper{},
-		},
-		{
-			"node is running, get AccountManager",
-			func() (interface{}, error) {
-				return s.StatusNode.AccountManager()
-			},
-			&accounts.Manager{},
 		},
 		{
 			"node is running, get RPC Client",
@@ -305,9 +275,9 @@ func (s *ManagerTestSuite) TestStartWithUpstreamEnabled() {
 //			progress <- struct{}{}
 //		},
 //		func(config *params.NodeConfig) {
-//			log.Info("WhisperService()")
-//			_, err := s.StatusNode.WhisperService()
-//			s.T().Logf("WhisperService(), error: %v", err)
+//			log.Info("WakuService()")
+//			_, err := s.StatusNode.WakuService()
+//			s.T().Logf("WakuService(), error: %v", err)
 //			progress <- struct{}{}
 //		},
 //		func(config *params.NodeConfig) {

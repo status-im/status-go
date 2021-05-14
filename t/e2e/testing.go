@@ -26,7 +26,7 @@ func WithDataDir(dataDir string) TestNodeOption {
 	return func(config *params.NodeConfig) {
 		config.DataDir = dataDir
 		config.KeyStoreDir = path.Join(dataDir, "keystore")
-		config.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
+		config.WakuConfig.DataDir = path.Join(dataDir, "wnode")
 	}
 }
 

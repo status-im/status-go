@@ -292,6 +292,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 		Name:      name,
 		Timestamp: int64(timesource.GetCurrentTime()),
 		Active:    true,
+		Joined:    int64(timesource.GetCurrentTime()),
 		ChatType:  ChatTypeOneToOne,
 	}
 }
@@ -309,6 +310,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		Color:       color,
 		ID:          orgID + chatID,
 		Timestamp:   int64(timesource.GetCurrentTime()),
+		Joined:      int64(timesource.GetCurrentTime()),
 		ChatType:    ChatTypeCommunityChat,
 	}
 }
@@ -348,6 +350,7 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 		Name:      name,
 		Active:    true,
 		Timestamp: int64(timesource.GetCurrentTime()),
+		Joined:    int64(timesource.GetCurrentTime()),
 		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		ChatType:  ChatTypePublic,
 	}
@@ -365,6 +368,7 @@ func CreateProfileChat(pubkey string, timesource common.TimeSource) *Chat {
 		Name:      id,
 		Active:    true,
 		Timestamp: int64(timesource.GetCurrentTime()),
+		Joined:    int64(timesource.GetCurrentTime()),
 		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		ChatType:  ChatTypeProfile,
 		Profile:   pubkey,

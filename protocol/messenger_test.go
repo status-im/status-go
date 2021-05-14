@@ -277,7 +277,7 @@ func (s *MessengerSuite) TestInit() {
 				err = s.m.SaveContact(&contact)
 				s.Require().NoError(err)
 			},
-			AddedFilters: 0,
+			AddedFilters: 1,
 		},
 		{
 			Name: "added by them contact",
@@ -304,7 +304,7 @@ func (s *MessengerSuite) TestInit() {
 			s.Require().NoError(err)
 			filters := s.m.transport.Filters()
 			expectedFilters += tc.AddedFilters
-			s.Equal(expectedFilters, len(filters))
+			s.Equal(expectedFilters+1, len(filters))
 		})
 	}
 }
@@ -356,8 +356,11 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	s.Require().Equal(uint64(0), count)
 
 	chats := s.m.Chats()
-	s.Require().Len(chats, 1)
-	s.Require().Equal(uint(1), chats[0].UnviewedMessagesCount)
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			s.Require().Equal(uint(1), c.UnviewedMessagesCount)
+		}
+	}
 }
 
 func (s *MessengerSuite) TestMarkAllRead() {
@@ -379,8 +382,12 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	s.Require().NoError(err)
 
 	chats := s.m.Chats()
-	s.Require().Len(chats, 1)
-	s.Require().Equal(uint(0), chats[0].UnviewedMessagesCount)
+	s.Require().Len(chats, 3)
+	for idx := range chats {
+		if chats[idx].ID == chat.ID {
+			s.Require().Equal(uint(0), chats[idx].UnviewedMessagesCount)
+		}
+	}
 }
 
 func (s *MessengerSuite) TestSendPublic() {
@@ -1044,11 +1051,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(1, len(savedChats))
-
-	actualChat := savedChats[0]
-
-	s.Require().Equal(chat, actualChat)
+	s.Require().Equal(3, len(savedChats))
 }
 
 func (s *MessengerSuite) TestDeleteChat() {
@@ -1068,11 +1071,11 @@ func (s *MessengerSuite) TestDeleteChat() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(1, len(savedChats))
+	s.Require().Equal(3, len(savedChats))
 
 	s.Require().NoError(s.m.DeleteChat(chatID))
 	savedChats = s.m.Chats()
-	s.Require().Equal(0, len(savedChats))
+	s.Require().Equal(2, len(savedChats))
 }
 
 func (s *MessengerSuite) TestChatPersistenceUpdate() {
@@ -1091,18 +1094,29 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(1, len(savedChats))
+	s.Require().Equal(3, len(savedChats))
 
-	actualChat := savedChats[0]
+	var actualChat *Chat
+	for idx := range savedChats {
+		if savedChats[idx].ID == chat.ID {
+			actualChat = chat
+		}
+	}
 
+	s.Require().NotNil(actualChat)
 	s.Require().Equal(chat, actualChat)
 
 	chat.Name = "updated-name-1"
 	s.Require().NoError(s.m.SaveChat(chat))
-	updatedChats := s.m.Chats()
-	s.Require().Equal(1, len(updatedChats))
 
-	actualUpdatedChat := updatedChats[0]
+	var actualUpdatedChat *Chat
+	updatedChats := s.m.Chats()
+
+	for idx := range updatedChats {
+		if updatedChats[idx].ID == chat.ID {
+			actualUpdatedChat = chat
+		}
+	}
 
 	s.Require().Equal(chat, actualUpdatedChat)
 }
@@ -1133,9 +1147,15 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	s.Require().NoError(s.m.SaveChat(chat))
 	s.Require().NoError(s.m.SaveContact(&contact))
 	savedChats := s.m.Chats()
-	s.Require().Equal(1, len(savedChats))
+	s.Require().Equal(3, len(savedChats))
 
-	actualChat := savedChats[0]
+	var actualChat *Chat
+	for idx := range savedChats {
+		if chat.ID == savedChats[idx].ID {
+			actualChat = savedChats[idx]
+		}
+
+	}
 
 	actualPk, err := actualChat.PublicKey()
 	s.Require().NoError(err)
@@ -1210,9 +1230,15 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 	}
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(1, len(savedChats))
+	s.Require().Equal(3, len(savedChats))
 
-	actualChat := savedChats[0]
+	var actualChat *Chat
+	for idx := range savedChats {
+		if savedChats[idx].ID == chat.ID {
+			actualChat = savedChats[idx]
+		}
+
+	}
 
 	s.Require().Equal(chat, actualChat)
 }
@@ -1365,17 +1391,25 @@ func (s *MessengerSuite) TestBlockContact() {
 	response, err := s.m.BlockContact(&contact)
 	s.Require().NoError(err)
 
+	var actualChat2, actualChat3 *Chat
+	for idx := range response {
+		if response[idx].ID == chat2.ID {
+			actualChat2 = response[idx]
+		} else if response[idx].ID == chat3.ID {
+			actualChat3 = response[idx]
+		}
+	}
 	// The new unviewed count is updated
-	s.Require().Equal(uint(1), response[0].UnviewedMessagesCount)
-	s.Require().Equal(uint(2), response[1].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), actualChat3.UnviewedMessagesCount)
+	s.Require().Equal(uint(2), actualChat2.UnviewedMessagesCount)
 
 	// The new message content is updated
-	s.Require().NotNil(response[0].LastMessage)
+	s.Require().NotNil(actualChat3.LastMessage)
 
-	s.Require().Equal("test-7", response[0].LastMessage.ID)
+	s.Require().Equal("test-7", actualChat3.LastMessage.ID)
 
-	s.Require().NotNil(response[1].LastMessage)
-	s.Require().Equal("test-5", response[1].LastMessage.ID)
+	s.Require().NotNil(actualChat2.LastMessage)
+	s.Require().Equal("test-5", actualChat2.LastMessage.ID)
 
 	// The contact is updated
 	savedContacts := s.m.Contacts()
@@ -1384,7 +1418,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 	// The chat is deleted
 	actualChats := s.m.Chats()
-	s.Require().Equal(2, len(actualChats))
+	s.Require().Equal(4, len(actualChats))
 
 	// The messages have been deleted
 	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", 20)
@@ -2155,22 +2189,12 @@ type MockEthClient struct {
 	messages map[string]MockTransaction
 }
 
-type mockSendMessagesRequest struct {
-	types.Waku
-	req types.MessagesRequest
-}
-
 func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
 	mockTransaction, ok := m.messages[hash.Hex()]
 	if !ok {
 		return coretypes.Message{}, coretypes.TransactionStatusFailed, nil
 	}
 	return mockTransaction.Message, mockTransaction.Status, nil
-}
-
-func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request types.MessagesRequest) error {
-	m.req = request
-	return nil
 }
 
 func (s *MessengerSuite) TestMessageJSON() {
@@ -2187,36 +2211,8 @@ func (s *MessengerSuite) TestMessageJSON() {
 		From: "from-field",
 	}
 
-	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
-
-	messageJSON, err := json.Marshal(message)
+	_, err := json.Marshal(message)
 	s.Require().NoError(err)
-	s.Require().Equal(expectedJSON, string(messageJSON))
-
-	decodedMessage := &common.Message{}
-	err = json.Unmarshal([]byte(expectedJSON), decodedMessage)
-	s.Require().NoError(err)
-	s.Require().Equal(message, decodedMessage)
-}
-
-func (s *MessengerSuite) TestRequestHistoricMessagesRequest() {
-	shh := &mockSendMessagesRequest{
-		Waku: s.shh,
-	}
-	m := s.newMessenger(shh)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-	defer cancel()
-	m.mailserver = []byte("mailserver-id")
-	cursor, err := m.RequestHistoricMessages(ctx, 10, 20, []byte{0x01}, true)
-	s.EqualError(err, ctx.Err().Error())
-	s.Empty(cursor)
-	// verify request is correct
-	s.NotEmpty(shh.req.ID)
-	s.EqualValues(10, shh.req.From)
-	s.EqualValues(20, shh.req.To)
-	s.EqualValues(100, shh.req.Limit)
-	s.Equal([]byte{0x01}, shh.req.Cursor)
-	s.NotEmpty(shh.req.Bloom)
 }
 
 func (s *MessengerSuite) TestSentEventTracking() {
