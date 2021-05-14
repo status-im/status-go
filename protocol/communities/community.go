@@ -62,6 +62,14 @@ type CommunityChat struct {
 	Members     map[string]*protobuf.CommunityMember `json:"members"`
 	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
 	CanPost     bool                                 `json:"canPost"`
+	Position    int                                  `json:"position"`
+	CategoryID  string                               `json:"categoryID"`
+}
+
+type CommunityCategory struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"`
 }
 
 func (o *Community) MarshalJSON() ([]byte, error) {
@@ -77,6 +85,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Name              string                               `json:"name"`
 		Description       string                               `json:"description"`
 		Chats             map[string]CommunityChat             `json:"chats"`
+		Categories        map[string]CommunityCategory         `json:"categories"`
 		Images            map[string]images.IdentityImage      `json:"images"`
 		Permissions       *protobuf.CommunityPermissions       `json:"permissions"`
 		Members           map[string]*protobuf.CommunityMember `json:"members"`
@@ -91,6 +100,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Admin:             o.IsAdmin(),
 		Verified:          o.config.Verified,
 		Chats:             make(map[string]CommunityChat),
+		Categories:        make(map[string]CommunityCategory),
 		Joined:            o.config.Joined,
 		CanRequestAccess:  o.CanRequestAccess(o.config.MemberIdentity),
 		CanJoin:           o.canJoin(),
@@ -99,6 +109,14 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		IsMember:          o.isMember(),
 	}
 	if o.config.CommunityDescription != nil {
+		for id, c := range o.config.CommunityDescription.Categories {
+			category := CommunityCategory{
+				ID:       id,
+				Name:     c.Name,
+				Position: int(c.Position),
+			}
+			communityItem.Categories[id] = category
+		}
 		for id, c := range o.config.CommunityDescription.Chats {
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
 			if err != nil {
@@ -110,6 +128,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Permissions: c.Permissions,
 				Members:     c.Members,
 				CanPost:     canPost,
+				CategoryID:  c.CategoryId,
+				Position:    int(c.Position),
 			}
 			communityItem.Chats[id] = chat
 		}
