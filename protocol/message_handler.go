@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 
@@ -19,8 +18,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
-
-	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -347,7 +344,7 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	pinMessage.ID, err = m.generatePinMessageID(pinMessage, chat)
+	pinMessage.ID, err = generatePinMessageID(&m.identity.PublicKey, pinMessage, chat)
 	if err != nil {
 		return err
 	}
@@ -1203,26 +1200,4 @@ func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey
 
 	// Otherwise we check if we added it
 	return contact.IsAdded(), nil
-}
-
-func (m *MessageHandler) generatePinMessageID(pm *common.PinMessage, chat *Chat) (string, error) {
-	data := gethcommon.FromHex(pm.MessageId)
-
-	switch {
-	case chat.ChatType == ChatTypeOneToOne:
-		ourPubKey := crypto.FromECDSAPub(&m.identity.PublicKey)
-		tmpPubKey, err := chat.PublicKey()
-		if err != nil {
-			return "", err
-		}
-		theirPubKey := crypto.FromECDSAPub(tmpPubKey)
-		data = append(data, ourPubKey...)   // our key
-		data = append(data, theirPubKey...) // their key
-	default:
-		data = append(data, []byte(chat.ID)...)
-	}
-	id := sha256.Sum256(data)
-	idString := fmt.Sprintf("%x", id)
-
-	return idString, nil
 }

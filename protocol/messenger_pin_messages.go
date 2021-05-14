@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -38,7 +40,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
-	message.ID, err = m.generatePinMessageID(message, chat)
+	message.ID, err = generatePinMessageID(&m.identity.PublicKey, message, chat)
 	if err != nil {
 		return nil, err
 	}
@@ -96,19 +98,25 @@ func (m *Messenger) SavePinMessages(messages []*common.PinMessage) error {
 	return m.persistence.SavePinMessages(messages)
 }
 
-func (m *Messenger) generatePinMessageID(pm *common.PinMessage, chat *Chat) (string, error) {
+func generatePinMessageID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *Chat) (string, error) {
 	data := gethcommon.FromHex(pm.MessageId)
 
 	switch {
 	case chat.ChatType == ChatTypeOneToOne:
-		ourPubKey := crypto.FromECDSAPub(pm.SigPubKey)
+		ourPubKey := crypto.FromECDSAPub(pubKey)
 		tmpPubKey, err := chat.PublicKey()
 		if err != nil {
 			return "", err
 		}
 		theirPubKey := crypto.FromECDSAPub(tmpPubKey)
-		data = append(data, ourPubKey...)   // our key
-		data = append(data, theirPubKey...) // their key
+
+		if bytes.Compare(ourPubKey, theirPubKey) < 0 {
+			data = append(data, ourPubKey...)   // our key
+			data = append(data, theirPubKey...) // their key
+		} else {
+			data = append(data, theirPubKey...) // their key
+			data = append(data, ourPubKey...)   // our key
+		}
 	default:
 		data = append(data, []byte(chat.ID)...)
 	}
