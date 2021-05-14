@@ -85,6 +85,10 @@ type Chat struct {
 
 	// CommunityID is the id of the community it belongs to
 	CommunityID string `json:"communityId,omitempty"`
+
+	// CommunityCategoryID is the id of the community category this chat belongs to.
+	CategoryID string `json:"categoryId,omitempty"`
+
 	// Joined is a timestamp that indicates when the chat was joined
 	Joined int64 `json:"joined,omitempty"`
 
@@ -305,6 +309,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 	return &Chat{
 		CommunityID: orgID,
+		CategoryID:  orgChat.CategoryId,
 		Name:        orgChat.Identity.DisplayName,
 		Active:      true,
 		Color:       color,

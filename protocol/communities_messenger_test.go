@@ -188,6 +188,26 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 
 	// Make sure the changes are reflect in the community
 	community = response.Communities()[0]
+
+	var chatIds []string
+	for k := range community.Chats() {
+		chatIds = append(chatIds, k)
+	}
+
+	category := &requests.CreateCommunityCategory{
+		CommunityID:  community.ID(),
+		CategoryName: "category-name",
+		ChatIDs:      chatIds,
+	}
+
+	response, err = s.bob.CreateCommunityCategory(category)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Categories(), 1)
+
+	// Make sure the changes are reflect in the community
+	community = response.Communities()[0]
 	chats := community.Chats()
 	s.Require().Len(chats, 1)
 
@@ -231,6 +251,12 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Communities()[0].Categories(), 1)
+
+	var categoryID string
+	for k := range response.Communities()[0].Categories() {
+		categoryID = k
+	}
 
 	// The chat should be created
 	createdChat = response.Chats()[0]
@@ -238,6 +264,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
 	s.Require().NotEmpty(createdChat.ID)
 	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
+	s.Require().Equal(categoryID, createdChat.CategoryID)
 	s.Require().True(createdChat.Active)
 	s.Require().NotEmpty(createdChat.Timestamp)
 	s.Require().True(strings.HasPrefix(createdChat.ID, community.IDString()))
@@ -464,6 +491,15 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 
 	community := response.Communities()[0]
 
+	category := &requests.CreateCommunityCategory{
+		CommunityID:  community.ID(),
+		CategoryName: "category-name",
+		ChatIDs:      []string{},
+	}
+
+	response, err = s.bob.CreateCommunityCategory(category)
+	community = response.Communities()[0]
+
 	privateKey, err := s.bob.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
@@ -496,6 +532,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Categories(), 1)
 	community = response.Communities()[0]
 	s.Require().True(community.Joined())
 	s.Require().True(community.IsAdmin())
