@@ -7,11 +7,11 @@ import (
 var ErrCreatePublicChatInvalidID = errors.New("create-public-chat: invalid id")
 
 type CreatePublicChat struct {
-	ID string
+	ID string `json:"id"`
 }
 
-func (j *CreatePublicChat) Validate() error {
-	if len(j.ID) == 0 {
+func (c *CreatePublicChat) Validate() error {
+	if len(c.ID) == 0 {
 		return ErrCreatePublicChatInvalidID
 	}
 

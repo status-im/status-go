@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -15,19 +16,48 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
-func (m *Messenger) connectedToMailserver() bool {
-	return m.online() && m.mailserver != nil
-}
+// defaultSyncInterval indicates how far back in seconds we should sync a filter
+var defaultSyncInterval uint32 = 60 * 60 * 24
 
-func (m *Messenger) scheduleSyncChat(chat *Chat) {
-	useMailservers, err := m.settings.GetUseMailservers()
-	if err != nil {
-		m.logger.Error("failed to get use mailservers", zap.Error(err))
-		return
+// tolerance is how many seconds of potentially out-of-order messages we want to fetch
+var tolerance uint32 = 60
+
+func (m *Messenger) shouldSync() (bool, error) {
+	if m.mailserver == nil || !m.online() {
+		return false, nil
 	}
 
-	if !useMailservers || !m.connectedToMailserver() {
-		return
+	useMailserver, err := m.settings.CanUseMailservers()
+	if err != nil {
+		m.logger.Error("failed to get use mailservers", zap.Error(err))
+		return false, err
+	}
+
+	if !useMailserver {
+		return false, nil
+	}
+
+	if !m.connectionState.IsExpensive() {
+		return true, nil
+	}
+
+	syncingOnMobileNetwork, err := m.settings.CanSyncOnMobileNetwork()
+	if err != nil {
+		return false, err
+	}
+
+	return syncingOnMobileNetwork, nil
+}
+
+func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
+	shouldSync, err := m.shouldSync()
+	if err != nil {
+		m.logger.Error("failed to get should sync", zap.Error(err))
+		return false, err
+	}
+
+	if !shouldSync {
+		return false, nil
 	}
 
 	go func() {
@@ -43,21 +73,25 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) {
 		}
 
 	}()
+	return true, nil
 }
 
 func (m *Messenger) scheduleSyncFilter(filter *transport.Filter) {
-	m.scheduleSyncFilters([]*transport.Filter{filter})
-
-}
-func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) {
-	useMailservers, err := m.settings.GetUseMailservers()
+	_, err := m.scheduleSyncFilters([]*transport.Filter{filter})
 	if err != nil {
-		m.logger.Error("failed to get use mailservers", zap.Error(err))
-		return
+		m.logger.Error("failed to schedule syncing filters", zap.Error(err))
 	}
 
-	if !useMailservers || !m.connectedToMailserver() {
-		return
+}
+func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, error) {
+	shouldSync, err := m.shouldSync()
+	if err != nil {
+		m.logger.Error("failed to get shouldSync", zap.Error(err))
+		return false, err
+	}
+
+	if !shouldSync {
+		return false, nil
 	}
 
 	go func() {
@@ -73,6 +107,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) {
 		}
 
 	}()
+	return true, nil
 }
 
 func (m *Messenger) calculateMailserverTo() uint32 {
@@ -135,31 +170,27 @@ func (m *Messenger) syncChat(chatID string) (*MessengerResponse, error) {
 	return m.syncFilters(filters)
 }
 
-func (m *Messenger) defaultSyncInterval() uint32 {
-	return 60 * 60 * 24
-}
-
 func (m *Messenger) defaultSyncPeriod() uint32 {
-	return uint32(m.getTimesource().GetCurrentTime()/1000) - m.defaultSyncInterval()
+	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
 }
 
-// capSyncPeriod caps the sync period to the default
-func (m *Messenger) capSyncPeriod(period uint32) uint32 {
-	d := uint32(m.defaultSyncPeriod())
+// calculateSyncPeriod caps the sync period to the default
+func (m *Messenger) calculateSyncPeriod(period uint32) uint32 {
+	d := m.defaultSyncPeriod()
 	if d > period {
 		return d
 	}
-	return period
+	return period - tolerance
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
 func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
-	useMailservers, err := m.settings.GetUseMailservers()
+	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
 	}
 
-	if !useMailservers || !m.connectedToMailserver() {
+	if !shouldSync {
 		return nil, nil
 	}
 
@@ -180,8 +211,6 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 
 	batches := make(map[int]MailserverBatch)
 
-	var syncedChatIDs []string
-
 	to := m.calculateMailserverTo()
 	var syncedTopics []mailservers.MailserverTopic
 	for _, filter := range filters {
@@ -197,8 +226,6 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 			chatID = filter.ChatID
 		}
 
-		syncedChatIDs = append(syncedChatIDs, chatID)
-
 		topicData, ok := topicsData[filter.Topic.String()]
 		if !ok {
 			topicData = mailservers.MailserverTopic{
@@ -208,7 +235,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		}
 		batch, ok := batches[topicData.LastRequest]
 		if !ok {
-			from := m.capSyncPeriod(uint32(topicData.LastRequest))
+			from := m.calculateSyncPeriod(uint32(topicData.LastRequest))
 			batch = MailserverBatch{From: from, To: to}
 		}
 
@@ -260,9 +287,6 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 				response.AddMessage(gap)
 				messagesToBeSaved = append(messagesToBeSaved, gap)
 			}
-			// Calculate gaps
-			// If last-synced is 0, no gaps
-			// If last-synced < from, create gap from
 		}
 	}
 
@@ -364,7 +388,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	batch := MailserverBatch{
 		ChatIDs: []string{chatID},
 		To:      chat.SyncedFrom,
-		From:    chat.SyncedFrom - m.defaultSyncInterval(),
+		From:    chat.SyncedFrom - defaultSyncInterval,
 		Topics:  topics,
 	}
 
@@ -438,4 +462,8 @@ func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filte
 
 func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
 	return m.transport.RemoveFilters(filters)
+}
+
+func (m *Messenger) ConnectionChanged(state connection.State) {
+	m.connectionState = state
 }

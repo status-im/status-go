@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	waku "github.com/status-im/status-go/waku/common"
 )
 
 func TestCleaner(t *testing.T) {
@@ -88,8 +88,8 @@ func BenchmarkCleanerPruneM100_000_B100(b *testing.B) {
 	benchmarkCleanerPrune(b, 100000, 100)
 }
 
-func setupTestServer(t *testing.T) *WhisperMailServer {
-	var s WhisperMailServer
+func setupTestServer(t *testing.T) *WakuMailServer {
+	var s WakuMailServer
 	db, _ := leveldb.Open(storage.NewMemStorage(), nil)
 
 	s.ms = &mailServer{
@@ -97,13 +97,13 @@ func setupTestServer(t *testing.T) *WhisperMailServer {
 			ldb:  db,
 			done: make(chan struct{}),
 		},
-		adapter: &whisperAdapter{},
+		adapter: &wakuAdapter{},
 	}
 	s.minRequestPoW = powRequirement
 	return &s
 }
 
-func archiveEnvelope(t *testing.T, sentTime time.Time, server *WhisperMailServer) *whisper.Envelope {
+func archiveEnvelope(t *testing.T, sentTime time.Time, server *WakuMailServer) *waku.Envelope {
 	env, err := generateEnvelope(sentTime)
 	require.NoError(t, err)
 	server.Archive(env)
@@ -117,7 +117,7 @@ func testPrune(t *testing.T, u time.Time, expected int, c *dbCleaner) {
 	require.Equal(t, expected, n)
 }
 
-func testMessagesCount(t *testing.T, expected int, s *WhisperMailServer) {
+func testMessagesCount(t *testing.T, expected int, s *WakuMailServer) {
 	count := countMessages(t, s.ms.db)
 	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
 }
@@ -142,7 +142,7 @@ func countMessages(t *testing.T, db DB) int {
 	defer func() { _ = i.Release() }()
 
 	for i.Next() {
-		var env whisper.Envelope
+		var env waku.Envelope
 		value, err := i.GetEnvelope(query.bloom)
 		if err != nil {
 			t.Fatal(err)

@@ -58,7 +58,7 @@ func (s *DevNodeSuite) SetupTest() {
 	networks := json.RawMessage("{}")
 	settings := accounts.Settings{Networks: &networks}
 	s.Require().NoError(err)
-	config.WhisperConfig.Enabled = false
+	config.WakuConfig.Enabled = false
 	config.LightEthConfig.Enabled = false
 	config.UpstreamConfig.Enabled = true
 	config.WalletConfig.Enabled = true

@@ -7,11 +7,11 @@ import (
 var ErrClearHistoryInvalidID = errors.New("clear-history: invalid id")
 
 type ClearHistory struct {
-	ID string
+	ID string `json:"id"`
 }
 
-func (j *ClearHistory) Validate() error {
-	if len(j.ID) == 0 {
+func (c *ClearHistory) Validate() error {
+	if len(c.ID) == 0 {
 		return ErrClearHistoryInvalidID
 	}
 

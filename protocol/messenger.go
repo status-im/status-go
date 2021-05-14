@@ -22,6 +22,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
@@ -105,6 +106,7 @@ type Messenger struct {
 	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
+	connectionState            connection.State
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex sync.Mutex
@@ -733,17 +735,15 @@ func (m *Messenger) adaptIdentityImageToProtobuf(img *userimage.IdentityImage) *
 
 // handleSharedSecrets process the negotiated secrets received from the encryption layer
 func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
-	var result []*transport.Filter
 	for _, secret := range secrets {
 		fSecret := types.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}
-		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
+		_, err := m.transport.ProcessNegotiatedSecret(fSecret)
 		if err != nil {
 			return err
 		}
-		result = append(result, filter)
 	}
 	return nil
 }
@@ -933,7 +933,6 @@ func (m *Messenger) Init() error {
 		publicKeys    []*ecdsa.PublicKey
 	)
 
-	logger.Info("1")
 	joinedCommunities, err := m.communitiesManager.Joined()
 	if err != nil {
 		return err
@@ -958,7 +957,6 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("2")
 
 	// Get chat IDs and public keys from the existing chats.
 	// TODO: Get only active chats by the query.
@@ -966,7 +964,6 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("3")
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
@@ -1006,19 +1003,17 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	// uspert profile chat
 	err = m.ensureMyOwnProfileChat()
 	if err != nil {
 		return err
 	}
-	// uspert profile chat
-	logger.Info("4")
 
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()
 	if err != nil {
 		return err
 	}
-	logger.Info("5")
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
@@ -1032,7 +1027,6 @@ func (m *Messenger) Init() error {
 		}
 		publicKeys = append(publicKeys, publicKey)
 	}
-	logger.Info("6")
 
 	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
 	if err != nil {
@@ -1042,10 +1036,8 @@ func (m *Messenger) Init() error {
 	for _, installation := range installations {
 		m.allInstallations.Store(installation.ID, installation)
 	}
-	logger.Info("7")
 
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
-	logger.Info("8")
 	return err
 }
 
@@ -1163,6 +1155,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	chat.LastClockValue = clock
 
 	chat.updateChatFromGroupMembershipChanges(group)
+	chat.Joined = int64(m.getTimesource().GetCurrentTime())
 
 	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 
@@ -1697,6 +1690,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	}
 
 	chat.updateChatFromGroupMembershipChanges(group)
+	chat.Joined = int64(m.getTimesource().GetCurrentTime())
 
 	response.AddChat(chat)
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -2567,10 +2561,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
-						added := m.handler.HandleSyncInstallationPublicChat(messageState, p)
+						addedChat := m.handler.HandleSyncInstallationPublicChat(messageState, p)
 
-						// We re-register as we want to receive mentions from the newly joined public chat
-						if added {
+						// We join and re-register as we want to receive mentions from the newly joined public chat
+						if addedChat != nil {
+							_, err = m.Join(addedChat)
+							if err != nil {
+								allMessagesProcessed = false
+								logger.Error("error joining chat", zap.Error(err))
+								continue
+							}
 							logger.Debug("newly synced public chat, re-registering for push notifications")
 							err := m.reregisterForPushNotifications()
 							if err != nil {

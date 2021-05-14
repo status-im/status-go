@@ -420,18 +420,6 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Filters, 2)
-
-	var orgFilterFound bool
-	var chatFilterFound bool
-	for _, f := range response.Filters {
-		orgFilterFound = orgFilterFound || f.ChatID == response.Communities()[0].IDString()
-		chatFilterFound = chatFilterFound || f.ChatID == response.Chats()[0].ID
-	}
-	// Make sure an community filter has been created
-	s.Require().True(orgFilterFound)
-	// Make sure the chat filter has been created
-	s.Require().True(chatFilterFound)
 
 	chatID := response.Chats()[0].ID
 	inputMessage := &common.Message{}
@@ -479,9 +467,8 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	privateKey, err := s.bob.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
-	response, err = s.alice.ImportCommunity(privateKey)
+	_, err = s.alice.ImportCommunity(privateKey)
 	s.Require().NoError(err)
-	s.Require().Len(response.Filters, 1)
 
 	// Invite user on bob side
 	newUser, err := crypto.GenerateKey()

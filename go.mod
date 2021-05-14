@@ -13,7 +13,6 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
-	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -38,7 +37,6 @@ require (
 	github.com/mat/besticon v3.12.0+incompatible
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
-	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/mattn/go-sqlite3 v1.12.0 // indirect
 	github.com/multiformats/go-multiaddr v0.1.1
@@ -54,7 +52,6 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.0
-	github.com/prometheus/common v0.9.1
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
@@ -76,7 +73,6 @@ require (
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
 	golang.org/x/mod v0.1.1-0.20191209134235-331c550502dd // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect

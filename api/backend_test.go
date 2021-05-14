@@ -20,6 +20,7 @@ import (
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -231,7 +232,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
-	connections := [...]string{wifi, cellular, unknown}
+	connections := [...]string{connection.Wifi, connection.Cellular, connection.Unknown}
 	backend := NewGethStatusBackend()
 	count := 3
 
@@ -251,10 +252,10 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 
 func TestBackendConnectionChangesToOffline(t *testing.T) {
 	b := NewGethStatusBackend()
-	b.ConnectionChange(none, false)
+	b.ConnectionChange(connection.None, false)
 	assert.True(t, b.connectionState.Offline)
 
-	b.ConnectionChange(wifi, false)
+	b.ConnectionChange(connection.Wifi, false)
 	assert.False(t, b.connectionState.Offline)
 
 	b.ConnectionChange("unknown-state", false)

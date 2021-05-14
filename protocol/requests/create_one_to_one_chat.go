@@ -9,11 +9,11 @@ import (
 var ErrCreateOneToOneChatInvalidID = errors.New("create-one-to-one-chat: invalid id")
 
 type CreateOneToOneChat struct {
-	ID types.HexBytes
+	ID types.HexBytes `json:"id"`
 }
 
-func (j *CreateOneToOneChat) Validate() error {
-	if len(j.ID) == 0 {
+func (c *CreateOneToOneChat) Validate() error {
+	if len(c.ID) == 0 {
 		return ErrCreateOneToOneChatInvalidID
 	}
 

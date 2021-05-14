@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
@@ -36,13 +37,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 
 	"go.uber.org/zap"
-)
-
-const (
-	// defaultConnectionsTarget used in Service.Start if configured connection target is 0.
-	defaultConnectionsTarget = 1
-	// defaultTimeoutWaitAdded is a timeout to use to establish initial connections.
-	defaultTimeoutWaitAdded = 5 * time.Second
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -312,9 +306,7 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 // UpdateMailservers updates information about selected mail servers.
 func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
-	log.Info("updating nodes", "nodes", nodes, "messenger", s.messenger)
 	if len(nodes) > 0 && s.messenger != nil {
-		log.Info("Setting messenger")
 		s.messenger.SetMailserver(nodes[0].ID().Bytes())
 	}
 	for _, peer := range nodes {
@@ -423,4 +415,10 @@ func buildMessengerOptions(
 	}
 
 	return options, nil
+}
+
+func (s *Service) ConnectionChanged(state connection.State) {
+	if s.messenger != nil {
+		s.messenger.ConnectionChanged(state)
+	}
 }

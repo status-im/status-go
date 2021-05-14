@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
@@ -594,6 +595,16 @@ func (n *StatusNode) WakuExtService() (s *wakuext.Service, err error) {
 	}
 
 	return
+}
+
+func (n *StatusNode) ConnectionChanged(state connection.State) error {
+	service, err := n.WakuExtService()
+	if err != nil {
+		return err
+	}
+
+	service.ConnectionChanged(state)
+	return nil
 }
 
 // WalletService returns wallet.Service instance if it was started.

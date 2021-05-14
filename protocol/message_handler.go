@@ -312,19 +312,23 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 	return nil
 }
 
-func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) bool {
+func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) *Chat {
 	chatID := message.Id
 	_, ok := state.AllChats.Load(chatID)
 	if ok {
-		return false
+		return nil
 	}
 
 	chat := CreatePublicChat(chatID, state.Timesource)
 
-	state.AllChats.Store(chat.ID, chat)
-	state.Response.AddChat(chat)
+	timestamp := uint32(state.Timesource.GetCurrentTime() / 1000)
+	chat.SyncedTo = timestamp
+	chat.SyncedFrom = timestamp
 
-	return true
+	state.AllChats.Store(chat.ID, chat)
+
+	state.Response.AddChat(chat)
+	return chat
 }
 
 func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {

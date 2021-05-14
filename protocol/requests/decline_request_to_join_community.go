@@ -9,7 +9,7 @@ import (
 var ErrDeclineRequestToJoinCommunityInvalidID = errors.New("accept-request-to-join-community: invalid id")
 
 type DeclineRequestToJoinCommunity struct {
-	ID types.HexBytes
+	ID types.HexBytes `json:"id"`
 }
 
 func (j *DeclineRequestToJoinCommunity) Validate() error {

@@ -18,7 +18,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	waku "github.com/status-im/status-go/waku/common"
 )
 
 func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
@@ -44,10 +44,10 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 	rawValue, err := iter.GetEnvelope(nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawValue)
-	var receivedEnvelope whisper.Envelope
+	var receivedEnvelope waku.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
 	require.NoError(t, err)
-	require.EqualValues(t, whisper.BytesToTopic(topic), receivedEnvelope.Topic)
+	require.EqualValues(t, waku.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
 	require.NoError(t, err)
@@ -77,10 +77,10 @@ func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 	rawValue, err := iter.GetEnvelope(nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawValue)
-	var receivedEnvelope whisper.Envelope
+	var receivedEnvelope waku.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
 	require.NoError(t, err)
-	require.EqualValues(t, whisper.BytesToTopic(topic), receivedEnvelope.Topic)
+	require.EqualValues(t, waku.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
 	require.NoError(t, err)
@@ -92,15 +92,15 @@ func newTestEnvelope(topic []byte) (types.Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	params := whisper.MessageParams{
+	params := waku.MessageParams{
 		TTL:      10,
 		PoW:      2.0,
 		Payload:  []byte("hello world"),
 		WorkTime: 1,
-		Topic:    whisper.BytesToTopic(topic),
+		Topic:    waku.BytesToTopic(topic),
 		Dst:      &privateKey.PublicKey,
 	}
-	message, err := whisper.NewSentMessage(&params)
+	message, err := waku.NewSentMessage(&params)
 	if err != nil {
 		return nil, err
 	}

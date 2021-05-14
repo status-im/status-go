@@ -19,7 +19,6 @@ package mailserver
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -35,7 +34,8 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/whisper"
+	waku "github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
 )
 
 const powRequirement = 0.00001
@@ -59,28 +59,23 @@ func TestMailserverSuite(t *testing.T) {
 
 type MailserverSuite struct {
 	suite.Suite
-	server  *WhisperMailServer
-	shh     *whisper.Whisper
-	config  *params.WhisperConfig
+	server  *WakuMailServer
+	shh     *waku.Waku
+	config  *params.WakuConfig
 	dataDir string
 }
 
 func (s *MailserverSuite) SetupTest() {
-	s.server = &WhisperMailServer{}
-	s.shh = whisper.New(&whisper.DefaultConfig)
+	s.server = &WakuMailServer{}
+	s.shh = waku.New(&waku.DefaultConfig, nil)
 	s.shh.RegisterMailServer(s.server)
 
 	tmpDir, err := ioutil.TempDir("", "mailserver-test")
 	s.Require().NoError(err)
 	s.dataDir = tmpDir
 
-	// required files to validate mail server decryption method
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	s.config = &params.WhisperConfig{
+	s.config = &params.WakuConfig{
 		DataDir:            tmpDir,
-		MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(privateKey)),
 		MailServerPassword: "testpassword",
 	}
 }
@@ -90,30 +85,18 @@ func (s *MailserverSuite) TearDownTest() {
 }
 
 func (s *MailserverSuite) TestInit() {
-	asymKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	testCases := []struct {
-		config        params.WhisperConfig
+		config        params.WakuConfig
 		expectedError error
 		info          string
 	}{
 		{
-			config:        params.WhisperConfig{DataDir: ""},
+			config:        params.WakuConfig{DataDir: ""},
 			expectedError: errDirectoryNotProvided,
 			info:          "config with empty DataDir",
 		},
 		{
-			config: params.WhisperConfig{
-				DataDir:            s.config.DataDir,
-				MailServerPassword: "",
-				MailServerAsymKey:  "",
-			},
-			expectedError: errDecryptionMethodNotProvided,
-			info:          "config with an empty password and empty asym key",
-		},
-		{
-			config: params.WhisperConfig{
+			config: params.WakuConfig{
 				DataDir:            s.config.DataDir,
 				MailServerPassword: "pwd",
 			},
@@ -121,24 +104,7 @@ func (s *MailserverSuite) TestInit() {
 			info:          "config with correct DataDir and Password",
 		},
 		{
-			config: params.WhisperConfig{
-				DataDir:           s.config.DataDir,
-				MailServerAsymKey: hex.EncodeToString(crypto.FromECDSA(asymKey)),
-			},
-			expectedError: nil,
-			info:          "config with correct DataDir and AsymKey",
-		},
-		{
-			config: params.WhisperConfig{
-				DataDir:            s.config.DataDir,
-				MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(asymKey)),
-				MailServerPassword: "pwd",
-			},
-			expectedError: nil,
-			info:          "config with both asym key and password",
-		},
-		{
-			config: params.WhisperConfig{
+			config: params.WakuConfig{
 				DataDir:             s.config.DataDir,
 				MailServerPassword:  "pwd",
 				MailServerRateLimit: 5,
@@ -150,13 +116,15 @@ func (s *MailserverSuite) TestInit() {
 
 	for _, tc := range testCases {
 		s.T().Run(tc.info, func(*testing.T) {
-			mailServer := &WhisperMailServer{}
-			shh := whisper.New(&whisper.DefaultConfig)
+			mailServer := &WakuMailServer{}
+			shh := waku.New(&waku.DefaultConfig, nil)
 			shh.RegisterMailServer(mailServer)
 
 			err := mailServer.Init(shh, &tc.config)
-			s.Equal(tc.expectedError, err)
-			defer mailServer.Close()
+			s.Require().Equal(tc.expectedError, err)
+			if err == nil {
+				defer mailServer.Close()
+			}
 
 			// db should be open only if there was no error
 			if tc.expectedError == nil {
@@ -172,81 +140,8 @@ func (s *MailserverSuite) TestInit() {
 	}
 }
 
-func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
-	// without configured Password and AsymKey
-	config := *s.config
-	config.MailServerAsymKey = ""
-	config.MailServerPassword = ""
-	s.Error(errDecryptionMethodNotProvided, s.server.Init(s.shh, &config))
-
-	// Password should work ok
-	config = *s.config
-	config.MailServerAsymKey = "" // clear asym key field
-	s.NoError(s.server.Init(s.shh, &config))
-	s.Require().NotNil(s.server.symFilter)
-	s.NotNil(s.server.symFilter.KeySym)
-	s.Nil(s.server.asymFilter)
-	s.server.Close()
-
-	// AsymKey can also be used
-	config = *s.config
-	config.MailServerPassword = "" // clear password field
-	s.NoError(s.server.Init(s.shh, &config))
-	s.Nil(s.server.symFilter) // important: symmetric filter should be nil
-	s.Require().NotNil(s.server.asymFilter)
-	s.Equal(config.MailServerAsymKey, hex.EncodeToString(crypto.FromECDSA(s.server.asymFilter.KeyAsym)))
-	s.server.Close()
-
-	// when Password and AsymKey are set, both are supported
-	config = *s.config
-	s.NoError(s.server.Init(s.shh, &config))
-	s.Require().NotNil(s.server.symFilter)
-	s.NotNil(s.server.symFilter.KeySym)
-	s.NotNil(s.server.asymFilter.KeyAsym)
-	s.server.Close()
-}
-
-func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
-	// Setup the server with a sym key
-	config := *s.config
-	config.MailServerAsymKey = "" // clear asym key
-	s.NoError(s.server.Init(s.shh, &config))
-
-	// Prepare a valid envelope
-	s.Require().NotNil(s.server.symFilter)
-	symKey := s.server.symFilter.KeySym
-	env, err := generateEnvelopeWithKeys(time.Now(), symKey, nil)
-	s.Require().NoError(err)
-
-	// Test openEnvelope with a valid envelope
-	d := s.server.openEnvelope(env)
-	s.NotNil(d)
-	s.Equal(testPayload, d.Payload)
-	s.server.Close()
-}
-
-func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
-	// Setup the server with an asymmetric key
-	config := *s.config
-	config.MailServerPassword = "" // clear password field
-	s.NoError(s.server.Init(s.shh, &config))
-
-	// Prepare a valid envelope
-	s.Require().NotNil(s.server.asymFilter)
-	pubKey := s.server.asymFilter.KeyAsym.PublicKey
-	env, err := generateEnvelopeWithKeys(time.Now(), nil, &pubKey)
-	s.Require().NoError(err)
-
-	// Test openEnvelope with a valid asymmetric key
-	d := s.server.openEnvelope(env)
-	s.NotNil(d)
-	s.Equal(testPayload, d.Payload)
-	s.server.Close()
-}
-
 func (s *MailserverSuite) TestArchive() {
 	config := *s.config
-	config.MailServerAsymKey = "" // clear asym key
 
 	err := s.server.Init(s.shh, &config)
 	s.Require().NoError(err)
@@ -294,7 +189,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	defer s.server.Close()
 
 	var (
-		sentEnvelopes  []*whisper.Envelope
+		sentEnvelopes  []*wakucommon.Envelope
 		sentHashes     []common.Hash
 		receivedHashes []common.Hash
 		archiveKeys    []string
@@ -490,7 +385,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	var archievedEnvelopes []*whisper.Envelope
+	var archievedEnvelopes []*wakucommon.Envelope
 
 	now := time.Now()
 	count := uint32(10)
@@ -584,7 +479,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 	}
 }
 
-func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
+func (s *MailserverSuite) messageExists(envelope *wakucommon.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	receivedHashes, _, _ := processRequestAndCollectHashes(s.server, MessagesRequestPayload{
 		Lower: low,
 		Upper: upp,
@@ -599,49 +494,13 @@ func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uin
 	return false
 }
 
-func (s *MailserverSuite) TestBloomFromReceivedMessage() {
-	testCases := []struct {
-		msg           whisper.ReceivedMessage
-		expectedBloom []byte
-		expectedErr   error
-		info          string
-	}{
-		{
-			msg:           whisper.ReceivedMessage{},
-			expectedBloom: []byte(nil),
-			expectedErr:   errors.New("Undersized p2p request"),
-			info:          "getting bloom filter for an empty whisper message should produce an error",
-		},
-		{
-			msg:           whisper.ReceivedMessage{Payload: []byte("hohohohoho")},
-			expectedBloom: []byte(nil),
-			expectedErr:   errors.New("Undersized bloom filter in p2p request"),
-			info:          "getting bloom filter for a malformed whisper message should produce an error",
-		},
-		{
-			msg:           whisper.ReceivedMessage{Payload: []byte("12345678")},
-			expectedBloom: whisper.MakeFullNodeBloom(),
-			expectedErr:   nil,
-			info:          "getting bloom filter for a valid whisper message should be successful",
-		},
-	}
-
-	for _, tc := range testCases {
-		s.T().Run(tc.info, func(*testing.T) {
-			bloom, err := s.server.bloomFromReceivedMessage(&tc.msg)
-			s.Equal(tc.expectedErr, err)
-			s.Equal(tc.expectedBloom, bloom)
-		})
-	}
-}
-
-func (s *MailserverSuite) setupServer(server *WhisperMailServer) {
+func (s *MailserverSuite) setupServer(server *WakuMailServer) {
 	const password = "password_for_this_test"
 
-	s.shh = whisper.New(&whisper.DefaultConfig)
+	s.shh = waku.New(&waku.DefaultConfig, nil)
 	s.shh.RegisterMailServer(server)
 
-	err := server.Init(s.shh, &params.WhisperConfig{
+	err := server.Init(s.shh, &params.WakuConfig{
 		DataDir:            s.dataDir,
 		MailServerPassword: password,
 		MinimumPoW:         powRequirement,
@@ -656,8 +515,8 @@ func (s *MailserverSuite) setupServer(server *WhisperMailServer) {
 	}
 }
 
-func (s *MailserverSuite) prepareRequest(envelopes []*whisper.Envelope, limit uint32) (
-	[]byte, *whisper.Envelope, error,
+func (s *MailserverSuite) prepareRequest(envelopes []*wakucommon.Envelope, limit uint32) (
+	[]byte, *wakucommon.Envelope, error,
 ) {
 	if len(envelopes) == 0 {
 		return nil, nil, errors.New("envelopes is empty")
@@ -676,7 +535,7 @@ func (s *MailserverSuite) prepareRequest(envelopes []*whisper.Envelope, limit ui
 	return peerID, request, nil
 }
 
-func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTestParams {
+func (s *MailserverSuite) defaultServerParams(env *wakucommon.Envelope) *ServerTestParams {
 	id, err := s.shh.NewKeyPair()
 	if err != nil {
 		s.T().Fatalf("failed to generate new key pair with seed %d: %s.", seed, err)
@@ -697,7 +556,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 	}
 }
 
-func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
+func (s *MailserverSuite) createRequest(p *ServerTestParams) *wakucommon.Envelope {
 	bloom := types.TopicToBloom(p.topic)
 	data := make([]byte, 8)
 	binary.BigEndian.PutUint32(data, p.low)
@@ -713,22 +572,22 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	return s.createEnvelope(p.topic, data, p.key)
 }
 
-func (s *MailserverSuite) createEnvelope(topic types.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *whisper.Envelope {
+func (s *MailserverSuite) createEnvelope(topic types.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *wakucommon.Envelope {
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {
 		s.T().Fatalf("failed to retrieve sym key with seed %d: %s.", seed, err)
 	}
 
-	params := &whisper.MessageParams{
+	params := &wakucommon.MessageParams{
 		KeySym:   key,
-		Topic:    whisper.TopicType(topic),
+		Topic:    wakucommon.TopicType(topic),
 		Payload:  data,
 		PoW:      powRequirement * 2,
 		WorkTime: 2,
 		Src:      srcKey,
 	}
 
-	msg, err := whisper.NewSentMessage(params)
+	msg, err := wakucommon.NewSentMessage(params)
 	if err != nil {
 		s.T().Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -740,9 +599,9 @@ func (s *MailserverSuite) createEnvelope(topic types.TopicType, data []byte, src
 	return env
 }
 
-func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.PublicKey) (*whisper.Envelope, error) {
-	params := &whisper.MessageParams{
-		Topic:    whisper.TopicType{0x1F, 0x7E, 0xA1, 0x7F},
+func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.PublicKey) (*wakucommon.Envelope, error) {
+	params := &wakucommon.MessageParams{
+		Topic:    wakucommon.TopicType{0x1F, 0x7E, 0xA1, 0x7F},
 		Payload:  testPayload,
 		PoW:      powRequirement,
 		WorkTime: 2,
@@ -754,7 +613,7 @@ func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.
 		params.Dst = keyAsym
 	}
 
-	msg, err := whisper.NewSentMessage(params)
+	msg, err := wakucommon.NewSentMessage(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new message with seed %d: %s", seed, err)
 	}
@@ -766,12 +625,12 @@ func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.
 	return env, nil
 }
 
-func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
+func generateEnvelope(sentTime time.Time) (*wakucommon.Envelope, error) {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	return generateEnvelopeWithKeys(sentTime, h[:], nil)
 }
 
-func processRequestAndCollectHashes(server *WhisperMailServer, payload MessagesRequestPayload) ([]common.Hash, []byte, types.Hash) {
+func processRequestAndCollectHashes(server *WakuMailServer, payload MessagesRequestPayload) ([]common.Hash, []byte, types.Hash) {
 	iter, _ := server.ms.createIterator(payload)
 	defer func() { _ = iter.Release() }()
 	bundles := make(chan []rlp.RawValue, 10)
@@ -781,7 +640,7 @@ func processRequestAndCollectHashes(server *WhisperMailServer, payload MessagesR
 	go func() {
 		for bundle := range bundles {
 			for _, rawEnvelope := range bundle {
-				var env *whisper.Envelope
+				var env *wakucommon.Envelope
 				if err := rlp.DecodeBytes(rawEnvelope, &env); err != nil {
 					panic(err)
 				}

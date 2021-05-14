@@ -2,11 +2,9 @@ package wakuext
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math"
-	"net"
 	"os"
 	"strconv"
 	"testing"
@@ -19,10 +17,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -32,8 +28,6 @@ import (
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
-	wakucommon "github.com/status-im/status-go/waku/common"
-	v0 "github.com/status-im/status-go/waku/v0"
 )
 
 func TestRequestMessagesErrors(t *testing.T) {
@@ -269,11 +263,6 @@ func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
 	s.NoError(err)
 	_, err = api.RequestMessages(context.Background(), ext.MessagesRequest{
 		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []types.TopicType{{1}},
-	})
-	s.EqualError(err, "another request with the same topics was sent less than 3s ago. Please wait for a bit longer, or set `force` to true in request parameters")
-	_, err = api.RequestMessages(context.Background(), ext.MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
 		Topics:         []types.TopicType{{2}},
 	})
 	s.NoError(err)
@@ -289,136 +278,4 @@ func (s *ShhExtSuite) TestFailedRequestWithUnknownMailServerPeer() {
 		Topics:         []types.TopicType{{1}},
 	})
 	s.EqualError(err, "could not find peer with ID: 10841e6db5c02fc331bf36a8d2a9137a1696d9d3b6b1f872f780e02aa8ec5bba")
-}
-
-const (
-	// internal waku protocol codes
-	p2pRequestCompleteCode = 125
-)
-
-type WakuNodeMockSuite struct {
-	suite.Suite
-
-	localWakuAPI *waku.PublicWakuAPI
-	localAPI     *PublicAPI
-	localNode    *enode.Node
-	remoteRW     *p2p.MsgPipeRW
-
-	localService *Service
-}
-
-func (s *WakuNodeMockSuite) SetupTest() {
-	db, err := leveldb.Open(storage.NewMemStorage(), nil)
-	s.Require().NoError(err)
-	conf := &waku.Config{
-		MinimumAcceptedPoW:  0,
-		MaxMessageSize:      100 << 10,
-		EnableConfirmations: true,
-	}
-	w := waku.New(conf, nil)
-	w2 := waku.New(nil, nil)
-	s.Require().NoError(w.Start(nil))
-	pkey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
-	rw1, rw2 := p2p.MsgPipe()
-	peer := v0.NewPeer(w, p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}}), rw2, nil)
-	go func() {
-		err := w.HandlePeer(peer, rw2)
-		panic(err)
-	}()
-	wakuWrapper := gethbridge.NewGethWakuWrapper(w)
-
-	peer1 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw1, nil)
-	err = peer1.Start()
-	s.Require().NoError(err, "failed run message loop")
-
-	nodeWrapper := ext.NewTestNodeWrapper(nil, wakuWrapper)
-	s.localService = New(
-		params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3},
-		nodeWrapper,
-		nil,
-		nil,
-		db,
-	)
-	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
-
-	s.localWakuAPI = waku.NewPublicWakuAPI(w)
-	s.localAPI = NewPublicAPI(s.localService)
-	s.localNode = node
-	s.remoteRW = rw1
-}
-
-func TestRequestMessagesSync(t *testing.T) {
-	suite.Run(t, new(RequestMessagesSyncSuite))
-}
-
-type RequestMessagesSyncSuite struct {
-	WakuNodeMockSuite
-}
-
-// NOTE: Disabling this for now as too flaky
-/*
-func (s *RequestMessagesSyncSuite) TestExpired() {
-	// intentionally discarding all requests, so that request will timeout
-	go func() {
-		for {
-			msg, err := s.remoteRW.ReadMsg()
-			s.Require().NoError(err)
-			s.Require().NoError(msg.Discard())
-		}
-	}()
-	_, err := s.localAPI.RequestMessagesSync(
-		ext.RetryConfig{
-			BaseTimeout: time.Millisecond * 100,
-		},
-		ext.MessagesRequest{
-			MailServerPeer: s.localNode.String(),
-			Topics:         []common.TopicType{{0x01, 0x02, 0x03, 0x04}},
-		},
-	)
-	s.Require().EqualError(err, "failed to request messages after 1 retries")
-}
-*/
-
-func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
-	const cursorSize = 36 // taken from mailserver_response.go from waku package
-	cursor := [cursorSize]byte{}
-	cursor[0] = 0x01
-
-	go func() {
-		attempt := 0
-		for {
-			attempt++
-			msg, err := s.remoteRW.ReadMsg()
-			s.Require().NoError(err)
-			if attempt < target {
-				s.Require().NoError(msg.Discard())
-				continue
-			}
-			var e wakucommon.Envelope
-			s.Require().NoError(msg.Decode(&e))
-			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, waku.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, cursor[:])))
-		}
-	}()
-	resp, err := s.localAPI.RequestMessagesSync(
-		ext.RetryConfig{
-			BaseTimeout: time.Second,
-			MaxRetries:  target,
-		},
-		ext.MessagesRequest{
-			MailServerPeer: s.localNode.String(),
-			Force:          true, // force true is convenient here because timeout is less then default delay (3s)
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().Equal(ext.MessagesResponse{Cursor: hex.EncodeToString(cursor[:])}, resp)
-}
-
-func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
-	s.testCompletedFromAttempt(1)
-}
-
-func (s *RequestMessagesSyncSuite) TestCompletedFromSecondAttempt() {
-	s.testCompletedFromAttempt(2)
 }

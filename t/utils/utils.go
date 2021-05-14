@@ -259,11 +259,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"LightEthConfig": {
 			"Enabled": true
 		},
-		"WhisperConfig": {
-			"Enabled": true,
-			"DataDir": "` + path.Join(testDir, "wnode") + `",
-			"EnableNTPSync": false
-		},
 		"ShhextConfig": {
 			"BackupDisabledDataDir": "` + testDir + `"
 		}
@@ -293,10 +288,8 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 	cfg.EnableNTPSync = true
 	cfg.NoDiscovery = true
 	cfg.LightEthConfig.Enabled = false
-	cfg.WhisperConfig.Enabled = true
 	if dataDir != "" {
 		cfg.KeyStoreDir = path.Join(dataDir, "keystore")
-		cfg.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
 	}
 
 	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests

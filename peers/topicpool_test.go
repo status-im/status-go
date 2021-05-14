@@ -16,7 +16,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/waku"
 )
 
 type TopicPoolSuite struct {
@@ -467,7 +467,7 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 	topicPool.running = 1
 	topicPool.maxCachedPeers = 0
 
-	whisper := whisper.New(nil)
+	waku := waku.New(&waku.DefaultConfig, nil)
 	srvkey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	server := &p2p.Server{
@@ -477,7 +477,7 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 			ListenAddr:  ":0",
 			PrivateKey:  srvkey,
 			NoDiscovery: true,
-			Protocols:   whisper.Protocols(),
+			Protocols:   waku.Protocols(),
 		},
 	}
 	require.NoError(t, server.Start())
@@ -490,7 +490,7 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 			ListenAddr:  ":0",
 			PrivateKey:  clientkey,
 			NoDiscovery: true,
-			Protocols:   whisper.Protocols(),
+			Protocols:   waku.Protocols(),
 		},
 	}
 	require.NoError(t, client.Start())

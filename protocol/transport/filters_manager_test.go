@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/waku"
 )
 
 type testKeysPersistence struct {
@@ -90,9 +90,9 @@ func (s *FiltersManagerSuite) SetupTest() {
 
 	keysPersistence := newTestKeysPersistence()
 
-	whisper := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
+	waku := gethbridge.NewGethWakuWrapper(waku.New(&waku.DefaultConfig, nil))
 
-	s.chats, err = NewFiltersManager(keysPersistence, whisper, s.manager[0].privateKey, s.logger)
+	s.chats, err = NewFiltersManager(keysPersistence, waku, s.manager[0].privateKey, s.logger)
 	s.Require().NoError(err)
 }
 

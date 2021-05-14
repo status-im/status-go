@@ -47,6 +47,7 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = CreatePublicChat(chatID, m.getTimesource())
+
 	}
 	chat.Active = true
 
@@ -56,15 +57,35 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 		return nil, err
 	}
 
+	// Store chat
+	m.allChats.Store(chat.ID, chat)
+
+	willSync, err := m.scheduleSyncChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	// We set the synced to, synced from to the default time
+	if !willSync {
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		chat.SyncedTo = timestamp
+		chat.SyncedFrom = timestamp
+	}
+
 	err = m.saveChat(chat)
 	if err != nil {
 		return nil, err
 	}
 
+	// Sync if it was created
+	if !ok {
+		if err := m.syncPublicChat(context.Background(), chat); err != nil {
+			return nil, err
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddChat(chat)
-
-	m.scheduleSyncChat(chat)
 
 	return response, nil
 }
@@ -95,16 +116,33 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 		return nil, err
 	}
 
-	err = m.saveChat(chat)
-	if err != nil {
-		return nil, err
-	}
+	// Store chat
+	m.allChats.Store(chat.ID, chat)
 
 	response := &MessengerResponse{}
 	response.AddChat(chat)
 
-	m.scheduleSyncChat(chat)
-	m.scheduleSyncFilter(filter)
+	willSync, err := m.scheduleSyncChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	// We set the synced to, synced from to the default time
+	if !willSync {
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		chat.SyncedTo = timestamp
+		chat.SyncedFrom = timestamp
+	}
+
+	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.saveChat(chat)
+	if err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }
@@ -131,19 +169,28 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		return nil, err
 	}
 
-	err = m.saveChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
 	// TODO(Samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chatID, chat)
 
 	response := &MessengerResponse{}
 	response.AddChat(chat)
 
-	m.scheduleSyncFilters(filters)
+	willSync, err := m.scheduleSyncFilters(filters)
+	if err != nil {
+		return nil, err
+	}
 
+	// We set the synced to, synced from to the default time
+	if !willSync {
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		chat.SyncedTo = timestamp
+		chat.SyncedFrom = timestamp
+	}
+
+	err = m.saveChat(chat)
+	if err != nil {
+		return nil, err
+	}
 	return response, nil
 
 }
@@ -340,12 +387,12 @@ func (m *Messenger) ensureTimelineChat() error {
 
 func (m *Messenger) ensureMyOwnProfileChat() error {
 	chatID := common.PubkeyToHex(&m.identity.PublicKey)
-	chat, ok := m.allChats.Load(chatID)
+	_, ok := m.allChats.Load(chatID)
 	if ok {
 		return nil
 	}
 
-	chat = m.buildProfileChat(chatID)
+	chat := m.buildProfileChat(chatID)
 
 	chat.Active = true
 

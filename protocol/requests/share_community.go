@@ -10,8 +10,8 @@ var ErrShareCommunityInvalidID = errors.New("share-community: invalid id")
 var ErrShareCommunityEmptyUsers = errors.New("share-community: empty users")
 
 type ShareCommunity struct {
-	CommunityID types.HexBytes
-	Users       []types.HexBytes
+	CommunityID types.HexBytes   `json:"communityId"`
+	Users       []types.HexBytes `json:"users"`
 }
 
 func (j *ShareCommunity) Validate() error {
