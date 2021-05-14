@@ -507,6 +507,10 @@ func (api *NimbusPublicAPI) SendChatMessage(ctx context.Context, message *common
 	return api.service.messenger.SendChatMessage(ctx, message)
 }
 
+func (api *NimbusPublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendPinMessage(ctx, message)
+}
+
 func (api *NimbusPublicAPI) ReSendChatMessage(ctx context.Context, messageID string) error {
 	return api.service.messenger.ReSendChatMessage(ctx, messageID)
 }

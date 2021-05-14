@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/status-im/status-go/protocol/transport"
-
 	"github.com/pkg/errors"
+
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -18,9 +18,9 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 
-	"go.uber.org/zap"
+	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 const (
@@ -322,6 +322,59 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 	state.Response.AddChat(chat)
 
 	return true
+}
+
+func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
+	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
+
+	logger.Info("Handling pin message")
+
+	pinMessage := &common.PinMessage{
+		PinMessage: message,
+		// MessageID:        message.MessageId,
+		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
+		From:             state.CurrentMessageState.Contact.ID,
+		SigPubKey:        state.CurrentMessageState.PublicKey,
+		Identicon:        state.CurrentMessageState.Contact.Identicon,
+		Alias:            state.CurrentMessageState.Contact.Alias,
+	}
+
+	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.AllContacts, state.Timesource)
+	if err != nil {
+		return err // matchChatEntity returns a descriptive error message
+	}
+
+	pinMessage.ID, err = generatePinMessageID(&m.identity.PublicKey, pinMessage, chat)
+	if err != nil {
+		return err
+	}
+
+	// If deleted-at is greater, ignore message
+	if chat.DeletedAtClockValue >= pinMessage.Clock {
+		return nil
+	}
+
+	// Set the LocalChatID for the message
+	pinMessage.LocalChatID = chat.ID
+
+	if c, ok := state.AllChats.Load(chat.ID); ok {
+		chat = c
+	}
+
+	// Set the LocalChatID for the message
+	pinMessage.LocalChatID = chat.ID
+
+	if chat.LastClockValue < message.Clock {
+		chat.LastClockValue = message.Clock
+	}
+
+	state.Response.AddPinMessage(pinMessage)
+
+	// Set in the modified maps chat
+	state.Response.AddChat(chat)
+	state.AllChats.Store(chat.ID, chat)
+
+	return nil
 }
 
 func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {

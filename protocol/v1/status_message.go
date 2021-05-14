@@ -190,6 +190,9 @@ func (m *StatusMessage) HandleApplication() error {
 	case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 		return m.unmarshalProtobufData(new(protobuf.ContactUpdate))
 
+	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.PinMessage))
+
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION:
 		return m.unmarshalProtobufData(new(protobuf.SyncInstallation))
 
