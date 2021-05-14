@@ -348,8 +348,8 @@ func (api *PublicAPI) CreateCommunity(request *requests.CreateCommunity) (*proto
 }
 
 // EditCommunity edits an existing community with the provided description
-func (api *PublicAPI) EditCommunity(communityID types.HexBytes, request *requests.CreateCommunity) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.EditCommunity(communityID, request)
+func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunity(request)
 }
 
 // ExportCommunity exports the private key of the community with given ID

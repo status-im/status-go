@@ -2,6 +2,7 @@ package communities
 
 import (
 	"bytes"
+	"github.com/status-im/status-go/protocol/requests"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -36,17 +37,14 @@ func (s *ManagerSuite) SetupTest() {
 }
 
 func (s *ManagerSuite) TestCreateCommunity() {
-	description := &protobuf.CommunityDescription{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status",
-			Description: "status community description",
-		},
+
+	request := &requests.CreateCommunity{
+		Name: "status",
+		Description: "status community description",
+		Membership: protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
-	community, err := s.manager.CreateCommunity(description)
+	community, err := s.manager.CreateCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
@@ -66,44 +64,41 @@ func (s *ManagerSuite) TestCreateCommunity() {
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
-	description := &protobuf.CommunityDescription{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status",
-			Description: "status community description",
-		},
+	//create community
+	createRequest := &requests.CreateCommunity{
+		Name: "status",
+		Description: "status community description",
+		Membership: protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
-	community, err := s.manager.CreateCommunity(description)
+	community, err := s.manager.CreateCommunity(createRequest)
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
-	descriptionEdited := &protobuf.CommunityDescription{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_ON_REQUEST,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "statusEdited",
+	update := &requests.EditCommunity{
+		CommunityID:     community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Name: "statusEdited",
 			Description: "status community description edited",
 		},
 	}
-	
-	communityEdited, err := s.manager.EditCommunity(community.ID(), descriptionEdited)
+	updatedCommunity, err := s.manager.EditCommunity(update)
 	s.Require().NoError(err)
-	
+	s.Require().NotNil(updatedCommunity)
+
+	//ensure updated community successfully stored
 	communities, err := s.manager.All()
 	s.Require().NoError(err)
 	// Consider status default community
 	s.Require().Len(communities, 2)
 
-	actualCommunity := communities[0]
+	storedCommunity := communities[0]
 	if bytes.Equal(community.ID(), communities[1].ID()) {
-		actualCommunity = communities[1]
+		storedCommunity = communities[1]
 	}
 
-	s.Require().Equal(communityEdited.ID(), actualCommunity.ID())
-	s.Require().Equal(communityEdited.PrivateKey(), actualCommunity.PrivateKey())
-	s.Require().True(proto.Equal(communityEdited.config.CommunityDescription, actualCommunity.config.CommunityDescription))
+	s.Require().Equal(storedCommunity.ID(), updatedCommunity.ID())
+	s.Require().Equal(storedCommunity.PrivateKey(), updatedCommunity.PrivateKey())
+	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.DisplayName, update.CreateCommunity.Name)
+	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.Description, update.CreateCommunity.Description)
 }
