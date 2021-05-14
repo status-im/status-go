@@ -1,7 +1,3 @@
-// +build !nimbus
-
-// TODO: Make independent version for Nimbus
-
 package account
 
 import (

@@ -73,7 +73,3 @@ _assets/compose/bootnode/keys
 
 # do not vendor nested vendor/ dirs
 vendor/**/vendor
-
-# Nimbus
-/vendor/github.com/status-im/nimbus/
-**/eth-node/bridge/nimbus/libnimbus.*
