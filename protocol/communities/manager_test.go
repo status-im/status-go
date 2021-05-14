@@ -2,8 +2,9 @@ package communities
 
 import (
 	"bytes"
-	"github.com/status-im/status-go/protocol/requests"
 	"testing"
+
+	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
@@ -39,9 +40,9 @@ func (s *ManagerSuite) SetupTest() {
 func (s *ManagerSuite) TestCreateCommunity() {
 
 	request := &requests.CreateCommunity{
-		Name: "status",
+		Name:        "status",
 		Description: "status community description",
-		Membership: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
 	community, err := s.manager.CreateCommunity(request)
@@ -66,9 +67,9 @@ func (s *ManagerSuite) TestCreateCommunity() {
 func (s *ManagerSuite) TestEditCommunity() {
 	//create community
 	createRequest := &requests.CreateCommunity{
-		Name: "status",
+		Name:        "status",
 		Description: "status community description",
-		Membership: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest)
@@ -76,12 +77,13 @@ func (s *ManagerSuite) TestEditCommunity() {
 	s.Require().NotNil(community)
 
 	update := &requests.EditCommunity{
-		CommunityID:     community.ID(),
+		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
-			Name: "statusEdited",
+			Name:        "statusEdited",
 			Description: "status community description edited",
 		},
 	}
+
 	updatedCommunity, err := s.manager.EditCommunity(update)
 	s.Require().NoError(err)
 	s.Require().NotNil(updatedCommunity)
