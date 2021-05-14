@@ -490,6 +490,14 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	return o.config.CommunityDescription, nil
 }
 
+func (o *Community) Edit(description *protobuf.CommunityDescription) {
+	o.config.CommunityDescription.Identity.DisplayName = description.Identity.DisplayName
+	o.config.CommunityDescription.Identity.Description = description.Identity.Description
+	o.config.CommunityDescription.Identity.Color = description.Identity.Color
+	o.config.CommunityDescription.Identity.Images = description.Identity.Images
+	o.config.CommunityDescription.Permissions = description.Permissions
+}
+
 func (o *Community) Join() {
 	o.config.Joined = true
 }

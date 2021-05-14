@@ -64,3 +64,46 @@ func (s *ManagerSuite) TestCreateCommunity() {
 	s.Require().Equal(community.PrivateKey(), actualCommunity.PrivateKey())
 	s.Require().True(proto.Equal(community.config.CommunityDescription, actualCommunity.config.CommunityDescription))
 }
+
+func (s *ManagerSuite) TestEditCommunity() {
+	description := &protobuf.CommunityDescription{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status",
+			Description: "status community description",
+		},
+	}
+
+	community, err := s.manager.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	descriptionEdited := &protobuf.CommunityDescription{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_ON_REQUEST,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "statusEdited",
+			Description: "status community description edited",
+		},
+	}
+	
+	communityEdited, err := s.manager.EditCommunity(community.ID(), descriptionEdited)
+	s.Require().NoError(err)
+	
+	communities, err := s.manager.All()
+	s.Require().NoError(err)
+	// Consider status default community
+	s.Require().Len(communities, 2)
+
+	actualCommunity := communities[0]
+	if bytes.Equal(community.ID(), communities[1].ID()) {
+		actualCommunity = communities[1]
+	}
+
+	s.Require().Equal(communityEdited.ID(), actualCommunity.ID())
+	s.Require().Equal(communityEdited.PrivateKey(), actualCommunity.PrivateKey())
+	s.Require().True(proto.Equal(communityEdited.config.CommunityDescription, actualCommunity.config.CommunityDescription))
+}

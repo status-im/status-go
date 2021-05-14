@@ -173,6 +173,38 @@ func (m *Manager) CreateCommunity(description *protobuf.CommunityDescription) (*
 	return community, nil
 }
 
+// CreateCommunity takes a description, updates the community with the description,
+// saves it and returns it
+func (m *Manager) EditCommunity(id types.HexBytes, description *protobuf.CommunityDescription) (*Community, error) {
+	err := ValidateCommunityDescription(description)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	description.Clock += 1
+
+	// Edit the community values
+	community.Edit(description)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
 func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
