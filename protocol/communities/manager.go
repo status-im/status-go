@@ -202,10 +202,17 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, fmt.Errorf("Can't create community description: %v", err)
 	}
 
-	//If permissions weren't explicitly set on original request, use existing ones
+	// If permissions weren't explicitly set on original request, use existing ones
 	if newDescription.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
 		newDescription.Permissions.Access = community.config.CommunityDescription.Permissions.Access
 	}
+	// If the image wasn't edited, use the existing one
+	// NOTE: This will NOT allow deletion of the community image; it will need to
+	// be handled separately.
+	if request.Image == "" {
+		newDescription.Identity.Images = community.config.CommunityDescription.Identity.Images
+	}
+	// TODO: handle delete image (if needed)
 	newDescription.Clock++
 
 	err = ValidateCommunityDescription(newDescription)
