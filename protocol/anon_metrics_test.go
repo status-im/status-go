@@ -1,3 +1,6 @@
+// +build postgres
+// TODO(samyoul) remove this `+build postgres` line ^^^ once docker testing in Jenkins is working good
+
 // In order to run these tests, you must run a PostgreSQL database.
 //
 // Using Docker:
