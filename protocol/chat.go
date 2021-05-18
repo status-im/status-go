@@ -82,6 +82,8 @@ type Chat struct {
 
 	// CommunityID is the id of the community it belongs to
 	CommunityID string `json:"communityId,omitempty"`
+	// Joined is a timestamp that indicates when the chat was joined
+	Joined int64 `json:"joined,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
