@@ -140,13 +140,18 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 	return
 }
 
-func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric, err error) {
-	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
+func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric, totalCount int, err error) {
+	countErr := db.db.QueryRow("SELECT count(*) FROM app_metrics").Scan(&totalCount)
+	if countErr != nil {
+		return nil, totalCount, countErr
+	}
 
+	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, totalCount, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		metric := AppMetric{}
 		err := rows.Scan(
@@ -155,9 +160,9 @@ func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric
 			&metric.SessionID, &metric.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, totalCount, err
 		}
 		appMetrics = append(appMetrics, metric)
 	}
-	return appMetrics, nil
+	return appMetrics, totalCount, nil
 }
