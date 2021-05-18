@@ -329,15 +329,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
-	description, err := request.ToCommunityDescription()
-	if err != nil {
-		return nil, err
-	}
-
-	description.Members = make(map[string]*protobuf.CommunityMember)
-	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
-
-	community, err := m.communitiesManager.CreateCommunity(description)
+	community, err := m.communitiesManager.CreateCommunity(request)
 	if err != nil {
 		return nil, err
 	}
@@ -352,6 +344,22 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		Filters: filters,
 	}
 
+	response.AddCommunity(community)
+
+	return response, nil
+}
+
+func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.EditCommunity(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
 	return response, nil

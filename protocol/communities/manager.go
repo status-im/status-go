@@ -3,6 +3,7 @@ package communities
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -134,8 +135,17 @@ func (m *Manager) Created() ([]*Community, error) {
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
-func (m *Manager) CreateCommunity(description *protobuf.CommunityDescription) (*Community, error) {
-	err := ValidateCommunityDescription(description)
+func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community, error) {
+
+	description, err := request.ToCommunityDescription()
+	if err != nil {
+		return nil, err
+	}
+
+	description.Members = make(map[string]*protobuf.CommunityMember)
+	description.Members[common.PubkeyToHex(m.identity)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
+
+	err = ValidateCommunityDescription(description)
 	if err != nil {
 		return nil, err
 	}
@@ -173,13 +183,65 @@ func (m *Manager) CreateCommunity(description *protobuf.CommunityDescription) (*
 	return community, nil
 }
 
+// CreateCommunity takes a description, updates the community with the description,
+// saves it and returns it
+func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	if !community.IsAdmin() {
+		return nil, errors.New("not an admin")
+	}
+
+	newDescription, err := request.ToCommunityDescription()
+	if err != nil {
+		return nil, fmt.Errorf("Can't create community description: %v", err)
+	}
+
+	// If permissions weren't explicitly set on original request, use existing ones
+	if newDescription.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
+		newDescription.Permissions.Access = community.config.CommunityDescription.Permissions.Access
+	}
+	// If the image wasn't edited, use the existing one
+	// NOTE: This will NOT allow deletion of the community image; it will need to
+	// be handled separately.
+	if request.Image == "" {
+		newDescription.Identity.Images = community.config.CommunityDescription.Identity.Images
+	}
+	// TODO: handle delete image (if needed)
+
+	err = ValidateCommunityDescription(newDescription)
+	if err != nil {
+		return nil, err
+	}
+
+	// Edit the community values
+	community.Edit(newDescription)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
 func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	if community.config.PrivateKey == nil {
+	if !community.IsAdmin() {
 		return nil, errors.New("not an admin")
 	}
 

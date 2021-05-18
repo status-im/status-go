@@ -345,7 +345,11 @@ func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID types.H
 // CreateCommunity creates a new community with the provided description
 func (api *PublicAPI) CreateCommunity(request *requests.CreateCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunity(request)
+}
 
+// EditCommunity edits an existing community with the provided description
+func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunity(request)
 }
 
 // ExportCommunity exports the private key of the community with given ID
