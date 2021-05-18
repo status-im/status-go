@@ -495,7 +495,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.Identity.Description = description.Identity.Description
 	o.config.CommunityDescription.Identity.Color = description.Identity.Color
 	o.config.CommunityDescription.Identity.Images = description.Identity.Images
-	o.config.CommunityDescription.Permissions = description.Permissions
+	o.increaseClock()
 }
 
 func (o *Community) Join() {

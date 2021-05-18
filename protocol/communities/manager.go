@@ -213,7 +213,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		newDescription.Identity.Images = community.config.CommunityDescription.Identity.Images
 	}
 	// TODO: handle delete image (if needed)
-	newDescription.Clock++
 
 	err = ValidateCommunityDescription(newDescription)
 	if err != nil {
