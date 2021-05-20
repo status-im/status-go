@@ -433,6 +433,22 @@ func (db *Database) GetLastKnownBlockByAddress(address common.Address) (block *L
 	return nil, nil
 }
 
+func (db *Database) getLastKnownBalances(addresses []common.Address) (map[common.Address]*LastKnownBlock, error) {
+	result := map[common.Address]*LastKnownBlock{}
+	for _, address := range addresses {
+		block, error := db.GetLastKnownBlockByAddress(address)
+		if error != nil {
+			return nil, error
+		}
+
+		if block != nil {
+			result[address] = block
+		}
+	}
+
+	return result, nil
+}
+
 func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address) (map[common.Address]*LastKnownBlock, []common.Address, error) {
 	res := map[common.Address]*LastKnownBlock{}
 	accountsWithoutHistory := []common.Address{}
@@ -785,8 +801,8 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 	if err != nil {
 		return err
 	}
-	updateTx, err := creator.Prepare(`UPDATE transfers 
-	SET log = ? 
+	updateTx, err := creator.Prepare(`UPDATE transfers
+	SET log = ?
 	WHERE network_id = ? AND address = ? AND hash = ?`)
 	if err != nil {
 		return err

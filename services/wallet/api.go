@@ -238,3 +238,34 @@ func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Addre
 		addresses,
 		new(big.Int).SetUint64(api.s.db.network))
 }
+
+type LastKnownBlockView struct {
+	Address common.Address `json:"address"`
+	Number  *big.Int       `json:"blockNumber"`
+	Balance BigInt         `json:"balance"`
+	Nonce   *int64         `json:"nonce"`
+}
+
+func blocksToViews(blocks map[common.Address]*LastKnownBlock) []LastKnownBlockView {
+	blocksViews := []LastKnownBlockView{}
+	for address, block := range blocks {
+		view := LastKnownBlockView{
+			Address: address,
+			Number:  block.Number,
+			Balance: BigInt{block.Balance},
+			Nonce:   block.Nonce,
+		}
+		blocksViews = append(blocksViews, view)
+	}
+
+	return blocksViews
+}
+
+func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]LastKnownBlockView, error) {
+	result, error := api.s.db.getLastKnownBalances(addresses)
+	if error != nil {
+		return nil, error
+	}
+
+	return blocksToViews(result), nil
+}

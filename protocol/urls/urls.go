@@ -74,11 +74,11 @@ func LinkPreviewWhitelist() []Site {
 			Address:   "youtu.be",
 			ImageSite: false,
 		},
-		Site{
-			Title:     "Tenor GIFs",
-			Address:   "tenor.com",
-			ImageSite: true,
-		},
+		// Site{
+		// 	Title:     "Tenor GIFs",
+		// 	Address:   "tenor.com",
+		// 	ImageSite: true,
+		// },
 		Site{
 			Title:     "GIPHY GIFs shortener",
 			Address:   "gph.is",
