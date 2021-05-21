@@ -28,7 +28,7 @@ func (api *API) SaveAppMetrics(ctx context.Context, appMetrics []appmetrics.AppM
 	return api.db.SaveAppMetrics(appMetrics, api.sessionID)
 }
 
-func (api *API) GetAppMetrics(ctx context.Context, limit int, offset int) ([]appmetrics.AppMetric, error) {
+func (api *API) GetAppMetrics(ctx context.Context, limit int, offset int) (appmetrics.Page, error) {
 	log.Debug("[AppMetricsAPI::GetAppMetrics]")
 	return api.db.GetAppMetrics(limit, offset)
 }

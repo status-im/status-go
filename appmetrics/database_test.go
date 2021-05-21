@@ -37,11 +37,14 @@ func TestSaveAppMetrics(t *testing.T) {
 	err := db.SaveAppMetrics(appMetrics, sessionID)
 	require.NoError(t, err)
 
-	res, err := db.GetAppMetrics(10, 0)
+	appMetricsPage, err := db.GetAppMetrics(10, 0)
+	res := appMetricsPage.AppMetrics
+	count := appMetricsPage.TotalCount
 	require.NoError(t, err)
 	require.Equal(t, appMetrics[0].Event, res[0].Event)
 	require.Equal(t, appMetrics[0].Value, res[0].Value)
 	require.Equal(t, appMetrics[0].OS, res[0].OS)
 	require.Equal(t, appMetrics[0].AppVersion, res[0].AppVersion)
 	require.NotNil(t, res[0].CreatedAt)
+	require.Equal(t, count, 1)
 }

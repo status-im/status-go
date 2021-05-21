@@ -28,6 +28,11 @@ type AppMetricValidationError struct {
 	Errors []gojsonschema.ResultError
 }
 
+type Page struct {
+	AppMetrics []AppMetric
+	TotalCount int
+}
+
 const (
 	// status-react navigation events
 	NavigateTo         AppMetricEventType = "navigate-to"
@@ -140,13 +145,18 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 	return
 }
 
-func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric, err error) {
-	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
+func (db *Database) GetAppMetrics(limit int, offset int) (page Page, err error) {
+	countErr := db.db.QueryRow("SELECT count(*) FROM app_metrics").Scan(&page.TotalCount)
+	if countErr != nil {
+		return page, countErr
+	}
 
+	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
-		return nil, err
+		return page, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		metric := AppMetric{}
 		err := rows.Scan(
@@ -155,9 +165,9 @@ func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric
 			&metric.SessionID, &metric.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return page, err
 		}
-		appMetrics = append(appMetrics, metric)
+		page.AppMetrics = append(page.AppMetrics, metric)
 	}
-	return appMetrics, nil
+	return page, nil
 }
