@@ -933,6 +933,7 @@ func (m *Messenger) Init() error {
 		publicKeys    []*ecdsa.PublicKey
 	)
 
+	logger.Info("1")
 	joinedCommunities, err := m.communitiesManager.Joined()
 	if err != nil {
 		return err
@@ -941,6 +942,7 @@ func (m *Messenger) Init() error {
 		// the org advertise on the public topic derived by the pk
 		publicChatIDs = append(publicChatIDs, org.IDString())
 	}
+	logger.Info("2")
 
 	// Init filters for the communities we are an admin of
 	var adminCommunitiesPks []*ecdsa.PrivateKey
@@ -948,6 +950,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("3")
 
 	for _, c := range adminCommunities {
 		adminCommunitiesPks = append(adminCommunitiesPks, c.PrivateKey())
@@ -957,6 +960,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("4")
 
 	// Get chat IDs and public keys from the existing chats.
 	// TODO: Get only active chats by the query.
@@ -964,6 +968,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("5")
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
@@ -998,22 +1003,26 @@ func (m *Messenger) Init() error {
 			return errors.New("invalid chat type")
 		}
 	}
+	logger.Info("6")
 	// upsert timeline chat
 	err = m.ensureTimelineChat()
 	if err != nil {
 		return err
 	}
+	logger.Info("7")
 	// uspert profile chat
 	err = m.ensureMyOwnProfileChat()
 	if err != nil {
 		return err
 	}
+	logger.Info("8")
 
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()
 	if err != nil {
 		return err
 	}
+	logger.Info("9")
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
@@ -1028,16 +1037,20 @@ func (m *Messenger) Init() error {
 		publicKeys = append(publicKeys, publicKey)
 	}
 
+	logger.Info("10")
 	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
 	if err != nil {
 		return err
 	}
 
+	logger.Info("11")
 	for _, installation := range installations {
 		m.allInstallations.Store(installation.ID, installation)
 	}
 
+	logger.Info("12")
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
+	logger.Info("13")
 	return err
 }
 
