@@ -76,23 +76,27 @@ func (f *FiltersManager) Init(
 	publicKeys []*ecdsa.PublicKey,
 ) ([]*Filter, error) {
 
+	f.logger.Info("1a")
 	// Load our contact code.
 	_, err := f.LoadContactCode(&f.privateKey.PublicKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load contact code")
 	}
+	f.logger.Info("2a")
 
 	// Load partitioned topic.
 	_, err = f.loadMyPartitioned()
 	if err != nil {
 		return nil, err
 	}
+	f.logger.Info("3a")
 
 	// Add discovery topic.
 	_, err = f.LoadDiscovery()
 	if err != nil {
 		return nil, err
 	}
+	f.logger.Info("4a")
 
 	// Add public, one-to-one and negotiated filters.
 	for _, chatID := range chatIDs {
@@ -101,6 +105,7 @@ func (f *FiltersManager) Init(
 			return nil, err
 		}
 	}
+	f.logger.Info("5a")
 
 	for _, publicKey := range publicKeys {
 		_, err := f.LoadContactCode(publicKey)
@@ -108,14 +113,17 @@ func (f *FiltersManager) Init(
 			return nil, err
 		}
 	}
+	f.logger.Info("6a")
 
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
+	f.logger.Info("7a")
 	var allFilters []*Filter
 	for _, f := range f.filters {
 		allFilters = append(allFilters, f)
 	}
+	f.logger.Info("8a")
 	return allFilters, nil
 }
 
@@ -539,11 +547,13 @@ func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 
 	symKey, ok := f.keys[chatID]
 	if ok {
+		f.logger.Info("cached")
 		symKeyID, err = f.service.AddSymKeyDirect(symKey)
 		if err != nil {
 			return nil, err
 		}
 	} else {
+		f.logger.Info("not cached")
 		symKeyID, err = f.service.AddSymKeyFromPassword(chatID)
 		if err != nil {
 			return nil, err
@@ -558,6 +568,8 @@ func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 			return nil, err
 		}
 	}
+
+	f.logger.Info("here")
 
 	id, err := f.service.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
