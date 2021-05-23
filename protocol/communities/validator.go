@@ -15,6 +15,12 @@ func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.C
 		return ErrInvalidCommunityDescriptionUnknownChatAccess
 	}
 
+	if len(chat.CategoryId) != 0 {
+		if _, exists := desc.Categories[chat.CategoryId]; !exists {
+			return ErrInvalidCommunityDescriptionUnknownChatCategory
+		}
+	}
+
 	for pk := range chat.Members {
 		if desc.Members == nil {
 			return ErrInvalidCommunityDescriptionMemberInChatButNotInOrg
@@ -23,6 +29,18 @@ func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.C
 		if _, ok := desc.Members[pk]; !ok {
 			return ErrInvalidCommunityDescriptionMemberInChatButNotInOrg
 		}
+	}
+
+	return nil
+}
+
+func validateCommunityCategory(category *protobuf.CommunityCategory) error {
+	if len(category.CategoryId) == 0 {
+		return ErrInvalidCommunityDescriptionCategoryNoID
+	}
+
+	if len(category.Name) == 0 {
+		return ErrInvalidCommunityDescriptionCategoryNoName
 	}
 
 	return nil
@@ -37,6 +55,12 @@ func ValidateCommunityDescription(desc *protobuf.CommunityDescription) error {
 	}
 	if desc.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
 		return ErrInvalidCommunityDescriptionUnknownOrgAccess
+	}
+
+	for _, category := range desc.Categories {
+		if err := validateCommunityCategory(category); err != nil {
+			return err
+		}
 	}
 
 	for _, chat := range desc.Chats {

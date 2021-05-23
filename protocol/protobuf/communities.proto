@@ -41,12 +41,21 @@ message CommunityDescription {
   ChatIdentity identity = 5;
   map<string,CommunityChat> chats = 6;
   repeated string ban_list = 7;
+  map<string,CommunityCategory> categories = 8;
 }
 
 message CommunityChat {
   map<string,CommunityMember> members = 1;
   CommunityPermissions permissions = 2;
   ChatIdentity identity = 3;
+  string category_id = 4;
+  int32 position = 5;
+}
+
+message CommunityCategory {
+  string category_id = 1;
+  string name = 2;
+  int32 position = 3;
 }
 
 message CommunityInvitation {

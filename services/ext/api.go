@@ -412,6 +412,31 @@ func (api *PublicAPI) RequestToJoinCommunity(request *requests.RequestToJoinComm
 	return api.service.messenger.RequestToJoinCommunity(request)
 }
 
+// CreateCommunityCategory creates a category within a particular community
+func (api *PublicAPI) CreateCommunityCategory(request *requests.CreateCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityCategory(request)
+}
+
+// ReorderCommunityCategories is used to change the order of the categories of a community
+func (api *PublicAPI) ReorderCommunityCategories(request *requests.ReorderCommunityCategories) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReorderCommunityCategories(request)
+}
+
+// ReorderCommunityChat allows changing the order of the chat or switching its category
+func (api *PublicAPI) ReorderCommunityChat(request *requests.ReorderCommunityChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReorderCommunityChat(request)
+}
+
+// EditCommunityCategory modifies a category within a particular community
+func (api *PublicAPI) EditCommunityCategory(request *requests.EditCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunityCategory(request)
+}
+
+// DeleteCommunityCategory deletes a category within a particular community and removes this category from any chat that has it
+func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityCategory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteCommunityCategory(request)
+}
+
 type ApplicationMessagesResponse struct {
 	Messages []*common.Message `json:"messages"`
 	Cursor   string            `json:"cursor"`

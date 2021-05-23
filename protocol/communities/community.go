@@ -62,6 +62,14 @@ type CommunityChat struct {
 	Members     map[string]*protobuf.CommunityMember `json:"members"`
 	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
 	CanPost     bool                                 `json:"canPost"`
+	Position    int                                  `json:"position"`
+	CategoryID  string                               `json:"categoryID"`
+}
+
+type CommunityCategory struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"` // Position is used to sort the categories
 }
 
 func (o *Community) MarshalJSON() ([]byte, error) {
@@ -77,6 +85,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Name              string                               `json:"name"`
 		Description       string                               `json:"description"`
 		Chats             map[string]CommunityChat             `json:"chats"`
+		Categories        map[string]CommunityCategory         `json:"categories"`
 		Images            map[string]images.IdentityImage      `json:"images"`
 		Permissions       *protobuf.CommunityPermissions       `json:"permissions"`
 		Members           map[string]*protobuf.CommunityMember `json:"members"`
@@ -91,6 +100,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Admin:             o.IsAdmin(),
 		Verified:          o.config.Verified,
 		Chats:             make(map[string]CommunityChat),
+		Categories:        make(map[string]CommunityCategory),
 		Joined:            o.config.Joined,
 		CanRequestAccess:  o.CanRequestAccess(o.config.MemberIdentity),
 		CanJoin:           o.canJoin(),
@@ -99,6 +109,14 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		IsMember:          o.isMember(),
 	}
 	if o.config.CommunityDescription != nil {
+		for id, c := range o.config.CommunityDescription.Categories {
+			category := CommunityCategory{
+				ID:       id,
+				Name:     c.Name,
+				Position: int(c.Position),
+			}
+			communityItem.Categories[id] = category
+		}
 		for id, c := range o.config.CommunityDescription.Chats {
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
 			if err != nil {
@@ -110,6 +128,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Permissions: c.Permissions,
 				Members:     c.Members,
 				CanPost:     canPost,
+				CategoryID:  c.CategoryId,
+				Position:    int(c.Position),
 			}
 			communityItem.Chats[id] = chat
 		}
@@ -169,8 +189,10 @@ func (o *Community) initialize() {
 }
 
 type CommunityChatChanges struct {
-	MembersAdded   map[string]*protobuf.CommunityMember
-	MembersRemoved map[string]*protobuf.CommunityMember
+	MembersAdded     map[string]*protobuf.CommunityMember
+	MembersRemoved   map[string]*protobuf.CommunityMember
+	CategoryModified string
+	PositionModified int
 }
 
 type CommunityChanges struct {
@@ -181,6 +203,10 @@ type CommunityChanges struct {
 	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
 	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
 	ChatsModified map[string]*CommunityChatChanges   `json:"chatsModified"`
+
+	CategoriesRemoved  []string                               `json:"categoriesRemoved"`
+	CategoriesAdded    map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
+	CategoriesModified map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
 
 	// ShouldMemberJoin indicates whether the user should join this community
 	// automatically
@@ -233,6 +259,14 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 		return nil, ErrChatAlreadyExists
 	}
 
+	// Sets the chat position to be the last within its category
+	chat.Position = 0
+	for _, c := range o.config.CommunityDescription.Chats {
+		if c.CategoryId == chat.CategoryId {
+			chat.Position++
+		}
+	}
+
 	o.config.CommunityDescription.Chats[chatID] = chat
 
 	o.increaseClock()
@@ -253,6 +287,15 @@ func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, e
 	if o.config.CommunityDescription.Chats == nil {
 		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
 	}
+
+	changes := o.emptyCommunityChanges()
+
+	if chat, exists := o.config.CommunityDescription.Chats[chatID]; exists {
+		tmpCatID := chat.CategoryId
+		chat.CategoryId = ""
+		o.SortCategoryChats(changes, tmpCatID)
+	}
+
 	delete(o.config.CommunityDescription.Chats, chatID)
 
 	o.increaseClock()
@@ -570,6 +613,7 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 			if o.config.CommunityDescription.Chats == nil {
 				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
 			}
+
 			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
 				if response.ChatsAdded == nil {
 					response.ChatsAdded = make(map[string]*protobuf.CommunityChat)
@@ -604,6 +648,65 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 						response.ChatsModified[chatID].MembersRemoved[pk] = member
 					}
 				}
+			}
+		}
+
+		// Check for categories that were removed
+		for categoryID := range o.config.CommunityDescription.Categories {
+			if description.Categories == nil {
+				description.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+
+			if description.Chats == nil {
+				description.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := description.Categories[categoryID]; !ok {
+				response.CategoriesRemoved = append(response.CategoriesRemoved, categoryID)
+			}
+
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+		}
+
+		// Check for categories that were added
+		for categoryID, category := range description.Categories {
+			if o.config.CommunityDescription.Categories == nil {
+				o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+			if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
+				if response.CategoriesAdded == nil {
+					response.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
+				}
+
+				response.CategoriesAdded[categoryID] = category
+			} else {
+				if o.config.CommunityDescription.Categories[categoryID].Name != category.Name || o.config.CommunityDescription.Categories[categoryID].Position != category.Position {
+					response.CategoriesModified[categoryID] = category
+				}
+			}
+		}
+
+		// Check for chat categories that were modified
+		for chatID, chat := range description.Chats {
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
+				continue // It's a new chat
+			}
+
+			if o.config.CommunityDescription.Chats[chatID].CategoryId != chat.CategoryId {
+				if response.ChatsModified[chatID] == nil {
+					response.ChatsModified[chatID] = &CommunityChatChanges{
+						MembersAdded:   make(map[string]*protobuf.CommunityMember),
+						MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					}
+				}
+
+				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
 			}
 		}
 	}
@@ -760,6 +863,17 @@ func (o *Community) Chats() map[string]*protobuf.CommunityChat {
 
 	response := make(map[string]*protobuf.CommunityChat)
 	for k, v := range o.config.CommunityDescription.Chats {
+		response[k] = v
+	}
+	return response
+}
+
+func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	response := make(map[string]*protobuf.CommunityCategory)
+	for k, v := range o.config.CommunityDescription.Categories {
 		response[k] = v
 	}
 	return response
@@ -1015,5 +1129,28 @@ func emptyCommunityChanges() *CommunityChanges {
 		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
 		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
 		ChatsModified: make(map[string]*CommunityChatChanges),
+
+		CategoriesRemoved:  []string{},
+		CategoriesAdded:    make(map[string]*protobuf.CommunityCategory),
+		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
 	}
+}
+
+type sortSlice []sorterHelperIdx
+type sorterHelperIdx struct {
+	pos    int32
+	catID  string
+	chatID string
+}
+
+func (d sortSlice) Len() int {
+	return len(d)
+}
+
+func (d sortSlice) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
+
+func (d sortSlice) Less(i, j int) bool {
+	return d[i].pos < d[j].pos
 }

@@ -235,6 +235,86 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	return response, nil
 }
 
+func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCategory) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.CreateCategory(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) EditCommunityCategory(request *requests.EditCommunityCategory) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.EditCategory(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) ReorderCommunityCategories(request *requests.ReorderCommunityCategories) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.ReorderCategories(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) ReorderCommunityChat(request *requests.ReorderCommunityChat) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.ReorderChat(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) DeleteCommunityCategory(request *requests.DeleteCommunityCategory) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.DeleteCategory(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
 func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
