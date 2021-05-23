@@ -69,7 +69,7 @@ type CommunityChat struct {
 type CommunityCategory struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Position int    `json:"position"`
+	Position int    `json:"position"` // Position is used to sort the categories
 }
 
 func (o *Community) MarshalJSON() ([]byte, error) {
@@ -259,13 +259,13 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 		return nil, ErrChatAlreadyExists
 	}
 
-	var pos int32 = 0
+	// Sets the chat position to be the last within its category
+	chat.Position = 0
 	for _, c := range o.config.CommunityDescription.Chats {
 		if c.CategoryId == chat.CategoryId {
-			pos = pos + 1
+			chat.Position++
 		}
 	}
-	chat.Position = pos
 
 	o.config.CommunityDescription.Chats[chatID] = chat
 

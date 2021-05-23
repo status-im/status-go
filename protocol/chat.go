@@ -86,7 +86,7 @@ type Chat struct {
 	// CommunityID is the id of the community it belongs to
 	CommunityID string `json:"communityId,omitempty"`
 
-	// CommunityCategoryID is the id of the community category this chat belongs to.
+	// CategoryID is the id of the community category this chat belongs to.
 	CategoryID string `json:"categoryId,omitempty"`
 
 	// Joined is a timestamp that indicates when the chat was joined
