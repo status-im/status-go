@@ -55,17 +55,9 @@ pipeline {
     } } }
 
     stage('Unit Tests') {
-
-      agent {
-        docker {
-          image 'postgres:9.6-alpine'
-          args '--name mailserver-db -e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -d -p 5432:5432'
-          reuseNode true
-        }
-      }
       steps {
         dir(env.STATUS_PATH) {
-          sh 'make test-unit'
+          sh 'docker-compose up --build'
         }
       }
     }
