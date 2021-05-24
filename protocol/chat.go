@@ -381,11 +381,16 @@ func CreateProfileChat(pubkey string, timesource common.TimeSource) *Chat {
 }
 
 func CreateGroupChat(timesource common.TimeSource) Chat {
+	timestamp := timesource.GetCurrentTime()
+	synced := uint32(timestamp / 1000)
+
 	return Chat{
-		Active:    true,
-		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
-		Timestamp: int64(timesource.GetCurrentTime()),
-		ChatType:  ChatTypePrivateGroupChat,
+		Active:     true,
+		Color:      chatColors[rand.Intn(len(chatColors))], // nolint: gosec
+		Timestamp:  int64(timestamp),
+		SyncedTo:   synced,
+		SyncedFrom: synced,
+		ChatType:   ChatTypePrivateGroupChat,
 	}
 }
 

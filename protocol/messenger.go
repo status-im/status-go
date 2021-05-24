@@ -1185,11 +1185,6 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	timestamp := uint32(chat.Timestamp / 1000)
-
-	chat.SyncedTo = timestamp
-	chat.SyncedFrom = timestamp
-
 	m.allChats.Store(chat.ID, &chat)
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
