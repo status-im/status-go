@@ -1232,6 +1232,11 @@ func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, ad
 	chat.Name = name
 	chat.InvitationAdmin = adminPK
 
+	timestamp := uint32(chat.Timestamp / 1000)
+
+	chat.SyncedTo = timestamp
+	chat.SyncedFrom = timestamp
+
 	response.AddChat(&chat)
 
 	return &response, m.saveChat(&chat)
