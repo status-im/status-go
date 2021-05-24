@@ -58,7 +58,8 @@ pipeline {
       agent {
         dockerfile {
           filename 'test.dockerfile'
-          //dir "${env.STATUS_PATH}"
+          dir "${env.STATUS_PATH}"
+          label "unit-test"
         }
       }
       steps {
