@@ -41,8 +41,8 @@ pipeline {
       sh 'GO111MODULE=off make setup-build modvendor-install'
     } } }
 
-    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
-      /* fail build if vendoring hasn't been done */
+    /*stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
+      // fail build if vendoring hasn't been done
       sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
     } } }
 
@@ -52,12 +52,13 @@ pipeline {
 
     stage('Canary') { steps { dir(env.STATUS_PATH) {
       sh 'make canary-test'
-    } } }
+    } } }*/
 
     stage('Unit Tests') {
+      agent { dockerfile true }
       steps {
         dir(env.STATUS_PATH) {
-          sh 'docker-compose up --build'
+          sh 'go version'
         }
       }
     }
