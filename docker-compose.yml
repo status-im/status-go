@@ -5,7 +5,7 @@ services:
       - db
     build:
       context: ./
-      dockerfile: Dockerfile-alternate
+      dockerfile: Dockerfile.tests
   db:
     image: postgres:9.6-alpine
     environment:
