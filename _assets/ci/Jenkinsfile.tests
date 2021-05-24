@@ -55,7 +55,12 @@ pipeline {
     } } }*/
 
     stage('Unit Tests') {
-      agent { dockerfile true }
+      agent {
+        dockerfile {
+          filename 'test.dockerfile'
+          dir "${env.STATUS_PATH}"
+        }
+      }
       steps {
         dir(env.STATUS_PATH) {
           sh 'go version'
