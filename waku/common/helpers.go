@@ -4,10 +4,10 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
-	"fmt"
 	mrand "math/rand"
+	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 )
 
 // IsPubKeyEqual checks that two public keys are equal
@@ -88,15 +88,7 @@ func GenerateSecureRandomData(length int) ([]byte, error) {
 
 // GenerateRandomID generates a random string, which is then returned to be used as a key id
 func GenerateRandomID() (id string, err error) {
-	buf, err := GenerateSecureRandomData(KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-	if !ValidateDataIntegrity(buf, KeyIDSize) {
-		return "", fmt.Errorf("error in generateRandomID: crypto/rand failed to generate random data")
-	}
-	id = common.Bytes2Hex(buf)
-	return id, err
+	return strings.ReplaceAll("-", "", uuid.New().String()+uuid.New().String()), nil
 }
 
 // ValidateDataIntegrity returns false if the data have the wrong or contains all zeros,
