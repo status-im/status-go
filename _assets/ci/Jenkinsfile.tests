@@ -62,9 +62,7 @@ pipeline {
         }
       }
       steps {
-        dir(env.STATUS_PATH) {
-          sh 'go version'
-        }
+        sh 'go version'
       }
     }
 
