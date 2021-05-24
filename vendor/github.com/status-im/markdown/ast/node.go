@@ -498,14 +498,16 @@ type CodeBlock struct {
 
 func (c *CodeBlock) MarshalJSON() ([]byte, error) {
 	type CodeBlockJSON struct {
-		Type    string `json:"type"`
-		Literal string `json:"literal"`
+		Type     string `json:"type"`
+		Literal  string `json:"literal"`
+		Language string `json:"language,omitempty"`
 		*Attribute
 	}
 	var c1 CodeBlockJSON
 	c1.Literal = string(c.Literal)
 	c1.Type = "codeblock"
 	c1.Attribute = c.Attribute
+	c1.Language = string(c.Info)
 
 	return json.Marshal(&c1)
 }

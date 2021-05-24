@@ -1109,8 +1109,6 @@ github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a/go
 github.com/status-im/keycard-go v0.0.0-20190316090335-8537d3370df4/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 h1:Oo2KZNP70KE0+IUJSidPj/BFS/RXNHmKIJOdckzml2E=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
-github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf h1:0w1mjNUqEHoL8RkcT4VEZ7+wzqQzAVQXZBFqPElkmJk=
-github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
 github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6 h1:wSC60c77UymRfRJKvzstqb3PMCs3t8x4luQBi0SCIMQ=
 github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
