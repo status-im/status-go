@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -16,6 +17,7 @@ type ActivityCenterType int
 const (
 	ActivityCenterNotificationTypeNewOneToOne = iota + 1
 	ActivityCenterNotificationTypeNewPrivateGroupChat
+	ActivityCenterNotificationTypeMention
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
@@ -26,6 +28,7 @@ type ActivityCenterNotification struct {
 	Name        string             `json:"name"`
 	Type        ActivityCenterType `json:"type"`
 	LastMessage *common.Message    `json:"lastMessage"`
+	Message     *common.Message    `json:"message"`
 	Timestamp   uint64             `json:"timestamp"`
 	Read        bool               `json:"read"`
 	Dismissed   bool               `json:"dismissed"`
@@ -43,4 +46,16 @@ func (n *ActivityCenterNotification) Valid() error {
 	}
 	return nil
 
+}
+
+func showMentionActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) bool {
+	if chat != nil && !chat.Active {
+		return false
+	}
+
+	if message.Mentioned && chat != nil && (chat.CommunityChat() || chat.PrivateGroupChat()) {
+		return true
+	}
+
+	return false
 }
