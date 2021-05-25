@@ -628,6 +628,8 @@ github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e h1:iT/UJdf+Sz
 github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
 github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf h1:0w1mjNUqEHoL8RkcT4VEZ7+wzqQzAVQXZBFqPElkmJk=
 github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
+github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6 h1:wSC60c77UymRfRJKvzstqb3PMCs3t8x4luQBi0SCIMQ=
+github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=

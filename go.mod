@@ -57,7 +57,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
-	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
+	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/extkeys v1.1.2
