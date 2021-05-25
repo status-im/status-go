@@ -129,7 +129,7 @@ func (s *ChatTestSuite) TestSerializeJSON() {
 
 	message.Clock = 1
 	message.Text = "`some markdown text`"
-	s.Require().NoError(message.PrepareContent())
+	s.Require().NoError(message.PrepareContent(""))
 	message.ParsedTextAst = nil
 	chat.LastMessage = message
 

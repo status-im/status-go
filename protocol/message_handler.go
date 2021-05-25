@@ -198,7 +198,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.Identicon = state.CurrentMessageState.Contact.Identicon
 	message.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
-	if err := message.PrepareContent(); err != nil {
+	if err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey)); err != nil {
 		return fmt.Errorf("failed to prepare content: %v", err)
 	}
 	chat, err := m.matchChatEntity(message, state.AllChats, state.AllContacts, state.Timesource)
@@ -579,7 +579,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
-	err := receivedMessage.PrepareContent()
+	err := receivedMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}

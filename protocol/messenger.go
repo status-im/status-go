@@ -2091,7 +2091,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		message.OutgoingStatus = common.OutgoingStatusSent
 	}
 	message.ID = rawMessage.ID
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3181,7 +3181,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 
 	message.ID = messageID
 	message.CommandParameters.ID = messageID
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3255,7 +3255,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 
 	message.ID = messageID
 	message.CommandParameters.ID = messageID
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3348,7 +3348,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	message.CommandParameters.Address = address
 	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionAccepted
 
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3428,7 +3428,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	message.ID = rawMessage.ID
 	message.CommandParameters.CommandState = common.CommandStateRequestTransactionDeclined
 
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3508,7 +3508,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	message.ID = rawMessage.ID
 	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionDeclined
 
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3605,7 +3605,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.CommandParameters.Signature = signature
 	message.CommandParameters.CommandState = common.CommandStateTransactionSent
 
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3684,7 +3684,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		CommandState:    common.CommandStateTransactionSent,
 	}
 
-	err = message.PrepareContent()
+	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -3766,7 +3766,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		message.CommandParameters.CommandState = common.CommandStateTransactionSent
 		message.CommandParameters.TransactionHash = validationResult.Transaction.TransactionHash
 
-		err = message.PrepareContent()
+		err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			return nil, err
 		}

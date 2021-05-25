@@ -145,6 +145,9 @@ type Message struct {
 	// Mentions is an array of mentions for a given message
 	Mentions []string
 
+	// Mentioned is whether the user is mentioned in the message
+	Mentioned bool `json:"mentioned"`
+
 	// Links is an array of links within given message
 	Links []string
 }
@@ -185,6 +188,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
 		MessageType       protobuf.MessageType             `json:"messageType"`
 		Mentions          []string                         `json:"mentions,omitempty"`
+		Mentioned         bool                             `json:"mentioned,omitempty"`
 		Links             []string                         `json:"links,omitempty"`
 	}{
 		ID:                m.ID,
@@ -212,6 +216,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,
 		Mentions:          m.Mentions,
+		Mentioned:         m.Mentioned,
 		Links:             m.Links,
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
@@ -377,8 +382,10 @@ func (v *SimplifiedTextVisitor) Visit(node ast.Node, entering bool) ast.WalkStat
 
 // implement interface of https://github.com/status-im/markdown/blob/b9fe921681227b1dace4b56364e15edb3b698308/ast/node.go#L701
 type MentionsAndLinksVisitor struct {
-	mentions []string
-	links    []string
+	identity  string
+	mentioned bool
+	mentions  []string
+	links     []string
 }
 
 func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
@@ -388,7 +395,11 @@ func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkSt
 	}
 	switch n := node.(type) {
 	case *ast.Mention:
-		v.mentions = append(v.mentions, string(n.Literal))
+		mention := string(n.Literal)
+		if mention == v.identity {
+			v.mentioned = true
+		}
+		v.mentions = append(v.mentions, mention)
 	case *ast.Link:
 		v.links = append(v.links, string(n.Destination))
 	}
@@ -396,17 +407,24 @@ func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkSt
 	return ast.GoToNext
 }
 
-func extractMentionsAndLinks(parsedText ast.Node) ([]string, []string) {
-	visitor := &MentionsAndLinksVisitor{}
+func runMentionsAndLinksVisitor(parsedText ast.Node, identity string) *MentionsAndLinksVisitor {
+	visitor := &MentionsAndLinksVisitor{identity: identity}
 	ast.Walk(parsedText, visitor)
-	return visitor.mentions, visitor.links
+	return visitor
 }
 
 // PrepareContent return the parsed content of the message, the line-count and whether
 // is a right-to-left message
-func (m *Message) PrepareContent() error {
+func (m *Message) PrepareContent(identity string) error {
 	parsedText := markdown.Parse([]byte(m.Text), nil)
-	m.Mentions, m.Links = extractMentionsAndLinks(parsedText)
+	visitor := runMentionsAndLinksVisitor(parsedText, identity)
+	m.Mentions = visitor.mentions
+	m.Links = visitor.links
+	// Leave it set if already set, as sometimes we might run this without
+	// an identity
+	if !m.Mentioned {
+		m.Mentioned = visitor.mentioned
+	}
 	jsonParsedText, err := json.Marshal(parsedText)
 	if err != nil {
 		return err
@@ -423,7 +441,7 @@ func (m *Message) PrepareContent() error {
 
 // GetSimplifiedText returns a the text stripped of all the markdown and with mentions
 // replaced by canonical names
-func (m *Message) GetSimplifiedText(canonicalNames map[string]string) (string, error) {
+func (m *Message) GetSimplifiedText(identity string, canonicalNames map[string]string) (string, error) {
 
 	if m.ContentType == protobuf.ChatMessage_AUDIO {
 		return "Audio", nil
@@ -439,7 +457,7 @@ func (m *Message) GetSimplifiedText(canonicalNames map[string]string) (string, e
 	}
 
 	if m.ParsedTextAst == nil {
-		err := m.PrepareContent()
+		err := m.PrepareContent(identity)
 		if err != nil {
 			return "", err
 		}

@@ -26,19 +26,12 @@ func showMessageNotification(publicKey ecdsa.PublicKey, message *common.Message,
 		return true
 	}
 
-	publicKeyString := common.PubkeyToHex(&publicKey)
-	mentioned := false
-	for _, mention := range message.Mentions {
-		if publicKeyString == mention {
-			mentioned = true
-		}
-	}
-
-	if mentioned {
+	if message.Mentioned {
 		return true
 	}
 
 	if responseTo != nil {
+		publicKeyString := common.PubkeyToHex(&publicKey)
 		return responseTo.From == publicKeyString
 	}
 
@@ -92,7 +85,8 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap)
 		canonicalNames[mentionID] = contact.CanonicalName()
 	}
 
-	simplifiedText, err := n.Message.GetSimplifiedText(canonicalNames)
+	// We don't pass idenity as only interested in the simplified text
+	simplifiedText, err := n.Message.GetSimplifiedText("", canonicalNames)
 	if err != nil {
 		return nil, err
 	}

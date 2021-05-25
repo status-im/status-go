@@ -51,7 +51,8 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		line_count,
 		response_to,
 		gap_from,
-		gap_to`
+		gap_to,
+		mentioned`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -91,6 +92,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.response_to,
 		m1.gap_from,
 		m1.gap_to,
+		m1.mentioned,
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -167,6 +169,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ResponseTo,
 		&gapFrom,
 		&gapTo,
+		&message.Mentioned,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -320,6 +323,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.ResponseTo,
 		gapFrom,
 		gapTo,
+		message.Mentioned,
 	}, nil
 }
 

@@ -31,7 +31,7 @@ func TestPrepareContentImage(t *testing.T) {
 	}
 	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 
-	require.NoError(t, message.PrepareContent())
+	require.NoError(t, message.PrepareContent(""))
 	require.Equal(t, expectedJPEG, message.Base64Image)
 }
 
@@ -51,7 +51,7 @@ func TestPrepareContentAudio(t *testing.T) {
 	}
 	message.Payload = &protobuf.ChatMessage_Audio{Audio: &audio}
 
-	require.NoError(t, message.PrepareContent())
+	require.NoError(t, message.PrepareContent(""))
 	require.Equal(t, expectedAAC, message.Base64Audio)
 }
 
@@ -79,10 +79,11 @@ func TestPrepareContentMentions(t *testing.T) {
 
 	message.Text = "hey @" + pk1String + " @" + pk2String
 
-	require.NoError(t, message.PrepareContent())
+	require.NoError(t, message.PrepareContent(pk2String))
 	require.Len(t, message.Mentions, 2)
 	require.Equal(t, message.Mentions[0], pk1String)
 	require.Equal(t, message.Mentions[1], pk2String)
+	require.True(t, message.Mentioned)
 }
 
 func TestPrepareContentLinks(t *testing.T) {
@@ -93,7 +94,7 @@ func TestPrepareContentLinks(t *testing.T) {
 
 	message.Text = "Just look at that repo " + link1 + " . And watch this video - " + link2
 
-	require.NoError(t, message.PrepareContent())
+	require.NoError(t, message.PrepareContent(""))
 	require.Len(t, message.Links, 2)
 	require.Equal(t, message.Links[0], link1)
 	require.Equal(t, message.Links[1], link2)
@@ -114,7 +115,7 @@ func TestPrepareSimplifiedText(t *testing.T) {
 
 	message.Text = "hey @" + pk1String + " @" + pk2String
 
-	require.NoError(t, message.PrepareContent())
+	require.NoError(t, message.PrepareContent(""))
 	require.Len(t, message.Mentions, 2)
 	require.Equal(t, message.Mentions[0], pk1String)
 	require.Equal(t, message.Mentions[1], pk2String)
@@ -123,7 +124,7 @@ func TestPrepareSimplifiedText(t *testing.T) {
 	canonicalNames[pk1String] = canonicalName1
 	canonicalNames[pk2String] = canonicalName2
 
-	simplifiedText, err := message.GetSimplifiedText(canonicalNames)
+	simplifiedText, err := message.GetSimplifiedText("", canonicalNames)
 	require.NoError(t, err)
 	require.Equal(t, "hey "+canonicalName1+" "+canonicalName2, simplifiedText)
 }

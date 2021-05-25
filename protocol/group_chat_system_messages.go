@@ -84,7 +84,8 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *syst
 		Seen:             true,
 		ID:               types.EncodeHex(crypto.Keccak256(e.Signature)),
 	}
-	_ = message.PrepareContent()
+	// We don't pass an identity here as system messages don't need the mentioned flag
+	_ = message.PrepareContent("")
 	return message
 }
 

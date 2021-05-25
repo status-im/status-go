@@ -30,6 +30,7 @@
 // 1618923660_create_pin_messages.up.sql (265B)
 // 1619094007_add_joined_chat_field.up.sql (101B)
 // 1619099821_add_last_synced_field.up.sql (226B)
+// 1621933219_add_mentioned.up.sql (70B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -655,7 +656,7 @@ func _1618923660_create_pin_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1618923660_create_pin_messages.up.sql", size: 265, mode: os.FileMode(0644), modTime: time.Unix(1621335496, 0)}
+	info := bindataFileInfo{name: "1618923660_create_pin_messages.up.sql", size: 265, mode: os.FileMode(0644), modTime: time.Unix(1621583900, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x61, 0x44, 0x3a, 0xbe, 0x30, 0xd2, 0x7e, 0xc0, 0xe2, 0x8e, 0x65, 0x53, 0x54, 0xbb, 0x7a, 0x1c, 0xb3, 0x5d, 0xd2, 0xa6, 0xa9, 0x28, 0xb7, 0xa4, 0x5f, 0x8b, 0x9, 0x5f, 0x17, 0xc1, 0x85, 0x21}}
 	return a, nil
 }
@@ -675,7 +676,7 @@ func _1619094007_add_joined_chat_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619094007_add_joined_chat_field.up.sql", size: 101, mode: os.FileMode(0644), modTime: time.Unix(1621335574, 0)}
+	info := bindataFileInfo{name: "1619094007_add_joined_chat_field.up.sql", size: 101, mode: os.FileMode(0644), modTime: time.Unix(1621583900, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfa, 0x30, 0x81, 0x3a, 0x2f, 0x9f, 0xb3, 0x0, 0x55, 0x8e, 0x1d, 0xa8, 0xb0, 0x68, 0xf0, 0x40, 0x1a, 0x6c, 0xaa, 0xfc, 0x33, 0xd1, 0xd1, 0x55, 0x3f, 0xf2, 0xbd, 0x54, 0xa1, 0x2b, 0x40, 0x95}}
 	return a, nil
 }
@@ -695,8 +696,28 @@ func _1619099821_add_last_synced_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619099821_add_last_synced_field.up.sql", size: 226, mode: os.FileMode(0644), modTime: time.Unix(1621335717, 0)}
+	info := bindataFileInfo{name: "1619099821_add_last_synced_field.up.sql", size: 226, mode: os.FileMode(0644), modTime: time.Unix(1621583900, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf, 0x52, 0x22, 0xe, 0x2f, 0xd7, 0x93, 0x5f, 0x42, 0xc2, 0x93, 0x4, 0x35, 0x6f, 0xc9, 0x19, 0xed, 0x6b, 0x52, 0x6f, 0xae, 0x99, 0xe2, 0x68, 0x3d, 0x4f, 0x40, 0xe, 0xe1, 0xa, 0x47, 0x21}}
+	return a, nil
+}
+
+var __1621933219_add_mentionedUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0a\x80\x30\x0c\x05\xd0\xdd\x53\xfc\x7b\x38\xa5\x36\x9d\x62\x0b\x9a\xce\x22\x18\xc4\xa1\x15\x8c\xde\xdf\x47\xa2\xbc\x40\x29\x08\xe3\x73\x7b\xb6\x66\xee\xfb\x69\x0e\x8a\x11\x53\x91\x3a\x67\x34\xeb\xef\x75\x77\x3b\x10\x4a\x11\xa6\x8c\xc8\x89\xaa\x28\x12\xc9\xca\xe3\xf0\x07\x00\x00\xff\xff\x76\x1d\xdd\xab\x46\x00\x00\x00")
+
+func _1621933219_add_mentionedUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1621933219_add_mentionedUpSql,
+		"1621933219_add_mentioned.up.sql",
+	)
+}
+
+func _1621933219_add_mentionedUpSql() (*asset, error) {
+	bytes, err := _1621933219_add_mentionedUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1621933219_add_mentioned.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1621933243, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0x76, 0x8a, 0xc9, 0x7, 0x8f, 0xa5, 0xcb, 0x12, 0x21, 0x4e, 0xfe, 0x96, 0x77, 0xcf, 0x7f, 0x76, 0x75, 0x36, 0x2c, 0xf8, 0x1d, 0x13, 0xcb, 0xcd, 0x6e, 0x70, 0xbf, 0xf5, 0x93, 0x67, 0xd1}}
 	return a, nil
 }
 
@@ -891,6 +912,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1619099821_add_last_synced_field.up.sql": _1619099821_add_last_synced_fieldUpSql,
 
+	"1621933219_add_mentioned.up.sql": _1621933219_add_mentionedUpSql,
+
 	"README.md": readmeMd,
 
 	"doc.go": docGo,
@@ -967,8 +990,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1618923660_create_pin_messages.up.sql":                       &bintree{_1618923660_create_pin_messagesUpSql, map[string]*bintree{}},
 	"1619094007_add_joined_chat_field.up.sql":                     &bintree{_1619094007_add_joined_chat_fieldUpSql, map[string]*bintree{}},
 	"1619099821_add_last_synced_field.up.sql":                     &bintree{_1619099821_add_last_synced_fieldUpSql, map[string]*bintree{}},
-	"README.md": &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":    &bintree{docGo, map[string]*bintree{}},
+	"1621933219_add_mentioned.up.sql":                             &bintree{_1621933219_add_mentionedUpSql, map[string]*bintree{}},
+	"README.md":                                                   &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":                                                      &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
