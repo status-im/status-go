@@ -76,6 +76,24 @@ func TestSaveSetting(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestIPFSGateway(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	ipfsg := &IPFSGateway{
+		GatewayURL:      "cf-ipfs.com",
+		ResolutionStyle: Subdomain,
+	}
+
+	require.NoError(t, db.SaveSetting("ipfs-gateway", ipfsg))
+
+	s, err := db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, ipfsg, s.IPFSGateway)
+}
+
 func TestGetNodeConfig(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
