@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/protocol/protobuf"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
 )
 
@@ -59,6 +60,7 @@ var (
 	nAddedContacts   = flag.Int("added-contacts", 100, "Number of added contacts to create")
 	nContacts        = flag.Int("contacts", 100, "Number of contacts to create")
 	nPublicChats     = flag.Int("public-chats", 5, "Number of public chats")
+	nMessages        = flag.Int("number-of-messages", 0, "Number of messages for each chat")
 	nOneToOneChats   = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
@@ -198,9 +200,25 @@ func main() {
 
 	for i := 0; i < *nPublicChats; i++ {
 		chat := protocol.CreatePublicChat(randomString(10), &testTimeSource{})
+		chat.SyncedTo = 0
+		chat.SyncedFrom = 0
+
 		err = wakuext.SaveChat(context.Background(), chat)
 		if err != nil {
 			return
+		}
+
+		var messages []*common.Message
+
+		for i := 0; i < *nMessages; i++ {
+			messages = append(messages, buildMessage(chat, i))
+
+		}
+
+		if len(messages) > 0 {
+			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+				return
+			}
 		}
 
 	}
@@ -215,9 +233,23 @@ func main() {
 
 		keyString := common.PubkeyToHex(&key.PublicKey)
 		chat := protocol.CreateOneToOneChat(keyString, &key.PublicKey, &testTimeSource{})
+		chat.SyncedTo = 0
+		chat.SyncedFrom = 0
 		err = wakuext.SaveChat(context.Background(), chat)
 		if err != nil {
 			return
+		}
+		var messages []*common.Message
+
+		for i := 0; i < *nMessages; i++ {
+			messages = append(messages, buildMessage(chat, i))
+
+		}
+
+		if len(messages) > 0 {
+			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+				return
+			}
 		}
 
 	}
@@ -450,6 +482,38 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func buildMessage(chat *protocol.Chat, count int) *common.Message {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		logger.Error("failed", err)
+		return nil
+	}
+
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := &common.Message{}
+	message.Text = fmt.Sprintf("test message %d", count)
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.From = common.PubkeyToHex(&key.PublicKey)
+	data := []byte(uuid.New().String())
+	message.ID = types.HexBytes(crypto.Keccak256(data)).String()
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	switch chat.ChatType {
+	case protocol.ChatTypePublic, protocol.ChatTypeProfile:
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
+	case protocol.ChatTypeOneToOne:
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
+	case protocol.ChatTypePrivateGroupChat:
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
+	}
+
+	message.PrepareContent("")
+	return message
+}
 
 func randomString(n int) string {
 	b := make([]rune, n)

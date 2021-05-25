@@ -319,10 +319,12 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string) error {
+	b.log.Info("starting node with account")
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
+	b.log.Info("loading node config")
 	conf, err := b.loadNodeConfig()
 	if err != nil {
 		return err
@@ -330,6 +332,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
+	b.log.Info("creating account db")
 	b.account = &acc
 	accountsDB := accounts.NewDB(b.appDB)
 	chatAddr, err := accountsDB.GetChatAddress()
@@ -351,6 +354,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		MainAccount:    walletAddr,
 	}
 
+	b.log.Info("starting node")
 	err = b.StartNode(conf)
 	if err != nil {
 		return err
@@ -613,13 +617,13 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
-	b.log.Debug("starting node with config", "config", config)
+	b.log.Info("starting node with config", "config", config)
 	// Update config with some defaults.
 	if err := config.UpdateWithDefaults(); err != nil {
 		return err
 	}
 
-	b.log.Debug("updated config with defaults", "config", config)
+	b.log.Info("updated config with defaults", "config", config)
 
 	// Start by validating configuration
 	if err := config.Validate(); err != nil {
