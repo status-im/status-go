@@ -130,8 +130,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -146,6 +146,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Timestamp,
 		chat.DeletedAtClockValue,
 		chat.UnviewedMessagesCount,
+		chat.UnviewedMentionsCount,
 		chat.LastClockValue,
 		encodedLastMessage,
 		encodedMembers.Bytes(),
@@ -235,6 +236,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.timestamp,
 			chats.deleted_at_clock_value,
 			chats.unviewed_message_count,
+			chats.unviewed_mentions_count,
 			chats.last_clock_value,
 			chats.last_message,
 			chats.members,
@@ -278,6 +280,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Timestamp,
 			&chat.DeletedAtClockValue,
 			&chat.UnviewedMessagesCount,
+			&chat.UnviewedMentionsCount,
 			&chat.LastClockValue,
 			&lastMessageBytes,
 			&encodedMembers,
@@ -364,6 +367,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			timestamp,
 			deleted_at_clock_value,
 			unviewed_message_count,
+			unviewed_mentions_count,
 			last_clock_value,
 			last_message,
 			members,
@@ -383,6 +387,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Timestamp,
 		&chat.DeletedAtClockValue,
 		&chat.UnviewedMessagesCount,
+		&chat.UnviewedMentionsCount,
 		&chat.LastClockValue,
 		&lastMessageBytes,
 		&encodedMembers,

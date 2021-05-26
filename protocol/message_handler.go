@@ -148,18 +148,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	chat.updateChatFromGroupMembershipChanges(group)
 
 	if !chat.Active {
-		notification := &ActivityCenterNotification{
-			ID:          types.FromHex(chat.ID),
-			Name:        chat.Name,
-			LastMessage: chat.LastMessage,
-			Type:        ActivityCenterNotificationTypeNewPrivateGroupChat,
-			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
-			ChatID:      chat.ID,
-		}
-		err := m.addActivityCenterNotification(messageState, notification)
-		if err != nil {
-			m.logger.Warn("failed to create activity center notification", zap.Error(err))
-		}
+		m.createMessageNotification(chat, messageState)
 	}
 
 	systemMessages := buildSystemMessages(message.Events, translations)
@@ -188,6 +177,28 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	}
 
 	return nil
+}
+
+func (m *MessageHandler) createMessageNotification(chat *Chat, messageState *ReceivedMessageState) {
+
+	var notificationType ActivityCenterType
+	if chat.OneToOne() {
+		notificationType = ActivityCenterNotificationTypeNewOneToOne
+	} else {
+		notificationType = ActivityCenterNotificationTypeNewPrivateGroupChat
+	}
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(chat.ID),
+		Name:        chat.Name,
+		LastMessage: chat.LastMessage,
+		Type:        notificationType,
+		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
+		ChatID:      chat.ID,
+	}
+	err := m.addActivityCenterNotification(messageState, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
+	}
 }
 
 func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
@@ -232,7 +243,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		chat.UnviewedMessagesCount++
+		m.updateUnviewedCounts(chat, message.Mentioned)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -245,18 +256,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	}
 
 	if !chat.Active {
-		notification := &ActivityCenterNotification{
-			ID:          types.FromHex(chat.ID),
-			Type:        ActivityCenterNotificationTypeNewOneToOne,
-			Name:        chat.Name,
-			LastMessage: chat.LastMessage,
-			Timestamp:   state.CurrentMessageState.WhisperTimestamp,
-			ChatID:      chat.ID,
-		}
-		err := m.addActivityCenterNotification(state, notification)
-		if err != nil {
-			m.logger.Warn("failed to save notification", zap.Error(err))
-		}
+		m.createMessageNotification(chat, state)
 	}
 
 	// Add to response
@@ -625,7 +625,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
-		chat.UnviewedMessagesCount++
+		m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
 	} else {
 		// Our own message, mark as sent
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
@@ -638,19 +638,9 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// If the chat is not active, create a notification in the center
 	if chat.OneToOne() && !chat.Active {
-		notification := &ActivityCenterNotification{
-			ID:          types.FromHex(chat.ID),
-			Name:        chat.Name,
-			LastMessage: chat.LastMessage,
-			Type:        ActivityCenterNotificationTypeNewOneToOne,
-			Timestamp:   state.CurrentMessageState.WhisperTimestamp,
-			ChatID:      chat.ID,
-		}
-		err := m.addActivityCenterNotification(state, notification)
-		if err != nil {
-			m.logger.Warn("failed to create notification", zap.Error(err))
-		}
+		m.createMessageNotification(chat, state)
 	}
+
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	// TODO(samyoul) remove storing of an updated reference pointer?
@@ -1204,4 +1194,11 @@ func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey
 
 	// Otherwise we check if we added it
 	return contact.IsAdded(), nil
+}
+
+func (m *MessageHandler) updateUnviewedCounts(chat *Chat, mentioned bool) {
+	chat.UnviewedMessagesCount++
+	if mentioned {
+		chat.UnviewedMentionsCount++
+	}
 }
