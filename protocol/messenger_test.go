@@ -334,13 +334,18 @@ func buildTestMessage(chat Chat) *common.Message {
 func (s *MessengerSuite) TestMarkMessagesSeen() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2
+	chat.UnviewedMentionsCount = 3
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 	inputMessage1 := buildTestMessage(*chat)
 	inputMessage1.ID = "1"
 	inputMessage1.Seen = false
+	inputMessage1.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage1.Mentioned = true
 	inputMessage2 := buildTestMessage(*chat)
 	inputMessage2.ID = "2"
+	inputMessage2.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage2.Mentioned = true
 	inputMessage2.Seen = false
 
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
@@ -359,6 +364,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	for _, c := range chats {
 		if c.ID == chat.ID {
 			s.Require().Equal(uint(1), c.UnviewedMessagesCount)
+			s.Require().Equal(uint(1), c.UnviewedMentionsCount)
 		}
 	}
 }

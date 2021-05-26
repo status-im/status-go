@@ -3068,6 +3068,7 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	}
 
 	chat.UnviewedMessagesCount = 0
+	chat.UnviewedMentionsCount = 0
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 	return nil

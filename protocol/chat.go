@@ -60,6 +60,7 @@ type Chat struct {
 
 	// Denormalized fields
 	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount uint            `json:"unviewedMentionsCount"`
 	LastMessage           *common.Message `json:"lastMessage"`
 
 	// Group chat fields
