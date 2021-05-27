@@ -61,7 +61,7 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 
 	maddr := list.Multiaddr()
 
-	// signal to our notifiees on successful conn.
+	// signal to our notifiees on listen.
 	s.notifyAll(func(n network.Notifiee) {
 		n.Listen(s, maddr)
 	})
@@ -73,6 +73,11 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 			delete(s.listeners.m, list)
 			s.listeners.cacheEOL = time.Time{}
 			s.listeners.Unlock()
+
+			// signal to our notifiees on listen close.
+			s.notifyAll(func(n network.Notifiee) {
+				n.ListenClose(s, maddr)
+			})
 			s.refs.Done()
 		}()
 		for {
@@ -84,6 +89,7 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 				}
 				return
 			}
+
 			log.Debugf("swarm listener accepted connection: %s", c)
 			s.refs.Add(1)
 			go func() {

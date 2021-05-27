@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
+	cid "github.com/ipfs/go-cid"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	b58 "github.com/mr-tron/base58/base58"
 	mh "github.com/multiformats/go-multihash"
@@ -55,7 +57,7 @@ func (id ID) String() string {
 	return id.Pretty()
 }
 
-// String prints out the peer ID.
+// ShortString prints out the peer ID.
 //
 // TODO(brian): ensure correctness at ID generation and
 // enforce this by only exposing functions that generate
@@ -83,7 +85,7 @@ func (id ID) MatchesPublicKey(pk ic.PubKey) bool {
 	return oid == id
 }
 
-// ExtractPublicKey attempts to extract the public key from an ID
+// ExtractPublicKey attempts to extract the public key from an ID.
 //
 // This method returns ErrNoPublicKey if the peer ID looks valid but it can't extract
 // the public key.
@@ -129,23 +131,24 @@ func IDFromBytes(b []byte) (ID, error) {
 	return ID(b), nil
 }
 
-// IDB58Decode accepts a base58-encoded multihash representing a peer ID
-// and returns the decoded ID if the input is valid.
+// IDB58Decode decodes a peer ID.
+//
+// Deprecated: Use Decode.
 func IDB58Decode(s string) (ID, error) {
-	m, err := mh.FromB58String(s)
-	if err != nil {
-		return "", err
-	}
-	return ID(m), err
+	return Decode(s)
 }
 
 // IDB58Encode returns the base58-encoded multihash representation of the ID.
+//
+// Deprecated: Use Encode.
 func IDB58Encode(id ID) string {
 	return b58.Encode([]byte(id))
 }
 
 // IDHexDecode accepts a hex-encoded multihash representing a peer ID
 // and returns the decoded ID if the input is valid.
+//
+// Deprecated: Don't raw-hex encode peer IDs, use base16 CIDs.
 func IDHexDecode(s string) (ID, error) {
 	m, err := mh.FromHexString(s)
 	if err != nil {
@@ -155,8 +158,64 @@ func IDHexDecode(s string) (ID, error) {
 }
 
 // IDHexEncode returns the hex-encoded multihash representation of the ID.
+//
+// Deprecated: Don't raw-hex encode peer IDs, use base16 CIDs.
 func IDHexEncode(id ID) string {
 	return hex.EncodeToString([]byte(id))
+}
+
+// Decode accepts an encoded peer ID and returns the decoded ID if the input is
+// valid.
+//
+// The encoded peer ID can either be a CID of a key or a raw multihash (identity
+// or sha256-256).
+func Decode(s string) (ID, error) {
+	if strings.HasPrefix(s, "Qm") || strings.HasPrefix(s, "1") {
+		// base58 encoded sha256 or identity multihash
+		m, err := mh.FromB58String(s)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse peer ID: %s", err)
+		}
+		return ID(m), nil
+	}
+
+	c, err := cid.Decode(s)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse peer ID: %s", err)
+	}
+	return FromCid(c)
+}
+
+// Encode encodes a peer ID as a string.
+//
+// At the moment, it base58 encodes the peer ID but, in the future, it will
+// switch to encoding it as a CID by default.
+func Encode(id ID) string {
+	return IDB58Encode(id)
+}
+
+// FromCid converts a CID to a peer ID, if possible.
+func FromCid(c cid.Cid) (ID, error) {
+	ty := c.Type()
+	if ty != cid.Libp2pKey {
+		s := cid.CodecToStr[ty]
+		if s == "" {
+			s = fmt.Sprintf("[unknown multicodec %d]", ty)
+		}
+		return "", fmt.Errorf("can't convert CID of type %s to a peer ID", s)
+	}
+	return ID(c.Hash()), nil
+}
+
+// ToCid encodes a peer ID as a CID of the public key.
+//
+// If the peer ID is invalid (e.g., empty), this will return the empty CID.
+func ToCid(id ID) cid.Cid {
+	m, err := mh.Cast([]byte(id))
+	if err != nil {
+		return cid.Cid{}
+	}
+	return cid.NewCidV1(cid.Libp2pKey, m)
 }
 
 // IDFromPublicKey returns the Peer ID corresponding to the public key pk.
@@ -178,7 +237,7 @@ func IDFromPrivateKey(sk ic.PrivKey) (ID, error) {
 	return IDFromPublicKey(sk.GetPublic())
 }
 
-// IDSlice for sorting peers
+// IDSlice for sorting peers.
 type IDSlice []ID
 
 func (es IDSlice) Len() int           { return len(es) }

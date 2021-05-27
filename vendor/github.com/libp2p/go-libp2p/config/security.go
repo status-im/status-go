@@ -12,7 +12,7 @@ import (
 	csms "github.com/libp2p/go-conn-security-multistream"
 )
 
-// SecC is a security transport constructor
+// SecC is a security transport constructor.
 type SecC func(h host.Host) (sec.SecureTransport, error)
 
 // MsSecC is a tuple containing a security transport constructor and a protocol
@@ -42,7 +42,7 @@ func SecurityConstructor(security interface{}) (SecC, error) {
 		return nil, err
 	}
 	return func(h host.Host) (sec.SecureTransport, error) {
-		t, err := ctor(h, nil)
+		t, err := ctor(h, nil, nil)
 		if err != nil {
 			return nil, err
 		}

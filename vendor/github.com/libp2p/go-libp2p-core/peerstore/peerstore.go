@@ -9,9 +9,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-
 	ic "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/record"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -22,7 +22,7 @@ var (
 	// AddressTTL is the expiration time of addresses.
 	AddressTTL = time.Hour
 
-	// TempAddrTTL is the ttl used for a short lived address
+	// TempAddrTTL is the ttl used for a short lived address.
 	TempAddrTTL = time.Minute * 2
 
 	// ProviderAddrTTL is the TTL of an address we've received from a provider.
@@ -107,7 +107,7 @@ type AddrBook interface {
 	// the given oldTTL to have the given newTTL.
 	UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL time.Duration)
 
-	// Addresses returns all known (and valid) addresses for a given peer
+	// Addrs returns all known (and valid) addresses for a given peer.
 	Addrs(p peer.ID) []ma.Multiaddr
 
 	// AddrStream returns a channel that gets all addresses for a given
@@ -115,11 +115,85 @@ type AddrBook interface {
 	// they will be sent along through the channel as well.
 	AddrStream(context.Context, peer.ID) <-chan ma.Multiaddr
 
-	// ClearAddresses removes all previously stored addresses
+	// ClearAddresses removes all previously stored addresses.
 	ClearAddrs(p peer.ID)
 
-	// PeersWithAddrs returns all of the peer IDs stored in the AddrBook
+	// PeersWithAddrs returns all of the peer IDs stored in the AddrBook.
 	PeersWithAddrs() peer.IDSlice
+}
+
+// CertifiedAddrBook manages "self-certified" addresses for remote peers.
+// Self-certified addresses are contained in peer.PeerRecords
+// which are wrapped in a record.Envelope and signed by the peer
+// to whom they belong.
+//
+// Certified addresses (CA) are generally more secure than uncertified
+// addresses (UA). Consequently, CAs beat and displace UAs. When the
+// peerstore learns CAs for a peer, it will reject UAs for the same peer
+// (as long as the former haven't expired).
+// Furthermore, peer records act like sequenced snapshots of CAs. Therefore,
+// processing a peer record that's newer than the last one seen overwrites
+// all addresses with the incoming ones.
+//
+// This interface is most useful when combined with AddrBook.
+// To test whether a given AddrBook / Peerstore implementation supports
+// certified addresses, callers should use the GetCertifiedAddrBook helper or
+// type-assert on the CertifiedAddrBook interface:
+//
+//     if cab, ok := aPeerstore.(CertifiedAddrBook); ok {
+//         cab.ConsumePeerRecord(signedPeerRecord, aTTL)
+//     }
+//
+type CertifiedAddrBook interface {
+	// ConsumePeerRecord adds addresses from a signed peer.PeerRecord (contained in
+	// a record.Envelope), which will expire after the given TTL.
+	//
+	// The 'accepted' return value indicates that the record was successfully processed
+	// and integrated into the CertifiedAddrBook state. If 'accepted' is false but no
+	// error is returned, it means that the record was ignored, most likely because
+	// a newer record exists for the same peer.
+	//
+	// Signed records added via this method will be stored without
+	// alteration as long as the address TTLs remain valid. The Envelopes
+	// containing the PeerRecords can be retrieved by calling GetPeerRecord(peerID).
+	//
+	// If the signed PeerRecord belongs to a peer that already has certified
+	// addresses in the CertifiedAddrBook, the new addresses will replace the
+	// older ones, if the new record has a higher sequence number than the
+	// existing record. Attempting to add a peer record with a
+	// sequence number that's <= an existing record for the same peer will not
+	// result in an error, but the record will be ignored, and the 'accepted'
+	// bool return value will be false.
+	//
+	// If the CertifiedAddrBook is also an AddrBook (which is most likely the case),
+	// adding certified addresses for a peer will *replace* any
+	// existing non-certified addresses for that peer, and only the certified
+	// addresses will be returned from AddrBook.Addrs thereafter.
+	//
+	// Likewise, once certified addresses have been added for a given peer,
+	// any non-certified addresses added via AddrBook.AddAddrs or
+	// AddrBook.SetAddrs will be ignored. AddrBook.SetAddrs may still be used
+	// to update the TTL of certified addresses that have previously been
+	// added via ConsumePeerRecord.
+	ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (accepted bool, err error)
+
+	// GetPeerRecord returns a Envelope containing a PeerRecord for the
+	// given peer id, if one exists.
+	// Returns nil if no signed PeerRecord exists for the peer.
+	GetPeerRecord(p peer.ID) *record.Envelope
+}
+
+// GetCertifiedAddrBook is a helper to "upcast" an AddrBook to a
+// CertifiedAddrBook by using type assertion. If the given AddrBook
+// is also a CertifiedAddrBook, it will be returned, and the ok return
+// value will be true. Returns (nil, false) if the AddrBook is not a
+// CertifiedAddrBook.
+//
+// Note that since Peerstore embeds the AddrBook interface, you can also
+// call GetCertifiedAddrBook(myPeerstore).
+func GetCertifiedAddrBook(ab AddrBook) (cab CertifiedAddrBook, ok bool) {
+	cab, ok = ab.(CertifiedAddrBook)
+	return cab, ok
 }
 
 // KeyBook tracks the keys of Peers.
@@ -153,11 +227,19 @@ type Metrics interface {
 	LatencyEWMA(peer.ID) time.Duration
 }
 
-// ProtoBook tracks the protocols supported by peers
+// ProtoBook tracks the protocols supported by peers.
 type ProtoBook interface {
 	GetProtocols(peer.ID) ([]string, error)
 	AddProtocols(peer.ID, ...string) error
 	SetProtocols(peer.ID, ...string) error
 	RemoveProtocols(peer.ID, ...string) error
+
+	// SupportsProtocols returns the set of protocols the peer supports from among the given protocols.
+	// If the returned error is not nil, the result is indeterminate.
 	SupportsProtocols(peer.ID, ...string) ([]string, error)
+
+	// FirstSupportedProtocol returns the first protocol that the peer supports among the given protocols.
+	// If the peer does not support any of the given protocols, this function will return an empty string and a nil error.
+	// If the returned error is not nil, the result is indeterminate.
+	FirstSupportedProtocol(peer.ID, ...string) (string, error)
 }

@@ -152,7 +152,9 @@ func (p *process) SetTeardown(tf TeardownFunc) {
 	p.teardown = tf
 	select {
 	case <-p.Closed():
-		p.closeErr = tf()
+		// Call the teardown function, but don't set the error. We can't
+		// change that after we shut down.
+		tf()
 	default:
 	}
 	p.Unlock()

@@ -3,34 +3,43 @@ package natpmp
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 // Implement the NAT-PMP protocol, typically supported by Apple routers and open source
 // routers such as DD-WRT and Tomato.
 //
-// See http://tools.ietf.org/html/draft-cheshire-nat-pmp-03
+// See https://tools.ietf.org/rfc/rfc6886.txt
 //
 // Usage:
 //
 //    client := natpmp.NewClient(gatewayIP)
 //    response, err := client.GetExternalAddress()
 
-// The recommended mapping lifetime for AddPortMapping
+// The recommended mapping lifetime for AddPortMapping.
 const RECOMMENDED_MAPPING_LIFETIME_SECONDS = 3600
 
 // Interface used to make remote procedure calls.
 type caller interface {
-	call(msg []byte) (result []byte, err error)
+	call(msg []byte, timeout time.Duration) (result []byte, err error)
 }
 
 // Client is a NAT-PMP protocol client.
 type Client struct {
-	caller caller
+	caller  caller
+	timeout time.Duration
 }
 
 // Create a NAT-PMP client for the NAT-PMP server at the gateway.
+// Uses default timeout which is around 128 seconds.
 func NewClient(gateway net.IP) (nat *Client) {
-	return &Client{&network{gateway}}
+	return &Client{&network{gateway}, 0}
+}
+
+// Create a NAT-PMP client for the NAT-PMP server at the gateway, with a timeout.
+// Timeout defines the total amount of time we will keep retrying before giving up.
+func NewClientWithTimeout(gateway net.IP, timeout time.Duration) (nat *Client) {
+	return &Client{&network{gateway}, timeout}
 }
 
 // Results of the NAT-PMP GetExternalAddress operation.
@@ -40,6 +49,8 @@ type GetExternalAddressResult struct {
 }
 
 // Get the external address of the router.
+//
+// Note that this call can take up to 128 seconds to return.
 func (n *Client) GetExternalAddress() (result *GetExternalAddressResult, err error) {
 	msg := make([]byte, 2)
 	msg[0] = 0 // Version 0
@@ -62,7 +73,8 @@ type AddPortMappingResult struct {
 	PortMappingLifetimeInSeconds uint32
 }
 
-// Add (or delete) a port mapping. To delete a mapping, set the requestedExternalPort and lifetime to 0
+// Add (or delete) a port mapping. To delete a mapping, set the requestedExternalPort and lifetime to 0.
+// Note that this call can take up to 128 seconds to return.
 func (n *Client) AddPortMapping(protocol string, internalPort, requestedExternalPort int, lifetime int) (result *AddPortMappingResult, err error) {
 	var opcode byte
 	if protocol == "udp" {
@@ -76,6 +88,7 @@ func (n *Client) AddPortMapping(protocol string, internalPort, requestedExternal
 	msg := make([]byte, 12)
 	msg[0] = 0 // Version 0
 	msg[1] = opcode
+	// [2:3] is reserved.
 	writeNetworkOrderUint16(msg[4:6], uint16(internalPort))
 	writeNetworkOrderUint16(msg[6:8], uint16(requestedExternalPort))
 	writeNetworkOrderUint32(msg[8:12], uint32(lifetime))
@@ -92,7 +105,7 @@ func (n *Client) AddPortMapping(protocol string, internalPort, requestedExternal
 }
 
 func (n *Client) rpc(msg []byte, resultSize int) (result []byte, err error) {
-	result, err = n.caller.call(msg)
+	result, err = n.caller.call(msg, n.timeout)
 	if err != nil {
 		return
 	}

@@ -5,10 +5,11 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/mux"
+
 	msmux "github.com/libp2p/go-stream-muxer-multistream"
 )
 
-// MuxC is a stream multiplex transport constructor
+// MuxC is a stream multiplex transport constructor.
 type MuxC func(h host.Host) (mux.Multiplexer, error)
 
 // MsMuxC is a tuple containing a multiplex transport constructor and a protocol
@@ -35,7 +36,7 @@ func MuxerConstructor(m interface{}) (MuxC, error) {
 		return nil, err
 	}
 	return func(h host.Host) (mux.Multiplexer, error) {
-		t, err := ctor(h, nil)
+		t, err := ctor(h, nil, nil)
 		if err != nil {
 			return nil, err
 		}

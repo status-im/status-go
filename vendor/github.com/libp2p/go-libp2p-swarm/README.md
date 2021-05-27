@@ -14,7 +14,7 @@ The libp2p swarm is the 'low level' interface for working with a given libp2p
 network. It gives you more fine grained control over various aspects of the
 system. Most applications don't need this level of access, so the `Swarm` is
 generally wrapped in a `Host` abstraction that provides a more friendly
-interface. See [the host interface](https://github.com/libp2p/go-libp2p-host)
+interface. See [the host interface](https://godoc.org/github.com/libp2p/go-libp2p-core/host#Host)
 for more info on that.
 
 ## Table of Contents

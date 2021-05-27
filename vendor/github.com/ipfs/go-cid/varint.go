@@ -1,5 +1,9 @@
 package cid
 
+import (
+	"github.com/multiformats/go-varint"
+)
+
 // Version of varint function that work with a string rather than
 // []byte to avoid unnecessary allocation
 
@@ -15,7 +19,7 @@ package cid
 // 	n  < 0: value larger than 64 bits (overflow)
 // 	        and -n is the number of bytes read
 //
-func uvarint(buf string) (uint64, int) {
+func uvarint(buf string) (uint64, int, error) {
 	var x uint64
 	var s uint
 	// we have a binary string so we can't use a range loope
@@ -23,12 +27,14 @@ func uvarint(buf string) (uint64, int) {
 		b := buf[i]
 		if b < 0x80 {
 			if i > 9 || i == 9 && b > 1 {
-				return 0, -(i + 1) // overflow
+				return 0, 0, varint.ErrOverflow
+			} else if b == 0 && i > 0 {
+				return 0, 0, varint.ErrNotMinimal
 			}
-			return x | uint64(b)<<s, i + 1
+			return x | uint64(b)<<s, i + 1, nil
 		}
 		x |= uint64(b&0x7f) << s
 		s += 7
 	}
-	return 0, 0
+	return 0, 0, varint.ErrUnderflow
 }

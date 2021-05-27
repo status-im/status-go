@@ -6,10 +6,12 @@ package multistream
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"errors"
+
 	"io"
 	"sync"
+
+	"github.com/multiformats/go-varint"
 )
 
 // ErrTooLarge is an error to signal that an incoming message was too large
@@ -50,9 +52,16 @@ func NewMultistreamMuxer() *MultistreamMuxer {
 	return new(MultistreamMuxer)
 }
 
+// LazyConn is the connection type returned by the lazy negotiation functions.
+type LazyConn interface {
+	io.ReadWriteCloser
+	// Flush flushes the lazy negotiation, if any.
+	Flush() error
+}
+
 func writeUvarint(w io.Writer, i uint64) error {
 	varintbuf := make([]byte, 16)
-	n := binary.PutUvarint(varintbuf, i)
+	n := varint.PutUvarint(varintbuf, i)
 	_, err := w.Write(varintbuf[:n])
 	if err != nil {
 		return err
@@ -93,26 +102,34 @@ func delimWrite(w io.Writer, mes []byte) error {
 // Ls is a Multistream muxer command which returns the list of handler names
 // available on a muxer.
 func Ls(rw io.ReadWriter) ([]string, error) {
-	err := delimWriteBuffered(rw, []byte("ls"))
+	err := handshake(rw)
+	if err != nil {
+		return nil, err
+	}
+	err = delimWriteBuffered(rw, []byte("ls"))
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := binary.ReadUvarint(&byteReader{rw})
+	response, err := lpReadBuf(rw)
 	if err != nil {
 		return nil, err
 	}
+
+	r := bytes.NewReader(response)
 
 	var out []string
-	for i := uint64(0); i < n; i++ {
-		val, err := lpReadBuf(rw)
-		if err != nil {
+	for {
+		val, err := lpReadBuf(r)
+		switch err {
+		default:
 			return nil, err
+		case io.EOF:
+			return out, nil
+		case nil:
+			out = append(out, string(val))
 		}
-		out = append(out, string(val))
 	}
-
-	return out, nil
 }
 
 func fulltextMatch(s string) func(string) bool {
@@ -244,8 +261,13 @@ loop:
 
 		switch tok {
 		case "ls":
+			protos, err := msm.encodeLocalProtocols()
+			if err != nil {
+				rwc.Close()
+				return nil, "", nil, err
+			}
 			select {
-			case pval <- "ls":
+			case pval <- string(protos):
 			case err := <-writeErr:
 				rwc.Close()
 				return nil, "", nil, err
@@ -334,30 +356,27 @@ loop:
 // Ls implements the "ls" command which writes the list of
 // supported protocols to the given Writer.
 func (msm *MultistreamMuxer) Ls(w io.Writer) error {
-	buf := new(bytes.Buffer)
-
-	msm.handlerlock.RLock()
-	err := writeUvarint(buf, uint64(len(msm.handlers)))
+	protos, err := msm.encodeLocalProtocols()
 	if err != nil {
 		return err
 	}
+	return delimWrite(w, protos)
+}
 
+// encodeLocalProtocols encodes the protocols this multistream-select router
+// handles, packed in a list of varint-delimited strings.
+func (msm *MultistreamMuxer) encodeLocalProtocols() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	msm.handlerlock.RLock()
 	for _, h := range msm.handlers {
 		err := delimWrite(buf, []byte(h.AddName))
 		if err != nil {
 			msm.handlerlock.RUnlock()
-			return err
+			return nil, err
 		}
 	}
 	msm.handlerlock.RUnlock()
-
-	ll := make([]byte, 16)
-	nw := binary.PutUvarint(ll, uint64(buf.Len()))
-
-	r := io.MultiReader(bytes.NewReader(ll[:nw]), buf)
-
-	_, err = io.Copy(w, r)
-	return err
+	return buf.Bytes(), nil
 }
 
 // Handle performs protocol negotiation on a ReadWriteCloser
@@ -371,10 +390,10 @@ func (msm *MultistreamMuxer) Handle(rwc io.ReadWriteCloser) error {
 	return h(p, rwc)
 }
 
-// ReadNextToken extracts a token from a ReadWriter. It is used during
+// ReadNextToken extracts a token from a Reader. It is used during
 // protocol negotiation and returns a string.
-func ReadNextToken(rw io.ReadWriter) (string, error) {
-	tok, err := ReadNextTokenBytes(rw)
+func ReadNextToken(r io.Reader) (string, error) {
+	tok, err := ReadNextTokenBytes(r)
 	if err != nil {
 		return "", err
 	}
@@ -382,18 +401,14 @@ func ReadNextToken(rw io.ReadWriter) (string, error) {
 	return string(tok), nil
 }
 
-// ReadNextTokenBytes extracts a token from a ReadWriter. It is used
+// ReadNextTokenBytes extracts a token from a Reader. It is used
 // during protocol negotiation and returns a byte slice.
-func ReadNextTokenBytes(rw io.ReadWriter) ([]byte, error) {
-	data, err := lpReadBuf(rw)
+func ReadNextTokenBytes(r io.Reader) ([]byte, error) {
+	data, err := lpReadBuf(r)
 	switch err {
 	case nil:
 		return data, nil
 	case ErrTooLarge:
-		err := delimWriteBuffered(rw, []byte("messages over 64k are not allowed"))
-		if err != nil {
-			return nil, err
-		}
 		return nil, ErrTooLarge
 	default:
 		return nil, err
@@ -406,7 +421,7 @@ func lpReadBuf(r io.Reader) ([]byte, error) {
 		br = &byteReader{r}
 	}
 
-	length, err := binary.ReadUvarint(br)
+	length, err := varint.ReadUvarint(br)
 	if err != nil {
 		return nil, err
 	}
@@ -418,6 +433,9 @@ func lpReadBuf(r io.Reader) ([]byte, error) {
 	buf := make([]byte, length)
 	_, err = io.ReadFull(r, buf)
 	if err != nil {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
 		return nil, err
 	}
 

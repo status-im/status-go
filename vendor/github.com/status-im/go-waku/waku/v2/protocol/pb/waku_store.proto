@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package pb;
+
+import "waku_message.proto";
+
+message Index {
+  bytes digest = 1;
+  double receivedTime = 2;
+}
+
+message PagingInfo {
+  uint64 pageSize = 1;
+  Index cursor = 2;
+  enum Direction {
+    BACKWARD = 0;
+    FORWARD = 1;
+  }
+  Direction direction = 3;
+}
+
+message ContentFilter {
+  string contentTopic = 1;
+}
+
+message HistoryQuery {
+  string pubsubTopic = 2;
+  repeated ContentFilter contentFilters = 3;
+  PagingInfo pagingInfo = 4; // used for pagination
+  double startTime = 5;
+  double endTime = 6;
+}
+
+message HistoryResponse {
+  repeated WakuMessage messages = 1;
+  PagingInfo pagingInfo = 2; // used for pagination
+}
+
+message HistoryRPC {
+  string request_id = 1;
+  HistoryQuery query = 2;
+  HistoryResponse response = 3;
+}

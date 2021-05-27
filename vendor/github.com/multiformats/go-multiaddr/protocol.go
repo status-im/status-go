@@ -62,19 +62,9 @@ var Protocols = []Protocol{}
 // This will cause any P_P2P multiaddr to print out as /p2p/ instead of /ipfs/.
 // Note that the binary serialization of this multiaddr does not change at any
 // point. This means that this code is not a breaking network change at any point
+//
+// DEPRECATED: this is now the default
 func SwapToP2pMultiaddrs() {
-	for i := range Protocols {
-		if Protocols[i].Code == P_P2P {
-			Protocols[i].Name = "p2p"
-			break
-		}
-	}
-
-	protoP2P.Name = "p2p"
-
-	protocolsByName["ipfs"] = protoP2P
-	protocolsByName["p2p"] = protoP2P
-	protocolsByCode[protoP2P.Code] = protoP2P
 }
 
 func AddProtocol(p Protocol) error {

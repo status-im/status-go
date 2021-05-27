@@ -21,9 +21,12 @@ var alpha = 1 - math.Exp(-1.0)
 var globalSweeper sweeper
 
 type sweeper struct {
-	sweepOnce       sync.Once
-	meters          []*Meter
-	mutex           sync.RWMutex
+	sweepOnce sync.Once
+
+	snapshotMu   sync.RWMutex
+	meters       []*Meter
+	activeMeters int
+
 	lastUpdateTime  time.Time
 	registerChannel chan *Meter
 }
@@ -41,9 +44,11 @@ func (sw *sweeper) run() {
 }
 
 func (sw *sweeper) register(m *Meter) {
-	// Add back the snapshot total. If we unregistered this
-	// one, we set it to zero.
-	atomic.AddUint64(&m.accumulator, m.snapshot.Total)
+	if m.registered {
+		// registered twice, move on.
+		return
+	}
+	m.registered = true
 	sw.meters = append(sw.meters, m)
 }
 
@@ -72,8 +77,8 @@ func (sw *sweeper) runActive() {
 }
 
 func (sw *sweeper) update() {
-	sw.mutex.Lock()
-	defer sw.mutex.Unlock()
+	sw.snapshotMu.Lock()
+	defer sw.snapshotMu.Unlock()
 
 	now := time.Now()
 	tdiff := now.Sub(sw.lastUpdateTime)
@@ -83,11 +88,15 @@ func (sw *sweeper) update() {
 	sw.lastUpdateTime = now
 	timeMultiplier := float64(time.Second) / float64(tdiff)
 
-	newLen := len(sw.meters)
-
-	for i, m := range sw.meters {
+	// Calculate the bandwidth for all active meters.
+	for i, m := range sw.meters[:sw.activeMeters] {
 		total := atomic.LoadUint64(&m.accumulator)
-		instant := timeMultiplier * float64(total-m.snapshot.Total)
+		diff := total - m.snapshot.Total
+		instant := timeMultiplier * float64(diff)
+
+		if diff > 0 {
+			m.snapshot.LastUpdate = now
+		}
 
 		if m.snapshot.Rate == 0 {
 			m.snapshot.Rate = instant
@@ -135,16 +144,35 @@ func (sw *sweeper) update() {
 		}
 
 		// Reset the rate, keep the total.
+		m.registered = false
 		m.snapshot.Rate = 0
-		newLen--
-		sw.meters[i] = sw.meters[newLen]
-	}
-
-	// trim the meter list
-	for i := newLen; i < len(sw.meters); i++ {
 		sw.meters[i] = nil
 	}
+
+	// Re-add the total to all the newly active accumulators and set the snapshot to the total.
+	// 1. We don't do this on register to avoid having to take the snapshot lock.
+	// 2. We skip calculating the bandwidth for this round so we get an _accurate_ bandwidth calculation.
+	for _, m := range sw.meters[sw.activeMeters:] {
+		total := atomic.AddUint64(&m.accumulator, m.snapshot.Total)
+		if total > m.snapshot.Total {
+			m.snapshot.LastUpdate = now
+		}
+		m.snapshot.Total = total
+	}
+
+	// compress and trim the meter list
+	var newLen int
+	for _, m := range sw.meters {
+		if m != nil {
+			sw.meters[newLen] = m
+			newLen++
+		}
+	}
+
 	sw.meters = sw.meters[:newLen]
+
+	// Finally, mark all meters still in the list as "active".
+	sw.activeMeters = len(sw.meters)
 }
 
 func (sw *sweeper) Register(m *Meter) {

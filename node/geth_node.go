@@ -143,6 +143,10 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 		return fmt.Errorf("%v: %v", ErrWakuServiceRegistrationFailure, err)
 	}
 
+	if err := activateWakuV2Service(stack, config, db); err != nil {
+		return fmt.Errorf("%v: %v", ErrWakuV2ServiceRegistrationFailure, err)
+	}
+
 	// start peer service
 	if err := activatePeerService(stack); err != nil {
 		return fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
@@ -327,6 +331,29 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 			return nil, err
 		}
 		return wakuext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
+	})
+}
+
+// activateWakuV2Service configures WakuV2 and adds it to the given node.
+func activateWakuV2Service(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
+	if !config.WakuV2Config.Enabled {
+		logger.Info("WakuV2 protocol is disabled")
+		return nil
+	}
+
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return createWakuV2Service(ctx, config.NodeKey, &config.WakuV2Config, &config.ClusterConfig)
+	})
+	if err != nil {
+		return
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		return wakuv2ext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
 	})
 }
 

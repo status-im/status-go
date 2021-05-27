@@ -34,7 +34,7 @@ func (s *Swarm) InterfaceListenAddresses() ([]ma.Multiaddr, error) {
 	isEOL := time.Now().After(s.listeners.cacheEOL)
 	s.listeners.RUnlock() // RLock end
 
-	if ifaceListenAddres != nil && !isEOL {
+	if !isEOL {
 		// Cache is valid, clone the slice
 		return append(ifaceListenAddres[:0:0], ifaceListenAddres...), nil
 	}
@@ -46,16 +46,20 @@ func (s *Swarm) InterfaceListenAddresses() ([]ma.Multiaddr, error) {
 
 	ifaceListenAddres = s.listeners.ifaceListenAddres
 	isEOL = time.Now().After(s.listeners.cacheEOL)
-	if ifaceListenAddres == nil || isEOL {
+	if isEOL {
 		// Cache is still invalid
+		listenAddres := s.listenAddressesNoLock()
+		if len(listenAddres) > 0 {
+			// We're actually listening on addresses.
+			var err error
+			ifaceListenAddres, err = addrutil.ResolveUnspecifiedAddresses(listenAddres, nil)
 
-		var err error
-		ifaceListenAddres, err = addrutil.ResolveUnspecifiedAddresses(
-			s.listenAddressesNoLock(), nil)
-
-		if err != nil {
-			s.listeners.Unlock() // Lock early exit
-			return nil, err
+			if err != nil {
+				s.listeners.Unlock() // Lock early exit
+				return nil, err
+			}
+		} else {
+			ifaceListenAddres = nil
 		}
 
 		s.listeners.ifaceListenAddres = ifaceListenAddres

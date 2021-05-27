@@ -3,6 +3,8 @@
 package crypto
 
 import (
+	"sync"
+
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
 	openssl "github.com/libp2p/go-openssl"
@@ -13,6 +15,9 @@ import (
 
 type opensslPublicKey struct {
 	key openssl.PublicKey
+
+	cacheLk sync.Mutex
+	cached  []byte
 }
 
 type opensslPrivateKey struct {
@@ -32,7 +37,7 @@ func unmarshalOpensslPublicKey(b []byte) (opensslPublicKey, error) {
 	if err != nil {
 		return opensslPublicKey{}, err
 	}
-	return opensslPublicKey{sk}, nil
+	return opensslPublicKey{key: sk, cached: b}, nil
 }
 
 // Verify compares a signature against input data
@@ -52,7 +57,13 @@ func (pk *opensslPublicKey) Type() pb.KeyType {
 
 // Bytes returns protobuf bytes of a public key
 func (pk *opensslPublicKey) Bytes() ([]byte, error) {
-	return MarshalPublicKey(pk)
+	pk.cacheLk.Lock()
+	var err error
+	if pk.cached == nil {
+		pk.cached, err = MarshalPublicKey(pk)
+	}
+	pk.cacheLk.Unlock()
+	return pk.cached, err
 }
 
 func (pk *opensslPublicKey) Raw() ([]byte, error) {
@@ -76,7 +87,7 @@ func (sk *opensslPrivateKey) Sign(message []byte) ([]byte, error) {
 
 // GetPublic returns a public key
 func (sk *opensslPrivateKey) GetPublic() PubKey {
-	return &opensslPublicKey{sk.key}
+	return &opensslPublicKey{key: sk.key}
 }
 
 func (sk *opensslPrivateKey) Type() pb.KeyType {

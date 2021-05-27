@@ -1,9 +1,12 @@
 package swarm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/mux"
@@ -22,6 +25,7 @@ var ErrConnClosed = errors.New("connection closed")
 // Conn is the connection type used by swarm. In general, you won't use this
 // type directly.
 type Conn struct {
+	id    uint32
 	conn  transport.CapableConn
 	swarm *Swarm
 
@@ -36,6 +40,11 @@ type Conn struct {
 	}
 
 	stat network.Stat
+}
+
+func (c *Conn) ID() string {
+	// format: <first 10 chars of peer id>-<global conn ordinal>
+	return fmt.Sprintf("%s-%d", c.RemotePeer().Pretty()[0:10], c.id)
 }
 
 // Close closes this connection.
@@ -167,8 +176,9 @@ func (c *Conn) Stat() network.Stat {
 }
 
 // NewStream returns a new Stream from this connection
-func (c *Conn) NewStream() (network.Stream, error) {
-	ts, err := c.conn.OpenStream()
+func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
+	ts, err := c.conn.OpenStream(ctx)
+
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +195,15 @@ func (c *Conn) addStream(ts mux.MuxedStream, dir network.Direction) (*Stream, er
 	}
 
 	// Wrap and register the stream.
-	stat := network.Stat{Direction: dir}
+	stat := network.Stat{
+		Direction: dir,
+		Opened:    time.Now(),
+	}
 	s := &Stream{
 		stream: ts,
 		conn:   c,
 		stat:   stat,
+		id:     atomic.AddUint32(&c.swarm.nextStreamID, 1),
 	}
 	c.streams.m[s] = struct{}{}
 

@@ -11,10 +11,12 @@ import (
 	"runtime"
 	"time"
 
+	log2 "github.com/ipfs/go-log/v2"
 	writer "github.com/ipfs/go-log/writer"
 
 	opentrace "github.com/opentracing/opentracing-go"
 	otExt "github.com/opentracing/opentracing-go/ext"
+	"go.uber.org/zap"
 )
 
 var log = Logger("eventlog")
@@ -22,17 +24,10 @@ var log = Logger("eventlog")
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
 type StandardLogger interface {
-	Debug(args ...interface{})
-	Debugf(format string, args ...interface{})
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Info(args ...interface{})
-	Infof(format string, args ...interface{})
-	Panic(args ...interface{})
-	Panicf(format string, args ...interface{})
+	log2.StandardLogger
+	// Deprecated use Warn
 	Warning(args ...interface{})
+	// Deprecated use Warnf
 	Warningf(format string, args ...interface{})
 }
 
@@ -55,9 +50,11 @@ type EventLogger interface {
 	// Finally the timestamp and package name are added to the accumulator and
 	// the metadata is logged.
 	// DEPRECATED
+	// Deprecated: Stop using go-log for event logging
 	Event(ctx context.Context, event string, m ...Loggable)
 
 	// DEPRECATED
+	// Deprecated: Stop using go-log for event logging
 	EventBegin(ctx context.Context, event string, m ...Loggable) *EventInProgress
 
 	// Start starts an opentracing span with `name`, using
@@ -74,6 +71,7 @@ type EventLogger interface {
 	//        defer log.Finish(ctx)
 	//        ...
 	//    }
+	// Deprecated: Stop using go-log for event logging
 	Start(ctx context.Context, name string) context.Context
 
 	// StartFromParentState starts an opentracing span with `name`, using
@@ -95,6 +93,7 @@ type EventLogger interface {
 	//        defer log.Finish(ctx)
 	//        ...
 	//    }
+	// Deprecated: Stop using go-log for event logging
 	StartFromParentState(ctx context.Context, name string, parent []byte) (context.Context, error)
 
 	// Finish completes the span associated with `ctx`.
@@ -103,6 +102,7 @@ type EventLogger interface {
 	// otherwise leads to undefined behavior.
 	// Finish will do its best to notify (log) when used in correctly
 	//		.e.g called twice, or called on a spanless `ctx`
+	// Deprecated: Stop using go-log for event logging
 	Finish(ctx context.Context)
 
 	// FinishWithErr completes the span associated with `ctx` and also calls
@@ -112,10 +112,12 @@ type EventLogger interface {
 	// otherwise leads to undefined behavior.
 	// FinishWithErr will do its best to notify (log) when used in correctly
 	//		.e.g called twice, or called on a spanless `ctx`
+	// Deprecated: Stop using go-log for event logging
 	FinishWithErr(ctx context.Context, err error)
 
 	// SetErr tags the span associated with `ctx` to reflect an error occured, and
 	// logs the value `err` under key `error`.
+	// Deprecated: Stop using go-log for event logging
 	SetErr(ctx context.Context, err error)
 
 	// LogKV records key:value logging data about an event stored in `ctx`
@@ -124,9 +126,11 @@ type EventLogger interface {
 	//        "error", "resolve failure",
 	//        "type", "cache timeout",
 	//        "waited.millis", 1500)
+	// Deprecated: Stop using go-log for event logging
 	LogKV(ctx context.Context, alternatingKeyValues ...interface{})
 
 	// SetTag tags key `k` and value `v` on the span associated with `ctx`
+	// Deprecated: Stop using go-log for event logging
 	SetTag(ctx context.Context, key string, value interface{})
 
 	// SetTags tags keys from the `tags` maps on the span associated with `ctx`
@@ -135,45 +139,56 @@ type EventLogger interface {
 	//		"type": bizStruct,
 	//      "request": req,
 	//		})
+	// Deprecated: Stop using go-log for event logging
 	SetTags(ctx context.Context, tags map[string]interface{})
 
 	// SerializeContext takes the SpanContext instance stored in `ctx` and Seralizes
 	// it to bytes. An error is returned if the `ctx` cannot be serialized to
 	// a bytes array
+	// Deprecated: Stop using go-log for event logging
 	SerializeContext(ctx context.Context) ([]byte, error)
 }
 
-// Logger retrieves an event logger by name
-func Logger(system string) EventLogger {
+var _ EventLogger = Logger("test-logger")
 
-	// TODO if we would like to adjust log levels at run-time. Store this event
-	// logger in a map (just like the util.Logger impl)
+// Logger retrieves an event logger by name
+func Logger(system string) *ZapEventLogger {
 	if len(system) == 0 {
-		setuplog := getLogger("setup-logger")
-		setuplog.Warning("Missing name parameter")
+		setuplog := Logger("setup-logger")
+		setuplog.Error("Missing name parameter")
 		system = "undefined"
 	}
-
-	logger := getLogger(system)
-
-	return &eventLogger{system: system, StandardLogger: logger}
+	logger := log2.Logger(system)
+	return &ZapEventLogger{system: system, SugaredLogger: logger.SugaredLogger}
 }
 
-// eventLogger implements the EventLogger and wraps a go-logging Logger
-type eventLogger struct {
-	StandardLogger
+// ZapEventLogger implements the EventLogger and wraps a go-logging Logger
+type ZapEventLogger struct {
+	zap.SugaredLogger
 
 	system string
 	// TODO add log-level
 }
 
-func (el *eventLogger) Start(ctx context.Context, operationName string) context.Context {
+// Deprecated: use Warn
+func (el *ZapEventLogger) Warning(args ...interface{}) {
+	el.Warn(args...)
+}
+
+// Deprecated: use Warnf
+func (el *ZapEventLogger) Warningf(format string, args ...interface{}) {
+	el.Warnf(format, args...)
+}
+
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) Start(ctx context.Context, operationName string) context.Context {
 	span, ctx := opentrace.StartSpanFromContext(ctx, operationName)
 	span.SetTag("system", el.system)
 	return ctx
 }
 
-func (el *eventLogger) StartFromParentState(ctx context.Context, operationName string, parent []byte) (context.Context, error) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) StartFromParentState(ctx context.Context, operationName string, parent []byte) (context.Context, error) {
 	sc, err := deserializeContext(parent)
 	if err != nil {
 		return nil, err
@@ -185,7 +200,8 @@ func (el *eventLogger) StartFromParentState(ctx context.Context, operationName s
 	return ctx, nil
 }
 
-func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	gTracer := opentrace.GlobalTracer()
 	b := make([]byte, 0)
 	carrier := bytes.NewBuffer(b)
@@ -196,7 +212,8 @@ func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	return carrier.Bytes(), nil
 }
 
-func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interface{}) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
@@ -206,7 +223,8 @@ func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interf
 	span.LogKV(alternatingKeyValues...)
 }
 
-func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
@@ -216,7 +234,8 @@ func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span.SetTag(k, v)
 }
 
-func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{}) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) SetTags(ctx context.Context, tags map[string]interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
@@ -228,7 +247,7 @@ func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{})
 	}
 }
 
-func (el *eventLogger) setErr(ctx context.Context, err error, skip int) {
+func (el *ZapEventLogger) setErr(ctx context.Context, err error, skip int) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(skip)
@@ -243,11 +262,13 @@ func (el *eventLogger) setErr(ctx context.Context, err error, skip int) {
 	span.LogKV("error", err.Error())
 }
 
-func (el *eventLogger) SetErr(ctx context.Context, err error) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) SetErr(ctx context.Context, err error) {
 	el.setErr(ctx, err, 1)
 }
 
-func (el *eventLogger) Finish(ctx context.Context) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) Finish(ctx context.Context) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
@@ -257,7 +278,8 @@ func (el *eventLogger) Finish(ctx context.Context) {
 	span.Finish()
 }
 
-func (el *eventLogger) FinishWithErr(ctx context.Context, err error) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) FinishWithErr(ctx context.Context, err error) {
 	el.setErr(ctx, err, 2)
 	el.Finish(ctx)
 }
@@ -273,8 +295,8 @@ func deserializeContext(bCtx []byte) (opentrace.SpanContext, error) {
 	return spanContext, nil
 }
 
-// DEPRECATED use `Start`
-func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
 	ctx = el.Start(ctx, event)
 
 	for _, m := range metadata {
@@ -297,12 +319,8 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 	return eip
 }
 
-type activeEventKeyType struct{}
-
-var activeEventKey = activeEventKeyType{}
-
-// DEPRECATED use `Start`
-func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
+// Deprecated: Stop using go-log for event logging
+func (el *ZapEventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
 
 	// short circuit if theres nothing to write to
 	if !writer.WriterGroup.Active() {
@@ -318,10 +336,7 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 		existing = Metadata{}
 	}
 	loggables = append(loggables, existing)
-
-	for _, datum := range metadata {
-		loggables = append(loggables, datum)
-	}
+	loggables = append(loggables, metadata...)
 
 	e := entry{
 		loggables: loggables,
@@ -349,11 +364,12 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 		return
 	}
 
-	writer.WriterGroup.Write(buf.Bytes())
+	_, _ = writer.WriterGroup.Write(buf.Bytes())
 }
 
 // DEPRECATED
 // EventInProgress represent and event which is happening
+// Deprecated: Stop using go-log for event logging
 type EventInProgress struct {
 	loggables []Loggable
 	doneFunc  func([]Loggable)
@@ -373,9 +389,9 @@ func (eip *EventInProgress) SetError(err error) {
 	})
 }
 
-// DEPRECATED use `Finish`
 // Done creates a new Event entry that includes the duration and appended
 // loggables.
+// Deprecated: Stop using go-log for event logging
 func (eip *EventInProgress) Done() {
 	eip.doneFunc(eip.loggables) // create final event with extra data
 }
@@ -391,8 +407,8 @@ func (eip *EventInProgress) DoneWithErr(err error) {
 	eip.doneFunc(eip.loggables)
 }
 
-// DEPRECATED use `Finish`
 // Close is an alias for done
+// Deprecated: Stop using go-log for event logging
 func (eip *EventInProgress) Close() error {
 	eip.Done()
 	return nil

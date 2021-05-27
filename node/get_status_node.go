@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -574,6 +575,19 @@ func (n *StatusNode) PeerService() (st *peer.Service, err error) {
 
 // WakuService exposes reference to Waku service running on top of the node
 func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// WakuService exposes reference to Whisper service running on top of the node
+func (n *StatusNode) WakuV2Service() (w *wakuv2.Waku, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

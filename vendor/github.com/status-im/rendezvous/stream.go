@@ -18,6 +18,18 @@ type InstrumentedStream struct {
 	s network.Stream
 }
 
+func (si InstrumentedStream) CloseWrite() error {
+	return si.s.CloseWrite()
+}
+
+func (si InstrumentedStream) CloseRead() error {
+	return si.s.CloseRead()
+}
+
+func (si InstrumentedStream) ID() string {
+	return si.s.ID()
+}
+
 func (si InstrumentedStream) Write(p []byte) (int, error) {
 	n, err := si.s.Write(p)
 	egressTrafficMeter.Mark(int64(n))

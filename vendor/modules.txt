@@ -407,11 +407,13 @@ github.com/spaolacci/murmur3
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20210420215247-c3d9868e7765
-github.com/status-im/go-waku/waku/common
+# github.com/status-im/go-waku v0.0.0-20210429184024-b9645a7c601f
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol
-github.com/status-im/go-waku/waku/v2/protocol/waku_store
+github.com/status-im/go-waku/waku/v2/protocol/lightpush
+github.com/status-im/go-waku/waku/v2/protocol/pb
+github.com/status-im/go-waku/waku/v2/protocol/relay
+github.com/status-im/go-waku/waku/v2/protocol/store
 # github.com/status-im/go-wakurelay-pubsub v0.4.2
 github.com/status-im/go-wakurelay-pubsub
 github.com/status-im/go-wakurelay-pubsub/pb
@@ -427,7 +429,7 @@ github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
-# github.com/status-im/rendezvous v1.3.1
+# github.com/status-im/rendezvous v1.3.2
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
@@ -439,8 +441,6 @@ github.com/status-im/tcp-shaker
 github.com/steakknife/bloomfilter
 # github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3
 github.com/steakknife/hamming
-# github.com/stretchr/objx v0.1.1
-github.com/stretchr/objx
 # github.com/stretchr/testify v1.6.1
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -556,8 +556,6 @@ golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/publicsuffix
 golang.org/x/net/route
-# golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-golang.org/x/sync/syncmap
 # golang.org/x/sys v0.0.0-20210317225723-c4fcb01b228e
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
@@ -584,7 +582,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# google.golang.org/protobuf v1.25.0
+# google.golang.org/protobuf v1.26.0-rc.1
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
@@ -595,13 +593,12 @@ google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
 google.golang.org/protobuf/internal/errors
-google.golang.org/protobuf/internal/fieldsort
 google.golang.org/protobuf/internal/filedesc
 google.golang.org/protobuf/internal/filetype
 google.golang.org/protobuf/internal/flags
 google.golang.org/protobuf/internal/genid
 google.golang.org/protobuf/internal/impl
-google.golang.org/protobuf/internal/mapsort
+google.golang.org/protobuf/internal/order
 google.golang.org/protobuf/internal/pragma
 google.golang.org/protobuf/internal/set
 google.golang.org/protobuf/internal/strs

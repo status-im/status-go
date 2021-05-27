@@ -68,17 +68,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 	var hash types.Hash
 	copy(hash[:], h[:types.HashLength])
 
-	if !r.Force {
-		err := api.service.RequestsRegistry().Register(hash, r.Topics)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if err := api.service.w.RequestStoreMessages(r.Topics, r.From, r.To, options); err != nil {
-		if !r.Force {
-			api.service.RequestsRegistry().Unregister(hash)
-		}
 		return nil, err
 	}
 
