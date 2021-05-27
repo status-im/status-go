@@ -58,6 +58,10 @@ message ChatMessage {
   // Grant for community chat messages
   bytes grant = 13;
 
+  // Replace indicates that this is a replacement of a message
+	// that has been updated
+  string replace = 14;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
@@ -72,5 +76,6 @@ message ChatMessage {
     COMMUNITY = 9;
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
+    EDIT = 11;
   }
 }

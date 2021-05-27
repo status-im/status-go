@@ -884,7 +884,6 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 
 	return result, nil
 }
-
 func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
