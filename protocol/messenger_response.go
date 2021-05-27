@@ -19,6 +19,7 @@ type MessengerResponse struct {
 	CommunityChanges        []*communities.CommunityChanges
 	RequestsToJoinCommunity []*communities.RequestToJoin
 	Mailservers             []mailservers.Mailserver
+	pendingEdits            []*common.Message
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about

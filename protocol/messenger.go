@@ -2050,6 +2050,30 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
+	} else if message.ContentType == protobuf.ChatMessage_EDIT {
+		if len(message.Replace) == 0 {
+			return nil, errors.New("the id of the message to replace is required")
+		}
+
+		msgToReplace, err := m.persistence.MessageByID(message.Replace)
+		if err != nil {
+			return nil, err
+		}
+
+		sender, err := msgToReplace.GetSenderPubKey()
+		if err != nil {
+			return nil, err
+		}
+
+		if !sender.Equal(&m.identity.PublicKey) {
+			return nil, errors.New("sender is not the author of the message")
+		}
+
+		if msgToReplace.ContentType != protobuf.ChatMessage_TEXT_PLAIN {
+			return nil, errors.New("only text messages can be replaced")
+		}
+
+		message.ChatId = msgToReplace.ChatId
 	}
 
 	var response MessengerResponse
@@ -2915,14 +2939,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	if len(messageState.Response.Messages) > 0 {
-		err = m.SaveMessages(messageState.Response.Messages)
+	if len(messageState.Response.pinMessages) > 0 {
+		err = m.SavePinMessages(messageState.Response.PinMessages())
 		if err != nil {
 			return nil, err
 		}
 	}
-	if len(messageState.Response.pinMessages) > 0 {
-		err = m.SavePinMessages(messageState.Response.PinMessages())
+
+	if len(messageState.Response.Messages) > 0 {
+		err = m.SaveMessages(messageState.Response.Messages)
 		if err != nil {
 			return nil, err
 		}

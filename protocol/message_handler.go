@@ -684,6 +684,12 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	}
 
+	if len(receivedMessage.Replace) != 0 {
+		if receivedMessage.ContentType != protobuf.ChatMessage_EDIT {
+			return errors.New("replace can only be used with an edit content type")
+		}
+	}
+
 	state.Response.Messages = append(state.Response.Messages, receivedMessage)
 
 	return nil
