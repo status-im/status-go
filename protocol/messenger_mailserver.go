@@ -16,9 +16,6 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
-// defaultSyncInterval indicates how far back in seconds we should sync a filter
-var defaultSyncInterval uint32 = 60 * 60 * 24
-
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 
@@ -170,17 +167,24 @@ func (m *Messenger) syncChat(chatID string) (*MessengerResponse, error) {
 	return m.syncFilters(filters)
 }
 
-func (m *Messenger) defaultSyncPeriod() uint32 {
-	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+func (m *Messenger) defaultSyncPeriod() (uint32, error) {
+	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod), nil
 }
 
 // calculateSyncPeriod caps the sync period to the default
-func (m *Messenger) calculateSyncPeriod(period uint32) uint32 {
-	d := m.defaultSyncPeriod()
-	if d > period {
-		return d
+func (m *Messenger) calculateSyncPeriod(period uint32) (uint32, error) {
+	d, err := m.defaultSyncPeriod()
+	if err != nil {
+		return 0, err
 	}
-	return period - tolerance
+	if d > period {
+		return d, nil
+	}
+	return period - tolerance, nil
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
@@ -228,14 +232,22 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 
 		topicData, ok := topicsData[filter.Topic.String()]
 		if !ok {
+			lastRequest, err := m.defaultSyncPeriod()
+			if err != nil {
+				return nil, err
+			}
 			topicData = mailservers.MailserverTopic{
 				Topic:       filter.Topic.String(),
-				LastRequest: int(m.defaultSyncPeriod()),
+				LastRequest: int(lastRequest),
 			}
 		}
 		batch, ok := batches[topicData.LastRequest]
 		if !ok {
-			from := m.calculateSyncPeriod(uint32(topicData.LastRequest))
+			from, err := m.calculateSyncPeriod(uint32(topicData.LastRequest))
+			if err != nil {
+				return nil, err
+			}
+
 			batch = MailserverBatch{From: from, To: to}
 		}
 
@@ -385,10 +397,14 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, ErrChatNotFound
 	}
 
+	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+	if err != nil {
+		return 0, err
+	}
 	batch := MailserverBatch{
 		ChatIDs: []string{chatID},
 		To:      chat.SyncedFrom,
-		From:    chat.SyncedFrom - defaultSyncInterval,
+		From:    chat.SyncedFrom - defaultSyncPeriod,
 		Topics:  topics,
 	}
 

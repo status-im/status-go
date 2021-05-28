@@ -50,6 +50,7 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 
 	}
 	chat.Active = true
+	chat.DeletedAtClockValue = 0
 
 	// Save topics
 	_, err := m.Join(chat)
@@ -67,7 +68,11 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+		if err != nil {
+			return nil, err
+		}
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
@@ -129,7 +134,11 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+		if err != nil {
+			return nil, err
+		}
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
@@ -182,7 +191,11 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncInterval
+		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+		if err != nil {
+			return nil, err
+		}
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
