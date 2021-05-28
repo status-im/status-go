@@ -31,8 +31,18 @@ message SyncInstallationPublicChat {
   string id = 2;
 }
 
+message SyncCommunity {
+  uint64 clock = 1;
+  bytes id = 2;
+  bytes private_key = 3;
+  bytes description = 4;
+  bool joined = 5;
+  bool verified = 6;
+}
+
 message SyncInstallation {
   repeated SyncInstallationContact contacts = 1;
   repeated SyncInstallationPublicChat public_chats = 2;
   SyncInstallationAccount account = 3;
+  repeated SyncCommunity communities = 4;
 }
