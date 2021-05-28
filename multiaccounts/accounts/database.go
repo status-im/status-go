@@ -104,6 +104,8 @@ type Settings struct {
 	StickerPacksPending            *json.RawMessage `json:"stickers/packs-pending,omitempty"`
 	StickersRecentStickers         *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
 	SyncingOnMobileNetwork         bool             `json:"syncing-on-mobile-network?,omitempty"`
+	// DefaultSyncPeriod is how far back in seconds we should pull messages from a mailserver
+	DefaultSyncPeriod uint `json:"default-sync-period"`
 	// SendPushNotifications indicates whether we should send push notifications for other clients
 	SendPushNotifications bool `json:"send-push-notifications?,omitempty"`
 	Appearance            uint `json:"appearance"`
@@ -348,6 +350,8 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET use_mailservers = ? WHERE synthetic_id = 'id'")
+	case "default-sync-period":
+		update, err = db.db.Prepare("UPDATE settings SET default_sync_period = ? WHERE synthetic_id = 'id'")
 	case "usernames":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET usernames = ? WHERE synthetic_id = 'id'")
@@ -398,7 +402,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -440,6 +444,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.StickerPacksPending,
 		&s.StickersRecentStickers,
 		&s.SyncingOnMobileNetwork,
+		&s.DefaultSyncPeriod,
 		&s.UseMailservers,
 		&s.MessagesFromContactsOnly,
 		&s.Usernames,
@@ -567,6 +572,15 @@ func (db *Database) CanUseMailservers() (bool, error) {
 func (db *Database) CanSyncOnMobileNetwork() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT syncing_on_mobile_network FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) GetDefaultSyncPeriod() (uint32, error) {
+	var result uint32
+	err := db.db.QueryRow("SELECT default_sync_period FROM settings WHERE synthetic_id = 'id'").Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
