@@ -47,7 +47,16 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id,timestamp,notification_type, chat_id) VALUES (?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID)
+	// encode message
+	var encodedMessage []byte
+	if notification.Message != nil {
+		encodedMessage, err = json.Marshal(notification.Message)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message) VALUES (?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage)
 	return err
 }
 
@@ -57,6 +66,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	for rows.Next() {
 		var chatID sql.NullString
 		var lastMessageBytes []byte
+		var messageBytes []byte
 		var name sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
@@ -67,6 +77,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.Read,
 			&notification.Accepted,
 			&notification.Dismissed,
+			&messageBytes,
 			&lastMessageBytes,
 			&name,
 			&latestCursor)
@@ -84,11 +95,20 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		// Restore last message
 		if lastMessageBytes != nil {
-			message := &common.Message{}
-			if err = json.Unmarshal(lastMessageBytes, message); err != nil {
+			lastMessage := &common.Message{}
+			if err = json.Unmarshal(lastMessageBytes, lastMessage); err != nil {
 				return "", nil, err
 			}
-			notification.LastMessage = message
+			notification.LastMessage = lastMessage
+		}
+
+		// Restore message
+		if messageBytes != nil {
+			message := &common.Message{}
+			if err = json.Unmarshal(messageBytes, message); err != nil {
+				return "", nil, err
+			}
+			notification.Message = message
 		}
 
 		notifications = append(notifications, notification)
@@ -126,6 +146,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.read,
   a.accepted,
   a.dismissed,
+  a.message,
   c.last_message,
   c.name,
   substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor

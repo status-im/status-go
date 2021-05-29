@@ -2405,6 +2405,39 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	return nil
 }
 
+// addNewActivityCenterNotification takes a common.Message and generates a new ActivityCenterNotification and appends it to the
+// []Response.ActivityCenterNotifications if the message is m.New
+func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message) error {
+	if !message.New {
+		return nil
+	}
+
+	chat, ok := r.AllChats.Load(message.LocalChatID)
+	if !ok {
+		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
+	}
+
+	if showMentionActivityCenterNotification(publicKey, message, chat, responseTo) {
+		notification := &ActivityCenterNotification{
+			ID:        types.FromHex(message.ID),
+			Name:      chat.Name,
+			Message:   message,
+			Type:      ActivityCenterNotificationTypeMention,
+			Timestamp: message.WhisperTimestamp,
+			ChatID:    chat.ID,
+		}
+
+		err := m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to save notification", zap.Error(err))
+			return err
+		}
+		r.Response.AddActivityCenterNotification(notification)
+	}
+
+	return nil
+}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
@@ -2971,6 +3004,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo]); err != nil {
 					return nil, err
 				}
+			}
+
+			// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
+			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
+				return nil, err
 			}
 		}
 	}
