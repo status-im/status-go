@@ -172,7 +172,7 @@ func (m *Messenger) defaultSyncPeriod() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod), nil
+	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod, nil
 }
 
 // calculateSyncPeriod caps the sync period to the default

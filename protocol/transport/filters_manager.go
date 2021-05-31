@@ -239,7 +239,8 @@ func (f *FiltersManager) FiltersByIdentities(identities []string) []*Filter {
 	var filters []*Filter
 
 	for _, filter := range f.filters {
-		if identitiesMap[filter.Identity] {
+		// Pre-pend 0x before comparing
+		if identitiesMap["0x"+filter.Identity] {
 			filters = append(filters, filter)
 		}
 	}
