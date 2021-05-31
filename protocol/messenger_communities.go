@@ -172,7 +172,7 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 			return nil, err
 		}
 
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
 		for idx := range chats {
 			chats[idx].SyncedTo = timestamp
 			chats[idx].SyncedFrom = timestamp

@@ -72,7 +72,7 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 		if err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
@@ -138,7 +138,7 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 		if err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
@@ -195,7 +195,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		if err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - uint32(defaultSyncPeriod)
+		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
 		chat.SyncedTo = timestamp
 		chat.SyncedFrom = timestamp
 	}
