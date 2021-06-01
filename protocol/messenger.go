@@ -2327,8 +2327,6 @@ type ReceivedMessageState struct {
 	AllInstallations *installationMap
 	// List of communities modified
 	ModifiedInstallations *stringBoolMap
-	// List of filters
-	AllFilters map[string]*transport.Filter
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
 	// EmojiReactions is a list of emoji reactions for the current batch
@@ -2447,7 +2445,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
-		AllFilters:            make(map[string]*transport.Filter),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
@@ -2794,7 +2791,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.CommunityDescription:
 						logger.Debug("Handling CommunityDescription")
-						err = m.handler.HandleCommunityDescription(messageState, publicKey, msg.ParsedMessage.Interface().(protobuf.CommunityDescription), msg.DecryptedPayload)
+						err = m.handleCommunityDescription(messageState, publicKey, msg.ParsedMessage.Interface().(protobuf.CommunityDescription), msg.DecryptedPayload)
 						if err != nil {
 							logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 							allMessagesProcessed = false

@@ -37,6 +37,7 @@ var (
 		SigningPhrase:             "yurt joey vibe",
 		SendPushNotifications:     true,
 		ProfilePicturesVisibility: ProfilePicturesVisibilityContactsOnly,
+		DefaultSyncPeriod:         86400,
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}

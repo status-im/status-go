@@ -167,7 +167,7 @@ func (m *Messenger) syncChat(chatID string) (*MessengerResponse, error) {
 	return m.syncFilters(filters)
 }
 
-func (m *Messenger) defaultSyncPeriod() (uint32, error) {
+func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
 	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
 	if err != nil {
 		return 0, err
@@ -175,9 +175,9 @@ func (m *Messenger) defaultSyncPeriod() (uint32, error) {
 	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod, nil
 }
 
-// calculateSyncPeriod caps the sync period to the default
-func (m *Messenger) calculateSyncPeriod(period uint32) (uint32, error) {
-	d, err := m.defaultSyncPeriod()
+// capToDefaultSyncPeriod caps the sync period to the default
+func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
+	d, err := m.defaultSyncPeriodFromNow()
 	if err != nil {
 		return 0, err
 	}
@@ -232,7 +232,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 
 		topicData, ok := topicsData[filter.Topic.String()]
 		if !ok {
-			lastRequest, err := m.defaultSyncPeriod()
+			lastRequest, err := m.defaultSyncPeriodFromNow()
 			if err != nil {
 				return nil, err
 			}
@@ -243,7 +243,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		}
 		batch, ok := batches[topicData.LastRequest]
 		if !ok {
-			from, err := m.calculateSyncPeriod(uint32(topicData.LastRequest))
+			from, err := m.capToDefaultSyncPeriod(uint32(topicData.LastRequest))
 			if err != nil {
 				return nil, err
 			}

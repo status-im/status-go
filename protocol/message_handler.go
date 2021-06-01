@@ -452,58 +452,6 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 	return nil
 }
 
-// HandleCommunityDescription handles an community description
-func (m *MessageHandler) HandleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
-	if err != nil {
-		return err
-	}
-
-	community := communityResponse.Community
-
-	state.Response.AddCommunity(community)
-	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
-
-	// If we haven't joined the org, nothing to do
-	if !community.Joined() {
-		return nil
-	}
-
-	// Update relevant chats names and add new ones
-	// Currently removal is not supported
-	chats := CreateCommunityChats(community, state.Timesource)
-	var chatIDs []string
-	for i, chat := range chats {
-
-		oldChat, ok := state.AllChats.Load(chat.ID)
-		if !ok {
-			// Beware, don't use the reference in the range (i.e chat) as it's a shallow copy
-			state.AllChats.Store(chat.ID, chats[i])
-
-			state.Response.AddChat(chat)
-			chatIDs = append(chatIDs, chat.ID)
-			// Update name, currently is the only field is mutable
-		} else if oldChat.Name != chat.Name {
-			oldChat.Name = chat.Name
-			// TODO(samyoul) remove storing of an updated reference pointer?
-			state.AllChats.Store(chat.ID, oldChat)
-			state.Response.AddChat(chat)
-		}
-	}
-
-	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
-	if err != nil {
-		return err
-	}
-
-	for _, filter := range filters {
-		state.AllFilters[filter.ChatID] = filter
-	}
-
-	return nil
-}
-
 // HandleCommunityInvitation handles an community invitation
 func (m *MessageHandler) HandleCommunityInvitation(state *ReceivedMessageState, signer *ecdsa.PublicKey, invitation protobuf.CommunityInvitation, rawPayload []byte) error {
 	if invitation.PublicKey == nil {

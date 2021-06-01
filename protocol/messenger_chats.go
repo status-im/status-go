@@ -37,6 +37,18 @@ func (m *Messenger) ActiveChats() []*Chat {
 	return chats
 }
 
+func (m *Messenger) initChatSyncFields(chat *Chat) error {
+	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+	if err != nil {
+		return err
+	}
+	timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
+	chat.SyncedTo = timestamp
+	chat.SyncedFrom = timestamp
+
+	return nil
+}
+
 func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -68,13 +80,9 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
-		if err != nil {
+		if err := m.initChatSyncFields(chat); err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
-		chat.SyncedTo = timestamp
-		chat.SyncedFrom = timestamp
 	}
 
 	err = m.saveChat(chat)
@@ -134,13 +142,9 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
-		if err != nil {
+		if err := m.initChatSyncFields(chat); err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
-		chat.SyncedTo = timestamp
-		chat.SyncedFrom = timestamp
 	}
 
 	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
@@ -191,13 +195,9 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 
 	// We set the synced to, synced from to the default time
 	if !willSync {
-		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
-		if err != nil {
+		if err := m.initChatSyncFields(chat); err != nil {
 			return nil, err
 		}
-		timestamp := uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod
-		chat.SyncedTo = timestamp
-		chat.SyncedFrom = timestamp
 	}
 
 	err = m.saveChat(chat)
