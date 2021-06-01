@@ -2131,7 +2131,33 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return true
 	})
 
+	cs, err := m.Communities()
+	if err != nil {
+		return err
+	}
+	for _, c := range cs {
+		if err = m.syncCommunity(ctx, c); err != nil {
+			return err
+		}
+	}
+
 	return err
+}
+
+func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
+	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
+
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	m.allChats.Store(chat.ID, chat)
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	return clock, chat
 }
 
 // SendPairInstallation sends a pair installation message
@@ -2196,17 +2222,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	if !m.hasPairedDevices() {
 		return nil
 	}
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncInstallationPublicChat{
 		Clock: clock,
@@ -2218,7 +2234,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
 		ResendAutomatically: true,
@@ -2237,17 +2253,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncInstallationContact{
 		Clock:         clock,
@@ -2261,9 +2267,49 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	var pkb []byte
+	pk := community.PrivateKey()
+	if pk != nil {
+		pkb = crypto.FromECDSA(pk)
+	}
+
+	syncMessage := &protobuf.SyncCommunity{
+		Clock:                clock,
+		Id:                   community.ID(),
+		PrivateKey:           pkb,
+		Description:          []byte(community.Description()),
+		Joined:               community.Joined(),
+		Verified:             community.Verified(),
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
 		ResendAutomatically: true,
 	})
 	if err != nil {
