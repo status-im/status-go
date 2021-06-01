@@ -143,6 +143,60 @@ func (s *CommunitySuite) TestCreateChat() {
 	s.Require().NotNil(changes.ChatsAdded[newChatID])
 }
 
+func (s *CommunitySuite) TestEditChat() {
+	newChatID := "new-chat-id"
+	org := s.buildCommunity(&s.identity.PublicKey)
+
+	identity := &protobuf.ChatIdentity{
+		DisplayName: "new-chat-display-name",
+		Description: "new-chat-description",
+	}
+	permissions := &protobuf.CommunityPermissions{
+		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Private: false,
+	}
+
+	_, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
+		Identity:    identity,
+		Permissions: permissions,
+	})
+	s.Require().NoError(err)
+
+	org.config.PrivateKey = nil
+	editedIdentity := &protobuf.ChatIdentity{
+		DisplayName: "edited-new-chat-display-name",
+		Description: "edited-new-chat-description",
+	}
+	editedPermissions := &protobuf.CommunityPermissions{
+		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Private: true,
+	}
+	_, err = org.EditChat(newChatID, &protobuf.CommunityChat{
+		Identity:    editedIdentity,
+		Permissions: editedPermissions,
+	})
+	s.Require().Equal(ErrNotAdmin, err)
+
+	description := org.config.CommunityDescription
+	org.config.PrivateKey = s.identity
+	editChanges, err := org.EditChat(newChatID, &protobuf.CommunityChat{
+		Identity:    editedIdentity,
+		Permissions: editedPermissions,
+	})
+
+	s.Require().NoError(err)
+
+	s.Require().NotNil(description.Chats[newChatID])
+	s.Require().NotEmpty(description.Clock)
+	s.Require().Equal(editedPermissions, description.Chats[newChatID].Permissions)
+	s.Require().Equal(editedIdentity, description.Chats[newChatID].Identity)
+
+	s.Require().NotNil(editChanges)
+	s.Require().NotNil(editChanges.ChatsModified[newChatID])
+	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Identity, editedIdentity)
+	s.Require().Equal(editChanges.ChatsModified[newChatID].ChatModified.Permissions, editedPermissions)
+}
+
 func (s *CommunitySuite) TestDeleteChat() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil

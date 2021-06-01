@@ -42,9 +42,10 @@ type Chat struct {
 	// ID is the id of the chat, for public chats it is the name e.g. status, for one-to-one
 	// is the hex encoded public key and for group chats is a random uuid appended with
 	// the hex encoded pk of the creator of the chat
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
 	// Active indicates whether the chat has been soft deleted
 	Active bool `json:"active"`
 
@@ -312,6 +313,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		CommunityID: orgID,
 		CategoryID:  orgChat.CategoryId,
 		Name:        orgChat.Identity.DisplayName,
+		Description: orgChat.Identity.Description,
 		Active:      true,
 		Color:       color,
 		ID:          orgID + chatID,
