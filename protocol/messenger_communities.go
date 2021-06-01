@@ -412,6 +412,37 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	return &response, m.saveChats(chats)
 }
 
+func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*MessengerResponse, error) {
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.EditChat(communityID, chatID, c)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	var chats []*Chat
+	var chatIDs []string
+	for chatID, chat := range changes.ChatsModified {
+		c := CreateCommunityChat(community.IDString(), chatID, chat.ChatModified, m.getTimesource())
+		chats = append(chats, c)
+		chatIDs = append(chatIDs, c.ID)
+		response.AddChat(c)
+	}
+
+	// Load filters
+	filters, err := m.transport.InitPublicFilters(chatIDs)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.scheduleSyncFilters(filters)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, m.saveChats(chats)
+}
+
 func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

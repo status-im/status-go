@@ -1262,3 +1262,31 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// It should not return those
 	require.Len(t, notifications, 0)
 }
+
+func TestSaveCommunityChat(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+
+	identity := &protobuf.ChatIdentity{
+		DisplayName: "community-chat-name",
+		Description: "community-chat-name-description",
+	}
+	permissions := &protobuf.CommunityPermissions{
+		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+
+	communityChat := &protobuf.CommunityChat{
+		Identity:    identity,
+		Permissions: permissions,
+	}
+
+	chat := CreateCommunityChat("test-or-gid", "test-chat-id", communityChat, &testTimeSource{})
+	chat.LastMessage = &common.Message{}
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	retrievedChat, err := p.Chat(chat.ID)
+	require.NoError(t, err)
+	require.Equal(t, chat, retrievedChat)
+}

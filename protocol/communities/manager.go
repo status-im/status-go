@@ -310,6 +310,30 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	return community, changes, nil
 }
 
+func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+	changes, err := community.EditChat(chatID, chat)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
 func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {

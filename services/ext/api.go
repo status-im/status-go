@@ -367,6 +367,11 @@ func (api *PublicAPI) CreateCommunityChat(communityID types.HexBytes, c *protobu
 	return api.service.messenger.CreateCommunityChat(communityID, c)
 }
 
+// CreateCommunityChat creates a community chat in the given community
+func (api *PublicAPI) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunityChat(communityID, chatID, c)
+}
+
 // InviteUsersToCommunity invites the users with pks to the community with ID
 func (api *PublicAPI) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.InviteUsersToCommunity(request)

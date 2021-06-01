@@ -59,6 +59,7 @@ func New(config Config) (*Community, error) {
 type CommunityChat struct {
 	ID          string                               `json:"id"`
 	Name        string                               `json:"name"`
+	Description string                               `json:"description"`
 	Members     map[string]*protobuf.CommunityMember `json:"members"`
 	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
 	CanPost     bool                                 `json:"canPost"`
@@ -125,6 +126,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			chat := CommunityChat{
 				ID:          id,
 				Name:        c.Identity.DisplayName,
+				Description: c.Identity.Description,
 				Permissions: c.Permissions,
 				Members:     c.Members,
 				CanPost:     canPost,
@@ -189,6 +191,7 @@ func (o *Community) initialize() {
 }
 
 type CommunityChatChanges struct {
+	ChatModified     *protobuf.CommunityChat
 	MembersAdded     map[string]*protobuf.CommunityMember
 	MembersRemoved   map[string]*protobuf.CommunityMember
 	CategoryModified string
@@ -243,7 +246,7 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -273,6 +276,38 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 
 	changes := o.emptyCommunityChanges()
 	changes.ChatsAdded[chatID] = chat
+	return changes, nil
+}
+
+func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if !o.IsAdmin() {
+		return nil, ErrNotAdmin
+	}
+
+	err := validateCommunityChat(o.config.CommunityDescription, chat)
+	if err != nil {
+		return nil, err
+	}
+
+	if o.config.CommunityDescription.Chats == nil {
+		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+	}
+	if _, exists := o.config.CommunityDescription.Chats[chatID]; !exists {
+		return nil, ErrChatNotFound
+	}
+
+	o.config.CommunityDescription.Chats[chatID] = chat
+
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.ChatsModified[chatID] = &CommunityChatChanges{
+		ChatModified: chat,
+	}
+
 	return changes, nil
 }
 
