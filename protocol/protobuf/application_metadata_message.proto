@@ -45,5 +45,6 @@ message ApplicationMetadataMessage {
     EDIT_MESSAGE = 29;
     STATUS_UPDATE = 30;
     DELETE_MESSAGE = 31;
+    SYNC_INSTALLATION_COMMUNITY = 32;
   }
 }
