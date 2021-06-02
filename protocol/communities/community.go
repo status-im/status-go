@@ -262,6 +262,12 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 		return nil, ErrChatAlreadyExists
 	}
 
+	for _, c := range o.config.CommunityDescription.Chats {
+		if chat.Identity.DisplayName == c.Identity.DisplayName {
+			return nil, ErrInvalidCommunityDescriptionDuplicatedName
+		}
+	}
+
 	// Sets the chat position to be the last within its category
 	chat.Position = 0
 	for _, c := range o.config.CommunityDescription.Chats {
