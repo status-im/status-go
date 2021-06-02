@@ -2180,17 +2180,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 		return nil, errors.New("no installation metadata")
 	}
 
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	pairMessage := &protobuf.PairInstallation{
 		Clock:          clock,
@@ -2203,7 +2193,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 	}
 
 	_, err = m.dispatchPairInstallationMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION,
 		ResendAutomatically: true,
@@ -2691,6 +2681,46 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 								logger.Warn("could not re-register for push notifications", zap.Error(err))
 								continue
 							}
+						}
+
+					case protobuf.SyncCommunity:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						community := msg.ParsedMessage.Interface().(protobuf.SyncCommunity)
+						logger.Debug("Handling SyncCommunity", zap.Any("message", community))
+
+						err = m.communitiesManager.SaveSyncCommunity(&community)
+						if err != nil {
+							allMessagesProcessed = false
+							logger.Warn("failed to save SyncCommunity in to database", zap.Error(err), zap.Any("community", community))
+							continue
+						}
+
+						var mr *MessengerResponse
+						if community.Joined {
+							mr, err = m.JoinCommunity(community.Id)
+							if err != nil {
+								allMessagesProcessed = false
+								logger.Warn("failed to join SyncCommunity", zap.Error(err), zap.Any("community", community))
+								continue
+							}
+						} else {
+							mr, err = m.LeaveCommunity(community.Id)
+							if err != nil {
+								allMessagesProcessed = false
+								logger.Warn("failed to leave SyncCommunity", zap.Error(err), zap.Any("community", community))
+								continue
+							}
+						}
+
+						err = messageState.Response.Merge(mr)
+						if err != nil {
+							allMessagesProcessed = false
+							logger.Warn("failed to merge message response", zap.Error(err), zap.Any("message response", mr))
+							continue
 						}
 
 					case protobuf.RequestAddressForTransaction:

@@ -29,7 +29,12 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 		return err
 	}
 
-	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?,?,?)`, id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Verified)
+	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?, ?, ?)`, id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Verified)
+	return err
+}
+
+func (p *Persistence) SaveSyncCommunity(community *protobuf.SyncCommunity) error {
+	_, err := p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?, ?, ?)`, community.Id, community.PrivateKey, community.Description, community.Joined, community.Verified)
 	return err
 }
 
