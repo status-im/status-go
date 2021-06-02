@@ -855,3 +855,7 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 	}
 	return community.CanPost(pk, chatID, grant)
 }
+
+func (m *Manager) SaveSyncCommunity(community *protobuf.SyncCommunity) error {
+	return m.persistence.SaveSyncCommunity(community)
+}
