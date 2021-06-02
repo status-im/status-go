@@ -883,7 +883,7 @@ func _1622184614_add_default_sync_periodUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622184614_add_default_sync_period.up.sql", size: 125, mode: os.FileMode(0644), modTime: time.Unix(1622464937, 0)}
+	info := bindataFileInfo{name: "1622184614_add_default_sync_period.up.sql", size: 125, mode: os.FileMode(0644), modTime: time.Unix(1622545218, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x60, 0x39, 0xeb, 0x8f, 0xdc, 0x1, 0x56, 0xc1, 0x9b, 0xaa, 0xda, 0x44, 0xe0, 0xdb, 0xda, 0x2c, 0xe7, 0x71, 0x8d, 0xbc, 0xc1, 0x9a, 0x4f, 0x48, 0xe0, 0x5e, 0x81, 0x1e, 0x8e, 0x6a, 0x4d, 0x3}}
 	return a, nil
 }
