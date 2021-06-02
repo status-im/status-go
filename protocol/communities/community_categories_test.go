@@ -57,10 +57,11 @@ func (s *CommunitySuite) TestCreateCategory() {
 		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
-	_, _ = org.CreateChat(newChatID, &protobuf.CommunityChat{
+	_, err = org.CreateChat(newChatID, &protobuf.CommunityChat{
 		Identity:    identity,
 		Permissions: permissions,
 	})
+	s.Require().NoError(err)
 
 	changes, err = org.CreateCategory(newCategoryID3, newCategoryName3, []string{newChatID})
 	s.Require().NoError(err)
@@ -81,10 +82,11 @@ func (s *CommunitySuite) TestEditCategory() {
 
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
-	_, _ = org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1})
+	_, err := org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1})
+	s.Require().NoError(err)
 	org.config.PrivateKey = nil
 
-	_, err := org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1})
+	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1})
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
@@ -111,7 +113,7 @@ func (s *CommunitySuite) TestEditCategory() {
 
 	// Edit by removing the chats
 
-	identity := &protobuf.ChatIdentity{
+	identity1 := &protobuf.ChatIdentity{
 		DisplayName: "new-chat-display-name",
 		Description: "new-chat-description",
 	}
@@ -122,14 +124,21 @@ func (s *CommunitySuite) TestEditCategory() {
 	testChatID2 := "test-chat-id-2"
 	testChatID3 := "test-chat-id-3"
 
-	_, _ = org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity,
+	_, err = org.CreateChat(testChatID2, &protobuf.CommunityChat{
+		Identity:    identity1,
 		Permissions: permissions,
 	})
-	_, _ = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity,
+	s.Require().NoError(err)
+	identity2 := &protobuf.ChatIdentity{
+		DisplayName: "identity-2",
+		Description: "new-chat-description",
+	}
+
+	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
+		Identity:    identity2,
 		Permissions: permissions,
 	})
+	s.Require().NoError(err)
 
 	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1, testChatID2, testChatID3})
 	s.Require().NoError(err)
@@ -142,12 +151,14 @@ func (s *CommunitySuite) TestEditCategory() {
 	s.Require().Equal(int32(1), description.Chats[testChatID2].Position)
 	s.Require().Equal(int32(2), description.Chats[testChatID3].Position)
 
-	_, _ = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1, testChatID3})
+	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1, testChatID3})
+	s.Require().NoError(err)
 	s.Require().Equal("", description.Chats[testChatID2].CategoryId)
 	s.Require().Equal(int32(0), description.Chats[testChatID1].Position)
 	s.Require().Equal(int32(1), description.Chats[testChatID3].Position)
 
-	_, _ = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID3})
+	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID3})
+	s.Require().NoError(err)
 	s.Require().Equal("", description.Chats[testChatID1].CategoryId)
 	s.Require().Equal(int32(0), description.Chats[testChatID3].Position)
 }
@@ -155,10 +166,6 @@ func (s *CommunitySuite) TestEditCategory() {
 func (s *CommunitySuite) TestDeleteCategory() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
-	identity := &protobuf.ChatIdentity{
-		DisplayName: "new-chat-display-name",
-		Description: "new-chat-description",
-	}
 	permissions := &protobuf.CommunityPermissions{
 		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
@@ -168,21 +175,35 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	newCategoryID := "new-category-id"
 	newCategoryName := "new-category-name"
 
-	_, _ = org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
-	})
-	_, _ = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
-	})
+	identity1 := &protobuf.ChatIdentity{
+		DisplayName: "display-name-2",
+		Description: "new-chat-description",
+	}
 
-	_, _ = org.CreateCategory(newCategoryID, newCategoryName, []string{})
+	_, err := org.CreateChat(testChatID2, &protobuf.CommunityChat{
+		Identity:    identity1,
+		Permissions: permissions,
+	})
+	s.Require().NoError(err)
+
+	identity2 := &protobuf.ChatIdentity{
+		DisplayName: "display-name-3",
+		Description: "new-chat-description",
+	}
+
+	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
+		Identity:    identity2,
+		Permissions: permissions,
+	})
+	s.Require().NoError(err)
+
+	_, err = org.CreateCategory(newCategoryID, newCategoryName, []string{})
+	s.Require().NoError(err)
 
 	description := org.config.CommunityDescription
 
-	_, _ = org.EditCategory(newCategoryID, newCategoryName, []string{testChatID2, testChatID1})
-
+	_, err = org.EditCategory(newCategoryID, newCategoryName, []string{testChatID2, testChatID1})
+	s.Require().NoError(err)
 	s.Require().Equal(newCategoryID, description.Chats[testChatID1].CategoryId)
 	s.Require().Equal(newCategoryID, description.Chats[testChatID2].CategoryId)
 
@@ -191,7 +212,7 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	s.Require().Equal(int32(1), description.Chats[testChatID1].Position)
 
 	org.config.PrivateKey = nil
-	_, err := org.DeleteCategory(testCategoryID1)
+	_, err = org.DeleteCategory(testCategoryID1)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
@@ -210,10 +231,6 @@ func (s *CommunitySuite) TestDeleteCategory() {
 func (s *CommunitySuite) TestDeleteChatOrder() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
-	identity := &protobuf.ChatIdentity{
-		DisplayName: "new-chat-display-name",
-		Description: "new-chat-description",
-	}
 	permissions := &protobuf.CommunityPermissions{
 		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
@@ -223,24 +240,39 @@ func (s *CommunitySuite) TestDeleteChatOrder() {
 	newCategoryID := "new-category-id"
 	newCategoryName := "new-category-name"
 
-	_, _ = org.CreateChat(testChatID2, &protobuf.CommunityChat{
-		Identity:    identity,
+	identity1 := &protobuf.ChatIdentity{
+		DisplayName: "identity-1",
+		Description: "new-chat-description",
+	}
+
+	_, err := org.CreateChat(testChatID2, &protobuf.CommunityChat{
+		Identity:    identity1,
 		Permissions: permissions,
 	})
-	_, _ = org.CreateChat(testChatID3, &protobuf.CommunityChat{
-		Identity:    identity,
+	s.Require().NoError(err)
+	identity2 := &protobuf.ChatIdentity{
+		DisplayName: "identity-2",
+		Description: "new-chat-description",
+	}
+
+	_, err = org.CreateChat(testChatID3, &protobuf.CommunityChat{
+		Identity:    identity2,
 		Permissions: permissions,
 	})
+	s.Require().NoError(err)
 
-	_, _ = org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1, testChatID2, testChatID3})
+	_, err = org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1, testChatID2, testChatID3})
+	s.Require().NoError(err)
 
-	description, _ := org.DeleteChat(testChatID2)
+	description, err := org.DeleteChat(testChatID2)
+	s.Require().NoError(err)
 	s.Require().Equal(int32(0), description.Chats[testChatID1].Position)
 	s.Require().Equal(int32(1), description.Chats[testChatID3].Position)
 
-	description, _ = org.DeleteChat(testChatID1)
+	description, err = org.DeleteChat(testChatID1)
+	s.Require().NoError(err)
 	s.Require().Equal(int32(0), description.Chats[testChatID3].Position)
 
-	_, err := org.DeleteChat(testChatID3)
+	_, err = org.DeleteChat(testChatID3)
 	s.Require().NoError(err)
 }

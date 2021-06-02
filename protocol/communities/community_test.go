@@ -141,6 +141,15 @@ func (s *CommunitySuite) TestCreateChat() {
 
 	s.Require().NotNil(changes)
 	s.Require().NotNil(changes.ChatsAdded[newChatID])
+
+	// Add a community with the same name
+
+	_, err = org.CreateChat("different-chat-id", &protobuf.CommunityChat{
+		Identity:    identity,
+		Permissions: permissions,
+	})
+
+	s.Require().Error(err)
 }
 
 func (s *CommunitySuite) TestEditChat() {
@@ -665,7 +674,10 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 			changes: func(org *Community) *CommunityChanges {
 				changes := org.emptyCommunityChanges()
 				changes.MembersAdded[s.member3Key] = &protobuf.CommunityMember{}
-				changes.ChatsAdded[testChatID2] = &protobuf.CommunityChat{Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY}, Members: make(map[string]*protobuf.CommunityMember)}
+				changes.ChatsAdded[testChatID2] = &protobuf.CommunityChat{
+					Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
+					Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY},
+					Members:     make(map[string]*protobuf.CommunityMember)}
 				changes.ChatsAdded[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
 				return changes
@@ -873,6 +885,10 @@ func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescript
 	desc.Members[s.member2Key] = &protobuf.CommunityMember{}
 	desc.Chats[testChatID1].Members = make(map[string]*protobuf.CommunityMember)
 	desc.Chats[testChatID1].Members[s.member1Key] = &protobuf.CommunityMember{}
+	desc.Chats[testChatID1].Identity = &protobuf.ChatIdentity{
+		DisplayName: "display-name",
+		Description: "description",
+	}
 	return desc
 }
 
@@ -952,7 +968,10 @@ func (s *CommunitySuite) addedChatCommunityDescription(org *Community) *protobuf
 	description := proto.Clone(org.config.CommunityDescription).(*protobuf.CommunityDescription)
 	description.Clock++
 	description.Members[s.member3Key] = &protobuf.CommunityMember{}
-	description.Chats[testChatID2] = &protobuf.CommunityChat{Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY}, Members: make(map[string]*protobuf.CommunityMember)}
+	description.Chats[testChatID2] = &protobuf.CommunityChat{
+		Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY},
+		Members:     make(map[string]*protobuf.CommunityMember)}
 	description.Chats[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
 	return description
