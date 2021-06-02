@@ -204,10 +204,15 @@ func TestPinMessageByChatID(t *testing.T) {
 
 		// Pin this message
 		if i%100 == 0 {
+			from := "me"
+			if i == 100 {
+				from = "them"
+			}
+
 			pinMessage := &common.PinMessage{
 				ID:          strconv.Itoa(i),
 				LocalChatID: chatID,
-				From:        "me",
+				From:        from,
 			}
 
 			pinMessage.MessageId = strconv.Itoa(i)
@@ -282,6 +287,7 @@ func TestPinMessageByChatID(t *testing.T) {
 			break
 		}
 	}
+
 	require.Equal(t, "", cursor) // for loop should exit because of cursor being empty
 	require.EqualValues(t, pinnedMessagesCount, len(result))
 	require.EqualValues(t, math.Ceil(float64(pinnedMessagesCount)/float64(pageSize)), iter)
@@ -292,6 +298,11 @@ func TestPinMessageByChatID(t *testing.T) {
 			return result[i].Clock > result[j].Clock
 		}),
 	)
+
+	require.Equal(t, "them", result[len(result)-1].PinnedBy)
+	for i := 0; i < len(result)-1; i++ {
+		require.Equal(t, "me", result[i].PinnedBy)
+	}
 }
 
 func TestMessageReplies(t *testing.T) {
