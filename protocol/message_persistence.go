@@ -638,7 +638,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 			return nil, "", err
 		}
 		pinnedMessage := &common.PinnedMessage{
-			Message:  message,
+			Message:  &message,
 			PinnedAt: pinnedAt,
 			PinnedBy: pinnedBy,
 		}

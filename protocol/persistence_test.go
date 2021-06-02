@@ -295,7 +295,7 @@ func TestPinMessageByChatID(t *testing.T) {
 		t,
 		// Verify descending order.
 		sort.SliceIsSorted(result, func(i, j int) bool {
-			return result[i].Clock > result[j].Clock
+			return result[i].Message.Clock > result[j].Message.Clock
 		}),
 	)
 
