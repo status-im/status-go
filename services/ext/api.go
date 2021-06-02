@@ -448,8 +448,8 @@ type ApplicationMessagesResponse struct {
 }
 
 type ApplicationPinnedMessagesResponse struct {
-	Messages []*common.PinnedMessage `json:"messages"`
-	Cursor   string                  `json:"cursor"`
+	PinnedMessages []*common.PinnedMessage `json:"pinnedMessages"`
+	Cursor         string                  `json:"cursor"`
 }
 
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
@@ -465,14 +465,14 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 }
 
 func (api *PublicAPI) ChatPinnedMessages(chatID, cursor string, limit int) (*ApplicationPinnedMessagesResponse, error) {
-	messages, cursor, err := api.service.messenger.PinnedMessageByChatID(chatID, cursor, limit)
+	pinnedMessages, cursor, err := api.service.messenger.PinnedMessageByChatID(chatID, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ApplicationPinnedMessagesResponse{
-		Messages: messages,
-		Cursor:   cursor,
+		PinnedMessages: pinnedMessages,
+		Cursor:         cursor,
 	}, nil
 }
 
