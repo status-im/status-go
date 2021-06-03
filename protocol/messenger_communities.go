@@ -423,8 +423,8 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 
 	var chats []*Chat
 	var chatIDs []string
-	for chatID, chat := range changes.ChatsModified {
-		c := CreateCommunityChat(community.IDString(), chatID, chat.ChatModified, m.getTimesource())
+	for chatID, change := range changes.ChatsModified {
+		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
 		chatIDs = append(chatIDs, c.ID)
 		response.AddChat(c)
@@ -753,8 +753,10 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 			state.Response.AddChat(chat)
 			chatIDs = append(chatIDs, chat.ID)
 			// Update name, currently is the only field is mutable
-		} else if oldChat.Name != chat.Name {
+		} else if oldChat.Name != chat.Name ||
+			oldChat.Description != chat.Description {
 			oldChat.Name = chat.Name
+			oldChat.Description = chat.Description
 			// TODO(samyoul) remove storing of an updated reference pointer?
 			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)
