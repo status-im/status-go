@@ -585,6 +585,20 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
+	if len(receivedMessage.OriginalMessageId) != 0 {
+		if receivedMessage.ContentType != protobuf.ChatMessage_EDIT {
+			return errors.New("replace can only be used with an edit content type")
+		}
+		shouldContinue, err := m.handleEditedMessage(state, receivedMessage)
+		if err != nil {
+			return err
+		}
+
+		if !shouldContinue {
+			return nil
+		}
+	}
+
 	// If the chat is not active, create a notification in the center
 	if chat.OneToOne() && !chat.Active {
 		m.createMessageNotification(chat, state)
@@ -621,12 +635,6 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 		state.Response.AddCommunity(community)
 		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
-	}
-
-	if len(receivedMessage.OriginalMessageId) != 0 {
-		if receivedMessage.ContentType != protobuf.ChatMessage_EDIT {
-			return errors.New("replace can only be used with an edit content type")
-		}
 	}
 
 	state.Response.AddMessage(receivedMessage)
@@ -1114,6 +1122,50 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 	}
 
 	return nil
+}
+
+func (m *MessageHandler) handleEditedMessage(state *ReceivedMessageState, message *common.Message) (bool, error) {
+	originalMessageID := message.OriginalMessageId
+	// Check if it's already in the response
+	originalMessage := state.Response.GetMessage(originalMessageID)
+	// and pull all the edits + original message
+	messageHistory, err := m.persistence.MessagesByOriginalMessageID(originalMessageID)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if we have the original message
+
+	if originalMessage == nil {
+		for _, m := range messageHistory {
+			if m.ID == originalMessageID {
+				originalMessage = m
+			}
+		}
+	}
+
+	// We don't have the original message, save the edited message hidden and continue
+	if originalMessage == nil {
+		// This could be a single query
+		err := m.persistence.SaveMessages([]*common.Message{message})
+		if err != nil {
+			return false, nil
+		}
+		err = m.persistence.HideMessage(message.ID)
+		if err != nil {
+			return false, nil
+		}
+		// We tell them to ignore this message
+		return false, nil
+	}
+
+	// We have an original message and potentially some edits
+
+	// check that the edit is valid
+
+	// find the most up to date edit
+
+	return true, nil
 }
 
 func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey string, chat *Chat) (bool, error) {
