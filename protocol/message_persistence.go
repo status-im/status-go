@@ -1454,3 +1454,40 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	err = db.saveChat(tx, *chat)
 	return err
 }
+
+func (db sqlitePersistence) MessagesByOriginalMessageID(id string) ([]*common.Message, error) {
+	allFields := db.tableUserMessagesAllFieldsJoin()
+
+	// nolint: gosec
+	rows, err := db.db.Query(fmt.Sprintf(`
+			SELECT
+				%s
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
+			WHERE m1.id = ? OR m1.original_message_id = ?`, allFields), id, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*common.Message
+	for rows.Next() {
+		var message common.Message
+		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
+			return nil, err
+		}
+		result = append(result, &message)
+	}
+
+	return result, nil
+}

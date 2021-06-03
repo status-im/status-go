@@ -272,3 +272,10 @@ func (r *MessengerResponse) SetMessages(messages []*common.Message) {
 	r.messages = make(map[string]*common.Message)
 	r.AddMessages(messages)
 }
+
+func (r *MessengerResponse) GetMessage(messageID string) *common.Message {
+	if r.messages == nil {
+		return nil
+	}
+	return r.messages[messageID]
+}
