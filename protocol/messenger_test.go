@@ -409,8 +409,8 @@ func (s *MessengerSuite) TestSendPublic() {
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	s.Require().Equal(1, len(response.Messages), "it returns the message")
-	outputMessage := response.Messages[0]
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+	outputMessage := response.Messages()[0]
 
 	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
@@ -435,8 +435,8 @@ func (s *MessengerSuite) TestSendProfile() {
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	s.Require().Equal(1, len(response.Messages), "it returns the message")
-	outputMessage := response.Messages[0]
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+	outputMessage := response.Messages()[0]
 
 	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
@@ -466,8 +466,8 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	s.NoError(err)
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Equal(1, len(response.Messages), "it returns the message")
-	outputMessage := response.Messages[0]
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+	outputMessage := response.Messages()[0]
 
 	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
@@ -499,8 +499,8 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	s.NoError(err)
 	response, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-	s.Require().Equal(1, len(response.Messages), "it returns the message")
-	outputMessage := response.Messages[0]
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+	outputMessage := response.Messages()[0]
 
 	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
@@ -527,8 +527,8 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	s.NoError(err)
 	response, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Equal(1, len(response.Messages), "it returns the message")
-	outputMessage := response.Messages[0]
+	s.Require().Equal(1, len(response.Messages()), "it returns the message")
+	outputMessage := response.Messages()[0]
 
 	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
@@ -556,9 +556,9 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	textMessage := response.Messages[0]
+	textMessage := response.Messages()[0]
 
 	s.Equal(textMessage.Text, text)
 	s.NotNil(textMessage.ParsedText)
@@ -596,18 +596,18 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	sentMessage := sendResponse.Messages[0]
+	sentMessage := sendResponse.Messages()[0]
 
 	// Wait for the message to reach its destination
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 	s.Require().Len(response.Chats(), 1)
 	actualChat := response.Chats()[0]
 	// It sets the unviewed messages count
@@ -639,7 +639,7 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 	sentResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	chat.DeletedAtClockValue = sentResponse.Messages[0].Clock
+	chat.DeletedAtClockValue = sentResponse.Messages()[0].Clock
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -647,7 +647,7 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 	time.Sleep(100 * time.Millisecond)
 	response, err := s.m.RetrieveAll()
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 0)
+	s.Require().Len(response.Messages(), 0)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -685,7 +685,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	time.Sleep(100 * time.Millisecond)
 	response, err := s.m.RetrieveAll()
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 0)
+	s.Require().Len(response.Messages(), 0)
 }
 
 // Resend their public message, receive only once
@@ -709,7 +709,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	sendResponse1, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
-	sentMessage := sendResponse1.Messages[0]
+	sentMessage := sendResponse1.Messages()[0]
 
 	err = theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
 	s.Require().NoError(err)
@@ -717,12 +717,12 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	// Wait for the message to reach its destination
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 	s.Require().Len(response.Chats(), 1)
 	actualChat := response.Chats()[0]
 	// It sets the unviewed messages count
@@ -740,7 +740,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	time.Sleep(100 * time.Millisecond)
 	response, err = s.m.RetrieveAll()
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 0)
+	s.Require().Len(response.Messages(), 0)
 }
 
 // Test receiving a message on an existing private chat
@@ -763,13 +763,13 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
-	sentMessage := sendResponse.Messages[0]
+	sentMessage := sendResponse.Messages()[0]
 
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
@@ -800,14 +800,14 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
-	sentMessage := sendResponse.Messages[0]
+	sentMessage := sendResponse.Messages()[0]
 
 	// Wait for the message to reach its destination
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 
@@ -839,14 +839,14 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
 	// Wait for the message to reach its destination
 	time.Sleep(100 * time.Millisecond)
 	response, err := s.m.RetrieveAll()
 	s.NoError(err)
 
-	s.Require().Equal(len(response.Messages), 0)
+	s.Require().Equal(len(response.Messages()), 0)
 	s.Require().Equal(len(response.Chats()), 0)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
@@ -896,13 +896,13 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
-	sentMessage := sendResponse.Messages[0]
+	sentMessage := sendResponse.Messages()[0]
 
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
@@ -1552,7 +1552,7 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 	response, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
 	chat = response.Chats()[0]
 
@@ -1579,9 +1579,9 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	initialCommandID := senderMessage.ID
 
@@ -1595,16 +1595,16 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request address for transaction", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -1617,9 +1617,9 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage = response.Messages[0]
+	senderMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	s.Require().Equal("Request address for transaction declined", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
@@ -1632,15 +1632,15 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage = response.Messages[0]
+	receiverMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request address for transaction declined", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -1676,9 +1676,9 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	s.Require().Equal("Transaction sent", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
@@ -1738,9 +1738,9 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 
 	s.Require().Equal("Transaction received", receiverMessage.Text)
@@ -1780,9 +1780,9 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	s.Require().Equal("Transaction sent", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
@@ -1842,9 +1842,9 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 
 	s.Require().Equal("Transaction received", receiverMessage.Text)
@@ -1878,9 +1878,9 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	initialCommandID := senderMessage.ID
 
@@ -1894,16 +1894,16 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request address for transaction", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -1916,9 +1916,9 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage = response.Messages[0]
+	senderMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	s.Require().Equal("Request address for transaction accepted", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
@@ -1932,15 +1932,15 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage = response.Messages[0]
+	receiverMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request address for transaction accepted", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -1971,9 +1971,9 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	initialCommandID := senderMessage.ID
 
@@ -1988,16 +1988,16 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request transaction", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -2011,9 +2011,9 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage = response.Messages[0]
+	senderMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 
 	s.Require().Equal("Transaction request declined", senderMessage.Text)
@@ -2024,16 +2024,16 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage = response.Messages[0]
+	receiverMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 
 	s.Require().Equal("Transaction request declined", receiverMessage.Text)
@@ -2061,9 +2061,9 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage := response.Messages[0]
+	senderMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 	initialCommandID := senderMessage.ID
 
@@ -2078,16 +2078,16 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage := response.Messages[0]
+	receiverMessage := response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 	s.Require().Equal("Request transaction", receiverMessage.Text)
 	s.Require().NotNil(receiverMessage.CommandParameters)
@@ -2104,9 +2104,9 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	senderMessage = response.Messages[0]
+	senderMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
 
 	s.Require().Equal("Transaction sent", senderMessage.Text)
@@ -2171,9 +2171,9 @@ func (s *MessengerSuite) TestRequestTransaction() {
 
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	receiverMessage = response.Messages[0]
+	receiverMessage = response.Messages()[0]
 	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
 
 	s.Require().Equal("Transaction received", receiverMessage.Text)

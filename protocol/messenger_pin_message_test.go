@@ -74,11 +74,11 @@ func (s *MessengerPinMessageSuite) TestPinMessage() {
 	inputMessage := buildTestMessage(*theirChat)
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)

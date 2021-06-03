@@ -141,8 +141,8 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Messages, 1)
-	s.Require().Equal(community.IDString(), response.Messages[0].CommunityID)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 }
 
 func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
@@ -241,8 +241,8 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Messages, 1)
-	s.Require().Equal(community.IDString(), response.Messages[0].CommunityID)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
 	response, err = s.alice.JoinCommunity(community.ID())
@@ -463,14 +463,14 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 		if err != nil {
 			return err
 		}
-		if len(response.Messages) == 0 {
+		if len(response.messages) == 0 {
 			return errors.New("message not received")
 		}
 		return nil
 	})
 
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Equal(chatID, response.Chats()[0].ID)
 }
@@ -978,7 +978,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.alice.identity.PublicKey)
@@ -991,14 +991,14 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 		if err != nil {
 			return err
 		}
-		if len(response.Messages) == 0 {
+		if len(response.messages) == 0 {
 			return errors.New("community link not received")
 		}
 		return nil
 	})
 
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 }
 
 func (s *MessengerCommunitiesSuite) TestBanUser() {

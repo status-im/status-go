@@ -135,7 +135,10 @@ type Message struct {
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
 
-	New bool `json:"new,omitempty"`
+	// Replace indicates that this is a replacement of a message
+	// that has been updated
+	Replace string `json:"replace,omitempty"`
+	New     bool   `json:"new,omitempty"`
 
 	SigPubKey *ecdsa.PublicKey `json:"-"`
 

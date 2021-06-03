@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -75,43 +74,42 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	inputMessage := buildTestMessage(*theirChat)
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().Len(sendResponse.Messages(), 1)
 
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	ogMessage := sendResponse.Messages[0]
+	ogMessage := sendResponse.Messages()[0]
 
 	editedMessage := buildTestMessage(*theirChat)
-	editedMessage.Replace = ogMessage.ID
+	editedMessage.OriginalMessageId = ogMessage.ID
 	editedMessage.ContentType = protobuf.ChatMessage_EDIT
 
 	sendResponse, err = theirMessenger.SendChatMessage(context.Background(), editedMessage)
 
-	s.NoError(err)
-	fmt.Println(sendResponse.Messages)
-	s.Require().Len(sendResponse.Messages, 1)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
 
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages, 1)
-	s.Require().Equal(ogMessage.ID, response.Messages[0].Replace)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(ogMessage.ID, response.Messages()[0].OriginalMessageId)
 
 	// Main instance user attempts to edit the message it received from theirMessenger
 	editedMessage = buildTestMessage(*ourChat)
-	editedMessage.Replace = ogMessage.ID
+	editedMessage.OriginalMessageId = ogMessage.ID
 	editedMessage.ContentType = protobuf.ChatMessage_EDIT
 	_, err = s.m.SendChatMessage(context.Background(), editedMessage)
 

@@ -47,6 +47,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		command_state,
 		command_signature,
 		replace_message,
+		original_message_id,
 		rtl,
 		line_count,
 		response_to,
@@ -87,6 +88,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.command_state,
 		m1.command_signature,
 		m1.replace_message,
+		m1.original_message_id,
 		m1.rtl,
 		m1.line_count,
 		m1.response_to,
@@ -127,6 +129,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var communityID sql.NullString
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
+	var originalMessageID sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -164,6 +167,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&command.CommandState,
 		&command.Signature,
 		&message.Replace,
+		&originalMessageID,
 		&message.RTL,
 		&message.LineCount,
 		&message.ResponseTo,
@@ -183,6 +187,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
 		return err
+	}
+
+	if originalMessageID.Valid {
+		message.OriginalMessageId = originalMessageID.String
 	}
 
 	if quotedText.Valid {
@@ -318,6 +326,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		command.CommandState,
 		command.Signature,
 		message.Replace,
+		message.OriginalMessageId,
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,

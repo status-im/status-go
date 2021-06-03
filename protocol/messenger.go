@@ -1221,8 +1221,8 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(&chat)
-	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1296,8 +1296,8 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1382,8 +1382,8 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1444,8 +1444,8 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 
 	var response MessengerResponse
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1644,8 +1644,8 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1708,8 +1708,8 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	chat.Joined = int64(m.getTimesource().GetCurrentTime())
 
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
+	response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
+	err = m.persistence.SaveMessages(response.Messages())
 	if err != nil {
 		return nil, err
 	}
@@ -1768,8 +1768,8 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 		}
 
 		chat.updateChatFromGroupMembershipChanges(group)
-		response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-		err = m.persistence.SaveMessages(response.Messages)
+		response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
+		err = m.persistence.SaveMessages(response.Messages())
 		if err != nil {
 			return nil, err
 		}
@@ -2071,11 +2071,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return nil, err
 		}
 	} else if message.ContentType == protobuf.ChatMessage_EDIT {
-		if len(message.Replace) == 0 {
+		if len(message.OriginalMessageId) == 0 {
 			return nil, errors.New("the id of the message to replace is required")
 		}
 
-		msgToReplace, err := m.persistence.MessageByID(message.Replace)
+		msgToReplace, err := m.persistence.MessageByID(message.OriginalMessageId)
 		if err != nil {
 			return nil, err
 		}
@@ -2150,10 +2150,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	response.Messages, err = m.pullMessagesAndResponsesFromDB([]*common.Message{message})
+	msg, err := m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
+	response.SetMessages(msg)
 
 	response.AddChat(chat)
 	return &response, m.saveChat(chat)
@@ -2998,8 +2999,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	if len(messageState.Response.Messages) > 0 {
-		err = m.SaveMessages(messageState.Response.Messages)
+	messagesToSave := messageState.Response.Messages()
+	if len(messageState.Response.messages) > 0 {
+		err = m.SaveMessages(messagesToSave)
 		if err != nil {
 			return nil, err
 		}
@@ -3021,11 +3023,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	newMessagesIds := map[string]struct{}{}
-	for _, message := range messageState.Response.Messages {
+	for _, message := range messagesToSave {
 		newMessagesIds[message.ID] = struct{}{}
 	}
 
-	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messageState.Response.Messages)
+	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messagesToSave)
 	if err != nil {
 		return nil, err
 	}
@@ -3033,13 +3035,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for _, message := range messagesWithResponses {
 		messagesByID[message.ID] = message
 	}
-	messageState.Response.Messages = messagesWithResponses
+	messageState.Response.SetMessages(messagesWithResponses)
 
 	notificationsEnabled, err := m.settings.GetNotificationsEnabled()
 	if err != nil {
 		return nil, err
 	}
-	for _, message := range messageState.Response.Messages {
+	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
 
@@ -3296,7 +3298,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3370,7 +3372,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3463,7 +3465,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3543,7 +3545,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3623,7 +3625,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3720,7 +3722,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3799,7 +3801,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	}
 
 	response.AddChat(chat)
-	response.Messages = []*common.Message{message}
+	response.AddMessages([]*common.Message{message})
 	return &response, m.saveChat(chat)
 }
 
@@ -3891,7 +3893,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			}
 		}
 
-		response.Messages = append(response.Messages, message)
+		response.AddMessage(message)
 		m.allChats.Store(chat.ID, chat)
 		response.AddChat(chat)
 
@@ -3914,8 +3916,8 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 
 	}
 
-	if len(response.Messages) > 0 {
-		err = m.SaveMessages(response.Messages)
+	if len(response.messages) > 0 {
+		err = m.SaveMessages(response.Messages())
 		if err != nil {
 			return nil, err
 		}

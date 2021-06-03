@@ -36,6 +36,7 @@
 // 1622464518_set_synced_to_from.up.sql (105B)
 // 1622464519_add_chat_description.up.sql (93B)
 // 1622622253_add_pinned_by_to_pin_messages.up.sql (52B)
+// 1622722745_add_original_message_id.up.sql (66B)
 // 1623938329_add_author_activity_center_notification_field.up.sql (66B)
 // README.md (554B)
 // doc.go (850B)
@@ -827,6 +828,26 @@ func _1622622253_add_pinned_by_to_pin_messagesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1622722745_add_original_message_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\x2f\xca\x4c\xcf\xcc\x4b\xcc\x81\x49\xc6\x67\xa6\x28\x84\x39\x06\x39\x7b\x38\x06\x59\x73\x01\x02\x00\x00\xff\xff\x37\x5e\xdc\xd4\x42\x00\x00\x00")
+
+func _1622722745_add_original_message_idUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1622722745_add_original_message_idUpSql,
+		"1622722745_add_original_message_id.up.sql",
+	)
+}
+
+func _1622722745_add_original_message_idUpSql() (*asset, error) {
+	bytes, err := _1622722745_add_original_message_idUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1622722745_add_original_message_id.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1624368024, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x94, 0x88, 0x73, 0xf6, 0x8e, 0x7f, 0xb1, 0xf2, 0xe, 0x6d, 0x30, 0x7c, 0xfd, 0x69, 0x26, 0xf5, 0x6, 0x97, 0x1d, 0x6f, 0xfb, 0x4b, 0xff, 0x9e, 0xcc, 0xa3, 0x5a, 0xac, 0xcc, 0x37, 0x63, 0xa4}}
+	return a, nil
+}
+
 var __1623938329_add_author_activity_center_notification_fieldUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x2e\xc9\x2c\xcb\x2c\xa9\x8c\x4f\x4e\xcd\x2b\x49\x2d\x8a\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x2b\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x2c\x2d\xc9\xc8\x2f\x52\x08\x71\x8d\x08\xb1\xe6\x02\x04\x00\x00\xff\xff\xc4\xaa\x64\x1f\x42\x00\x00\x00")
 
 func _1623938329_add_author_activity_center_notification_fieldUpSqlBytes() ([]byte, error) {
@@ -1050,6 +1071,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1622622253_add_pinned_by_to_pin_messages.up.sql": _1622622253_add_pinned_by_to_pin_messagesUpSql,
 
+	"1622722745_add_original_message_id.up.sql": _1622722745_add_original_message_idUpSql,
+
 	"1623938329_add_author_activity_center_notification_field.up.sql": _1623938329_add_author_activity_center_notification_fieldUpSql,
 
 	"README.md": readmeMd,
@@ -1134,6 +1157,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1622464518_set_synced_to_from.up.sql":                             &bintree{_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
 	"1622464519_add_chat_description.up.sql":                           &bintree{_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
 	"1622622253_add_pinned_by_to_pin_messages.up.sql":                  &bintree{_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
+	"1622722745_add_original_message_id.up.sql":                        &bintree{_1622722745_add_original_message_idUpSql, map[string]*bintree{}},
 	"1623938329_add_author_activity_center_notification_field.up.sql":  &bintree{_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
