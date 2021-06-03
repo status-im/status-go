@@ -191,7 +191,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-	messageIDString := response.Messages[0].ID
+	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
@@ -350,7 +350,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-	messageIDString := response.Messages[0].ID
+	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
@@ -576,7 +576,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	inputMessage = buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-	messageIDString := response.Messages[0].ID
+	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
@@ -779,7 +779,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	inputMessage.Text = "Hey @" + types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-	messageIDString := response.Messages[0].ID
+	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 

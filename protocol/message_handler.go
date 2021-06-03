@@ -162,7 +162,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		if exists {
 			continue
 		}
-		messageState.Response.Messages = append(messageState.Response.Messages, message)
+		messageState.Response.AddMessage(message)
 	}
 
 	messageState.Response.AddChat(chat)
@@ -263,7 +263,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	// Add to response
 	state.Response.AddChat(chat)
 	if message != nil {
-		state.Response.Messages = append(state.Response.Messages, message)
+		state.Response.AddMessage(message)
 	}
 
 	// Set in the modified maps chat
@@ -623,13 +623,13 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	}
 
-	if len(receivedMessage.Replace) != 0 {
+	if len(receivedMessage.OriginalMessageId) != 0 {
 		if receivedMessage.ContentType != protobuf.ChatMessage_EDIT {
 			return errors.New("replace can only be used with an edit content type")
 		}
 	}
 
-	state.Response.Messages = append(state.Response.Messages, receivedMessage)
+	state.Response.AddMessage(receivedMessage)
 
 	return nil
 }

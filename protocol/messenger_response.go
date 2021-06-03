@@ -11,7 +11,6 @@ import (
 )
 
 type MessengerResponse struct {
-	Messages                []*common.Message
 	Contacts                []*Contact
 	Installations           []*multidevice.Installation
 	EmojiReactions          []*EmojiReaction
@@ -28,6 +27,7 @@ type MessengerResponse struct {
 	removedChats                map[string]bool
 	communities                 map[string]*communities.Community
 	activityCenterNotifications map[string]*ActivityCenterNotification
+	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
 }
 
@@ -50,7 +50,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Communities                 []*communities.Community           `json:"communities,omitempty"`
 		ActivityCenterNotifications []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
 	}{
-		Messages:                r.Messages,
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
 		EmojiReactions:          r.EmojiReactions,
@@ -60,6 +59,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Mailservers:             r.Mailservers,
 	}
 
+	responseItem.Messages = r.Messages()
 	responseItem.Notifications = r.Notifications()
 	responseItem.Chats = r.Chats()
 	responseItem.Communities = r.Communities()
@@ -112,7 +112,7 @@ func (r *MessengerResponse) PinMessages() []*common.PinMessage {
 
 func (r *MessengerResponse) IsEmpty() bool {
 	return len(r.chats)+
-		len(r.Messages)+
+		len(r.messages)+
 		len(r.pinMessages)+
 		len(r.Contacts)+
 		len(r.Installations)+
@@ -144,27 +144,11 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddChats(response.Chats())
 	r.AddRemovedChats(response.RemovedChats())
 	r.AddNotifications(response.Notifications())
-	r.overrideMessages(response.Messages)
+	r.AddMessages(response.Messages())
 	r.AddCommunities(response.Communities())
 	r.AddPinMessages(response.PinMessages())
 
 	return nil
-}
-
-// overrideMessages append new messages and override existing ones in response.Messages
-func (r *MessengerResponse) overrideMessages(messages []*common.Message) {
-	for _, overrideMessage := range messages {
-		var found = false
-		for idx, chat := range r.Messages {
-			if chat.ID == overrideMessage.ID {
-				r.Messages[idx] = overrideMessage
-				found = true
-			}
-		}
-		if !found {
-			r.Messages = append(r.Messages, overrideMessage)
-		}
-	}
 }
 
 func (r *MessengerResponse) AddCommunities(communities []*communities.Community) {
@@ -263,6 +247,28 @@ func (r *MessengerResponse) AddPinMessages(pms []*common.PinMessage) {
 	}
 }
 
+func (r *MessengerResponse) Messages() []*common.Message {
+	var ms []*common.Message
+	for _, m := range r.messages {
+		ms = append(ms, m)
+	}
+	return ms
+}
+
+func (r *MessengerResponse) AddMessages(ms []*common.Message) {
+	for _, m := range ms {
+		r.AddMessage(m)
+	}
+}
+
 func (r *MessengerResponse) AddMessage(message *common.Message) {
-	r.Messages = append(r.Messages, message)
+	if r.messages == nil {
+		r.messages = make(map[string]*common.Message)
+	}
+	r.messages[message.ID] = message
+}
+
+func (r *MessengerResponse) SetMessages(messages []*common.Message) {
+	r.messages = make(map[string]*common.Message)
+	r.AddMessages(messages)
 }

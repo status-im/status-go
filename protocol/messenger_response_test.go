@@ -30,19 +30,18 @@ func TestMessengerResponseMergeMessages(t *testing.T) {
 	message1 := &common.Message{ID: "1"}
 	modifiedMessage1 := &common.Message{ID: "1", From: "name"}
 	message2 := &common.Message{ID: "3"}
-	response1 := &MessengerResponse{
-		Messages: []*common.Message{message1},
-	}
+	response1 := &MessengerResponse{}
+	response1.AddMessage(message1)
 
-	response2 := &MessengerResponse{
-		Messages: []*common.Message{modifiedMessage1, message2},
-	}
+	response2 := &MessengerResponse{}
+	response2.AddMessage(modifiedMessage1)
+	response2.AddMessage(message2)
 
 	require.NoError(t, response1.Merge(response2))
 
-	require.Len(t, response1.Messages, 2)
-	require.Equal(t, modifiedMessage1, response1.Messages[0])
-	require.Equal(t, message2, response1.Messages[1])
+	require.Len(t, response1.Messages(), 2)
+	require.Equal(t, modifiedMessage1, response1.Messages()[0])
+	require.Equal(t, message2, response1.Messages()[1])
 }
 
 func TestMessengerResponseMergeNotImplemented(t *testing.T) {

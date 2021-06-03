@@ -95,14 +95,14 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	// Wait for message to arrive to bob
 	response, err := WaitOnMessengerResponse(
 		bob,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages(), 1)
 
-	messageID := response.Messages[0].ID
+	messageID := response.Messages()[0].ID
 
 	// Respond with an emoji, donald trump style
 
@@ -184,11 +184,11 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		alice,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"no message received",
 	)
 	s.Require().NoError(err)
-	messageID := response.Messages[0].ID
+	messageID := response.Messages()[0].ID
 
 	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
 	s.Require().NoError(err)

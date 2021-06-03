@@ -272,7 +272,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		bob2,
-		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
 		"message not received",
 	)
 	s.Require().NoError(err)

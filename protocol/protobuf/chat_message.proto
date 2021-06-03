@@ -58,9 +58,9 @@ message ChatMessage {
   // Grant for community chat messages
   bytes grant = 13;
 
-  // Replace indicates that this is a replacement of a message
-	// that has been updated
-  string replace = 14;
+  // original_message_id indicates that this is a edit of a message
+  // that has been updated
+  string original_message_id = 14;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
