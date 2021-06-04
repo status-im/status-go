@@ -3114,7 +3114,23 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 func (m *Messenger) MuteChat(chatID string) error {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return errors.New("chat not found")
+		// Only one to one chan be muted when it's not in the database
+		publicKey, err := common.HexToPubkey(chatID)
+		if err != nil {
+			return err
+		}
+
+		// Create a one to one chat and set active to false
+		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
+		chat.Active = false
+		err = m.initChatSyncFields(chat)
+		if err != nil {
+			return err
+		}
+		err = m.saveChat(chat)
+		if err != nil {
+			return err
+		}
 	}
 
 	err := m.persistence.MuteChat(chatID)
