@@ -36,6 +36,7 @@
 // 1622464518_set_synced_to_from.up.sql (105B)
 // 1622464519_add_chat_description.up.sql (93B)
 // 1622622253_add_pinned_by_to_pin_messages.up.sql (52B)
+// 1622811339_add_communities_synced_at.up.sql (68B)
 // 1623938329_add_author_activity_center_notification_field.up.sql (66B)
 // 1623938330_add_edit_messages.up.sql (369B)
 // 1624978434_add_muted_community.up.sql (82B)
@@ -831,6 +832,26 @@ func _1622622253_add_pinned_by_to_pin_messagesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1622811339_add_communities_synced_atUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\x14\x57\xe6\x25\xa7\xa6\xc4\x27\x96\x28\x84\x78\xfa\xba\x06\x87\x38\xfa\x06\x58\x73\x01\x02\x00\x00\xff\xff\x66\xc6\x24\x8b\x44\x00\x00\x00")
+
+func _1622811339_add_communities_synced_atUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1622811339_add_communities_synced_atUpSql,
+		"1622811339_add_communities_synced_at.up.sql",
+	)
+}
+
+func _1622811339_add_communities_synced_atUpSql() (*asset, error) {
+	bytes, err := _1622811339_add_communities_synced_atUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1622811339_add_communities_synced_at.up.sql", size: 68, mode: os.FileMode(0644), modTime: time.Unix(1627387629, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8b, 0x7f, 0x66, 0xd, 0x1e, 0xe7, 0x25, 0x70, 0xea, 0x8d, 0xd6, 0x52, 0xa8, 0xbe, 0x6d, 0x56, 0x75, 0x84, 0xd1, 0x45, 0x55, 0xe0, 0xe8, 0xe1, 0xb3, 0x5c, 0x99, 0x57, 0xf3, 0x44, 0xa4, 0x4c}}
+	return a, nil
+}
+
 var __1623938329_add_author_activity_center_notification_fieldUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x2e\xc9\x2c\xcb\x2c\xa9\x8c\x4f\x4e\xcd\x2b\x49\x2d\x8a\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x2b\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x2c\x2d\xc9\xc8\x2f\x52\x08\x71\x8d\x08\xb1\xe6\x02\x04\x00\x00\xff\xff\xc4\xaa\x64\x1f\x42\x00\x00\x00")
 
 func _1623938329_add_author_activity_center_notification_fieldUpSqlBytes() ([]byte, error) {
@@ -1134,6 +1155,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1622622253_add_pinned_by_to_pin_messages.up.sql": _1622622253_add_pinned_by_to_pin_messagesUpSql,
 
+	"1622811339_add_communities_synced_at.up.sql": _1622811339_add_communities_synced_atUpSql,
+
 	"1623938329_add_author_activity_center_notification_field.up.sql": _1623938329_add_author_activity_center_notification_fieldUpSql,
 
 	"1623938330_add_edit_messages.up.sql": _1623938330_add_edit_messagesUpSql,
@@ -1226,6 +1249,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1622464518_set_synced_to_from.up.sql":                                    &bintree{_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
 	"1622464519_add_chat_description.up.sql":                                  &bintree{_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
 	"1622622253_add_pinned_by_to_pin_messages.up.sql":                         &bintree{_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
+	"1622811339_add_communities_synced_at.up.sql":                             &bintree{_1622811339_add_communities_synced_atUpSql, map[string]*bintree{}},
 	"1623938329_add_author_activity_center_notification_field.up.sql":         &bintree{_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
 	"1623938330_add_edit_messages.up.sql":                                     &bintree{_1623938330_add_edit_messagesUpSql, map[string]*bintree{}},
 	"1624978434_add_muted_community.up.sql":                                   &bintree{_1624978434_add_muted_communityUpSql, map[string]*bintree{}},

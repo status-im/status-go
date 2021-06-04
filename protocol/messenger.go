@@ -2137,7 +2137,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return true
 	})
 
-	cs, err := m.Communities()
+	cs, err := m.JoinedCommunities()
 	if err != nil {
 		return err
 	}
@@ -2289,11 +2289,16 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		pkb = crypto.FromECDSA(pk)
 	}
 
+	md, err := community.MarshaledDescription()
+	if err != nil {
+		return err
+	}
+
 	syncMessage := &protobuf.SyncCommunity{
 		Clock:                clock,
 		Id:                   community.ID(),
 		PrivateKey:           pkb,
-		Description:          []byte(community.Description()),
+		Description:          md,
 		Joined:               community.Joined(),
 		Verified:             community.Verified(),
 	}
@@ -2701,14 +2706,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						var mr *MessengerResponse
 						if community.Joined {
-							mr, err = m.JoinCommunity(community.Id)
+							mr, err = m.joinCommunity(community.Id)
 							if err != nil {
 								allMessagesProcessed = false
 								logger.Warn("failed to join SyncCommunity", zap.Error(err), zap.Any("community", community))
 								continue
 							}
 						} else {
-							mr, err = m.LeaveCommunity(community.Id)
+							mr, err = m.leaveCommunity(community.Id)
 							if err != nil {
 								allMessagesProcessed = false
 								logger.Warn("failed to leave SyncCommunity", zap.Error(err), zap.Any("community", community))

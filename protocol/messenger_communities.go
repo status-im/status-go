@@ -132,6 +132,11 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+	// TODO resolve this undeclared `community` var
+	err := m.syncCommunity(context.Background(), community)
+	if err != nil {
+		return nil, err
+	}
 
 	return m.joinCommunity(ctx, communityID)
 }
@@ -356,6 +361,11 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+	// TODO resolve this undeclared `community` var
+	err := m.syncCommunity(context.Background(), community)
+	if err != nil {
+		return nil, err
+	}
 
 	return m.leaveCommunity(communityID)
 }
@@ -500,6 +510,10 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	err = m.syncCommunity(context.Background(), community)
+	if err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }
