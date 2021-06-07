@@ -230,6 +230,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.CommunityInvitation))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoin))
+	case protobuf.ApplicationMetadataMessage_EDIT_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.EditMessage))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
 		// This message is a bit different as it's encrypted, so we pass it straight through
 		v := reflect.ValueOf(m.UnwrappedPayload)

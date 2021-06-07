@@ -150,6 +150,9 @@ type Message struct {
 
 	// Links is an array of links within given message
 	Links []string
+
+	// EditedAt indicates the clock value it was edited
+	EditedAt uint64 `json:"editedAt"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -190,6 +193,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Mentions          []string                         `json:"mentions,omitempty"`
 		Mentioned         bool                             `json:"mentioned,omitempty"`
 		Links             []string                         `json:"links,omitempty"`
+		EditedAt          uint64                           `json:"editedAt,omitempty"`
 	}{
 		ID:                m.ID,
 		WhisperTimestamp:  m.WhisperTimestamp,
@@ -221,6 +225,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
 		GapParameters:     m.GapParameters,
+		EditedAt:          m.EditedAt,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
