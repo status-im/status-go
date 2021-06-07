@@ -58,17 +58,13 @@ pipeline {
       sh 'make canary-test'
     } } }*/
 
-    stage('Unit Tests') {
-      agent {
-        dockerfile {
-          filename 'test.dockerfile'
-          dir "${env.STATUS_PATH}"
-        }
+    stage('Unit Tests') { steps { script { dir(env.STATUS_PATH) {
+      docker.image('postgres:9.6-alpine').withRun(
+              '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
+      ) { c ->
+        sh 'make test-unit'
       }
-      steps {
-        sh 'go version'
-      }
-    }
+    } } } }
 
     stage('Race E2E Tests') {
       agent { label 'linux' }
