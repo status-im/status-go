@@ -11,7 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -87,14 +87,21 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 	ogMessage := sendResponse.Messages()[0]
 
-	editedMessage := buildTestMessage(*theirChat)
-	editedMessage.OriginalMessageId = ogMessage.ID
-	editedMessage.ContentType = protobuf.ChatMessage_EDIT
+	messageID, err := types.DecodeHex(ogMessage.ID)
+	s.Require().NoError(err)
 
-	sendResponse, err = theirMessenger.SendChatMessage(context.Background(), editedMessage)
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
 
 	s.Require().NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
+	s.Require().Equal(sendResponse.Messages()[0].Text, editedText)
 
 	response, err = WaitOnMessengerResponse(
 		s.m,
@@ -105,13 +112,14 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(ogMessage.ID, response.Messages()[0].OriginalMessageId)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
 
 	// Main instance user attempts to edit the message it received from theirMessenger
-	editedMessage = buildTestMessage(*ourChat)
-	editedMessage.OriginalMessageId = ogMessage.ID
-	editedMessage.ContentType = protobuf.ChatMessage_EDIT
-	_, err = s.m.SendChatMessage(context.Background(), editedMessage)
+	editedMessage = &requests.EditMessage{
+		ID:   messageID,
+		Text: "edited-again text",
+	}
+	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
-	s.Require().Equal("sender is not the author of the message", err.Error())
+	s.Require().Equal(ErrInvalidEditAuthor, err.Error())
 }

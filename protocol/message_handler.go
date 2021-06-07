@@ -512,6 +512,10 @@ func (m *MessageHandler) handleWrappedCommunityDescriptionMessage(payload []byte
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 
+func (m *MessageHandler) HandleEditMessage(state *ReceivedMessageState) error {
+	return nil
+}
+
 func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
@@ -583,20 +587,6 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	err = chat.UpdateFromMessage(receivedMessage, state.Timesource)
 	if err != nil {
 		return err
-	}
-
-	if len(receivedMessage.OriginalMessageId) != 0 {
-		if receivedMessage.ContentType != protobuf.ChatMessage_EDIT {
-			return errors.New("replace can only be used with an edit content type")
-		}
-		shouldContinue, err := m.handleEditedMessage(state, receivedMessage)
-		if err != nil {
-			return err
-		}
-
-		if !shouldContinue {
-			return nil
-		}
 	}
 
 	// If the chat is not active, create a notification in the center
@@ -1124,48 +1114,41 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 	return nil
 }
 
-func (m *MessageHandler) handleEditedMessage(state *ReceivedMessageState, message *common.Message) (bool, error) {
-	originalMessageID := message.OriginalMessageId
-	// Check if it's already in the response
-	originalMessage := state.Response.GetMessage(originalMessageID)
-	// and pull all the edits + original message
-	messageHistory, err := m.persistence.MessagesByOriginalMessageID(originalMessageID)
-	if err != nil {
-		return false, err
-	}
+func (m *MessageHandler) handleEditedMessage(state *ReceivedMessageState, message *protobuf.EditMessage) (bool, error) {
+	/*
+		originalMessageID := message.OriginalMessageId
+		// Check if it's already in the response
+		originalMessage := state.Response.GetMessage(originalMessageID)
+		// otherwise pull from database
+		if originalMessage == nil {
+			originalMessage, err := m.persistence.MessageByID(originalMessageID)
 
-	// Check if we have the original message
-
-	if originalMessage == nil {
-		for _, m := range messageHistory {
-			if m.ID == originalMessageID {
-				originalMessage = m
+			if err != nil {
+				return false, err
 			}
 		}
-	}
 
-	// We don't have the original message, save the edited message hidden and continue
-	if originalMessage == nil {
-		// This could be a single query
-		err := m.persistence.SaveMessages([]*common.Message{message})
-		if err != nil {
+		// We don't have the original message, save the edited message
+		if originalMessage == nil {
+			// Save edit and return
+			//m.persistence.SaveMessageEdit()
 			return false, nil
+
 		}
-		err = m.persistence.HideMessage(message.ID)
-		if err != nil {
-			return false, nil
-		}
-		// We tell them to ignore this message
-		return false, nil
-	}
 
-	// We have an original message and potentially some edits
+		// Check edit is valid
 
-	// check that the edit is valid
+		// Check that edit should be applied
 
-	// find the most up to date edit
+		// Update message and return it */
 
 	return true, nil
+}
+
+func (m *MessageHandler) checkForEdits(message *common.Message) error {
+	// Check for any pending edit
+	// If any pending edits are available and valid, apply them
+	return nil
 }
 
 func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey string, chat *Chat) (bool, error) {

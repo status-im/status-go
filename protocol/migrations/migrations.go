@@ -36,7 +36,7 @@
 // 1622464518_set_synced_to_from.up.sql (105B)
 // 1622464519_add_chat_description.up.sql (93B)
 // 1622622253_add_pinned_by_to_pin_messages.up.sql (52B)
-// 1622722745_add_original_message_id.up.sql (66B)
+// 1622722745_add_original_message_id.up.sql (254B)
 // 1623938329_add_author_activity_center_notification_field.up.sql (66B)
 // README.md (554B)
 // doc.go (850B)
@@ -828,7 +828,7 @@ func _1622622253_add_pinned_by_to_pin_messagesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1622722745_add_original_message_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\x2f\xca\x4c\xcf\xcc\x4b\xcc\x81\x49\xc6\x67\xa6\x28\x84\x39\x06\x39\x7b\x38\x06\x59\x73\x01\x02\x00\x00\xff\xff\x37\x5e\xdc\xd4\x42\x00\x00\x00")
+var __1622722745_add_original_message_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\xcc\x41\x0a\xc2\x30\x10\x85\xe1\x7d\x4e\xf1\x96\x0a\xde\xa0\xab\xb1\x1d\x54\x88\x29\x84\xd4\x6d\x28\xcd\xa0\x45\xa5\xd0\x49\xc1\xe3\x4b\x41\x17\x42\x5c\x7f\xef\xfd\x64\x03\x7b\x04\xda\x5b\xc6\xa2\x32\xc7\xa7\xa8\xf6\x57\x51\x50\xd3\xa0\x6e\x6d\x77\x76\x90\x34\x66\x49\xb1\xcf\x38\xb9\xc0\x07\xf6\x95\x31\xb5\x67\x0a\x5c\x7a\xc6\x75\xae\xd8\x18\x60\x78\x4c\xc3\xfd\x7b\x82\x6b\x03\x5c\x67\xed\x6e\x95\x5b\x9f\xe3\x98\x70\x21\x5f\x1f\xe9\xd7\x3e\xa1\x7f\xac\xd3\x32\x0f\x52\xa4\x2c\xaf\x5c\x84\x42\xca\x6c\x2b\xf3\x0e\x00\x00\xff\xff\x78\xbe\xc2\xbb\xfe\x00\x00\x00")
 
 func _1622722745_add_original_message_idUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -843,8 +843,8 @@ func _1622722745_add_original_message_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622722745_add_original_message_id.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1624368024, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x94, 0x88, 0x73, 0xf6, 0x8e, 0x7f, 0xb1, 0xf2, 0xe, 0x6d, 0x30, 0x7c, 0xfd, 0x69, 0x26, 0xf5, 0x6, 0x97, 0x1d, 0x6f, 0xfb, 0x4b, 0xff, 0x9e, 0xcc, 0xa3, 0x5a, 0xac, 0xcc, 0x37, 0x63, 0xa4}}
+	info := bindataFileInfo{name: "1622722745_add_original_message_id.up.sql", size: 254, mode: os.FileMode(0644), modTime: time.Unix(1624368035, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x12, 0x7e, 0x5e, 0x10, 0xbe, 0xe6, 0xdf, 0xb7, 0xbe, 0xce, 0x67, 0xcf, 0x63, 0xae, 0x4, 0x80, 0xab, 0xc3, 0x74, 0x9, 0x3b, 0x6b, 0x48, 0xa9, 0xd0, 0x79, 0xbe, 0x2d, 0xb7, 0x0, 0x5, 0xfc}}
 	return a, nil
 }
 

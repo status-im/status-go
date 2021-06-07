@@ -25,6 +25,22 @@ message AudioMessage {
   }
 }
 
+message EditMessage {
+  uint64 clock = 1;
+  // Text of the message
+  string text = 2;
+
+  string chat_id = 3;
+  string message_id = 4;
+
+  // Grant for community edit messages
+  bytes grant = 5;
+
+  // The type of message (public/one-to-one/private-group-chat)
+  MessageType message_type = 6;
+}
+
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -58,10 +74,6 @@ message ChatMessage {
   // Grant for community chat messages
   bytes grant = 13;
 
-  // original_message_id indicates that this is a edit of a message
-  // that has been updated
-  string original_message_id = 14;
-
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
@@ -76,6 +88,5 @@ message ChatMessage {
     COMMUNITY = 9;
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
-    EDIT = 11;
   }
 }
