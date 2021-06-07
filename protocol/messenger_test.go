@@ -8,7 +8,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/big"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,10 +50,6 @@ func TestMessengerSuite(t *testing.T) {
 
 func TestMessengerWithDataSyncEnabledSuite(t *testing.T) {
 	suite.Run(t, &MessengerSuite{enableDataSync: true})
-}
-
-func TestMessageHandlerSuite(t *testing.T) {
-	suite.Run(t, new(MessageHandlerSuite))
 }
 
 type MessengerSuite struct {
@@ -2397,155 +2392,10 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	s.Equal(2, rawMessage.SendCount)
 }
 
-type MessageHandlerSuite struct {
-	suite.Suite
-
-	messageHandler *MessageHandler
-	logger         *zap.Logger
-}
-
-func (s *MessageHandlerSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	s.messageHandler = &MessageHandler{
-		identity: privateKey,
-		logger:   s.logger,
-	}
-}
-
-func (s *MessageHandlerSuite) TearDownTest() {
-	_ = s.logger.Sync()
-}
-
 type testTimeSource struct{}
 
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
-}
-
-func (s *MessageHandlerSuite) TestRun() {
-	key1, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	key2, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	testCases := []struct {
-		Name           string
-		Error          bool
-		Chat           *Chat // Chat to create
-		Message        common.Message
-		SigPubKey      *ecdsa.PublicKey
-		ExpectedChatID string
-	}{
-		{
-			Name: "Public chat",
-			Chat: CreatePublicChat("test-chat", &testTimeSource{}),
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "test-chat",
-					MessageType: protobuf.MessageType_PUBLIC_GROUP,
-					Text:        "test-text"},
-			},
-			SigPubKey:      &key1.PublicKey,
-			ExpectedChatID: "test-chat",
-		},
-		{
-			Name: "Private message from myself with existing chat",
-			Chat: CreateOneToOneChat("test-private-chat", &key1.PublicKey, &testTimeSource{}),
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "test-chat",
-					MessageType: protobuf.MessageType_ONE_TO_ONE,
-					Text:        "test-text"},
-			},
-			SigPubKey:      &key1.PublicKey,
-			ExpectedChatID: oneToOneChatID(&key1.PublicKey),
-		},
-		{
-			Name: "Private message from other with existing chat",
-			Chat: CreateOneToOneChat("test-private-chat", &key2.PublicKey, &testTimeSource{}),
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "test-chat",
-					MessageType: protobuf.MessageType_ONE_TO_ONE,
-					Text:        "test-text"},
-			},
-
-			SigPubKey:      &key2.PublicKey,
-			ExpectedChatID: oneToOneChatID(&key2.PublicKey),
-		},
-		{
-			Name: "Private message from myself without chat",
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "test-chat",
-					MessageType: protobuf.MessageType_ONE_TO_ONE,
-					Text:        "test-text"},
-			},
-
-			SigPubKey:      &key1.PublicKey,
-			ExpectedChatID: oneToOneChatID(&key1.PublicKey),
-		},
-		{
-			Name: "Private message from other without chat",
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "test-chat",
-					MessageType: protobuf.MessageType_ONE_TO_ONE,
-					Text:        "test-text"},
-			},
-
-			SigPubKey:      &key2.PublicKey,
-			ExpectedChatID: oneToOneChatID(&key2.PublicKey),
-		},
-		{
-			Name:      "Private message without public key",
-			SigPubKey: nil,
-			Error:     true,
-		},
-		{
-			Name: "Private group message",
-			Message: common.Message{
-				ChatMessage: protobuf.ChatMessage{
-					ChatId:      "non-existing-chat",
-					MessageType: protobuf.MessageType_PRIVATE_GROUP,
-					Text:        "test-text"},
-			},
-			Error:     true,
-			SigPubKey: &key2.PublicKey,
-		},
-	}
-
-	for idx, tc := range testCases {
-		s.Run(tc.Name, func() {
-			chatsMap := new(chatMap)
-			contactsMap := new(contactMap)
-			if tc.Chat != nil && tc.Chat.ID != "" {
-				chatsMap.Store(tc.Chat.ID, tc.Chat)
-			}
-
-			message := tc.Message
-			message.SigPubKey = tc.SigPubKey
-			// ChatID is not set at the beginning.
-			s.Empty(message.LocalChatID)
-
-			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageSender
-			chat, err := s.messageHandler.matchChatEntity(&message, chatsMap, contactsMap, &testTimeSource{})
-			if tc.Error {
-				s.Require().Error(err)
-			} else {
-				s.Require().NoError(err)
-				if tc.ExpectedChatID != "" {
-
-					s.Require().NotNil(chat)
-					s.Require().Equal(tc.ExpectedChatID, chat.ID)
-				}
-			}
-		})
-	}
 }
 
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
