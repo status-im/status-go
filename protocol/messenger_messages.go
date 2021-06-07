@@ -45,25 +45,17 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	message.Text = request.Text
-	message.EditedAt = clock
-
-	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.persistence.SaveMessages([]*common.Message{message})
-	if err != nil {
-		return nil, err
-	}
-
 	editMessage := &EditMessage{}
 
 	editMessage.Text = request.Text
 	editMessage.ChatId = message.ChatId
 	editMessage.MessageId = request.ID.String()
 	editMessage.Clock = clock
+
+	err = m.applyEditMessage(&editMessage.EditMessage, message)
+	if err != nil {
+		return nil, err
+	}
 
 	encodedMessage, err := m.encodeChatEntity(chat, editMessage)
 	if err != nil {
@@ -85,4 +77,16 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	response.AddMessage(message)
 
 	return response, nil
+}
+
+func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message *common.Message) error {
+	message.Text = editMessage.Text
+	message.EditedAt = editMessage.Clock
+
+	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	if err != nil {
+		return err
+	}
+
+	return m.persistence.SaveMessages([]*common.Message{message})
 }

@@ -2460,6 +2460,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
@@ -2469,7 +2470,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
-		Response:              &MessengerResponse{},
+		Response:              response,
 		Timesource:            m.getTimesource(),
 	}
 
@@ -2559,6 +2560,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handler.HandleChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.EditMessage:
+						logger.Debug("Handling EditMessage")
+						editProto := msg.ParsedMessage.Interface().(protobuf.EditMessage)
+						editMessage := EditMessage{
+							EditMessage: editProto,
+							From:        contact.ID,
+							ID:          messageID,
+							SigPubKey:   publicKey,
+						}
+						err = m.HandleEditMessage(response, editMessage)
+						if err != nil {
+							logger.Warn("failed to handle EditMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
