@@ -6,5 +6,6 @@ CREATE TABLE user_messages_edits (
   message_id VARCHAR NOT NULL,
   source VARCHAR NOT NULL,
   text VARCHAR NOT NULL,
-  id VARCHAR NOT NULL
+  id VARCHAR NOT NULL,
+  PRIMARY KEY(id)
 );

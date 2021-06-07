@@ -512,7 +512,49 @@ func (m *MessageHandler) handleWrappedCommunityDescriptionMessage(payload []byte
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 
-func (m *MessageHandler) HandleEditMessage(state *ReceivedMessageState) error {
+func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage EditMessage) error {
+	messageID := editMessage.MessageId
+	// Check if it's already in the response
+	originalMessage := response.GetMessage(messageID)
+	// otherwise pull from database
+	if originalMessage == nil {
+		var err error
+		originalMessage, err = m.persistence.MessageByID(messageID)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// We don't have the original message, save the edited message
+	if originalMessage == nil {
+		return m.persistence.SaveEdit(editMessage)
+	}
+
+	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	// Check edit is valid
+	if originalMessage.From != editMessage.From {
+		return errors.New("invalid edit, not the right author")
+	}
+
+	// Check that edit should be applied
+	if originalMessage.EditedAt >= editMessage.Clock {
+		return m.persistence.SaveEdit(editMessage)
+	}
+
+	// Update message and return it
+	err := m.applyEditMessage(&editMessage.EditMessage, originalMessage)
+	if err != nil {
+		return err
+	}
+
+	response.AddMessage(originalMessage)
+	response.AddChat(chat)
+
 	return nil
 }
 
@@ -1112,37 +1154,6 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 	}
 
 	return nil
-}
-
-func (m *MessageHandler) handleEditedMessage(state *ReceivedMessageState, message *protobuf.EditMessage) (bool, error) {
-	/*
-		originalMessageID := message.OriginalMessageId
-		// Check if it's already in the response
-		originalMessage := state.Response.GetMessage(originalMessageID)
-		// otherwise pull from database
-		if originalMessage == nil {
-			originalMessage, err := m.persistence.MessageByID(originalMessageID)
-
-			if err != nil {
-				return false, err
-			}
-		}
-
-		// We don't have the original message, save the edited message
-		if originalMessage == nil {
-			// Save edit and return
-			//m.persistence.SaveMessageEdit()
-			return false, nil
-
-		}
-
-		// Check edit is valid
-
-		// Check that edit should be applied
-
-		// Update message and return it */
-
-	return true, nil
 }
 
 func (m *MessageHandler) checkForEdits(message *common.Message) error {

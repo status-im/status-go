@@ -326,7 +326,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		command.CommandState,
 		command.Signature,
 		message.Replace,
-		message.EditedAt,
+		int64(message.EditedAt),
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,
@@ -1425,6 +1425,11 @@ func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64,
 	}
 
 	return db.clearHistory(chat, currentClockValue, tx, true)
+}
+
+func (db sqlitePersistence) SaveEdit(editMessage EditMessage) error {
+	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, source, text, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
+	return err
 }
 
 func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx, deactivate bool) error {
