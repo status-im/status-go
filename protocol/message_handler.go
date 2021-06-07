@@ -1089,6 +1089,18 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 	}
 	contact := state.CurrentMessageState.Contact
 
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, m.identity, state.CurrentMessageState.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	// Remove any images still encrypted after the decryption process
+	for name, image := range ci.Images {
+		if image.Encrypted {
+			delete(ci.Images, name)
+		}
+	}
+
 	logger.Info("Handling contact update")
 	newImages, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
 	if err != nil {

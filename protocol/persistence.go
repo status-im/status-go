@@ -590,6 +590,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 			continue
 		}
 
+		// TODO implement something that doesn't reject all images if a single image fails validation
 		// Validate image URI to make sure it's serializable
 		_, err = images.GetPayloadDataURI(image.Payload)
 		if err != nil {

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
@@ -27,6 +26,8 @@ import (
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
@@ -132,6 +133,8 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
+		WithToplevelDatabaseMigrations(),
+		WithAppSettings(accounts.Settings{}, params.NodeConfig{}),
 	}
 
 	options = append(options, extraOptions...)
@@ -2570,6 +2573,82 @@ func (s *MessengerSuite) TestChatIdentity() {
 	s.Require().NoError(err)
 
 	s.Require().Exactly(len(iis), len(ci.Images))
+}
 
-	spew.Dump(ci, len(ci.Images))
+func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
+	smPayload := "hello small image"
+	lgPayload := "hello large image"
+
+	ci := protobuf.ChatIdentity{
+		Clock: uint64(time.Now().Unix()),
+		Images: map[string]*protobuf.IdentityImage{
+			"small": {
+				Payload: []byte(smPayload),
+			},
+			"large": {
+				Payload: []byte(lgPayload),
+			},
+		},
+	}
+
+	// Make contact keys and Contacts, set the Contacts to added
+	contactKeys := make([]*ecdsa.PrivateKey, 10)
+	for i := range contactKeys {
+		contactKey, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		contactKeys[i] = contactKey
+
+		contact, err := buildContactFromPublicKey(&contactKey.PublicKey)
+		s.Require().NoError(err)
+
+		contact.SystemTags = append(contact.SystemTags, contactAdded)
+		s.m.allContacts.Store(contact.ID, contact)
+	}
+
+	// Test EncryptIdentityImagesWithContactPubKeys
+	err := EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
+	s.Require().NoError(err)
+
+	for _, ii := range ci.Images {
+		s.Require().Equal(s.m.allContacts.Len(), len(ii.EncryptionKeys))
+	}
+	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
+	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
+	s.Require().True(ci.Images["small"].Encrypted)
+	s.Require().True(ci.Images["large"].Encrypted)
+
+	// Test DecryptIdentityImagesWithIdentityPrivateKey
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+
+	s.Require().Equal(smPayload, string(ci.Images["small"].Payload))
+	s.Require().Equal(lgPayload, string(ci.Images["large"].Payload))
+	s.Require().False(ci.Images["small"].Encrypted)
+	s.Require().False(ci.Images["large"].Encrypted)
+
+	// RESET Messenger identity, Contacts and IdentityImage.EncryptionKeys
+	s.m.allContacts = new(contactMap)
+	ci.Images["small"].EncryptionKeys = nil
+	ci.Images["large"].EncryptionKeys = nil
+
+	// Test EncryptIdentityImagesWithContactPubKeys with no contacts
+	err = EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
+	s.Require().NoError(err)
+
+	for _, ii := range ci.Images {
+		s.Require().Equal(0, len(ii.EncryptionKeys))
+	}
+	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
+	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
+	s.Require().True(ci.Images["small"].Encrypted)
+	s.Require().True(ci.Images["large"].Encrypted)
+
+	// Test DecryptIdentityImagesWithIdentityPrivateKey with no valid identity
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+
+	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
+	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
+	s.Require().True(ci.Images["small"].Encrypted)
+	s.Require().True(ci.Images["large"].Encrypted)
 }

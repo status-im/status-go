@@ -198,6 +198,14 @@ func NewMessenger(
 		}
 	}
 
+	// Apply any post database creation changes to the database
+	c.db = database
+	for _, opt := range c.afterDbCreatedHooks {
+		if err := opt(&c); err != nil {
+			return nil, err
+		}
+	}
+
 	// Apply migrations for all components.
 	err := sqlite.Migrate(database)
 	if err != nil {
@@ -683,6 +691,33 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		Clock:   m.transport.GetCurrentTime(),
 		EnsName: "", // TODO add ENS name handling to dedicate PR
 	}
+	err := m.attachIdentityImagesToChatIdentity(context, ci)
+	if err != nil {
+		return nil, err
+	}
+
+	return ci, nil
+}
+
+// adaptIdentityImageToProtobuf Adapts a images.IdentityImage to protobuf.IdentityImage
+func (m *Messenger) adaptIdentityImageToProtobuf(img *userimage.IdentityImage) *protobuf.IdentityImage {
+	return &protobuf.IdentityImage{
+		Payload:    img.Payload,
+		SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
+		ImageType:  images.ImageType(img.Payload),
+	}
+}
+
+func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *protobuf.ChatIdentity) error {
+	s, err := m.getSettings()
+	if err != nil {
+		return err
+	}
+
+	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToNone {
+		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
+		return nil
+	}
 
 	ciis := make(map[string]*protobuf.IdentityImage)
 
@@ -692,7 +727,7 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 
 		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
@@ -706,7 +741,7 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 
 		imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(imgs)))
@@ -718,19 +753,17 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		ci.Images = ciis
 
 	default:
-		return ci, fmt.Errorf("unknown ChatIdentity context '%s'", context)
+		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
-	return ci, nil
-}
-
-// adaptIdentityImageToProtobuf Adapts a images.IdentityImage to protobuf.IdentityImage
-func (m *Messenger) adaptIdentityImageToProtobuf(img *userimage.IdentityImage) *protobuf.IdentityImage {
-	return &protobuf.IdentityImage{
-		Payload:    img.Payload,
-		SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
-		ImageType:  images.ImageType(img.Payload),
+	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToContactsOnly {
+		err := EncryptIdentityImagesWithContactPubKeys(ci.Images, m)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // handleSharedSecrets process the negotiated secrets received from the encryption layer
@@ -4289,4 +4322,9 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact,
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allContacts.Store(msg.From, c)
 	return c, nil
+}
+
+func (m *Messenger) getSettings() (accounts.Settings, error) {
+	sDB := accounts.NewDB(m.database)
+	return sDB.GetSettings()
 }
