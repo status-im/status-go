@@ -22,7 +22,7 @@ import (
 func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 	topic := []byte{0xaa, 0xbb, 0xcc, 0xdd}
 
-	db, err := NewPostgresDB("postgres://whisper:mysecretpassword@127.0.0.1:5432/whisper?sslmode=disable")
+	db, err := NewPostgresDB("postgres://127.0.0.1:5432/whisper?sslmode=disable")
 	require.NoError(t, err)
 
 	envelope, err := newTestEnvelope(topic)
@@ -55,7 +55,7 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 	topic := []byte{0x01, 0x02, 0x03, 0x04}
 
-	db, err := NewPostgresDB("postgres://whisper:mysecretpassword@127.0.0.1:5432/whisper?sslmode=disable")
+	db, err := NewPostgresDB("postgres://127.0.0.1:5432/whisper?sslmode=disable")
 	require.NoError(t, err)
 
 	envelope, err := newTestEnvelope(topic)
