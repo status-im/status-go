@@ -591,6 +591,10 @@ func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.M
 	return api.service.messenger.SendChatMessages(ctx, messages)
 }
 
+func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditMessage(ctx, request)
+}
+
 func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPinMessage(ctx, message)
 }

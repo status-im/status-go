@@ -9,3 +9,5 @@ CREATE TABLE user_messages_edits (
   id VARCHAR NOT NULL,
   PRIMARY KEY(id)
 );
+
+CREATE INDEX user_messages_edits_message_id_source ON user_messages_edits(message_id, source);
