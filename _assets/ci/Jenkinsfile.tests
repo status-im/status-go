@@ -41,7 +41,7 @@ pipeline {
       sh 'GO111MODULE=off make setup-build modvendor-install'
     } } }
 
-    /*stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
+    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
       // fail build if vendoring hasn't been done
       sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
     } } }
@@ -52,11 +52,11 @@ pipeline {
 
     stage('Canary') { steps { dir(env.STATUS_PATH) {
       sh 'make canary-test'
-    } } }*/
+    } } }
 
     stage('Unit Tests') { steps { script { dir(env.STATUS_PATH) {
       docker.image('postgres:9.6-alpine').withRun(
-              '-e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -p 5432:5432'
+              '-e POSTGRES_USER=test_user -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=test_db -p 5432:5432'
       ) { c ->
         sh 'make test-unit'
       }
