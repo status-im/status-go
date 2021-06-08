@@ -107,5 +107,5 @@ func newTestEnvelope(topic []byte) (types.Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	return gethbridge.NewWhisperEnvelope(envelope), nil
+	return gethbridge.NewWakuEnvelope(envelope), nil
 }
