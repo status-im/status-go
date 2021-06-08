@@ -1,7 +1,7 @@
 library 'status-jenkins-lib@v1.2.17'
 
 pipeline {
-  agent none
+  agent { label 'linux' }
 
   parameters {
     string(
@@ -31,17 +31,13 @@ pipeline {
   }
 
   stages {
-    stage('Prep') {
-      agent { label 'linux' }
-      steps { dir(env.STATUS_PATH) { script {
+    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
       println("Version:    ${utils.getVersion()}")
       println("Git Branch: ${utils.branchName()}")
       println("Git Commit: ${utils.gitCommit()}")
     } } } }
 
-    stage('Setup') {
-      agent { label 'linux' }
-      steps { dir(env.STATUS_PATH) {
+    stage('Setup') { steps { dir(env.STATUS_PATH) {
       sh 'GO111MODULE=off make setup-build modvendor-install'
     } } }
 
@@ -66,9 +62,7 @@ pipeline {
       }
     } } } }
 
-    stage('Race E2E Tests') {
-      agent { label 'linux' }
-      steps { dir(env.STATUS_PATH) {
+    stage('Race E2E Tests') { steps { dir(env.STATUS_PATH) {
       sh 'make test-e2e-race'
     } } }
   } // stages
