@@ -28,8 +28,9 @@ type PinMessage struct {
 }
 
 type PinnedMessage struct {
-	Message
-	PinnedAt uint64 `json:"pinnedAt"`
+	Message  *Message `json:"message"`
+	PinnedAt uint64   `json:"pinnedAt"`
+	PinnedBy string   `json:"pinnedBy"`
 }
 
 // WrapGroupMessage indicates whether we should wrap this in membership information

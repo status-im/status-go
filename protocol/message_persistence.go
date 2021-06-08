@@ -594,6 +594,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 			SELECT
 				%s,
 				pm.clock_value as pinnedAt,
+				pm.pinned_by as pinnedBy,
 				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
 			FROM
 				pin_messages pm
@@ -630,14 +631,16 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 		var (
 			message  common.Message
 			pinnedAt uint64
+			pinnedBy string
 			cursor   string
 		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &pinnedAt, &cursor); err != nil {
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &pinnedAt, &pinnedBy, &cursor); err != nil {
 			return nil, "", err
 		}
 		pinnedMessage := &common.PinnedMessage{
-			Message:  message,
+			Message:  &message,
 			PinnedAt: pinnedAt,
+			PinnedBy: pinnedBy,
 		}
 		result = append(result, pinnedMessage)
 		cursors = append(cursors, cursor)
@@ -937,7 +940,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	selectQuery := "SELECT clock_value FROM pin_messages WHERE id = ?"
 
 	// insert
-	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned`
+	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by`
 	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
 	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
 	insertStmt, err := tx.Prepare(insertQuery)
@@ -946,7 +949,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	}
 
 	// update
-	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ? WHERE id = ?"
+	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ?, pinned_by = ? WHERE id = ?"
 	updateStmt, err := tx.Prepare(updateQuery)
 	if err != nil {
 		return
@@ -966,6 +969,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 				message.LocalChatID,
 				message.Clock,
 				message.Pinned,
+				message.From,
 			}
 			_, err = insertStmt.Exec(allValues...)
 			if err != nil {
@@ -975,7 +979,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 			// found, update if current message is more recent, otherwise skip
 			if existingClock < message.Clock {
 				// update
-				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.ID)
+				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.From, message.ID)
 				if err != nil {
 					return
 				}
