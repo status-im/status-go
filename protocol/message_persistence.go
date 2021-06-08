@@ -1428,8 +1428,28 @@ func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64,
 }
 
 func (db sqlitePersistence) SaveEdit(editMessage EditMessage) error {
-	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, source, text, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
+	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
 	return err
+}
+
+func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMessage, error) {
+	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, text, id FROM user_messages_edits WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []*EditMessage
+
+	for rows.Next() {
+		e := &EditMessage{}
+		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, e)
+
+	}
+	return messages, nil
 }
 
 func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx, deactivate bool) error {

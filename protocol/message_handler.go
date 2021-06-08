@@ -48,7 +48,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		return err
 	}
 
-	allowed, err := m.isMessageAllowedFrom(messageState.AllContacts, messageState.CurrentMessageState.Contact.ID, chat)
+	allowed, err := m.isMessageAllowedFrom(messageState.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
 	}
@@ -189,12 +189,12 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	if err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey)); err != nil {
 		return fmt.Errorf("failed to prepare content: %v", err)
 	}
-	chat, err := m.matchChatEntity(message, state.AllChats, state.AllContacts, state.Timesource)
+	chat, err := m.matchChatEntity(message)
 	if err != nil {
 		return err
 	}
 
-	allowed, err := m.isMessageAllowedFrom(state.AllContacts, state.CurrentMessageState.Contact.ID, chat)
+	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
 	}
@@ -320,7 +320,7 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 		Alias:            state.CurrentMessageState.Contact.Alias,
 	}
 
-	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.AllContacts, state.Timesource)
+	chat, err := m.matchChatEntity(pinMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -363,7 +363,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 	contact := state.CurrentMessageState.Contact
 	chat, ok := state.AllChats.Load(contact.ID)
 
-	allowed, err := m.isMessageAllowedFrom(state.AllContacts, state.CurrentMessageState.Contact.ID, chat)
+	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
 	}
@@ -497,7 +497,7 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 		var err error
 		originalMessage, err = m.persistence.MessageByID(messageID)
 
-		if err != nil {
+		if err != nil && err != common.ErrRecordNotFound {
 			return err
 		}
 	}
@@ -554,12 +554,12 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
-	chat, err := m.matchChatEntity(receivedMessage, state.AllChats, state.AllContacts, state.Timesource)
+	chat, err := m.matchChatEntity(receivedMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	allowed, err := m.isMessageAllowedFrom(state.AllContacts, state.CurrentMessageState.Contact.ID, chat)
+	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
 	}
@@ -587,7 +587,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
 
-	if c, ok := state.AllChats.Load(chat.ID); ok {
+	if c, ok := m.allChats.Load(chat.ID); ok {
 		chat = c
 	}
 
@@ -602,7 +602,12 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	}
 
-	err = chat.UpdateFromMessage(receivedMessage, state.Timesource)
+	err = m.checkForEdits(receivedMessage)
+	if err != nil {
+		return err
+	}
+
+	err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
 	if err != nil {
 		return err
 	}
@@ -615,7 +620,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	// TODO(samyoul) remove storing of an updated reference pointer?
-	state.AllChats.Store(chat.ID, chat)
+	m.allChats.Store(chat.ID, chat)
 
 	contact := state.CurrentMessageState.Contact
 	if receivedMessage.EnsName != "" {
@@ -861,7 +866,7 @@ func (m *Messenger) HandleDeclineRequestTransaction(messageState *ReceivedMessag
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap, contacts *contactMap, timesource common.TimeSource) (*Chat, error) {
+func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -872,7 +877,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap
 		// For public messages, all outgoing and incoming messages have the same chatID
 		// equal to a public chat name.
 		chatID := chatEntity.GetChatId()
-		chat, ok := chats.Load(chatID)
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			return nil, errors.New("received a public chatEntity from non-existing chat")
 		}
@@ -881,7 +886,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := chatEntity.GetChatId()
-		chat, ok := chats.Load(chatID)
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			if len(chatID) != PubKeyStringLength {
 				return nil, errors.New("invalid pubkey length")
@@ -896,27 +901,27 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap
 				return nil, errors.Wrap(err, "failed to decode pubkey")
 			}
 
-			chat = CreateOneToOneChat(chatID[:8], pubKey, timesource)
+			chat = CreateOneToOneChat(chatID[:8], pubKey, m.getTimesource())
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
 		// It's an incoming private chatEntity. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
 		chatID := contactIDFromPublicKey(chatEntity.GetSigPubKey())
-		chat, ok := chats.Load(chatID)
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			// TODO: this should be a three-word name used in the mobile client
-			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
+			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), m.getTimesource())
 			chat.Active = false
 		}
 		// We set the chat as inactive and will create a notification
 		// if it's not coming from a contact
-		contact, ok := contacts.Load(chatID)
+		contact, ok := m.allContacts.Load(chatID)
 		chat.Active = chat.Active || (ok && contact.IsAdded())
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
 		chatID := chatEntity.GetChatId()
-		chat, ok := chats.Load(chatID)
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			return nil, errors.New("received community chat chatEntity for non-existing chat")
 		}
@@ -945,7 +950,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap
 		// In the case of a group chatEntity, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
 		chatID := chatEntity.GetChatId()
-		chat, ok := chats.Load(chatID)
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			return nil, errors.New("received group chat chatEntity for non-existing chat")
 		}
@@ -1019,7 +1024,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR pr
 		return nil
 	}
 
-	chat, err := m.matchChatEntity(emojiReaction, state.AllChats, state.AllContacts, state.Timesource)
+	chat, err := m.matchChatEntity(emojiReaction)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -1049,7 +1054,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR pr
 }
 
 func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHInvitations protobuf.GroupChatInvitation) error {
-	allowed, err := m.isMessageAllowedFrom(state.AllContacts, state.CurrentMessageState.Contact.ID, nil)
+	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
 	if err != nil {
 		return err
 	}
@@ -1102,7 +1107,7 @@ func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHI
 // extracts contact information stored in the protobuf and adds it to the user's contact for update.
 func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.ChatIdentity) error {
 	logger := m.logger.With(zap.String("site", "HandleChatIdentity"))
-	allowed, err := m.isMessageAllowedFrom(state.AllContacts, state.CurrentMessageState.Contact.ID, nil)
+	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
 	if err != nil {
 		return err
 	}
@@ -1135,10 +1140,31 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 func (m *Messenger) checkForEdits(message *common.Message) error {
 	// Check for any pending edit
 	// If any pending edits are available and valid, apply them
+	edits, err := m.persistence.GetEdits(message.ID, message.From)
+	if err != nil {
+		return err
+	}
+
+	if len(edits) == 0 {
+		return nil
+	}
+
+	// Apply the first edit that is valid
+	for _, e := range edits {
+		if e.Clock >= message.Clock {
+			// Update message and return it
+			err := m.applyEditMessage(&e.EditMessage, message)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
 	return nil
 }
 
-func (m *Messenger) isMessageAllowedFrom(allContacts *contactMap, publicKey string, chat *Chat) (bool, error) {
+func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {
 	onlyFromContacts, err := m.settings.GetMessagesFromContactsOnly()
 	if err != nil {
 		return false, err
@@ -1163,7 +1189,7 @@ func (m *Messenger) isMessageAllowedFrom(allContacts *contactMap, publicKey stri
 		return true, nil
 	}
 
-	contact, ok := allContacts.Load(publicKey)
+	contact, ok := m.allContacts.Load(publicKey)
 	if !ok {
 		// If it's not in contacts, we don't allow it
 		return false, nil

@@ -24,12 +24,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, err
 	}
 
-	sender, err := message.GetSenderPubKey()
-	if err != nil {
-		return nil, err
-	}
-
-	if !sender.Equal(&m.identity.PublicKey) {
+	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
 		return nil, ErrInvalidEditAuthor
 	}
 
@@ -80,6 +75,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 }
 
 func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message *common.Message) error {
+	// TODO: should save an edit if it's the first time it's being edited
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
 

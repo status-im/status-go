@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -219,4 +220,60 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	s.Require().NoError(err)
 	// It discards the edit
 	s.Require().Len(response.Messages(), 0)
+}
+
+func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+	messageID := "message-id"
+
+	inputMessage := buildTestMessage(*theirChat)
+	inputMessage.Clock = 1
+	editMessage := EditMessage{
+		EditMessage: protobuf.EditMessage{
+			Clock:     2,
+			Text:      "some text",
+			MessageId: messageID,
+			ChatId:    theirChat.ID,
+		},
+		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+	}
+
+	response := &MessengerResponse{}
+
+	// Handle edit first
+	err = s.m.HandleEditMessage(response, editMessage)
+	s.Require().NoError(err)
+
+	// Handle chat message
+	response = &MessengerResponse{}
+	state := &ReceivedMessageState{
+		Response: response,
+		CurrentMessageState: &CurrentMessageState{
+			Message:          inputMessage.ChatMessage,
+			MessageID:        messageID,
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &theirMessenger.identity.PublicKey,
+		},
+	}
+	err = s.m.HandleChatMessage(state)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+
+	editedMessage := response.Messages()[0]
+
+	s.Require().Equal(uint64(2), editedMessage.EditedAt)
 }
