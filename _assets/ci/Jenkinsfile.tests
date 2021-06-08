@@ -56,7 +56,7 @@ pipeline {
 
     stage('Unit Tests') { steps { script { dir(env.STATUS_PATH) {
       docker.image('postgres:9.6-alpine').withRun(
-              '-e POSTGRES_USER=test_user -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=test_db -p 5432:5432'
+              '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
       ) { c ->
         sh 'make test-unit'
       }
