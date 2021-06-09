@@ -3033,12 +3033,13 @@ func (m *Messenger) RequestHistoricMessages(
 	ctx context.Context,
 	from, to uint32,
 	cursor []byte,
+	storeCursor *types.StoreRequestCursor,
 	waitForResponse bool,
-) ([]byte, error) {
+) ([]byte, *types.StoreRequestCursor, error) {
 	if m.mailserver == nil {
-		return nil, errors.New("no mailserver selected")
+		return nil, nil, errors.New("no mailserver selected")
 	}
-	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, waitForResponse)
+	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, storeCursor, waitForResponse)
 }
 
 func (m *Messenger) MessageByID(id string) (*common.Message, error) {

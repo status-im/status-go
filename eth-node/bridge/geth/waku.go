@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/go-waku/waku/v2/protocol/store"
-
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -34,6 +32,10 @@ func GetGethWakuFrom(m types.Waku) *waku.Waku {
 
 func (w *gethWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
 	return NewGethPublicWakuAPIWrapper(waku.NewPublicWakuAPI(w.waku))
+}
+
+func (w *gethWakuWrapper) Version() uint {
+	return 1
 }
 
 // MinPow returns the PoW value required by this node.
@@ -183,8 +185,8 @@ func (w *gethWakuWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, enve
 	return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*wakucommon.Envelope), timeout)
 }
 
-func (w *gethWakuWrapper) RequestStoreMessages(topics []types.TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error {
-	return errors.New("Not implemented")
+func (w *gethWakuWrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
+	return nil, errors.New("not implemented")
 }
 
 type wakuFilterWrapper struct {

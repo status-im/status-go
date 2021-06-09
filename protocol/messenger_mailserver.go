@@ -349,14 +349,14 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 
 func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 	m.logger.Info("syncing topic", zap.Any("topic", batch.Topics), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
-	cursor, err := m.transport.SendMessagesRequestForTopics(context.Background(), m.mailserver, batch.From, batch.To, nil, batch.Topics, true)
+	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(context.Background(), m.mailserver, batch.From, batch.To, nil, nil, batch.Topics, true)
 	if err != nil {
 		return err
 	}
-	for len(cursor) != 0 {
+	for len(cursor) != 0 || storeCursor != nil {
 		m.logger.Info("retrieved cursor", zap.Any("cursor", cursor))
 
-		cursor, err = m.transport.SendMessagesRequest(context.Background(), m.mailserver, batch.From, batch.To, cursor, true)
+		cursor, storeCursor, err = m.transport.SendMessagesRequest(context.Background(), m.mailserver, batch.From, batch.To, cursor, storeCursor, true)
 		if err != nil {
 			return err
 		}
@@ -377,14 +377,15 @@ func (m *Messenger) RequestHistoricMessagesForFilter(
 	ctx context.Context,
 	from, to uint32,
 	cursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	filter *transport.Filter,
 	waitForResponse bool,
-) ([]byte, error) {
+) ([]byte, *types.StoreRequestCursor, error) {
 	if m.mailserver == nil {
-		return nil, errors.New("no mailserver selected")
+		return nil, nil, errors.New("no mailserver selected")
 	}
 
-	return m.transport.SendMessagesRequestForFilter(ctx, m.mailserver, from, to, cursor, filter, waitForResponse)
+	return m.transport.SendMessagesRequestForFilter(ctx, m.mailserver, from, to, cursor, previousStoreCursor, filter, waitForResponse)
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {

@@ -318,6 +318,10 @@ func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
 	return nil
 }
 
+func (s *Service) SetMailserver(peer []byte) {
+	s.messenger.SetMailserver(peer)
+}
+
 // Protocols returns a new protocols list. In this case, there are none.
 func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
