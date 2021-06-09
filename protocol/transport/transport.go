@@ -405,6 +405,10 @@ func (t *Transport) cleanFiltersLoop() {
 	}()
 }
 
+func (t *Transport) WakuVersion() uint {
+	return t.waku.Version()
+}
+
 func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID []byte,
@@ -416,7 +420,7 @@ func (t *Transport) SendMessagesRequestForTopics(
 ) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 	r := createMessagesRequest(from, to, previousCursor, previousStoreCursor, topics)
 	if t.waku.Version() == 2 {
-		previousStoreCursor, err = t.waku.RequestStoreMessages(peerID, r)
+		storeCursor, err = t.waku.RequestStoreMessages(peerID, r)
 		if err != nil {
 			return
 		}
