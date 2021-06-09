@@ -410,30 +410,36 @@ func (t *Transport) SendMessagesRequestForTopics(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	topics []types.TopicType,
 	waitForResponse bool,
-) (cursor []byte, err error) {
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
+	r := createMessagesRequest(from, to, previousCursor, previousStoreCursor, topics)
+	if t.waku.Version() == 2 {
+		previousStoreCursor, err = t.waku.RequestStoreMessages(peerID, r)
+		if err != nil {
+			return
+		}
+	} else {
+		events := make(chan types.EnvelopeEvent, 10)
+		sub := t.waku.SubscribeEnvelopeEvents(events)
+		defer sub.Unsubscribe()
 
-	r := createMessagesRequest(from, to, previousCursor, topics)
+		err = t.waku.SendMessagesRequest(peerID, r)
+		if err != nil {
+			return
+		}
 
-	events := make(chan types.EnvelopeEvent, 10)
-	sub := t.waku.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
+		if !waitForResponse {
+			return
+		}
 
-	err = t.waku.SendMessagesRequest(peerID, r)
-	if err != nil {
-		return
-	}
-
-	if !waitForResponse {
-		return
-	}
-
-	resp, err := t.waitForRequestCompleted(ctx, r.ID, events)
-	if err == nil && resp != nil && resp.Error != nil {
-		err = resp.Error
-	} else if err == nil && resp != nil {
-		cursor = resp.Cursor
+		resp, err := t.waitForRequestCompleted(ctx, r.ID, events)
+		if err == nil && resp != nil && resp.Error != nil {
+			err = resp.Error
+		} else if err == nil && resp != nil {
+			cursor = resp.Cursor
+		}
 	}
 	return
 }
@@ -444,15 +450,16 @@ func (t *Transport) SendMessagesRequest(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	waitForResponse bool,
-) (cursor []byte, err error) {
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 
 	topics := make([]types.TopicType, len(t.Filters()))
 	for _, f := range t.Filters() {
 		topics = append(topics, f.Topic)
 	}
 
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
 }
 
 func (t *Transport) SendMessagesRequestForFilter(
@@ -460,17 +467,18 @@ func (t *Transport) SendMessagesRequestForFilter(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	filter *Filter,
 	waitForResponse bool,
-) (cursor []byte, err error) {
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 
 	topics := make([]types.TopicType, len(t.Filters()))
 	topics = append(topics, filter.Topic)
 
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
 }
 
-func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicType) types.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, topics []types.TopicType) types.MessagesRequest {
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
@@ -479,12 +487,13 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicT
 		topicBytes = append(topicBytes, topics[idx][:])
 	}
 	return types.MessagesRequest{
-		ID:     id,
-		From:   from,
-		To:     to,
-		Limit:  1000,
-		Cursor: cursor,
-		Topics: topicBytes,
+		ID:          id,
+		From:        from,
+		To:          to,
+		Limit:       1000,
+		Cursor:      cursor,
+		Topics:      topicBytes,
+		StoreCursor: storeCursor,
 	}
 }
 

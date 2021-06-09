@@ -657,9 +657,10 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error
 	now := uint32(m.transport.GetCurrentTime() / 1000)
 	monthAgo := now - (86400 * 30)
 
-	_, err := m.RequestHistoricMessagesForFilter(context.Background(),
+	_, _, err := m.RequestHistoricMessagesForFilter(context.Background(),
 		monthAgo,
 		now,
+		nil,
 		nil,
 		filter,
 		false)
