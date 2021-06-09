@@ -173,8 +173,12 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
 	var options []store.HistoryRequestOption
 
+	peerId, err := peer.Decode(string(peerID))
+	if err != nil {
+		return nil, err
+	}
 	options = []store.HistoryRequestOption{
-		store.WithPeer(peer.ID(peerID)),
+		store.WithPeer(peerId),
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
@@ -185,24 +189,27 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		}))
 	}
 
-	// go-waku uses nanosecond precision, so we convert seconds to nanoseconds
-	var from uint64 = uint64(r.From) * 1000000000
-	var to uint64 = uint64(r.To) * 1000000000
-
 	var topics []types.TopicType
 	for _, topic := range r.Topics {
 		topics = append(topics, types.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(topics, from, to, options)
+	pbCursor, err := w.waku.Query(topics, uint64(r.From), uint64(r.To), options)
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.StoreRequestCursor{
-		Digest:       pbCursor.Digest,
-		ReceivedTime: pbCursor.ReceivedTime,
-	}, nil
+	// TODO: there is an error in store protocol determining when we reach the last page of a cursor. In the meanwhile i'm nulling the result
+	pbCursor = nil
+
+	if pbCursor != nil {
+		return &types.StoreRequestCursor{
+			Digest:       pbCursor.Digest,
+			ReceivedTime: pbCursor.ReceivedTime,
+		}, nil
+	} else {
+		return nil, nil
+	}
 }
 
 // RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
