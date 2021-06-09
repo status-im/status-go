@@ -1,9 +1,7 @@
-// +build postgres
-
 // In order to run these tests, you must run a PostgreSQL database.
 //
 // Using Docker:
-//   docker run --name mailserver-db -e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -d -p 5432:5432 postgres:9.6-alpine
+//   docker run --name mailserver-db -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
 //
 
 package mailserver
@@ -24,7 +22,7 @@ import (
 func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 	topic := []byte{0xaa, 0xbb, 0xcc, 0xdd}
 
-	db, err := NewPostgresDB("postgres://whisper:mysecretpassword@127.0.0.1:5432/whisper?sslmode=disable")
+	db, err := NewPostgresDB("postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable")
 	require.NoError(t, err)
 
 	envelope, err := newTestEnvelope(topic)
@@ -57,7 +55,7 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 	topic := []byte{0x01, 0x02, 0x03, 0x04}
 
-	db, err := NewPostgresDB("postgres://whisper:mysecretpassword@127.0.0.1:5432/whisper?sslmode=disable")
+	db, err := NewPostgresDB("postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable")
 	require.NoError(t, err)
 
 	envelope, err := newTestEnvelope(topic)
@@ -109,5 +107,5 @@ func newTestEnvelope(topic []byte) (types.Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	return gethbridge.NewWhisperEnvelope(envelope), nil
+	return gethbridge.NewWakuEnvelope(envelope), nil
 }

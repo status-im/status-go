@@ -42,7 +42,7 @@ pipeline {
     } } }
 
     stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
-      /* fail build if vendoring hasn't been done */
+      // fail build if vendoring hasn't been done
       sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
     } } }
 
@@ -54,9 +54,13 @@ pipeline {
       sh 'make canary-test'
     } } }
 
-    stage('Unit Tests') { steps { dir(env.STATUS_PATH) {
-      sh 'make test-unit'
-    } } }
+    stage('Unit Tests') { steps { script { dir(env.STATUS_PATH) {
+      docker.image('postgres:9.6-alpine').withRun(
+        '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
+      ) { c ->
+        sh 'make test-unit'
+      }
+    } } } }
 
     stage('Race E2E Tests') { steps { dir(env.STATUS_PATH) {
       sh 'make test-e2e-race'
