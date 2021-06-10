@@ -165,7 +165,7 @@ func (db *Database) GetAppMetrics(limit int, offset int) (page Page, err error) 
 	return page, err
 }
 
-func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err error) {
+func (db *Database) getFromRows(rows *sql.Rows) (appMetrics []AppMetric, err error) {
 	var metrics []AppMetric
 
 	for rows.Next() {
