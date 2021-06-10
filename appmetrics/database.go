@@ -155,7 +155,7 @@ func (db *Database) GetAppMetrics(limit int, offset int) (page Page, err error) 
 		return page, countErr
 	}
 
-	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
+	rows, err := db.db.Query("SELECT id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return page, err
 	}

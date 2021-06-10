@@ -110,7 +110,7 @@ func (s *MessengerAnonMetricsSuite) TestReceiveAnonMetric() {
 	// Check that we have what we stored
 	amsdb, err := ama.GetAppMetrics(context.Background(), 100, 0)
 	s.Require().NoError(err)
-	s.Require().Len(amsdb, 10)
+	s.Require().Len(amsdb.AppMetrics, 10)
 
 	// Wait for messages to arrive at bob
 	_, err = WaitOnMessengerResponse(
