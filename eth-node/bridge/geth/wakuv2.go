@@ -173,12 +173,12 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
 	var options []store.HistoryRequestOption
 
-	peerId, err := peer.Decode(string(peerID))
+	peer, err := peer.Decode(string(peerID))
 	if err != nil {
 		return nil, err
 	}
 	options = []store.HistoryRequestOption{
-		store.WithPeer(peerId),
+		store.WithPeer(peer),
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
@@ -200,6 +200,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 	}
 
 	// TODO: there is an error in store protocol determining when we reach the last page of a cursor. In the meanwhile i'm nulling the result
+	_ = pbCursor
 	pbCursor = nil
 
 	if pbCursor != nil {
@@ -207,9 +208,9 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 			Digest:       pbCursor.Digest,
 			ReceivedTime: pbCursor.ReceivedTime,
 		}, nil
-	} else {
-		return nil, nil
 	}
+
+	return nil, nil
 }
 
 // RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,

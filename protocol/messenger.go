@@ -524,9 +524,8 @@ func (m *Messenger) online() bool {
 	// TODO: we are still missing peer management in wakuv2
 	if m.transport.WakuVersion() == 2 {
 		return true
-	} else {
-		return m.node.PeersCount() > 0
 	}
+	return m.node.PeersCount() > 0
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
