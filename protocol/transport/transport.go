@@ -438,7 +438,8 @@ func (t *Transport) SendMessagesRequestForTopics(
 			return
 		}
 
-		resp, err := t.waitForRequestCompleted(ctx, r.ID, events)
+		var resp *types.MailServerResponse
+		resp, err = t.waitForRequestCompleted(ctx, r.ID, events)
 		if err == nil && resp != nil && resp.Error != nil {
 			err = resp.Error
 		} else if err == nil && resp != nil {
