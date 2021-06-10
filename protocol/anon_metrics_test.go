@@ -1,10 +1,7 @@
-// +build postgres
-// TODO(samyoul) remove this `+build postgres` line ^^^ once docker testing in Jenkins is working good
-
 // In order to run these tests, you must run a PostgreSQL database.
 //
 // Using Docker:
-//   docker run --name anonmetrics-db -e POSTGRES_USER=anonmetrics -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=anonmetrics -d -p 5432:5432 postgres:9.6-alpine
+//   docker run --name test-db -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
 //
 
 package protocol
@@ -83,7 +80,7 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	// Generate Bob Messenger as the Server
 	amsc := &anonmetrics.ServerConfig{
 		Enabled:     true,
-		PostgresURI: "postgres://anonmetrics:mysecretpassword@127.0.0.1:5432/anonmetrics?sslmode=disable",
+		PostgresURI: "postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable",
 	}
 	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, s.logger, []Option{WithAnonMetricsServerConfig(amsc)})
 	s.Require().NoError(err)
@@ -130,11 +127,11 @@ func (s *MessengerAnonMetricsSuite) TestReceiveAnonMetric() {
 
 	// Check the values of received and stored metrics against the broadcast metrics
 	for _, bobMetric := range bobMetrics {
-		s.Require().True(bobMetric.CreatedAt.Equal(amsdb[0].CreatedAt), "created_at values are equal")
-		s.Require().Exactly(bobMetric.SessionID, amsdb[0].SessionID, "session_id matched exactly")
-		s.Require().Exactly(bobMetric.Value, amsdb[0].Value, "value matches exactly")
-		s.Require().Exactly(bobMetric.Event, amsdb[0].Event, "event matches exactly")
-		s.Require().Exactly(bobMetric.OS, amsdb[0].OS, "operating system matches exactly")
-		s.Require().Exactly(bobMetric.AppVersion, amsdb[0].AppVersion, "app version matches exactly")
+		s.Require().True(bobMetric.CreatedAt.Equal(amsdb.AppMetrics[0].CreatedAt), "created_at values are equal")
+		s.Require().Exactly(bobMetric.SessionID, amsdb.AppMetrics[0].SessionID, "session_id matched exactly")
+		s.Require().Exactly(bobMetric.Value, amsdb.AppMetrics[0].Value, "value matches exactly")
+		s.Require().Exactly(bobMetric.Event, amsdb.AppMetrics[0].Event, "event matches exactly")
+		s.Require().Exactly(bobMetric.OS, amsdb.AppMetrics[0].OS, "operating system matches exactly")
+		s.Require().Exactly(bobMetric.AppVersion, amsdb.AppMetrics[0].AppVersion, "app version matches exactly")
 	}
 }
