@@ -86,17 +86,8 @@ func _1565447861_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD:vendor/github.com/vacp2p/mvds/store/migrations/migrations.go
 	info := bindataFileInfo{name: "1565447861_initial_schema.down.sql", size: 28, mode: os.FileMode(0644), modTime: time.Unix(1565447902, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x55, 0x8d, 0x3, 0x68, 0x1a, 0x9c, 0xd7, 0xc7, 0xb4, 0x5a, 0xb1, 0x27, 0x47, 0xf4, 0xc6, 0x8d, 0x85, 0xbb, 0xae, 0xb6, 0x69, 0xc5, 0xbc, 0x21, 0xba, 0xc0, 0xc6, 0x2a, 0xc8, 0xb2, 0xf7}}
-=======
-<<<<<<< HEAD
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.down.sql", size: 25, mode: os.FileMode(0644), modTime: time.Unix(1607354881, 0)}
-=======
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.down.sql", size: 25, mode: os.FileMode(0644), modTime: time.Unix(1618493571, 0)}
->>>>>>> Added new processed field to app metrics table
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb9, 0x31, 0x3f, 0xce, 0xfa, 0x44, 0x36, 0x1b, 0xb0, 0xec, 0x5d, 0xb, 0x90, 0xb, 0x21, 0x4f, 0xd5, 0xe5, 0x50, 0xed, 0xc7, 0x43, 0xdf, 0x83, 0xb4, 0x3a, 0xc1, 0x55, 0x2e, 0x53, 0x7c, 0x67}}
->>>>>>> Added new processed field to app metrics table:protocol/transport/whisper/migrations/migrations.go
 	return a, nil
 }
 
@@ -115,17 +106,8 @@ func _1565447861_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD:vendor/github.com/vacp2p/mvds/store/migrations/migrations.go
 	info := bindataFileInfo{name: "1565447861_initial_schema.up.sql", size: 140, mode: os.FileMode(0644), modTime: time.Unix(1565448062, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x21, 0x13, 0xbf, 0x64, 0x18, 0xf7, 0xe2, 0xd8, 0xb5, 0x7d, 0x8, 0xf1, 0x66, 0xb9, 0xb3, 0x49, 0x68, 0xe2, 0xa2, 0xea, 0x90, 0x11, 0x70, 0x9c, 0x15, 0x28, 0x3f, 0x3f, 0x90, 0x3c, 0x76, 0xf}}
-=======
-<<<<<<< HEAD
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1607354881, 0)}
-=======
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1618493571, 0)}
->>>>>>> Added new processed field to app metrics table
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x25, 0x41, 0xc, 0x92, 0xdd, 0x9e, 0xff, 0x5d, 0xd0, 0x93, 0xe4, 0x24, 0x50, 0x29, 0xcf, 0xc6, 0xf7, 0x49, 0x3c, 0x73, 0xd9, 0x8c, 0xfa, 0xf2, 0xcf, 0xf6, 0x6f, 0xbc, 0x31, 0xe6, 0xf7, 0xe2}}
->>>>>>> Added new processed field to app metrics table:protocol/transport/whisper/migrations/migrations.go
 	return a, nil
 }
 
@@ -144,17 +126,8 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD:vendor/github.com/vacp2p/mvds/store/migrations/migrations.go
 	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1565447878, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xef, 0xaf, 0xdf, 0xcf, 0x65, 0xae, 0x19, 0xfc, 0x9d, 0x29, 0xc1, 0x91, 0xaf, 0xb5, 0xd5, 0xb1, 0x56, 0xf3, 0xee, 0xa8, 0xba, 0x13, 0x65, 0xdb, 0xab, 0xcf, 0x4e, 0xac, 0x92, 0xe9, 0x60, 0xf1}}
-=======
-<<<<<<< HEAD
-	info := bindataFileInfo{name: "doc.go", size: 373, mode: os.FileMode(0644), modTime: time.Unix(1607354881, 0)}
-=======
-	info := bindataFileInfo{name: "doc.go", size: 373, mode: os.FileMode(0644), modTime: time.Unix(1618493571, 0)}
->>>>>>> Added new processed field to app metrics table
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x23, 0x6a, 0xc1, 0xce, 0x94, 0xf6, 0xef, 0xf1, 0x97, 0x95, 0xb, 0x35, 0xaf, 0x5f, 0xe7, 0x5f, 0xac, 0x6e, 0xb8, 0xab, 0xba, 0xb5, 0x35, 0x97, 0x22, 0x36, 0x11, 0xce, 0x44, 0xfc, 0xfa, 0xac}}
->>>>>>> Added new processed field to app metrics table:protocol/transport/whisper/migrations/migrations.go
 	return a, nil
 }
 
