@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -18,6 +19,7 @@ type MessengerResponse struct {
 	Invitations             []*GroupChatInvitation
 	CommunityChanges        []*communities.CommunityChanges
 	RequestsToJoinCommunity []*communities.RequestToJoin
+	AnonymousMetrics        []*appmetrics.AppMetric
 	Mailservers             []mailservers.Mailserver
 
 	// notifications a list of notifications derived from messenger events

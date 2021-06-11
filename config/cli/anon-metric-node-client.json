@@ -1,0 +1,31 @@
+{
+  "NetworkID": 1,
+  "DataDir": "/tmp/status-go-data",
+  "NodeKey": "03b1238c30d5925e3a17b4c1464ac686b3da98527f01b8c6a0731c451c191d30",
+  "Rendezvous": true,
+  "NoDiscovery": false,
+  "ListenAddr": "0.0.0.0:30303",
+  "RegisterTopics": ["whispermail"],
+
+  "HTTPEnabled": true,
+  "HTTPHost": "127.0.0.1",
+  "HTTPPort": 8545,
+  "APIModules": "eth,net,web3,admin,appmetrics",
+
+  "WakuConfig": {
+    "Enabled": true,
+    "EnableMailServer": true,
+    "DataDir": "/var/tmp/statusd/waku",
+    "MailServerPassword": "status-offline-inbox"
+  },
+
+  "LogFile": "/var/log/status-go.log",
+  "LogLevel": "DEBUG",
+  "LogMaxSize": 200,
+  "LogMaxBackups": 5,
+  "LogCompressRotated": true,
+
+  "ShhextConfig": {
+    "AnonMetricsSendID": "04195647953b3e672ed468da732a53faf6b0ab4ba7278a22bed1519492599a9c852469667548334282f18c865e44eec30dc3f189655e4ad199605a34549713b786"
+  }
+}

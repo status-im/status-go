@@ -22,12 +22,14 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -84,6 +86,8 @@ type Messenger struct {
 	processor                  *common.MessageProcessor
 	handler                    *MessageHandler
 	ensVerifier                *ens.Verifier
+	anonMetricsClient          *anonmetrics.Client
+	anonMetricsServer          *anonmetrics.Server
 	pushNotificationClient     *pushnotificationclient.Client
 	pushNotificationServer     *pushnotificationserver.Server
 	communitiesManager         *communities.Manager
@@ -241,6 +245,29 @@ func NewMessenger(
 		return nil, errors.Wrap(err, "failed to create messageProcessor")
 	}
 
+	// Initialise anon metrics client
+	var anonMetricsClient *anonmetrics.Client
+	if c.anonMetricsClientConfig != nil && c.anonMetricsClientConfig.ShouldSend {
+		anonMetricsClient = anonmetrics.NewClient(processor)
+		anonMetricsClient.Config = c.anonMetricsClientConfig
+		anonMetricsClient.Identity = identity
+		anonMetricsClient.DB = appmetrics.NewDB(database)
+		anonMetricsClient.Logger = logger
+	}
+
+	// Initialise anon metrics server
+	var anonMetricsServer *anonmetrics.Server
+	if c.anonMetricsServerConfig != nil && c.anonMetricsServerConfig.Enabled {
+		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")
+		}
+
+		anonMetricsServer = server
+		anonMetricsServer.Config = c.anonMetricsServerConfig
+		anonMetricsServer.Logger = logger
+	}
+
 	// Initialize push notification server
 	var pushNotificationServer *pushnotificationserver.Server
 	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
@@ -282,6 +309,8 @@ func NewMessenger(
 		encryptor:                  encryptionProtocol,
 		processor:                  processor,
 		handler:                    handler,
+		anonMetricsClient:          anonMetricsClient,
+		anonMetricsServer:          anonMetricsServer,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
@@ -315,6 +344,13 @@ func NewMessenger(
 			database.Close,
 		},
 		logger: logger,
+	}
+
+	if anonMetricsClient != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
+	}
+	if anonMetricsServer != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsServer.Stop)
 	}
 
 	if c.envelopesMonitorConfig != nil {
@@ -408,6 +444,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Start anonymous metrics client
+	if m.anonMetricsClient != nil {
+		if err := m.anonMetricsClient.Start(); err != nil {
 			return nil, err
 		}
 	}
@@ -2824,6 +2867,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.AnonymousMetricBatch:
+						logger.Debug("Handling AnonymousMetricBatch")
+						if m.anonMetricsServer == nil {
+							logger.Warn("unable to handle AnonymousMetricBatch, anonMetricsServer is nil")
+							continue
+						}
+
+						ams, err := m.anonMetricsServer.StoreMetrics(msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch))
+						if err != nil {
+							logger.Warn("failed to store AnonymousMetricBatch", zap.Error(err))
+							continue
+						}
+						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
+
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
@@ -4229,6 +4286,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		if err != nil {
 			return nil, err
 		}
+
 	case ChatTypePublic, ChatTypeProfile:
 		l.Debug("sending public message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
@@ -4236,6 +4294,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		if err != nil {
 			return nil, err
 		}
+
 	case ChatTypeCommunityChat:
 		l.Debug("sending community chat message", zap.String("chatName", chat.Name))
 		// TODO: add grant
@@ -4244,6 +4303,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		if err != nil {
 			return nil, err
 		}
+
 	case ChatTypePrivateGroupChat:
 		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
 		l.Debug("sending group message", zap.String("chatName", chat.Name))

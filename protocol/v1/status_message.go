@@ -237,6 +237,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return nil
 	case protobuf.ApplicationMetadataMessage_CHAT_IDENTITY:
 		return m.unmarshalProtobufData(new(protobuf.ChatIdentity))
+	case protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH:
+		return m.unmarshalProtobufData(new(protobuf.AnonymousMetricBatch))
 	}
 	return nil
 }
