@@ -2415,12 +2415,13 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
 	}
 
-	if showMentionActivityCenterNotification(publicKey, message, chat, responseTo) {
+	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
+	if isNotification {
 		notification := &ActivityCenterNotification{
 			ID:        types.FromHex(message.ID),
 			Name:      chat.Name,
 			Message:   message,
-			Type:      ActivityCenterNotificationTypeMention,
+			Type:      notificationType,
 			Timestamp: message.WhisperTimestamp,
 			ChatID:    chat.ID,
 		}
