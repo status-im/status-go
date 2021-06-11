@@ -4,6 +4,6 @@
 // If go-bindata is called from the same directory, asset names
 // have no prefix and "github.com/status-im/migrate/v4" works as expected.
 
-package migrations
+package postgres
 
 //go:generate go-bindata -pkg migrations -o ../migrations.go ./

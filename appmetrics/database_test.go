@@ -153,7 +153,7 @@ func TestDatabase_DeleteOlderThan(t *testing.T) {
 	// Get all metrics from DB, none should be deleted
 	ams, err := db.GetAppMetrics(100, 0)
 	require.NoError(t, err)
-	require.Len(t, ams, 20)
+	require.Len(t, ams.AppMetrics, 20)
 
 	// Delete all messages older than 1 hours in the future
 	err = db.DeleteOlderThan(&oneHourHence)
@@ -162,5 +162,5 @@ func TestDatabase_DeleteOlderThan(t *testing.T) {
 	// Get all metrics from DB, all should be deleted
 	ams, err = db.GetAppMetrics(100, 0)
 	require.NoError(t, err)
-	require.Len(t, ams, 0)
+	require.Len(t, ams.AppMetrics, 0)
 }
