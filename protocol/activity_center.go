@@ -15,9 +15,11 @@ import (
 type ActivityCenterType int
 
 const (
-	ActivityCenterNotificationTypeNewOneToOne = iota + 1
+	ActivityCenterNotificationNoType ActivityCenterType = iota
+	ActivityCenterNotificationTypeNewOneToOne
 	ActivityCenterNotificationTypeNewPrivateGroupChat
 	ActivityCenterNotificationTypeMention
+	ActivityCenterNotificationTypeReply
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
@@ -48,14 +50,19 @@ func (n *ActivityCenterNotification) Valid() error {
 
 }
 
-func showMentionActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) bool {
-	if chat != nil && !chat.Active {
-		return false
+func showMentionOrReplyActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) (bool, ActivityCenterType) {
+	if chat == nil || !chat.Active || (!chat.CommunityChat() && !chat.PrivateGroupChat()) {
+		return false, ActivityCenterNotificationNoType
 	}
 
-	if message.Mentioned && chat != nil && (chat.CommunityChat() || chat.PrivateGroupChat()) {
-		return true
+	if message.Mentioned {
+		return true, ActivityCenterNotificationTypeMention
 	}
 
-	return false
+	publicKeyString := common.PubkeyToHex(&publicKey)
+	if responseTo != nil && responseTo.From == publicKeyString {
+		return true, ActivityCenterNotificationTypeReply
+	}
+
+	return false, ActivityCenterNotificationNoType
 }
