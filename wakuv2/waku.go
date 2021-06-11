@@ -542,7 +542,9 @@ func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []st
 		}
 	}
 
-	cursor = result.PagingInfo.Cursor
+	if len(result.Messages) != 0 {
+		cursor = result.PagingInfo.Cursor
+	}
 
 	return
 }
