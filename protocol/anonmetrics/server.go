@@ -5,10 +5,13 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/migrate/v4/database/postgres"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
+	_ "github.com/lib/pq"
+	"github.com/status-im/migrate/v4"
 	"github.com/status-im/status-go/appmetrics"
-	"github.com/status-im/status-go/postgres"
+	"github.com/status-im/status-go/protocol/anonmetrics/migrations"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -23,8 +26,9 @@ type Server struct {
 	PostgresDB *sql.DB
 }
 
-func NewServer(postgresURI string, migrationResource *bindata.AssetSource) (*Server, error) {
-	db, err := postgres.NewMigratedDB(postgresURI, migrationResource)
+func NewServer(postgresURI string) (*Server, error) {
+	postgresMigration := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+	db, err := NewMigratedDB(postgresURI, postgresMigration)
 	if err != nil {
 		return nil, err
 	}
@@ -126,4 +130,44 @@ func (s *Server) GetAppMetrics(limit int, offset int) ([]appmetrics.AppMetric, e
 	defer rows.Close()
 
 	return s.getFromRows(rows)
+}
+
+func NewMigratedDB(uri string, migrationResource *bindata.AssetSource) (*sql.DB, error) {
+	db, err := sql.Open("postgres", uri)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := setup(db, migrationResource); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func setup(d *sql.DB, migrationResource *bindata.AssetSource) error {
+	source, err := bindata.WithInstance(migrationResource)
+	if err != nil {
+		return err
+	}
+
+	driver, err := postgres.WithInstance(d, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithInstance(
+		"go-bindata",
+		source,
+		"postgres",
+		driver)
+	if err != nil {
+		return err
+	}
+
+	if err = m.Up(); err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }
