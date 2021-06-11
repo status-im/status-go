@@ -3,12 +3,13 @@ package anonmetrics
 import (
 	"database/sql"
 
+	// Import postgres driver
+	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"github.com/status-im/migrate/v4/database/postgres"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
-	_ "github.com/lib/pq"
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/protocol/anonmetrics/migrations"
