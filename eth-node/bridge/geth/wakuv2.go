@@ -199,10 +199,6 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		return nil, err
 	}
 
-	// TODO: there is an error in store protocol determining when we reach the last page of a cursor. In the meanwhile i'm nulling the result
-	_ = pbCursor
-	pbCursor = nil
-
 	if pbCursor != nil {
 		return &types.StoreRequestCursor{
 			Digest:       pbCursor.Digest,
