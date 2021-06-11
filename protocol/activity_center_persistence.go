@@ -287,6 +287,20 @@ func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead() error {
 	return err
 }
 
+func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexBytes) error {
+
+	idsArgs := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		idsArgs = append(idsArgs, id)
+	}
+
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+	query := "UPDATE activity_center_notifications SET read = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+	_, err := db.db.Exec(query, idsArgs...)
+	return err
+
+}
+
 func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	var count uint64
 	err := db.db.QueryRow(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read`).Scan(&count)

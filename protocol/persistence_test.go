@@ -1207,7 +1207,13 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), count)
 
-	// Mark the all read
+	// Mark first one as read
+	require.NoError(t, p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID1}))
+	count, err = p.UnreadActivityCenterNotificationsCount()
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
+
+	// Mark all read
 	require.NoError(t, p.MarkAllActivityCenterNotificationsRead())
 	_, notifications, err = p.ActivityCenterNotifications(cursor, 2)
 	require.NoError(t, err)
