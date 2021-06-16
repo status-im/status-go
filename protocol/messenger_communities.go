@@ -838,3 +838,32 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 
 	return nil
 }
+
+func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
+
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&syncCommunity)
+	if err != nil {
+		return err
+	}
+	if !shouldHandle {
+		return nil
+	}
+
+	sigPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	var cd protobuf.CommunityDescription
+	err = proto.Unmarshal(syncCommunity.Description, &cd)
+	if err != nil {
+		return err
+	}
+
+	err = m.handleCommunityDescription(messageState, &sigPrivKey.PublicKey, cd, syncCommunity.Description)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -2697,34 +2697,35 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						community := msg.ParsedMessage.Interface().(protobuf.SyncCommunity)
 						logger.Debug("Handling SyncCommunity", zap.Any("message", community))
 
-						err = m.communitiesManager.SaveSyncCommunity(&community)
+						shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&community)
 						if err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to save SyncCommunity in to database", zap.Error(err), zap.Any("community", community))
 							continue
 						}
-
-						var mr *MessengerResponse
-						if community.Joined {
-							mr, err = m.joinCommunity(community.Id)
-							if err != nil {
-								allMessagesProcessed = false
-								logger.Warn("failed to join SyncCommunity", zap.Error(err), zap.Any("community", community))
-								continue
-							}
-						} else {
-							mr, err = m.leaveCommunity(community.Id)
-							if err != nil {
-								allMessagesProcessed = false
-								logger.Warn("failed to leave SyncCommunity", zap.Error(err), zap.Any("community", community))
-								continue
-							}
+						if !shouldHandle {
+							continue
 						}
 
-						err = messageState.Response.Merge(mr)
+						sigPrivKey, err := crypto.ToECDSA(community.PrivateKey)
 						if err != nil {
 							allMessagesProcessed = false
-							logger.Warn("failed to merge message response", zap.Error(err), zap.Any("message response", mr))
+							logger.Warn("failed to convert private key bytes to ECDSA key", zap.Error(err), zap.Any("private key bytes", community.PrivateKey))
+							continue
+						}
+
+						var cd protobuf.CommunityDescription
+						err = proto.Unmarshal(community.Description, &cd)
+						if err != nil {
+							allMessagesProcessed = false
+							logger.Warn("failed to unmarshal community description protobuf bytes", zap.Error(err), zap.Any("community description bytes", community.Description))
+							continue
+						}
+
+						err = m.handleCommunityDescription(messageState, &sigPrivKey.PublicKey, cd, community.Description)
+						if err != nil {
+							allMessagesProcessed = false
+							logger.Warn("failed to handle community description", zap.Error(err), zap.Any("community description", cd))
 							continue
 						}
 

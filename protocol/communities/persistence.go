@@ -33,9 +33,21 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	return err
 }
 
-func (p *Persistence) SaveSyncCommunity(community *protobuf.SyncCommunity) error {
-	_, err := p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?, ?, ?)`, community.Id, community.PrivateKey, community.Description, community.Joined, community.Verified)
-	return err
+func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
+	err := qr.Scan()
+
+	switch err {
+	case sql.ErrNoRows:
+		// Query does not match, therefore synced_at value is not older than the new clock value or id was not found
+		return true, nil
+	case nil:
+		// Error is nil, therefore query matched and synced_at is older than the new clock
+		return false, nil
+	default:
+		// Error is not nil and is not sql.ErrNoRows, therefore pass out the error
+		return false, err
+	}
 }
 
 func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query string) (response []*Community, err error) {
