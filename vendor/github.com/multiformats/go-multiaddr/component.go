@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/multiformats/go-varint"
 )
 
 // Component is a single multiaddr Component.
@@ -158,7 +160,7 @@ func newComponent(protocol Protocol, bvalue []byte) *Component {
 	size := len(bvalue)
 	size += len(protocol.VCode)
 	if protocol.Size < 0 {
-		size += VarintSize(len(bvalue))
+		size += varint.UvarintSize(uint64(len(bvalue)))
 	}
 	maddr := make([]byte, size)
 	var offset int

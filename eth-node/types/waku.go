@@ -3,6 +3,8 @@ package types
 import (
 	"crypto/ecdsa"
 	"time"
+
+	"github.com/status-im/go-waku/waku/v2/protocol/store"
 )
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -52,4 +54,7 @@ type Waku interface {
 	// SendMessagesRequest sends a MessagesRequest. This is an equivalent to RequestHistoricMessages
 	// in terms of the functionality.
 	SendMessagesRequest(peerID []byte, request MessagesRequest) error
+
+	// RequestStoreMessages uses the WAKU2-STORE protocol to request historic messages
+	RequestStoreMessages(topics []TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error
 }

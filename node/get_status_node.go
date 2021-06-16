@@ -35,8 +35,10 @@ import (
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -584,6 +586,19 @@ func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
 	return
 }
 
+// WakuV2Service exposes reference to Whisper service running on top of the node
+func (n *StatusNode) WakuV2Service() (w *wakuv2.Waku, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
 // WakuExtService exposes reference to shh extension service running on top of the node
 func (n *StatusNode) WakuExtService() (s *wakuext.Service, err error) {
 	n.mu.RLock()
@@ -605,6 +620,19 @@ func (n *StatusNode) ConnectionChanged(state connection.State) error {
 
 	service.ConnectionChanged(state)
 	return nil
+}
+
+// WakuV2ExtService exposes reference to waku v2 extension service running on top of the node
+func (n *StatusNode) WakuV2ExtService() (s *wakuv2ext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
 }
 
 // WalletService returns wallet.Service instance if it was started.

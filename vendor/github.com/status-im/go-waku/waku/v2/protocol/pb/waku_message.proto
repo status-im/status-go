@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package pb;
+
+message WakuMessage {
+    bytes payload = 1;
+    string contentTopic = 2;
+    uint32 version = 3;
+    double timestamp = 4;
+    bytes proof = 21;
+}

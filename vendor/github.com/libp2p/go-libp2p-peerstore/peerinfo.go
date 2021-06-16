@@ -5,7 +5,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-// Deprecated: use github.com/libp2p/go-libp2p-core/peer.Info instead.
+// Deprecated: use github.com/libp2p/go-libp2p-core/peer.AddrInfo instead.
 type PeerInfo = core.AddrInfo
 
 // Deprecated: use github.com/libp2p/go-libp2p-core/peer.ErrInvalidAddr instead.

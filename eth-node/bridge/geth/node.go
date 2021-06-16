@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -52,6 +53,29 @@ func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
 	}
 
 	return NewGethWakuWrapper(nativeWaku), nil
+}
+
+func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (types.Waku, error) {
+	var nativeWaku *wakuv2.Waku
+	if ctx == nil || ctx == w {
+		err := w.stack.Service(&nativeWaku)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		switch serviceProvider := ctx.(type) {
+		case *node.ServiceContext:
+			err := serviceProvider.Service(&nativeWaku)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if nativeWaku == nil {
+		return nil, errors.New("waku service is not available")
+	}
+
+	return NewGethWakuV2Wrapper(nativeWaku), nil
 }
 
 func (w *gethNodeWrapper) AddPeer(url string) error {

@@ -90,6 +90,10 @@ func (n *testNode) GetWaku(_ interface{}) (types.Waku, error) {
 	return n.shh, nil
 }
 
+func (n *testNode) GetWakuV2(_ interface{}) (types.Waku, error) {
+	return n.shh, nil
+}
+
 func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return nil, nil
 }

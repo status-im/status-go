@@ -22,7 +22,7 @@ go get github.com/ipfs/go-log
 
 ## Usage
 
-Once the pacakge is imported under the name `logging`, an instance of `EventLogger` can be created like so:
+Once the package is imported under the name `logging`, an instance of `EventLogger` can be created like so:
 
 ```go
 var log = logging.Logger("subsystem name")

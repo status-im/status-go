@@ -1,5 +1,5 @@
 // Package transport provides the Transport interface, which represents
-// the devices and network protocols used to send and recieve data.
+// the devices and network protocols used to send and receive data.
 package transport
 
 import (

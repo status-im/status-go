@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	logging "github.com/ipfs/go-log"
+
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -32,16 +34,19 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // Errors related to node and services creation.
 var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
 	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
+	ErrWakuV2ServiceRegistrationFailure           = errors.New("failed to register the WakuV2 service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
@@ -136,6 +141,10 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 	// start Waku service
 	if err := activateWakuService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWakuServiceRegistrationFailure, err)
+	}
+
+	if err := activateWakuV2Service(stack, config, db); err != nil {
+		return fmt.Errorf("%v: %v", ErrWakuV2ServiceRegistrationFailure, err)
 	}
 
 	// start peer service
@@ -325,6 +334,29 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 	})
 }
 
+// activateWakuV2Service configures WakuV2 and adds it to the given node.
+func activateWakuV2Service(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
+	if !config.WakuV2Config.Enabled {
+		logger.Info("WakuV2 protocol is disabled")
+		return nil
+	}
+
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return createWakuV2Service(ctx, config.NodeKey, &config.WakuV2Config, &config.ClusterConfig)
+	})
+	if err != nil {
+		return
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		return wakuv2ext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
+	})
+}
+
 func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
 	cfg := &waku.Config{
 		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
@@ -365,6 +397,35 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 		if err := w.SetBloomFilter(emptyBloomFilter); err != nil {
 			return nil, err
 		}
+	}
+
+	return w, nil
+}
+
+func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuV2Config, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+	cfg := &wakuv2.Config{
+		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
+		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
+		Host:                   wakuCfg.Host,
+		Port:                   wakuCfg.Port,
+		BootNodes:              clusterCfg.WakuNodes,
+		StoreNodes:             clusterCfg.WakuStoreNodes,
+	}
+
+	if wakuCfg.MaxMessageSize > 0 {
+		cfg.MaxMessageSize = wakuCfg.MaxMessageSize
+	}
+
+	lvl, err := logging.LevelFromString("info")
+	if err != nil {
+		panic(err)
+	}
+	logging.SetAllLoggers(lvl)
+
+	w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger())
+
+	if err != nil {
+		return nil, err
 	}
 
 	return w, nil

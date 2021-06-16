@@ -14,6 +14,9 @@ go-cid
 This is an implementation in Go of the [CID spec](https://github.com/ipld/cid).
 It is used in `go-ipfs` and related packages to refer to a typed hunk of data.
 
+## Lead Maintainer
+
+[Eric Myhre](https://github.com/warpfork)
 
 ## Table of Contents
 
@@ -31,35 +34,15 @@ It is used in `go-ipfs` and related packages to refer to a typed hunk of data.
 go get github.com/ipfs/go-cid
 ```
 
-Note that `go-cid` is packaged with Gx, so it is recommended to use Gx to install and use it (see Usage section).
-
 ## Usage
-
-### Using Gx and Gx-go
-
-This module is packaged with [Gx](https://github.com/whyrusleeping/gx). In order to use it in your own project it is recommended that you:
-
-```sh
-go get -u github.com/whyrusleeping/gx
-go get -u github.com/whyrusleeping/gx-go
-cd <your-project-repository>
-gx init
-gx import github.com/ipfs/go-cid
-gx install --global
-gx-go --rewrite
-```
-
-Please check [Gx](https://github.com/whyrusleeping/gx) and [Gx-go](https://github.com/whyrusleeping/gx-go) documentation for more information.
 
 ### Running tests
 
-Before running tests, please run:
+Run tests with `go test` from the directory root
 
 ```sh
-make deps
+go test
 ```
-
-This will make sure that dependencies are rewritten to known working versions.
 
 ### Examples
 

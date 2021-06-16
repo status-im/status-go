@@ -78,6 +78,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 		gethbridge.NewGethWakuWrapper(shh),
 		identity,
 		database,
+		"waku_keys",
 		nil,
 		nil,
 		s.logger,

@@ -205,21 +205,41 @@ func NewMessenger(
 	}
 
 	// Initialize transport layer.
+	var transp *transport.Transport
+
 	logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
-	waku, err := node.GetWaku(nil)
-	if err != nil || waku == nil {
-		return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
-	}
-	transp, err := transport.NewTransport(
-		waku,
-		identity,
-		database,
-		nil,
-		c.envelopesMonitorConfig,
-		logger,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create  Transport")
+
+	if waku, err := node.GetWaku(nil); err == nil && waku != nil {
+		transp, err = transport.NewTransport(
+			waku,
+			identity,
+			database,
+			"waku_keys",
+			nil,
+			c.envelopesMonitorConfig,
+			logger,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create  Transport")
+		}
+	} else {
+		logger.Info("failed to find Waku service; trying WakuV2", zap.Error(err))
+		wakuV2, err := node.GetWakuV2(nil)
+		if err != nil || wakuV2 == nil {
+			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
+		}
+		transp, err = transport.NewTransport(
+			wakuV2,
+			identity,
+			database,
+			"wakuv2_keys",
+			nil,
+			c.envelopesMonitorConfig,
+			logger,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create  Transport")
+		}
 	}
 
 	// Initialize encryption layer.

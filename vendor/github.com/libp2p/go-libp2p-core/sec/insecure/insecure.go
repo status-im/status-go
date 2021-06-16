@@ -6,6 +6,7 @@ package insecure
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -60,7 +61,7 @@ func (t *Transport) LocalPrivateKey() ci.PrivKey {
 	return t.key
 }
 
-// SecureInbound *pretends to secure* an outbound connection to the given peer.
+// SecureInbound *pretends to secure* an inbound connection to the given peer.
 // It sends the local peer's ID and public key, and receives the same from the remote peer.
 // No validation is performed as to the authenticity or ownership of the provided public key,
 // and the key exchange provides no security.
@@ -143,7 +144,6 @@ func (ic *Conn) runHandshakeSync() error {
 		return nil
 	}
 
-	rw := msgio.NewReadWriter(ic.Conn)
 	// Generate an Exchange message
 	msg, err := makeExchangeMessage(ic.localPrivKey.GetPublic())
 	if err != nil {
@@ -151,7 +151,7 @@ func (ic *Conn) runHandshakeSync() error {
 	}
 
 	// Send our Exchange and read theirs
-	remoteMsg, err := readWriteMsg(rw, msg)
+	remoteMsg, err := readWriteMsg(ic.Conn, msg)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (ic *Conn) runHandshakeSync() error {
 		return err
 	}
 
-	remoteID, err := peer.IDFromPublicKey(remotePubkey)
+	remoteID, err := peer.IDFromBytes(remoteMsg.Id)
 	if err != nil {
 		return err
 	}
@@ -181,17 +181,21 @@ func (ic *Conn) runHandshakeSync() error {
 }
 
 // read and write a message at the same time.
-func readWriteMsg(c msgio.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
+func readWriteMsg(rw io.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
+	const maxMessageSize = 1 << 16
+
 	outBytes, err := out.Marshal()
 	if err != nil {
 		return nil, err
 	}
 	wresult := make(chan error)
 	go func() {
-		wresult <- c.WriteMsg(outBytes)
+		w := msgio.NewVarintWriter(rw)
+		wresult <- w.WriteMsg(outBytes)
 	}()
 
-	msg, err1 := c.ReadMsg()
+	r := msgio.NewVarintReaderSize(rw, maxMessageSize)
+	msg, err1 := r.ReadMsg()
 
 	// Always wait for the read to finish.
 	err2 := <-wresult
@@ -200,7 +204,7 @@ func readWriteMsg(c msgio.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
 		return nil, err1
 	}
 	if err2 != nil {
-		c.ReleaseMsg(msg)
+		r.ReleaseMsg(msg)
 		return nil, err2
 	}
 	inMsg := new(pb.Exchange)

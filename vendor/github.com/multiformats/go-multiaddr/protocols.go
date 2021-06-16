@@ -29,6 +29,7 @@ const (
 	P_GARLIC32          = 0x01BF
 	P_P2P_WEBRTC_DIRECT = 0x0114
 	P_WS                = 0x01DD
+	P_WSS               = 0x01DE
 )
 
 var (
@@ -177,7 +178,7 @@ var (
 		VCode: CodeToVarint(P_HTTPS),
 	}
 	protoP2P = Protocol{
-		Name:       "ipfs",
+		Name:       "p2p",
 		Code:       P_P2P,
 		VCode:      CodeToVarint(P_P2P),
 		Size:       LengthPrefixedVarSize,
@@ -200,6 +201,11 @@ var (
 		Name:  "ws",
 		Code:  P_WS,
 		VCode: CodeToVarint(P_WS),
+	}
+	protoWSS = Protocol{
+		Name:  "wss",
+		Code:  P_WSS,
+		VCode: CodeToVarint(P_WSS),
 	}
 )
 
@@ -230,6 +236,7 @@ func init() {
 		protoUNIX,
 		protoP2P_WEBRTC_DIRECT,
 		protoWS,
+		protoWSS,
 	} {
 		if err := AddProtocol(p); err != nil {
 			panic(err)

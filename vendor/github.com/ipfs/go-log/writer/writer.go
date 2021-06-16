@@ -26,11 +26,6 @@ type MirrorWriter struct {
 	msgSync chan []byte
 }
 
-type writerSync struct {
-	w  io.WriteCloser
-	br chan []byte
-}
-
 // NewMirrorWriter initializes and returns a MirrorWriter.
 func NewMirrorWriter() *MirrorWriter {
 	mw := &MirrorWriter{
@@ -216,13 +211,11 @@ func (bw *bufWriter) loop() {
 		if nextMsg == nil || nextCh == nil {
 			// nextCh == nil implies we are 'dead' and draining the incoming channel
 			// until the caller notices and closes it for us
-			select {
-			case b, ok := <-incoming:
-				if !ok {
-					return
-				}
-				nextMsg = b
+			b, ok := <-incoming
+			if !ok {
+				return
 			}
+			nextMsg = b
 		}
 
 		select {

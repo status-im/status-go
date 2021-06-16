@@ -1,10 +1,7 @@
 os:
   - linux
 
-language: go
-
-go:
-  - 1.11.x
+# Don't use the go language tag. Install manually to fix wasm.
 
 env:
   global:
@@ -15,9 +12,19 @@ env:
 
 # disable travis install
 install:
-  - true
+  # Manually download and install Go 1.13 instead of using gimme.
+  # It looks like gimme Go causes some errors on go-test for Wasm.
+  - wget -O go.tar.gz https://dl.google.com/go/go1.15.3.linux-amd64.tar.gz
+  - tar -C ~ -xzf go.tar.gz
+  - rm go.tar.gz
+  - export GOROOT=~/go
+  - export PATH=$GOROOT/bin:$PATH
+  - go version
+  - go env
 
 script:
+  - export GOROOT=~/go
+  - export PATH=$GOROOT/bin:$PATH
   - bash <(curl -s https://raw.githubusercontent.com/ipfs/ci-helpers/master/travis-ci/run-standard-tests.sh)
 
 

@@ -521,7 +521,8 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	conf.WakuConfig.Enabled = true
+	// Start WakuV1 if WakuV2 is not enabled
+	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
 
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
@@ -1196,6 +1197,34 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		// Set initial connection state
 		st.ConnectionChanged(b.connectionState)
 	}
+
+	wakuV2Service, err := b.statusNode.WakuV2Service()
+
+	switch err {
+	case node.ErrServiceUnknown: // WakuV2 was never registered
+	case nil:
+		if err := wakuV2Service.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+			return err
+		}
+		b.selectedAccountKeyID, err = wakuV2Service.AddKeyPair(identity)
+		if err != nil {
+			return ErrWakuIdentityInjectionFailure
+		}
+	default:
+		return err
+	}
+
+	if wakuV2Service != nil {
+		st, err := b.statusNode.WakuV2ExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

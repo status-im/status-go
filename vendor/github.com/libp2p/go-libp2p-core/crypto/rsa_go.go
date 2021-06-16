@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"io"
+	"sync"
 
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
@@ -23,6 +24,9 @@ type RsaPrivateKey struct {
 // RsaPublicKey is an rsa public key
 type RsaPublicKey struct {
 	k rsa.PublicKey
+
+	cacheLk sync.Mutex
+	cached  []byte
 }
 
 // GenerateRSAKeyPair generates a new rsa private and public key
@@ -35,7 +39,7 @@ func GenerateRSAKeyPair(bits int, src io.Reader) (PrivKey, PubKey, error) {
 		return nil, nil, err
 	}
 	pk := priv.PublicKey
-	return &RsaPrivateKey{sk: *priv}, &RsaPublicKey{pk}, nil
+	return &RsaPrivateKey{sk: *priv}, &RsaPublicKey{k: pk}, nil
 }
 
 // Verify compares a signature against input data
@@ -54,7 +58,13 @@ func (pk *RsaPublicKey) Type() pb.KeyType {
 
 // Bytes returns protobuf bytes of a public key
 func (pk *RsaPublicKey) Bytes() ([]byte, error) {
-	return MarshalPublicKey(pk)
+	pk.cacheLk.Lock()
+	var err error
+	if pk.cached == nil {
+		pk.cached, err = MarshalPublicKey(pk)
+	}
+	pk.cacheLk.Unlock()
+	return pk.cached, err
 }
 
 func (pk *RsaPublicKey) Raw() ([]byte, error) {
@@ -80,7 +90,7 @@ func (sk *RsaPrivateKey) Sign(message []byte) ([]byte, error) {
 
 // GetPublic returns a public key
 func (sk *RsaPrivateKey) GetPublic() PubKey {
-	return &RsaPublicKey{sk.sk.PublicKey}
+	return &RsaPublicKey{k: sk.sk.PublicKey}
 }
 
 func (sk *RsaPrivateKey) Type() pb.KeyType {
@@ -137,5 +147,6 @@ func UnmarshalRsaPublicKey(b []byte) (PubKey, error) {
 	if pk.N.BitLen() < MinRsaKeyBits {
 		return nil, ErrRsaKeyTooSmall
 	}
-	return &RsaPublicKey{*pk}, nil
+
+	return &RsaPublicKey{k: *pk}, nil
 }

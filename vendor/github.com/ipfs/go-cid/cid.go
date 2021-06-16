@@ -22,29 +22,21 @@ package cid
 import (
 	"bytes"
 	"encoding"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	mbase "github.com/multiformats/go-multibase"
 	mh "github.com/multiformats/go-multihash"
+	varint "github.com/multiformats/go-varint"
 )
 
 // UnsupportedVersionString just holds an error message
 const UnsupportedVersionString = "<unsupported cid version>"
 
 var (
-	// ErrVarintBuffSmall means that a buffer passed to the cid parser was not
-	// long enough, or did not contain an invalid cid
-	ErrVarintBuffSmall = errors.New("reading varint: buffer too small")
-
-	// ErrVarintTooBig means that the varint in the given cid was above the
-	// limit of 2^64
-	ErrVarintTooBig = errors.New("reading varint: varint bigger than 64bits" +
-		" and not supported")
-
 	// ErrCidTooShort means that the cid passed to decode was not long
 	// enough to be a valid Cid
 	ErrCidTooShort = errors.New("cid too short")
@@ -66,102 +58,122 @@ const (
 
 	GitRaw = 0x78
 
-	EthBlock           = 0x90
-	EthBlockList       = 0x91
-	EthTxTrie          = 0x92
-	EthTx              = 0x93
-	EthTxReceiptTrie   = 0x94
-	EthTxReceipt       = 0x95
-	EthStateTrie       = 0x96
-	EthAccountSnapshot = 0x97
-	EthStorageTrie     = 0x98
-	BitcoinBlock       = 0xb0
-	BitcoinTx          = 0xb1
-	ZcashBlock         = 0xc0
-	ZcashTx            = 0xc1
-	DecredBlock        = 0xe0
-	DecredTx           = 0xe1
-	DashBlock          = 0xf0
-	DashTx             = 0xf1
+	EthBlock              = 0x90
+	EthBlockList          = 0x91
+	EthTxTrie             = 0x92
+	EthTx                 = 0x93
+	EthTxReceiptTrie      = 0x94
+	EthTxReceipt          = 0x95
+	EthStateTrie          = 0x96
+	EthAccountSnapshot    = 0x97
+	EthStorageTrie        = 0x98
+	BitcoinBlock          = 0xb0
+	BitcoinTx             = 0xb1
+	ZcashBlock            = 0xc0
+	ZcashTx               = 0xc1
+	DecredBlock           = 0xe0
+	DecredTx              = 0xe1
+	DashBlock             = 0xf0
+	DashTx                = 0xf1
+	FilCommitmentUnsealed = 0xf101
+	FilCommitmentSealed   = 0xf102
 )
 
 // Codecs maps the name of a codec to its type
 var Codecs = map[string]uint64{
-	"v0":                   DagProtobuf,
-	"raw":                  Raw,
-	"protobuf":             DagProtobuf,
-	"cbor":                 DagCBOR,
-	"libp2p-key":           Libp2pKey,
-	"git-raw":              GitRaw,
-	"eth-block":            EthBlock,
-	"eth-block-list":       EthBlockList,
-	"eth-tx-trie":          EthTxTrie,
-	"eth-tx":               EthTx,
-	"eth-tx-receipt-trie":  EthTxReceiptTrie,
-	"eth-tx-receipt":       EthTxReceipt,
-	"eth-state-trie":       EthStateTrie,
-	"eth-account-snapshot": EthAccountSnapshot,
-	"eth-storage-trie":     EthStorageTrie,
-	"bitcoin-block":        BitcoinBlock,
-	"bitcoin-tx":           BitcoinTx,
-	"zcash-block":          ZcashBlock,
-	"zcash-tx":             ZcashTx,
-	"decred-block":         DecredBlock,
-	"decred-tx":            DecredTx,
-	"dash-block":           DashBlock,
-	"dash-tx":              DashTx,
+	"v0":                      DagProtobuf,
+	"raw":                     Raw,
+	"protobuf":                DagProtobuf,
+	"cbor":                    DagCBOR,
+	"libp2p-key":              Libp2pKey,
+	"git-raw":                 GitRaw,
+	"eth-block":               EthBlock,
+	"eth-block-list":          EthBlockList,
+	"eth-tx-trie":             EthTxTrie,
+	"eth-tx":                  EthTx,
+	"eth-tx-receipt-trie":     EthTxReceiptTrie,
+	"eth-tx-receipt":          EthTxReceipt,
+	"eth-state-trie":          EthStateTrie,
+	"eth-account-snapshot":    EthAccountSnapshot,
+	"eth-storage-trie":        EthStorageTrie,
+	"bitcoin-block":           BitcoinBlock,
+	"bitcoin-tx":              BitcoinTx,
+	"zcash-block":             ZcashBlock,
+	"zcash-tx":                ZcashTx,
+	"decred-block":            DecredBlock,
+	"decred-tx":               DecredTx,
+	"dash-block":              DashBlock,
+	"dash-tx":                 DashTx,
+	"fil-commitment-unsealed": FilCommitmentUnsealed,
+	"fil-commitment-sealed":   FilCommitmentSealed,
 }
 
 // CodecToStr maps the numeric codec to its name
 var CodecToStr = map[uint64]string{
-	Raw:                "raw",
-	DagProtobuf:        "protobuf",
-	DagCBOR:            "cbor",
-	GitRaw:             "git-raw",
-	EthBlock:           "eth-block",
-	EthBlockList:       "eth-block-list",
-	EthTxTrie:          "eth-tx-trie",
-	EthTx:              "eth-tx",
-	EthTxReceiptTrie:   "eth-tx-receipt-trie",
-	EthTxReceipt:       "eth-tx-receipt",
-	EthStateTrie:       "eth-state-trie",
-	EthAccountSnapshot: "eth-account-snapshot",
-	EthStorageTrie:     "eth-storage-trie",
-	BitcoinBlock:       "bitcoin-block",
-	BitcoinTx:          "bitcoin-tx",
-	ZcashBlock:         "zcash-block",
-	ZcashTx:            "zcash-tx",
-	DecredBlock:        "decred-block",
-	DecredTx:           "decred-tx",
-	DashBlock:          "dash-block",
-	DashTx:             "dash-tx",
+	Raw:                   "raw",
+	DagProtobuf:           "protobuf",
+	DagCBOR:               "cbor",
+	GitRaw:                "git-raw",
+	EthBlock:              "eth-block",
+	EthBlockList:          "eth-block-list",
+	EthTxTrie:             "eth-tx-trie",
+	EthTx:                 "eth-tx",
+	EthTxReceiptTrie:      "eth-tx-receipt-trie",
+	EthTxReceipt:          "eth-tx-receipt",
+	EthStateTrie:          "eth-state-trie",
+	EthAccountSnapshot:    "eth-account-snapshot",
+	EthStorageTrie:        "eth-storage-trie",
+	BitcoinBlock:          "bitcoin-block",
+	BitcoinTx:             "bitcoin-tx",
+	ZcashBlock:            "zcash-block",
+	ZcashTx:               "zcash-tx",
+	DecredBlock:           "decred-block",
+	DecredTx:              "decred-tx",
+	DashBlock:             "dash-block",
+	DashTx:                "dash-tx",
+	FilCommitmentUnsealed: "fil-commitment-unsealed",
+	FilCommitmentSealed:   "fil-commitment-sealed",
+}
+
+// tryNewCidV0 tries to convert a multihash into a CIDv0 CID and returns an
+// error on failure.
+func tryNewCidV0(mhash mh.Multihash) (Cid, error) {
+	// Need to make sure hash is valid for CidV0 otherwise we will
+	// incorrectly detect it as CidV1 in the Version() method
+	dec, err := mh.Decode(mhash)
+	if err != nil {
+		return Undef, err
+	}
+	if dec.Code != mh.SHA2_256 || dec.Length != 32 {
+		return Undef, fmt.Errorf("invalid hash for cidv0 %d-%d", dec.Code, dec.Length)
+	}
+	return Cid{string(mhash)}, nil
 }
 
 // NewCidV0 returns a Cid-wrapped multihash.
 // They exist to allow IPFS to work with Cids while keeping
 // compatibility with the plain-multihash format used used in IPFS.
 // NewCidV1 should be used preferentially.
+//
+// Panics if the multihash isn't sha2-256.
 func NewCidV0(mhash mh.Multihash) Cid {
-	// Need to make sure hash is valid for CidV0 otherwise we will
-	// incorrectly detect it as CidV1 in the Version() method
-	dec, err := mh.Decode(mhash)
+	c, err := tryNewCidV0(mhash)
 	if err != nil {
 		panic(err)
 	}
-	if dec.Code != mh.SHA2_256 || dec.Length != 32 {
-		panic("invalid hash for cidv0")
-	}
-	return Cid{string(mhash)}
+	return c
 }
 
 // NewCidV1 returns a new Cid using the given multicodec-packed
 // content type.
+//
+// Panics if the multihash is invalid.
 func NewCidV1(codecType uint64, mhash mh.Multihash) Cid {
 	hashlen := len(mhash)
 	// two 8 bytes (max) numbers plus hash
-	buf := make([]byte, 2*binary.MaxVarintLen64+hashlen)
-	n := binary.PutUvarint(buf, 1)
-	n += binary.PutUvarint(buf[n:], codecType)
+	buf := make([]byte, 1+varint.UvarintSize(codecType)+hashlen)
+	n := varint.PutUvarint(buf, 1)
+	n += varint.PutUvarint(buf[n:], codecType)
 	cn := copy(buf[n:], mhash)
 	if cn != hashlen {
 		panic("copy hash length is inconsistent")
@@ -203,7 +215,7 @@ func Parse(v interface{}) (Cid, error) {
 	case []byte:
 		return Cast(v2)
 	case mh.Multihash:
-		return NewCidV0(v2), nil
+		return tryNewCidV0(v2)
 	case Cid:
 		return v2, nil
 	default:
@@ -234,7 +246,7 @@ func Decode(v string) (Cid, error) {
 			return Undef, err
 		}
 
-		return NewCidV0(hash), nil
+		return tryNewCidV0(hash)
 	}
 
 	_, data, err := mbase.Decode(v)
@@ -267,17 +279,6 @@ func ExtractEncoding(v string) (mbase.Encoding, error) {
 	return encoding, nil
 }
 
-func uvError(read int) error {
-	switch {
-	case read == 0:
-		return ErrVarintBuffSmall
-	case read < 0:
-		return ErrVarintTooBig
-	default:
-		return nil
-	}
-}
-
 // Cast takes a Cid data slice, parses it and returns a Cid.
 // For CidV1, the data buffer is in the form:
 //
@@ -290,36 +291,16 @@ func uvError(read int) error {
 // Please use decode when parsing a regular Cid string, as Cast does not
 // expect multibase-encoded data. Cast accepts the output of Cid.Bytes().
 func Cast(data []byte) (Cid, error) {
-	if len(data) == 34 && data[0] == 18 && data[1] == 32 {
-		h, err := mh.Cast(data)
-		if err != nil {
-			return Undef, err
-		}
-
-		return NewCidV0(h), nil
-	}
-
-	vers, n := binary.Uvarint(data)
-	if err := uvError(n); err != nil {
-		return Undef, err
-	}
-
-	if vers != 1 {
-		return Undef, fmt.Errorf("expected 1 as the cid version number, got: %d", vers)
-	}
-
-	_, cn := binary.Uvarint(data[n:])
-	if err := uvError(cn); err != nil {
-		return Undef, err
-	}
-
-	rest := data[n+cn:]
-	h, err := mh.Cast(rest)
+	nr, c, err := CidFromBytes(data)
 	if err != nil {
 		return Undef, err
 	}
 
-	return Cid{string(data[0 : n+cn+len(h)])}, nil
+	if nr != len(data) {
+		return Undef, fmt.Errorf("trailing bytes in data buffer passed to cid Cast")
+	}
+
+	return c, nil
 }
 
 // UnmarshalBinary is equivalent to Cast(). It implements the
@@ -357,14 +338,14 @@ func (c Cid) Type() uint64 {
 	if c.Version() == 0 {
 		return DagProtobuf
 	}
-	_, n := uvarint(c.str)
-	codec, _ := uvarint(c.str[n:])
+	_, n, _ := uvarint(c.str)
+	codec, _, _ := uvarint(c.str[n:])
 	return codec
 }
 
 // String returns the default string representation of a
-// Cid. Currently, Base58 is used as the encoding for the
-// multibase string.
+// Cid. Currently, Base32 is used for CIDV1 as the encoding for the
+// multibase string, Base58 is used for CIDV0.
 func (c Cid) String() string {
 	switch c.Version() {
 	case 0:
@@ -420,9 +401,9 @@ func (c Cid) Hash() mh.Multihash {
 	}
 
 	// skip version length
-	_, n1 := binary.Uvarint(bytes)
+	_, n1, _ := varint.FromUvarint(bytes)
 	// skip codec length
-	_, n2 := binary.Uvarint(bytes[n1:])
+	_, n2, _ := varint.FromUvarint(bytes[n1:])
 
 	return mh.Multihash(bytes[n1+n2:])
 }
@@ -432,6 +413,30 @@ func (c Cid) Hash() mh.Multihash {
 // with Cast().
 func (c Cid) Bytes() []byte {
 	return []byte(c.str)
+}
+
+// ByteLen returns the length of the CID in bytes.
+// It's equivalent to `len(c.Bytes())`, but works without an allocation,
+// and should therefore be preferred.
+//
+// (See also the WriteTo method for other important operations that work without allocation.)
+func (c Cid) ByteLen() int {
+	return len(c.str)
+}
+
+// WriteBytes writes the CID bytes to the given writer.
+// This method works without incurring any allocation.
+//
+// (See also the ByteLen method for other important operations that work without allocation.)
+func (c Cid) WriteBytes(w io.Writer) (int, error) {
+	n, err := io.WriteString(w, c.str)
+	if err != nil {
+		return n, err
+	}
+	if n != len(c.str) {
+		return n, fmt.Errorf("failed to write entire cid string")
+	}
+	return n, nil
 }
 
 // MarshalBinary is equivalent to Bytes(). It implements the
@@ -513,12 +518,29 @@ func (c Cid) Loggable() map[string]interface{} {
 
 // Prefix builds and returns a Prefix out of a Cid.
 func (c Cid) Prefix() Prefix {
-	dec, _ := mh.Decode(c.Hash()) // assuming we got a valid multiaddr, this will not error
+	if c.Version() == 0 {
+		return Prefix{
+			MhType:   mh.SHA2_256,
+			MhLength: 32,
+			Version:  0,
+			Codec:    DagProtobuf,
+		}
+	}
+
+	offset := 0
+	version, n, _ := uvarint(c.str[offset:])
+	offset += n
+	codec, n, _ := uvarint(c.str[offset:])
+	offset += n
+	mhtype, n, _ := uvarint(c.str[offset:])
+	offset += n
+	mhlen, _, _ := uvarint(c.str[offset:])
+
 	return Prefix{
-		MhType:   dec.Code,
-		MhLength: dec.Length,
-		Version:  c.Version(),
-		Codec:    c.Type(),
+		MhType:   mhtype,
+		MhLength: int(mhlen),
+		Version:  version,
+		Codec:    codec,
 	}
 }
 
@@ -543,6 +565,12 @@ func (p Prefix) Sum(data []byte) (Cid, error) {
 		length = -1
 	}
 
+	if p.Version == 0 && (p.MhType != mh.SHA2_256 ||
+		(p.MhLength != 32 && p.MhLength != -1)) {
+
+		return Undef, fmt.Errorf("invalid v0 prefix")
+	}
+
 	hash, err := mh.Sum(data, p.MhType, length)
 	if err != nil {
 		return Undef, err
@@ -562,34 +590,42 @@ func (p Prefix) Sum(data []byte) (Cid, error) {
 //
 //     <version><codec><mh-type><mh-length>
 func (p Prefix) Bytes() []byte {
-	buf := make([]byte, 4*binary.MaxVarintLen64)
-	n := binary.PutUvarint(buf, p.Version)
-	n += binary.PutUvarint(buf[n:], p.Codec)
-	n += binary.PutUvarint(buf[n:], uint64(p.MhType))
-	n += binary.PutUvarint(buf[n:], uint64(p.MhLength))
-	return buf[:n]
+	size := varint.UvarintSize(p.Version)
+	size += varint.UvarintSize(p.Codec)
+	size += varint.UvarintSize(p.MhType)
+	size += varint.UvarintSize(uint64(p.MhLength))
+
+	buf := make([]byte, size)
+	n := varint.PutUvarint(buf, p.Version)
+	n += varint.PutUvarint(buf[n:], p.Codec)
+	n += varint.PutUvarint(buf[n:], p.MhType)
+	n += varint.PutUvarint(buf[n:], uint64(p.MhLength))
+	if n != size {
+		panic("size mismatch")
+	}
+	return buf
 }
 
 // PrefixFromBytes parses a Prefix-byte representation onto a
 // Prefix.
 func PrefixFromBytes(buf []byte) (Prefix, error) {
 	r := bytes.NewReader(buf)
-	vers, err := binary.ReadUvarint(r)
+	vers, err := varint.ReadUvarint(r)
 	if err != nil {
 		return Prefix{}, err
 	}
 
-	codec, err := binary.ReadUvarint(r)
+	codec, err := varint.ReadUvarint(r)
 	if err != nil {
 		return Prefix{}, err
 	}
 
-	mhtype, err := binary.ReadUvarint(r)
+	mhtype, err := varint.ReadUvarint(r)
 	if err != nil {
 		return Prefix{}, err
 	}
 
-	mhlen, err := binary.ReadUvarint(r)
+	mhlen, err := varint.ReadUvarint(r)
 	if err != nil {
 		return Prefix{}, err
 	}
@@ -600,4 +636,42 @@ func PrefixFromBytes(buf []byte) (Prefix, error) {
 		MhType:   mhtype,
 		MhLength: int(mhlen),
 	}, nil
+}
+
+func CidFromBytes(data []byte) (int, Cid, error) {
+	if len(data) > 2 && data[0] == mh.SHA2_256 && data[1] == 32 {
+		if len(data) < 34 {
+			return 0, Undef, fmt.Errorf("not enough bytes for cid v0")
+		}
+
+		h, err := mh.Cast(data[:34])
+		if err != nil {
+			return 0, Undef, err
+		}
+
+		return 34, Cid{string(h)}, nil
+	}
+
+	vers, n, err := varint.FromUvarint(data)
+	if err != nil {
+		return 0, Undef, err
+	}
+
+	if vers != 1 {
+		return 0, Undef, fmt.Errorf("expected 1 as the cid version number, got: %d", vers)
+	}
+
+	_, cn, err := varint.FromUvarint(data[n:])
+	if err != nil {
+		return 0, Undef, err
+	}
+
+	mhnr, _, err := mh.MHFromBytes(data[n+cn:])
+	if err != nil {
+		return 0, Undef, err
+	}
+
+	l := n + cn + mhnr
+
+	return l, Cid{string(data[0:l])}, nil
 }

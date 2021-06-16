@@ -2,10 +2,14 @@ package swarm
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 )
+
+// TODO: change this text when we fix the bug
+var errDialCanceled = errors.New("dial was aborted internally, likely due to https://git.io/Je2wW")
 
 // DialFunc is the type of function expected by DialSync.
 type DialFunc func(context.Context, peer.ID) (*Conn, error)
@@ -78,6 +82,16 @@ func (ad *activeDial) decref() {
 
 func (ad *activeDial) start(ctx context.Context) {
 	ad.conn, ad.err = ad.ds.dialFunc(ctx, ad.id)
+
+	// This isn't the user's context so we should fix the error.
+	switch ad.err {
+	case context.Canceled:
+		// The dial was canceled with `CancelDial`.
+		ad.err = errDialCanceled
+	case context.DeadlineExceeded:
+		// We hit an internal timeout, not a context timeout.
+		ad.err = ErrDialTimeout
+	}
 	close(ad.waitch)
 	ad.cancel()
 }

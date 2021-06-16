@@ -1,0 +1,24 @@
+{
+  "Rendezvous": false,
+  "NoDiscovery": true,
+  "ClusterConfig": {
+    "Enabled": true,
+    "Fleet": "wakuv2.prod",
+    "BootNodes": [],
+    "TrustedMailServers": [],
+    "PushNotificationsServers": [],
+    "StaticNodes": [],
+    "RendezvousNodes": [],
+    "WakuNodes": [
+      "/ip4/8.210.222.231/tcp/30303/p2p/16Uiu2HAmL5okWopX7NqZWBUKVqW8iUxCEmd5GMHLVPwCgzYzQv3e",
+      "/ip4/188.166.135.145/tcp/30303/p2p/16Uiu2HAmL5okWopX7NqZWBUKVqW8iUxCEmd5GMHLVPwCgzYzQv3e",
+      "/ip4/34.121.100.108/tcp/30303/p2p/16Uiu2HAmVkKntsECaYfefR1V2yCR79CegLATuTPE6B9TxgxBiiiA"
+    ],
+    "WakuStoreNodes": [
+      "/ip4/134.209.113.86/tcp/9000/p2p/16Uiu2HAmVVi6Q4j7MAKVibquW8aA27UNrA4Q8Wkz9EetGViu8ZF1"
+    ]
+  },
+  "WakuV2Config": {
+		"Enabled": true
+	}
+}

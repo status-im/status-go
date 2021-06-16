@@ -8,8 +8,6 @@ import (
 	"math/rand"
 	"net"
 	"time"
-
-	"github.com/jackpal/gateway"
 )
 
 var ErrNoExternalAddress = errors.New("no external address")
@@ -70,6 +68,9 @@ func DiscoverNATs(ctx context.Context) <-chan NAT {
 				if !ok {
 					natpmp = nil
 				}
+			case <-ctx.Done():
+				// timeout.
+				return
 			}
 			if ok {
 				select {
@@ -98,7 +99,7 @@ func DiscoverGateway() (NAT, error) {
 	case 1:
 		return nats[0], nil
 	}
-	gw, _ := gateway.DiscoverGateway()
+	gw, _ := getDefaultGateway()
 	bestNAT := nats[0]
 	natGw, _ := bestNAT.GetDeviceAddress()
 	bestNATIsGw := gw != nil && natGw.Equal(gw)
