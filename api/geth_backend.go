@@ -521,7 +521,7 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	// Start WakuV2 if WakuV2 is not enabled
+	// Start WakuV1 if WakuV2 is not enabled
 	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
 
 	// NodeConfig.Version should be taken from params.Version

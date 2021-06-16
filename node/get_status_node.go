@@ -586,7 +586,7 @@ func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
 	return
 }
 
-// WakuService exposes reference to Whisper service running on top of the node
+// WakuV2Service exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WakuV2Service() (w *wakuv2.Waku, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -622,7 +622,7 @@ func (n *StatusNode) ConnectionChanged(state connection.State) error {
 	return nil
 }
 
-// WakuExtService exposes reference to waku v2 extension service running on top of the node
+// WakuV2ExtService exposes reference to waku v2 extension service running on top of the node
 func (n *StatusNode) WakuV2ExtService() (s *wakuv2ext.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
