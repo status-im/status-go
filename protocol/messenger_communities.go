@@ -849,7 +849,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return nil
 	}
 
-	sigPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
+	// Don't use the public key of the private key uncompress the community id
+	orgPubKey, err := crypto.DecompressPubkey(syncCommunity.Id)
 	if err != nil {
 		return err
 	}
@@ -860,10 +861,44 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	err = m.handleCommunityDescription(messageState, &sigPrivKey.PublicKey, cd, syncCommunity.Description)
+	err = m.handleCommunityDescription(messageState, orgPubKey, cd, syncCommunity.Description)
 	if err != nil {
 		return err
 	}
+
+	// join or leave the community
+	var mr *MessengerResponse
+	if syncCommunity.Joined {
+		mr, err = m.JoinCommunity(syncCommunity.Id)
+		if err != nil {
+			return err
+		}
+	} else {
+		mr, err = m.LeaveCommunity(syncCommunity.Id)
+		if err != nil {
+			return err
+		}
+	}
+	err = messageState.Response.Merge(mr)
+	if err != nil {
+		return err
+	}
+
+	// update the clock value
+	err = m.communitiesManager.SetSyncClock(syncCommunity.Id, syncCommunity.Clock)
+	if err != nil {
+		return err
+	}
+
+	// associate private key with community if set
+	if syncCommunity.PrivateKey == nil {
+		return nil
+	}
+	orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
+	if err != nil {
+		return err
+	}
+	err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
 
 	return nil
 }

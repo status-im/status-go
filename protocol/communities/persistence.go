@@ -35,7 +35,7 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
-	err := qr.Scan()
+	err := qr.Scan() // TODO this will throw an error if a row matches but has no scan params
 
 	switch err {
 	case sql.ErrNoRows:
@@ -262,4 +262,14 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 	}
 
 	return request, nil
+}
+
+func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET synced_at = ? WHERE community_id = ? AND synced_at < ?`, clock, id, clock)
+	return err
+}
+
+func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET private_key = ? WHERE community_id = ?`, crypto.FromECDSA(privKey), id)
+	return err
 }
