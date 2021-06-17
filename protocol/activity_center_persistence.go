@@ -56,7 +56,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message) VALUES (?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage)
+	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, author) VALUES (?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, notification.Author)
 	return err
 }
 
@@ -68,6 +68,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		var lastMessageBytes []byte
 		var messageBytes []byte
 		var name sql.NullString
+		var author sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
 			&notification.ID,
@@ -80,6 +81,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&messageBytes,
 			&lastMessageBytes,
 			&name,
+			&author,
 			&latestCursor)
 		if err != nil {
 			return "", nil, err
@@ -91,6 +93,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		if name.Valid {
 			notification.Name = name.String
+		}
+
+		if author.Valid {
+			notification.Author = name.String
 		}
 
 		// Restore last message
@@ -149,6 +155,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.message,
   c.last_message,
   c.name,
+  a.author,
   substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
   FROM activity_center_notifications a
   LEFT JOIN chats c

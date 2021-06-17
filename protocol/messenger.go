@@ -2444,6 +2444,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			Type:      notificationType,
 			Timestamp: message.WhisperTimestamp,
 			ChatID:    chat.ID,
+			Author:    message.From,
 		}
 
 		err := m.persistence.SaveActivityCenterNotification(notification)

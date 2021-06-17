@@ -192,6 +192,7 @@ func (m *MessageHandler) createMessageNotification(chat *Chat, messageState *Rec
 		Name:        chat.Name,
 		LastMessage: chat.LastMessage,
 		Type:        notificationType,
+		Author:      messageState.CurrentMessageState.Contact.ID,
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
 	}
