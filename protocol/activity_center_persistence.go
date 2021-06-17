@@ -96,7 +96,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		}
 
 		if author.Valid {
-			notification.Author = name.String
+			notification.Author = author.String
 		}
 
 		// Restore last message
