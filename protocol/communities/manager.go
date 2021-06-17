@@ -859,3 +859,11 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	return m.persistence.ShouldHandleSyncCommunity(community)
 }
+
+func (m *Manager) SetSyncClock(id []byte, clock uint64) error {
+	return m.persistence.SetSyncClock(id, clock)
+}
+
+func (m *Manager) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
+	return m.persistence.SetPrivateKey(id, privKey)
+}
