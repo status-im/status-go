@@ -73,6 +73,8 @@ var remoteMethods = [...]string{
 	"eth_mining",
 	"eth_hashrate",
 	"eth_gasPrice",
+	"eth_maxPriorityFeePerGas",
+	"eth_feeHistory",
 	//"eth_accounts", // due to sub-accounts handling
 	"eth_blockNumber",
 	"eth_getBalance",
