@@ -61,4 +61,11 @@ func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 	should, err = s.db.ShouldHandleSyncCommunity(sc)
 	s.NoError(err, "SaveSyncCommunity")
 	s.False(should)
+
+	// check again to see is the community should be synced
+	sc.Clock++
+	sc.Clock++
+	should, err = s.db.ShouldHandleSyncCommunity(sc)
+	s.NoError(err, "SaveSyncCommunity")
+	s.True(should)
 }

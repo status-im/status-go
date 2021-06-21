@@ -34,8 +34,19 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 }
 
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+	// TODO see if there is a way to make this more elegant
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
-	err := qr.Scan() // TODO this will throw an error if a row matches but has no scan params
+
+	rcr := rawCommunityRow{}
+	syncedAt := sql.NullTime{}
+	err := qr.Scan(
+		&rcr.ID,
+		&rcr.PrivateKey,
+		&rcr.Description,
+		&rcr.Joined,
+		&rcr.Verified,
+		&syncedAt,
+	)
 
 	switch err {
 	case sql.ErrNoRows:
