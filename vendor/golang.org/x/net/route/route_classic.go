@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build darwin || dragonfly || freebsd || netbsd
 // +build darwin dragonfly freebsd netbsd
 
 package route
@@ -18,7 +17,7 @@ func (m *RouteMessage) marshal() ([]byte, error) {
 		return nil, errUnsupportedMessage
 	}
 	l := w.bodyOff + addrsSpace(m.Addrs)
-	if runtime.GOOS == "darwin" || runtime.GOOS == "ios" {
+	if runtime.GOOS == "darwin" {
 		// Fix stray pointer writes on macOS.
 		// See golang.org/issue/22456.
 		l += 1024
