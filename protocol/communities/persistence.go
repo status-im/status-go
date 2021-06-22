@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -276,11 +275,11 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 }
 
 func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
-	_, err := p.db.Exec(`UPDATE communities_communities SET synced_at = ? WHERE community_id = ? AND synced_at < ?`, clock, id, clock)
+	_, err := p.db.Exec(`UPDATE communities_communities SET synced_at = ? WHERE id = ? AND synced_at < ?`, clock, id, clock)
 	return err
 }
 
 func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
-	_, err := p.db.Exec(`UPDATE communities_communities SET private_key = ? WHERE community_id = ?`, crypto.FromECDSA(privKey), id)
+	_, err := p.db.Exec(`UPDATE communities_communities SET private_key = ? WHERE id = ?`, crypto.FromECDSA(privKey), id)
 	return err
 }

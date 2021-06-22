@@ -2,6 +2,7 @@ package communities
 
 import (
 	"database/sql"
+
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -90,4 +91,24 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 		rawCommRow.SyncedAt,
 	)
 	return err
+}
+
+func (p *Persistence) getRawCommunityRow(id []byte) (rawCommunityRow, error) {
+	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ?`, id)
+
+	rcr := rawCommunityRow{}
+	syncedAt := sql.NullTime{}
+	err := qr.Scan(
+		&rcr.ID,
+		&rcr.PrivateKey,
+		&rcr.Description,
+		&rcr.Joined,
+		&rcr.Verified,
+		&syncedAt,
+	)
+	if syncedAt.Valid {
+		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
+	}
+
+	return rcr, err
 }
