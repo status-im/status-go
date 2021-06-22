@@ -81,7 +81,7 @@ type Messenger struct {
 	persistence                *sqlitePersistence
 	transport                  *transport.Transport
 	encryptor                  *encryption.Protocol
-	processor                  *common.MessageProcessor
+	sender                     *common.MessageSender
 	handler                    *MessageHandler
 	ensVerifier                *ens.Verifier
 	pushNotificationClient     *pushnotificationclient.Client
@@ -249,7 +249,7 @@ func NewMessenger(
 		logger,
 	)
 
-	processor, err := common.NewMessageProcessor(
+	sender, err := common.NewMessageSender(
 		identity,
 		database,
 		encryptionProtocol,
@@ -258,7 +258,7 @@ func NewMessenger(
 		c.featureFlags,
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create messageProcessor")
+		return nil, errors.Wrap(err, "failed to create messageSender")
 	}
 
 	// Initialize push notification server
@@ -266,7 +266,7 @@ func NewMessenger(
 	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
 		c.pushNotificationServerConfig.Identity = identity
 		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(database)
-		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
+		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, sender)
 	}
 
 	// Initialize push notification client
@@ -282,7 +282,7 @@ func NewMessenger(
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
-	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor, sqlitePersistence)
+	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, sender, sqlitePersistence)
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
@@ -300,7 +300,7 @@ func NewMessenger(
 		persistence:                sqlitePersistence,
 		transport:                  transp,
 		encryptor:                  encryptionProtocol,
-		processor:                  processor,
+		sender:                     sender,
 		handler:                    handler,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
@@ -328,7 +328,7 @@ func NewMessenger(
 			encryptionProtocol.Stop,
 			transp.ResetFilters,
 			transp.Stop,
-			func() error { processor.Stop(); return nil },
+			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
@@ -444,7 +444,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	// set shared secret handles
-	m.processor.SetHandleSharedSecrets(m.handleSharedSecrets)
+	m.sender.SetHandleSharedSecrets(m.handleSharedSecrets)
 
 	subscriptions, err := m.encryptor.Start(m.identity)
 	if err != nil {
@@ -572,7 +572,7 @@ func (m *Messenger) publishContactCode() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = m.processor.SendPublic(ctx, contactCodeTopic, rawMessage)
+	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
@@ -643,7 +643,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = m.processor.SendPublic(ctx, chat.ID, rawMessage)
+	_, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -1200,7 +1200,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1279,7 +1279,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1364,7 +1364,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1425,7 +1425,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1500,7 +1500,7 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 		return nil, err
 	}
 
-	id, err := m.processor.SendPrivate(ctx, adminpk, &spec)
+	id, err := m.sender.SendPrivate(ctx, adminpk, &spec)
 	if err != nil {
 		return nil, err
 	}
@@ -1568,7 +1568,7 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 		return nil, err
 	}
 
-	id, err := m.processor.SendPrivate(ctx, userpk, &spec)
+	id, err := m.sender.SendPrivate(ctx, userpk, &spec)
 	if err != nil {
 		return nil, err
 	}
@@ -1626,7 +1626,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1690,7 +1690,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 		return nil, err
 	}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1753,7 +1753,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 			return nil, err
 		}
 
-		encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+		encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1837,7 +1837,7 @@ func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMess
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {
-		_, err := m.processor.SendPrivate(ctx, &m.identity.PublicKey, &spec)
+		_, err := m.sender.SendPrivate(ctx, &m.identity.PublicKey, &spec)
 		if err != nil {
 			return err
 		}
@@ -1849,7 +1849,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	var err error
 	var id []byte
 
-	id, err = m.processor.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
+	id, err = m.sender.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
 
 	if err != nil {
 		return nil, err
@@ -1884,7 +1884,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 		//message for sending to paired devices later
 		specCopyForPairedDevices := spec
 		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) {
-			id, err = m.processor.SendPrivate(ctx, publicKey, &spec)
+			id, err = m.sender.SendPrivate(ctx, publicKey, &spec)
 
 			if err != nil {
 				return spec, err
@@ -1899,7 +1899,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 
 	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
+		id, err = m.sender.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
 			return spec, err
 		}
@@ -1918,7 +1918,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
-		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
+		id, err = m.sender.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
 			return spec, err
 		}
@@ -1967,7 +1967,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
 		}
 
-		id, err = m.processor.SendGroup(ctx, spec.Recipients, spec)
+		id, err = m.sender.SendGroup(ctx, spec.Recipients, spec)
 		if err != nil {
 			return spec, err
 		}
@@ -2479,7 +2479,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		for _, shhMessage := range messages {
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
-			statusMessages, acks, err := m.processor.HandleMessages(shhMessage, true)
+			statusMessages, acks, err := m.sender.HandleMessages(shhMessage, true)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -4083,7 +4083,7 @@ func (m *Messenger) StartPushNotificationsServer() error {
 			Logger:   m.logger,
 			Identity: m.identity,
 		}
-		m.pushNotificationServer = pushnotificationserver.New(config, pushNotificationServerPersistence, m.processor)
+		m.pushNotificationServer = pushnotificationserver.New(config, pushNotificationServerPersistence, m.sender)
 	}
 
 	return m.pushNotificationServer.Start()
@@ -4280,7 +4280,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 				return nil, err
 			}
 
-			encodedMessage, err = m.processor.EncodeAbridgedMembershipUpdate(group, message)
+			encodedMessage, err = m.sender.EncodeAbridgedMembershipUpdate(group, message)
 			if err != nil {
 				return nil, err
 			}

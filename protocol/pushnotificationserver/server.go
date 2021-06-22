@@ -34,19 +34,19 @@ type Config struct {
 }
 
 type Server struct {
-	persistence      Persistence
-	config           *Config
-	messageProcessor *common.MessageProcessor
+	persistence   Persistence
+	config        *Config
+	messageSender *common.MessageSender
 	// SentRequests keeps track of the requests sent to gorush, for testing only
 	SentRequests int64
 }
 
-func New(config *Config, persistence Persistence, messageProcessor *common.MessageProcessor) *Server {
+func New(config *Config, persistence Persistence, messageSender *common.MessageSender) *Server {
 	if len(config.GorushURL) == 0 {
 		config.GorushURL = defaultGorushURL
 
 	}
-	return &Server{persistence: persistence, config: config, messageProcessor: messageProcessor}
+	return &Server{persistence: persistence, config: config, messageSender: messageSender}
 }
 
 func (s *Server) Start() error {
@@ -112,7 +112,7 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -135,7 +135,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -178,7 +178,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -459,11 +459,11 @@ func (s *Server) sendPushNotification(requestAndRegistrations []*RequestAndRegis
 
 // listenToPublicKeyQueryTopic listen to a topic derived from the hashed public key
 func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
-	if s.messageProcessor == nil {
+	if s.messageSender == nil {
 		return nil
 	}
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	_, err := s.messageProcessor.JoinPublic(encodedPublicKey)
+	_, err := s.messageSender.JoinPublic(encodedPublicKey)
 	return err
 }
 

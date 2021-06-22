@@ -26,20 +26,20 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-func TestMessageProcessorSuite(t *testing.T) {
-	suite.Run(t, new(MessageProcessorSuite))
+func TestMessageSenderSuite(t *testing.T) {
+	suite.Run(t, new(MessageSenderSuite))
 }
 
-type MessageProcessorSuite struct {
+type MessageSenderSuite struct {
 	suite.Suite
 
-	processor   *MessageProcessor
+	sender      *MessageSender
 	tmpDir      string
 	testMessage protobuf.ChatMessage
 	logger      *zap.Logger
 }
 
-func (s *MessageProcessorSuite) SetupTest() {
+func (s *MessageSenderSuite) SetupTest() {
 	s.testMessage = protobuf.ChatMessage{
 		Text:        "abc123",
 		ChatId:      "testing-adamb",
@@ -60,7 +60,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := sqlite.Open(filepath.Join(s.tmpDir, "processor-test.sql"), "some-key")
+	database, err := sqlite.Open(filepath.Join(s.tmpDir, "sender-test.sql"), "some-key")
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
@@ -85,7 +85,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 	)
 	s.Require().NoError(err)
 
-	s.processor, err = NewMessageProcessor(
+	s.sender, err = NewMessageSender(
 		identity,
 		database,
 		encryptionProtocol,
@@ -96,12 +96,12 @@ func (s *MessageProcessorSuite) SetupTest() {
 	s.Require().NoError(err)
 }
 
-func (s *MessageProcessorSuite) TearDownTest() {
+func (s *MessageSenderSuite) TearDownTest() {
 	os.Remove(s.tmpDir)
 	_ = s.logger.Sync()
 }
 
-func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
+func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	relayerKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -118,7 +118,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
-	decodedMessages, _, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.sender.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	s.Require().Equal(1, len(decodedMessages))
@@ -130,7 +130,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
-func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
+func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	relayerKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -154,7 +154,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
-	decodedMessages, _, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.sender.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer, while the wrapped one will be attributed to the author
@@ -167,14 +167,14 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
-func (s *MessageProcessorSuite) CalculatePoWTest() {
+func (s *MessageSenderSuite) CalculatePoWTest() {
 	largeSizePayload := make([]byte, largeSizeInBytes)
 	s.Require().Equal(whisperLargeSizePoW, calculatePoW(largeSizePayload))
 	normalSizePayload := make([]byte, largeSizeInBytes-1)
 	s.Require().Equal(whisperDefaultPoW, calculatePoW(normalSizePayload))
 
 }
-func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
+func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	relayerKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -206,7 +206,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 
 	messageSpec, err := senderEncryptionProtocol.BuildDirectMessage(
 		relayerKey,
-		&s.processor.identity.PublicKey,
+		&s.sender.identity.PublicKey,
 		marshalledDataSyncMessage,
 	)
 	s.Require().NoError(err)
@@ -218,7 +218,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	decodedMessages, _, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.sender.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer,

@@ -34,7 +34,7 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 	}
-	_, err = m.processor.SendPublic(context.Background(), org.IDString(), rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	return err
 }
 
@@ -57,7 +57,7 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION,
 	}
-	_, err = m.processor.SendPrivate(context.Background(), pk, &rawMessage)
+	_, err = m.sender.SendPrivate(context.Background(), pk, &rawMessage)
 	return err
 }
 
@@ -210,7 +210,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 	}
-	_, err = m.processor.SendCommunityMessage(context.Background(), community.PublicKey(), rawMessage)
+	_, err = m.sender.SendCommunityMessage(context.Background(), community.PublicKey(), rawMessage)
 	if err != nil {
 		return nil, err
 	}
