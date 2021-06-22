@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build darwin || dragonfly || freebsd || netbsd || openbsd
 // +build darwin dragonfly freebsd netbsd openbsd
 
 // Package route provides basic functions for the manipulation of
@@ -89,7 +88,7 @@ func (m *RouteMessage) Marshal() ([]byte, error) {
 	return m.marshal()
 }
 
-// A RIBType represents a type of routing information base.
+// A RIBType reprensents a type of routing information base.
 type RIBType int
 
 const (
