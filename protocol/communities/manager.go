@@ -3,10 +3,12 @@ package communities
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/google/uuid"
@@ -507,6 +509,10 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			return nil, err
 		}
 	}
+
+	jc, _ := json.MarshalIndent(community, "", "  ")
+	spew.Dump("community from description")
+	fmt.Println(string(jc))
 
 	changes, err := community.UpdateCommunityDescription(signer, description, payload)
 	if err != nil {

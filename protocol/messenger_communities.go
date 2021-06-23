@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -132,8 +133,7 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) JoinCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	// TODO resolve this undeclared `community` var
-	err := m.syncCommunity(context.Background(), community)
+	err := m.syncCommunityFromID(context.Background(), communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -352,8 +352,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	// TODO resolve this undeclared `community` var
-	err := m.syncCommunity(context.Background(), community)
+	err := m.syncCommunityFromID(context.Background(), communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -823,6 +822,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	if err != nil {
 		return err
 	}
+
+	spew.Dump(syncCommunity.Description, cd)
 
 	err = m.handleCommunityDescription(messageState, orgPubKey, cd, syncCommunity.Description)
 	if err != nil {
