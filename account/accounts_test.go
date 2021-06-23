@@ -1,6 +1,7 @@
 package account
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -10,12 +11,16 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+const testPassword = "test-password"
+const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
 	accManager := NewGethManager()
@@ -142,8 +147,6 @@ func (s *ManagerTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))
 	s.keydir = keyStoreDir
-
-	testPassword := "test-password"
 
 	// Initial test - create test account
 	_, accountInfo, mnemonic, err := s.accManager.CreateAccount(testPassword)
@@ -347,4 +350,73 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 
 	files, _ = ioutil.ReadDir(newKeyDir)
 	s.Equal(1, len(files))
+}
+
+func (s *ManagerTestSuite) TestReEncryptKey() {
+	var firstKeyPath string
+	files, _ := ioutil.ReadDir(s.keydir)
+
+	// thiere is only one file in this dir,
+	// is there a better way to reference it?
+	for _, f := range files {
+		firstKeyPath = filepath.Join(s.keydir, f.Name())
+	}
+
+	rawKey, _ := ioutil.ReadFile(firstKeyPath)
+	reEncryptedKey, _ := s.accManager.ReEncryptKey(rawKey, testPassword, newTestPassword)
+
+	type Key struct {
+		Address string `json:"address"`
+	}
+
+	var unmarshaledRaw, unmarshaledReEncrypted Key
+	_ = json.Unmarshal(rawKey, &unmarshaledRaw)
+	_ = json.Unmarshal(reEncryptedKey, &unmarshaledReEncrypted)
+
+	oldCrypto, _ := keystore.RawKeyToCryptoJSON(rawKey)
+	newCrypto, _ := keystore.RawKeyToCryptoJSON(reEncryptedKey)
+
+	// Test address is same post re-encryption
+	s.Equal(unmarshaledRaw.Address, unmarshaledReEncrypted.Address)
+
+	// Test cipher changes after re-encryption
+	s.NotEqual(oldCrypto.CipherText, newCrypto.CipherText)
+
+	// Test re-encrypted key cannot be decrypted using old testPasswordword
+	_, decryptOldError := keystore.DecryptKey(reEncryptedKey, testPassword)
+	s.Require().Error(decryptOldError)
+
+	// Test re-encrypted key can be decrypted using new testPassword
+	_, decryptNewError := keystore.DecryptKey(reEncryptedKey, newTestPassword)
+	s.Require().NoError(decryptNewError)
+}
+
+func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
+
+	err := s.accManager.ReEncryptKeyStoreDir(s.keydir, testPassword, newTestPassword)
+	s.Require().NoError(err)
+
+	err = filepath.Walk(s.keydir, func(path string, fileInfo os.FileInfo, err error) error {
+		if fileInfo.IsDir() {
+			return nil
+		}
+
+		// walk should not throw callback errors
+		s.Require().NoError(err)
+
+		rawKeyFile, err := ioutil.ReadFile(path)
+		s.Require().NoError(err)
+
+		// should not decrypt with old password
+		_, decryptError := keystore.DecryptKey(rawKeyFile, testPassword)
+		s.Require().Error(decryptError)
+
+		// should decrypt with new password
+		_, decryptError = keystore.DecryptKey(rawKeyFile, newTestPassword)
+		s.Require().NoError(decryptError)
+
+		return nil
+	})
+
+	s.Require().NoError(err)
 }

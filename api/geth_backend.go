@@ -459,6 +459,25 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 	return nil
 }
 
+func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
+	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID))
+	config := b.StatusNode().Config()
+	keyDir := config.KeyStoreDir
+
+	err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
+	if err != nil {
+		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
+	}
+
+	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	if err != nil {
+		// couldn't change db password so undo keystore changes to mainitain consistency
+		_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		return err
+	}
+	return nil
+}
+
 func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
