@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -18,7 +17,6 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("IDDD", request.ID.String())
 	message, err := m.persistence.MessageByID(request.ID.String())
 	if err != nil {
 		return nil, err
@@ -68,16 +66,38 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
+		chat.LastMessage = message
+		err := m.saveChat(chat)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddMessage(message)
+	response.AddChat(chat)
 
 	return response, nil
 }
 
 func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message *common.Message) error {
-	// TODO: should save an edit if it's the first time it's being edited
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
+
+	// Save original message as edit so we can retrieve history
+	if message.EditedAt == 0 {
+		originalEdit := EditMessage{}
+		originalEdit.Clock = message.Clock
+		originalEdit.LocalChatID = message.LocalChatID
+		originalEdit.MessageId = message.ID
+		originalEdit.Text = message.Text
+		originalEdit.From = message.From
+		err := m.persistence.SaveEdit(originalEdit)
+		if err != nil {
+			return err
+		}
+	}
 
 	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
