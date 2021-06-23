@@ -528,6 +528,13 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 		return err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		chat.LastMessage = originalMessage
+		err := m.saveChat(chat)
+		if err != nil {
+			return err
+		}
+	}
 	response.AddMessage(originalMessage)
 	response.AddChat(chat)
 

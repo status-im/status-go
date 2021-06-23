@@ -104,6 +104,9 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	s.Require().Len(sendResponse.Messages(), 1)
 	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
 	s.Require().Equal(sendResponse.Messages()[0].Text, editedText)
+	s.Require().Len(sendResponse.Chats(), 1)
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().NotEmpty(sendResponse.Chats()[0].LastMessage.EditedAt)
 
 	response, err = WaitOnMessengerResponse(
 		s.m,
@@ -195,10 +198,12 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	}
 
 	err = s.m.HandleEditMessage(response, editMessage)
-	// It should error as the user can't edit this message
 	s.Require().NoError(err)
 	// It save the edit
 	s.Require().Len(response.Messages(), 1)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().NotNil(response.Chats()[0].LastMessage)
+	s.Require().NotEmpty(response.Chats()[0].LastMessage.EditedAt)
 
 	editedMessage = response.Messages()[0]
 
