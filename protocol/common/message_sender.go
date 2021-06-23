@@ -43,7 +43,7 @@ type SentMessage struct {
 	MessageIDs [][]byte
 }
 
-type MessageProcessor struct {
+type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
 	protocol    *encryption.Protocol
@@ -67,14 +67,14 @@ type MessageProcessor struct {
 	handleSharedSecrets func([]*sharedsecret.Secret) error
 }
 
-func NewMessageProcessor(
+func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
 	enc *encryption.Protocol,
 	transport *transport.Transport,
 	logger *zap.Logger,
 	features FeatureFlags,
-) (*MessageProcessor, error) {
+) (*MessageSender, error) {
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
 		database,
@@ -89,7 +89,7 @@ func NewMessageProcessor(
 	}
 	ds := datasync.New(dataSyncNode, dataSyncTransport, features.Datasync, logger)
 
-	p := &MessageProcessor{
+	p := &MessageSender{
 		identity:      identity,
 		datasync:      ds,
 		protocol:      enc,
@@ -116,25 +116,25 @@ func NewMessageProcessor(
 	return p, nil
 }
 
-func (p *MessageProcessor) Stop() {
-	for _, c := range p.sentMessagesSubscriptions {
+func (s *MessageSender) Stop() {
+	for _, c := range s.sentMessagesSubscriptions {
 		close(c)
 	}
-	p.sentMessagesSubscriptions = nil
-	p.datasync.Stop() // idempotent op
+	s.sentMessagesSubscriptions = nil
+	s.datasync.Stop() // idempotent op
 }
 
-func (p *MessageProcessor) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
-	p.handleSharedSecrets = handler
+func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
+	s.handleSharedSecrets = handler
 }
 
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
-func (p *MessageProcessor) SendPrivate(
+func (s *MessageSender) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug(
+	s.logger.Debug(
 		"sending a private message",
 		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
@@ -148,47 +148,47 @@ func (p *MessageProcessor) SendPrivate(
 
 	// Set sender identity if not specified
 	if rawMessage.Sender == nil {
-		rawMessage.Sender = p.identity
+		rawMessage.Sender = s.identity
 	}
 
-	return p.sendPrivate(ctx, recipient, rawMessage)
+	return s.sendPrivate(ctx, recipient, rawMessage)
 }
 
 // SendCommunityMessage takes encoded data, encrypts it and sends through the wire
 // using the community topic and their key
-func (p *MessageProcessor) SendCommunityMessage(
+func (s *MessageSender) SendCommunityMessage(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug(
+	s.logger.Debug(
 		"sending a community message",
 		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
 	)
-	rawMessage.Sender = p.identity
+	rawMessage.Sender = s.identity
 
-	return p.sendCommunity(ctx, recipient, &rawMessage)
+	return s.sendCommunity(ctx, recipient, &rawMessage)
 }
 
 // SendGroup takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
-func (p *MessageProcessor) SendGroup(
+func (s *MessageSender) SendGroup(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug(
+	s.logger.Debug(
 		"sending a private group message",
 		zap.String("site", "SendGroup"),
 	)
 	// Set sender if not specified
 	if rawMessage.Sender == nil {
-		rawMessage.Sender = p.identity
+		rawMessage.Sender = s.identity
 	}
 
 	// Calculate messageID first and set on raw message
-	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
+	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -197,7 +197,7 @@ func (p *MessageProcessor) SendGroup(
 
 	// Send to each recipients
 	for _, recipient := range recipients {
-		_, err = p.sendPrivate(ctx, recipient, &rawMessage)
+		_, err = s.sendPrivate(ctx, recipient, &rawMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message")
 		}
@@ -206,14 +206,14 @@ func (p *MessageProcessor) SendGroup(
 }
 
 // sendCommunity sends data to the recipient identifying with a given public key.
-func (p *MessageProcessor) sendCommunity(
+func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
-	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -223,29 +223,29 @@ func (p *MessageProcessor) sendCommunity(
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
-	p.notifyOnScheduledMessage(rawMessage)
+	s.notifyOnScheduledMessage(rawMessage)
 
 	messageIDs := [][]byte{messageID}
-	hash, newMessage, err := p.sendCommunityRawMessage(ctx, recipient, wrappedMessage, messageIDs)
+	hash, newMessage, err := s.sendCommunityRawMessage(ctx, recipient, wrappedMessage, messageIDs)
 	if err != nil {
-		p.logger.Error("failed to send a community message", zap.Error(err))
+		s.logger.Error("failed to send a community message", zap.Error(err))
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	p.transport.Track(messageIDs, hash, newMessage)
+	s.transport.Track(messageIDs, hash, newMessage)
 
 	return messageID, nil
 }
 
 // sendPrivate sends data to the recipient identifying with a given public key.
-func (p *MessageProcessor) sendPrivate(
+func (s *MessageSender) sendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
-	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -255,24 +255,24 @@ func (p *MessageProcessor) sendPrivate(
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
-	p.notifyOnScheduledMessage(rawMessage)
+	s.notifyOnScheduledMessage(rawMessage)
 
-	if p.featureFlags.Datasync && rawMessage.ResendAutomatically {
+	if s.featureFlags.Datasync && rawMessage.ResendAutomatically {
 		// No need to call transport tracking.
 		// It is done in a data sync dispatch step.
-		datasyncID, err := p.addToDataSync(recipient, wrappedMessage)
+		datasyncID, err := s.addToDataSync(recipient, wrappedMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
 		// We don't need to receive confirmations from our own devices
-		if !IsPubKeyEqual(recipient, &p.identity.PublicKey) {
+		if !IsPubKeyEqual(recipient, &s.identity.PublicKey) {
 			confirmation := &RawMessageConfirmation{
 				DataSyncID: datasyncID,
 				MessageID:  messageID,
 				PublicKey:  crypto.CompressPubkey(recipient),
 			}
 
-			err = p.persistence.InsertPendingConfirmation(confirmation)
+			err = s.persistence.InsertPendingConfirmation(confirmation)
 			if err != nil {
 				return nil, err
 			}
@@ -280,24 +280,24 @@ func (p *MessageProcessor) sendPrivate(
 	} else if rawMessage.SkipEncryption {
 		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
-		hash, newMessage, err := p.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
+		hash, newMessage, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
 		if err != nil {
-			p.logger.Error("failed to send a private message", zap.Error(err))
+			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		p.transport.Track(messageIDs, hash, newMessage)
+		s.transport.Track(messageIDs, hash, newMessage)
 
 	} else {
-		messageSpec, err := p.protocol.BuildDirectMessage(rawMessage.Sender, recipient, wrappedMessage)
+		messageSpec, err := s.protocol.BuildDirectMessage(rawMessage.Sender, recipient, wrappedMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to encrypt message")
 		}
 
 		// The shared secret needs to be handle before we send a message
 		// otherwise the topic might not be set up before we receive a message
-		if p.handleSharedSecrets != nil {
-			err := p.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+		if s.handleSharedSecrets != nil {
+			err := s.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
 			if err != nil {
 				return nil, err
 			}
@@ -305,50 +305,50 @@ func (p *MessageProcessor) sendPrivate(
 		}
 
 		messageIDs := [][]byte{messageID}
-		hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
+		hash, newMessage, err := s.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
 		if err != nil {
-			p.logger.Error("failed to send a private message", zap.Error(err))
+			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		p.transport.Track(messageIDs, hash, newMessage)
+		s.transport.Track(messageIDs, hash, newMessage)
 	}
 
 	return messageID, nil
 }
 
 // sendPairInstallation sends data to the recipients, using DH
-func (p *MessageProcessor) SendPairInstallation(
+func (s *MessageSender) SendPairInstallation(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
-	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
+	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	messageSpec, err := p.protocol.BuildDHMessage(p.identity, recipient, wrappedMessage)
+	messageSpec, err := s.protocol.BuildDHMessage(s.identity, recipient, wrappedMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encrypt message")
 	}
 
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	messageID := v1protocol.MessageID(&s.identity.PublicKey, wrappedMessage)
 	messageIDs := [][]byte{messageID}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
+	hash, newMessage, err := s.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	p.transport.Track(messageIDs, hash, newMessage)
+	s.transport.Track(messageIDs, hash, newMessage)
 
 	return messageID, nil
 }
 
-func (p *MessageProcessor) encodeMembershipUpdate(
+func (s *MessageSender) encodeMembershipUpdate(
 	message v1protocol.MembershipUpdateMessage,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
@@ -374,7 +374,7 @@ func (p *MessageProcessor) encodeMembershipUpdate(
 
 // EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
 // All the events in a group are encoded and added to the payload
-func (p *MessageProcessor) EncodeMembershipUpdate(
+func (s *MessageSender) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
@@ -383,43 +383,43 @@ func (p *MessageProcessor) EncodeMembershipUpdate(
 		Events: group.Events(),
 	}
 
-	return p.encodeMembershipUpdate(message, chatEntity)
+	return s.encodeMembershipUpdate(message, chatEntity)
 }
 
 // EncodeAbridgedMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
 // Only the events relevant to the sender are encoded
-func (p *MessageProcessor) EncodeAbridgedMembershipUpdate(
+func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 	group *v1protocol.Group,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
 	message := v1protocol.MembershipUpdateMessage{
 		ChatID: group.ChatID(),
-		Events: group.AbridgedEvents(&p.identity.PublicKey),
+		Events: group.AbridgedEvents(&s.identity.PublicKey),
 	}
-	return p.encodeMembershipUpdate(message, chatEntity)
+	return s.encodeMembershipUpdate(message, chatEntity)
 }
 
 // SendPublic takes encoded data, encrypts it and sends through the wire.
-func (p *MessageProcessor) SendPublic(
+func (s *MessageSender) SendPublic(
 	ctx context.Context,
 	chatName string,
 	rawMessage RawMessage,
 ) ([]byte, error) {
 	// Set sender
 	if rawMessage.Sender == nil {
-		rawMessage.Sender = p.identity
+		rawMessage.Sender = s.identity
 	}
 
-	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
+	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
 	var newMessage *types.NewMessage
 
-	messageSpec, err := p.protocol.BuildPublicMessage(p.identity, wrappedMessage)
+	messageSpec, err := s.protocol.BuildPublicMessage(s.identity, wrappedMessage)
 	if err != nil {
-		p.logger.Error("failed to send a public message", zap.Error(err))
+		s.logger.Error("failed to send a public message", zap.Error(err))
 		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
 	}
 
@@ -441,9 +441,9 @@ func (p *MessageProcessor) SendPublic(
 	rawMessage.ID = types.EncodeHex(messageID)
 
 	// notify before dispatching
-	p.notifyOnScheduledMessage(&rawMessage)
+	s.notifyOnScheduledMessage(&rawMessage)
 
-	hash, err := p.transport.SendPublic(ctx, newMessage, chatName)
+	hash, err := s.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
 		return nil, err
 	}
@@ -453,9 +453,9 @@ func (p *MessageProcessor) SendPublic(
 		MessageIDs: [][]byte{messageID},
 	}
 
-	p.notifyOnSentMessage(sentMessage)
+	s.notifyOnSentMessage(sentMessage)
 
-	p.transport.Track([][]byte{messageID}, hash, newMessage)
+	s.transport.Track([][]byte{messageID}, hash, newMessage)
 
 	return messageID, nil
 }
@@ -489,8 +489,8 @@ func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataS
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, [][]byte, error) {
-	logger := p.logger.With(zap.String("site", "handleMessages"))
+func (s *MessageSender) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, [][]byte, error) {
+	logger := s.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
 	var statusMessages []*v1protocol.StatusMessage
@@ -501,12 +501,12 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 		return nil, nil, err
 	}
 
-	err = p.handleEncryptionLayer(context.Background(), &statusMessage)
+	err = s.handleEncryptionLayer(context.Background(), &statusMessage)
 	if err != nil {
 		hlogger.Debug("failed to handle an encryption message", zap.Error(err))
 	}
 
-	statusMessages, acks, err := unwrapDatasyncMessage(&statusMessage, p.datasync)
+	statusMessages, acks, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
 	if err != nil {
 		hlogger.Debug("failed to handle datasync message", zap.Error(err))
 		//that wasn't a datasync message, so use the original payload
@@ -531,32 +531,32 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 }
 
 // fetchDecryptionKey returns the private key associated with this public key, and returns true if it's an ephemeral key
-func (p *MessageProcessor) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa.PrivateKey, bool) {
+func (s *MessageSender) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa.PrivateKey, bool) {
 	destinationID := types.EncodeHex(crypto.FromECDSAPub(destination))
 
-	p.ephemeralKeysMutex.Lock()
-	decryptionKey, ok := p.ephemeralKeys[destinationID]
-	p.ephemeralKeysMutex.Unlock()
+	s.ephemeralKeysMutex.Lock()
+	decryptionKey, ok := s.ephemeralKeys[destinationID]
+	s.ephemeralKeysMutex.Unlock()
 
 	// the key is not there, fallback on identity
 	if !ok {
-		return p.identity, false
+		return s.identity, false
 	}
 	return decryptionKey, true
 }
 
-func (p *MessageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
-	logger := p.logger.With(zap.String("site", "handleEncryptionLayer"))
+func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
+	logger := s.logger.With(zap.String("site", "handleEncryptionLayer"))
 	publicKey := message.SigPubKey()
 
 	// if it's an ephemeral key, we don't negotiate a topic
-	decryptionKey, skipNegotiation := p.fetchDecryptionKey(message.Dst)
+	decryptionKey, skipNegotiation := s.fetchDecryptionKey(message.Dst)
 
-	err := message.HandleEncryption(decryptionKey, publicKey, p.protocol, skipNegotiation)
+	err := message.HandleEncryption(decryptionKey, publicKey, s.protocol, skipNegotiation)
 
 	// if it's an ephemeral key, we don't have to handle a device not found error
 	if err == encryption.ErrDeviceNotFound && !skipNegotiation {
-		if err := p.handleErrDeviceNotFound(ctx, publicKey); err != nil {
+		if err := s.handleErrDeviceNotFound(ctx, publicKey); err != nil {
 			logger.Error("failed to handle ErrDeviceNotFound", zap.Error(err))
 		}
 	}
@@ -567,9 +567,9 @@ func (p *MessageProcessor) handleEncryptionLayer(ctx context.Context, message *v
 	return nil
 }
 
-func (p *MessageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
 	now := time.Now().Unix()
-	advertise, err := p.protocol.ShouldAdvertiseBundle(publicKey, now)
+	advertise, err := s.protocol.ShouldAdvertiseBundle(publicKey, now)
 	if err != nil {
 		return err
 	}
@@ -577,7 +577,7 @@ func (p *MessageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 		return nil
 	}
 
-	messageSpec, err := p.protocol.BuildBundleAdvertiseMessage(p.identity, publicKey)
+	messageSpec, err := s.protocol.BuildBundleAdvertiseMessage(s.identity, publicKey)
 	if err != nil {
 		return err
 	}
@@ -586,17 +586,17 @@ func (p *MessageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	defer cancel()
 	// We don't pass an array of messageIDs as no action needs to be taken
 	// when sending a bundle
-	_, _, err = p.sendMessageSpec(ctx, publicKey, messageSpec, nil)
+	_, _, err = s.sendMessageSpec(ctx, publicKey, messageSpec, nil)
 	if err != nil {
 		return err
 	}
 
-	p.protocol.ConfirmBundleAdvertisement(publicKey, now)
+	s.protocol.ConfirmBundleAdvertisement(publicKey, now)
 
 	return nil
 }
 
-func (p *MessageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
+func (s *MessageSender) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
 	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
@@ -604,19 +604,19 @@ func (p *MessageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error)
 	return wrappedMessage, nil
 }
 
-func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) ([]byte, error) {
-	groupID := datasync.ToOneToOneGroupID(&p.identity.PublicKey, publicKey)
+func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) ([]byte, error) {
+	groupID := datasync.ToOneToOneGroupID(&s.identity.PublicKey, publicKey)
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
-	exist, err := p.datasync.IsPeerInGroup(groupID, peerID)
+	exist, err := s.datasync.IsPeerInGroup(groupID, peerID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check if peer is in group")
 	}
 	if !exist {
-		if err := p.datasync.AddPeer(groupID, peerID); err != nil {
+		if err := s.datasync.AddPeer(groupID, peerID); err != nil {
 			return nil, errors.Wrap(err, "failed to add peer")
 		}
 	}
-	id, err := p.datasync.AppendMessage(groupID, message)
+	id, err := s.datasync.AppendMessage(groupID, message)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to append message to datasync")
 	}
@@ -626,41 +626,41 @@ func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []b
 
 // sendDataSync sends a message scheduled by the data sync layer.
 // Data Sync layer calls this method "dispatch" function.
-func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
+func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, marshalledDatasyncPayload []byte, payload *datasyncproto.Payload) error {
 	// Calculate the messageIDs
 	messageIDs := make([][]byte, 0, len(payload.Messages))
 	for _, payload := range payload.Messages {
-		messageIDs = append(messageIDs, v1protocol.MessageID(&p.identity.PublicKey, payload.Body))
+		messageIDs = append(messageIDs, v1protocol.MessageID(&s.identity.PublicKey, payload.Body))
 	}
 
-	messageSpec, err := p.protocol.BuildDirectMessage(p.identity, publicKey, encodedMessage)
+	messageSpec, err := s.protocol.BuildDirectMessage(s.identity, publicKey, marshalledDatasyncPayload)
 	if err != nil {
 		return errors.Wrap(err, "failed to encrypt message")
 	}
 
 	// The shared secret needs to be handle before we send a message
 	// otherwise the topic might not be set up before we receive a message
-	if p.handleSharedSecrets != nil {
-		err := p.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+	if s.handleSharedSecrets != nil {
+		err := s.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
 		if err != nil {
 			return err
 		}
 
 	}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
+	hash, newMessage, err := s.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
 	if err != nil {
-		p.logger.Error("failed to send a datasync message", zap.Error(err))
+		s.logger.Error("failed to send a datasync message", zap.Error(err))
 		return err
 	}
 
-	p.transport.Track(messageIDs, hash, newMessage)
+	s.transport.Track(messageIDs, hash, newMessage)
 
 	return nil
 }
 
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
-func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
@@ -671,9 +671,9 @@ func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, rawMessage
 	var err error
 
 	if rawMessage.SendOnPersonalTopic {
-		hash, err = p.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
+		hash, err = s.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
 	} else {
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+		hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -684,7 +684,7 @@ func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, rawMessage
 
 // sendCommunityRawMessage sends a message not wrapped in an encryption layer
 // to a community
-func (p *MessageProcessor) sendCommunityRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) sendCommunityRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
@@ -692,7 +692,7 @@ func (p *MessageProcessor) sendCommunityRawMessage(ctx context.Context, publicKe
 		PowTime:   whisperPoWTime,
 	}
 
-	hash, err := p.transport.SendCommunityMessage(ctx, newMessage, publicKey)
+	hash, err := s.transport.SendCommunityMessage(ctx, newMessage, publicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -701,23 +701,23 @@ func (p *MessageProcessor) sendCommunityRawMessage(ctx context.Context, publicKe
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage, err := MessageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	logger := p.logger.With(zap.String("site", "sendMessageSpec"))
+	logger := s.logger.With(zap.String("site", "sendMessageSpec"))
 
 	var hash []byte
 
 	// process shared secret
 	if messageSpec.AgreedSecret {
 		logger.Debug("sending using shared secret")
-		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
+		hash, err = s.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
 	} else {
 		logger.Debug("sending partitioned topic")
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+		hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -729,61 +729,61 @@ func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 		MessageIDs: messageIDs,
 	}
 
-	p.notifyOnSentMessage(sentMessage)
+	s.notifyOnSentMessage(sentMessage)
 
 	return hash, newMessage, nil
 }
 
 // SubscribeToSentMessages returns a channel where we publish every time a message is sent
-func (p *MessageProcessor) SubscribeToSentMessages() <-chan *SentMessage {
+func (s *MessageSender) SubscribeToSentMessages() <-chan *SentMessage {
 	c := make(chan *SentMessage, 100)
-	p.sentMessagesSubscriptions = append(p.sentMessagesSubscriptions, c)
+	s.sentMessagesSubscriptions = append(s.sentMessagesSubscriptions, c)
 	return c
 }
 
-func (p *MessageProcessor) notifyOnSentMessage(sentMessage *SentMessage) {
+func (s *MessageSender) notifyOnSentMessage(sentMessage *SentMessage) {
 	// Publish on channels, drop if buffer is full
-	for _, c := range p.sentMessagesSubscriptions {
+	for _, c := range s.sentMessagesSubscriptions {
 		select {
 		case c <- sentMessage:
 		default:
-			p.logger.Warn("sent messages subscription channel full, dropping message")
+			s.logger.Warn("sent messages subscription channel full, dropping message")
 		}
 	}
 
 }
 
 // SubscribeToScheduledMessages returns a channel where we publish every time a message is scheduled for sending
-func (p *MessageProcessor) SubscribeToScheduledMessages() <-chan *RawMessage {
+func (s *MessageSender) SubscribeToScheduledMessages() <-chan *RawMessage {
 	c := make(chan *RawMessage, 100)
-	p.scheduledMessagesSubscriptions = append(p.scheduledMessagesSubscriptions, c)
+	s.scheduledMessagesSubscriptions = append(s.scheduledMessagesSubscriptions, c)
 	return c
 }
 
-func (p *MessageProcessor) notifyOnScheduledMessage(message *RawMessage) {
+func (s *MessageSender) notifyOnScheduledMessage(message *RawMessage) {
 	// Publish on channels, drop if buffer is full
-	for _, c := range p.scheduledMessagesSubscriptions {
+	for _, c := range s.scheduledMessagesSubscriptions {
 		select {
 		case c <- message:
 		default:
-			p.logger.Warn("scheduled messages subscription channel full, dropping message")
+			s.logger.Warn("scheduled messages subscription channel full, dropping message")
 		}
 	}
 }
 
-func (p *MessageProcessor) JoinPublic(id string) (*transport.Filter, error) {
-	return p.transport.JoinPublic(id)
+func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
+	return s.transport.JoinPublic(id)
 }
 
 // AddEphemeralKey adds an ephemeral key that we will be listening to
 // note that we never removed them from now, as waku/whisper does not
 // recalculate topics on removal, so effectively there's no benefit.
 // On restart they will be gone.
-func (p *MessageProcessor) AddEphemeralKey(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
-	p.ephemeralKeysMutex.Lock()
-	p.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
-	p.ephemeralKeysMutex.Unlock()
-	return p.transport.LoadKeyFilters(privateKey)
+func (s *MessageSender) AddEphemeralKey(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
+	s.ephemeralKeysMutex.Lock()
+	s.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
+	s.ephemeralKeysMutex.Unlock()
+	return s.transport.LoadKeyFilters(privateKey)
 }
 
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {

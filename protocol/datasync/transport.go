@@ -72,7 +72,7 @@ func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload protobuf
 			continue
 		}
 
-		data, err := proto.Marshal(payload)
+		marshalledPayload, err := proto.Marshal(payload)
 		if err != nil {
 			t.logger.Error("failed to marshal payload")
 			continue
@@ -85,7 +85,7 @@ func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload protobuf
 		}
 		// We don't return an error otherwise datasync will keep
 		// re-trying sending at each epoch
-		err = t.dispatch(context.Background(), publicKey, data, payload)
+		err = t.dispatch(context.Background(), publicKey, marshalledPayload, payload)
 		if err != nil {
 			t.logger.Error("failed to send message", zap.Error(err))
 			continue

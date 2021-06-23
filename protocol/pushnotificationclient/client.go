@@ -179,8 +179,8 @@ type Client struct {
 	// randomReader only used for testing so we have deterministic encryption
 	reader io.Reader
 
-	//messageProcessor is a message processor used to send and being notified of messages
-	messageProcessor *common.MessageProcessor
+	//messageSender used to send and being notified of messages
+	messageSender *common.MessageSender
 
 	// registrationLoopQuitChan is a channel to indicate to the registration loop that should be terminating
 	registrationLoopQuitChan chan struct{}
@@ -194,11 +194,11 @@ type Client struct {
 	registrationSubscriptions []chan struct{}
 }
 
-func New(persistence *Persistence, config *Config, processor *common.MessageProcessor, messagePersistence MessagePersistence) *Client {
+func New(persistence *Persistence, config *Config, sender *common.MessageSender, messagePersistence MessagePersistence) *Client {
 	return &Client{
 		quit:               make(chan struct{}),
 		config:             config,
-		messageProcessor:   processor,
+		messageSender:      sender,
 		messagePersistence: messagePersistence,
 		persistence:        persistence,
 		reader:             rand.Reader,
@@ -206,8 +206,8 @@ func New(persistence *Persistence, config *Config, processor *common.MessageProc
 }
 
 func (c *Client) Start() error {
-	if c.messageProcessor == nil {
-		return errors.New("can't start, missing message processor")
+	if c.messageSender == nil {
+		return errors.New("can't start, missing message sender")
 	}
 
 	err := c.loadLastPushNotificationRegistration()
@@ -685,8 +685,8 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 func (c *Client) subscribeForMessageEvents() {
 	go func() {
 		c.config.Logger.Debug("subscribing for message events")
-		sentMessagesSubscription := c.messageProcessor.SubscribeToSentMessages()
-		scheduledMessagesSubscription := c.messageProcessor.SubscribeToScheduledMessages()
+		sentMessagesSubscription := c.messageSender.SubscribeToSentMessages()
+		scheduledMessagesSubscription := c.messageSender.SubscribeToScheduledMessages()
 		for {
 			select {
 			// order is important, since both are asynchronous, we want to process
@@ -1273,7 +1273,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 		SkipEncryption:      true,
 	}
 
-	_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, &rawMessage)
+	_, err = c.messageSender.SendPrivate(context.Background(), server.PublicKey, &rawMessage)
 
 	if err != nil {
 		return err
@@ -1336,7 +1336,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.messageProcessor.AddEphemeralKey(ephemeralKey)
+	_, err = c.messageSender.AddEphemeralKey(ephemeralKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1377,7 +1377,7 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 			MessageType:    protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
 		}
 
-		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, &rawMessage)
+		_, err = c.messageSender.SendPrivate(context.Background(), serverPublicKey, &rawMessage)
 
 		if err != nil {
 			return nil, err
@@ -1657,14 +1657,14 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		MessageType:    protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
 	}
 
-	_, err = c.messageProcessor.AddEphemeralKey(ephemeralKey)
+	_, err = c.messageSender.AddEphemeralKey(ephemeralKey)
 	if err != nil {
 		return err
 	}
 
 	// this is the topic of message
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	messageID, err := c.messageProcessor.SendPublic(context.Background(), encodedPublicKey, rawMessage)
+	messageID, err := c.messageSender.SendPublic(context.Background(), encodedPublicKey, rawMessage)
 
 	if err != nil {
 		return err

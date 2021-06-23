@@ -189,7 +189,7 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 	}
 
 	// Encrypt payload
-	directMessage, installations, err := p.encryptor.EncryptPayload(publicKey, myIdentityKey, activeInstallations, payload)
+	directMessagesByInstalls, installations, err := p.encryptor.EncryptPayload(publicKey, myIdentityKey, activeInstallations, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 	// Build message
 	message := &ProtocolMessage{
 		InstallationId: p.encryptor.config.InstallationID,
-		DirectMessage:  directMessage,
+		DirectMessage:  directMessagesByInstalls,
 	}
 
 	err = p.addBundle(myIdentityKey, message)
