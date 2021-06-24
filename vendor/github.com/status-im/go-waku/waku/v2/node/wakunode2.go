@@ -15,6 +15,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
@@ -34,12 +35,15 @@ type WakuNode struct {
 	opts *WakuNodeParameters
 
 	relay     *relay.WakuRelay
+	filter    *filter.WakuFilter
 	lightPush *lightpush.WakuLightPush
 
 	subscriptions      map[relay.Topic][]*Subscription
 	subscriptionsMutex sync.Mutex
 
 	bcaster Broadcaster
+
+	filters filter.Filters
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -83,6 +87,14 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 
 	if params.enableRelay {
 		err := w.mountRelay(params.wOpts...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if params.enableFilter {
+		w.filters = make(filter.Filters)
+		err := w.mountFilter()
 		if err != nil {
 			return nil, err
 		}
@@ -141,27 +153,44 @@ func (w *WakuNode) Relay() *relay.WakuRelay {
 	return w.relay
 }
 
+func (w *WakuNode) Filter() *filter.WakuFilter {
+	return w.filter
+}
+
 func (w *WakuNode) mountRelay(opts ...wakurelay.Option) error {
 	var err error
 	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, opts...)
 
-	// TODO: filters
 	// TODO: rlnRelay
 
 	return err
 }
 
+func (w *WakuNode) mountFilter() error {
+	filterHandler := func(requestId string, msg pb.MessagePush) {
+		for _, message := range msg.Messages {
+			w.filters.Notify(message, requestId) // Trigger filter handlers on a light node
+		}
+	}
+	w.filter = filter.NewWakuFilter(w.ctx, w.host, filterHandler)
+
+	return nil
+
+}
 func (w *WakuNode) mountLightPush() {
 	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay)
 }
 
 func (w *WakuNode) startStore() error {
+	w.opts.store.Start(w.host)
+
+	w.opts.store.Resume(w.ctx, string(relay.GetTopic(nil)), nil)
+
 	_, err := w.Subscribe(nil)
 	if err != nil {
 		return err
 	}
 
-	w.opts.store.Start(w.host)
 	return nil
 }
 
@@ -182,6 +211,26 @@ func (w *WakuNode) AddStorePeer(address string) (*peer.ID, error) {
 	}
 
 	return &info.ID, w.opts.store.AddPeer(info.ID, info.Addrs)
+}
+
+// TODO Remove code duplication
+func (w *WakuNode) AddFilterPeer(address string) (*peer.ID, error) {
+	if w.filter == nil {
+		return nil, errors.New("WakuFilter is not set")
+	}
+
+	filterPeer, err := ma.NewMultiaddr(address)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract the peer ID from the multiaddr.
+	info, err := peer.AddrInfoFromP2pAddr(filterPeer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &info.ID, w.filter.AddPeer(info.ID, info.Addrs)
 }
 
 func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime float64, endTime float64, opts ...store.HistoryRequestOption) (*pb.HistoryResponse, error) {
@@ -205,6 +254,21 @@ func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime 
 	return result, nil
 }
 
+func (w *WakuNode) Resume(ctx context.Context, peerList []peer.ID) error {
+	if w.opts.store == nil {
+		return errors.New("WakuStore is not set")
+	}
+
+	result, err := w.opts.store.Resume(ctx, string(relay.DefaultWakuTopic), peerList)
+	if err != nil {
+		return err
+	}
+
+	log.Info("the number of retrieved messages since the last online time: ", result)
+
+	return nil
+}
+
 func (node *WakuNode) Subscribe(topic *relay.Topic) (*Subscription, error) {
 	// Subscribes to a PubSub topic.
 	// NOTE The data field SHOULD be decoded as a WakuMessage.
@@ -219,6 +283,12 @@ func (node *WakuNode) Subscribe(topic *relay.Topic) (*Subscription, error) {
 	if isNew && node.opts.store != nil && node.opts.storeMsgs {
 		log.Info("Subscribing store to topic ", t)
 		node.bcaster.Register(node.opts.store.MsgC)
+	}
+
+	// Subscribe filter
+	if isNew && node.filter != nil {
+		log.Info("Subscribing filter to topic ", t)
+		node.bcaster.Register(node.filter.MsgC)
 	}
 
 	if err != nil {
@@ -274,6 +344,74 @@ func (node *WakuNode) Subscribe(topic *relay.Topic) (*Subscription, error) {
 	}(t)
 
 	return subscription, nil
+}
+
+// Wrapper around WakuFilter.Subscribe
+// that adds a Filter object to node.filters
+func (node *WakuNode) SubscribeFilter(ctx context.Context, request pb.FilterRequest, ch filter.ContentFilterChan) {
+	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
+	// ContentFilterChan takes MessagePush structs
+
+	// Status: Implemented.
+
+	// Sanity check for well-formed subscribe FilterRequest
+	//doAssert(request.subscribe, "invalid subscribe request")
+
+	log.Info("SubscribeFilter, request: ", request)
+
+	var id string
+
+	if node.filter != nil {
+		id, err := node.filter.Subscribe(ctx, request)
+
+		if id == "" || err != nil {
+			// Failed to subscribe
+			log.Error("remote subscription to filter failed", request)
+			//waku_node_errors.inc(labelValues = ["subscribe_filter_failure"])
+			id = string(protocol.GenerateRequestId())
+		}
+	}
+
+	// Register handler for filter, whether remote subscription succeeded or not
+	node.filters[id] = filter.Filter{ContentFilters: request.ContentFilters, Chan: ch}
+}
+
+func (node *WakuNode) UnsubscribeFilter(ctx context.Context, request pb.FilterRequest) {
+
+	log.Info("UnsubscribeFilter, request: ", request)
+	// Send message to full node in order to unsubscribe
+	node.filter.Unsubscribe(ctx, request)
+
+	// Remove local filter
+	var idsToRemove []string
+	for id, f := range node.filters {
+		// Iterate filter entries to remove matching content topics
+		// make sure we delete the content filter
+		// if no more topics are left
+		for _, cfToDelete := range request.ContentFilters {
+			for i, cf := range f.ContentFilters {
+				if cf.ContentTopic == cfToDelete.ContentTopic {
+					l := len(f.ContentFilters) - 1
+					f.ContentFilters[l], f.ContentFilters[i] = f.ContentFilters[i], f.ContentFilters[l]
+					f.ContentFilters = f.ContentFilters[:l]
+					break
+				}
+
+			}
+			if len(f.ContentFilters) == 0 {
+				idsToRemove = append(idsToRemove, id)
+			}
+		}
+	}
+
+	for _, rId := range idsToRemove {
+		for id, _ := range node.filters {
+			if id == rId {
+				delete(node.filters, id)
+				break
+			}
+		}
+	}
 }
 
 func (node *WakuNode) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic) ([]byte, error) {

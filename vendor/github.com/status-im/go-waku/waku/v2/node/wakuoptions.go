@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
@@ -18,12 +19,14 @@ type WakuNodeParameters struct {
 	privKey    *crypto.PrivKey
 	libP2POpts []libp2p.Option
 
-	enableRelay bool
-	wOpts       []wakurelay.Option
+	enableRelay  bool
+	enableFilter bool
+	wOpts        []wakurelay.Option
 
 	enableStore bool
 	storeMsgs   bool
 	store       *store.WakuStore
+	filter      *filter.WakuFilter
 
 	enableLightPush bool
 }
@@ -80,6 +83,16 @@ func WithLibP2POptions(opts ...libp2p.Option) WakuNodeOption {
 func WithWakuRelay(opts ...wakurelay.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRelay = true
+		params.wOpts = opts
+		return nil
+	}
+}
+
+// WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
+// accepts a list of WakuFilter gossipsub options to setup the protocol
+func WithWakuFilter(opts ...wakurelay.Option) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableFilter = true
 		params.wOpts = opts
 		return nil
 	}
