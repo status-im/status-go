@@ -1087,7 +1087,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
-	// Create an community chat
+	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
 		Name:        "new community",

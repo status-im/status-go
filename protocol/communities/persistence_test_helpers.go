@@ -37,8 +37,30 @@ func (rc *rawCommunityRow) toSyncCommunityProtobuf() *protobuf.SyncCommunity {
 	}
 }
 
+func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (*rawCommunityRow, error) {
+	rcr := new(rawCommunityRow)
+	syncedAt := sql.NullTime{}
 
-func (p *Persistence) getAllCommunitiesRaw() (rcrs []rawCommunityRow, err error) {
+	err := rowScan(
+		&rcr.ID,
+		&rcr.PrivateKey,
+		&rcr.Description,
+		&rcr.Joined,
+		&rcr.Verified,
+		&syncedAt,
+	)
+	if syncedAt.Valid {
+		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rcr, nil
+}
+
+func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error) {
 	var rows *sql.Rows
 	rows, err = p.db.Query(`SELECT id, private_key, description, joined, verified, synced_at FROM communities_communities`)
 	if err != nil {
@@ -56,21 +78,7 @@ func (p *Persistence) getAllCommunitiesRaw() (rcrs []rawCommunityRow, err error)
 	}()
 
 	for rows.Next() {
-		rcr := rawCommunityRow{}
-		syncedAt := sql.NullTime{}
-
-		err = rows.Scan(
-			&rcr.ID,
-			&rcr.PrivateKey,
-			&rcr.Description,
-			&rcr.Joined,
-			&rcr.Verified,
-			&syncedAt,
-		)
-		if syncedAt.Valid {
-			rcr.SyncedAt = uint64(syncedAt.Time.Unix())
-		}
-
+		rcr, err := p.scanRowToStruct(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
@@ -78,6 +86,11 @@ func (p *Persistence) getAllCommunitiesRaw() (rcrs []rawCommunityRow, err error)
 		rcrs = append(rcrs, rcr)
 	}
 	return rcrs, nil
+}
+
+func (p *Persistence) getRawCommunityRow(id []byte) (*rawCommunityRow, error) {
+	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ?`, id)
+	return p.scanRowToStruct(qr.Scan)
 }
 
 func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
@@ -91,24 +104,4 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 		rawCommRow.SyncedAt,
 	)
 	return err
-}
-
-func (p *Persistence) getRawCommunityRow(id []byte) (rawCommunityRow, error) {
-	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ?`, id)
-
-	rcr := rawCommunityRow{}
-	syncedAt := sql.NullTime{}
-	err := qr.Scan(
-		&rcr.ID,
-		&rcr.PrivateKey,
-		&rcr.Description,
-		&rcr.Joined,
-		&rcr.Verified,
-		&syncedAt,
-	)
-	if syncedAt.Valid {
-		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
-	}
-
-	return rcr, err
 }
