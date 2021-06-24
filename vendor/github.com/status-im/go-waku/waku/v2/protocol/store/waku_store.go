@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -32,8 +33,10 @@ const ConnectionTimeout = 10 * time.Second
 const DefaultContentTopic = "/waku/2/default-content/proto"
 
 var (
-	ErrNoPeersAvailable = errors.New("no suitable remote peers")
-	ErrInvalidId        = errors.New("invalid request id")
+	ErrNoPeersAvailable      = errors.New("no suitable remote peers")
+	ErrInvalidId             = errors.New("invalid request id")
+	ErrFailedToResumeHistory = errors.New("failed to resume the history")
+	ErrFailedQuery           = errors.New("failed to resolve the query")
 )
 
 func minOf(vars ...int) int {
@@ -247,27 +250,31 @@ func (store *WakuStore) Start(h host.Host) {
 	log.Info("Store protocol started")
 }
 
+func (store *WakuStore) storeMessage(pubSubTopic string, msg *pb.WakuMessage) {
+	index, err := computeIndex(msg)
+	if err != nil {
+		log.Error("could not calculate message index", err)
+		return
+	}
+
+	store.messagesMutex.Lock()
+	store.messages = append(store.messages, IndexedWakuMessage{msg: msg, index: index, pubsubTopic: pubSubTopic})
+	store.messagesMutex.Unlock()
+
+	if store.msgProvider == nil {
+		return
+	}
+
+	err = store.msgProvider.Put(index, pubSubTopic, msg) // Should the index be stored?
+	if err != nil {
+		log.Error("could not store message", err)
+		return
+	}
+}
+
 func (store *WakuStore) storeIncomingMessages() {
 	for envelope := range store.MsgC {
-		index, err := computeIndex(envelope.Message())
-		if err != nil {
-			log.Error("could not calculate message index", err)
-			continue
-		}
-
-		store.messagesMutex.Lock()
-		store.messages = append(store.messages, IndexedWakuMessage{msg: envelope.Message(), index: index, pubsubTopic: envelope.PubsubTopic()})
-		store.messagesMutex.Unlock()
-
-		if store.msgProvider == nil {
-			continue
-		}
-
-		err = store.msgProvider.Put(index, envelope.PubsubTopic(), envelope.Message()) // Should the index be stored?
-		if err != nil {
-			log.Error("could not store message", err)
-			continue
-		}
+		store.storeMessage(envelope.PubsubTopic(), envelope.Message())
 	}
 }
 
@@ -452,6 +459,37 @@ func DefaultOptions() []HistoryRequestOption {
 	}
 }
 
+func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
+	connOpt, err := store.h.NewStream(ctx, selectedPeer, WakuStoreProtocolId)
+	if err != nil {
+		log.Info("failed to connect to remote peer", err)
+		return nil, err
+	}
+
+	defer connOpt.Close()
+	defer connOpt.Reset()
+
+	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(requestId)}
+
+	writer := protoio.NewDelimitedWriter(connOpt)
+	reader := protoio.NewDelimitedReader(connOpt, 64*1024)
+
+	err = writer.WriteMsg(historyRequest)
+	if err != nil {
+		log.Error("could not write request", err)
+		return nil, err
+	}
+
+	historyResponseRPC := &pb.HistoryRPC{}
+	err = reader.ReadMsg(historyResponseRPC)
+	if err != nil {
+		log.Error("could not read response", err)
+		return nil, err
+	}
+
+	return historyResponseRPC.Response, nil
+}
+
 func (store *WakuStore) Query(ctx context.Context, q *pb.HistoryQuery, opts ...HistoryRequestOption) (*pb.HistoryResponse, error) {
 	params := new(HistoryRequestParameters)
 	params.s = store
@@ -482,34 +520,88 @@ func (store *WakuStore) Query(ctx context.Context, q *pb.HistoryQuery, opts ...H
 
 	q.PagingInfo.PageSize = params.pageSize
 
-	connOpt, err := store.h.NewStream(ctx, params.selectedPeer, WakuStoreProtocolId)
-	if err != nil {
-		log.Info("failed to connect to remote peer", err)
-		return nil, err
+	return store.queryFrom(ctx, q, params.selectedPeer, params.requestId)
+}
+
+func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) (*pb.HistoryResponse, error) {
+	// loops through the candidateList in order and sends the query to each until one of the query gets resolved successfully
+	// returns the number of retrieved messages, or error if all the requests fail
+	for _, peer := range candidateList {
+		result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestId())
+		if err != nil {
+			return result, nil
+		}
 	}
 
-	defer connOpt.Close()
-	defer connOpt.Reset()
+	return nil, ErrFailedQuery
+}
 
-	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(params.requestId)}
+func (store *WakuStore) findLastSeen() float64 {
+	var lastSeenTime float64 = 0
+	for _, imsg := range store.messages {
+		if imsg.msg.Timestamp > lastSeenTime {
+			lastSeenTime = imsg.msg.Timestamp
+		}
+	}
+	return lastSeenTime
+}
 
-	writer := protoio.NewDelimitedWriter(connOpt)
-	reader := protoio.NewDelimitedReader(connOpt, 64*1024)
+// resume proc retrieves the history of waku messages published on the default waku pubsub topic since the last time the waku store node has been online
+// messages are stored in the store node's messages field and in the message db
+// the offline time window is measured as the difference between the current time and the timestamp of the most recent persisted waku message
+// an offset of 20 second is added to the time window to count for nodes asynchrony
+// the history is fetched from one of the peers persisted in the waku store node's peer manager unit
+// peerList indicates the list of peers to query from. The history is fetched from the first available peer in this list. Such candidates should be found through a discovery method (to be developed).
+// if no peerList is passed, one of the peers in the underlying peer manager unit of the store protocol is picked randomly to fetch the history from. The history gets fetched successfully if the dialed peer has been online during the queried time window.
+// the resume proc returns the number of retrieved messages if no error occurs, otherwise returns the error string
 
-	err = writer.WriteMsg(historyRequest)
-	if err != nil {
-		log.Error("could not write request", err)
-		return nil, err
+func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error) {
+	currentTime := float64(time.Now().UnixNano())
+	lastSeenTime := store.findLastSeen()
+
+	log.Info("resume ", int64(currentTime))
+
+	var offset float64 = 200000
+	currentTime = currentTime + offset
+	lastSeenTime = math.Max(lastSeenTime-offset, 0)
+
+	rpc := &pb.HistoryQuery{
+		PubsubTopic: pubsubTopic,
+		StartTime:   lastSeenTime,
+		EndTime:     currentTime,
+		PagingInfo: &pb.PagingInfo{
+			PageSize:  0,
+			Direction: pb.PagingInfo_BACKWARD,
+		},
+	}
+	var response *pb.HistoryResponse
+	if len(peerList) > 0 {
+		var err error
+		response, err = store.queryLoop(ctx, rpc, peerList)
+		if err != nil {
+			log.Error("failed to resume history", err)
+			return -1, ErrFailedToResumeHistory
+		}
+	} else {
+		p := store.selectPeer()
+
+		if p == nil {
+			return -1, ErrNoPeersAvailable
+		}
+
+		var err error
+		response, err = store.queryFrom(ctx, rpc, *p, protocol.GenerateRequestId())
+		if err != nil {
+			log.Error("failed to resume history", err)
+			return -1, ErrFailedToResumeHistory
+		}
 	}
 
-	historyResponseRPC := &pb.HistoryRPC{}
-	err = reader.ReadMsg(historyResponseRPC)
-	if err != nil {
-		log.Error("could not read response", err)
-		return nil, err
+	for _, msg := range response.Messages {
+		store.storeMessage(pubsubTopic, msg)
 	}
 
-	return historyResponseRPC.Response, nil
+	return len(response.Messages), nil
 }
 
 // TODO: queryWithAccounting
