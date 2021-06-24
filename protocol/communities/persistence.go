@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
