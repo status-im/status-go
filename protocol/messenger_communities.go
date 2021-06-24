@@ -902,7 +902,5 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	if err != nil {
 		return err
 	}
-	err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
-
-	return nil
+	return m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
 }
