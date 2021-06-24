@@ -4,11 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -24,6 +20,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -1098,23 +1095,29 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 		Description: "new community description",
 	}
 
-	_, err := s.alice.CreateCommunity(createCommunityReq)
+	newCommunity, err := s.alice.communitiesManager.CreateCommunity(createCommunityReq)
 	s.NoError(err, "CreateCommunity")
 
+	// Check that Alice has 2 communities
 	cs, err := s.alice.communitiesManager.All()
 	s.NoError(err, "communitiesManager.All")
 	s.Len(cs, 2, "Must have 2 communities")
 
-	// pair devices
-	theirMessenger, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	// Create new device
+	theirDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
 	s.Require().NoError(err)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	tcs, err := theirDevice.communitiesManager.All()
+	s.NoError(err, "theirDevice.communitiesManager.All")
+	s.Len(tcs, 1, "Must have 1 communities")
+
+	// Pair devices
+	err = theirDevice.SetInstallationMetadata(theirDevice.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirMessenger.SendPairInstallation(context.Background())
+	response, err := theirDevice.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -1127,35 +1130,28 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 		"installation not received",
 	)
 
+	// Check device pairing is installed and enabled
 	s.Require().NoError(err)
 	actualInstallation := response.Installations[0]
-	s.Require().Equal(theirMessenger.installationID, actualInstallation.ID)
+	s.Require().Equal(theirDevice.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.alice.EnableInstallation(theirMessenger.installationID)
+	err = s.alice.EnableInstallation(theirDevice.installationID)
 	s.Require().NoError(err)
 
 	// Sync communities
-	//var newCom *communities.Community
 	for _, c := range cs {
 		err = s.alice.syncCommunity(context.Background(), c)
 		s.NoError(err, "syncCommunity")
-
-		/*
-		md, _ := c.MarshaledDescription()
-		spew.Dump(c.Name(), c.ID(), c.PrivateKey(), md)
-		sc, _ := json.MarshalIndent(c, "", "  ")
-		fmt.Println(string(sc))
-		*/
 	}
 
 	// Wait for the message to reach its destination
 	var theirCommunities []*communities.Community
 	err = tt.RetryWithBackOff(func() error {
 		var err error
-		response, err = theirMessenger.RetrieveAll()
+		response, err = theirDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1168,19 +1164,26 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 		return errors.New("not received any communities")
 	})
-	s.Require().NoError(err)
+	s.NoError(err)
 
-	/*
-	tcj0, err := json.Marshal(theirCommunities[1])
-	spew.Dump(tcj0)
+	// Count the number of communities in their device
+	tcs, err = theirDevice.communitiesManager.All()
+	s.NoError(err)
+	s.Len(tcs, 2, "There must be 2 communities")
 
-	tcj1, err := json.Marshal(theirCommunities[1])
-	spew.Dump(tcj1)
-	 */
+	// Get the new community from their db
+	tnc, err := theirDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.NoError(err)
 
-	tcs, err := theirMessenger.communitiesManager.All()
-	tcsj, err := json.MarshalIndent(tcs, "", "  ")
-	spew.Dump(len(tcs))
-	fmt.Println(string(tcsj))
-	//spew.Dump(tcs[1].PrivateKey())
+	// Check the community on their device matched the new community on Alice's device
+	s.Equal(newCommunity.ID(), tnc.ID())
+	s.Equal(newCommunity.Name(), tnc.Name())
+	s.Equal(newCommunity.Description(), tnc.Description())
+	s.Equal(newCommunity.IDString(), tnc.IDString())
+	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
+	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
+	s.Equal(newCommunity.Verified(), tnc.Verified())
+	s.Equal(newCommunity.Joined(), tnc.Joined())
+	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
+	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 }

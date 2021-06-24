@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -848,19 +847,23 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return nil
 	}
 
-	// Don't use the public key of the private key uncompress the community id
+	// Don't use the public key of the private key, uncompress the community id
 	orgPubKey, err := crypto.DecompressPubkey(syncCommunity.Id)
 	if err != nil {
 		return err
 	}
 
-	var cd protobuf.CommunityDescription
-	err = proto.Unmarshal(syncCommunity.Description, &cd)
+	var amm protobuf.ApplicationMetadataMessage
+	err = proto.Unmarshal(syncCommunity.Description, &amm)
 	if err != nil {
 		return err
 	}
 
-	spew.Dump(syncCommunity.Description, cd)
+	var cd protobuf.CommunityDescription
+	err = proto.Unmarshal(amm.Payload, &cd)
+	if err != nil {
+		return err
+	}
 
 	err = m.handleCommunityDescription(messageState, orgPubKey, cd, syncCommunity.Description)
 	if err != nil {

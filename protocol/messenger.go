@@ -2289,18 +2289,18 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		pkb = crypto.FromECDSA(pk)
 	}
 
-	md, err := community.MarshaledDescription()
+	md, err := community.ToBytes()
 	if err != nil {
 		return err
 	}
 
 	syncMessage := &protobuf.SyncCommunity{
-		Clock:                clock,
-		Id:                   community.ID(),
-		PrivateKey:           pkb,
-		Description:          md,
-		Joined:               community.Joined(),
-		Verified:             community.Verified(),
+		Clock:       clock,
+		Id:          community.ID(),
+		PrivateKey:  pkb,
+		Description: md,
+		Joined:      community.Joined(),
+		Verified:    community.Verified(),
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
