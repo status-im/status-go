@@ -7,12 +7,12 @@ import (
 )
 
 type rawCommunityRow struct {
-	ID []byte
-	PrivateKey []byte
+	ID          []byte
+	PrivateKey  []byte
 	Description []byte
-	Joined bool
-	Verified bool
-	SyncedAt uint64
+	Joined      bool
+	Verified    bool
+	SyncedAt    uint64
 }
 
 func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommunityRow {
@@ -23,17 +23,6 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommuni
 		Joined:      syncCommProto.Joined,
 		Verified:    syncCommProto.Verified,
 		SyncedAt:    syncCommProto.Clock,
-	}
-}
-
-func (rc *rawCommunityRow) toSyncCommunityProtobuf() *protobuf.SyncCommunity {
-	return &protobuf.SyncCommunity{
-		Clock:                rc.SyncedAt,
-		Id:                   rc.ID,
-		PrivateKey:           rc.PrivateKey,
-		Description:          rc.Description,
-		Joined:               rc.Joined,
-		Verified:             rc.Verified,
 	}
 }
 
