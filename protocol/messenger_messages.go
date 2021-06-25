@@ -82,6 +82,9 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 }
 
 func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message *common.Message) error {
+	if err := ValidateText(editMessage.Text); err != nil {
+		return err
+	}
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
 

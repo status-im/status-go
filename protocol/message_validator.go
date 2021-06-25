@@ -153,6 +153,18 @@ func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestT
 	return nil
 }
 
+func ValidateText(text string) error {
+	if len(strings.TrimSpace(text)) == 0 {
+		return errors.New("text can't be empty")
+	}
+
+	if len([]rune(text)) > maxChatMessageTextLength {
+		return fmt.Errorf("text shouldn't be longer than %d", maxChatMessageTextLength)
+	}
+
+	return nil
+}
+
 func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp uint64) error {
 	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
@@ -162,12 +174,8 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("timestamp can't be 0")
 	}
 
-	if len(strings.TrimSpace(message.Text)) == 0 {
-		return errors.New("text can't be empty")
-	}
-
-	if len([]rune(message.Text)) > maxChatMessageTextLength {
-		return fmt.Errorf("text shouldn't be longer than %d", maxChatMessageTextLength)
+	if err := ValidateText(message.Text); err != nil {
+		return err
 	}
 
 	if len(message.ChatId) == 0 {
