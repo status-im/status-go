@@ -490,6 +490,9 @@ func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*c
 }
 
 func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage EditMessage) error {
+	if err := ValidateEditMessage(editMessage.EditMessage); err != nil {
+		return err
+	}
 	messageID := editMessage.MessageId
 	// Check if it's already in the response
 	originalMessage := response.GetMessage(messageID)
