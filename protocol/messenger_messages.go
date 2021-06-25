@@ -56,10 +56,11 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
-		ResendAutomatically: true,
+		LocalChatID:          chat.ID,
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
+		SkipGroupMessageWrap: true,
+		ResendAutomatically:  true,
 	}
 	_, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {

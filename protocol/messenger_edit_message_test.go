@@ -283,3 +283,86 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 
 	s.Require().Equal(uint64(2), editedMessage.EditedAt)
 }
+
+// Test editing a message on an existing private group chat
+func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats(), 1)
+
+	ourChat := response.Chats()[0]
+
+	err = s.m.SaveChat(ourChat)
+	s.NoError(err)
+
+	members := []string{common.PubkeyToHex(&theirMessenger.identity.PublicKey)}
+	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
+	s.NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"no joining group event received",
+	)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*ourChat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	sentMessage := sendResponse.Messages()[0]
+
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Edit message
+
+	messageID, err := types.DecodeHex(sentMessage.ID)
+	s.Require().NoError(err)
+
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+	}
+
+	_, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+
+	s.Require().NoError(err)
+
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().False(response.Messages()[0].New)
+}
