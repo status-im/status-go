@@ -40,8 +40,15 @@ func TestMessengerResponseMergeMessages(t *testing.T) {
 	require.NoError(t, response1.Merge(response2))
 
 	require.Len(t, response1.Messages(), 2)
-	require.Equal(t, modifiedMessage1, response1.Messages()[0])
-	require.Equal(t, message2, response1.Messages()[1])
+	messages := response1.Messages()
+	if messages[0].ID == modifiedMessage1.ID {
+		require.Equal(t, modifiedMessage1, messages[0])
+		require.Equal(t, message2, messages[1])
+	} else {
+		require.Equal(t, modifiedMessage1, messages[1])
+		require.Equal(t, message2, messages[0])
+	}
+
 }
 
 func TestMessengerResponseMergeNotImplemented(t *testing.T) {

@@ -239,6 +239,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	// Add to response
 	state.Response.AddChat(chat)
 	if message != nil {
+		message.New = true
 		state.Response.AddMessage(message)
 	}
 
@@ -657,6 +658,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	}
 
+	receivedMessage.New = true
 	state.Response.AddMessage(receivedMessage)
 
 	return nil
