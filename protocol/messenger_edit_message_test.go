@@ -118,6 +118,7 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().False(response.Messages()[0].New)
 
 	// Main instance user attempts to edit the message it received from theirMessenger
 	editedMessage = &requests.EditMessage{

@@ -13,7 +13,8 @@ import (
 type EditMessage struct {
 	protobuf.EditMessage
 
-	ID string `json:"id",omitempty"`
+	// ID is the ID of the message that has been edited
+	ID string `json:"id,omitempty"`
 
 	// From is a public key of the author of the edit reaction.
 	From string `json:"from,omitempty"`
