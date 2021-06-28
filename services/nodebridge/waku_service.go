@@ -8,8 +8,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-// Make sure that WakuService implements node.Service interface.
-var _ node.Service = (*WakuService)(nil)
+// Make sure that WakuService implements node.Lifecycle interface.
+var _ node.Lifecycle = (*WakuService)(nil)
 
 type WakuService struct {
 	Waku types.Waku
@@ -33,8 +33,8 @@ func (w *WakuService) APIs() []rpc.API {
 }
 
 // Start is run when a service is started.
-// It does nothing in this case but is required by `node.Service` interface.
-func (w *WakuService) Start(server *p2p.Server) error {
+// It does nothing in this case but is required by `node.Lifecycle` interface.
+func (w *WakuService) Start() error {
 	return nil
 }
 
