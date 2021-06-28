@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -138,7 +137,7 @@ func bindContract(address common.Address, caller bind.ContractCaller, transactor
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.ContractCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -157,7 +156,7 @@ func (_Contract *ContractRaw) Transact(opts *bind.TransactOpts, method string, p
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -174,78 +173,93 @@ func (_Contract *ContractTransactorRaw) Transact(opts *bind.TransactOpts, method
 
 // Ens is a free data retrieval call binding the contract method 0x3f15457f.
 //
-// Solidity: function ens() constant returns(address)
+// Solidity: function ens() view returns(address)
 func (_Contract *ContractCaller) Ens(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "ens")
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "ens")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Ens is a free data retrieval call binding the contract method 0x3f15457f.
 //
-// Solidity: function ens() constant returns(address)
+// Solidity: function ens() view returns(address)
 func (_Contract *ContractSession) Ens() (common.Address, error) {
 	return _Contract.Contract.Ens(&_Contract.CallOpts)
 }
 
 // Ens is a free data retrieval call binding the contract method 0x3f15457f.
 //
-// Solidity: function ens() constant returns(address)
+// Solidity: function ens() view returns(address)
 func (_Contract *ContractCallerSession) Ens() (common.Address, error) {
 	return _Contract.Contract.Ens(&_Contract.CallOpts)
 }
 
 // Oracle is a free data retrieval call binding the contract method 0x7dc0d1d0.
 //
-// Solidity: function oracle() constant returns(address)
+// Solidity: function oracle() view returns(address)
 func (_Contract *ContractCaller) Oracle(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "oracle")
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "oracle")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Oracle is a free data retrieval call binding the contract method 0x7dc0d1d0.
 //
-// Solidity: function oracle() constant returns(address)
+// Solidity: function oracle() view returns(address)
 func (_Contract *ContractSession) Oracle() (common.Address, error) {
 	return _Contract.Contract.Oracle(&_Contract.CallOpts)
 }
 
 // Oracle is a free data retrieval call binding the contract method 0x7dc0d1d0.
 //
-// Solidity: function oracle() constant returns(address)
+// Solidity: function oracle() view returns(address)
 func (_Contract *ContractCallerSession) Oracle() (common.Address, error) {
 	return _Contract.Contract.Oracle(&_Contract.CallOpts)
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractCaller) SupportsInterface(opts *bind.CallOpts, interfaceID [4]byte) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "supportsInterface", interfaceID)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "supportsInterface", interfaceID)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractSession) SupportsInterface(interfaceID [4]byte) (bool, error) {
 	return _Contract.Contract.SupportsInterface(&_Contract.CallOpts, interfaceID)
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractCallerSession) SupportsInterface(interfaceID [4]byte) (bool, error) {
 	return _Contract.Contract.SupportsInterface(&_Contract.CallOpts, interfaceID)
 }
@@ -432,4 +446,15 @@ func (_Contract *ContractFilterer) WatchClaim(opts *bind.WatchOpts, sink chan<- 
 			}
 		}
 	}), nil
+}
+
+// ParseClaim is a log parse operation binding the contract event 0xa2e66ce20e6fb2c4f61339c364ad79f15160cf5307230c8bc4d628adbca2ba39.
+//
+// Solidity: event Claim(bytes32 indexed node, address indexed owner, bytes dnsname)
+func (_Contract *ContractFilterer) ParseClaim(log types.Log) (*ContractClaim, error) {
+	event := new(ContractClaim)
+	if err := _Contract.contract.UnpackLog(event, "Claim", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }

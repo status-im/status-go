@@ -28,7 +28,7 @@ import (
 
 // KeySigner generates a signer using a private key
 func KeySigner(chainID *big.Int, key *ecdsa.PrivateKey) (signerfn bind.SignerFn) {
-	signerfn = func(signer types.Signer, address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+	signerfn = func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		keyAddr := crypto.PubkeyToAddress(key.PublicKey)
 		if address != keyAddr {
 			return nil, errors.New("not authorized to sign this account")
@@ -41,7 +41,7 @@ func KeySigner(chainID *big.Int, key *ecdsa.PrivateKey) (signerfn bind.SignerFn)
 
 // AccountSigner generates a signer using an account
 func AccountSigner(chainID *big.Int, wallet *accounts.Wallet, account *accounts.Account, passphrase string) (signerfn bind.SignerFn) {
-	signerfn = func(signer types.Signer, address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+	signerfn = func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		if address != account.Address {
 			return nil, errors.New("not authorized to sign this account")
 		}

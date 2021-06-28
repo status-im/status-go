@@ -8,7 +8,6 @@ package metrics
 import (
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,12 +26,8 @@ var Enabled = false
 // for health monitoring and debug metrics that might impact runtime performance.
 var EnabledExpensive = false
 
-// EnabledStr has the same function as Enabled but
-// it can be set during compilation (linking) time.
-var EnabledStr = "false"
-
 // enablerFlags is the CLI flag names to use to enable metrics collections.
-var enablerFlags = []string{"metrics", "dashboard"}
+var enablerFlags = []string{"metrics"}
 
 // expensiveEnablerFlags is the CLI flag names to use to enable metrics collections.
 var expensiveEnablerFlags = []string{"metrics.expensive"}
@@ -56,12 +51,6 @@ func init() {
 				EnabledExpensive = true
 			}
 		}
-	}
-
-	if v, err := strconv.ParseBool(EnabledStr); err == nil && v {
-		log.Info("Enabling metrics collection")
-		Enabled = true
-		EnabledExpensive = true
 	}
 }
 
