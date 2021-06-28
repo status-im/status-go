@@ -219,6 +219,14 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 	}
 }
 
+func NewSubsetOfPrivateAccountAPI(am *accounts.Manager) *PrivateAccountAPI {
+return &PrivateAccountAPI{
+		am:        am,
+		nonceLock: nil,
+		b:         nil,
+	}
+}
+
 // listAccounts will return a list of addresses for accounts this node manages.
 func (s *PrivateAccountAPI) ListAccounts() []common.Address {
 	return s.am.Accounts()
@@ -449,7 +457,7 @@ func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr c
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: addr}
 
-	wallet, err := s.b.AccountManager().Find(account)
+	wallet, err := s.am.Find(account)
 	if err != nil {
 		return nil, err
 	}
