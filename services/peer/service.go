@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// Make sure that Service implements node.Service interface.
-var _ node.Service = (*Service)(nil)
+// Make sure that Service implements node.Lifecycle interface.
+var _ node.Lifecycle = (*Service)(nil)
 
 // Discoverer manages peer discovery.
 type Discoverer interface {
@@ -48,7 +48,7 @@ func (s *Service) SetDiscoverer(d Discoverer) {
 
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
-func (s *Service) Start(server *p2p.Server) error {
+func (s *Service) Start() error {
 	return nil
 }
 

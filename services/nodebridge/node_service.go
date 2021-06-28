@@ -8,8 +8,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-// Make sure that NodeService implements node.Service interface.
-var _ node.Service = (*NodeService)(nil)
+// Make sure that NodeService implements node.Lifecycle interface.
+var _ node.Lifecycle = (*NodeService)(nil)
 
 type NodeService struct {
 	Node types.Node
@@ -33,13 +33,13 @@ func (w *NodeService) APIs() []rpc.API {
 }
 
 // Start is run when a service is started.
-// It does nothing in this case but is required by `node.Service` interface.
-func (w *NodeService) Start(server *p2p.Server) error {
+// It does nothing in this case but is required by `node.Lifecycle` interface.
+func (w *NodeService) Start() error {
 	return nil
 }
 
 // Stop is run when a service is stopped.
-// It does nothing in this case but is required by `node.Service` interface.
+// It does nothing in this case but is required by `node.Lifecycle` interface.
 func (w *NodeService) Stop() error {
 	return nil
 }
