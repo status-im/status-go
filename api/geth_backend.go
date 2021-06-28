@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
@@ -774,40 +773,6 @@ func (b *GethStatusBackend) CallRPC(inputJSON string) (string, error) {
 		return "", ErrRPCClientUnavailable
 	}
 	return client.CallRaw(inputJSON), nil
-}
-
-// GetNodesFromContract returns a list of nodes from the contract
-func (b *GethStatusBackend) GetNodesFromContract(rpcEndpoint string, contractAddress string) ([]string, error) {
-	var response []string
-
-	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
-	defer cancel()
-
-	ethclient, err := ethclient.DialContext(ctx, rpcEndpoint)
-	if err != nil {
-		return response, err
-	}
-
-	contract, err := registry.NewNodes(common.HexToAddress(contractAddress), ethclient)
-	if err != nil {
-		return response, err
-	}
-
-	nodeCount, err := contract.NodeCount(nil)
-	if err != nil {
-		return response, err
-	}
-
-	one := big.NewInt(1)
-	for i := big.NewInt(0); i.Cmp(nodeCount) < 0; i.Add(i, one) {
-		node, err := contract.Nodes(nil, i)
-		if err != nil {
-			return response, err
-		}
-		response = append(response, node)
-	}
-
-	return response, nil
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.

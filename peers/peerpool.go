@@ -15,7 +15,6 @@ import (
 
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/discovery"
-	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
 	"github.com/status-im/status-go/signal"
@@ -60,8 +59,6 @@ type Options struct {
 	TopicStopSearchDelay time.Duration
 	// TrustedMailServers is a list of trusted nodes.
 	TrustedMailServers []enode.ID
-	// MailServerRegistryAddress is the MailServerRegistry contract address
-	MailServerRegistryAddress string
 }
 
 // NewDefaultOptions returns a struct with default Options.
@@ -181,12 +178,6 @@ func (p *PeerPool) Start(server *p2p.Server, rpcClient contracts.RPCClient) erro
 }
 
 func (p *PeerPool) initVerifier(rpcClient contracts.RPCClient) (v Verifier, err error) {
-	if addr := p.opts.MailServerRegistryAddress; addr != "" {
-		caller := contracts.NewContractCaller(rpcClient)
-		addrBytes := common.FromHex(addr)
-		return registry.NewVerifier(caller, common.BytesToAddress(addrBytes))
-	}
-
 	return verifier.NewLocalVerifier(p.opts.TrustedMailServers), nil
 }
 
