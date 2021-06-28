@@ -11,7 +11,6 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 
 require (
-	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
@@ -21,10 +20,10 @@ require (
 	github.com/ethereum/go-ethereum v1.10.4
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.4.1
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
-	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/ipfs/go-log v1.0.4
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
@@ -33,7 +32,7 @@ require (
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/lucasb-eyer/go-colorful v1.0.3
-	github.com/mat/besticon v3.12.0+incompatible
+	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/multiformats/go-multiaddr v0.3.2
@@ -45,7 +44,7 @@ require (
 	github.com/oliamb/cutter v0.2.2
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.5.0
+	github.com/prometheus/client_golang v1.9.0
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
@@ -64,7 +63,7 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
-	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
+	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 	golang.org/x/text v0.3.6
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0

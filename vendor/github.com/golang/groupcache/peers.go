@@ -24,9 +24,12 @@ import (
 	pb "github.com/golang/groupcache/groupcachepb"
 )
 
+// Context is an alias to context.Context for backwards compatibility purposes.
+type Context = context.Context
+
 // ProtoGetter is the interface that must be implemented by a peer.
 type ProtoGetter interface {
-	Get(context context.Context, in *pb.GetRequest, out *pb.GetResponse) error
+	Get(ctx context.Context, in *pb.GetRequest, out *pb.GetResponse) error
 }
 
 // PeerPicker is the interface that must be implemented to locate
