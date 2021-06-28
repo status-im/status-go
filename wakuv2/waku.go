@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
@@ -58,6 +59,7 @@ import (
 const messageQueueLimit = 1024
 
 type settings struct {
+	LightClient            bool            // Indicates if the node is a light client
 	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
 	EnableConfirmations    bool            // Enable sending message confirmations
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
@@ -115,6 +117,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	waku.settings = settings{
+		LightClient:            cfg.LightClient,
 		MaxMsgSize:             cfg.MaxMessageSize,
 		SoftBlacklistedPeerIDs: make(map[string]bool),
 	}
@@ -139,35 +142,27 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
-	waku.node, err = node.New(context.Background(),
+	opts := []node.WakuNodeOption{
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
-		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
 		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
-	)
+		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+	}
+
+	if cfg.LightClient {
+		opts = append(opts, node.WithLightPush())
+	} else {
+		opts = append(opts, node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))))
+	}
+
+	waku.node, err = node.New(context.Background(), opts...)
 
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
 	}
 
-	for _, bootnode := range cfg.BootNodes {
-		err := waku.node.DialPeer(bootnode)
-		if err != nil {
-			log.Warn("Could not dial peer", err)
-		} else {
-			log.Info("Bootnode dialed successfully", bootnode)
-		}
-	}
-
-	for _, storenode := range cfg.StoreNodes {
-		peerID, err := waku.node.AddStorePeer(storenode)
-		if err != nil {
-			log.Warn("Could not add store peer", err)
-		} else {
-			log.Info("Storepeeer dialed successfully", "peerId", peerID.Pretty())
-		}
-	}
+	waku.addPeers(cfg)
 
 	go waku.runMsgLoop()
 
@@ -176,7 +171,49 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	return waku, nil
 }
 
+func (waku *Waku) addPeers(cfg *Config) {
+	for _, relaynode := range cfg.RelayNodes {
+		err := waku.node.DialPeer(relaynode)
+		if err != nil {
+			log.Warn("Could not dial peer", err)
+		} else {
+			log.Info("Relay peer dialed successfully", relaynode)
+		}
+	}
+
+	for _, storenode := range cfg.StoreNodes {
+		peerID, err := waku.node.AddStorePeer(storenode)
+		if err != nil {
+			log.Warn("Could not add store peer", err)
+		} else {
+			log.Info("Store peeer dialed successfully", "peerId", peerID.Pretty())
+		}
+	}
+
+	for _, filternode := range cfg.FilterNodes {
+		peerID, err := waku.node.AddFilterPeer(filternode)
+		if err != nil {
+			log.Warn("Could not add filter peer", err)
+		} else {
+			log.Info("Filter peer dialed successfully", "peerId", peerID.Pretty())
+		}
+	}
+
+	for _, lightpushnode := range cfg.LightpushNodes {
+		peerID, err := waku.node.AddLightPushPeer(lightpushnode)
+		if err != nil {
+			log.Warn("Could not add lightpush peer", err)
+		} else {
+			log.Info("lightpush peer dialed successfully", "peerId", peerID.Pretty())
+		}
+	}
+}
+
 func (w *Waku) runMsgLoop() {
+	if w.settings.LightClient {
+		return
+	}
+
 	sub, err := w.node.Subscribe(nil)
 	if err != nil {
 		fmt.Println("Could not subscribe:", err)
@@ -479,12 +516,44 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
+func (w *Waku) filterMessageLoop(topics [][]byte) {
+	pubsubTopic := relay.GetTopic(nil)
+	filterRequest := pb.FilterRequest{
+		Topic:     string(pubsubTopic),
+		Subscribe: true,
+	}
+	var contentFilters []*pb.FilterRequest_ContentFilter
+	for _, topic := range topics {
+		t := &pb.FilterRequest_ContentFilter{ContentTopic: string(topic)}
+		contentFilters = append(contentFilters, t)
+	}
+	filterRequest.ContentFilters = contentFilters
+	envChannel := make(chan *protocol.Envelope, 1024)
+	err := w.node.SubscribeFilter(context.Background(), filterRequest, envChannel)
+	if err != nil {
+		w.logger.Warn("could not add wakuv2 filter for topics", zap.Any("topics", topics))
+		return
+	}
+
+	for env := range envChannel {
+		envelopeErrors, err := w.OnNewEnvelopes(env)
+
+		// TODO: should these be handled?
+		_ = envelopeErrors
+		_ = err
+	}
+}
+
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	s, err := w.filters.Install(f)
 	if err != nil {
 		return s, err
+	}
+
+	if w.settings.LightClient {
+		go w.filterMessageLoop(f.Topics)
 	}
 
 	return s, nil
@@ -499,10 +568,32 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 // TODO: This does not seem to update the bloom filter, but does update
 // the topic interest map
 func (w *Waku) Unsubscribe(id string) error {
+	filter := w.filters.Get(id)
+
+	if filter != nil && w.settings.LightClient {
+		pubsubTopic := relay.GetTopic(nil)
+		filterRequest := pb.FilterRequest{
+			Topic:     string(pubsubTopic),
+			Subscribe: true,
+		}
+
+		var contentFilters []*pb.FilterRequest_ContentFilter
+		for _, topic := range filter.Topics {
+			t := &pb.FilterRequest_ContentFilter{ContentTopic: string(topic)}
+			contentFilters = append(contentFilters, t)
+		}
+		filterRequest.ContentFilters = contentFilters
+
+		w.node.UnsubscribeFilter(context.Background(), filterRequest)
+
+		// TODO: close channel on line 540
+	}
+
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
+
 	return nil
 }
 

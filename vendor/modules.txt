@@ -1,9 +1,9 @@
-# github.com/PuerkitoBio/goquery v1.6.0
+# github.com/PuerkitoBio/goquery v1.6.1
 github.com/PuerkitoBio/goquery
 # github.com/allegro/bigcache v1.2.0
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
-# github.com/andybalholm/cascadia v1.1.0
+# github.com/andybalholm/cascadia v1.2.0
 github.com/andybalholm/cascadia
 # github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
 github.com/aristanetworks/goarista/monotime
@@ -135,15 +135,15 @@ github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
-# github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
+# github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 github.com/golang/groupcache
 github.com/golang/groupcache/consistenthash
 github.com/golang/groupcache/groupcachepb
 github.com/golang/groupcache/lru
 github.com/golang/groupcache/singleflight
-# github.com/golang/mock v1.4.1
+# github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
-# github.com/golang/protobuf v1.4.1
+# github.com/golang/protobuf v1.5.2
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
 github.com/golang/protobuf/ptypes
@@ -154,7 +154,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/snappy
 # github.com/google/gopacket v1.1.17
 github.com/google/gopacket/routing
-# github.com/google/uuid v1.1.1
+# github.com/google/uuid v1.1.2
 github.com/google/uuid
 # github.com/gorilla/websocket v1.4.2
 github.com/gorilla/websocket
@@ -316,7 +316,7 @@ github.com/libp2p/go-ws-transport
 github.com/libp2p/go-yamux/v2
 # github.com/lucasb-eyer/go-colorful v1.0.3
 github.com/lucasb-eyer/go-colorful
-# github.com/mat/besticon v3.12.0+incompatible
+# github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
 github.com/mat/besticon/besticon
 github.com/mat/besticon/colorfinder
 github.com/mat/besticon/ico
@@ -375,17 +375,17 @@ github.com/pborman/uuid
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.5.0
+# github.com/prometheus/client_golang v1.11.0
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.9.1
+# github.com/prometheus/common v0.29.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.0.8
+# github.com/prometheus/procfs v0.6.0
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -393,7 +393,7 @@ github.com/prometheus/procfs/internal/util
 github.com/prometheus/tsdb/fileutil
 # github.com/rjeczalik/notify v0.9.2
 github.com/rjeczalik/notify
-# github.com/rs/cors v1.6.0
+# github.com/rs/cors v1.7.0
 github.com/rs/cors
 # github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 github.com/russolsen/transit
@@ -407,7 +407,8 @@ github.com/spaolacci/murmur3
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20210624095504-4133155590da
+# github.com/status-im/go-waku v0.0.0-20210628141428-367459f4d755
+github.com/status-im/go-waku/waku/v2/metrics
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol
 github.com/status-im/go-waku/waku/v2/protocol/filter
@@ -504,7 +505,7 @@ github.com/xeipuuv/gojsonpointer
 github.com/xeipuuv/gojsonreference
 # github.com/xeipuuv/gojsonschema v1.2.0
 github.com/xeipuuv/gojsonschema
-# go.opencensus.io v0.22.4
+# go.opencensus.io v0.23.0
 go.opencensus.io/internal/tagencoding
 go.opencensus.io/metric/metricdata
 go.opencensus.io/metric/metricproducer
@@ -524,7 +525,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+# golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/chacha20
@@ -539,13 +540,13 @@ golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
+# golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 golang.org/x/image/bmp
 golang.org/x/image/riff
 golang.org/x/image/vp8
 golang.org/x/image/vp8l
 golang.org/x/image/webp
-# golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+# golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -557,12 +558,12 @@ golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/publicsuffix
 golang.org/x/net/route
-# golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3
+# golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.5
+# golang.org/x/text v0.3.6
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -583,7 +584,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# google.golang.org/protobuf v1.26.0-rc.1
+# google.golang.org/protobuf v1.26.0
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
@@ -605,6 +606,7 @@ google.golang.org/protobuf/internal/set
 google.golang.org/protobuf/internal/strs
 google.golang.org/protobuf/internal/version
 google.golang.org/protobuf/proto
+google.golang.org/protobuf/reflect/protodesc
 google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
