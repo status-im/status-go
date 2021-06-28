@@ -8,8 +8,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-// Make sure that Service implements node.Service interface.
-var _ node.Service = (*Service)(nil)
+// Make sure that Service implements node.Lifecycle interface.
+var _ node.Lifecycle = (*Service)(nil)
 
 // Service represents out own implementation of personal sign operations.
 type Service struct {
@@ -51,7 +51,7 @@ func (s *Service) APIs() []rpc.API {
 }
 
 // Start is run when a service is started.
-func (s *Service) Start(server *p2p.Server) error {
+func (s *Service) Start() error {
 	s.quit = make(chan struct{})
 	err := s.transactionSentToUpstreamEvent.Start()
 	if err != nil {
