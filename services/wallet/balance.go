@@ -50,7 +50,9 @@ func GetTokensBalances(parent context.Context, client *walletClient, accounts, t
 				if !exist {
 					response[account] = map[common.Address]*hexutil.Big{}
 				}
-				response[account][token] = balance
+				b := hexutil.Big(*balance)
+
+				response[account][token] = &b
 				mu.Unlock()
 				return nil
 			})

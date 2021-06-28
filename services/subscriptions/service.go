@@ -8,8 +8,8 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
-// Make sure that Service implements gethnode.Service interface.
-var _ gethnode.Service = (*Service)(nil)
+// Make sure that Service implements gethnode.Lifecycle interface.
+var _ gethnode.Lifecycle = (*Service)(nil)
 
 // Service represents our own implementation of personal sign operations.
 type Service struct {
@@ -41,7 +41,7 @@ func (s *Service) APIs() []gethrpc.API {
 }
 
 // Start is run when a service is started.
-func (s *Service) Start(server *p2p.Server) error {
+func (s *Service) Start() error {
 	return nil
 }
 
