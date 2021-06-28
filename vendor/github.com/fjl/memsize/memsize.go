@@ -223,10 +223,10 @@ func (c *context) scanMap(v reflect.Value) uintptr {
 		extra = uintptr(0)
 	)
 	if c.tc.needScan(typ.Key()) || c.tc.needScan(typ.Elem()) {
-		for _, k := range v.MapKeys() {
+		iterateMap(v, func(k, v reflect.Value) {
 			extra += c.scan(invalidAddr, k, false)
-			extra += c.scan(invalidAddr, v.MapIndex(k), false)
-		}
+			extra += c.scan(invalidAddr, v, false)
+		})
 	} else {
 		extra = len*typ.Key().Size() + len*typ.Elem().Size()
 	}

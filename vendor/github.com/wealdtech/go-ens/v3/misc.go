@@ -101,7 +101,7 @@ func Domain(domain string) string {
 //     -3 |  bar
 func DomainPart(domain string, part int) (string, error) {
 	if part == 0 {
-		return "", fmt.Errorf("Invalid part")
+		return "", fmt.Errorf("invalid part")
 	}
 	domain, err := NormaliseDomain(domain)
 	if err != nil {
@@ -109,7 +109,7 @@ func DomainPart(domain string, part int) (string, error) {
 	}
 	parts := strings.Split(domain, ".")
 	if len(parts) < abs(part) {
-		return "", fmt.Errorf("Not enough parts")
+		return "", fmt.Errorf("not enough parts")
 	}
 	if part < 0 {
 		return parts[len(parts)+part], nil

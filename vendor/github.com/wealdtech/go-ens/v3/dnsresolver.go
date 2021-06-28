@@ -128,6 +128,7 @@ func (r *DNSResolver) SetZonehash(opts *bind.TransactOpts, zonehash []byte) (*ty
 // DNSWireFormatDomainHash hashes a domain name in wire format
 func DNSWireFormatDomainHash(domain string) (hash [32]byte) {
 	sha := sha3.NewLegacyKeccak256()
+	// //nolint:golint,errcheck
 	sha.Write(DNSWireFormat(domain))
 	sha.Sum(hash[:0])
 	return
@@ -150,7 +151,7 @@ func DNSWireFormat(domain string) []byte {
 	for _, piece := range pieces {
 		bytes[offset] = byte(len(piece))
 		offset++
-		copy(bytes[offset:offset+len(piece)], []byte(piece))
+		copy(bytes[offset:offset+len(piece)], piece)
 		offset += len(piece)
 	}
 	return bytes

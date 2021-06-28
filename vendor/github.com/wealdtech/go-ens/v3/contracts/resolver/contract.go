@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -138,7 +137,7 @@ func bindContract(address common.Address, caller bind.ContractCaller, transactor
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.ContractCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -157,7 +156,7 @@ func (_Contract *ContractRaw) Transact(opts *bind.TransactOpts, method string, p
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -174,261 +173,309 @@ func (_Contract *ContractTransactorRaw) Transact(opts *bind.TransactOpts, method
 
 // ABI is a free data retrieval call binding the contract method 0x2203ab56.
 //
-// Solidity: function ABI(bytes32 node, uint256 contentTypes) constant returns(uint256, bytes)
+// Solidity: function ABI(bytes32 node, uint256 contentTypes) view returns(uint256, bytes)
 func (_Contract *ContractCaller) ABI(opts *bind.CallOpts, node [32]byte, contentTypes *big.Int) (*big.Int, []byte, error) {
-	var (
-		ret0 = new(*big.Int)
-		ret1 = new([]byte)
-	)
-	out := &[]interface{}{
-		ret0,
-		ret1,
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "ABI", node, contentTypes)
+
+	if err != nil {
+		return *new(*big.Int), *new([]byte), err
 	}
-	err := _Contract.contract.Call(opts, out, "ABI", node, contentTypes)
-	return *ret0, *ret1, err
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	out1 := *abi.ConvertType(out[1], new([]byte)).(*[]byte)
+
+	return out0, out1, err
+
 }
 
 // ABI is a free data retrieval call binding the contract method 0x2203ab56.
 //
-// Solidity: function ABI(bytes32 node, uint256 contentTypes) constant returns(uint256, bytes)
+// Solidity: function ABI(bytes32 node, uint256 contentTypes) view returns(uint256, bytes)
 func (_Contract *ContractSession) ABI(node [32]byte, contentTypes *big.Int) (*big.Int, []byte, error) {
 	return _Contract.Contract.ABI(&_Contract.CallOpts, node, contentTypes)
 }
 
 // ABI is a free data retrieval call binding the contract method 0x2203ab56.
 //
-// Solidity: function ABI(bytes32 node, uint256 contentTypes) constant returns(uint256, bytes)
+// Solidity: function ABI(bytes32 node, uint256 contentTypes) view returns(uint256, bytes)
 func (_Contract *ContractCallerSession) ABI(node [32]byte, contentTypes *big.Int) (*big.Int, []byte, error) {
 	return _Contract.Contract.ABI(&_Contract.CallOpts, node, contentTypes)
 }
 
 // Addr is a free data retrieval call binding the contract method 0x3b3b57de.
 //
-// Solidity: function addr(bytes32 node) constant returns(address)
+// Solidity: function addr(bytes32 node) view returns(address)
 func (_Contract *ContractCaller) Addr(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "addr", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "addr", node)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Addr is a free data retrieval call binding the contract method 0x3b3b57de.
 //
-// Solidity: function addr(bytes32 node) constant returns(address)
+// Solidity: function addr(bytes32 node) view returns(address)
 func (_Contract *ContractSession) Addr(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Addr(&_Contract.CallOpts, node)
 }
 
 // Addr is a free data retrieval call binding the contract method 0x3b3b57de.
 //
-// Solidity: function addr(bytes32 node) constant returns(address)
+// Solidity: function addr(bytes32 node) view returns(address)
 func (_Contract *ContractCallerSession) Addr(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Addr(&_Contract.CallOpts, node)
 }
 
 // Addr0 is a free data retrieval call binding the contract method 0xf1cb7e06.
 //
-// Solidity: function addr(bytes32 node, uint256 coinType) constant returns(bytes)
+// Solidity: function addr(bytes32 node, uint256 coinType) view returns(bytes)
 func (_Contract *ContractCaller) Addr0(opts *bind.CallOpts, node [32]byte, coinType *big.Int) ([]byte, error) {
-	var (
-		ret0 = new([]byte)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "addr0", node, coinType)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "addr0", node, coinType)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
 }
 
 // Addr0 is a free data retrieval call binding the contract method 0xf1cb7e06.
 //
-// Solidity: function addr(bytes32 node, uint256 coinType) constant returns(bytes)
+// Solidity: function addr(bytes32 node, uint256 coinType) view returns(bytes)
 func (_Contract *ContractSession) Addr0(node [32]byte, coinType *big.Int) ([]byte, error) {
 	return _Contract.Contract.Addr0(&_Contract.CallOpts, node, coinType)
 }
 
 // Addr0 is a free data retrieval call binding the contract method 0xf1cb7e06.
 //
-// Solidity: function addr(bytes32 node, uint256 coinType) constant returns(bytes)
+// Solidity: function addr(bytes32 node, uint256 coinType) view returns(bytes)
 func (_Contract *ContractCallerSession) Addr0(node [32]byte, coinType *big.Int) ([]byte, error) {
 	return _Contract.Contract.Addr0(&_Contract.CallOpts, node, coinType)
 }
 
 // Authorisations is a free data retrieval call binding the contract method 0xf86bc879.
 //
-// Solidity: function authorisations(bytes32 , address , address ) constant returns(bool)
+// Solidity: function authorisations(bytes32 , address , address ) view returns(bool)
 func (_Contract *ContractCaller) Authorisations(opts *bind.CallOpts, arg0 [32]byte, arg1 common.Address, arg2 common.Address) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "authorisations", arg0, arg1, arg2)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "authorisations", arg0, arg1, arg2)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // Authorisations is a free data retrieval call binding the contract method 0xf86bc879.
 //
-// Solidity: function authorisations(bytes32 , address , address ) constant returns(bool)
+// Solidity: function authorisations(bytes32 , address , address ) view returns(bool)
 func (_Contract *ContractSession) Authorisations(arg0 [32]byte, arg1 common.Address, arg2 common.Address) (bool, error) {
 	return _Contract.Contract.Authorisations(&_Contract.CallOpts, arg0, arg1, arg2)
 }
 
 // Authorisations is a free data retrieval call binding the contract method 0xf86bc879.
 //
-// Solidity: function authorisations(bytes32 , address , address ) constant returns(bool)
+// Solidity: function authorisations(bytes32 , address , address ) view returns(bool)
 func (_Contract *ContractCallerSession) Authorisations(arg0 [32]byte, arg1 common.Address, arg2 common.Address) (bool, error) {
 	return _Contract.Contract.Authorisations(&_Contract.CallOpts, arg0, arg1, arg2)
 }
 
 // Contenthash is a free data retrieval call binding the contract method 0xbc1c58d1.
 //
-// Solidity: function contenthash(bytes32 node) constant returns(bytes)
+// Solidity: function contenthash(bytes32 node) view returns(bytes)
 func (_Contract *ContractCaller) Contenthash(opts *bind.CallOpts, node [32]byte) ([]byte, error) {
-	var (
-		ret0 = new([]byte)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "contenthash", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "contenthash", node)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
 }
 
 // Contenthash is a free data retrieval call binding the contract method 0xbc1c58d1.
 //
-// Solidity: function contenthash(bytes32 node) constant returns(bytes)
+// Solidity: function contenthash(bytes32 node) view returns(bytes)
 func (_Contract *ContractSession) Contenthash(node [32]byte) ([]byte, error) {
 	return _Contract.Contract.Contenthash(&_Contract.CallOpts, node)
 }
 
 // Contenthash is a free data retrieval call binding the contract method 0xbc1c58d1.
 //
-// Solidity: function contenthash(bytes32 node) constant returns(bytes)
+// Solidity: function contenthash(bytes32 node) view returns(bytes)
 func (_Contract *ContractCallerSession) Contenthash(node [32]byte) ([]byte, error) {
 	return _Contract.Contract.Contenthash(&_Contract.CallOpts, node)
 }
 
 // DnsRecord is a free data retrieval call binding the contract method 0xa8fa5682.
 //
-// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) constant returns(bytes)
+// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) view returns(bytes)
 func (_Contract *ContractCaller) DnsRecord(opts *bind.CallOpts, node [32]byte, name [32]byte, resource uint16) ([]byte, error) {
-	var (
-		ret0 = new([]byte)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "dnsRecord", node, name, resource)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "dnsRecord", node, name, resource)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
 }
 
 // DnsRecord is a free data retrieval call binding the contract method 0xa8fa5682.
 //
-// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) constant returns(bytes)
+// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) view returns(bytes)
 func (_Contract *ContractSession) DnsRecord(node [32]byte, name [32]byte, resource uint16) ([]byte, error) {
 	return _Contract.Contract.DnsRecord(&_Contract.CallOpts, node, name, resource)
 }
 
 // DnsRecord is a free data retrieval call binding the contract method 0xa8fa5682.
 //
-// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) constant returns(bytes)
+// Solidity: function dnsRecord(bytes32 node, bytes32 name, uint16 resource) view returns(bytes)
 func (_Contract *ContractCallerSession) DnsRecord(node [32]byte, name [32]byte, resource uint16) ([]byte, error) {
 	return _Contract.Contract.DnsRecord(&_Contract.CallOpts, node, name, resource)
 }
 
 // HasDNSRecords is a free data retrieval call binding the contract method 0x4cbf6ba4.
 //
-// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) constant returns(bool)
+// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) view returns(bool)
 func (_Contract *ContractCaller) HasDNSRecords(opts *bind.CallOpts, node [32]byte, name [32]byte) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "hasDNSRecords", node, name)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "hasDNSRecords", node, name)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // HasDNSRecords is a free data retrieval call binding the contract method 0x4cbf6ba4.
 //
-// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) constant returns(bool)
+// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) view returns(bool)
 func (_Contract *ContractSession) HasDNSRecords(node [32]byte, name [32]byte) (bool, error) {
 	return _Contract.Contract.HasDNSRecords(&_Contract.CallOpts, node, name)
 }
 
 // HasDNSRecords is a free data retrieval call binding the contract method 0x4cbf6ba4.
 //
-// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) constant returns(bool)
+// Solidity: function hasDNSRecords(bytes32 node, bytes32 name) view returns(bool)
 func (_Contract *ContractCallerSession) HasDNSRecords(node [32]byte, name [32]byte) (bool, error) {
 	return _Contract.Contract.HasDNSRecords(&_Contract.CallOpts, node, name)
 }
 
 // InterfaceImplementer is a free data retrieval call binding the contract method 0x124a319c.
 //
-// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) constant returns(address)
+// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) view returns(address)
 func (_Contract *ContractCaller) InterfaceImplementer(opts *bind.CallOpts, node [32]byte, interfaceID [4]byte) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "interfaceImplementer", node, interfaceID)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "interfaceImplementer", node, interfaceID)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // InterfaceImplementer is a free data retrieval call binding the contract method 0x124a319c.
 //
-// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) constant returns(address)
+// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) view returns(address)
 func (_Contract *ContractSession) InterfaceImplementer(node [32]byte, interfaceID [4]byte) (common.Address, error) {
 	return _Contract.Contract.InterfaceImplementer(&_Contract.CallOpts, node, interfaceID)
 }
 
 // InterfaceImplementer is a free data retrieval call binding the contract method 0x124a319c.
 //
-// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) constant returns(address)
+// Solidity: function interfaceImplementer(bytes32 node, bytes4 interfaceID) view returns(address)
 func (_Contract *ContractCallerSession) InterfaceImplementer(node [32]byte, interfaceID [4]byte) (common.Address, error) {
 	return _Contract.Contract.InterfaceImplementer(&_Contract.CallOpts, node, interfaceID)
 }
 
 // Name is a free data retrieval call binding the contract method 0x691f3431.
 //
-// Solidity: function name(bytes32 node) constant returns(string)
+// Solidity: function name(bytes32 node) view returns(string)
 func (_Contract *ContractCaller) Name(opts *bind.CallOpts, node [32]byte) (string, error) {
-	var (
-		ret0 = new(string)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "name", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "name", node)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
 // Name is a free data retrieval call binding the contract method 0x691f3431.
 //
-// Solidity: function name(bytes32 node) constant returns(string)
+// Solidity: function name(bytes32 node) view returns(string)
 func (_Contract *ContractSession) Name(node [32]byte) (string, error) {
 	return _Contract.Contract.Name(&_Contract.CallOpts, node)
 }
 
 // Name is a free data retrieval call binding the contract method 0x691f3431.
 //
-// Solidity: function name(bytes32 node) constant returns(string)
+// Solidity: function name(bytes32 node) view returns(string)
 func (_Contract *ContractCallerSession) Name(node [32]byte) (string, error) {
 	return _Contract.Contract.Name(&_Contract.CallOpts, node)
 }
 
 // Pubkey is a free data retrieval call binding the contract method 0xc8690233.
 //
-// Solidity: function pubkey(bytes32 node) constant returns(bytes32 x, bytes32 y)
+// Solidity: function pubkey(bytes32 node) view returns(bytes32 x, bytes32 y)
 func (_Contract *ContractCaller) Pubkey(opts *bind.CallOpts, node [32]byte) (struct {
 	X [32]byte
 	Y [32]byte
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "pubkey", node)
+
+	outstruct := new(struct {
 		X [32]byte
 		Y [32]byte
 	})
-	out := ret
-	err := _Contract.contract.Call(opts, out, "pubkey", node)
-	return *ret, err
+
+	outstruct.X = out[0].([32]byte)
+	outstruct.Y = out[1].([32]byte)
+
+	return *outstruct, err
+
 }
 
 // Pubkey is a free data retrieval call binding the contract method 0xc8690233.
 //
-// Solidity: function pubkey(bytes32 node) constant returns(bytes32 x, bytes32 y)
+// Solidity: function pubkey(bytes32 node) view returns(bytes32 x, bytes32 y)
 func (_Contract *ContractSession) Pubkey(node [32]byte) (struct {
 	X [32]byte
 	Y [32]byte
@@ -438,7 +485,7 @@ func (_Contract *ContractSession) Pubkey(node [32]byte) (struct {
 
 // Pubkey is a free data retrieval call binding the contract method 0xc8690233.
 //
-// Solidity: function pubkey(bytes32 node) constant returns(bytes32 x, bytes32 y)
+// Solidity: function pubkey(bytes32 node) view returns(bytes32 x, bytes32 y)
 func (_Contract *ContractCallerSession) Pubkey(node [32]byte) (struct {
 	X [32]byte
 	Y [32]byte
@@ -448,52 +495,62 @@ func (_Contract *ContractCallerSession) Pubkey(node [32]byte) (struct {
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractCaller) SupportsInterface(opts *bind.CallOpts, interfaceID [4]byte) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "supportsInterface", interfaceID)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "supportsInterface", interfaceID)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractSession) SupportsInterface(interfaceID [4]byte) (bool, error) {
 	return _Contract.Contract.SupportsInterface(&_Contract.CallOpts, interfaceID)
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
-// Solidity: function supportsInterface(bytes4 interfaceID) constant returns(bool)
+// Solidity: function supportsInterface(bytes4 interfaceID) pure returns(bool)
 func (_Contract *ContractCallerSession) SupportsInterface(interfaceID [4]byte) (bool, error) {
 	return _Contract.Contract.SupportsInterface(&_Contract.CallOpts, interfaceID)
 }
 
 // Text is a free data retrieval call binding the contract method 0x59d1d43c.
 //
-// Solidity: function text(bytes32 node, string key) constant returns(string)
+// Solidity: function text(bytes32 node, string key) view returns(string)
 func (_Contract *ContractCaller) Text(opts *bind.CallOpts, node [32]byte, key string) (string, error) {
-	var (
-		ret0 = new(string)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "text", node, key)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "text", node, key)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
 // Text is a free data retrieval call binding the contract method 0x59d1d43c.
 //
-// Solidity: function text(bytes32 node, string key) constant returns(string)
+// Solidity: function text(bytes32 node, string key) view returns(string)
 func (_Contract *ContractSession) Text(node [32]byte, key string) (string, error) {
 	return _Contract.Contract.Text(&_Contract.CallOpts, node, key)
 }
 
 // Text is a free data retrieval call binding the contract method 0x59d1d43c.
 //
-// Solidity: function text(bytes32 node, string key) constant returns(string)
+// Solidity: function text(bytes32 node, string key) view returns(string)
 func (_Contract *ContractCallerSession) Text(node [32]byte, key string) (string, error) {
 	return _Contract.Contract.Text(&_Contract.CallOpts, node, key)
 }

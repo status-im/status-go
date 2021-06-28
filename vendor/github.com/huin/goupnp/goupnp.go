@@ -21,10 +21,8 @@ import (
 	"net/url"
 	"time"
 
-	"golang.org/x/net/html/charset"
-
-	"github.com/huin/goupnp/httpu"
 	"github.com/huin/goupnp/ssdp"
+	"golang.org/x/net/html/charset"
 )
 
 // ContextError is an error that wraps an error with some context information.
@@ -33,12 +31,29 @@ type ContextError struct {
 	Err     error
 }
 
+func ctxError(err error, msg string) ContextError {
+	return ContextError{
+		Context: msg,
+		Err:     err,
+	}
+}
+
+func ctxErrorf(err error, msg string, args ...interface{}) ContextError {
+	return ContextError{
+		Context: fmt.Sprintf(msg, args...),
+		Err:     err,
+	}
+}
+
 func (err ContextError) Error() string {
 	return fmt.Sprintf("%s: %v", err.Context, err.Err)
 }
 
 // MaybeRootDevice contains either a RootDevice or an error.
 type MaybeRootDevice struct {
+	// Identifier of the device.
+	USN string
+
 	// Set iff Err == nil.
 	Root *RootDevice
 
@@ -58,12 +73,12 @@ type MaybeRootDevice struct {
 // while attempting to send the query. An error or RootDevice is returned for
 // each discovered RootDevice.
 func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
-	httpu, err := httpu.NewHTTPUClient()
+	hc, hcCleanup, err := httpuClient()
 	if err != nil {
 		return nil, err
 	}
-	defer httpu.Close()
-	responses, err := ssdp.SSDPRawSearch(httpu, string(searchTarget), 2, 3)
+	defer hcCleanup()
+	responses, err := ssdp.SSDPRawSearch(hc, string(searchTarget), 2, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +86,7 @@ func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
 	results := make([]MaybeRootDevice, len(responses))
 	for i, response := range responses {
 		maybe := &results[i]
+		maybe.USN = response.Header.Get("USN")
 		loc, err := response.Location()
 		if err != nil {
 			maybe.Err = ContextError{"unexpected bad location from search", err}

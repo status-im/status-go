@@ -255,7 +255,15 @@ func (l *maListener) Accept() (Conn, error) {
 		}
 	}
 
-	return wrap(nconn, l.laddr, raddr), nil
+	var laddr ma.Multiaddr
+	if nconn.LocalAddr().String() != "" {
+		laddr, err = FromNetAddr(nconn.LocalAddr())
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert conn.LocalAddr: %s", err)
+		}
+	}
+
+	return wrap(nconn, laddr, raddr), nil
 }
 
 // Multiaddr returns the listener's (local) Multiaddr.

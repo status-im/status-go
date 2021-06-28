@@ -20,7 +20,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -138,7 +137,7 @@ func bindContract(address common.Address, caller bind.ContractCaller, transactor
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.ContractCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -157,7 +156,7 @@ func (_Contract *ContractRaw) Transact(opts *bind.TransactOpts, method string, p
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Contract *ContractCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Contract.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -174,78 +173,93 @@ func (_Contract *ContractTransactorRaw) Transact(opts *bind.TransactOpts, method
 
 // Owner is a free data retrieval call binding the contract method 0x02571be3.
 //
-// Solidity: function owner(bytes32 node) constant returns(address)
+// Solidity: function owner(bytes32 node) returns(address)
 func (_Contract *ContractCaller) Owner(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "owner", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "owner", node)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Owner is a free data retrieval call binding the contract method 0x02571be3.
 //
-// Solidity: function owner(bytes32 node) constant returns(address)
+// Solidity: function owner(bytes32 node) returns(address)
 func (_Contract *ContractSession) Owner(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Owner(&_Contract.CallOpts, node)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x02571be3.
 //
-// Solidity: function owner(bytes32 node) constant returns(address)
+// Solidity: function owner(bytes32 node) returns(address)
 func (_Contract *ContractCallerSession) Owner(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Owner(&_Contract.CallOpts, node)
 }
 
 // Resolver is a free data retrieval call binding the contract method 0x0178b8bf.
 //
-// Solidity: function resolver(bytes32 node) constant returns(address)
+// Solidity: function resolver(bytes32 node) returns(address)
 func (_Contract *ContractCaller) Resolver(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "resolver", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "resolver", node)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Resolver is a free data retrieval call binding the contract method 0x0178b8bf.
 //
-// Solidity: function resolver(bytes32 node) constant returns(address)
+// Solidity: function resolver(bytes32 node) returns(address)
 func (_Contract *ContractSession) Resolver(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Resolver(&_Contract.CallOpts, node)
 }
 
 // Resolver is a free data retrieval call binding the contract method 0x0178b8bf.
 //
-// Solidity: function resolver(bytes32 node) constant returns(address)
+// Solidity: function resolver(bytes32 node) returns(address)
 func (_Contract *ContractCallerSession) Resolver(node [32]byte) (common.Address, error) {
 	return _Contract.Contract.Resolver(&_Contract.CallOpts, node)
 }
 
 // Ttl is a free data retrieval call binding the contract method 0x16a25cbd.
 //
-// Solidity: function ttl(bytes32 node) constant returns(uint64)
+// Solidity: function ttl(bytes32 node) returns(uint64)
 func (_Contract *ContractCaller) Ttl(opts *bind.CallOpts, node [32]byte) (uint64, error) {
-	var (
-		ret0 = new(uint64)
-	)
-	out := ret0
-	err := _Contract.contract.Call(opts, out, "ttl", node)
-	return *ret0, err
+	var out []interface{}
+	err := _Contract.contract.Call(opts, &out, "ttl", node)
+
+	if err != nil {
+		return *new(uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+
+	return out0, err
+
 }
 
 // Ttl is a free data retrieval call binding the contract method 0x16a25cbd.
 //
-// Solidity: function ttl(bytes32 node) constant returns(uint64)
+// Solidity: function ttl(bytes32 node) returns(uint64)
 func (_Contract *ContractSession) Ttl(node [32]byte) (uint64, error) {
 	return _Contract.Contract.Ttl(&_Contract.CallOpts, node)
 }
 
 // Ttl is a free data retrieval call binding the contract method 0x16a25cbd.
 //
-// Solidity: function ttl(bytes32 node) constant returns(uint64)
+// Solidity: function ttl(bytes32 node) returns(uint64)
 func (_Contract *ContractCallerSession) Ttl(node [32]byte) (uint64, error) {
 	return _Contract.Contract.Ttl(&_Contract.CallOpts, node)
 }
@@ -476,6 +490,17 @@ func (_Contract *ContractFilterer) WatchNewOwner(opts *bind.WatchOpts, sink chan
 	}), nil
 }
 
+// ParseNewOwner is a log parse operation binding the contract event 0xce0457fe73731f824cc272376169235128c118b49d344817417c6d108d155e82.
+//
+// Solidity: event NewOwner(bytes32 indexed node, bytes32 indexed label, address owner)
+func (_Contract *ContractFilterer) ParseNewOwner(log types.Log) (*ContractNewOwner, error) {
+	event := new(ContractNewOwner)
+	if err := _Contract.contract.UnpackLog(event, "NewOwner", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 // ContractNewResolverIterator is returned from FilterNewResolver and is used to iterate over the raw logs and unpacked data for NewResolver events raised by the Contract contract.
 type ContractNewResolverIterator struct {
 	Event *ContractNewResolver // Event containing the contract specifics and raw log
@@ -607,6 +632,17 @@ func (_Contract *ContractFilterer) WatchNewResolver(opts *bind.WatchOpts, sink c
 			}
 		}
 	}), nil
+}
+
+// ParseNewResolver is a log parse operation binding the contract event 0x335721b01866dc23fbee8b6b2c7b1e14d6f05c28cd35a2c934239f94095602a0.
+//
+// Solidity: event NewResolver(bytes32 indexed node, address resolver)
+func (_Contract *ContractFilterer) ParseNewResolver(log types.Log) (*ContractNewResolver, error) {
+	event := new(ContractNewResolver)
+	if err := _Contract.contract.UnpackLog(event, "NewResolver", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 // ContractNewTTLIterator is returned from FilterNewTTL and is used to iterate over the raw logs and unpacked data for NewTTL events raised by the Contract contract.
@@ -742,6 +778,17 @@ func (_Contract *ContractFilterer) WatchNewTTL(opts *bind.WatchOpts, sink chan<-
 	}), nil
 }
 
+// ParseNewTTL is a log parse operation binding the contract event 0x1d4f9bbfc9cab89d66e1a1562f2233ccbf1308cb4f63de2ead5787adddb8fa68.
+//
+// Solidity: event NewTTL(bytes32 indexed node, uint64 ttl)
+func (_Contract *ContractFilterer) ParseNewTTL(log types.Log) (*ContractNewTTL, error) {
+	event := new(ContractNewTTL)
+	if err := _Contract.contract.UnpackLog(event, "NewTTL", log); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 // ContractTransferIterator is returned from FilterTransfer and is used to iterate over the raw logs and unpacked data for Transfer events raised by the Contract contract.
 type ContractTransferIterator struct {
 	Event *ContractTransfer // Event containing the contract specifics and raw log
@@ -873,4 +920,15 @@ func (_Contract *ContractFilterer) WatchTransfer(opts *bind.WatchOpts, sink chan
 			}
 		}
 	}), nil
+}
+
+// ParseTransfer is a log parse operation binding the contract event 0xd4735d920b0f87494915f556dd9b54c8f309026070caea5c737245152564d266.
+//
+// Solidity: event Transfer(bytes32 indexed node, address owner)
+func (_Contract *ContractFilterer) ParseTransfer(log types.Log) (*ContractTransfer, error) {
+	event := new(ContractTransfer)
+	if err := _Contract.contract.UnpackLog(event, "Transfer", log); err != nil {
+		return nil, err
+	}
+	return event, nil
 }

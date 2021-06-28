@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
+	"github.com/ethereum/go-ethereum/les/utils"
 )
 
 // requestDistributor implements a mechanism that distributes requests to
@@ -49,7 +50,7 @@ type requestDistributor struct {
 type distPeer interface {
 	waitBefore(uint64) (time.Duration, float64)
 	canQueue() bool
-	queueSend(f func())
+	queueSend(f func()) bool
 }
 
 // distReq is the request abstraction used by the distributor. It is based on
@@ -73,7 +74,7 @@ type distReq struct {
 }
 
 // newRequestDistributor creates a new request distributor
-func newRequestDistributor(peers *peerSet, clock mclock.Clock) *requestDistributor {
+func newRequestDistributor(peers *serverPeerSet, clock mclock.Clock) *requestDistributor {
 	d := &requestDistributor{
 		clock:    clock,
 		reqQueue: list.New(),
@@ -82,7 +83,7 @@ func newRequestDistributor(peers *peerSet, clock mclock.Clock) *requestDistribut
 		peers:    make(map[distPeer]struct{}),
 	}
 	if peers != nil {
-		peers.notify(d)
+		peers.subscribe(d)
 	}
 	d.wg.Add(1)
 	go d.loop()
@@ -90,14 +91,14 @@ func newRequestDistributor(peers *peerSet, clock mclock.Clock) *requestDistribut
 }
 
 // registerPeer implements peerSetNotify
-func (d *requestDistributor) registerPeer(p *peer) {
+func (d *requestDistributor) registerPeer(p *serverPeer) {
 	d.peerLock.Lock()
 	d.peers[p] = struct{}{}
 	d.peerLock.Unlock()
 }
 
 // unregisterPeer implements peerSetNotify
-func (d *requestDistributor) unregisterPeer(p *peer) {
+func (d *requestDistributor) unregisterPeer(p *serverPeer) {
 	d.peerLock.Lock()
 	delete(d.peers, p)
 	d.peerLock.Unlock()
@@ -110,13 +111,15 @@ func (d *requestDistributor) registerTestPeer(p distPeer) {
 	d.peerLock.Unlock()
 }
 
-// distMaxWait is the maximum waiting time after which further necessary waiting
-// times are recalculated based on new feedback from the servers
-const distMaxWait = time.Millisecond * 50
+var (
+	// distMaxWait is the maximum waiting time after which further necessary waiting
+	// times are recalculated based on new feedback from the servers
+	distMaxWait = time.Millisecond * 50
 
-// waitForPeers is the time window in which a request does not fail even if it
-// has no suitable peers to send to at the moment
-const waitForPeers = time.Second * 3
+	// waitForPeers is the time window in which a request does not fail even if it
+	// has no suitable peers to send to at the moment
+	waitForPeers = time.Second * 3
+)
 
 // main event loop
 func (d *requestDistributor) loop() {
@@ -177,12 +180,11 @@ func (d *requestDistributor) loop() {
 type selectPeerItem struct {
 	peer   distPeer
 	req    *distReq
-	weight int64
+	weight uint64
 }
 
-// Weight implements wrsItem interface
-func (sp selectPeerItem) Weight() int64 {
-	return sp.weight
+func selectPeerWeight(i interface{}) uint64 {
+	return i.(selectPeerItem).weight
 }
 
 // nextRequest returns the next possible request from any peer, along with the
@@ -192,7 +194,7 @@ func (d *requestDistributor) nextRequest() (distPeer, *distReq, time.Duration) {
 	elem := d.reqQueue.Front()
 	var (
 		bestWait time.Duration
-		sel      *weightedRandomSelect
+		sel      *utils.WeightedRandomSelect
 	)
 
 	d.peerLock.RLock()
@@ -217,9 +219,9 @@ func (d *requestDistributor) nextRequest() (distPeer, *distReq, time.Duration) {
 				wait, bufRemain := peer.waitBefore(cost)
 				if wait == 0 {
 					if sel == nil {
-						sel = newWeightedRandomSelect()
+						sel = utils.NewWeightedRandomSelect(selectPeerWeight)
 					}
-					sel.update(selectPeerItem{peer: peer, req: req, weight: int64(bufRemain*1000000) + 1})
+					sel.Update(selectPeerItem{peer: peer, req: req, weight: uint64(bufRemain*1000000) + 1})
 				} else {
 					if bestWait == 0 || wait < bestWait {
 						bestWait = wait
@@ -237,7 +239,7 @@ func (d *requestDistributor) nextRequest() (distPeer, *distReq, time.Duration) {
 	}
 
 	if sel != nil {
-		c := sel.choose().(selectPeerItem)
+		c := sel.Choose().(selectPeerItem)
 		return c.peer, c.req, 0
 	}
 	return nil, nil, bestWait

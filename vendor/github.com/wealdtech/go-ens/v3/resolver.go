@@ -205,7 +205,7 @@ func resolveName(backend bind.ContractBackend, input string) (address common.Add
 		return UnknownAddress, err
 	}
 	if bytes.Equal(nameHash[:], zeroHash) {
-		err = errors.New("Bad name")
+		err = errors.New("bad name")
 	} else {
 		address, err = resolveHash(backend, input)
 	}
@@ -251,10 +251,11 @@ func (r *Resolver) Text(name string) (string, error) {
 // SetABI sets the ABI associated with a name
 func (r *Resolver) SetABI(opts *bind.TransactOpts, name string, abi string, contentType *big.Int) (*types.Transaction, error) {
 	var data []byte
-	if contentType.Cmp(big.NewInt(1)) == 0 {
+	switch contentType.Uint64() {
+	case 1:
 		// Uncompressed JSON
 		data = []byte(abi)
-	} else if contentType.Cmp(big.NewInt(2)) == 0 {
+	case 2:
 		// Zlib-compressed JSON
 		var b bytes.Buffer
 		w := zlib.NewWriter(&b)
@@ -263,8 +264,8 @@ func (r *Resolver) SetABI(opts *bind.TransactOpts, name string, abi string, cont
 		}
 		w.Close()
 		data = b.Bytes()
-	} else {
-		return nil, errors.New("Unsupported content type")
+	default:
+		return nil, errors.New("unsupported content type")
 	}
 
 	nameHash, err := NameHash(r.domain)

@@ -15,19 +15,13 @@
 package ens
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"math/big"
-	"reflect"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/wealdtech/go-ens/v3/contracts/auctionregistrar"
 	"github.com/wealdtech/go-ens/v3/contracts/registry"
 	"github.com/wealdtech/go-ens/v3/util"
@@ -120,47 +114,27 @@ func (r *Registry) SetSubdomainOwner(opts *bind.TransactOpts, name string, subna
 	return r.Contract.SetSubnodeOwner(opts, nameHash, labelHash, address)
 }
 
-// RegistryContractAddress obtains the address of the registry contract for a chain
+// RegistryContractAddress obtains the address of the registry contract for a chain.
+// This is (currently) the same for all chains.
 func RegistryContractAddress(backend bind.ContractBackend) (common.Address, error) {
-	chainID := big.NewInt(0)
-	if reflect.TypeOf(backend).String() == "*ethclient.Client" {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var err error
-		chainID, err = backend.(*ethclient.Client).NetworkID(ctx)
-		if err != nil {
-			return UnknownAddress, err
-		}
-	}
+	//	chainID := big.NewInt(0)
+	//	if reflect.TypeOf(backend).String() == "*ethclient.Client" {
+	//		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	//		defer cancel()
+	//		var err error
+	//		chainID, err = backend.(*ethclient.Client).NetworkID(ctx)
+	//		if err != nil {
+	//			return UnknownAddress, err
+	//		}
+	//	}
 
-	// Instantiate the registry contract
-	if chainID.Cmp(params.MainnetChainConfig.ChainID) == 0 {
-		return common.HexToAddress("00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), nil
-	} else if chainID.Cmp(params.TestnetChainConfig.ChainID) == 0 {
-		return common.HexToAddress("112234455c3a32fd11230c42e7bccd4a84e02010"), nil
-	} else if chainID.Cmp(params.RinkebyChainConfig.ChainID) == 0 {
-		return common.HexToAddress("e7410170f87102DF0055eB195163A03B7F2Bff4A"), nil
-	} else if chainID.Cmp(params.GoerliChainConfig.ChainID) == 0 {
-		return common.HexToAddress("112234455c3a32fd11230c42e7bccd4a84e02010"), nil
-	} else {
-		return UnknownAddress, fmt.Errorf("No contract for network ID %v", chainID)
-	}
+	// Instantiate the registry contract.  The same for all chains.
+	return common.HexToAddress("00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), nil
 }
-
-//// RegistryContract obtains the registry contract for a chain
-//func RegistryContract(backend bind.ContractBackend) (*registry.RegistryContract, error) {
-//	address, err := RegistryContractAddress(backend)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	// Instantiate the registry contract
-//	return registry.NewRegistryContract(address, backend)
-//}
 
 // RegistryContractFromRegistrar obtains the registry contract given an
 // existing registrar contract
-func RegistryContractFromRegistrar(backend bind.ContractBackend, registrar *auctionregistrar.Contract) (*registry.RegistryContract, error) {
+func RegistryContractFromRegistrar(backend bind.ContractBackend, registrar *auctionregistrar.Contract) (*registry.Contract, error) {
 	if registrar == nil {
 		return nil, errors.New("no registrar contract")
 	}
@@ -168,23 +142,11 @@ func RegistryContractFromRegistrar(backend bind.ContractBackend, registrar *auct
 	if err != nil {
 		return nil, err
 	}
-	return registry.NewRegistryContract(registryAddress, backend)
+	return registry.NewContract(registryAddress, backend)
 }
 
-//// Resolver obtains the address of the resolver for a .eth name
-//func Resolver(contract *registry.RegistryContract, name string) (common.Address, error) {
-//	if contract == nil {
-//		return UnknownAddress, errors.New("no registry contract")
-//	}
-//	address, err := contract.Resolver(nil, NameHash(name))
-//	if err == nil && bytes.Compare(address.Bytes(), UnknownAddress.Bytes()) == 0 {
-//		err = errors.New("no resolver")
-//	}
-//	return address, err
-//}
-
 // SetResolver sets the resolver for a name
-func SetResolver(session *registry.RegistryContractSession, name string, resolverAddr *common.Address) (*types.Transaction, error) {
+func SetResolver(session *registry.ContractSession, name string, resolverAddr *common.Address) (*types.Transaction, error) {
 	nameHash, err := NameHash(name)
 	if err != nil {
 		return nil, err
@@ -193,7 +155,7 @@ func SetResolver(session *registry.RegistryContractSession, name string, resolve
 }
 
 // SetSubdomainOwner sets the owner for a subdomain of a name
-func SetSubdomainOwner(session *registry.RegistryContractSession, name string, subdomain string, ownerAddr *common.Address) (*types.Transaction, error) {
+func SetSubdomainOwner(session *registry.ContractSession, name string, subdomain string, ownerAddr *common.Address) (*types.Transaction, error) {
 	nameHash, err := NameHash(name)
 	if err != nil {
 		return nil, err
@@ -206,12 +168,12 @@ func SetSubdomainOwner(session *registry.RegistryContractSession, name string, s
 }
 
 // CreateRegistrySession creates a session suitable for multiple calls
-func CreateRegistrySession(chainID *big.Int, wallet *accounts.Wallet, account *accounts.Account, passphrase string, contract *registry.RegistryContract, gasPrice *big.Int) *registry.RegistryContractSession {
+func CreateRegistrySession(chainID *big.Int, wallet *accounts.Wallet, account *accounts.Account, passphrase string, contract *registry.Contract, gasPrice *big.Int) *registry.ContractSession {
 	// Create a signer
 	signer := util.AccountSigner(chainID, wallet, account, passphrase)
 
 	// Return our session
-	session := &registry.RegistryContractSession{
+	session := &registry.ContractSession{
 		Contract: contract,
 		CallOpts: bind.CallOpts{
 			Pending: true,

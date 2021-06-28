@@ -55,7 +55,7 @@ type servingQueue struct {
 type servingTask struct {
 	sq                                       *servingQueue
 	servingTime, timeAdded, maxTime, expTime uint64
-	peer                                     *peer
+	peer                                     *clientPeer
 	priority                                 int64
 	biasAdded                                bool
 	token                                    runToken
@@ -123,7 +123,7 @@ func (t *servingTask) waitOrStop() bool {
 // newServingQueue returns a new servingQueue
 func newServingQueue(suspendBias int64, utilTarget float64) *servingQueue {
 	sq := &servingQueue{
-		queue:          prque.New(nil),
+		queue:          prque.NewWrapAround(nil),
 		suspendBias:    suspendBias,
 		queueAddCh:     make(chan *servingTask, 100),
 		queueBestCh:    make(chan *servingTask),
@@ -142,7 +142,7 @@ func newServingQueue(suspendBias int64, utilTarget float64) *servingQueue {
 }
 
 // newTask creates a new task with the given priority
-func (sq *servingQueue) newTask(peer *peer, maxTime uint64, priority int64) *servingTask {
+func (sq *servingQueue) newTask(peer *clientPeer, maxTime uint64, priority int64) *servingTask {
 	return &servingTask{
 		sq:       sq,
 		peer:     peer,
@@ -187,7 +187,7 @@ func (sq *servingQueue) threadController() {
 type (
 	// peerTasks lists the tasks received from a given peer when selecting peers to freeze
 	peerTasks struct {
-		peer     *peer
+		peer     *clientPeer
 		list     []*servingTask
 		sumTime  uint64
 		priority float64
@@ -211,7 +211,7 @@ func (l peerList) Swap(i, j int) {
 // freezePeers selects the peers with the worst priority queued tasks and freezes
 // them until burstTime goes under burstDropLimit or all peers are frozen
 func (sq *servingQueue) freezePeers() {
-	peerMap := make(map[*peer]*peerTasks)
+	peerMap := make(map[*clientPeer]*peerTasks)
 	var peerList peerList
 	if sq.best != nil {
 		sq.queue.Push(sq.best, sq.best.priority)
@@ -239,7 +239,7 @@ func (sq *servingQueue) freezePeers() {
 	drop := true
 	for _, tasks := range peerList {
 		if drop {
-			tasks.peer.freezeClient()
+			tasks.peer.freeze()
 			tasks.peer.fcClient.Freeze()
 			sq.queuedTime -= tasks.sumTime
 			sqQueuedGauge.Update(int64(sq.queuedTime))
@@ -279,7 +279,7 @@ func (sq *servingQueue) updateRecentTime() {
 func (sq *servingQueue) addTask(task *servingTask) {
 	if sq.best == nil {
 		sq.best = task
-	} else if task.priority > sq.best.priority {
+	} else if task.priority-sq.best.priority > 0 {
 		sq.queue.Push(sq.best, sq.best.priority)
 		sq.best = task
 	} else {

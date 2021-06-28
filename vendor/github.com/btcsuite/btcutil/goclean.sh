@@ -9,40 +9,38 @@
 # 7. race detector (http://blog.golang.org/race-detector)
 # 8. test coverage (http://blog.golang.org/cover)
 #
-# gometalint (github.com/alecthomas/gometalinter) is used to run each each
-# static checker.
 
 set -ex
 
 # Automatic checks
-test -z "$(gometalinter --disable-all \
---enable=gofmt \
---enable=goimports \
---enable=golint \
---enable=vet \
---enable=gosimple \
---enable=unconvert \
---deadline=120s ./... | grep -v 'ExampleNew' 2>&1 | tee /dev/stderr)"
-env GORACE="halt_on_error=1" go test -race ./...
+for i in $(find . -name go.mod -type f -print); do
+  module=$(dirname ${i})
+  echo "==> ${module}"
 
-# Run test coverage on each subdirectories and merge the coverage profile.
-
-echo "mode: count" > profile.cov
-
-# Standard go tooling behavior is to ignore dirs with leading underscores.
-for dir in $(find . -maxdepth 10 -not -path './.git*' -not -path '*/_*' -type d);
-do
-if ls $dir/*.go &> /dev/null; then
-  go test -covermode=count -coverprofile=$dir/profile.tmp $dir
-  if [ -f $dir/profile.tmp ]; then
-    cat $dir/profile.tmp | tail -n +2 >> profile.cov
-    rm $dir/profile.tmp
+  MODNAME=$(echo $module | sed -E -e "s/^$ROOTPATHPATTERN//" \
+    -e 's,^/,,' -e 's,/v[0-9]+$,,')
+  if [ -z "$MODNAME" ]; then
+    MODNAME=.
   fi
-fi
+
+  # run tests
+  (cd $MODNAME &&
+    echo "mode: atomic" > profile.cov && \
+    env GORACE=halt_on_error=1 go test -race -covermode=atomic -coverprofile=profile.tmp ./... && \
+    cat profile.tmp | tail -n +2 >> profile.cov && \
+    rm profile.tmp && \
+    go tool cover -func profile.cov
+  )
+
+  # check linters
+  (cd $MODNAME && \
+    go mod download && \
+    golangci-lint run --deadline=10m --disable-all \
+      --enable=gofmt \
+      --enable=goimports \
+      --enable=golint \
+      --enable=govet \
+      --enable=gosimple \
+      --enable=unconvert
+  )
 done
-
-go tool cover -func profile.cov
-
-# To submit the test coverage result to coveralls.io,
-# use goveralls (https://github.com/mattn/goveralls)
-# goveralls -coverprofile=profile.cov -service=travis-ci

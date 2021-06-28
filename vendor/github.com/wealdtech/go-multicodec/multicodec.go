@@ -76,6 +76,15 @@ func ID(name string) (uint64, error) {
 	return codec.id, nil
 }
 
+// MustID obtains the ID of a codec from its name, panicking if not present.
+func MustID(name string) uint64 {
+	codec, exists := codecs[name]
+	if !exists {
+		panic(fmt.Errorf("unknown name %s", name))
+	}
+	return codec.id
+}
+
 // Name obtains the name of a codec from its ID
 func Name(id uint64) (string, error) {
 	codec, exists := reverseCodecs[id]
@@ -83,4 +92,13 @@ func Name(id uint64) (string, error) {
 		return "", fmt.Errorf("unknown ID 0x%x", id)
 	}
 	return codec.name, nil
+}
+
+// MustName obtains the name of a codec from its ID, panicking if not present.
+func MustName(id uint64) string {
+	codec, exists := reverseCodecs[id]
+	if !exists {
+		panic(fmt.Errorf("unknown ID 0x%x", id))
+	}
+	return codec.name
 }

@@ -225,7 +225,7 @@ func (n *Name) SetController(controller common.Address, opts *bind.TransactOpts)
 		return nil, err
 	}
 	// Are we actually trying to reclaim?
-	if registrant == opts.From && registrant == controller {
+	if registrant == opts.From && opts.From == controller {
 		return n.Reclaim(opts)
 	}
 

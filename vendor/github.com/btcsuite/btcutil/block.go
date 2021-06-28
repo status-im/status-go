@@ -114,7 +114,7 @@ func (b *Block) Hash() *chainhash.Hash {
 func (b *Block) Tx(txNum int) (*Tx, error) {
 	// Ensure the requested transaction is in range.
 	numTx := uint64(len(b.msgBlock.Transactions))
-	if txNum < 0 || uint64(txNum) > numTx {
+	if txNum < 0 || uint64(txNum) >= numTx {
 		str := fmt.Sprintf("transaction index %d is out of range - max %d",
 			txNum, numTx-1)
 		return nil, OutOfRangeError(str)
