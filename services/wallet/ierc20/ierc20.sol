@@ -1,8 +1,9 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
 
 /**
- * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
- * the optional functions; to access them see `ERC20Detailed`.
+ * @dev Interface of the ERC20 standard as defined in the EIP.
  */
 interface IERC20 {
     /**
@@ -20,16 +21,16 @@ interface IERC20 {
      *
      * Returns a boolean value indicating whether the operation succeeded.
      *
-     * Emits a `Transfer` event.
+     * Emits a {Transfer} event.
      */
     function transfer(address recipient, uint256 amount) external returns (bool);
 
     /**
      * @dev Returns the remaining number of tokens that `spender` will be
-     * allowed to spend on behalf of `owner` through `transferFrom`. This is
+     * allowed to spend on behalf of `owner` through {transferFrom}. This is
      * zero by default.
      *
-     * This value changes when `approve` or `transferFrom` are called.
+     * This value changes when {approve} or {transferFrom} are called.
      */
     function allowance(address owner, address spender) external view returns (uint256);
 
@@ -38,14 +39,14 @@ interface IERC20 {
      *
      * Returns a boolean value indicating whether the operation succeeded.
      *
-     * > Beware that changing an allowance with this method brings the risk
+     * IMPORTANT: Beware that changing an allowance with this method brings the risk
      * that someone may use both the old and the new allowance by unfortunate
      * transaction ordering. One possible solution to mitigate this race
      * condition is to first reduce the spender's allowance to 0 and set the
      * desired value afterwards:
      * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
      *
-     * Emits an `Approval` event.
+     * Emits an {Approval} event.
      */
     function approve(address spender, uint256 amount) external returns (bool);
 
@@ -56,9 +57,13 @@ interface IERC20 {
      *
      * Returns a boolean value indicating whether the operation succeeded.
      *
-     * Emits a `Transfer` event.
+     * Emits a {Transfer} event.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
@@ -70,7 +75,7 @@ interface IERC20 {
 
     /**
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
-     * a call to `approve`. `value` is the new allowance.
+     * a call to {approve}. `value` is the new allowance.
      */
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
