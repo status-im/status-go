@@ -182,6 +182,10 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 	return response, m.saveChats(chats)
 }
 
+func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
+	return m.communitiesManager.SetMuted(communityID, muted)
+}
+
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

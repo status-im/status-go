@@ -28,6 +28,7 @@ type Config struct {
 	Joined                        bool
 	Requested                     bool
 	Verified                      bool
+	Muted                         bool
 	Logger                        *zap.Logger
 	RequestedToJoinAt             uint64
 	MemberIdentity                *ecdsa.PublicKey
@@ -96,6 +97,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Color             string                               `json:"color"`
 		RequestedToJoinAt uint64                               `json:"requestedToJoinAt,omitempty"`
 		IsMember          bool                                 `json:"isMember"`
+		Muted             bool                                 `json:"muted"`
 	}{
 		ID:                o.ID(),
 		Admin:             o.IsAdmin(),
@@ -108,6 +110,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		CanManageUsers:    o.CanManageUsers(o.config.MemberIdentity),
 		RequestedToJoinAt: o.RequestedToJoinAt(),
 		IsMember:          o.isMember(),
+		Muted:             o.config.Muted,
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
