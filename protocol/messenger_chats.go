@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -293,13 +292,6 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 func (m *Messenger) saveChat(chat *Chat) error {
 	previousChat, ok := m.allChats.Load(chat.ID)
 	if chat.OneToOne() {
-		// We clear all notifications so it pops up again
-		if !chat.Active {
-			err := m.persistence.DeleteActivityCenterNotification(types.FromHex(chat.ID))
-			if err != nil {
-				return err
-			}
-		}
 		name, identicon, err := generateAliasAndIdenticon(chat.ID)
 		if err != nil {
 			return err
