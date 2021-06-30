@@ -873,12 +873,12 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	// join or leave the community
 	var mr *MessengerResponse
 	if syncCommunity.Joined {
-		mr, err = m.JoinCommunity(context.Background(), syncCommunity.Id)
+		mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
 		if err != nil {
 			return err
 		}
 	} else {
-		mr, err = m.LeaveCommunity(syncCommunity.Id)
+		mr, err = m.leaveCommunity(syncCommunity.Id)
 		if err != nil {
 			return err
 		}
