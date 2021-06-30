@@ -19,7 +19,7 @@ type Persistence struct {
 	logger *zap.Logger
 }
 
-const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
+const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()
@@ -54,13 +54,14 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
 		var joined bool
 		var verified bool
+		var muted bool
 		var requestedToJoinAt sql.NullInt64
-		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &requestedToJoinAt)
+		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted, &requestedToJoinAt)
 		if err != nil {
 			return nil, err
 		}
 
-		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, uint64(requestedToJoinAt.Int64), p.logger)
+		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(requestedToJoinAt.Int64), p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -89,9 +90,10 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
 	var joined bool
 	var verified bool
+	var muted bool
 	var requestedToJoinAt sql.NullInt64
 
-	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &requestedToJoinAt)
+	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted, &requestedToJoinAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -99,10 +101,10 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 		return nil, err
 	}
 
-	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, uint64(requestedToJoinAt.Int64), p.logger)
+	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(requestedToJoinAt.Int64), p.logger)
 }
 
-func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, descriptionBytes []byte, joined, verified bool, requestedToJoinAt uint64, logger *zap.Logger) (*Community, error) {
+func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, descriptionBytes []byte, joined, verified, muted bool, requestedToJoinAt uint64, logger *zap.Logger) (*Community, error) {
 
 	var privateKey *ecdsa.PrivateKey
 	var err error
@@ -140,6 +142,7 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		Logger:                        logger,
 		ID:                            id,
 		Verified:                      verified,
+		Muted:                         muted,
 		RequestedToJoinAt:             requestedToJoinAt,
 		Joined:                        joined,
 	}
@@ -226,6 +229,11 @@ func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestTo
 
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state uint) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
+	return err
+}
+
+func (p *Persistence) SetMuted(communityID []byte, muted bool) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET muted = ? WHERE id = ?`, muted, communityID)
 	return err
 }
 

@@ -548,6 +548,10 @@ func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) e
 	return nil
 }
 
+func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
+	return m.persistence.SetMuted(id, muted)
+}
+
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {
