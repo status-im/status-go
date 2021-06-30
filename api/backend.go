@@ -35,7 +35,6 @@ type StatusBackend interface {
 
 	CallPrivateRPC(inputJSON string) (string, error)
 	CallRPC(inputJSON string) (string, error)
-	GetNodesFromContract(rpcEndpoint string, contractAddress string) ([]string, error)
 	HashTransaction(sendArgs transactions.SendTxArgs) (transactions.SendTxArgs, types.Hash, error)
 	HashTypedData(typed typeddata.TypedData) (types.Hash, error)
 	HashTypedDataV4(typed signercore.TypedData) (types.Hash, error)

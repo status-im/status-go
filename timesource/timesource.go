@@ -194,7 +194,7 @@ func (s *NTPTimeSource) StartService() error {
 }
 
 // Start runs a goroutine that updates local offset every updatePeriod.
-func (s *NTPTimeSource) Start(*p2p.Server) error {
+func (s *NTPTimeSource) Start() error {
 	return s.runPeriodically(s.updateOffset)
 }
 

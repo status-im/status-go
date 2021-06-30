@@ -64,7 +64,7 @@ type Service struct {
 }
 
 // Make sure that Service implements node.Service interface.
-var _ node.Service = (*Service)(nil)
+var _ node.Lifecycle = (*Service)(nil)
 
 func New(
 	config params.ShhextConfig,
@@ -209,7 +209,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
 
-	message, err := transaction.AsMessage(signer)
+	message, err := transaction.AsMessage(signer, nil)
 	if err != nil {
 		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
@@ -328,10 +328,15 @@ func (s *Service) APIs() []rpc.API {
 	panic("this is abstract service, use shhext or wakuext implementation")
 }
 
+func (s *Service) SetP2PServer(server *p2p.Server) {
+	s.server = server
+}
+
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
-func (s *Service) Start(server *p2p.Server) error {
-	s.server = server
+func (s *Service) Start() error {
+	// TODO: set server before start
+	//	s.server = server
 	return nil
 }
 

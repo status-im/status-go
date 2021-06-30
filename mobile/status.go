@@ -516,27 +516,6 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-// GetNodesFromContract returns a list of nodes from a given contract
-//export GetNodesFromContract
-func GetNodesFromContract(rpcEndpoint string, contractAddress string) string {
-	nodes, err := statusBackend.GetNodesFromContract(
-		rpcEndpoint,
-		contractAddress,
-	)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Nodes []string `json:"result"`
-	}{Nodes: nodes})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
 // AddPeer adds an enode as a peer.
 func AddPeer(enode string) string {
 	err := statusBackend.StatusNode().AddPeer(enode)

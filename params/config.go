@@ -17,13 +17,35 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
+
+// ----------
+// LightEthConfig
+// ----------
+
+// LightEthConfig holds LES-related configuration
+// Status nodes are always lightweight clients (due to mobile platform constraints)
+type LightEthConfig struct {
+	// Enabled flag specifies whether protocol is enabled
+	Enabled bool
+
+	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
+	DatabaseCache int
+
+	// TrustedNodes is a list of trusted servers
+	TrustedNodes []string
+
+	//MinTrustedFraction is minimum percentage of connected trusted servers to validate header(1-100)
+	MinTrustedFraction int
+}
 
 // ----------
 // DatabaseConfig
@@ -412,6 +434,9 @@ type NodeConfig struct {
 	// ClusterConfig extra configuration for supporting cluster peers.
 	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`
 
+	// LightEthConfig extra configuration for LES
+	LightEthConfig LightEthConfig `json:"LightEthConfig," validate:"structonly"`
+
 	// WakuConfig provides a configuration for Waku subprotocol.
 	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
 
@@ -705,6 +730,9 @@ func (c *NodeConfig) updatePeerLimits() {
 	if c.NoDiscovery && !c.Rendezvous {
 		return
 	}
+	if c.LightEthConfig.Enabled {
+		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
+	}
 }
 
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
@@ -738,6 +766,9 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		EnableNTPSync:    true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
+		},
+		LightEthConfig: LightEthConfig{
+			DatabaseCache: 16,
 		},
 		WakuConfig: WakuConfig{
 			DataDir:        wakuDir,
@@ -840,6 +871,10 @@ func (c *NodeConfig) Validate() error {
 		}
 	}
 
+	if c.UpstreamConfig.Enabled && c.LightEthConfig.Enabled {
+		return fmt.Errorf("both UpstreamConfig and LightEthConfig are enabled, but they are mutually exclusive")
+	}
+
 	if err := c.validateChildStructs(validate); err != nil {
 		return err
 	}
@@ -889,6 +924,9 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.ClusterConfig.Validate(validate); err != nil {
 		return err
 	}
+	if err := c.LightEthConfig.Validate(validate); err != nil {
+		return err
+	}
 	if err := c.SwarmConfig.Validate(validate); err != nil {
 		return err
 	}
@@ -917,6 +955,19 @@ func (c *UpstreamRPCConfig) Validate(validate *validator.Validate) error {
 
 // Validate validates the ClusterConfig struct and returns an error if inconsistent values are found
 func (c *ClusterConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate validates the LightEthConfig struct and returns an error if inconsistent values are found
+func (c *LightEthConfig) Validate(validate *validator.Validate) error {
 	if !c.Enabled {
 		return nil
 	}
@@ -994,4 +1045,19 @@ func (c *NodeConfig) FormatAPIModules() []string {
 // AddAPIModule adds a mobule to APIModules
 func (c *NodeConfig) AddAPIModule(m string) {
 	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
+}
+
+// LesTopic returns discovery v5 topic derived from genesis of the provided network.
+// 1 - mainnet, 3 - ropsten, 4 - rinkeby
+func LesTopic(netid int) string {
+	switch netid {
+	case 1:
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
+	case 3:
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RopstenGenesisHash.Bytes()[:8])
+	case 4:
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
+	default:
+		return ""
+	}
 }

@@ -15,8 +15,8 @@ type Service struct {
 	w types.Waku
 }
 
-func New(config params.ShhextConfig, n types.Node, ctx interface{}, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
-	w, err := n.GetWaku(ctx)
+func New(config params.ShhextConfig, n types.Node, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
+	w, err := n.GetWaku(nil)
 	if err != nil {
 		panic(err)
 	}

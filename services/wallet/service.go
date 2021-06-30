@@ -43,7 +43,7 @@ type Service struct {
 }
 
 // Start signals transmitter.
-func (s *Service) Start(*p2p.Server) error {
+func (s *Service) Start() error {
 	s.group = NewGroup(context.Background())
 	return s.signals.Start()
 }

@@ -43,9 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -203,37 +201,13 @@ func (s *LightEthereum) VfluxRequest(n *enode.Node, reqs vflux.Requests) vflux.R
 	if !s.udpEnabled {
 		return nil
 	}
-	reqsEnc, _ := rlp.EncodeToBytes(&reqs)
-	repliesEnc, _ := s.p2pServer.DiscV5.TalkRequest(s.serverPool.DialNode(n), "vfx", reqsEnc)
-	var replies vflux.Replies
-	if len(repliesEnc) == 0 || rlp.DecodeBytes(repliesEnc, &replies) != nil {
-		return nil
-	}
-	return replies
+	return nil
 }
 
 // vfxVersion returns the version number of the "les" service subdomain of the vflux UDP
 // service, as advertised in the ENR record
 func (s *LightEthereum) vfxVersion(n *enode.Node) uint {
-	if n.Seq() == 0 {
-		var err error
-		if !s.udpEnabled {
-			return 0
-		}
-		if n, err = s.p2pServer.DiscV5.RequestENR(n); n != nil && err == nil && n.Seq() != 0 {
-			s.serverPool.Persist(n)
-		} else {
-			return 0
-		}
-	}
-
-	var les []rlp.RawValue
-	if err := n.Load(enr.WithEntry("les", &les)); err != nil || len(les) < 1 {
-		return 0
-	}
-	var version uint
-	rlp.DecodeBytes(les[0], &version) // Ignore additional fields (for forward compatibility).
-	return version
+	return 0
 }
 
 // prenegQuery sends a capacity query to the given server node to determine whether

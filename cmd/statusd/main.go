@@ -71,8 +71,6 @@ var (
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
 	metricsPort    = flag.Int("metrics-port", 9305, "Port for the Prometheus /metrics endpoint")
-
-	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -182,20 +180,6 @@ func main() {
 		profiling.NewProfiler(*pprofPort).Go()
 	}
 
-	// Sync blockchain and stop.
-	if *syncAndExit >= 0 {
-		exitCode := syncAndStopNode(interruptCh, backend.StatusNode(), *syncAndExit)
-		// Call was interrupted. Wait for graceful shutdown.
-		if exitCode == -1 {
-			if gethNode := backend.StatusNode().GethNode(); gethNode != nil {
-				gethNode.Wait()
-			}
-			return
-		}
-		// Otherwise, exit immediately with a returned exit code.
-		os.Exit(exitCode)
-	}
-
 	if config.PushNotificationServerConfig.Enabled {
 		if config.NodeKey == "" {
 			logger.Error("node key needs to be set if running a push notification server")
@@ -227,7 +211,7 @@ func main() {
 			protocol.WithDatabase(db),
 		}
 
-		messenger, err := protocol.NewMessenger(identity, gethbridge.NewNodeBridge(backend.StatusNode().GethNode()), installationID.String(), options...)
+		messenger, err := protocol.NewMessenger(identity, gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()), installationID.String(), options...)
 		if err != nil {
 			logger.Error("failed to create messenger", "error", err)
 			return

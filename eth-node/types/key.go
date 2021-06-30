@@ -3,7 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/extkeys"
 )

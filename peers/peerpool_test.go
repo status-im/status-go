@@ -128,7 +128,7 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCacheEthV5() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, ""}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -177,7 +177,7 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
 
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond, nil, ""}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(peer, nil))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
@@ -230,7 +230,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond, nil, ""}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server, nil))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
@@ -277,7 +277,7 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond, nil, ""}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server, nil))
 
@@ -294,7 +294,7 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, ""}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -373,7 +373,6 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 		true,
 		100 * time.Millisecond,
 		[]enode.ID{s.peers[0].Self().ID()},
-		"",
 	}
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
 	s.Require().NoError(peerPool.Start(s.peers[1], nil))
