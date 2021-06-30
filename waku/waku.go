@@ -1056,7 +1056,7 @@ func (w *Waku) Send(envelope *common.Envelope) error {
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
-func (w *Waku) Start(*p2p.Server) error {
+func (w *Waku) Start() error {
 	go w.update()
 
 	numCPU := runtime.NumCPU()
@@ -1517,6 +1517,10 @@ func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.Envelope {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 	return w.envelopes[hash]
+}
+
+func (w *Waku) Version() uint {
+	return 1
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.

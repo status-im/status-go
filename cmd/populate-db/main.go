@@ -140,13 +140,13 @@ func main() {
 	backend := api.NewGethStatusBackend()
 	err = ImportAccount(*seedPhrase, backend)
 	if err != nil {
-		logger.Error("failed", "err", err)
+		logger.Error("failed import account", "err", err)
 		return
 	}
 
-	wakuextservice, err := backend.WakuExtService()
-	if err != nil {
-		logger.Error("failed", "err", err)
+	wakuextservice := backend.StatusNode().WakuExtService()
+	if wakuextservice == nil {
+		logger.Error("wakuext not available")
 		return
 	}
 
@@ -165,14 +165,14 @@ func main() {
 	for i := 0; i < *nAddedContacts; i++ {
 		key, err := crypto.GenerateKey()
 		if err != nil {
-			logger.Error("failed", err)
+			logger.Error("failed generate key", err)
 			return
 		}
 
 		keyString := common.PubkeyToHex(&key.PublicKey)
 		_, err = wakuext.AddContact(context.Background(), keyString)
 		if err != nil {
-			logger.Error("failed", "err", err)
+			logger.Error("failed Add contact", "err", err)
 			return
 		}
 	}
@@ -253,6 +253,11 @@ func main() {
 		}
 
 	}
+	url := "enode://30211cbd81c25f07b03a0196d56e6ce4604bb13db773ff1c0ea2253547fafd6c06eae6ad3533e2ba39d59564cfbdbb5e2ce7c137a5ebb85e99dcfc7a75f99f55@23.236.58.92:443"
+	fmt.Println("UPDATING")
+	wakuext.UpdateMailservers([]string{url})
+	time.Sleep(10 * time.Second)
+	fmt.Println("UPDATED")
 
 }
 
@@ -427,21 +432,25 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	manager.InitKeystore("./tmp")
 	err := backend.OpenAccounts()
 	if err != nil {
+		logger.Error("failed open accounts", err)
 		return err
 	}
 	generator := manager.AccountsGenerator()
 	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
 	if err != nil {
+		logger.Error("import mnemonic", err)
 		return err
 	}
 
 	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
 	if err != nil {
+		logger.Error("deriver addressess", err)
 		return err
 	}
 
 	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
 	if err != nil {
+		logger.Error("store addressess", err)
 		return err
 	}
 
@@ -450,11 +459,13 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
 	if err != nil {
+		logger.Error("default settings", err)
 		return err
 	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID)
 	if err != nil {
+		logger.Error("node config", err)
 		return err
 	}
 
@@ -477,8 +488,15 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		Path:      pathDefaultChat,
 	}
 
+	fmt.Println(nodeConfig)
 	accounts := []accounts.Account{walletAccount, chatAccount}
-	return backend.StartNodeWithAccountAndConfig(account, "", *settings, nodeConfig, accounts)
+	err = backend.StartNodeWithAccountAndConfig(account, "", *settings, nodeConfig, accounts)
+	if err != nil {
+		logger.Error("start node", err)
+		return err
+	}
+
+	return nil
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -486,7 +504,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func buildMessage(chat *protocol.Chat, count int) *common.Message {
 	key, err := crypto.GenerateKey()
 	if err != nil {
-		logger.Error("failed", err)
+		logger.Error("failed build message", err)
 		return nil
 	}
 

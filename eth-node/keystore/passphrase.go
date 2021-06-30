@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"
 
@@ -107,8 +107,13 @@ func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
 	}
 	key := crypto.ToECDSAUnsafe(keyBytes)
 
+	id, err := uuid.FromBytes(keyId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Key{
-		ID:              uuid.UUID(keyId),
+		ID:              id,
 		Address:         crypto.PubkeyToAddress(key.PublicKey),
 		PrivateKey:      key,
 		ExtendedKey:     extKey,
@@ -156,7 +161,11 @@ func decryptKeyV3(keyProtected *encryptedKeyJSONV3, auth string) (keyBytes []byt
 	if keyProtected.Version != version {
 		return nil, nil, fmt.Errorf("Version not supported: %v", keyProtected.Version)
 	}
-	keyId = uuid.Parse(keyProtected.Id)
+	id, err := uuid.Parse(keyProtected.Id)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyId = id[:]
 	plainText, err := DecryptDataV3(keyProtected.Crypto, auth)
 	if err != nil {
 		return nil, nil, err
@@ -165,7 +174,12 @@ func decryptKeyV3(keyProtected *encryptedKeyJSONV3, auth string) (keyBytes []byt
 }
 
 func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byte, keyId []byte, err error) {
-	keyId = uuid.Parse(keyProtected.Id)
+	id, err := uuid.Parse(keyProtected.Id)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyId = id[:]
+
 	mac, err := hex.DecodeString(keyProtected.Crypto.MAC)
 	if err != nil {
 		return nil, nil, err
@@ -329,8 +343,7 @@ func pkcs7Unpad(in []byte) []byte {
 	return in[:len(in)-int(padding)]
 }
 
-
-func RawKeyToCryptoJSON(rawKeyFile []byte) (cj CryptoJSON, e error){
+func RawKeyToCryptoJSON(rawKeyFile []byte) (cj CryptoJSON, e error) {
 	var keyJSON encryptedKeyJSONV3
 	if e := json.Unmarshal(rawKeyFile, &keyJSON); e != nil {
 		return cj, fmt.Errorf("failed to read key file: %s", e)

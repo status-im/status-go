@@ -18,10 +18,12 @@ import (
 
 type gethNodeWrapper struct {
 	stack *node.Node
+	waku1 *waku.Waku
+	waku2 *wakuv2.Waku
 }
 
-func NewNodeBridge(stack *node.Node) types.Node {
-	return &gethNodeWrapper{stack: stack}
+func NewNodeBridge(stack *node.Node, waku1 *waku.Waku, waku2 *wakuv2.Waku) types.Node {
+	return &gethNodeWrapper{stack: stack, waku1: waku1, waku2: waku2}
 }
 
 func (w *gethNodeWrapper) Poll() {
@@ -32,50 +34,28 @@ func (w *gethNodeWrapper) NewENSVerifier(logger *zap.Logger) enstypes.ENSVerifie
 	return gethens.NewVerifier(logger)
 }
 
+func (w *gethNodeWrapper) SetWaku1(waku *waku.Waku) {
+	w.waku1 = waku
+}
+
+func (w *gethNodeWrapper) SetWaku2(waku *wakuv2.Waku) {
+	w.waku2 = waku
+}
+
 func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
-	var nativeWaku *waku.Waku
-	if ctx == nil || ctx == w {
-		err := w.stack.Service(&nativeWaku)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		switch serviceProvider := ctx.(type) {
-		case *node.ServiceContext:
-			err := serviceProvider.Service(&nativeWaku)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	if nativeWaku == nil {
+	if w.waku1 == nil {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return NewGethWakuWrapper(nativeWaku), nil
+	return NewGethWakuWrapper(w.waku1), nil
 }
 
 func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (types.Waku, error) {
-	var nativeWaku *wakuv2.Waku
-	if ctx == nil || ctx == w {
-		err := w.stack.Service(&nativeWaku)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		switch serviceProvider := ctx.(type) {
-		case *node.ServiceContext:
-			err := serviceProvider.Service(&nativeWaku)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	if nativeWaku == nil {
+	if w.waku2 == nil {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return NewGethWakuV2Wrapper(nativeWaku), nil
+	return NewGethWakuV2Wrapper(w.waku2), nil
 }
 
 func (w *gethNodeWrapper) AddPeer(url string) error {

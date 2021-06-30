@@ -153,7 +153,7 @@ func pushMessage(notification *Notification) {
 }
 
 // Start Worker which processes all incoming messages
-func (s *Service) Start(_ *p2p.Server) error {
+func (s *Service) Start() error {
 	s.started = true
 
 	s.transmitter.quit = make(chan struct{})

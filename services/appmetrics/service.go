@@ -15,7 +15,7 @@ type Service struct {
 	db *appmetrics.Database
 }
 
-func (s *Service) Start(*p2p.Server) error {
+func (s *Service) Start() error {
 	return nil
 }
 

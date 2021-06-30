@@ -32,7 +32,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
-func (s *Service) Start(server *p2p.Server) error {
+func (s *Service) Start() error {
 	resetStats()
 	return nil
 }

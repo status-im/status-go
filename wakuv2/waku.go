@@ -548,7 +548,7 @@ func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []st
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
-func (w *Waku) Start(*p2p.Server) error {
+func (w *Waku) Start() error {
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
 		go w.processQueue()

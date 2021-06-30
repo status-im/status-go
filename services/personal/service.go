@@ -9,7 +9,7 @@ import (
 )
 
 // Make sure that Service implements node.Service interface.
-var _ node.Service = (*Service)(nil)
+var _ node.Lifecycle = (*Service)(nil)
 
 // Service represents out own implementation of personal sign operations.
 type Service struct {
@@ -40,7 +40,7 @@ func (s *Service) APIs() []rpc.API {
 
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
-func (s *Service) Start(server *p2p.Server) error {
+func (s *Service) Start() error {
 	return nil
 }
 

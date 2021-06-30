@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -206,12 +206,16 @@ func (m *Manager) SetAccountAddresses(main types.Address, secondary ...types.Add
 }
 
 // SetChatAccount initializes selectedChatAccount with privKey
-func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
+func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
-	id := uuid.NewRandom()
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+
 	key := &types.Key{
 		ID:         id,
 		Address:    address,
@@ -222,6 +226,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 		Address:    address,
 		AccountKey: key,
 	}
+	return nil
 }
 
 // MainAccountAddress returns currently selected watch addresses.
