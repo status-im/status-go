@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+option go_package = "github.com/protocol/protobuf";
 package protobuf;
 
 import "chat_message.proto";

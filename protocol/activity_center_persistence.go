@@ -56,7 +56,16 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, author) VALUES (?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, notification.Author)
+	// encode message
+	var encodedReplyMessage []byte
+	if notification.ReplyMessage != nil {
+		encodedReplyMessage, err = json.Marshal(notification.ReplyMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, reply_message, author) VALUES (?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, encodedReplyMessage, notification.Author)
 	return err
 }
 
@@ -67,6 +76,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		var chatID sql.NullString
 		var lastMessageBytes []byte
 		var messageBytes []byte
+		var replyMessageBytes []byte
 		var name sql.NullString
 		var author sql.NullString
 		notification := &ActivityCenterNotification{}
@@ -80,6 +90,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.Dismissed,
 			&messageBytes,
 			&lastMessageBytes,
+			&replyMessageBytes,
 			&name,
 			&author,
 			&latestCursor)
@@ -115,6 +126,15 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 				return "", nil, err
 			}
 			notification.Message = message
+		}
+
+		// Restore reply message
+		if replyMessageBytes != nil {
+			replyMessage := &common.Message{}
+			if err = json.Unmarshal(replyMessageBytes, replyMessage); err != nil {
+				return "", nil, err
+			}
+			notification.ReplyMessage = replyMessage
 		}
 
 		notifications = append(notifications, notification)
@@ -154,6 +174,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.dismissed,
   a.message,
   c.last_message,
+  a.reply_message,
   c.name,
   a.author,
   substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
