@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -318,6 +319,12 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	if community == nil {
 		return nil, nil, ErrOrgNotFound
 	}
+
+	// Remove communityID prefix from chatID if exists
+	if strings.HasPrefix(chatID, communityID.String()) {
+		chatID = strings.TrimPrefix(communityID.String(), communityID.String())
+	}
+
 	changes, err := community.EditChat(chatID, chat)
 	if err != nil {
 		return nil, nil, err
@@ -343,6 +350,14 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Co
 		return nil, nil, ErrOrgNotFound
 	}
 	categoryID := uuid.New().String()
+
+	// Remove communityID prefix from chatID if exists
+	for i, cid := range request.ChatIDs {
+		if strings.HasPrefix(cid, request.CommunityID.String()) {
+			request.ChatIDs[i] = strings.TrimPrefix(cid, request.CommunityID.String())
+		}
+	}
+
 	changes, err := community.CreateCategory(categoryID, request.CategoryName, request.ChatIDs)
 	if err != nil {
 		return nil, nil, err
@@ -366,6 +381,13 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	}
 	if community == nil {
 		return nil, nil, ErrOrgNotFound
+	}
+
+	// Remove communityID prefix from chatID if exists
+	for i, cid := range request.ChatIDs {
+		if strings.HasPrefix(cid, request.CommunityID.String()) {
+			request.ChatIDs[i] = strings.TrimPrefix(cid, request.CommunityID.String())
+		}
 	}
 
 	changes, err := community.EditCategory(request.CategoryID, request.CategoryName, request.ChatIDs)
@@ -416,6 +438,11 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 	}
 	if community == nil {
 		return nil, nil, ErrOrgNotFound
+	}
+
+	// Remove communityID prefix from chatID if exists
+	if strings.HasPrefix(request.ChatID, request.CommunityID.String()) {
+		request.ChatID = strings.TrimPrefix(request.ChatID, request.CommunityID.String())
 	}
 
 	changes, err := community.ReorderChat(request.CategoryID, request.ChatID, request.Position)
