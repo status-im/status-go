@@ -1183,6 +1183,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
 	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
 	s.Equal(newCommunity.Verified(), tnc.Verified())
+	s.Equal(newCommunity.Muted(), tnc.Muted())
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
