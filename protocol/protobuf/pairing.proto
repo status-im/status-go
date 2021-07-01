@@ -38,6 +38,7 @@ message SyncCommunity {
   bytes description = 4;
   bool joined = 5;
   bool verified = 6;
+  bool muted = 7;
 }
 
 message SyncInstallation {
