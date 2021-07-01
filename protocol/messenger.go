@@ -2295,6 +2295,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		Description: md,
 		Joined:      community.Joined(),
 		Verified:    community.Verified(),
+		Muted:       community.Muted(),
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
