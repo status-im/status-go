@@ -13,6 +13,7 @@ type rawCommunityRow struct {
 	Joined      bool
 	Verified    bool
 	SyncedAt    uint64
+	Muted       bool
 }
 
 func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommunityRow {
@@ -23,6 +24,7 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommuni
 		Joined:      syncCommProto.Joined,
 		Verified:    syncCommProto.Verified,
 		SyncedAt:    syncCommProto.Clock,
+		Muted:       syncCommProto.Muted,
 	}
 }
 
@@ -37,6 +39,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Joined,
 		&rcr.Verified,
 		&syncedAt,
+		&rcr.Muted,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
@@ -51,7 +54,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 
 func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error) {
 	var rows *sql.Rows
-	rows, err = p.db.Query(`SELECT id, private_key, description, joined, verified, synced_at FROM communities_communities`)
+	rows, err = p.db.Query(`SELECT * FROM communities_communities`)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +87,14 @@ func (p *Persistence) getRawCommunityRow(id []byte) (*rawCommunityRow, error) {
 
 func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 	_, err := p.db.Exec(
-		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "synced_at") VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "synced_at", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
 		rawCommRow.PrivateKey,
 		rawCommRow.Description,
 		rawCommRow.Joined,
 		rawCommRow.Verified,
 		rawCommRow.SyncedAt,
+		rawCommRow.Muted,
 	)
 	return err
 }
