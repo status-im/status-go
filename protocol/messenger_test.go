@@ -1612,6 +1612,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	myPkString := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
 	err = s.m.SaveChat(chat)
@@ -1655,6 +1656,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(theirPkString, receiverMessage.ChatId)
 	s.Require().Equal(common.CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
 
 	// We decline the request
@@ -1692,6 +1694,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(common.CommandStateRequestAddressForTransactionDeclined, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(myPkString, receiverMessage.ChatId)
 	s.Require().Equal(initialCommandID, receiverMessage.Replace)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
@@ -1911,6 +1914,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	myPkString := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 
@@ -1955,6 +1959,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal(common.CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(theirPkString, receiverMessage.ChatId)
 
 	// We accept the request
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
@@ -1994,6 +1999,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal("some-address", receiverMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, receiverMessage.Replace)
+	s.Require().Equal(myPkString, receiverMessage.ChatId)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
