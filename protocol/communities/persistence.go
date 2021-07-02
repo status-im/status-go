@@ -35,6 +35,8 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	// TODO see if there is a way to make this more elegant
+	// Keep the "*".
+	// When the test for this function fails because the table has changed we should update sync functionality
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
 
 	rcr := rawCommunityRow{}

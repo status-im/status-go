@@ -54,6 +54,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 
 func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error) {
 	var rows *sql.Rows
+	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
 	rows, err = p.db.Query(`SELECT * FROM communities_communities`)
 	if err != nil {
 		return nil, err
@@ -81,6 +82,7 @@ func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error
 }
 
 func (p *Persistence) getRawCommunityRow(id []byte) (*rawCommunityRow, error) {
+	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ?`, id)
 	return p.scanRowToStruct(qr.Scan)
 }
