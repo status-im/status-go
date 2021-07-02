@@ -322,7 +322,7 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 
 	// Remove communityID prefix from chatID if exists
 	if strings.HasPrefix(chatID, communityID.String()) {
-		chatID = strings.TrimPrefix(communityID.String(), communityID.String())
+		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
 
 	changes, err := community.EditChat(chatID, chat)
