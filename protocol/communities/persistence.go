@@ -46,6 +46,7 @@ func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunit
 		&rcr.Joined,
 		&rcr.Verified,
 		&syncedAt,
+		&rcr.Muted,
 	)
 
 	switch err {
