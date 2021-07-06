@@ -310,6 +310,6 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexB
 
 func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	var count uint64
-	err := db.db.QueryRow(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read`).Scan(&count)
+	err := db.db.QueryRow(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read AND NOT dismissed AND NOT accepted`).Scan(&count)
 	return count, err
 }
