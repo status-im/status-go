@@ -72,7 +72,7 @@ func SSDPRawSearch(
 
 	isExactSearch := searchTarget != SSDPAll && searchTarget != UPNPRootDevice
 
-	seenUSNs := make(map[string]bool)
+	seenIDs := make(map[string]bool)
 	var responses []*http.Response
 	for _, response := range allResponses {
 		if response.StatusCode != 200 {
@@ -83,17 +83,14 @@ func SSDPRawSearch(
 			continue
 		}
 		usn := response.Header.Get("USN")
-		if usn == "" {
-			// Empty/missing USN in search response - using location instead.
-			location, err := response.Location()
-			if err != nil {
-				// No usable location in search response - discard.
-				continue
-			}
-			usn = location.String()
+		loc, err := response.Location()
+		if err != nil {
+			// No usable location in search response - discard.
+			continue
 		}
-		if _, alreadySeen := seenUSNs[usn]; !alreadySeen {
-			seenUSNs[usn] = true
+		id := loc.String() + "\x00" + usn
+		if _, alreadySeen := seenIDs[id]; !alreadySeen {
+			seenIDs[id] = true
 			responses = append(responses, response)
 		}
 	}

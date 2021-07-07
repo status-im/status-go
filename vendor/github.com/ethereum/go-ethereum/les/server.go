@@ -201,10 +201,9 @@ func (s *LesServer) Start() error {
 	s.handler.start()
 	s.wg.Add(1)
 	go s.capacityManagement()
-	/*
-		if s.p2pSrv.DiscV5 != nil {
-			s.p2pSrv.DiscV5.RegisterTalkHandler("vfx", s.vfluxServer.ServeEncoded)
-		}*/
+	if s.p2pSrv.DiscV5 != nil {
+		s.p2pSrv.DiscV5.RegisterTalkHandler("vfx", s.vfluxServer.ServeEncoded)
+	}
 	return nil
 }
 

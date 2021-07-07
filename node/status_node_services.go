@@ -95,26 +95,16 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 		services = append(services, wakuext)
 	}
 
-	b.log.Info("WAKU ENABLED")
-
 	if config.WalletConfig.Enabled {
 		walletService := b.walletService(config.NetworkID, accountsFeed)
-		b.log.Info("SETTING REPC CLIETN")
 		b.walletSrvc.SetClient(b.rpcClient.Ethclient())
-		b.log.Info("SET REPC CLIETN")
 		services = append(services, walletService)
 	}
-
-	b.log.Info("WALLET ENABLED")
 
 	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
 	services = append(services, b.localNotificationsService(config.NetworkID))
 
-	b.log.Info("SET CLIENT")
-
 	b.peerSrvc.SetDiscoverer(b)
-
-	b.log.Info("SET DISCOVERER")
 
 	for i := range services {
 		b.gethNode.RegisterAPIs(services[i].APIs())

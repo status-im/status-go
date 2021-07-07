@@ -79,18 +79,23 @@ type GethStatusBackend struct {
 func NewGethStatusBackend() *GethStatusBackend {
 	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit)
 
+	backend := &GethStatusBackend{}
+	backend.initialize()
+	return backend
+}
+
+func (b *GethStatusBackend) initialize() {
 	statusNode := node.New()
 	accountManager := account.NewGethManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 
-	return &GethStatusBackend{
-		statusNode:     statusNode,
-		accountManager: accountManager,
-		transactor:     transactor,
-		personalAPI:    personalAPI,
-		log:            log.New("package", "status-go/api.GethStatusBackend"),
-	}
+	b.statusNode = statusNode
+	b.accountManager = accountManager
+	b.transactor = transactor
+	b.personalAPI = personalAPI
+	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
+	b.log = log.New("package", "status-go/api.GethStatusBackend")
 }
 
 // StatusNode returns reference to node manager
@@ -122,12 +127,10 @@ func (b *GethStatusBackend) IsNodeRunning() bool {
 func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	log.Info("STARTING NODE")
 	if err := b.startNode(config); err != nil {
 		signal.SendNodeCrashed(err)
 		return err
 	}
-	log.Info("STARTED NODE")
 	return nil
 }
 
@@ -149,6 +152,7 @@ func (b *GethStatusBackend) OpenAccounts() error {
 		return err
 	}
 	b.multiaccountsDB = db
+	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
 	return nil
 }
@@ -487,17 +491,14 @@ func (b *GethStatusBackend) StartNodeWithAccountAndConfig(
 	nodecfg *params.NodeConfig,
 	subaccs []accounts.Account,
 ) error {
-	log.Info("STARTING 1 NODE")
 	err := b.SaveAccount(account)
 	if err != nil {
 		return err
 	}
-	log.Info("STARTING 2 NODE")
 	err = b.ensureAppDBOpened(account, password)
 	if err != nil {
 		return err
 	}
-	log.Info("STARTING 3 NODE")
 	err = b.saveAccountsAndSettings(settings, nodecfg, subaccs)
 	if err != nil {
 		return err
@@ -625,10 +626,11 @@ func (b *GethStatusBackend) StopNode() error {
 }
 
 func (b *GethStatusBackend) stopNode() error {
-	if !b.IsNodeRunning() {
-		return node.ErrNoRunningNode
+	if b.statusNode == nil || !b.IsNodeRunning() {
+		return nil
 	}
 	defer signal.SendNodeStopped()
+
 	return b.statusNode.Stop()
 }
 
@@ -915,7 +917,16 @@ func (b *GethStatusBackend) Logout() error {
 	}
 
 	b.AccountManager().Logout()
+	b.appDB = nil
 
+	if b.statusNode != nil {
+		if err := b.statusNode.Stop(); err != nil {
+			return err
+		}
+		b.statusNode = nil
+	}
+	// re-initialize the node, at some point we should better manage the lifecycle
+	b.initialize()
 	return nil
 }
 

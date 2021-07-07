@@ -401,7 +401,7 @@ func (srv *Server) RemoveTrustedPeer(node *enode.Node) {
 	}
 }
 
-// SubscribePeers subscribes the given channel to peer events
+// SubscribeEvents subscribes the given channel to peer events
 func (srv *Server) SubscribeEvents(ch chan *PeerEvent) event.Subscription {
 	return srv.peerFeed.Subscribe(ch)
 }
@@ -671,7 +671,6 @@ func (srv *Server) maxInboundConns() int {
 }
 
 func (srv *Server) maxDialedConns() (limit int) {
-	log.Info("max dialled", "no-dial", srv.NoDial, "max-peers", srv.MaxPeers)
 	if srv.NoDial || srv.MaxPeers == 0 {
 		return 0
 	}
@@ -781,7 +780,6 @@ running:
 			c.cont <- srv.postHandshakeChecks(peers, inboundCount, c)
 
 		case c := <-srv.checkpointAddPeer:
-			log.Info("checkpoing add peer")
 			// At this point the connection is past the protocol handshake.
 			// Its capabilities are known and the remote identity is verified.
 			err := srv.addPeerChecks(peers, inboundCount, c)
@@ -1045,7 +1043,6 @@ func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
 }
 
 func (srv *Server) launchPeer(c *conn) *Peer {
-	log.Info("launching peer")
 	p := newPeer(srv.log, c, srv.Protocols)
 	if srv.EnableMsgEvents {
 		// If message events are enabled, pass the peerFeed
@@ -1058,7 +1055,6 @@ func (srv *Server) launchPeer(c *conn) *Peer {
 
 // runPeer runs in its own goroutine for each peer.
 func (srv *Server) runPeer(p *Peer) {
-	log.Info("Running peer", "peer", p)
 	if srv.newPeerHook != nil {
 		srv.newPeerHook(p)
 	}

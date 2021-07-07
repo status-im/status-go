@@ -114,7 +114,7 @@ type Reactor struct {
 }
 
 func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
-	signer := types.NewEIP155Signer(r.chain)
+	signer := types.NewLondonSigner(r.chain)
 	client := &walletClient{client: r.client}
 	ctl := &controlCommand{
 		db:       r.db,

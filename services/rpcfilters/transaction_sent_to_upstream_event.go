@@ -79,6 +79,8 @@ func (e *transactionSentToUpstreamEvent) Stop() {
 	default:
 		close(e.quit)
 	}
+
+	e.quit = nil
 }
 
 func (e *transactionSentToUpstreamEvent) Subscribe() (int, chan types.Hash) {

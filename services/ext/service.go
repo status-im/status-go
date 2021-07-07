@@ -198,7 +198,7 @@ type verifyTransactionClient struct {
 }
 
 func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
-	signer := gethtypes.NewEIP155Signer(c.chainID)
+	signer := gethtypes.NewLondonSigner(c.chainID)
 	client, err := ethclient.Dial(c.url)
 	if err != nil {
 		return coretypes.Message{}, coretypes.TransactionStatusPending, err
@@ -335,8 +335,6 @@ func (s *Service) SetP2PServer(server *p2p.Server) {
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Start() error {
-	// TODO: set server before start
-	//	s.server = server
 	return nil
 }
 
@@ -358,6 +356,7 @@ func (s *Service) Stop() error {
 			log.Error("failed to stop messenger", "err", err)
 			return err
 		}
+		s.messenger = nil
 	}
 
 	return nil

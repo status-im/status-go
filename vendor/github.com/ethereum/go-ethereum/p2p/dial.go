@@ -206,7 +206,6 @@ func (d *dialScheduler) removeStatic(n *enode.Node) {
 
 // peerAdded updates the peer set.
 func (d *dialScheduler) peerAdded(c *conn) {
-	log.Info("PEER added")
 	select {
 	case d.addPeerCh <- c:
 	case <-d.ctx.Done():
@@ -215,7 +214,6 @@ func (d *dialScheduler) peerAdded(c *conn) {
 
 // peerRemoved updates the peer set.
 func (d *dialScheduler) peerRemoved(c *conn) {
-	log.Info("PEER removed")
 	select {
 	case d.remPeerCh <- c:
 	case <-d.ctx.Done():
@@ -245,7 +243,7 @@ loop:
 		select {
 		case node := <-nodesCh:
 			if err := d.checkDial(node); err != nil {
-				d.log.Info("Discarding dial candidate", "id", node.ID(), "ip", node.IP(), "reason", err)
+				d.log.Trace("Discarding dial candidate", "id", node.ID(), "ip", node.IP(), "reason", err)
 			} else {
 				d.startDial(newDialTask(node, dynDialedConn))
 			}
@@ -279,22 +277,14 @@ loop:
 		case node := <-d.addStaticCh:
 			id := node.ID()
 			_, exists := d.static[id]
-			d.log.Info("Adding static node", "id", id, "ip", node.IP(), "added", !exists)
+			d.log.Trace("Adding static node", "id", id, "ip", node.IP(), "added", !exists)
 			if exists {
-				d.log.Info("existing, continue")
 				continue loop
 			}
 			task := newDialTask(node, staticDialedConn)
-			d.log.Info("new dial task")
 			d.static[id] = task
-			d.log.Info("checking dial")
-			err := d.checkDial(node)
-			d.log.Info("dial checked")
-			if err == nil {
-				d.log.Info("addign to static pool")
+			if d.checkDial(node) == nil {
 				d.addToStaticPool(task)
-			} else {
-				d.log.Info("error", "err", err)
 			}
 
 		case node := <-d.remStaticCh:
@@ -386,7 +376,6 @@ func (d *dialScheduler) expireHistory() {
 // freeDialSlots returns the number of free dial slots. The result can be negative
 // when peers are connected while their task is still running.
 func (d *dialScheduler) freeDialSlots() int {
-	log.Info("checkign slots", "max dials", d.maxDialPeers, "dial peers", d.dialPeers)
 	slots := (d.maxDialPeers - d.dialPeers) * 2
 	if slots > d.maxActiveDials {
 		slots = d.maxActiveDials
@@ -423,9 +412,7 @@ func (d *dialScheduler) checkDial(n *enode.Node) error {
 
 // startStaticDials starts n static dial tasks.
 func (d *dialScheduler) startStaticDials(n int) (started int) {
-	log.Info("starting", "n", n)
 	for started = 0; started < n && len(d.staticPool) > 0; started++ {
-		log.Info("starting static")
 		idx := d.rand.Intn(len(d.staticPool))
 		task := d.staticPool[idx]
 		d.startDial(task)

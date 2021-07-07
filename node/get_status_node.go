@@ -87,7 +87,8 @@ type StatusNode struct {
 	accountsManager    *accounts.Manager
 
 	// services
-	// Not sure whether we can use the one that has already be initalized above
+	// we explicitly list every service, we could use interfaces
+	// and store them in a nicer way, but for now stupid is good
 	rpcFiltersSrvc         *rpcfilters.Service
 	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
@@ -147,7 +148,6 @@ func (n *StatusNode) Server() *p2p.Server {
 // Start starts current StatusNode, failing if it's already started.
 // It accepts a list of services that should be added to the node.
 func (n *StatusNode) Start(config *params.NodeConfig, accs *accounts.Manager) error {
-	n.accountsManager = accs
 	return n.StartWithOptions(config, StartOptions{
 		StartDiscovery:  true,
 		AccountsManager: accs,
@@ -181,11 +181,9 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	}
 
 	n.db = db
-	n.log.Info("starting with db")
 
 	err = n.startWithDB(config, options.AccountsManager, db)
 
-	n.log.Info("started with db")
 	// continue only if there was no error when starting node with a db
 	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
 		err = n.startDiscovery()
@@ -207,9 +205,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		return err
 	}
 	n.config = config
-	n.log.Info("starting geth node")
 
-	n.log.Info("setting up rpc client")
 	if err := n.setupRPCClient(); err != nil {
 		return err
 	}
@@ -406,6 +402,25 @@ func (n *StatusNode) stop() error {
 
 		return err
 	}
+
+	n.rpcFiltersSrvc = nil
+	n.subscriptionsSrvc = nil
+	n.rpcStatsSrvc = nil
+	n.accountsSrvc = nil
+	n.browsersSrvc = nil
+	n.nodeBridgeSrvc = nil
+	n.permissionsSrvc = nil
+	n.mailserversSrvc = nil
+	n.appMetricsSrvc = nil
+	n.walletSrvc = nil
+	n.peerSrvc = nil
+	n.localNotificationsSrvc = nil
+	n.personalSrvc = nil
+	n.timeSourceSrvc = nil
+	n.wakuSrvc = nil
+	n.wakuExtSrvc = nil
+	n.wakuV2Srvc = nil
+	n.wakuV2ExtSrvc = nil
 
 	return nil
 }

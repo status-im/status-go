@@ -128,10 +128,13 @@ func (e *latestBlockChangedEvent) Stop() {
 
 	select {
 	case <-e.quit:
+		e.quit = nil
 		return
 	default:
 		close(e.quit)
 	}
+
+	e.quit = nil
 }
 
 func (e *latestBlockChangedEvent) Subscribe() (int, chan common.Hash) {

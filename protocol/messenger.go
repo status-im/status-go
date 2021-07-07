@@ -206,7 +206,6 @@ func NewMessenger(
 	// Initialize transport layer.
 	var transp *transport.Transport
 
-	logger.Info("TEST", zap.Any("node", node))
 	if waku, err := node.GetWaku(nil); err == nil && waku != nil {
 		transp, err = transport.NewTransport(
 			waku,

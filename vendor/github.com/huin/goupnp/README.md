@@ -44,3 +44,22 @@ encountered as an [issue on this
 project](https://github.com/huin/goupnp/issues/new). If it just works, then
 please report at least minimal working functionality as an issue, and
 optionally contribute the metadata upstream.
+
+## Migrating due to Breaking Changes
+
+- \#40 introduced a breaking change to handling non-utf8 encodings, but removes a heavy
+  dependency on `golang.org/x/net` with charset encodings. If this breaks your usage of this
+  library, you can return to the old behavior by modifying the exported variable and importing
+  the package yourself:
+
+```go
+import (
+  "golang.org/x/net/html/charset"
+  "github.com/huin/goupnp"
+)
+
+func init() {
+  // should be modified before goupnp libraries are in use.
+  goupnp.CharsetReaderFault = charset.NewReaderLabel
+}
+```
