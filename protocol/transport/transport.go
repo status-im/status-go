@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
@@ -466,10 +467,13 @@ func (t *Transport) SendMessagesRequestForTopics(
 	topics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
-	if t.waku.Version() == 2 {
+	switch t.waku.Version() {
+	case 2:
 		storeCursor, err = t.createMessagesRequestV2(peerID, from, to, previousStoreCursor, topics)
-	} else {
+	case 1:
 		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	default:
+		err = fmt.Errorf("unsupported version %d", t.waku.Version())
 	}
 	return
 }
