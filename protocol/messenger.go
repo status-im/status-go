@@ -3215,6 +3215,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		Address:  address,
 		Value:    value,
 		Contract: contract,
+		ChatId:   chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3287,6 +3288,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		Clock:    message.Clock,
 		Value:    value,
 		Contract: contract,
+		ChatId:   chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3384,6 +3386,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		Clock:   message.Clock,
 		Id:      messageID,
 		Address: address,
+		ChatId:  chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3461,8 +3464,9 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	}
 
 	request := &protobuf.DeclineRequestTransaction{
-		Clock: message.Clock,
-		Id:    messageID,
+		Clock:  message.Clock,
+		Id:     messageID,
+		ChatId: chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3539,8 +3543,9 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	}
 
 	request := &protobuf.DeclineRequestAddressForTransaction{
-		Clock: message.Clock,
-		Id:    messageID,
+		Clock:  message.Clock,
+		Id:     messageID,
+		ChatId: chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3634,6 +3639,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		Id:              messageID,
 		TransactionHash: transactionHash,
 		Signature:       signature,
+		ChatId:          chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
@@ -3707,6 +3713,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		Clock:           message.Clock,
 		TransactionHash: transactionHash,
 		Signature:       signature,
+		ChatId:          chatID,
 	}
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {

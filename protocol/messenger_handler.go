@@ -689,10 +689,11 @@ func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMes
 	}
 	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
-			Clock:       command.Clock,
-			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
-			Text:        "Request address for transaction",
-			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
+			Clock:     command.Clock,
+			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
+			Text:      "Request address for transaction",
+			// ChatId is only used as-is for messages sent to oneself (i.e: mostly sync) so no need to check it here
+			ChatId:      command.GetChatId(),
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
@@ -713,10 +714,11 @@ func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState,
 	}
 	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
-			Clock:       command.Clock,
-			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
-			Text:        "Request transaction",
-			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
+			Clock:     command.Clock,
+			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
+			Text:      "Request transaction",
+			// ChatId is only used for messages sent to oneself (i.e: mostly sync) so no need to check it here
+			ChatId:      command.GetChatId(),
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
@@ -762,6 +764,7 @@ func (m *Messenger) HandleAcceptRequestAddressForTransaction(messageState *Recei
 	initialMessage.CommandParameters.Address = command.Address
 	initialMessage.Seen = false
 	initialMessage.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionAccepted
+	initialMessage.ChatId = command.GetChatId()
 
 	// Hide previous message
 	previousMessage, err := m.persistence.MessageByCommandID(messageState.CurrentMessageState.Contact.ID, command.Id)
@@ -831,6 +834,7 @@ func (m *Messenger) HandleDeclineRequestAddressForTransaction(messageState *Rece
 	oldMessage.Text = requestAddressForTransactionDeclinedMessage
 	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionDeclined
+	oldMessage.ChatId = command.GetChatId()
 
 	// Hide previous message
 	err = m.persistence.HideMessage(command.Id)
@@ -872,6 +876,7 @@ func (m *Messenger) HandleDeclineRequestTransaction(messageState *ReceivedMessag
 	oldMessage.Text = transactionRequestDeclinedMessage
 	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = common.CommandStateRequestTransactionDeclined
+	oldMessage.ChatId = command.GetChatId()
 
 	// Hide previous message
 	err = m.persistence.HideMessage(command.Id)
