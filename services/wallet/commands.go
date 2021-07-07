@@ -148,7 +148,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 				chain:    c.chain,
 				client:   c.client,
 				accounts: []common.Address{address},
-				signer:   types.NewEIP155Signer(c.chain),
+				signer:   types.NewLondonSigner(c.chain),
 				db:       c.db,
 			},
 			feed:    c.feed,
@@ -187,7 +187,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	for i, address := range c.accounts {
 		erc20 := &erc20HistoricalCommand{
 			db:           c.db,
-			erc20:        NewERC20TransfersDownloader(c.client, []common.Address{address}, types.NewEIP155Signer(c.chain)),
+			erc20:        NewERC20TransfersDownloader(c.client, []common.Address{address}, types.NewLondonSigner(c.chain)),
 			client:       c.client,
 			feed:         c.feed,
 			address:      address,
@@ -248,7 +248,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, db *Database,
 					chain:    chain,
 					client:   client,
 					accounts: []common.Address{address},
-					signer:   types.NewEIP155Signer(chain),
+					signer:   types.NewLondonSigner(chain),
 					db:       db,
 				},
 				block: block,
@@ -443,7 +443,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		chain:    c.chain,
 		client:   c.client,
 		accounts: c.accounts,
-		signer:   types.NewEIP155Signer(c.chain),
+		signer:   types.NewLondonSigner(c.chain),
 		db:       c.db,
 	}
 	_, err = c.LoadTransfers(parent, downloader, 40)
@@ -575,7 +575,7 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 		chain:    c.chain,
 		client:   c.client,
 		accounts: c.accounts,
-		signer:   types.NewEIP155Signer(c.chain),
+		signer:   types.NewLondonSigner(c.chain),
 		db:       c.db,
 	}
 	transfersByAddress, err := c.LoadTransfers(parent, downloader, 40, c.blocksByAddress)

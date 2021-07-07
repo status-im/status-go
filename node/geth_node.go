@@ -69,6 +69,20 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 
 // newGethNodeConfig returns default stack configuration for mobile client node
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
+	// NOTE: I haven't changed anything related to this paramters, but
+	// it seems they were previously ignored if set to 0, but now they seem
+	// to be used, so they need to be set to something
+	maxPeers := 100
+	maxPendingPeers := 100
+
+	if config.MaxPeers != 0 {
+		maxPeers = config.MaxPeers
+	}
+
+	if config.MaxPendingPeers != 0 {
+		maxPendingPeers = config.MaxPendingPeers
+	}
+
 	nc := &node.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
@@ -77,12 +91,11 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery: true, // we always use only v5 server
-			ListenAddr:  config.ListenAddr,
-			NAT:         nat.Any(),
-			// FIX ME: don't hardcode
-			MaxPeers:        200,
-			MaxPendingPeers: 200,
+			NoDiscovery:     true, // we always use only v5 server
+			ListenAddr:      config.ListenAddr,
+			NAT:             nat.Any(),
+			MaxPeers:        maxPeers,
+			MaxPendingPeers: maxPendingPeers,
 		},
 		HTTPModules: config.FormatAPIModules(),
 	}
@@ -197,13 +210,3 @@ func parseNodesToNodeID(enodes []string) []enode.ID {
 	}
 	return nodeIDs
 }
-
-/*
-// timeSource get timeSource to be used by whisper
-func timeSource(ctx *node.ServiceContext) (func() time.Time, error) {
-	var timeSource *timesource.NTPTimeSource
-	if err := ctx.Service(&timeSource); err != nil {
-		return nil, err
-	}
-	return timeSource.Now, nil
-}*/

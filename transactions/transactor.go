@@ -100,7 +100,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	}
 
 	chainID := big.NewInt(int64(t.networkID))
-	signer := gethtypes.NewEIP155Signer(chainID)
+	signer := gethtypes.NewLondonSigner(chainID)
 
 	tx := t.buildTransaction(args)
 	t.addrLock.LockAddr(args.From)
@@ -205,7 +205,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	validatedArgs.Gas = &newGas
 
 	tx := t.buildTransaction(validatedArgs)
-	hash = types.Hash(gethtypes.NewEIP155Signer(chainID).Hash(tx))
+	hash = types.Hash(gethtypes.NewLondonSigner(chainID).Hash(tx))
 
 	return validatedArgs, hash, nil
 }
@@ -309,7 +309,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 
 	tx := t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
 
-	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
+	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
 	}
