@@ -409,6 +409,54 @@ func (t *Transport) WakuVersion() uint {
 	return t.waku.Version()
 }
 
+func (t *Transport) createMessagesRequestV1(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+	topics []types.TopicType,
+	waitForResponse bool,
+) (cursor []byte, err error) {
+	r := createMessagesRequest(from, to, previousCursor, nil, topics)
+
+	events := make(chan types.EnvelopeEvent, 10)
+	sub := t.waku.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	err = t.waku.SendMessagesRequest(peerID, r)
+	if err != nil {
+		return
+	}
+
+	if !waitForResponse {
+		return
+	}
+
+	var resp *types.MailServerResponse
+	resp, err = t.waitForRequestCompleted(ctx, r.ID, events)
+	if err == nil && resp != nil && resp.Error != nil {
+		err = resp.Error
+	} else if err == nil && resp != nil {
+		cursor = resp.Cursor
+	}
+
+	return
+}
+
+func (t *Transport) createMessagesRequestV2(
+	peerID []byte,
+	from, to uint32,
+	previousStoreCursor *types.StoreRequestCursor,
+	topics []types.TopicType,
+) (storeCursor *types.StoreRequestCursor, err error) {
+	r := createMessagesRequest(from, to, nil, previousStoreCursor, topics)
+	storeCursor, err = t.waku.RequestStoreMessages(peerID, r)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID []byte,
@@ -418,33 +466,10 @@ func (t *Transport) SendMessagesRequestForTopics(
 	topics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
-	r := createMessagesRequest(from, to, previousCursor, previousStoreCursor, topics)
 	if t.waku.Version() == 2 {
-		storeCursor, err = t.waku.RequestStoreMessages(peerID, r)
-		if err != nil {
-			return
-		}
+		storeCursor, err = t.createMessagesRequestV2(peerID, from, to, previousStoreCursor, topics)
 	} else {
-		events := make(chan types.EnvelopeEvent, 10)
-		sub := t.waku.SubscribeEnvelopeEvents(events)
-		defer sub.Unsubscribe()
-
-		err = t.waku.SendMessagesRequest(peerID, r)
-		if err != nil {
-			return
-		}
-
-		if !waitForResponse {
-			return
-		}
-
-		var resp *types.MailServerResponse
-		resp, err = t.waitForRequestCompleted(ctx, r.ID, events)
-		if err == nil && resp != nil && resp.Error != nil {
-			err = resp.Error
-		} else if err == nil && resp != nil {
-			cursor = resp.Cursor
-		}
+		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
 	}
 	return
 }
