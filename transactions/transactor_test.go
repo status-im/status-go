@@ -24,7 +24,6 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/contracts/ens/contract"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -260,33 +259,6 @@ func (s *TransactorSuite) TestLocalNonce() {
 	s.EqualError(err, testErr.Error())
 	resultNonce, _ = s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
-}
-
-func (s *TransactorSuite) TestContractCreation() {
-	key, _ := gethcrypto.GenerateKey()
-	testaddr := gethcrypto.PubkeyToAddress(key.PublicKey)
-	genesis := core.GenesisAlloc{
-		testaddr: {Balance: big.NewInt(100000000000)},
-	}
-	backend := backends.NewSimulatedBackend(genesis, math.MaxInt64)
-	selectedAccount := &account.SelectedExtKey{
-		Address:    types.Address(testaddr),
-		AccountKey: &types.Key{PrivateKey: key},
-	}
-	s.manager.sender = backend
-	s.manager.gasCalculator = backend
-	s.manager.pendingNonceProvider = backend
-	tx := SendTxArgs{
-		From:  types.Address(testaddr),
-		Input: types.FromHex(contract.ENSBin),
-	}
-
-	hash, err := s.manager.SendTransaction(tx, selectedAccount)
-	s.NoError(err)
-	backend.Commit()
-	receipt, err := backend.TransactionReceipt(context.TODO(), common.Hash(hash))
-	s.NoError(err)
-	s.Equal(gethcrypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
 }
 
 func (s *TransactorSuite) TestSendTransactionWithSignature() {

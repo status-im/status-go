@@ -1,13 +1,16 @@
 package node
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	logging "github.com/ipfs/go-log"
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
@@ -43,6 +46,9 @@ import (
 var (
 	// ErrWakuClearIdentitiesFailure clearing whisper identities has failed.
 	ErrWakuClearIdentitiesFailure = errors.New("failed to clear waku identities")
+	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
+	// This is a normal situation when a node is stopped.
+	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
 func (b *StatusNode) initServices(config *params.NodeConfig) error {
@@ -107,12 +113,29 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	b.peerSrvc.SetDiscoverer(b)
 
 	for i := range services {
-		b.gethNode.RegisterAPIs(services[i].APIs())
-		b.gethNode.RegisterProtocols(services[i].Protocols())
-		b.gethNode.RegisterLifecycle(services[i])
+		b.RegisterLifecycle(services[i])
 	}
 
+	b.services = services
+
 	return nil
+}
+
+func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
+	b.addPublicMethods(s.APIs())
+	b.gethNode.RegisterAPIs(s.APIs())
+	b.gethNode.RegisterProtocols(s.Protocols())
+	b.gethNode.RegisterLifecycle(s)
+}
+
+// Add through reflection a list of public methods so we can check when the
+// user makes a call if they are allowed
+func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
+	for _, api := range apis {
+		if api.Public {
+			addSuitableCallbacks(reflect.ValueOf(api.Service), api.Namespace, b.publicMethods)
+		}
+	}
 }
 
 func (b *StatusNode) nodeBridge() types.Node {
@@ -285,7 +308,7 @@ func (b *StatusNode) rpcFiltersService() *rpcfilters.Service {
 func (b *StatusNode) subscriptionService() *subscriptions.Service {
 	if b.subscriptionsSrvc == nil {
 
-		b.subscriptionsSrvc = subscriptions.New(func() *rpc.Client { return b.RPCPrivateClient() })
+		b.subscriptionsSrvc = subscriptions.New(func() *rpc.Client { return b.RPCClient() })
 	}
 	return b.subscriptionsSrvc
 }
@@ -459,4 +482,40 @@ func (b *StatusNode) Cleanup() error {
 	}
 	return nil
 
+}
+
+type RPCCall struct {
+	Method string `json:"method"`
+}
+
+func (b *StatusNode) CallPrivateRPC(inputJSON string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.rpcClient == nil {
+		return "", ErrRPCClientUnavailable
+	}
+
+	return b.rpcClient.CallRaw(inputJSON), nil
+}
+
+// CallRPC calls public methods on the node, we register public methods
+// in a map and check if they can be called in this function
+func (b *StatusNode) CallRPC(inputJSON string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.rpcClient == nil {
+		return "", ErrRPCClientUnavailable
+	}
+
+	rpcCall := &RPCCall{}
+	err := json.Unmarshal([]byte(inputJSON), rpcCall)
+	if err != nil {
+		return "", err
+	}
+
+	if rpcCall.Method == "" || !b.publicMethods[rpcCall.Method] {
+		return ErrRPCMethodUnavailable, nil
+	}
+
+	return b.rpcClient.CallRaw(inputJSON), nil
 }

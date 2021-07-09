@@ -27,7 +27,6 @@ func (s *Service) APIs() []rpc.API {
 			Namespace: "mailservers",
 			Version:   "0.1.0",
 			Service:   NewAPI(s.db),
-			Public:    true,
 		},
 	}
 }

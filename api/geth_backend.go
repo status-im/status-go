@@ -591,7 +591,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
-	b.personalAPI.SetRPC(b.statusNode.RPCPrivateClient(), rpc.DefaultCallTimeout)
 
 	if err = b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
@@ -678,7 +677,7 @@ func (b *GethStatusBackend) CallRPC(inputJSON string) (string, error) {
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
 func (b *GethStatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
-	client := b.statusNode.RPCPrivateClient()
+	client := b.statusNode.RPCClient()
 	if client == nil {
 		return "", ErrRPCClientUnavailable
 	}
@@ -817,12 +816,6 @@ func (b *GethStatusBackend) registerHandlers() error {
 		clients = append(clients, c)
 	} else {
 		return errors.New("RPC client unavailable")
-	}
-
-	if c := b.StatusNode().RPCPrivateClient(); c != nil {
-		clients = append(clients, c)
-	} else {
-		return errors.New("RPC private client unavailable")
 	}
 
 	for _, client := range clients {

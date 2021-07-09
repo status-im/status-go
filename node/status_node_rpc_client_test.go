@@ -1,16 +1,12 @@
-package node_test
+package node
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	gethnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rpc"
-
-	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 )
 
@@ -20,45 +16,13 @@ func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
 	return "some method result", nil
 }
 
-type testService struct{}
-
-func (s *testService) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
-}
-
-func (s *testService) APIs() []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: "pri",
-			Version:   "1.0",
-			Service:   &TestServiceAPI{},
-			Public:    false,
-		},
-		{
-			Namespace: "pub",
-			Version:   "1.0",
-			Service:   &TestServiceAPI{},
-			Public:    true,
-		},
+func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
+	statusNode := New()
+	err := statusNode.Start(config, nil)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func (s *testService) Start(server *p2p.Server) error {
-	return nil
-}
-
-func (s *testService) Stop() error {
-	return nil
-}
-
-func createAndStartStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
-	services := []gethnode.ServiceConstructor{
-		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
-			return &testService{}, nil
-		},
-	}
-	statusNode := node.New()
-	return statusNode, statusNode.Start(config, nil, services...)
+	return statusNode, nil
 }
 
 func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
@@ -66,6 +30,12 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
 		APIModules: "", // no whitelisted API modules; use only public APIs
+		UpstreamConfig: params.UpstreamRPCConfig{
+			URL:     "https://infura.io",
+			Enabled: true},
+		WakuConfig: params.WakuConfig{
+			Enabled: true,
+		},
 	})
 	require.NoError(t, err)
 	defer func() {
@@ -76,38 +46,19 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	client := statusNode.RPCClient()
 	require.NotNil(t, client)
 
-	var result string
-
-	// call public API
-	err = client.Call(&result, "pub_someMethod")
+	// call public API with public RPC Client
+	result, err := statusNode.CallRPC(`{"jsonrpc": "2.0", "id": 1, "method": "eth_uninstallFilter", "params": ["id"]}`)
 	require.NoError(t, err)
-	require.Equal(t, "some method result", result)
+
+	// the call is successful
+	require.False(t, strings.Contains(result, "error"))
+
+	result, err = statusNode.CallRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
+	require.NoError(t, err)
 
 	// call private API with public RPC client
-	err = client.Call(&result, "pri_someMethod")
-	require.EqualError(t, err, "the method pri_someMethod does not exist/is not available")
-}
+	require.Equal(t, ErrRPCMethodUnavailable, result)
 
-func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
-	var err error
-
-	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		APIModules: "pri",
-	})
-	require.NoError(t, err)
-	defer func() {
-		err := statusNode.Stop()
-		require.NoError(t, err)
-	}()
-
-	client := statusNode.RPCClient()
-	require.NotNil(t, client)
-
-	// call private API
-	var result string
-	err = client.Call(&result, "pri_someMethod")
-	require.NoError(t, err)
-	require.Equal(t, "some method result", result)
 }
 
 func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
@@ -120,12 +71,9 @@ func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	client := statusNode.RPCPrivateClient()
-	require.NotNil(t, client)
-
-	// call private API with private RPC client
-	var result string
-	err = client.Call(&result, "pri_someMethod")
+	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
 	require.NoError(t, err)
-	require.Equal(t, "some method result", result)
+
+	// the call is successful
+	require.False(t, strings.Contains(result, "error"))
 }

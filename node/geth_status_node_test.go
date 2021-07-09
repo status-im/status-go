@@ -1,23 +1,16 @@
 package node
 
 import (
-	"fmt"
 	"io/ioutil"
 	"math"
 	"net"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-
-	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/require"
 
@@ -87,68 +80,6 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	require.NoError(t, n.Stop())
 }
 
-func TestStatusNodeServiceGetters(t *testing.T) {
-	config := params.NodeConfig{
-		EnableNTPSync: true,
-		WakuConfig: params.WakuConfig{
-			Enabled: true,
-		},
-		LightEthConfig: params.LightEthConfig{
-			Enabled: true,
-		},
-	}
-	n := New()
-
-	var (
-		instance interface{}
-		err      error
-	)
-
-	services := []struct {
-		getter func() (interface{}, error)
-		typ    reflect.Type
-	}{
-		{
-			getter: func() (interface{}, error) {
-				return n.WakuService()
-			},
-			typ: reflect.TypeOf(&waku.Waku{}),
-		},
-		{
-			getter: func() (interface{}, error) {
-				return n.LightEthereumService()
-			},
-			typ: reflect.TypeOf(&les.LightEthereum{}),
-		},
-	}
-
-	for _, service := range services {
-		t.Run(service.typ.String(), func(t *testing.T) {
-			// checks before node is started
-			instance, err = service.getter()
-			require.EqualError(t, err, ErrNoRunningNode.Error())
-			require.Nil(t, instance)
-
-			// start node
-			require.NoError(t, n.Start(&config, nil))
-
-			// checks after node is started
-			instance, err = service.getter()
-			require.NoError(t, err)
-			require.NotNil(t, instance)
-			require.Equal(t, service.typ, reflect.TypeOf(instance))
-
-			// stop node
-			require.NoError(t, n.Stop())
-
-			// checks after node is stopped
-			instance, err = service.getter()
-			require.EqualError(t, err, ErrNoRunningNode.Error())
-			require.Nil(t, instance)
-		})
-	}
-}
-
 func TestStatusNodeAddPeer(t *testing.T) {
 	var err error
 
@@ -162,7 +93,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
-	defer func() { require.NoError(t, peer.Stop()) }()
+	defer func() { require.NoError(t, peer.Close()) }()
 	peerURL := peer.Server().Self().URLv4()
 
 	n := New()
@@ -247,51 +178,4 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	node, err = n.discoverNode()
 	require.NoError(t, err)
 	require.Equal(t, net.ParseIP("127.0.0.2").To4(), node.IP())
-}
-
-func TestChaosModeCheckRPCClientsUpstreamURL(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{
-			"id": 1,
-			"jsonrpc": "2.0",
-			"result": 1
-		}`)
-	}))
-	defer ts.Close()
-
-	config := params.NodeConfig{
-		NoDiscovery: true,
-		ListenAddr:  "127.0.0.1:0",
-		UpstreamConfig: params.UpstreamRPCConfig{
-			Enabled: true,
-			// put "infura.io" substring to simulate blocking an actual infura.io URLs
-			URL: ts.URL + "?actualURL=infura.io",
-		},
-	}
-	n := New()
-	require.NoError(t, n.Start(&config, nil))
-	defer func() { require.NoError(t, n.Stop()) }()
-	require.NotNil(t, n.RPCClient())
-
-	client := n.RPCClient()
-	require.NotNil(t, client)
-
-	err := client.Call(nil, "net_version")
-	require.NoError(t, err)
-
-	// act
-	err = n.ChaosModeCheckRPCClientsUpstreamURL(true)
-	require.NoError(t, err)
-
-	// assert
-	err = client.Call(nil, "net_version")
-	require.Error(t, err)
-
-	// act
-	err = n.ChaosModeCheckRPCClientsUpstreamURL(false)
-	require.NoError(t, err)
-
-	// assert
-	err = client.Call(nil, "net_version")
-	require.NoError(t, err)
 }

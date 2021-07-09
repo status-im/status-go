@@ -32,7 +32,6 @@ func (s *Service) APIs() []rpc.API {
 			Namespace: "browsers",
 			Version:   "0.1.0",
 			Service:   NewAPI(s.db),
-			Public:    true,
 		},
 	}
 }
