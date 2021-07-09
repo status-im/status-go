@@ -42,14 +42,15 @@ func TestRequestMessagesErrors(t *testing.T) {
 		NoUSB: true,
 	}) // in-memory node as no data dir
 	require.NoError(t, err)
-	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) {
-		return gethbridge.GetGethWakuFrom(waku), nil
-	})
+	w := gethbridge.GetGethWakuFrom(waku)
+	aNode.RegisterLifecycle(w)
+	aNode.RegisterAPIs(w.APIs())
+	aNode.RegisterProtocols(w.Protocols())
 	require.NoError(t, err)
 
 	err = aNode.Start()
 	require.NoError(t, err)
-	defer func() { require.NoError(t, aNode.Stop()) }()
+	defer func() { require.NoError(t, aNode.Close()) }()
 
 	handler := ext.NewHandlerMock(1)
 	config := params.ShhextConfig{
@@ -58,7 +59,7 @@ func TestRequestMessagesErrors(t *testing.T) {
 		PFSEnabled:            true,
 	}
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
-	service := New(config, nodeWrapper, nil, handler, nil)
+	service := New(config, nodeWrapper, handler, nil)
 	api := NewPublicAPI(service)
 
 	const mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
@@ -116,7 +117,7 @@ func TestInitProtocol(t *testing.T) {
 	require.NoError(t, err)
 
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
-	service := New(config, nodeWrapper, nil, nil, db)
+	service := New(config, nodeWrapper, nil, db)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	require.NoError(t, err)
@@ -164,9 +165,9 @@ func (s *ShhExtSuite) createAndAddNode() {
 	stack, err := node.New(cfg)
 	s.NoError(err)
 	w := waku.New(nil, nil)
-	err = stack.Register(func(n *node.ServiceContext) (node.Service, error) {
-		return w, nil
-	})
+	stack.RegisterLifecycle(w)
+	stack.RegisterAPIs(w.APIs())
+	stack.RegisterProtocols(w.Protocols())
 	s.NoError(err)
 
 	// set up protocol
@@ -180,7 +181,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
 	nodeWrapper := ext.NewTestNodeWrapper(nil, gethbridge.NewGethWakuWrapper(w))
-	service := New(config, nodeWrapper, nil, nil, db)
+	service := New(config, nodeWrapper, nil, db)
 	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
 	s.Require().NoError(err)
 
@@ -197,9 +198,10 @@ func (s *ShhExtSuite) createAndAddNode() {
 	err = service.InitProtocol(privateKey, sqlDB, multiAccounts, acc, zap.NewNop())
 	s.NoError(err)
 
-	err = stack.Register(func(n *node.ServiceContext) (node.Service, error) {
-		return service, nil
-	})
+	stack.RegisterLifecycle(service)
+	stack.RegisterAPIs(service.APIs())
+	stack.RegisterProtocols(service.Protocols())
+
 	s.NoError(err)
 
 	// start the node
@@ -220,7 +222,7 @@ func (s *ShhExtSuite) SetupTest() {
 
 func (s *ShhExtSuite) TearDownTest() {
 	for _, n := range s.nodes {
-		s.NoError(n.Stop())
+		s.NoError(n.Close())
 	}
 	s.nodes = nil
 	s.wakus = nil

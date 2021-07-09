@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestWakuLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
@@ -25,8 +24,8 @@ func TestWakuLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 		require.NoError(t, node.Stop())
 	}()
 
-	var waku *waku.Waku
-	require.NoError(t, node.gethService(&waku))
+	waku := node.WakuService()
+	require.NotNil(t, waku)
 
 	bloomFilter := waku.BloomFilter()
 	expectedEmptyBloomFilter := make([]byte, 64)
@@ -48,7 +47,7 @@ func TestWakuLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 		require.NoError(t, node.Stop())
 	}()
 
-	var waku *waku.Waku
-	require.NoError(t, node.gethService(&waku))
+	waku := node.WakuService()
+	require.NotNil(t, waku)
 	require.Nil(t, waku.BloomFilter())
 }

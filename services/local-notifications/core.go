@@ -212,7 +212,6 @@ func (s *Service) APIs() []rpc.API {
 			Namespace: "localnotifications",
 			Version:   "0.1.0",
 			Service:   NewAPI(s),
-			Public:    true,
 		},
 	}
 }

@@ -37,7 +37,7 @@ func (s *MessengerMuteSuite) SetupTest() {
 	config.MinimumAcceptedPoW = 0
 	shh := waku.New(&config, s.logger)
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start(nil))
+	s.Require().NoError(shh.Start())
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity

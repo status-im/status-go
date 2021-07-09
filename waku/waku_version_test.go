@@ -69,13 +69,13 @@ func (s *WakuTestSuite) TestHandleP2PMessageCode() {
 
 	w1 := New(nil, nil)
 	s.Require().NoError(w1.SetMinimumPoW(0.0000001, false))
-	s.Require().NoError(w1.Start(nil))
+	s.Require().NoError(w1.Start())
 
 	go func() { handleError(s.T(), w1.Stop()) }()
 
 	w2 := New(nil, nil)
 	s.Require().NoError(w2.SetMinimumPoW(0.0000001, false))
-	s.Require().NoError(w2.Start(nil))
+	s.Require().NoError(w2.Start())
 	go func() { handleError(s.T(), w2.Stop()) }()
 
 	envelopeEvents := make(chan common.EnvelopeEvent, 10)
@@ -589,7 +589,7 @@ func (s *WakuTestSuite) TestRateLimiterIntegration() {
 
 func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	w1 := New(nil, nil)
-	s.Require().NoError(w1.Start(nil))
+	s.Require().NoError(w1.Start())
 	defer func() { handleError(s.T(), w1.Stop()) }()
 
 	rw1, rw2 := p2p.MsgPipe()
@@ -600,7 +600,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	}()
 
 	w2 := New(nil, nil)
-	s.Require().NoError(w2.Start(nil))
+	s.Require().NoError(w2.Start())
 	defer func() { handleError(s.T(), w2.Stop()) }()
 
 	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw2, nil)

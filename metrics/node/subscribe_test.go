@@ -21,7 +21,7 @@ func TestSubscribeServerEvents(t *testing.T) {
 	err = gethNode.Start()
 	require.NoError(t, err)
 	defer func() {
-		err := gethNode.Stop()
+		err := gethNode.Close()
 		require.NoError(t, err)
 	}()
 

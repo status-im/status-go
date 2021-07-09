@@ -186,7 +186,7 @@ func initializeBloomFilterMode(t *testing.T) {
 		if !bytes.Equal(node.waku.BloomFilter(), masterBloomFilter) {
 			t.Fatalf("bloom mismatch on init.")
 		}
-		_ = node.waku.Start(nil)
+		_ = node.waku.Start()
 		topics := make([]common.TopicType, 0)
 		topics = append(topics, sharedTopic)
 		f := common.Filter{KeySym: sharedKey, Messages: common.NewMemoryMessageStore()}

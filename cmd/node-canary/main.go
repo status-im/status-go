@@ -108,15 +108,15 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	defer func() { _ = clientBackend.StopNode() }()
 
 	clientNode := clientBackend.StatusNode()
-	clientGethWakuService, err := clientNode.WakuService()
-	if err != nil {
-		logger.Error("Could not retrieve waku service", "error", err)
+	clientGethWakuService := clientNode.WakuService()
+	if clientGethWakuService == nil {
+		logger.Error("Could not retrieve waku service")
 		os.Exit(1)
 	}
 	clientWakuService := gethbridge.NewGethWakuWrapper(clientGethWakuService)
-	clientWakuExtService, err := clientNode.WakuExtService()
-	if err != nil {
-		logger.Error("Could not retrieve wakuext service", "error", err)
+	clientWakuExtService := clientNode.WakuExtService()
+	if clientWakuExtService == nil {
+		logger.Error("Could not retrieve wakuext service")
 		os.Exit(1)
 	}
 

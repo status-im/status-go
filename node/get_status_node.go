@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
@@ -61,6 +61,7 @@ var (
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
 	ErrServiceUnknown         = errors.New("service unknown")
 	ErrDiscoveryRunning       = errors.New("discovery is already running")
+	ErrRPCMethodUnavailable   = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -71,10 +72,9 @@ type StatusNode struct {
 	appDB           *sql.DB
 	multiaccountsDB *multiaccounts.Database
 
-	config           *params.NodeConfig // Status node configuration
-	gethNode         *node.Node         // reference to Geth P2P stack/node
-	rpcClient        *rpc.Client        // reference to public RPC client
-	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
+	config    *params.NodeConfig // Status node configuration
+	gethNode  *node.Node         // reference to Geth P2P stack/node
+	rpcClient *rpc.Client        // reference to an RPC client
 
 	discovery discovery.Discovery
 	register  *peers.Register
@@ -87,8 +87,10 @@ type StatusNode struct {
 	accountsManager    *accounts.Manager
 
 	// services
+	services      []common.StatusService
+	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
-	// and store them in a nicer way, but for now stupid is good
+	// and store them in a nicer way and user reflection, but for now stupid is good
 	rpcFiltersSrvc         *rpcfilters.Service
 	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
@@ -114,6 +116,7 @@ func New() *StatusNode {
 	return &StatusNode{
 		gethAccountManager: account.NewGethManager(),
 		log:                log.New("package", "status-go/node.StatusNode"),
+		publicMethods:      make(map[string]bool),
 	}
 }
 
@@ -227,7 +230,7 @@ func (n *StatusNode) startGethNode() error {
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
-	// setup public RPC client
+	// setup RPC client
 	gethNodeClient, err := n.gethNode.Attach()
 	if err != nil {
 		return
@@ -236,13 +239,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	if err != nil {
 		return
 	}
-
-	// setup private RPC client
-	gethNodePrivateClient, err := n.gethNode.Attach()
-	if err != nil {
-		return
-	}
-	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
 
 	return
 }
@@ -389,7 +385,6 @@ func (n *StatusNode) stop() error {
 	}
 
 	n.rpcClient = nil
-	n.rpcPrivateClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
 	// and may be completely different. Similarly with `config`.
 	n.gethNode = nil
@@ -421,6 +416,7 @@ func (n *StatusNode) stop() error {
 	n.wakuExtSrvc = nil
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
+	n.publicMethods = make(map[string]bool)
 
 	return nil
 }
@@ -593,43 +589,6 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.rpcClient
-}
-
-// RPCPrivateClient exposes reference to RPC client connected to the running node
-// that can call both public and private APIs.
-func (n *StatusNode) RPCPrivateClient() *rpc.Client {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	return n.rpcPrivateClient
-}
-
-// ChaosModeCheckRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
-// if defined, without restarting the node. This is required for the Chaos Unicorn Day.
-// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
-func (n *StatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
-	url := n.config.UpstreamConfig.URL
-
-	if on {
-		if strings.Contains(url, "infura.io") {
-			url = "https://httpbin.org/status/500"
-		}
-	}
-
-	publicClient := n.RPCClient()
-	if publicClient != nil {
-		if err := publicClient.UpdateUpstreamURL(url); err != nil {
-			return err
-		}
-	}
-
-	privateClient := n.RPCPrivateClient()
-	if privateClient != nil {
-		if err := privateClient.UpdateUpstreamURL(url); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // Discover sets up the discovery for a specific topic.

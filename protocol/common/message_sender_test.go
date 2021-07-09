@@ -72,7 +72,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	wakuConfig := waku.DefaultConfig
 	wakuConfig.MinimumAcceptedPoW = 0
 	shh := waku.New(&wakuConfig, s.logger)
-	s.Require().NoError(shh.Start(nil))
+	s.Require().NoError(shh.Start())
 
 	whisperTransport, err := transport2.NewTransport(
 		gethbridge.NewGethWakuWrapper(shh),

@@ -484,7 +484,7 @@ func TestExpiry(t *testing.T) {
 	}
 
 	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Fatal("failed to start waku")
 	}
 	defer func() { handleError(t, w.Stop()) }()
@@ -550,7 +550,7 @@ func TestCustomization(t *testing.T) {
 	w := New(nil, nil)
 	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
 	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Fatal("failed to start node")
 	}
 	defer func() { handleError(t, w.Stop()) }()
@@ -643,7 +643,7 @@ func TestSymmetricSendCycle(t *testing.T) {
 	w := New(nil, nil)
 	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
 	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Fatal("failed to start node")
 	}
 	defer func() { handleError(t, w.Stop()) }()
@@ -734,7 +734,7 @@ func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
 	w := New(nil, nil)
 	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
 	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Fatal("could not start node")
 	}
 	defer func() { handleError(t, w.Stop()) }()
@@ -823,7 +823,7 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Errorf("failed to start waku: '%s'", err)
 	}
 
@@ -894,7 +894,7 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	if err := w.Start(nil); err != nil {
+	if err := w.Start(); err != nil {
 		t.Errorf("failed to start waku: '%s'", err)
 	}
 	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()

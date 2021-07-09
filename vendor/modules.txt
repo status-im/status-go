@@ -38,7 +38,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.14.1
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.4 => github.com/status-im/go-ethereum v1.10.4-status.0
+# github.com/ethereum/go-ethereum v1.10.4 => github.com/status-im/go-ethereum v1.10.4-status.1
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -60,14 +60,11 @@ github.com/ethereum/go-ethereum/consensus/clique
 github.com/ethereum/go-ethereum/consensus/ethash
 github.com/ethereum/go-ethereum/consensus/misc
 github.com/ethereum/go-ethereum/console/prompt
-github.com/ethereum/go-ethereum/contracts/checkpointoracle
-github.com/ethereum/go-ethereum/contracts/checkpointoracle/contract
 github.com/ethereum/go-ethereum/core
 github.com/ethereum/go-ethereum/core/bloombits
 github.com/ethereum/go-ethereum/core/forkid
 github.com/ethereum/go-ethereum/core/rawdb
 github.com/ethereum/go-ethereum/core/state
-github.com/ethereum/go-ethereum/core/state/pruner
 github.com/ethereum/go-ethereum/core/state/snapshot
 github.com/ethereum/go-ethereum/core/types
 github.com/ethereum/go-ethereum/core/vm
@@ -82,12 +79,8 @@ github.com/ethereum/go-ethereum/crypto/secp256k1
 github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/include
 github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/src
 github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/src/modules/recovery
-github.com/ethereum/go-ethereum/eth
 github.com/ethereum/go-ethereum/eth/downloader
-github.com/ethereum/go-ethereum/eth/ethconfig
-github.com/ethereum/go-ethereum/eth/fetcher
 github.com/ethereum/go-ethereum/eth/filters
-github.com/ethereum/go-ethereum/eth/gasprice
 github.com/ethereum/go-ethereum/eth/protocols/eth
 github.com/ethereum/go-ethereum/eth/protocols/snap
 github.com/ethereum/go-ethereum/ethapi
@@ -98,32 +91,22 @@ github.com/ethereum/go-ethereum/ethdb/memorydb
 github.com/ethereum/go-ethereum/event
 github.com/ethereum/go-ethereum/internal/debug
 github.com/ethereum/go-ethereum/internal/ethapi
-github.com/ethereum/go-ethereum/les
-github.com/ethereum/go-ethereum/les/checkpointoracle
-github.com/ethereum/go-ethereum/les/flowcontrol
-github.com/ethereum/go-ethereum/les/utils
-github.com/ethereum/go-ethereum/les/vflux
-github.com/ethereum/go-ethereum/les/vflux/client
-github.com/ethereum/go-ethereum/les/vflux/server
 github.com/ethereum/go-ethereum/light
 github.com/ethereum/go-ethereum/log
 github.com/ethereum/go-ethereum/metrics
 github.com/ethereum/go-ethereum/metrics/exp
 github.com/ethereum/go-ethereum/metrics/prometheus
-github.com/ethereum/go-ethereum/miner
 github.com/ethereum/go-ethereum/node
 github.com/ethereum/go-ethereum/p2p
 github.com/ethereum/go-ethereum/p2p/discover
 github.com/ethereum/go-ethereum/p2p/discover/v4wire
 github.com/ethereum/go-ethereum/p2p/discover/v5wire
 github.com/ethereum/go-ethereum/p2p/discv5
-github.com/ethereum/go-ethereum/p2p/dnsdisc
 github.com/ethereum/go-ethereum/p2p/enode
 github.com/ethereum/go-ethereum/p2p/enr
 github.com/ethereum/go-ethereum/p2p/msgrate
 github.com/ethereum/go-ethereum/p2p/nat
 github.com/ethereum/go-ethereum/p2p/netutil
-github.com/ethereum/go-ethereum/p2p/nodestate
 github.com/ethereum/go-ethereum/p2p/rlpx
 github.com/ethereum/go-ethereum/p2p/tracker
 github.com/ethereum/go-ethereum/params
@@ -595,7 +578,6 @@ golang.org/x/net/publicsuffix
 golang.org/x/net/route
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 golang.org/x/sync/errgroup
-golang.org/x/sync/singleflight
 # golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
@@ -625,8 +607,6 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
-golang.org/x/time/rate
 # google.golang.org/protobuf v1.26.0
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
