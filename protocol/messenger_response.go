@@ -138,8 +138,10 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedChats)+
 		len(r.Mailservers)+
 		len(r.notifications)+
+		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
-		len(r.RequestsToJoinCommunity) == 0
+		len(r.RequestsToJoinCommunity) == 0 &&
+		r.currentStatus == nil
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
@@ -267,6 +269,10 @@ func (r *MessengerResponse) SetCurrentStatus(status accounts.UserStatus) {
 }
 
 func (r *MessengerResponse) AddStatusUpdate(upd accounts.UserStatus) {
+	if r.statusUpdates == nil {
+		r.statusUpdates = make(map[string]accounts.UserStatus)
+	}
+
 	r.statusUpdates[upd.PublicKey] = upd
 }
 

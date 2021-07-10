@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -42,9 +43,14 @@ func (m *Messenger) sendUserStatus(status accounts.UserStatus) error {
 
 	status.Clock = uint64(time.Now().Unix())
 
+	err = m.settings.SaveSetting("current-user-status", status)
+	if err != nil {
+		return err
+	}
+
 	statusUpdate := &protobuf.StatusUpdate{
 		Clock:      status.Clock,
-		StatusType: protobuf.StatusUpdate_StatusType(status.Clock),
+		StatusType: protobuf.StatusUpdate_StatusType(status.StatusType),
 		CustomText: status.CustomText,
 	}
 
@@ -88,6 +94,11 @@ func (m *Messenger) sendCurrentUserStatus() {
 		m.logger.Debug("Error obtaining latest status", zap.Error(err))
 		return
 	}
+	if currStatus == nil {
+		defaultStatus := GetDefaultUserStatus()
+		currStatus = &defaultStatus
+	}
+
 	if err := m.sendUserStatus(*currStatus); err != nil {
 		m.logger.Debug("Error when sending the latest user status", zap.Error(err))
 	}
@@ -110,11 +121,21 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Comm
 		return err
 	}
 
+	if status == nil {
+		defaultStatus := GetDefaultUserStatus()
+		status = &defaultStatus
+	}
+
 	status.Clock = uint64(time.Now().Unix())
+
+	err = m.settings.SaveSetting("current-user-status", status)
+	if err != nil {
+		return err
+	}
 
 	statusUpdate := &protobuf.StatusUpdate{
 		Clock:      status.Clock,
-		StatusType: protobuf.StatusUpdate_StatusType(status.Clock),
+		StatusType: protobuf.StatusUpdate_StatusType(status.StatusType),
 		CustomText: status.CustomText,
 	}
 
@@ -138,7 +159,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Comm
 	return nil
 }
 
-func (m *Messenger) BroadcastLatestUserStatus() {
+func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	m.sendCurrentUserStatus()
 	go func() {
@@ -154,10 +175,24 @@ func (m *Messenger) BroadcastLatestUserStatus() {
 }
 
 func (m *Messenger) SetUserStatus(newStatus int, newCustomText string) error {
+	if len([]rune(newCustomText)) > maxStatusMessageText {
+		return fmt.Errorf("custom text shouldn't be longer than %d", maxStatusMessageText)
+	}
+
+	if newStatus != int(protobuf.StatusUpdate_ONLINE) && newStatus != int(protobuf.StatusUpdate_DO_NOT_DISTURB) {
+		return fmt.Errorf("unknown status type")
+	}
+
 	currStatus, err := m.settings.GetCurrentStatus()
 	if err != nil {
 		return err
 	}
+
+	if currStatus == nil {
+		c := GetDefaultUserStatus()
+		currStatus = &c
+	}
+
 	if newStatus == currStatus.StatusType && newCustomText == currStatus.CustomText {
 		m.logger.Debug("Status type did not change")
 		return nil
@@ -184,9 +219,9 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		currentStatus = &c
 	}
 
-	if state.CurrentMessageState.PublicKey == &m.identity.PublicKey { // Status message is ours
-		if currentStatus.Clock >= statusMessage.Clock {
-			return nil // this is an older status message, ignoring it
+	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours
+		if currentStatus.Clock >= statusMessage.Clock || (currentStatus.StatusType == int(statusMessage.StatusType) && currentStatus.CustomText == statusMessage.CustomText) {
+			return nil // older status message, or status does not change ignoring it
 		}
 		newStatus := ToUserStatus(statusMessage)
 		err = m.settings.SaveSetting("current-user-status", newStatus)
@@ -205,6 +240,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		}
 
 		statusUpdate := ToUserStatus(statusMessage)
+		statusUpdate.PublicKey = state.CurrentMessageState.Contact.ID
 		state.Response.AddStatusUpdate(statusUpdate)
 	}
 	return nil

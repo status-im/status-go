@@ -40,6 +40,7 @@ var (
 		DefaultSyncPeriod:         86400,
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
+		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
 )
 
@@ -247,4 +248,27 @@ func TestAddressDoesntExist(t *testing.T) {
 	exists, err := db.AddressExists(types.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+func TestCurrentStatus(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	status := &UserStatus{
+		PublicKey:  "0x112233445566",
+		Clock:      123,
+		CustomText: "ABC",
+	}
+
+	require.NoError(t, db.SaveSetting("current-user-status", status))
+
+	s, err := db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, status, s.CurrentUserStatus)
+
+	currStatus, err := db.GetCurrentStatus()
+	require.NoError(t, err)
+	require.Equal(t, status, currStatus)
 }

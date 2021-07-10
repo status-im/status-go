@@ -458,6 +458,8 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.watchExpiredEmojis()
 	m.watchIdentityImageChanges()
+	m.broadcastLatestUserStatus()
+
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
 	}
