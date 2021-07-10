@@ -1021,7 +1021,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	// uspert profile chat
+	// upsert profile chat
 	err = m.ensureMyOwnProfileChat()
 	if err != nil {
 		return err
@@ -2567,6 +2567,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandlePairInstallation(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle PairInstallation", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.StatusUpdate:
+						p := msg.ParsedMessage.Interface().(protobuf.StatusUpdate)
+						logger.Debug("Handling StatusUpdate", zap.Any("message", p))
+						err = m.HandleStatusUpdate(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle StatusMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

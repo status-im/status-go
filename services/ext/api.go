@@ -497,6 +497,10 @@ func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 
+func (api *PublicAPI) SetUserStatus(status int, customText string) error {
+	return api.service.messenger.SetUserStatus(status, customText)
+}
+
 func (api *PublicAPI) DeleteMessage(id string) error {
 	return api.service.messenger.DeleteMessage(id)
 }

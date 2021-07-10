@@ -56,6 +56,13 @@ func (a *Account) IsOwnAccount() bool {
 	return a.Wallet || a.Type == accountTypeSeed || a.Type == accountTypeGenerated || a.Type == accountTypeKey
 }
 
+type UserStatus struct {
+	PublicKey  string `json:"public-key,omitempty"`
+	StatusType int    `json:"status-type"`
+	Clock      uint64 `json:"clock"`
+	CustomText string `json:"text"`
+}
+
 type Settings struct {
 	// required
 	Address                   types.Address    `json:"address"`
@@ -118,6 +125,8 @@ type Settings struct {
 	WalletVisibleTokens            *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
 	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
 	WebViewAllowPermissionRequests bool             `json:"webview-allow-permission-requests?,omitempty"`
+	SendStatusUpdates              bool             `json:"send-status-updates?,omitempty"`
+	CurrentUserStatus              *UserStatus      `json:"current-user-status"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -386,6 +395,15 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET anon_metrics_should_send = ? WHERE synthetic_id = 'id'")
+	case "current-user-status":
+		value = &sqlite.JSONBlob{Data: value}
+		update, err = db.db.Prepare("UPDATE settings SET current_user_status = ? WHERE synthetic_id = 'id'")
+	case "send-status-updates?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET send_status_updates = ? WHERE synthetic_id = 'id'")
 	default:
 		return ErrInvalidConfig
 	}
@@ -649,4 +667,15 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
 	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM accounts WHERE address = ?)", address).Scan(&exists)
 	return exists, err
+}
+
+func (db *Database) GetCurrentStatus() (status *UserStatus, err error) {
+	err = db.db.QueryRow("SELECT current_user_status FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &status})
+	return status, err
+}
+
+func (db *Database) ShouldBroadcastUserStatus() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT send_status_updates FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	return result, err
 }

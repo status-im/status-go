@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -28,6 +29,8 @@ type MessengerResponse struct {
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
+	currentStatus               *accounts.UserStatus
+	statusUpdates               map[string]accounts.UserStatus
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -48,6 +51,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Notifications               []*localnotifications.Notification `json:"notifications"`
 		Communities                 []*communities.Community           `json:"communities,omitempty"`
 		ActivityCenterNotifications []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
+		CurrentStatus               *accounts.UserStatus               `json:"currentStatus,omitempty"`
+		StatusUpdates               []accounts.UserStatus              `json:"statusUpdates,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -56,6 +61,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
 		Mailservers:             r.Mailservers,
+		CurrentStatus:           r.currentStatus,
 	}
 
 	responseItem.Messages = r.Messages()
@@ -65,6 +71,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem.RemovedChats = r.RemovedChats()
 	responseItem.ActivityCenterNotifications = r.ActivityCenterNotifications()
 	responseItem.PinMessages = r.PinMessages()
+	responseItem.StatusUpdates = r.StatusUpdates()
 
 	return json.Marshal(responseItem)
 }
@@ -107,6 +114,15 @@ func (r *MessengerResponse) PinMessages() []*common.PinMessage {
 		pinMessages = append(pinMessages, pm)
 	}
 	return pinMessages
+}
+
+func (r *MessengerResponse) StatusUpdates() []accounts.UserStatus {
+	var userStatus []accounts.UserStatus
+	for pk, s := range r.statusUpdates {
+		s.PublicKey = pk
+		userStatus = append(userStatus, s)
+	}
+	return userStatus
 }
 
 func (r *MessengerResponse) IsEmpty() bool {
@@ -244,6 +260,14 @@ func (r *MessengerResponse) AddPinMessages(pms []*common.PinMessage) {
 	for _, pm := range pms {
 		r.AddPinMessage(pm)
 	}
+}
+
+func (r *MessengerResponse) SetCurrentStatus(status accounts.UserStatus) {
+	r.currentStatus = &status
+}
+
+func (r *MessengerResponse) AddStatusUpdate(upd accounts.UserStatus) {
+	r.statusUpdates[upd.PublicKey] = upd
 }
 
 func (r *MessengerResponse) Messages() []*common.Message {

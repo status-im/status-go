@@ -144,7 +144,7 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 		return nil, err
 	}
 
-	chatIDs := []string{community.IDString()}
+	chatIDs := community.DefaultFilters()
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 	response.AddChats(chats)
@@ -179,7 +179,16 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 
 	response.AddCommunity(community)
 
-	return response, m.saveChats(chats)
+	if err = m.saveChats(chats); err != nil {
+		return nil, err
+	}
+
+	err = m.sendCurrentUserStatusToCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {

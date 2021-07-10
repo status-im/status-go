@@ -854,6 +854,15 @@ func (o *Community) IDString() string {
 	return types.EncodeHex(o.ID())
 }
 
+func (o *Community) StatusUpdatesChannelID() string {
+	return o.IDString() + "-ping"
+}
+
+func (o *Community) DefaultFilters() []string {
+	cID := o.IDString()
+	return []string{cID, cID + "-ping"}
+}
+
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {
 	return o.config.PrivateKey
 }
