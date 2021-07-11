@@ -185,7 +185,8 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 	if r.Cursor != nil {
 		options = append(options, store.WithCursor(&pb.Index{
 			Digest:       r.StoreCursor.Digest,
-			ReceivedTime: r.StoreCursor.ReceivedTime,
+			ReceiverTime: r.StoreCursor.ReceiverTime,
+			SenderTime:   r.StoreCursor.SenderTime,
 		}))
 	}
 
@@ -202,7 +203,8 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 	if pbCursor != nil {
 		return &types.StoreRequestCursor{
 			Digest:       pbCursor.Digest,
-			ReceivedTime: pbCursor.ReceivedTime,
+			ReceiverTime: pbCursor.ReceiverTime,
+			SenderTime:   pbCursor.SenderTime,
 		}, nil
 	}
 

@@ -36,7 +36,8 @@ type MessagesRequest struct {
 
 type StoreRequestCursor struct {
 	Digest       []byte  `json:"digest"`
-	ReceivedTime float64 `json:"receivedTime"`
+	ReceiverTime float64 `json:"receiverTime"`
+	SenderTime   float64 `json:"senderTime"`
 }
 
 // SetDefaults sets the From and To defaults

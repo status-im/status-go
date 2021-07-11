@@ -28,10 +28,10 @@ const (
 	// https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md
 	GossipSubID_v11 = protocol.ID("/meshsub/1.1.0")
 
-	// WakuRelayID_v200b2 is the protocol ID for version 2.0.0-beta2 of the WakuRelay protocol.
+	// WakuRelayID_v200 is the protocol ID for version 2.0.0 of the WakuRelay protocol.
 	// See the spec for details about how v1.1.0 compares to v1.0.0:
 	// https://specs.vac.dev/specs/waku/v2/waku-relay
-	WakuRelayID_v200b2 = protocol.ID("/vac/waku/relay/2.0.0-beta2")
+	WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 )
 
 var (
@@ -419,7 +419,7 @@ type connectInfo struct {
 }
 
 func (gs *WakuRelaySubRouter) Protocols() []protocol.ID {
-	return []protocol.ID{WakuRelayID_v200b2, GossipSubID_v11, GossipSubID_v10, FloodSubID}
+	return []protocol.ID{WakuRelayID_v200, GossipSubID_v11, GossipSubID_v10, FloodSubID}
 }
 
 func (gs *WakuRelaySubRouter) Attach(p *PubSub) {
@@ -1629,7 +1629,7 @@ func (gs *WakuRelaySubRouter) emitGossip(topic string, exclude map[peer.ID]struc
 	for p := range gs.p.topics[topic] {
 		_, inExclude := exclude[p]
 		_, direct := gs.direct[p]
-		if !inExclude && !direct && (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11 || gs.peers[p] == WakuRelayID_v200b2) && gs.score.Score(p) >= gs.gossipThreshold {
+		if !inExclude && !direct && (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11 || gs.peers[p] == WakuRelayID_v200) && gs.score.Score(p) >= gs.gossipThreshold {
 			peers = append(peers, p)
 		}
 	}
@@ -1797,7 +1797,7 @@ func (gs *WakuRelaySubRouter) getPeers(topic string, count int, filter func(peer
 
 	peers := make([]peer.ID, 0, len(tmap))
 	for p := range tmap {
-		if (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11 || gs.peers[p] == WakuRelayID_v200b2) && filter(p) {
+		if (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11 || gs.peers[p] == WakuRelayID_v200) && filter(p) {
 			peers = append(peers, p)
 		}
 	}

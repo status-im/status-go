@@ -14,6 +14,8 @@
 package model
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"

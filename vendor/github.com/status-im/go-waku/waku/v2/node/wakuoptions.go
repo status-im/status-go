@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
@@ -13,6 +14,9 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
+
+// Default clientId
+const clientId string = "Go Waku v2 node"
 
 type WakuNodeParameters struct {
 	multiAddr  []ma.Multiaddr
@@ -28,7 +32,11 @@ type WakuNodeParameters struct {
 	store       *store.WakuStore
 	filter      *filter.WakuFilter
 
+	keepAliveInterval time.Duration
+
 	enableLightPush bool
+
+	connStatusChan chan ConnStatus
 }
 
 type WakuNodeOption func(*WakuNodeParameters) error
@@ -130,9 +138,24 @@ func WithLightPush() WakuNodeOption {
 	}
 }
 
+func WithKeepAlive(t time.Duration) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.keepAliveInterval = t
+		return nil
+	}
+}
+
+func WithConnStatusChan(connStatusChan chan ConnStatus) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.connStatusChan = connStatusChan
+		return nil
+	}
+}
+
 // Default options used in the libp2p node
 var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.DefaultTransports,
+	libp2p.UserAgent(clientId),
 	libp2p.NATPortMap(),       // Attempt to open ports using uPNP for NATed hosts.
 	libp2p.EnableNATService(), // TODO: is this needed?)
 	libp2p.ConnectionManager(connmgr.NewConnManager(200, 300, 0)),
