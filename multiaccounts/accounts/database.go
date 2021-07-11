@@ -56,13 +56,6 @@ func (a *Account) IsOwnAccount() bool {
 	return a.Wallet || a.Type == accountTypeSeed || a.Type == accountTypeGenerated || a.Type == accountTypeKey
 }
 
-type UserStatus struct {
-	PublicKey  string `json:"public-key,omitempty"`
-	StatusType int    `json:"status-type"`
-	Clock      uint64 `json:"clock"`
-	CustomText string `json:"text"`
-}
-
 type Settings struct {
 	// required
 	Address                   types.Address    `json:"address"`
@@ -126,7 +119,7 @@ type Settings struct {
 	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
 	WebViewAllowPermissionRequests bool             `json:"webview-allow-permission-requests?,omitempty"`
 	SendStatusUpdates              bool             `json:"send-status-updates?,omitempty"`
-	CurrentUserStatus              *UserStatus      `json:"current-user-status"`
+	CurrentUserStatus              *json.RawMessage `json:"current-user-status"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -672,9 +665,12 @@ func (db *Database) AddressExists(address types.Address) (exists bool, err error
 	return exists, err
 }
 
-func (db *Database) GetCurrentStatus() (status *UserStatus, err error) {
-	err = db.db.QueryRow("SELECT current_user_status FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &status})
-	return status, err
+func (db *Database) GetCurrentStatus(status interface{}) error {
+	err := db.db.QueryRow("SELECT current_user_status FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &status})
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	return err
 }
 
 func (db *Database) ShouldBroadcastUserStatus() (bool, error) {

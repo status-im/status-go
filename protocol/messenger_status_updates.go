@@ -8,30 +8,30 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-func ToUserStatus(msg protobuf.StatusUpdate) accounts.UserStatus {
-	return accounts.UserStatus{
-		StatusType: int(msg.StatusType),
-		Clock:      msg.Clock,
-		CustomText: msg.CustomText,
-	}
-}
+func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
 
-func GetDefaultUserStatus() accounts.UserStatus {
-	return accounts.UserStatus{
+	status := &UserStatus{
 		StatusType: int(protobuf.StatusUpdate_ONLINE),
 		Clock:      0,
 		CustomText: "",
 	}
+
+	err := m.settings.GetCurrentStatus(status)
+	if err != nil {
+		m.logger.Debug("Error obtaining latest status", zap.Error(err))
+		return nil, err
+	}
+
+	return status, nil
 }
 
-func (m *Messenger) sendUserStatus(status accounts.UserStatus) error {
+func (m *Messenger) sendUserStatus(status UserStatus) error {
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		return err
@@ -90,14 +90,21 @@ func (m *Messenger) sendUserStatus(status accounts.UserStatus) error {
 }
 
 func (m *Messenger) sendCurrentUserStatus() {
-	currStatus, err := m.settings.GetCurrentStatus()
+	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
+	if err != nil {
+		m.logger.Debug("Error while getting status broadcast setting", zap.Error(err))
+		return
+	}
+
+	if !shouldBroadcastUserStatus {
+		m.logger.Debug("user status should not be broadcasted")
+		return
+	}
+
+	currStatus, err := m.GetCurrentUserStatus()
 	if err != nil {
 		m.logger.Debug("Error obtaining latest status", zap.Error(err))
 		return
-	}
-	if currStatus == nil {
-		defaultStatus := GetDefaultUserStatus()
-		currStatus = &defaultStatus
 	}
 
 	if err := m.sendUserStatus(*currStatus); err != nil {
@@ -116,15 +123,10 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Comm
 		return nil
 	}
 
-	status, err := m.settings.GetCurrentStatus()
+	status, err := m.GetCurrentUserStatus()
 	if err != nil {
 		m.logger.Debug("Error obtaining latest status", zap.Error(err))
 		return err
-	}
-
-	if status == nil {
-		defaultStatus := GetDefaultUserStatus()
-		status = &defaultStatus
 	}
 
 	status.Clock = uint64(time.Now().Unix())
@@ -184,14 +186,10 @@ func (m *Messenger) SetUserStatus(newStatus int, newCustomText string) error {
 		return fmt.Errorf("unknown status type")
 	}
 
-	currStatus, err := m.settings.GetCurrentStatus()
+	currStatus, err := m.GetCurrentUserStatus()
 	if err != nil {
+		m.logger.Debug("Error obtaining latest status", zap.Error(err))
 		return err
-	}
-
-	if currStatus == nil {
-		c := GetDefaultUserStatus()
-		currStatus = &c
 	}
 
 	if newStatus == currStatus.StatusType && newCustomText == currStatus.CustomText {
@@ -210,14 +208,10 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		return err
 	}
 
-	currentStatus, err := m.settings.GetCurrentStatus()
+	currentStatus, err := m.GetCurrentUserStatus()
 	if err != nil {
+		m.logger.Debug("Error obtaining latest status", zap.Error(err))
 		return err
-	}
-
-	if currentStatus == nil {
-		c := GetDefaultUserStatus()
-		currentStatus = &c
 	}
 
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours

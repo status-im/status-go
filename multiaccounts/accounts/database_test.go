@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 )
 
 var (
@@ -256,7 +257,7 @@ func TestCurrentStatus(t *testing.T) {
 
 	require.NoError(t, db.CreateSettings(settings, config))
 
-	status := &UserStatus{
+	status := &protocol.UserStatus{
 		PublicKey:  "0x112233445566",
 		Clock:      123,
 		CustomText: "ABC",
@@ -268,7 +269,8 @@ func TestCurrentStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, status, s.CurrentUserStatus)
 
-	currStatus, err := db.GetCurrentStatus()
+	var currStatus *protocol.UserStatus
+	err = db.GetCurrentStatus(&currStatus)
 	require.NoError(t, err)
 	require.Equal(t, status, currStatus)
 }
