@@ -90,6 +90,12 @@ func (m *Messenger) sendUserStatus(status UserStatus) error {
 }
 
 func (m *Messenger) sendCurrentUserStatus() {
+	err := m.persistence.CleanOlderStatusUpdates()
+	if err != nil {
+		m.logger.Debug("Error cleaning status updates", zap.Error(err))
+		return
+	}
+
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		m.logger.Debug("Error while getting status broadcast setting", zap.Error(err))
@@ -225,18 +231,17 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		}
 		state.Response.SetCurrentStatus(newStatus)
 	} else {
-		allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
-		if err != nil {
-			return err
-		}
-
-		if !allowed {
-			return ErrMessageNotAllowed
-		}
-
 		statusUpdate := ToUserStatus(statusMessage)
 		statusUpdate.PublicKey = state.CurrentMessageState.Contact.ID
+
+		m.persistence.InsertStatusUpdate(statusUpdate)
+
 		state.Response.AddStatusUpdate(statusUpdate)
 	}
+
 	return nil
+}
+
+func (m *Messenger) StatusUpdates() ([]UserStatus, error) {
+	return m.persistence.StatusUpdates()
 }

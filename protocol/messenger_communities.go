@@ -470,6 +470,12 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
+	// Init the default community filters
+	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
@@ -503,7 +509,7 @@ func (m *Messenger) ImportCommunity(key *ecdsa.PrivateKey) (*MessengerResponse, 
 	}
 
 	// Load filters
-	_, err = m.transport.InitPublicFilters([]string{community.IDString()})
+	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
 	if err != nil {
 		return nil, err
 	}
