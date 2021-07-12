@@ -470,7 +470,7 @@ func (b *StatusNode) Cleanup() error {
 		}
 	}
 
-	if b.Config().WalletConfig.Enabled {
+	if b.Config() != nil && b.Config().WalletConfig.Enabled {
 		if b.walletSrvc != nil {
 			if b.walletSrvc.IsStarted() {
 				err := b.walletSrvc.Stop()
