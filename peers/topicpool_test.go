@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,8 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/waku"
 )
 
 type TopicPoolSuite struct {
@@ -456,80 +453,4 @@ func (s *TopicPoolSuite) TestConnectedButRemoved() {
 	s.Contains(s.topicPool.connectedPeers, nodeID1)
 	s.False(s.topicPool.ConfirmDropped(s.peer, nodeID1))
 	s.False(s.topicPool.pendingPeers[nodeID1].added)
-}
-
-func TestServerIgnoresInboundPeer(t *testing.T) {
-	topic := discv5.Topic("cap=cap1")
-	limits := params.NewLimits(0, 0)
-	cache, err := newInMemoryCache()
-	require.NoError(t, err)
-	topicPool := newTopicPool(nil, topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
-	topicPool.running = 1
-	topicPool.maxCachedPeers = 0
-
-	waku := waku.New(&waku.DefaultConfig, nil)
-	srvkey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	server := &p2p.Server{
-		Config: p2p.Config{
-			MaxPeers:    1,
-			Name:        "server",
-			ListenAddr:  ":0",
-			PrivateKey:  srvkey,
-			NoDiscovery: true,
-			Protocols:   waku.Protocols(),
-		},
-	}
-	require.NoError(t, server.Start())
-	clientkey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	client := &p2p.Server{
-		Config: p2p.Config{
-			MaxPeers:    1,
-			Name:        "client",
-			ListenAddr:  ":0",
-			PrivateKey:  clientkey,
-			NoDiscovery: true,
-			Protocols:   waku.Protocols(),
-		},
-	}
-	require.NoError(t, client.Start())
-
-	// add peer to topic pool, as if it was discovered.
-	// it will be ignored due to the limit and added to a table of pending peers.
-	clientID := enode.PubkeyToIDV4(&clientkey.PublicKey)
-	clientNodeV5 := discv5.NewNode(
-		discv5.PubkeyID(&clientkey.PublicKey),
-		client.Self().IP(),
-		uint16(client.Self().UDP()),
-		uint16(client.Self().TCP()),
-	)
-	require.NoError(t, topicPool.processFoundNode(server, clientNodeV5))
-	require.Contains(t, topicPool.pendingPeers, clientID)
-	require.False(t, topicPool.pendingPeers[clientID].added)
-
-	errch := helpers.WaitForPeerAsync(server, client.Self().URLv4(), p2p.PeerEventTypeAdd, 5*time.Second)
-	// connect to a server from client. client will be an inbound connection for a server.
-	client.AddPeer(server.Self())
-	select {
-	case err := <-errch:
-		require.NoError(t, err)
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "failed waiting for WaitPeerAsync")
-	}
-
-	// wait some time to confirm that RemovePeer wasn't called on the server object.
-	errch = helpers.WaitForPeerAsync(server, client.Self().URLv4(), p2p.PeerEventTypeDrop, time.Second)
-	// simulate that event was received by a topic pool.
-	// topic pool will ignore this even because it sees that it is inbound connection.
-	topicPool.ConfirmAdded(server, clientID)
-	require.Contains(t, topicPool.pendingPeers, clientID)
-	require.False(t, topicPool.pendingPeers[clientID].dismissed)
-
-	select {
-	case err := <-errch:
-		require.EqualError(t, err, "wait for peer: timeout")
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "failed waiting for WaitPeerAsync")
-	}
 }

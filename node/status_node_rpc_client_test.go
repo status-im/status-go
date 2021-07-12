@@ -64,7 +64,11 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 	var err error
 
-	statusNode, err := createAndStartStatusNode(&params.NodeConfig{})
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
+		WakuConfig: params.WakuConfig{
+			Enabled: true,
+		},
+	})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()
