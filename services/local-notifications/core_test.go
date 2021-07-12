@@ -30,7 +30,7 @@ func TestServiceStartStop(t *testing.T) {
 	defer stop()
 
 	s := NewService(db, 1777)
-	require.NoError(t, s.Start(nil))
+	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 
 	require.NoError(t, s.Stop())
@@ -43,7 +43,7 @@ func TestWalletSubscription(t *testing.T) {
 
 	feed := &event.Feed{}
 	s := NewService(db, 1777)
-	require.NoError(t, s.Start(nil))
+	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 
 	require.NoError(t, s.SubscribeWallet(feed))
@@ -67,7 +67,7 @@ func TestTransactionNotification(t *testing.T) {
 	defer stop()
 
 	s := NewService(db, 1777)
-	require.NoError(t, s.Start(nil))
+	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 
 	var signalEvent []byte

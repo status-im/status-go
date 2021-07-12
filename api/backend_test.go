@@ -12,14 +12,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/status-im/status-go/account/generator"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -165,68 +162,6 @@ func TestBackendGettersConcurrently(t *testing.T) {
 		assert.True(t, backend.IsNodeRunning())
 		wg.Done()
 	}()
-
-	wg.Wait()
-}
-
-func TestBackendAccountsConcurrently(t *testing.T) {
-	utils.Init()
-
-	backend := NewGethStatusBackend()
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
-
-	var wgCreateAccounts sync.WaitGroup
-	count := 3
-	type AccountData struct {
-		MasterAccount generator.GeneratedAccountInfo
-		AccountInfo   account.Info
-		Password      string
-	}
-	addressCh := make(chan AccountData, count) // use buffered channel to avoid blocking
-
-	// create new accounts concurrently
-	for i := 0; i < count; i++ {
-		wgCreateAccounts.Add(1)
-		go func(pass string) {
-			MKInfo, accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
-			assert.NoError(t, err)
-			addressCh <- AccountData{MKInfo, accountInfo, pass}
-			wgCreateAccounts.Done()
-		}("password-00" + fmt.Sprint(i))
-	}
-
-	// close addressCh as otherwise for loop never finishes
-	go func() { wgCreateAccounts.Wait(); close(addressCh) }()
-
-	// select, reselect or logout concurrently
-	var wg sync.WaitGroup
-
-	for accountData := range addressCh {
-		wg.Add(1)
-		go func(accountData AccountData) {
-			loginParams := account.LoginParams{
-				MainAccount:  types.HexToAddress(accountData.AccountInfo.WalletAddress),
-				ChatAddress:  types.HexToAddress(accountData.AccountInfo.ChatAddress),
-				Password:     accountData.Password,
-				MultiAccount: accountData.MasterAccount.ToMultiAccount(),
-			}
-			assert.NoError(t, backend.SelectAccount(loginParams))
-			wg.Done()
-		}(accountData)
-
-		wg.Add(1)
-		go func() {
-			assert.NoError(t, backend.Logout())
-			wg.Done()
-		}()
-	}
 
 	wg.Wait()
 }
@@ -528,6 +463,10 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
+
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+	require.NoError(t, b.OpenAccounts())
 
 	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex))
 	defer func() {

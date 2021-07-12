@@ -591,6 +591,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
+	b.personalAPI.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 
 	if err = b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)

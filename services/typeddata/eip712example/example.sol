@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.8.0;
 
 contract Example {
 
@@ -58,7 +58,7 @@ contract Example {
         MAIL = hash(mail);
     }
 
-    function hash(EIP712Domain eip712Domain) internal pure returns (bytes32) {
+    function hash(EIP712Domain memory eip712Domain) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             EIP712DOMAIN_TYPEHASH,
             keccak256(bytes(eip712Domain.name)),
@@ -68,7 +68,7 @@ contract Example {
         ));
     }
 
-    function hash(Person person) internal pure returns (bytes32) {
+    function hash(Person memory person) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             PERSON_TYPEHASH,
             keccak256(bytes(person.name)),
@@ -76,12 +76,12 @@ contract Example {
         ));
     }
 
-    function hash(Mail mail) internal pure returns (bytes32) {
+    function hash(Mail memory m) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             MAIL_TYPEHASH,
-            hash(mail.from),
-            hash(mail.to),
-            keccak256(bytes(mail.contents))
+            hash(m.from),
+            hash(m.to),
+            keccak256(bytes(m.contents))
         ));
     }
 
