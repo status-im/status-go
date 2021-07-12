@@ -27,5 +27,4 @@ func addSuitableCallbacks(receiver reflect.Value, namespace string, methods map[
 		name := formatName(method.Name)
 		methods[namespace+"_"+name] = true
 	}
-	return
 }

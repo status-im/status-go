@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -20,7 +18,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/static"
 )
 
 // Errors related to node and services creation.
@@ -69,7 +66,7 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 
 // newGethNodeConfig returns default stack configuration for mobile client node
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
-	// NOTE: I haven't changed anything related to this paramters, but
+	// NOTE: I haven't changed anything related to this parameters, but
 	// it seems they were previously ignored if set to 0, but now they seem
 	// to be used, so they need to be set to something
 	maxPeers := 100
@@ -131,46 +128,6 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	}
 
 	return nc, nil
-}
-
-// calculateGenesis retrieves genesis value for given network
-func calculateGenesis(networkID uint64) (*core.Genesis, error) {
-	var genesis *core.Genesis
-
-	switch networkID {
-	case params.MainNetworkID:
-		genesis = core.DefaultGenesisBlock()
-	case params.RopstenNetworkID:
-		genesis = core.DefaultRopstenGenesisBlock()
-	case params.RinkebyNetworkID:
-		genesis = core.DefaultRinkebyGenesisBlock()
-	case params.GoerliNetworkID:
-		genesis = core.DefaultGoerliGenesisBlock()
-	case params.StatusChainNetworkID:
-		var err error
-		if genesis, err = defaultStatusChainGenesisBlock(); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, nil
-	}
-
-	return genesis, nil
-}
-
-// defaultStatusChainGenesisBlock returns the StatusChain network genesis block.
-func defaultStatusChainGenesisBlock() (*core.Genesis, error) {
-	genesisJSON, err := static.ConfigStatusChainGenesisJsonBytes()
-	if err != nil {
-		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
-	}
-
-	var genesis *core.Genesis
-	err = json.Unmarshal(genesisJSON, &genesis)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
-	}
-	return genesis, nil
 }
 
 // parseNodes creates list of enode.Node out of enode strings.

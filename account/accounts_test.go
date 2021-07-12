@@ -269,7 +269,7 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	s.accManager.SetChatAccount(privKey)
+	s.Require().NoError(s.accManager.SetChatAccount(privKey))
 	selectedChatAccount, err := s.accManager.SelectedChatAccount()
 	s.Require().NoError(err)
 	s.Require().NotNil(selectedChatAccount)

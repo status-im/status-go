@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
-	"time"
 
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -35,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
@@ -49,9 +47,6 @@ import (
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/wakuv2"
 )
-
-// tickerResolution is the delta to check blockchain sync progress.
-const tickerResolution = time.Second
 
 // errors
 var (
@@ -96,7 +91,6 @@ type StatusNode struct {
 	rpcStatsSrvc           *rpcstats.Service
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
-	nodeBridgeSrvc         *nodebridge.NodeService
 	permissionsSrvc        *permissions.Service
 	mailserversSrvc        *mailservers.Service
 	appMetricsSrvc         *appmetricsservice.Service
@@ -403,7 +397,6 @@ func (n *StatusNode) stop() error {
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
-	n.nodeBridgeSrvc = nil
 	n.permissionsSrvc = nil
 	n.mailserversSrvc = nil
 	n.appMetricsSrvc = nil
