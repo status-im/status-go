@@ -33,10 +33,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-const (
-	contractQueryTimeout = 1000 * time.Millisecond
-)
-
 var (
 	// ErrWhisperClearIdentitiesFailure clearing whisper identities has failed.
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
@@ -278,7 +274,9 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	b.accountManager.SetChatAccount(chatKey)
+	if err := b.accountManager.SetChatAccount(chatKey); err != nil {
+		return err
+	}
 	_, err = b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err

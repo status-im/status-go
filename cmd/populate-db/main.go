@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	stdlog "log"
@@ -25,6 +24,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+
 	//"github.com/status-im/status-go/appdatabase"
 	//gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -54,8 +54,6 @@ var (
 	ipcEnabled       = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
 	ipcFile          = flag.String("ipcfile", "", "Set IPC file path")
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
-	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
-	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	nAddedContacts   = flag.Int("added-contacts", 100, "Number of added contacts to create")
 	nContacts        = flag.Int("contacts", 100, "Number of contacts to create")
@@ -64,7 +62,6 @@ var (
 	nOneToOneChats   = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
-	register  = flag.Bool("register", false, "Register and make the node discoverable by other nodes")
 	networkID = flag.Int(
 		"network-id",
 		params.RopstenNetworkID,
@@ -74,8 +71,6 @@ var (
 		),
 	)
 	listenAddr = flag.String("addr", "", "address to bind listener to")
-
-	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -253,12 +248,6 @@ func main() {
 		}
 
 	}
-	url := "enode://30211cbd81c25f07b03a0196d56e6ce4604bb13db773ff1c0ea2253547fafd6c06eae6ad3533e2ba39d59564cfbdbb5e2ce7c137a5ebb85e99dcfc7a75f99f55@23.236.58.92:443"
-	fmt.Println("UPDATING")
-	wakuext.UpdateMailservers([]string{url})
-	time.Sleep(10 * time.Second)
-	fmt.Println("UPDATED")
-
 }
 
 func getDefaultDataDir() string {
@@ -278,12 +267,6 @@ func setupLogging(config *params.NodeConfig) {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 }
-
-var (
-	errStatusServiceRequiresIPC  = errors.New("to enable the StatusService on IPC, -ipc flag must be set")
-	errStatusServiceRequiresHTTP = errors.New("to enable the StatusService on HTTP, -http flag must be set")
-	errStatusServiceInvalidFlag  = errors.New("-status flag valid values are: ipc, http")
-)
 
 // printVersion prints verbose output about version and config.
 func printVersion(config *params.NodeConfig) {
@@ -429,7 +412,9 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	backend.UpdateRootDataDir("./tmp")
 	manager := backend.AccountManager()
-	manager.InitKeystore("./tmp")
+	if err := manager.InitKeystore("./tmp"); err != nil {
+		return err
+	}
 	err := backend.OpenAccounts()
 	if err != nil {
 		logger.Error("failed open accounts", err)
@@ -438,19 +423,16 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	generator := manager.AccountsGenerator()
 	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
 	if err != nil {
-		logger.Error("import mnemonic", err)
 		return err
 	}
 
 	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
 	if err != nil {
-		logger.Error("deriver addressess", err)
 		return err
 	}
 
 	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
 	if err != nil {
-		logger.Error("store addressess", err)
 		return err
 	}
 
@@ -459,13 +441,11 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
 	if err != nil {
-		logger.Error("default settings", err)
 		return err
 	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID)
 	if err != nil {
-		logger.Error("node config", err)
 		return err
 	}
 
@@ -529,14 +509,14 @@ func buildMessage(chat *protocol.Chat, count int) *common.Message {
 		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
 	}
 
-	message.PrepareContent("")
+	_ = message.PrepareContent("")
 	return message
 }
 
 func randomString(n int) string {
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		b[i] = letterRunes[rand.Intn(len(letterRunes))] // nolint: gosec
 	}
 	return string(b)
 }

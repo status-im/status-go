@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/services/ext"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
@@ -140,13 +139,6 @@ func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
 
 func (b *StatusNode) nodeBridge() types.Node {
 	return gethbridge.NewNodeBridge(b.gethNode, b.wakuSrvc, b.wakuV2Srvc)
-}
-
-func (b *StatusNode) nodeBridgeService() *nodebridge.NodeService {
-	if b.nodeBridgeSrvc == nil {
-		b.nodeBridgeSrvc = &nodebridge.NodeService{Node: b.nodeBridge()}
-	}
-	return b.nodeBridgeSrvc
 }
 
 func (b *StatusNode) wakuExtService(config *params.NodeConfig) (*wakuext.Service, error) {
