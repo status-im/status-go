@@ -2,6 +2,7 @@ package peers
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -65,7 +66,14 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	// If a peer was trusted, it was moved to connectedPeers,
 	// signal was sent and we can safely remove it.
 	if peer, ok := t.connectedPeers[nodeID]; ok {
-		t.removeServerPeer(server, peer)
+		// NOTE: removeServerPeer removes the server peer immediately.
+		// which means the next discovery.summary is not going to include
+		// the peer.
+		// We leave some time so that we ensure the signal is propagated
+		go func() {
+			time.Sleep(200)
+			t.removeServerPeer(server, peer)
+		}()
 		// Delete it from `connectedPeers` immediately to
 		// prevent removing it from the cache which logic is
 		// implemented in TopicPool.
@@ -75,7 +83,15 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	// It a peer was not trusted, it is still in pendingPeers.
 	// We should remove it from the p2p.Server.
 	if peer, ok := t.pendingPeers[nodeID]; ok {
-		t.removeServerPeer(server, peer.peerInfo)
+		// NOTE: removeServerPeer removes the server peer immediately.
+		// which means the next discovery.summary is not going to include
+		// the peer.
+		// We leave some time so that we ensure the signal is propagated
+		go func() {
+			time.Sleep(200)
+			t.removeServerPeer(server, peer.peerInfo)
+		}()
+
 		// Delete it from `connectedPeers` immediately to
 		// prevent removing it from the cache which logic is
 		// implemented in TopicPool.

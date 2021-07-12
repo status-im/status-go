@@ -346,7 +346,9 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 			poolEvents <- envelope.Type
 			var summary []*p2p.PeerInfo
 			s.NoError(json.Unmarshal(envelope.Event, &summary))
-			summaries <- summary
+			if len(summary) != 0 {
+				summaries <- summary
+			}
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
@@ -384,7 +386,9 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 
 	// wait for a summary event to be sure that ConfirmAdded() was called
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Equal(s.peers[0].Self().ID().String(), (<-summaries)[0].ID)
+	summary := (<-summaries)
+	s.Require().Len(summary, 1)
+	s.Equal(s.peers[0].Self().ID().String(), summary[0].ID)
 
 	// check cache
 	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
