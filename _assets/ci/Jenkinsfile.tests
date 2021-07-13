@@ -61,9 +61,5 @@ pipeline {
         sh 'make test-unit'
       }
     } } } }
-
-    stage('Race E2E Tests') { steps { dir(env.STATUS_PATH) {
-      sh 'make test-e2e-race'
-    } } }
   } // stages
 } // pipeline

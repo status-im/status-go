@@ -17,9 +17,6 @@ jobs:
   - stage: Test unit and integration
     script:
       - make test-unit
-  - stage: Test e2e on private network
-    script:
-      - make test-e2e-race
 cache:
   directories:
   - ".ethereumtest/Mainnet"
