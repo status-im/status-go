@@ -130,6 +130,11 @@ func (db *Database) UpdateAccount(account Account) error {
 	return err
 }
 
+func (db *Database) UpdateAccountKeycardPairing(account Account) error {
+	_, err := db.db.Exec("UPDATE accounts SET keycardPairing = ? WHERE keyUid = ?", account.KeycardPairing, account.KeyUID)
+	return err
+}
+
 func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) error {
 	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE keyUid = ?", loginTimestamp, keyUID)
 	return err

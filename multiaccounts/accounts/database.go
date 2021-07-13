@@ -551,6 +551,11 @@ func (db *Database) DeleteAccount(address types.Address) error {
 	return err
 }
 
+func (db *Database) DeleteSeedAndKeyAccounts() error {
+	_, err := db.db.Exec("DELETE FROM accounts WHERE type = ? OR type = ?", accountTypeSeed, accountTypeKey)
+	return err
+}
+
 func (db *Database) GetNotificationsEnabled() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT notifications_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
