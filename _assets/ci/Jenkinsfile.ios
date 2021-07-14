@@ -55,7 +55,7 @@ pipeline {
       sh 'make statusgo-ios'
       sh 'go get golang.org/x/tools/go/packages'
       dir('build/bin') {
-        sh 'zip -r status-go-ios.zip Statusgo.framework'
+        sh 'zip -r status-go-ios.zip Statusgo.xcframework'
         sh "cp status-go-ios.zip ${env.ARTIFACT}"
       }
     } } }
