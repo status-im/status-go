@@ -311,14 +311,12 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
-		t.log.Info("ERROR SIGNIN TRANSACTION", "hash", hash)
 		return hash, err
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
-		t.log.Info("ERROR SENDING TRANSACTION", "hash", hash)
 		return hash, err
 	}
 	return types.Hash(signedTx.Hash()), nil
@@ -340,8 +338,6 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 		to := common.Address(*args.To)
 		var txData gethtypes.TxData
 
-		t.log.Info("checking fee for dynamic", "args", args)
-
 		if args.IsDynamicFeeTx() {
 			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
 			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
@@ -355,7 +351,6 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 				Value:     value,
 				Data:      args.GetInput(),
 			}
-			t.log.Info("is dynamic", "txdata", txData)
 		} else {
 			txData = &gethtypes.LegacyTx{
 				Nonce:    nonce,
@@ -365,7 +360,6 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 				Value:    value,
 				Data:     args.GetInput(),
 			}
-			t.log.Info("is not dynamic", "txdata", txData)
 		}
 		tx = gethtypes.NewTx(txData)
 		t.logNewTx(args, gas, gasPrice, value)

@@ -131,7 +131,7 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 	chainID := big.NewInt(int64(config.NetworkID))
 	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.AccountKey.PrivateKey)
 	s.NoError(err)
-	data, err := rlp.EncodeToBytes(signedTx)
+	data, err := signedTx.MarshalBinary()
 	s.NoError(err)
 	return hexutil.Bytes(data)
 }
