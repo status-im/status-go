@@ -264,7 +264,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		nonce = uint64(*args.Nonce)
 	}
 	gasPrice := (*big.Int)(args.GasPrice)
-	if args.GasPrice == nil {
+	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = t.gasCalculator.SuggestGasPrice(ctx)
@@ -277,7 +277,9 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	value := (*big.Int)(args.Value)
 
 	var gas uint64
-	if args.Gas == nil {
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
+	} else if args.Gas == nil && !args.IsDynamicFeeTx() {
 		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 
@@ -303,20 +305,20 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
 			gas = defaultGas
 		}
-	} else {
-		gas = uint64(*args.Gas)
 	}
 
 	tx := t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
 
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
+		t.log.Info("ERROR SIGNIN TRANSACTION", "hash", hash)
 		return hash, err
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
+		t.log.Info("ERROR SENDING TRANSACTION", "hash", hash)
 		return hash, err
 	}
 	return types.Hash(signedTx.Hash()), nil
@@ -335,7 +337,37 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 	var tx *gethtypes.Transaction
 
 	if args.To != nil {
-		tx = gethtypes.NewTransaction(nonce, common.Address(*args.To), value, gas, gasPrice, args.GetInput())
+		to := common.Address(*args.To)
+		var txData gethtypes.TxData
+
+		t.log.Info("checking fee for dynamic", "args", args)
+
+		if args.IsDynamicFeeTx() {
+			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
+			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
+
+			txData = &gethtypes.DynamicFeeTx{
+				Nonce:     nonce,
+				Gas:       gas,
+				GasTipCap: gasTipCap,
+				GasFeeCap: gasFeeCap,
+				To:        &to,
+				Value:     value,
+				Data:      args.GetInput(),
+			}
+			t.log.Info("is dynamic", "txdata", txData)
+		} else {
+			txData = &gethtypes.LegacyTx{
+				Nonce:    nonce,
+				GasPrice: gasPrice,
+				Gas:      gas,
+				To:       &to,
+				Value:    value,
+				Data:     args.GetInput(),
+			}
+			t.log.Info("is not dynamic", "txdata", txData)
+		}
+		tx = gethtypes.NewTx(txData)
 		t.logNewTx(args, gas, gasPrice, value)
 	} else {
 		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
