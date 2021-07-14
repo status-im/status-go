@@ -80,17 +80,19 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, 
 	var usedGas hexutil.Uint64
 	var usedGasPrice *big.Int
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
-	if args.GasPrice == nil {
-		usedGasPrice = (*big.Int)(testGasPrice)
-		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
-	} else {
-		usedGasPrice = (*big.Int)(args.GasPrice)
-	}
-	if args.Gas == nil {
-		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
-		usedGas = testGas
-	} else {
-		usedGas = *args.Gas
+	if !args.IsDynamicFeeTx() {
+		if args.GasPrice == nil {
+			usedGasPrice = (*big.Int)(testGasPrice)
+			s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
+		} else {
+			usedGasPrice = (*big.Int)(args.GasPrice)
+		}
+		if args.Gas == nil {
+			s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
+			usedGas = testGas
+		} else {
+			usedGas = *args.Gas
+		}
 	}
 	// Prepare the transaction and RLP encode it.
 	data := s.rlpEncodeTx(args, s.nodeConfig, account, &resultNonce, usedGas, usedGasPrice)
@@ -99,16 +101,35 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, 
 }
 
 func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
-	newTx := gethtypes.NewTransaction(
-		uint64(*nonce),
-		common.Address(*args.To),
-		args.Value.ToInt(),
-		uint64(gas),
-		gasPrice,
-		[]byte(args.Input),
-	)
+	var txData gethtypes.TxData
+	to := common.Address(*args.To)
+	if args.IsDynamicFeeTx() {
+		gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
+		gasFeeCap := (*big.Int)(args.MaxFeePerGas)
+
+		txData = &gethtypes.DynamicFeeTx{
+			Nonce:     uint64(*nonce),
+			Gas:       uint64(gas),
+			GasTipCap: gasTipCap,
+			GasFeeCap: gasFeeCap,
+			To:        &to,
+			Value:     args.Value.ToInt(),
+			Data:      args.GetInput(),
+		}
+	} else {
+		txData = &gethtypes.LegacyTx{
+			Nonce:    uint64(*nonce),
+			GasPrice: gasPrice,
+			Gas:      uint64(gas),
+			To:       &to,
+			Value:    args.Value.ToInt(),
+			Data:     args.GetInput(),
+		}
+	}
+
+	newTx := gethtypes.NewTx(txData)
 	chainID := big.NewInt(int64(config.NetworkID))
-	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
+	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.AccountKey.PrivateKey)
 	s.NoError(err)
 	data, err := rlp.EncodeToBytes(signedTx)
 	s.NoError(err)
@@ -122,12 +143,16 @@ func (s *TransactorSuite) TestGasValues() {
 		AccountKey: &types.Key{PrivateKey: key},
 	}
 	testCases := []struct {
-		name     string
-		gas      *hexutil.Uint64
-		gasPrice *hexutil.Big
+		name                 string
+		gas                  *hexutil.Uint64
+		gasPrice             *hexutil.Big
+		maxFeePerGas         *hexutil.Big
+		maxPriorityFeePerGas *hexutil.Big
 	}{
 		{
 			"noGasDef",
+			nil,
+			nil,
 			nil,
 			nil,
 		},
@@ -135,16 +160,30 @@ func (s *TransactorSuite) TestGasValues() {
 			"gasDefined",
 			&testGas,
 			nil,
+			nil,
+			nil,
 		},
 		{
 			"gasPriceDefined",
 			nil,
 			testGasPrice,
+			nil,
+			nil,
 		},
 		{
 			"nilSignTransactionSpecificArgs",
 			nil,
 			nil,
+			nil,
+			nil,
+		},
+
+		{
+			"maxFeeAndPriorityset",
+			nil,
+			nil,
+			testGasPrice,
+			testGasPrice,
 		},
 	}
 
@@ -152,10 +191,12 @@ func (s *TransactorSuite) TestGasValues() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
 			args := SendTxArgs{
-				From:     account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-				To:       account.ToAddress(utils.TestConfig.Account2.WalletAddress),
-				Gas:      testCase.gas,
-				GasPrice: testCase.gasPrice,
+				From:                 account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+				To:                   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+				Gas:                  testCase.gas,
+				GasPrice:             testCase.gasPrice,
+				MaxFeePerGas:         testCase.maxFeePerGas,
+				MaxPriorityFeePerGas: testCase.maxPriorityFeePerGas,
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
@@ -309,7 +350,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			}
 
 			// simulate transaction signed externally
-			signer := gethtypes.NewEIP155Signer(chainID)
+			signer := gethtypes.NewLondonSigner(chainID)
 			tx := gethtypes.NewTransaction(uint64(nonce), common.Address(to), (*big.Int)(value), uint64(gas), (*big.Int)(gasPrice), data)
 			hash := signer.Hash(tx)
 			sig, err := gethcrypto.Sign(hash[:], privKey)

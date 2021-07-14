@@ -38,12 +38,14 @@ type GasCalculator interface {
 // This struct is based on go-ethereum's type in internal/ethapi/api.go, but we have freedom
 // over the exact layout of this struct.
 type SendTxArgs struct {
-	From     types.Address   `json:"from"`
-	To       *types.Address  `json:"to"`
-	Gas      *hexutil.Uint64 `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	Value    *hexutil.Big    `json:"value"`
-	Nonce    *hexutil.Uint64 `json:"nonce"`
+	From                 types.Address   `json:"from"`
+	To                   *types.Address  `json:"to"`
+	Gas                  *hexutil.Uint64 `json:"gas"`
+	GasPrice             *hexutil.Big    `json:"gasPrice"`
+	Value                *hexutil.Big    `json:"value"`
+	Nonce                *hexutil.Uint64 `json:"nonce"`
+	MaxFeePerGas         *hexutil.Big    `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *hexutil.Big    `json:"maxPriorityFeePerGas"`
 	// We keep both "input" and "data" for backward compatibility.
 	// "input" is a preferred field.
 	// see `vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go:1107`
@@ -60,6 +62,11 @@ func (args SendTxArgs) Valid() bool {
 
 	// we only allow both fields to present if they have the same data
 	return bytes.Equal(args.Input, args.Data)
+}
+
+// IsDynamicFeeTx checks whether dynamic fee parameters are set for the tx
+func (args SendTxArgs) IsDynamicFeeTx() bool {
+	return args.MaxFeePerGas != nil && args.MaxPriorityFeePerGas != nil
 }
 
 // GetInput returns either Input or Data field's value dependent on what is filled.
