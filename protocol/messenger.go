@@ -2544,6 +2544,23 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.DeleteMessage:
+						logger.Debug("Handling DeleteMessage")
+						deleteProto := msg.ParsedMessage.Interface().(protobuf.DeleteMessage)
+						deleteMessage := DeleteMessage{
+							DeleteMessage: deleteProto,
+							From:          contact.ID,
+							ID:            messageID,
+							SigPubKey:     publicKey,
+						}
+
+						err = m.HandleDeleteMessage(messageState, deleteMessage)
+						if err != nil {
+							logger.Warn("failed to handle DeleteMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.PinMessage:
 						pinMessage := msg.ParsedMessage.Interface().(protobuf.PinMessage)
 						err = m.HandlePinMessage(messageState, pinMessage)
