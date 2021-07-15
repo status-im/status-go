@@ -2404,13 +2404,14 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if isNotification {
 		notification := &ActivityCenterNotification{
-			ID:        types.FromHex(message.ID),
-			Name:      chat.Name,
-			Message:   message,
-			Type:      notificationType,
-			Timestamp: message.WhisperTimestamp,
-			ChatID:    chat.ID,
-			Author:    message.From,
+			ID:           types.FromHex(message.ID),
+			Name:         chat.Name,
+			Message:      message,
+			ReplyMessage: responseTo,
+			Type:         notificationType,
+			Timestamp:    message.WhisperTimestamp,
+			ChatID:       chat.ID,
+			Author:       message.From,
 		}
 
 		err := m.persistence.SaveActivityCenterNotification(notification)

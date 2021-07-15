@@ -24,7 +24,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -32,7 +32,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func _1561059284_add_waku_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0664), modTime: time.Unix(1624977226, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0644), modTime: time.Unix(1621536525, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe5, 0x2a, 0x7e, 0x9, 0xa3, 0xdd, 0xc6, 0x3, 0xfa, 0xaa, 0x98, 0xa0, 0x26, 0x5e, 0x67, 0x43, 0xe6, 0x20, 0xfd, 0x10, 0xfd, 0x60, 0x89, 0x17, 0x13, 0x87, 0x1b, 0x44, 0x36, 0x79, 0xb6, 0x60}}
 	return a, nil
 }
@@ -108,7 +108,7 @@ func _1561059284_add_waku_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0664), modTime: time.Unix(1624977226, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0644), modTime: time.Unix(1621536525, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x5c, 0x8, 0x32, 0xef, 0x12, 0x88, 0x21, 0xd, 0x7a, 0x42, 0x4d, 0xe7, 0x2d, 0x6c, 0x99, 0xb6, 0x1, 0xf1, 0xba, 0x2c, 0x40, 0x8d, 0xa9, 0x4b, 0xe6, 0xc4, 0x21, 0xec, 0x47, 0x6b, 0xf7}}
 	return a, nil
 }
@@ -128,7 +128,7 @@ func _1616691080_add_wakuv2_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.down.sql", size: 24, mode: os.FileMode(0664), modTime: time.Unix(1624977216, 0)}
+	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1624911413, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x42, 0xb6, 0x23, 0x70, 0xb8, 0x63, 0x18, 0x61, 0xea, 0x35, 0x6e, 0xae, 0xe9, 0x71, 0x89, 0xa, 0xa5, 0x72, 0xa2, 0x64, 0xaa, 0x45, 0x1, 0xf, 0xfc, 0xee, 0x1b, 0xd9, 0xd2, 0x27, 0xf4, 0xe2}}
 	return a, nil
 }
@@ -148,7 +148,7 @@ func _1616691080_add_wakuv2_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.up.sql", size: 111, mode: os.FileMode(0664), modTime: time.Unix(1624977216, 0)}
+	info := bindataFileInfo{name: "1616691080_add_wakuV2_keys.up.sql", size: 111, mode: os.FileMode(0644), modTime: time.Unix(1624911413, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0xf0, 0x97, 0x25, 0xfe, 0x96, 0x2c, 0xa8, 0x62, 0x4a, 0x71, 0x75, 0xff, 0x5f, 0x43, 0x1e, 0x71, 0x53, 0xf1, 0xde, 0xf, 0xcf, 0xcd, 0x87, 0x15, 0x61, 0x9d, 0x25, 0x2e, 0xaf, 0x18, 0x99}}
 	return a, nil
 }
@@ -168,7 +168,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 373, mode: os.FileMode(0664), modTime: time.Unix(1624977226, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 373, mode: os.FileMode(0644), modTime: time.Unix(1621536525, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x23, 0x6a, 0xc1, 0xce, 0x94, 0xf6, 0xef, 0xf1, 0x97, 0x95, 0xb, 0x35, 0xaf, 0x5f, 0xe7, 0x5f, 0xac, 0x6e, 0xb8, 0xab, 0xba, 0xb5, 0x35, 0x97, 0x22, 0x36, 0x11, 0xce, 0x44, 0xfc, 0xfa, 0xac}}
 	return a, nil
 }
@@ -264,16 +264,15 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"1561059284_add_waku_keys.down.sql": _1561059284_add_waku_keysDownSql,
-
-	"1561059284_add_waku_keys.up.sql": _1561059284_add_waku_keysUpSql,
-
+	"1561059284_add_waku_keys.down.sql":   _1561059284_add_waku_keysDownSql,
+	"1561059284_add_waku_keys.up.sql":     _1561059284_add_waku_keysUpSql,
 	"1616691080_add_wakuV2_keys.down.sql": _1616691080_add_wakuv2_keysDownSql,
-
-	"1616691080_add_wakuV2_keys.up.sql": _1616691080_add_wakuv2_keysUpSql,
-
-	"doc.go": docGo,
+	"1616691080_add_wakuV2_keys.up.sql":   _1616691080_add_wakuv2_keysUpSql,
+	"doc.go":                              docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
@@ -316,11 +315,11 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1561059284_add_waku_keys.down.sql":   &bintree{_1561059284_add_waku_keysDownSql, map[string]*bintree{}},
-	"1561059284_add_waku_keys.up.sql":     &bintree{_1561059284_add_waku_keysUpSql, map[string]*bintree{}},
-	"1616691080_add_wakuV2_keys.down.sql": &bintree{_1616691080_add_wakuv2_keysDownSql, map[string]*bintree{}},
-	"1616691080_add_wakuV2_keys.up.sql":   &bintree{_1616691080_add_wakuv2_keysUpSql, map[string]*bintree{}},
-	"doc.go":                              &bintree{docGo, map[string]*bintree{}},
+	"1561059284_add_waku_keys.down.sql": {_1561059284_add_waku_keysDownSql, map[string]*bintree{}},
+	"1561059284_add_waku_keys.up.sql": {_1561059284_add_waku_keysUpSql, map[string]*bintree{}},
+	"1616691080_add_wakuV2_keys.down.sql": {_1616691080_add_wakuv2_keysDownSql, map[string]*bintree{}},
+	"1616691080_add_wakuV2_keys.up.sql": {_1616691080_add_wakuv2_keysUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
