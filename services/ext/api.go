@@ -302,6 +302,10 @@ func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) erro
 	return api.service.messenger.SaveChat(chat)
 }
 
+func (api *PublicAPI) SaveMessages(parent context.Context, messages []*common.Message) error {
+	return api.service.messenger.SaveMessages(messages)
+}
+
 func (api *PublicAPI) CreateOneToOneChat(parent context.Context, request *requests.CreateOneToOneChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateOneToOneChat(request)
 }
