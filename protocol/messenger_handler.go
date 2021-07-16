@@ -545,14 +545,14 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 	return nil
 }
 
-func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage) error {
+func (m *Messenger) HandleDeleteMessage(response *MessengerResponse, deleteMessage DeleteMessage) error {
 	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
 		return err
 	}
 
 	messageID := deleteMessage.MessageId
 	// Check if it's already in the response
-	originalMessage := state.Response.GetMessage(messageID)
+	originalMessage := response.GetMessage(messageID)
 	// otherwise pull from database
 	if originalMessage == nil {
 		var err error
@@ -604,8 +604,8 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			}
 		}
 	}
-	state.Response.AddRemovedMessage(messageID)
-	state.Response.AddChat(chat)
+	response.AddRemovedMessage(messageID)
+	response.AddChat(chat)
 
 	return nil
 }
@@ -1259,16 +1259,16 @@ func (m *Messenger) checkForEdits(message *common.Message) error {
 func (m *Messenger) checkForDeletes(message *common.Message) error {
 	// Check for any pending deletes
 	// If any pending deletes are available and valid, apply them
-	messageDelete, err := m.persistence.GetDelete(message.ID, message.From)
+	messageDeletes, err := m.persistence.GetDeletes(message.ID, message.From)
 	if err != nil {
 		return err
 	}
 
-	if messageDelete == nil {
+	if messageDeletes == nil || len(messageDeletes) == 0 {
 		return nil
 	}
 
-	return m.applyDeleteMessage(messageDelete, message)
+	return m.applyDeleteMessage(messageDeletes, message)
 }
 
 func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {

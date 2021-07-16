@@ -2554,7 +2554,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							SigPubKey:     publicKey,
 						}
 
-						err = m.HandleDeleteMessage(messageState, deleteMessage)
+						err = m.HandleDeleteMessage(messageState.Response, deleteMessage)
 						if err != nil {
 							logger.Warn("failed to handle DeleteMessage", zap.Error(err))
 							allMessagesProcessed = false

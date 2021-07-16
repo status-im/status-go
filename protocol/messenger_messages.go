@@ -176,8 +176,8 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	return m.persistence.SaveMessages([]*common.Message{message})
 }
 
-func (m *Messenger) applyDeleteMessage(deleteMessage *DeleteMessage, message *common.Message) error {
-	if deleteMessage.From != message.From {
+func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message *common.Message) error {
+	if messageDeletes[0].From != message.From {
 		return ErrInvalidEditOrDeleteAuthor
 	}
 

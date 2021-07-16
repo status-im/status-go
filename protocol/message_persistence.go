@@ -1441,11 +1441,13 @@ func (db sqlitePersistence) SaveDelete(deleteMessage DeleteMessage) error {
 	return err
 }
 
-func (db sqlitePersistence) GetDelete(messageID string, from string) (*DeleteMessage, error) {
+func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*DeleteMessage, error) {
 	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, id FROM user_messages_deletes WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
 	if err != nil {
 		return nil, err
 	}
+
+	var messages []*DeleteMessage
 
 	for rows.Next() {
 		d := &DeleteMessage{}
@@ -1453,9 +1455,10 @@ func (db sqlitePersistence) GetDelete(messageID string, from string) (*DeleteMes
 		if err != nil {
 			return nil, err
 		}
-		return d, nil
+		messages = append(messages, d)
+
 	}
-	return nil, nil
+	return messages, nil
 }
 
 func (db sqlitePersistence) SaveEdit(editMessage EditMessage) error {
