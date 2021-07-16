@@ -580,12 +580,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	// Update message and return it
 	originalMessage.Deleted = true
 
-	err := originalMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
-	if err != nil {
-		return err
-	}
-
-	err = m.persistence.SaveMessages([]*common.Message{originalMessage})
+	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
 	if err != nil {
 		return err
 	}
