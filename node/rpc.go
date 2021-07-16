@@ -5,8 +5,8 @@ import (
 	"unicode"
 )
 
-// formatName converts to first character of name to lowercase.
-func formatName(name string) string {
+// firstCharToLower converts to first character of name to lowercase.
+func firstCharToLower(name string) string {
 	ret := []rune(name)
 	if len(ret) > 0 {
 		ret[0] = unicode.ToLower(ret[0])
@@ -24,7 +24,7 @@ func addSuitableCallbacks(receiver reflect.Value, namespace string, methods map[
 		if method.PkgPath != "" {
 			continue // method not exported
 		}
-		name := formatName(method.Name)
+		name := firstCharToLower(method.Name)
 		methods[namespace+"_"+name] = true
 	}
 }
