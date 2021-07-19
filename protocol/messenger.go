@@ -2870,7 +2870,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Process any community changes
 			for _, changes := range messageState.Response.CommunityChanges {
 				if changes.ShouldMemberJoin {
-					response, err := m.joinCommunity(changes.Community.ID())
+					response, err := m.joinCommunity(context.TODO(), changes.Community.ID())
 					if err != nil {
 						logger.Error("cannot join community", zap.Error(err))
 						continue

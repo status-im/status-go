@@ -864,7 +864,7 @@ func (db sqlitePersistence) CleanOlderStatusUpdates() error {
 	now := time.Now()
 	oneHourAgo := now.Add(time.Duration(-1) * time.Hour)
 	_, err := db.db.Exec(`DELETE FROM status_updates WHERE clock < ?`,
-		int(oneHourAgo.Unix()),
+		uint64(oneHourAgo.Unix()),
 	)
 
 	return err

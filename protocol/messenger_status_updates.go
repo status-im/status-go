@@ -31,7 +31,7 @@ func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
 	return status, nil
 }
 
-func (m *Messenger) sendUserStatus(status UserStatus) error {
+func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error {
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (m *Messenger) sendUserStatus(status UserStatus) error {
 		ResendAutomatically: true,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), contactCodeTopic, rawMessage)
+	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (m *Messenger) sendUserStatus(status UserStatus) error {
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
-		_, err = m.sender.SendPublic(context.Background(), rawMessage.LocalChatID, rawMessage)
+		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (m *Messenger) sendUserStatus(status UserStatus) error {
 	return nil
 }
 
-func (m *Messenger) sendCurrentUserStatus() {
+func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 	err := m.persistence.CleanOlderStatusUpdates()
 	if err != nil {
 		m.logger.Debug("Error cleaning status updates", zap.Error(err))
@@ -113,12 +113,12 @@ func (m *Messenger) sendCurrentUserStatus() {
 		return
 	}
 
-	if err := m.sendUserStatus(*currStatus); err != nil {
+	if err := m.sendUserStatus(ctx, *currStatus); err != nil {
 		m.logger.Debug("Error when sending the latest user status", zap.Error(err))
 	}
 }
 
-func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Community) error {
+func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, community *communities.Community) error {
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Comm
 		ResendAutomatically: true,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), rawMessage.LocalChatID, rawMessage)
+	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -170,12 +170,13 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(community *communities.Comm
 
 func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
-	m.sendCurrentUserStatus()
+	ctx := context.Background()
+	m.sendCurrentUserStatus(ctx)
 	go func() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
-				m.sendCurrentUserStatus()
+				m.sendCurrentUserStatus(ctx)
 			case <-m.quit:
 				return
 			}
@@ -183,7 +184,7 @@ func (m *Messenger) broadcastLatestUserStatus() {
 	}()
 }
 
-func (m *Messenger) SetUserStatus(newStatus int, newCustomText string) error {
+func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomText string) error {
 	if len([]rune(newCustomText)) > maxStatusMessageText {
 		return fmt.Errorf("custom text shouldn't be longer than %d", maxStatusMessageText)
 	}
@@ -206,7 +207,7 @@ func (m *Messenger) SetUserStatus(newStatus int, newCustomText string) error {
 	currStatus.StatusType = newStatus
 	currStatus.CustomText = newCustomText
 
-	return m.sendUserStatus(*currStatus)
+	return m.sendUserStatus(ctx, *currStatus)
 }
 
 func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessage protobuf.StatusUpdate) error {
@@ -214,14 +215,14 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		return err
 	}
 
-	currentStatus, err := m.GetCurrentUserStatus()
-	if err != nil {
-		m.logger.Debug("Error obtaining latest status", zap.Error(err))
-		return err
-	}
-
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours
-		if currentStatus.Clock >= statusMessage.Clock || (currentStatus.StatusType == int(statusMessage.StatusType) && currentStatus.CustomText == statusMessage.CustomText) {
+		currentStatus, err := m.GetCurrentUserStatus()
+		if err != nil {
+			m.logger.Debug("Error obtaining latest status", zap.Error(err))
+			return err
+		}
+
+		if currentStatus.Clock >= statusMessage.Clock {
 			return nil // older status message, or status does not change ignoring it
 		}
 		newStatus := ToUserStatus(statusMessage)

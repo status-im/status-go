@@ -3,8 +3,8 @@ package protocol
 import "github.com/status-im/status-go/protocol/protobuf"
 
 type UserStatus struct {
-	PublicKey  string `json:"public-key,omitempty"`
-	StatusType int    `json:"status-type"`
+	PublicKey  string `json:"publicKey,omitempty"`
+	StatusType int    `json:"statusType"`
 	Clock      uint64 `json:"clock"`
 	CustomText string `json:"text"`
 }

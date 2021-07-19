@@ -336,7 +336,7 @@ func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.
 
 // JoinCommunity joins a community with the given ID
 func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.JoinCommunity(communityID)
+	return api.service.messenger.JoinCommunity(parent, communityID)
 }
 
 // LeaveCommunity leaves a commuity with the given ID
@@ -364,13 +364,13 @@ func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error)
 }
 
 // ImportCommunity imports a community with the given private key in hex
-func (api *PublicAPI) ImportCommunity(hexPrivateKey string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string) (*protocol.MessengerResponse, error) {
 	// Strip the 0x from the beginning
 	privateKey, err := crypto.HexToECDSA(hexPrivateKey[2:])
 	if err != nil {
 		return nil, err
 	}
-	return api.service.messenger.ImportCommunity(privateKey)
+	return api.service.messenger.ImportCommunity(ctx, privateKey)
 
 }
 
@@ -512,8 +512,8 @@ func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 
-func (api *PublicAPI) SetUserStatus(status int, customText string) error {
-	return api.service.messenger.SetUserStatus(status, customText)
+func (api *PublicAPI) SetUserStatus(ctx context.Context, status int, customText string) error {
+	return api.service.messenger.SetUserStatus(ctx, status, customText)
 }
 
 func (api *PublicAPI) DeleteMessage(id string) error {
