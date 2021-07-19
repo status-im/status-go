@@ -10,6 +10,7 @@ import (
 )
 
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")
+var ErrInvalidDeleteTypeAuthor = errors.New("message type cannot be deleted")
 var ErrInvalidEditContentType = errors.New("only text messages can be replaced")
 
 func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessage) (*MessengerResponse, error) {
@@ -96,6 +97,15 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("Chat not found")
+	}
+
+	// Only certain types of messages can be deleted
+	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN &&
+		message.ContentType != protobuf.ChatMessage_STICKER &&
+		message.ContentType != protobuf.ChatMessage_EMOJI &&
+		message.ContentType != protobuf.ChatMessage_IMAGE &&
+		message.ContentType != protobuf.ChatMessage_AUDIO {
+		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())

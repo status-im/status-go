@@ -102,6 +102,32 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
+func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestGapMessage(*theirChat)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	// Delete should not work
+	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
+
+	s.Require().Equal(ErrInvalidDeleteTypeAuthor, err)
+}
+
 // TODO fix activity center notifications not being deleted when a message is deleted
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
