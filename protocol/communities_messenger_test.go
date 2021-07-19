@@ -146,6 +146,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
+	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -245,7 +246,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -440,8 +441,10 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
 
+	ctx := context.Background()
+
 	// We join the org
-	response, err = s.alice.JoinCommunity(community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -454,7 +457,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
 
-	_, err = s.alice.SendChatMessage(context.Background(), inputMessage)
+	_, err = s.alice.SendChatMessage(ctx, inputMessage)
 	s.NoError(err)
 
 	// Pull message and make sure org is received
@@ -476,6 +479,8 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 }
 
 func (s *MessengerCommunitiesSuite) TestImportCommunity() {
+	ctx := context.Background()
+
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -503,7 +508,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	privateKey, err := s.bob.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
-	_, err = s.alice.ImportCommunity(privateKey)
+	_, err = s.alice.ImportCommunity(ctx, privateKey)
 	s.Require().NoError(err)
 
 	// Invite user on bob side
@@ -539,6 +544,8 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
+	ctx := context.Background()
+
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
 		Name:        "status",
@@ -562,7 +569,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	message.CommunityID = community.IDString()
 
 	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(context.Background(), message)
+	response, err = s.bob.SendChatMessage(ctx, message)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 

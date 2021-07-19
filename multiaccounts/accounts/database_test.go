@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
 )
 
 var (
@@ -249,28 +248,4 @@ func TestAddressDoesntExist(t *testing.T) {
 	exists, err := db.AddressExists(types.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
-}
-
-func TestCurrentStatus(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	require.NoError(t, db.CreateSettings(settings, config))
-
-	status := &protocol.UserStatus{
-		PublicKey:  "0x112233445566",
-		Clock:      123,
-		CustomText: "ABC",
-	}
-
-	require.NoError(t, db.SaveSetting("current-user-status", status))
-
-	s, err := db.GetSettings()
-	require.NoError(t, err)
-	require.Equal(t, status, s.CurrentUserStatus)
-
-	var currStatus *protocol.UserStatus
-	err = db.GetCurrentStatus(&currStatus)
-	require.NoError(t, err)
-	require.Equal(t, status, currStatus)
 }

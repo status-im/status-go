@@ -235,8 +235,10 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 		statusUpdate := ToUserStatus(statusMessage)
 		statusUpdate.PublicKey = state.CurrentMessageState.Contact.ID
 
-		m.persistence.InsertStatusUpdate(statusUpdate)
-
+		err := m.persistence.InsertStatusUpdate(statusUpdate)
+		if err != nil {
+			return err
+		}
 		state.Response.AddStatusUpdate(statusUpdate)
 	}
 
