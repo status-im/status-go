@@ -165,7 +165,13 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	candidates := fs.GetWatchersByTopic(StringToTopic(recvMessage.Envelope.Message().ContentTopic))
+	topic, err := V2TopicToV1Topic(recvMessage.Envelope.Message().ContentTopic)
+	if err != nil {
+		log.Trace(err.Error(), "topic", recvMessage.Envelope.Message().ContentTopic)
+		return
+	}
+
+	candidates := fs.GetWatchersByTopic(*topic)
 	for _, watcher := range candidates {
 		match := true
 		if decodedMsg == nil {
