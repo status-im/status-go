@@ -135,7 +135,10 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	}
 
 	message.Deleted = true
-	m.persistence.SaveMessages([]*common.Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
+	if err != nil {
+		return nil, err
+	}
 
 	err = m.persistence.HideMessage(messageID)
 	if err != nil {

@@ -38,7 +38,7 @@ func (s *MessengerDeleteMessageSuite) SetupTest() {
 	config.MinimumAcceptedPoW = 0
 	shh := waku.New(&config, s.logger)
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start(nil))
+	s.Require().NoError(shh.Start())
 
 	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
@@ -123,7 +123,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {
 	ogMessage := sendResponse.Messages()[0]
 
 	// Delete should not work
-	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
+	_, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
 
 	s.Require().Equal(ErrInvalidDeleteTypeAuthor, err)
 }

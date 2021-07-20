@@ -1264,7 +1264,7 @@ func (m *Messenger) checkForDeletes(message *common.Message) error {
 		return err
 	}
 
-	if messageDeletes == nil || len(messageDeletes) == 0 {
+	if len(messageDeletes) == 0 {
 		return nil
 	}
 
