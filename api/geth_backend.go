@@ -463,6 +463,77 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
+func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, settings accounts.Settings, password string, newPassword string) error {
+	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(account, password)
+	if err != nil {
+		return err
+	}
+
+	accountDB := accounts.NewDB(b.appDB)
+	err = accountDB.SaveSetting("keycard-instance_uid", settings.KeycardInstanceUID)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSetting("keycard-paired_on", settings.KeycardPAiredOn)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSetting("keycard-pairing", settings.KeycardPairing)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSetting("mnemonic", nil)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.DeleteSeedAndKeyAccounts()
+	if err != nil {
+		return err
+	}
+
+	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
+	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	err = b.closeAppDB()
+	if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(keyStoreDir)
+}
+
+func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
+	err := b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID}, password)
+	if err != nil {
+		return err
+	}
+
+	accountsDB := accounts.NewDB(b.appDB)
+	_, err = accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+
+	err = b.closeAppDB()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
