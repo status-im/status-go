@@ -200,6 +200,11 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	err = m.syncCommunity(context.Background(), community)
+	if err != nil {
+		return nil, err
+	}
+
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
 		Clock:       requestToJoin.Clock,
 		EnsName:     requestToJoin.ENSName,
@@ -810,6 +815,22 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return nil
 	}
 
+	// Handle any community requests to join
+	pending := false
+	for _, rtj := range syncCommunity.RequestsToJoin {
+		req := new(communities.RequestToJoin)
+		req.InitFromSyncProtobuf(rtj)
+
+		if req.State == communities.RequestToJoinStatePending {
+			pending = true
+		}
+
+		err = m.communitiesManager.SaveRequestToJoin(req)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Don't use the public key of the private key, uncompress the community id
 	orgPubKey, err := crypto.DecompressPubkey(syncCommunity.Id)
 	if err != nil {
@@ -833,22 +854,24 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	// join or leave the community
-	var mr *MessengerResponse
-	if syncCommunity.Joined {
-		mr, err = m.joinCommunity(syncCommunity.Id)
+	// if we are not waiting for approval join or leave the community
+	if !pending {
+		var mr *MessengerResponse
+		if syncCommunity.Joined {
+			mr, err = m.joinCommunity(syncCommunity.Id)
+			if err != nil {
+				return err
+			}
+		} else {
+			mr, err = m.leaveCommunity(syncCommunity.Id)
+			if err != nil {
+				return err
+			}
+		}
+		err = messageState.Response.Merge(mr)
 		if err != nil {
 			return err
 		}
-	} else {
-		mr, err = m.leaveCommunity(syncCommunity.Id)
-		if err != nil {
-			return err
-		}
-	}
-	err = messageState.Response.Merge(mr)
-	if err != nil {
-		return err
 	}
 
 	// update the clock value

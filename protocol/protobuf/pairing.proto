@@ -39,6 +39,17 @@ message SyncCommunity {
   bool joined = 5;
   bool verified = 6;
   bool muted = 7;
+  repeated SyncCommunityRequestsToJoin requests_to_join = 8;
+}
+
+message SyncCommunityRequestsToJoin {
+  bytes id = 1;
+  string public_key = 2;
+  uint64 clock = 3;
+  string ens_name = 4;
+  string chat_id = 5;
+  bytes community_id = 6;
+  uint64 state = 7;
 }
 
 message SyncInstallation {

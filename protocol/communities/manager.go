@@ -131,6 +131,10 @@ func (m *Manager) Joined() ([]*Community, error) {
 	return m.persistence.JoinedCommunities(m.identity)
 }
 
+func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
+	return m.persistence.JoinedAndPendingCommunitiesWithRequests(m.identity)
+}
+
 func (m *Manager) Created() ([]*Community, error) {
 	return m.persistence.CreatedCommunities(m.identity)
 }
@@ -832,8 +836,13 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 		return nil, nil, err
 	}
 	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
+	community.AddRequestToJoin(requestToJoin)
 
 	return community, requestToJoin, nil
+}
+
+func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
+	return m.persistence.SaveRequestToJoin(request)
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
