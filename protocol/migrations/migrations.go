@@ -926,7 +926,7 @@ func _1625762506_add_deleted_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1625762506_add_deleted_messages.up.sql", size: 357, mode: os.FileMode(0644), modTime: time.Unix(1627321821, 0)}
+	info := bindataFileInfo{name: "1625762506_add_deleted_messages.up.sql", size: 357, mode: os.FileMode(0644), modTime: time.Unix(1627322438, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x61, 0x42, 0xb6, 0x8c, 0x7f, 0x2d, 0xec, 0xa9, 0x6d, 0x3d, 0x0, 0xa3, 0x32, 0xd8, 0x4a, 0x38, 0x5c, 0x97, 0xfc, 0x68, 0xde, 0xa9, 0xb7, 0xd8, 0xde, 0xb, 0x29, 0x93, 0xdc, 0x81, 0xf8}}
 	return a, nil
 }
