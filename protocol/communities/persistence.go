@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -112,6 +113,62 @@ func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Com
 	return p.queryCommunities(memberIdentity, query)
 }
 
+func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
+	query := `SELECT
+c.id, c.private_key, c.description, c.joined, c.verified, c.muted,
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state
+FROM communities_communities c
+LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
+WHERE c.Joined OR r.state = ?`
+
+	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	spew.Dump(err)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			// Don't shadow original error
+			_ = rows.Close()
+			return
+
+		}
+		err = rows.Close()
+	}()
+
+	for rows.Next() {
+		// Community specific fields
+		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
+		var joined, verified, muted bool
+
+		// Request to join specific fields
+		var rtjID, rtjCommunityID []byte
+		var rtjPublicKey, rtjENSName, rtjChatID string
+		var rtjClock, rtjState sql.NullInt64
+
+		err := rows.Scan(
+			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted,
+			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState)
+		spew.Dump(err)
+		if err != nil {
+			return nil, err
+		}
+
+		comm, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(rtjClock.Int64), p.logger)
+		spew.Dump(err)
+		if err != nil {
+			return nil, err
+		}
+
+		rtj := unmarshalRequestToJoinFromDB(rtjID, rtjCommunityID, rtjPublicKey, rtjENSName, rtjChatID, rtjClock, rtjState)
+		comm.AddRequestToJoin(rtj)
+		comms = append(comms, comm)
+	}
+
+	return comms, nil
+}
+
 func (p *Persistence) CreatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
 	query := communitiesBaseQuery + ` WHERE c.private_key IS NOT NULL`
 	return p.queryCommunities(memberIdentity, query)
@@ -178,6 +235,18 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		Joined:                        joined,
 	}
 	return New(config)
+}
+
+func unmarshalRequestToJoinFromDB(ID, communityID []byte, publicKey, ensName, chatID string, clock, state sql.NullInt64) *RequestToJoin {
+	return &RequestToJoin{
+		ID:          ID,
+		PublicKey:   publicKey,
+		Clock:       uint64(clock.Int64),
+		ENSName:     ensName,
+		ChatID:      chatID,
+		CommunityID: communityID,
+		State:       RequestToJoinState(state.Int64),
+	}
 }
 
 func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
@@ -258,7 +327,7 @@ func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestTo
 	return requests, nil
 }
 
-func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state uint) error {
+func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
 	return err
 }

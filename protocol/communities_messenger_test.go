@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -1086,6 +1087,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 
 }
 
+// TestSyncCommunity tests basic sync functionality between 2 Messengers
 func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -1117,29 +1119,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirDevice.SendPairInstallation(context.Background())
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().False(response.Chats()[0].Active)
 
-	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
-		"installation not received",
-	)
-
-	// Check device pairing is installed and enabled
-	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
-	s.Require().Equal(theirDevice.installationID, actualInstallation.ID)
-	s.Require().NotNil(actualInstallation.InstallationMetadata)
-	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
-	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
-
-	err = s.alice.EnableInstallation(theirDevice.installationID)
-	s.Require().NoError(err)
+	s.pairTwoDevices(theirDevice, s.alice, "their-name", "their-device-type")
 
 	// Sync communities
 	for _, c := range cs {
@@ -1151,7 +1132,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	var theirCommunities []*communities.Community
 	err = tt.RetryWithBackOff(func() error {
 		var err error
-		response, err = theirDevice.RetrieveAll()
+		response, err := theirDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1187,4 +1168,88 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
+}
+
+// TestSyncCommunity2 tests more complex pairing and syncing scenarios
+func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
+	// Create new device
+	theirDevice1, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	tcs1, err := theirDevice1.communitiesManager.All()
+	s.NoError(err, "theirDevice.communitiesManager.All")
+	s.Len(tcs1, 1, "Must have 1 communities")
+
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "their-name-1",
+		DeviceType: "their-device-type-1",
+	}
+	err = theirDevice1.SetInstallationMetadata(theirDevice1.installationID, im1)
+	s.Require().NoError(err)
+
+	// Create another new device
+	theirDevice2, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	tcs2, err := theirDevice2.communitiesManager.All()
+	s.NoError(err, "theirDevice.communitiesManager.All")
+	s.Len(tcs2, 1, "Must have 1 communities")
+
+	im2 := &multidevice.InstallationMetadata{
+		Name:       "their-name-2",
+		DeviceType: "their-device-type-2",
+	}
+	err = theirDevice2.SetInstallationMetadata(theirDevice2.installationID, im2)
+	s.Require().NoError(err)
+
+	// Pair the two new devices
+	s.pairTwoDevices(theirDevice1, theirDevice2, im1.Name, im1.DeviceType)
+	s.pairTwoDevices(theirDevice2, theirDevice1, im2.Name, im2.DeviceType)
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+	newCommunity, err := s.alice.communitiesManager.CreateCommunity(createCommunityReq)
+	s.NoError(err, "CreateCommunity")
+
+	// Check that Alice has 2 communities
+	cs, err := s.alice.communitiesManager.All()
+	s.NoError(err, "communitiesManager.All")
+	s.Len(cs, 2, "Must have 2 communities")
+
+
+
+	spew.Dump(newCommunity, theirDevice1.Installations(), theirDevice2.Installations())
+}
+
+func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
+	// Send pairing data
+	response, err := device1.SendPairInstallation(context.Background())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		device2,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
+	// Check device pairing is installed and enabled
+	s.Require().NoError(err)
+	actualInstallation := response.Installations[0]
+	s.Require().Equal(device1.installationID, actualInstallation.ID)
+	s.Require().NotNil(actualInstallation.InstallationMetadata)
+	s.Require().Equal(deviceName, actualInstallation.InstallationMetadata.Name)
+	s.Require().Equal(deviceType, actualInstallation.InstallationMetadata.DeviceType)
+
+	// Ensure installation is enabled
+	err = device2.EnableInstallation(device1.installationID)
+	s.Require().NoError(err)
 }

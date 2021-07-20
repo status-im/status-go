@@ -1,6 +1,9 @@
 package communities
 
 import (
+	"github.com/davecgh/go-spew/spew"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -147,4 +150,49 @@ func (s *PersistenceSuite) TestSetPrivateKey() {
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
 	s.NoError(err, "getRawCommunityRow")
 	s.Equal(crypto.FromECDSA(pk), rcr.PrivateKey, "private key must match given key")
+}
+
+//TODO complete this
+func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
+	// TODO need to parse CommunityDescription into the output of Community.ToBytes()
+	desc := &protobuf.CommunityDescription{
+		Permissions: &protobuf.CommunityPermissions{},
+	}
+
+	sc := &protobuf.SyncCommunity{
+		Id:          []byte("0x123456"),
+		Description: []byte("this is a description"),
+		Joined:      true,
+		Verified:    true,
+	}
+
+	// add a new community to the db with no private key
+	err := s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
+	s.NoError(err, "saveRawCommunityRow")
+
+	rcrs, err := s.db.getAllCommunitiesRaw()
+	s.NoError(err, "SaveCommunity shouldn't give any error")
+	s.Len(rcrs, 2, "Should have 2 communities")
+
+	privKey, err := crypto.GenerateKey()
+	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+
+	rtj := &RequestToJoin{
+		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
+		PublicKey:   common.PubkeyToHex(&privKey.PublicKey),
+		Clock:       uint64(time.Now().Unix()),
+		ENSName:     "",
+		ChatID:      "",
+		CommunityID: sc.Id,
+		State:       RequestToJoinStatePending,
+	}
+	err = s.db.SaveRequestToJoin(rtj)
+	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&privKey.PublicKey)
+	s.NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
+	s.Len(comms, 2, "Should have 2 communities")
+
+	spew.Dump(comms, err)
 }

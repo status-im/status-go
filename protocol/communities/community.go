@@ -31,6 +31,7 @@ type Config struct {
 	Muted                         bool
 	Logger                        *zap.Logger
 	RequestedToJoinAt             uint64
+	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 }
 
@@ -1180,6 +1181,14 @@ func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
 
 	}
 	return response, nil
+}
+
+func (o *Community) AddRequestToJoin(request *RequestToJoin) {
+	o.config.RequestsToJoin = append(o.config.RequestsToJoin, request)
+}
+
+func (o *Community) RequestsToJoin() []*RequestToJoin {
+	return o.config.RequestsToJoin
 }
 
 func emptyCommunityChanges() *CommunityChanges {

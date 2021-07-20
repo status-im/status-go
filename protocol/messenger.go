@@ -2137,7 +2137,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return true
 	})
 
-	cs, err := m.JoinedCommunities()
+	cs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
 	if err != nil {
 		return err
 	}
@@ -2294,6 +2294,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
+	var rtjs []*protobuf.SyncCommunityRequestsToJoin
+	reqs := community.RequestsToJoin()
+	for _, req := range reqs {
+		rtjs = append(rtjs, req.ToSyncProtobuf())
+	}
+
 	syncMessage := &protobuf.SyncCommunity{
 		Clock:       clock,
 		Id:          community.ID(),
@@ -2302,6 +2308,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		Joined:      community.Joined(),
 		Verified:    community.Verified(),
 		Muted:       community.Muted(),
+		RequestsToJoin: rtjs,
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
