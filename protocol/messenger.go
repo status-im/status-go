@@ -2283,33 +2283,11 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	var pkb []byte
-	pk := community.PrivateKey()
-	if pk != nil {
-		pkb = crypto.FromECDSA(pk)
-	}
-
-	md, err := community.ToBytes()
+	syncMessage, err := community.ToSyncCommunityProtobuf(clock)
 	if err != nil {
 		return err
 	}
 
-	var rtjs []*protobuf.SyncCommunityRequestsToJoin
-	reqs := community.RequestsToJoin()
-	for _, req := range reqs {
-		rtjs = append(rtjs, req.ToSyncProtobuf())
-	}
-
-	syncMessage := &protobuf.SyncCommunity{
-		Clock:       clock,
-		Id:          community.ID(),
-		PrivateKey:  pkb,
-		Description: md,
-		Joined:      community.Joined(),
-		Verified:    community.Verified(),
-		Muted:       community.Muted(),
-		RequestsToJoin: rtjs,
-	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
