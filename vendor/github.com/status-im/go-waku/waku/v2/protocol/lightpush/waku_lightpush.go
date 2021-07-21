@@ -177,7 +177,12 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 	}
 
 	defer connOpt.Close()
-	defer connOpt.Reset()
+	defer func() {
+		err := connOpt.Reset()
+		if err != nil {
+			log.Error("failed to reset connection", err)
+		}
+	}()
 
 	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestId), Query: req}
 

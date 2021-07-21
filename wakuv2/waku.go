@@ -50,6 +50,7 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
@@ -145,6 +146,9 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
+	connStatusChan := make(chan node.ConnStatus)
+
+	keepAliveInt := 1
 	waku.node, err = node.New(context.Background(),
 		node.WithLibP2POptions(
 			libp2p.BandwidthReporter(waku.bandwidthCounter),
@@ -152,9 +156,21 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
-		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
+		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
+		node.WithConnStatusChan(connStatusChan),
+		node.WithKeepAlive(time.Duration(keepAliveInt)*time.Second),
 	)
 
+	go func() {
+		for {
+			select {
+			case <-waku.quit:
+				return
+			case c := <-connStatusChan:
+				signal.SendPeerStats(c)
+			}
+		}
+	}()
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
