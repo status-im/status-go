@@ -186,7 +186,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	s.Len(comms, 2, "Should have 2 communities")
 
 	for _, comm := range comms {
-		switch comm.IDString(){
+		switch comm.IDString() {
 		case com.IDString():
 			s.Len(comm.RequestsToJoin(), 0, "Should have no RequestsToJoin")
 		case com2.IDString():
@@ -204,7 +204,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 	com, err := New(Config{
 		MemberIdentity: &identity.PublicKey,
 		PrivateKey:     comPrivKey,
-		ID: &comPrivKey.PublicKey,
+		ID:             &comPrivKey.PublicKey,
 	})
 	s.NoError(err, "New shouldn't give any error")
 
@@ -214,4 +214,3 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 
 	return com
 }
-
