@@ -5,11 +5,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -1221,8 +1221,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.NoError(err, "communitiesManager.All")
 	s.Len(cs, 2, "Must have 2 communities")
 
-
-
+	// TODO finish this
 	spew.Dump(newCommunity, theirDevice1.Installations(), theirDevice2.Installations())
 }
 

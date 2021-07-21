@@ -55,5 +55,5 @@ func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityReques
 }
 
 func (r *RequestToJoin) Empty() bool {
-	return len(r.ID) + len(r.PublicKey) + int(r.Clock) + len(r.ENSName) + len(r.ChatID) + len(r.CommunityID) + int(r.State) == 0
+	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
 }

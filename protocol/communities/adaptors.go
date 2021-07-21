@@ -24,13 +24,13 @@ func (o *Community) ToSyncCommunityProtobuf(clock uint64) (*protobuf.SyncCommuni
 	}
 
 	return &protobuf.SyncCommunity{
-		Clock:       clock,
-		Id:          o.ID(),
-		PrivateKey:  pkb,
-		Description: md,
-		Joined:      o.Joined(),
-		Verified:    o.Verified(),
-		Muted:       o.Muted(),
+		Clock:          clock,
+		Id:             o.ID(),
+		PrivateKey:     pkb,
+		Description:    md,
+		Joined:         o.Joined(),
+		Verified:       o.Verified(),
+		Muted:          o.Muted(),
 		RequestsToJoin: rtjs,
 	}, nil
 }
