@@ -5,8 +5,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -122,7 +120,6 @@ LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_k
 WHERE c.Joined OR r.state = ?`
 
 	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
-	spew.Dump(err)
 	if err != nil {
 		return nil, err
 	}
@@ -144,25 +141,25 @@ WHERE c.Joined OR r.state = ?`
 
 		// Request to join specific fields
 		var rtjID, rtjCommunityID []byte
-		var rtjPublicKey, rtjENSName, rtjChatID string
+		var rtjPublicKey, rtjENSName, rtjChatID sql.NullString
 		var rtjClock, rtjState sql.NullInt64
 
 		err := rows.Scan(
 			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted,
 			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState)
-		spew.Dump(err)
 		if err != nil {
 			return nil, err
 		}
 
 		comm, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(rtjClock.Int64), p.logger)
-		spew.Dump(err)
 		if err != nil {
 			return nil, err
 		}
 
 		rtj := unmarshalRequestToJoinFromDB(rtjID, rtjCommunityID, rtjPublicKey, rtjENSName, rtjChatID, rtjClock, rtjState)
-		comm.AddRequestToJoin(rtj)
+		if !rtj.Empty() {
+			comm.AddRequestToJoin(rtj)
+		}
 		comms = append(comms, comm)
 	}
 
@@ -237,13 +234,13 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 	return New(config)
 }
 
-func unmarshalRequestToJoinFromDB(ID, communityID []byte, publicKey, ensName, chatID string, clock, state sql.NullInt64) *RequestToJoin {
+func unmarshalRequestToJoinFromDB(ID, communityID []byte, publicKey, ensName, chatID sql.NullString, clock, state sql.NullInt64) *RequestToJoin {
 	return &RequestToJoin{
 		ID:          ID,
-		PublicKey:   publicKey,
+		PublicKey:   publicKey.String,
 		Clock:       uint64(clock.Int64),
-		ENSName:     ensName,
-		ChatID:      chatID,
+		ENSName:     ensName.String,
+		ChatID:      chatID.String,
 		CommunityID: communityID,
 		State:       RequestToJoinState(state.Int64),
 	}

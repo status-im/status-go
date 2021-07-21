@@ -1,9 +1,7 @@
 package communities
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
+	"crypto/ecdsa"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -11,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -152,47 +152,66 @@ func (s *PersistenceSuite) TestSetPrivateKey() {
 	s.Equal(crypto.FromECDSA(pk), rcr.PrivateKey, "private key must match given key")
 }
 
-//TODO complete this
 func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
-	// TODO need to parse CommunityDescription into the output of Community.ToBytes()
-	desc := &protobuf.CommunityDescription{
-		Permissions: &protobuf.CommunityPermissions{},
-	}
-
-	sc := &protobuf.SyncCommunity{
-		Id:          []byte("0x123456"),
-		Description: []byte("this is a description"),
-		Joined:      true,
-		Verified:    true,
-	}
-
-	// add a new community to the db with no private key
-	err := s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
-
-	rcrs, err := s.db.getAllCommunitiesRaw()
-	s.NoError(err, "SaveCommunity shouldn't give any error")
-	s.Len(rcrs, 2, "Should have 2 communities")
-
-	privKey, err := crypto.GenerateKey()
+	identity, err := crypto.GenerateKey()
 	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
 
+	clock := uint64(time.Now().Unix())
+
+	// Add a new community that we have joined
+	com := s.makeNewCommunity(identity)
+	com.Join()
+	sc, err := com.ToSyncCommunityProtobuf(clock)
+	s.NoError(err, "Community.ToSyncCommunityProtobuf shouldn't give any error")
+	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
+	s.NoError(err, "saveRawCommunityRow")
+
+	// Add a new community that we have requested to join, but not yet joined
+	com2 := s.makeNewCommunity(identity)
+	err = s.db.SaveCommunity(com2)
+	s.NoError(err, "SaveCommunity shouldn't give any error")
 
 	rtj := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
-		PublicKey:   common.PubkeyToHex(&privKey.PublicKey),
-		Clock:       uint64(time.Now().Unix()),
-		ENSName:     "",
-		ChatID:      "",
-		CommunityID: sc.Id,
+		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		Clock:       clock,
+		CommunityID: com2.ID(),
 		State:       RequestToJoinStatePending,
 	}
 	err = s.db.SaveRequestToJoin(rtj)
 	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
 
-	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&privKey.PublicKey)
+	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&identity.PublicKey)
 	s.NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
 	s.Len(comms, 2, "Should have 2 communities")
 
-	spew.Dump(comms, err)
+	for _, comm := range comms {
+		switch comm.IDString(){
+		case com.IDString():
+			s.Len(comm.RequestsToJoin(), 0, "Should have no RequestsToJoin")
+		case com2.IDString():
+			rtjs := comm.RequestsToJoin()
+			s.Len(rtjs, 1, "Should have one RequestsToJoin")
+			s.Equal(rtjs[0], rtj, "RequestToJoin should match the Request stored in the db")
+		}
+	}
 }
+
+func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Community {
+	comPrivKey, err := crypto.GenerateKey()
+	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+	com, err := New(Config{
+		MemberIdentity: &identity.PublicKey,
+		PrivateKey:     comPrivKey,
+		ID: &comPrivKey.PublicKey,
+	})
+	s.NoError(err, "New shouldn't give any error")
+
+	md, err := com.MarshaledDescription()
+	s.NoError(err, "Community.MarshaledDescription shouldn't give any error")
+	com.config.MarshaledCommunityDescription = md
+
+	return com
+}
+
