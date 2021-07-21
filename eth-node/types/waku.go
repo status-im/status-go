@@ -3,14 +3,15 @@ package types
 import (
 	"crypto/ecdsa"
 	"time"
-
-	"github.com/status-im/go-waku/waku/v2/protocol/store"
 )
 
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
 	PublicWakuAPI() PublicWakuAPI
+
+	// Waku protocol version
+	Version() uint
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
@@ -56,5 +57,5 @@ type Waku interface {
 	SendMessagesRequest(peerID []byte, request MessagesRequest) error
 
 	// RequestStoreMessages uses the WAKU2-STORE protocol to request historic messages
-	RequestStoreMessages(topics []TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error
+	RequestStoreMessages(peerID []byte, request MessagesRequest) (*StoreRequestCursor, error)
 }

@@ -144,7 +144,7 @@ github.com/golang/groupcache/consistenthash
 github.com/golang/groupcache/groupcachepb
 github.com/golang/groupcache/lru
 github.com/golang/groupcache/singleflight
-# github.com/golang/mock v1.4.1
+# github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.5.2
 github.com/golang/protobuf/proto
@@ -391,13 +391,13 @@ github.com/peterh/liner
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.9.0
+# github.com/prometheus/client_golang v1.11.0
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.18.0
+# github.com/prometheus/common v0.29.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
@@ -426,7 +426,8 @@ github.com/spacemonkeygo/spacelog
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20210624095504-4133155590da
+# github.com/status-im/go-waku v0.0.0-20210711181138-a2ff7f3df962
+github.com/status-im/go-waku/waku/v2/metrics
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol
 github.com/status-im/go-waku/waku/v2/protocol/filter
@@ -434,7 +435,8 @@ github.com/status-im/go-waku/waku/v2/protocol/lightpush
 github.com/status-im/go-waku/waku/v2/protocol/pb
 github.com/status-im/go-waku/waku/v2/protocol/relay
 github.com/status-im/go-waku/waku/v2/protocol/store
-# github.com/status-im/go-wakurelay-pubsub v0.4.2
+github.com/status-im/go-waku/waku/v2/utils
+# github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210711180556-9afd35dadd3f
 github.com/status-im/go-wakurelay-pubsub
 github.com/status-im/go-wakurelay-pubsub/pb
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
@@ -521,7 +523,7 @@ github.com/xeipuuv/gojsonpointer
 github.com/xeipuuv/gojsonreference
 # github.com/xeipuuv/gojsonschema v1.2.0
 github.com/xeipuuv/gojsonschema
-# go.opencensus.io v0.22.4
+# go.opencensus.io v0.23.0
 go.opencensus.io/internal/tagencoding
 go.opencensus.io/metric/metricdata
 go.opencensus.io/metric/metricproducer

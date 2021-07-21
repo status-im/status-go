@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -34,6 +36,10 @@ func GetGethWakuV2From(m types.Waku) *wakuv2.Waku {
 
 func (w *gethWakuV2Wrapper) PublicWakuAPI() types.PublicWakuAPI {
 	return NewGethPublicWakuV2APIWrapper(wakuv2.NewPublicWakuAPI(w.waku))
+}
+
+func (w *gethWakuV2Wrapper) Version() uint {
+	return 2
 }
 
 // MinPow returns the PoW value required by this node.
@@ -164,6 +170,47 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 	return errors.New("DEPRECATED")
 }
 
+func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
+	var options []store.HistoryRequestOption
+
+	peer, err := peer.Decode(string(peerID))
+	if err != nil {
+		return nil, err
+	}
+	options = []store.HistoryRequestOption{
+		store.WithPeer(peer),
+		store.WithPaging(false, uint64(r.Limit)),
+	}
+
+	if r.Cursor != nil {
+		options = append(options, store.WithCursor(&pb.Index{
+			Digest:       r.StoreCursor.Digest,
+			ReceiverTime: r.StoreCursor.ReceiverTime,
+			SenderTime:   r.StoreCursor.SenderTime,
+		}))
+	}
+
+	var topics []types.TopicType
+	for _, topic := range r.Topics {
+		topics = append(topics, types.BytesToTopic(topic))
+	}
+
+	pbCursor, err := w.waku.Query(topics, uint64(r.From), uint64(r.To), options)
+	if err != nil {
+		return nil, err
+	}
+
+	if pbCursor != nil {
+		return &types.StoreRequestCursor{
+			Digest:       pbCursor.Digest,
+			ReceiverTime: pbCursor.ReceiverTime,
+			SenderTime:   pbCursor.SenderTime,
+		}, nil
+	}
+
+	return nil, nil
+}
+
 // RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
 // which is known to implement MailServer interface, and is supposed to process this
 // request and respond with a number of peer-to-peer messages (possibly expired),
@@ -171,10 +218,6 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWakuV2Wrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
 	return errors.New("DEPRECATED")
-}
-
-func (w *gethWakuV2Wrapper) RequestStoreMessages(topics []types.TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error {
-	return w.waku.Query(topics, from, to, options)
 }
 
 type wakuV2FilterWrapper struct {

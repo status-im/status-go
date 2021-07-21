@@ -24,12 +24,20 @@ type MessagesRequest struct {
 	Limit uint32 `json:"limit"`
 	// Cursor is used as starting point for paginated requests.
 	Cursor []byte `json:"cursor"`
+	// StoreCursor is used as starting point for WAKUV2 paginatedRequests
+	StoreCursor *StoreRequestCursor `json:"storeCursor"`
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
 
 	// Topics is a list of topics. A returned message should
 	// belong to one of the topics from the list.
 	Topics [][]byte `json:"topics"`
+}
+
+type StoreRequestCursor struct {
+	Digest       []byte  `json:"digest"`
+	ReceiverTime float64 `json:"receiverTime"`
+	SenderTime   float64 `json:"senderTime"`
 }
 
 // SetDefaults sets the From and To defaults

@@ -526,8 +526,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return w.node.Publish(context.Background(), msg, nil)
 }
 
-func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) error {
-	// TODO: run into a go routine?
+func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.String()
@@ -536,14 +535,18 @@ func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []st
 	result, err := w.node.Query(context.Background(), strTopics, float64(from), float64(to), opts...)
 
 	for _, msg := range result.Messages {
-		envelope := wakuprotocol.NewEnvelope(msg, string(relay.DefaultWakuTopic)) // TODO: consider modifying go-waku to return envelopes instead of messages
+		envelope := wakuprotocol.NewEnvelope(msg, string(relay.DefaultWakuTopic))
 		_, err = w.OnNewEnvelopes(envelope)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return err
+	if len(result.Messages) != 0 {
+		cursor = result.PagingInfo.Cursor
+	}
+
+	return
 }
 
 // Start implements node.Service, starting the background data propagation thread

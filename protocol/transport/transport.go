@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
@@ -405,7 +406,11 @@ func (t *Transport) cleanFiltersLoop() {
 	}()
 }
 
-func (t *Transport) SendMessagesRequestForTopics(
+func (t *Transport) WakuVersion() uint {
+	return t.waku.Version()
+}
+
+func (t *Transport) createMessagesRequestV1(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
@@ -413,8 +418,7 @@ func (t *Transport) SendMessagesRequestForTopics(
 	topics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, err error) {
-
-	r := createMessagesRequest(from, to, previousCursor, topics)
+	r := createMessagesRequest(from, to, previousCursor, nil, topics)
 
 	events := make(chan types.EnvelopeEvent, 10)
 	sub := t.waku.SubscribeEnvelopeEvents(events)
@@ -429,11 +433,47 @@ func (t *Transport) SendMessagesRequestForTopics(
 		return
 	}
 
-	resp, err := t.waitForRequestCompleted(ctx, r.ID, events)
+	var resp *types.MailServerResponse
+	resp, err = t.waitForRequestCompleted(ctx, r.ID, events)
 	if err == nil && resp != nil && resp.Error != nil {
 		err = resp.Error
 	} else if err == nil && resp != nil {
 		cursor = resp.Cursor
+	}
+
+	return
+}
+
+func (t *Transport) createMessagesRequestV2(
+	peerID []byte,
+	from, to uint32,
+	previousStoreCursor *types.StoreRequestCursor,
+	topics []types.TopicType,
+) (storeCursor *types.StoreRequestCursor, err error) {
+	r := createMessagesRequest(from, to, nil, previousStoreCursor, topics)
+	storeCursor, err = t.waku.RequestStoreMessages(peerID, r)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (t *Transport) SendMessagesRequestForTopics(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
+	topics []types.TopicType,
+	waitForResponse bool,
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
+	switch t.waku.Version() {
+	case 2:
+		storeCursor, err = t.createMessagesRequestV2(peerID, from, to, previousStoreCursor, topics)
+	case 1:
+		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	default:
+		err = fmt.Errorf("unsupported version %d", t.waku.Version())
 	}
 	return
 }
@@ -444,15 +484,16 @@ func (t *Transport) SendMessagesRequest(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	waitForResponse bool,
-) (cursor []byte, err error) {
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 
 	topics := make([]types.TopicType, len(t.Filters()))
 	for _, f := range t.Filters() {
 		topics = append(topics, f.Topic)
 	}
 
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
 }
 
 func (t *Transport) SendMessagesRequestForFilter(
@@ -460,17 +501,18 @@ func (t *Transport) SendMessagesRequestForFilter(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	previousStoreCursor *types.StoreRequestCursor,
 	filter *Filter,
 	waitForResponse bool,
-) (cursor []byte, err error) {
+) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 
 	topics := make([]types.TopicType, len(t.Filters()))
 	topics = append(topics, filter.Topic)
 
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
 }
 
-func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicType) types.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, topics []types.TopicType) types.MessagesRequest {
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
@@ -479,12 +521,13 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicT
 		topicBytes = append(topicBytes, topics[idx][:])
 	}
 	return types.MessagesRequest{
-		ID:     id,
-		From:   from,
-		To:     to,
-		Limit:  1000,
-		Cursor: cursor,
-		Topics: topicBytes,
+		ID:          id,
+		From:        from,
+		To:          to,
+		Limit:       1000,
+		Cursor:      cursor,
+		Topics:      topicBytes,
+		StoreCursor: storeCursor,
 	}
 }
 

@@ -6,7 +6,8 @@ import "waku_message.proto";
 
 message Index {
   bytes digest = 1;
-  double receivedTime = 2;
+  double receiverTime = 2;
+  double senderTime = 3;
 }
 
 message PagingInfo {

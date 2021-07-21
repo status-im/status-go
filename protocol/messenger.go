@@ -515,6 +515,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 }
 
 func (m *Messenger) online() bool {
+	// TODO: we are still missing peer management in wakuv2
+	if m.transport.WakuVersion() == 2 {
+		return true
+	}
 	return m.node.PeersCount() > 0
 }
 
@@ -3033,12 +3037,13 @@ func (m *Messenger) RequestHistoricMessages(
 	ctx context.Context,
 	from, to uint32,
 	cursor []byte,
+	storeCursor *types.StoreRequestCursor,
 	waitForResponse bool,
-) ([]byte, error) {
+) ([]byte, *types.StoreRequestCursor, error) {
 	if m.mailserver == nil {
-		return nil, errors.New("no mailserver selected")
+		return nil, nil, errors.New("no mailserver selected")
 	}
-	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, waitForResponse)
+	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, storeCursor, waitForResponse)
 }
 
 func (m *Messenger) MessageByID(id string) (*common.Message, error) {

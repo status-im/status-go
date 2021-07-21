@@ -13,23 +13,25 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"github.com/status-im/go-waku/waku/v2/utils"
 )
 
 var log = logging.Logger("wakustore")
 
 const WakuStoreProtocolId = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta3")
 const MaxPageSize = 100 // Maximum number of waku messages in each page
-const ConnectionTimeout = 10 * time.Second
 const DefaultContentTopic = "/waku/2/default-content/proto"
 
 var (
@@ -180,8 +182,15 @@ func (w *WakuStore) FindMessages(query *pb.HistoryQuery) *pb.HistoryResponse {
 	return result
 }
 
+type StoredMessage struct {
+	ID           []byte
+	PubsubTopic  string
+	ReceiverTime int64
+	Message      *pb.WakuMessage
+}
+
 type MessageProvider interface {
-	GetAll() ([]*protocol.Envelope, error)
+	GetAll() ([]StoredMessage, error)
 	Put(cursor *pb.Index, pubsubTopic string, message *pb.WakuMessage) error
 	Stop()
 }
@@ -193,13 +202,18 @@ type IndexedWakuMessage struct {
 }
 
 type WakuStore struct {
-	MsgC          chan *protocol.Envelope
-	messages      []IndexedWakuMessage
+	ctx        context.Context
+	MsgC       chan *protocol.Envelope
+	messages   []IndexedWakuMessage
+	messageSet map[[32]byte]struct{}
+
 	messagesMutex sync.Mutex
 
 	storeMsgs   bool
 	msgProvider MessageProvider
 	h           host.Host
+
+	peerChan chan *event.EvtPeerConnectednessChanged
 }
 
 func NewWakuStore(shouldStoreMessages bool, p MessageProvider) *WakuStore {
@@ -215,8 +229,18 @@ func (store *WakuStore) SetMsgProvider(p MessageProvider) {
 	store.msgProvider = p
 }
 
-func (store *WakuStore) Start(h host.Host) {
+func (store *WakuStore) peerListener() {
+	for e := range store.peerChan {
+		if e.Connectedness == network.NotConnected {
+			log.Info("Notification received ", e.Peer)
+		}
+	}
+}
+
+func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *event.EvtPeerConnectednessChanged) {
 	store.h = h
+	store.ctx = ctx
+	store.peerChan = peerChan
 
 	if !store.storeMsgs {
 		log.Info("Store protocol started (messages aren't stored)")
@@ -225,29 +249,46 @@ func (store *WakuStore) Start(h host.Host) {
 
 	store.h.SetStreamHandler(WakuStoreProtocolId, store.onRequest)
 
-	go store.storeIncomingMessages()
+	go store.storeIncomingMessages(ctx)
 
 	if store.msgProvider == nil {
 		log.Info("Store protocol started (no message provider)")
 		return
 	}
 
-	envelopes, err := store.msgProvider.GetAll()
+	storedMessages, err := store.msgProvider.GetAll()
 	if err != nil {
 		log.Error("could not load DBProvider messages")
+		stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "store_load_failure")}, metrics.Errors.M(1))
 		return
 	}
 
-	for _, env := range envelopes {
-		idx, err := computeIndex(env.Message())
-		if err != nil {
-			log.Error("could not calculate message index", err)
-			continue
+	for _, storedMessage := range storedMessages {
+		idx := &pb.Index{
+			Digest:       storedMessage.ID,
+			ReceiverTime: float64(storedMessage.ReceiverTime),
 		}
-		store.messages = append(store.messages, IndexedWakuMessage{msg: env.Message(), index: idx, pubsubTopic: env.PubsubTopic()})
+
+		store.storeMessageWithIndex(storedMessage.PubsubTopic, idx, storedMessage.Message)
+
+		stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "stored")}, metrics.StoreMessages.M(int64(len(store.messages))))
 	}
 
+	go store.peerListener()
+
 	log.Info("Store protocol started")
+}
+
+func (store *WakuStore) storeMessageWithIndex(pubsubTopic string, idx *pb.Index, msg *pb.WakuMessage) {
+	var k [32]byte
+	copy(k[:], idx.Digest)
+
+	if _, ok := store.messageSet[k]; ok {
+		return
+	}
+
+	store.messageSet[k] = struct{}{}
+	store.messages = append(store.messages, IndexedWakuMessage{msg: msg, index: idx, pubsubTopic: pubsubTopic})
 }
 
 func (store *WakuStore) storeMessage(pubSubTopic string, msg *pb.WakuMessage) {
@@ -258,21 +299,26 @@ func (store *WakuStore) storeMessage(pubSubTopic string, msg *pb.WakuMessage) {
 	}
 
 	store.messagesMutex.Lock()
-	store.messages = append(store.messages, IndexedWakuMessage{msg: msg, index: index, pubsubTopic: pubSubTopic})
-	store.messagesMutex.Unlock()
+	defer store.messagesMutex.Unlock()
+
+	store.storeMessageWithIndex(pubSubTopic, index, msg)
 
 	if store.msgProvider == nil {
 		return
 	}
 
 	err = store.msgProvider.Put(index, pubSubTopic, msg) // Should the index be stored?
+
 	if err != nil {
 		log.Error("could not store message", err)
+		stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "store_failure")}, metrics.Errors.M(1))
 		return
 	}
+
+	stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "stored")}, metrics.StoreMessages.M(int64(len(store.messages))))
 }
 
-func (store *WakuStore) storeIncomingMessages() {
+func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
 	for envelope := range store.MsgC {
 		store.storeMessage(envelope.PubsubTopic(), envelope.Message())
 	}
@@ -289,6 +335,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
 		log.Error("error reading request", err)
+		stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "decodeRPCFailure")}, metrics.Errors.M(1))
 		return
 	}
 
@@ -315,7 +362,8 @@ func computeIndex(msg *pb.WakuMessage) (*pb.Index, error) {
 	digest := sha256.Sum256(data)
 	return &pb.Index{
 		Digest:       digest[:],
-		ReceivedTime: float64(time.Now().UnixNano()),
+		ReceiverTime: float64(time.Now().UnixNano()),
+		SenderTime:   msg.Timestamp,
 	}, nil
 }
 
@@ -325,10 +373,10 @@ func indexComparison(x, y *pb.Index) int {
 	// returns -1 if x < y
 	// returns 1 if x > y
 
-	var timecmp int = 0 // TODO: ask waku team why Index ReceivedTime is is float?
-	if x.ReceivedTime > y.ReceivedTime {
+	var timecmp int = 0
+	if x.SenderTime > y.SenderTime {
 		timecmp = 1
-	} else if x.ReceivedTime < y.ReceivedTime {
+	} else if x.SenderTime < y.SenderTime {
 		timecmp = -1
 	}
 
@@ -352,58 +400,16 @@ func findIndex(msgList []IndexedWakuMessage, index *pb.Index) int {
 	// returns the position of an IndexedWakuMessage in msgList whose index value matches the given index
 	// returns -1 if no match is found
 	for i, indexedWakuMessage := range msgList {
-		if bytes.Compare(indexedWakuMessage.index.Digest, index.Digest) == 0 && indexedWakuMessage.index.ReceivedTime == index.ReceivedTime {
+		if bytes.Equal(indexedWakuMessage.index.Digest, index.Digest) && indexedWakuMessage.index.ReceiverTime == index.ReceiverTime {
 			return i
 		}
 	}
 	return -1
 }
 
-func (store *WakuStore) AddPeer(p peer.ID, addrs []ma.Multiaddr) error {
-	for _, addr := range addrs {
-		store.h.Peerstore().AddAddr(p, addr, peerstore.PermanentAddrTTL)
-	}
-	err := store.h.Peerstore().AddProtocols(p, string(WakuStoreProtocolId))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (store *WakuStore) selectPeer() *peer.ID {
-	// @TODO We need to be more stratigic about which peers we dial. Right now we just set one on the service.
-	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
-	// This will require us to check for various factors such as:
-	//  - which topics they track
-	//  - latency?
-	//  - default store peer?
-
-	// Selects the best peer for a given protocol
-	var peers peer.IDSlice
-	for _, peer := range store.h.Peerstore().Peers() {
-		protocols, err := store.h.Peerstore().SupportsProtocols(peer, string(WakuStoreProtocolId))
-		if err != nil {
-			log.Error("error obtaining the protocols supported by peers", err)
-			return nil
-		}
-
-		if len(protocols) > 0 {
-			peers = append(peers, peer)
-		}
-	}
-
-	if len(peers) >= 1 {
-		// TODO: proper heuristic here that compares peer scores and selects "best" one. For now the first peer for the given protocol is returned
-		return &peers[0]
-	}
-
-	return nil
-}
-
 type HistoryRequestParameters struct {
 	selectedPeer peer.ID
 	requestId    []byte
-	timeout      *time.Duration
 	cursor       *pb.Index
 	pageSize     uint64
 	asc          bool
@@ -421,8 +427,12 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 
 func WithAutomaticPeerSelection() HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p := params.s.selectPeer()
-		params.selectedPeer = *p
+		p, err := utils.SelectPeer(params.s.h, string(WakuStoreProtocolId))
+		if err == nil {
+			params.selectedPeer = *p
+		} else {
+			log.Info("Error selecting peer: ", err)
+		}
 	}
 }
 
@@ -484,8 +494,11 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = reader.ReadMsg(historyResponseRPC)
 	if err != nil {
 		log.Error("could not read response", err)
+		stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "decodeRPCFailure")}, metrics.Errors.M(1))
 		return nil, err
 	}
+
+	stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "retrieved")}, metrics.StoreMessages.M(int64(len(store.messages))))
 
 	return historyResponseRPC.Response, nil
 }
@@ -555,7 +568,7 @@ func (store *WakuStore) findLastSeen() float64 {
 // if no peerList is passed, one of the peers in the underlying peer manager unit of the store protocol is picked randomly to fetch the history from. The history gets fetched successfully if the dialed peer has been online during the queried time window.
 // the resume proc returns the number of retrieved messages if no error occurs, otherwise returns the error string
 
-func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error) {
+func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, error) {
 	currentTime := float64(time.Now().UnixNano())
 	lastSeenTime := store.findLastSeen()
 
@@ -577,20 +590,20 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 	var response *pb.HistoryResponse
 	if len(peerList) > 0 {
 		var err error
-		response, err = store.queryLoop(ctx, rpc, peerList)
+		response, err = store.queryLoop(store.ctx, rpc, peerList)
 		if err != nil {
 			log.Error("failed to resume history", err)
 			return -1, ErrFailedToResumeHistory
 		}
 	} else {
-		p := store.selectPeer()
+		p, err := utils.SelectPeer(store.h, string(WakuStoreProtocolId))
 
-		if p == nil {
+		if err != nil {
+			log.Info("Error selecting peer: ", err)
 			return -1, ErrNoPeersAvailable
 		}
 
-		var err error
-		response, err = store.queryFrom(ctx, rpc, *p, protocol.GenerateRequestId())
+		response, err = store.queryFrom(store.ctx, rpc, *p, protocol.GenerateRequestId())
 		if err != nil {
 			log.Error("failed to resume history", err)
 			return -1, ErrFailedToResumeHistory
