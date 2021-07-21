@@ -852,7 +852,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return nil
 	}
 
-	// Handle any community requests to join
+	// Handle any community requests to join.
+	// MUST BE HANDLED BEFORE DESCRIPTION!
 	pending := false
 	for _, rtj := range syncCommunity.RequestsToJoin {
 		req := new(communities.RequestToJoin)
