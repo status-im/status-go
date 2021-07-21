@@ -139,11 +139,14 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
+	connStatusChan := make(chan node.ConnStatus)
+
 	waku.node, err = node.New(context.Background(),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
 		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
+		node.WithConnStatusChan(connStatusChan)
 	)
 
 	if err != nil {
