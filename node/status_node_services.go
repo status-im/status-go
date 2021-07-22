@@ -102,7 +102,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 
 	if config.WalletConfig.Enabled {
 		walletService := b.walletService(config.NetworkID, accountsFeed)
-		b.walletSrvc.SetClient(b.rpcClient.Ethclient())
+		b.walletSrvc.SetClient(b.rpcClient)
 		services = append(services, walletService)
 	}
 

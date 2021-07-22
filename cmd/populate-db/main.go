@@ -103,6 +103,8 @@ func main() {
 		opts,
 		configFiles,
 	)
+	fmt.Println(config)
+
 	if err != nil {
 		printUsage()
 		logger.Error(err.Error())
@@ -368,7 +370,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
+		URL:     "https://ropsten.infura.io/v3/800c641949d64d768a5070a1b0511938",
 	}
 
 	nodeConfig.Name = "StatusIM"
@@ -475,6 +477,19 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		logger.Error("start node", err)
 		return err
 	}
+
+	result, err := backend.SuggestFees()
+	if err != nil {
+		logger.Error("fee history", "err", err)
+		return err
+	}
+
+	r, err := json.Marshal(result)
+	if err != nil {
+		logger.Error("failed marshal json", "err", err)
+		return err
+	}
+	logger.Info("result", "result", string(r))
 
 	return nil
 }

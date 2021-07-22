@@ -112,6 +112,7 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 //
 // It uses custom routing scheme for calls.
 func (c *Client) Call(result interface{}, method string, args ...interface{}) error {
+	fmt.Println("GETH CALLING", method)
 	ctx := context.Background()
 	return c.CallContext(ctx, result, method, args...)
 }
@@ -154,6 +155,7 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 		c.RLock()
 		client := c.upstream
 		c.RUnlock()
+		fmt.Println("CALLLING REMOTE", method)
 		return client.CallContext(ctx, result, method, args...)
 	}
 

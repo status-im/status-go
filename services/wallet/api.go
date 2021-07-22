@@ -234,7 +234,7 @@ func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Addre
 	}
 
 	return api.s.StartReactor(
-		api.s.client.client,
+		api.s.rpcClient,
 		addresses,
 		new(big.Int).SetUint64(api.s.db.network))
 }
@@ -268,4 +268,8 @@ func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Addres
 	}
 
 	return blocksToViews(result), nil
+}
+
+func (api *API) SuggestFees() (*SuggestFeesResponse, error) {
+	return api.s.SuggestFees()
 }

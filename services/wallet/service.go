@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	statusgorpc "github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
@@ -35,6 +35,7 @@ type Service struct {
 	reactor             *Reactor
 	signals             *SignalsTransmitter
 	client              *walletClient
+	rpcClient           *statusgorpc.Client
 	cryptoOnRampManager *CryptoOnRampManager
 	started             bool
 
@@ -54,8 +55,9 @@ func (s *Service) GetFeed() *event.Feed {
 }
 
 // SetClient sets ethclient
-func (s *Service) SetClient(client *ethclient.Client) {
-	s.client = &walletClient{client: client}
+func (s *Service) SetClient(client *statusgorpc.Client) {
+	s.rpcClient = client
+	s.client = &walletClient{client: client.Ethclient()}
 }
 
 // MergeBlocksRanges merge old blocks ranges if possible
@@ -71,8 +73,8 @@ func (s *Service) MergeBlocksRanges(accounts []common.Address, chain uint64) err
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
-func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
-	reactor := NewReactor(s.db, s.feed, client, chain)
+func (s *Service) StartReactor(client *statusgorpc.Client, accounts []common.Address, chain *big.Int) error {
+	reactor := NewReactor(s.db, s.feed, client.Ethclient(), chain)
 	err := reactor.Start(accounts)
 	if err != nil {
 		return err

@@ -289,6 +289,7 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 // The result must be a pointer so that package json can unmarshal into it. You
 // can also pass nil, in which case the result is ignored.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	fmt.Println("GETH CALLING", method)
 	if result != nil && reflect.TypeOf(result).Kind() != reflect.Ptr {
 		return fmt.Errorf("call result parameter must be pointer or nil interface: %v", result)
 	}
@@ -316,7 +317,10 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 	case len(resp.Result) == 0:
 		return ErrNoResult
 	default:
-		return json.Unmarshal(resp.Result, &result)
+		fmt.Println("UNMARSHALING", string(resp.Result), &result)
+		err := json.Unmarshal(resp.Result, &result)
+		fmt.Println("ERR", err)
+		return err
 	}
 }
 
