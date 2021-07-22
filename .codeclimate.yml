@@ -38,7 +38,8 @@ checks:
     config:
       threshold: # language-specific defaults. an override will affect all languages.
 exclude_patterns:
-  - vendor/
-  - static/
-  - t/
-  - mailserver/migrations
+  - "vendor/"
+  - "static/"
+  - "t/"
+  - "mailserver/migrations"
+  - "**/*/bindata.go"
