@@ -54,10 +54,12 @@ type Peer struct {
 	rateLimitsMu         sync.Mutex
 	rateLimits           common.RateLimits
 
+	stats *common.StatsTracker
+
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 }
 
-func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger) common.Peer {
+func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger, stats *common.StatsTracker) common.Peer {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -73,6 +75,7 @@ func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logg
 		quit:           make(chan struct{}),
 		bloomFilter:    common.MakeFullNodeBloom(),
 		fullNode:       true,
+		stats:          stats,
 	}
 }
 
