@@ -775,7 +775,7 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 	}
 
 	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.Description() == "" && community.MembersCount() == 0 {
+	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
 		return
 	}
 

@@ -168,7 +168,7 @@ func (o *Community) Name() string {
 	return ""
 }
 
-func (o *Community) Description() string {
+func (o *Community) DescriptionText() string {
 	if o != nil &&
 		o.config != nil &&
 		o.config.CommunityDescription != nil &&
@@ -878,6 +878,10 @@ func (o *Community) PrivateKey() *ecdsa.PrivateKey {
 
 func (o *Community) PublicKey() *ecdsa.PublicKey {
 	return o.config.ID
+}
+
+func (o *Community) Description() *protobuf.CommunityDescription {
+	return o.config.CommunityDescription
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
