@@ -18,8 +18,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.4
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/mock v1.4.1
+	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
 	github.com/ipfs/go-log v1.0.4
@@ -42,13 +41,13 @@ require (
 	github.com/oliamb/cutter v0.2.2
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20210624095504-4133155590da
-	github.com/status-im/go-wakurelay-pubsub v0.4.2
+	github.com/status-im/go-waku v0.0.0-20210721180231-73bedde63ca4
+	github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210711180556-9afd35dadd3f
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.2

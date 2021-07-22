@@ -61,7 +61,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 	if r.Cursor != nil {
 		options = append(options, store.WithCursor(&pb.Index{
 			Digest:       r.Cursor.Digest,
-			ReceivedTime: r.Cursor.ReceivedTime,
+			ReceiverTime: r.Cursor.ReceivedTime,
 		}))
 	}
 
