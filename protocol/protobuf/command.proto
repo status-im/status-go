@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/protocol/protobuf";
+option go_package = "./;protobuf";
 package protobuf;
 
 message RequestAddressForTransaction {

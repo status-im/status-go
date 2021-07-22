@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -1044,4 +1045,215 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 
+}
+
+// TestSyncCommunity tests basic sync functionality between 2 Messengers
+func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	newCommunity, err := s.alice.communitiesManager.CreateCommunity(createCommunityReq)
+	s.NoError(err, "CreateCommunity")
+
+	// Check that Alice has 2 communities
+	cs, err := s.alice.communitiesManager.All()
+	s.NoError(err, "communitiesManager.All")
+	s.Len(cs, 2, "Must have 2 communities")
+
+	// Create new device
+	theirDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	tcs, err := theirDevice.communitiesManager.All()
+	s.NoError(err, "theirDevice.communitiesManager.All")
+	s.Len(tcs, 1, "Must have 1 communities")
+
+	// Pair devices
+	err = theirDevice.SetInstallationMetadata(theirDevice.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+
+	s.pairTwoDevices(theirDevice, s.alice, "their-name", "their-device-type")
+
+	// Sync communities
+	for _, c := range cs {
+		err = s.alice.syncCommunity(context.Background(), c)
+		s.NoError(err, "syncCommunity")
+	}
+
+	// Wait for the message to reach its destination
+	var theirCommunities []*communities.Community
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err := theirDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		theirCommunities = response.Communities()
+
+		if len(theirCommunities) > 1 {
+			return nil
+		}
+
+		return errors.New("not received any communities")
+	})
+	s.NoError(err)
+
+	// Count the number of communities in their device
+	tcs, err = theirDevice.communitiesManager.All()
+	s.NoError(err)
+	s.Len(tcs, 2, "There must be 2 communities")
+
+	// Get the new community from their db
+	tnc, err := theirDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.NoError(err)
+
+	// Check the community on their device matched the new community on Alice's device
+	s.Equal(newCommunity.ID(), tnc.ID())
+	s.Equal(newCommunity.Name(), tnc.Name())
+	s.Equal(newCommunity.DescriptionText(), tnc.DescriptionText())
+	s.Equal(newCommunity.IDString(), tnc.IDString())
+	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
+	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
+	s.Equal(newCommunity.Verified(), tnc.Verified())
+	s.Equal(newCommunity.Muted(), tnc.Muted())
+	s.Equal(newCommunity.Joined(), tnc.Joined())
+	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
+	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
+}
+
+// TestSyncCommunity2 tests more complex pairing and syncing scenarios
+func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
+	// Set Alice's installation metadata
+	aim := &multidevice.InstallationMetadata{
+		Name:       "alice's-device",
+		DeviceType: "alice's-device-type",
+	}
+	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
+	s.NoError(err)
+
+	// Create Alice's other device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.NoError(err)
+
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	s.NoError(err)
+
+	// Pair alice's two devices
+	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
+	s.pairTwoDevices(s.alice, alicesOtherDevice, aim.Name, aim.DeviceType)
+
+	// Create a community admin device
+	adminIdentity, err := crypto.GenerateKey()
+	s.NoError(err)
+	admin, err := newMessengerWithKey(s.shh, adminIdentity, s.logger, nil)
+	s.NoError(err)
+
+	tcs2, err := admin.communitiesManager.All()
+	s.NoError(err, "admin.communitiesManager.All")
+	s.Len(tcs2, 1, "Must have 1 communities")
+
+	// Admin creates a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+	community, err := admin.communitiesManager.CreateCommunity(createCommunityReq)
+	s.NoError(err, "CreateCommunity")
+
+	// Check that admin has 2 communities
+	acs, err := admin.communitiesManager.All()
+	s.NoError(err, "communitiesManager.All")
+	s.Len(acs, 2, "Must have 2 communities")
+
+	// Check that Alice has only 1 community on either device
+	cs, err := s.alice.communitiesManager.All()
+	s.NoError(err, "communitiesManager.All")
+	s.Len(cs, 1, "Must have 1 communities")
+
+	tcs1, err := alicesOtherDevice.communitiesManager.All()
+	s.NoError(err, "alicesOtherDevice.communitiesManager.All")
+	s.Len(tcs1, 1, "Must have 1 communities")
+
+	// Alice finds new community on the app
+	comPayload, err := community.ToBytes()
+	s.NoError(err)
+	_, err = s.alice.communitiesManager.HandleCommunityDescriptionMessage(community.PublicKey(), community.Description(), comPayload)
+	s.NoError(err)
+
+	cs, err = s.alice.communitiesManager.All()
+	s.NoError(err, "communitiesManager.All")
+	s.Len(cs, 2, "Must have 2 communities")
+	for _, c := range cs {
+		s.False(c.Joined(), "Must not have joined the community")
+	}
+
+	// Alice requests to join the new community
+	_, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
+	s.NoError(err)
+
+	// Admin checks request to join has been received
+	/*err = tt.RetryWithBackOff(func() error {
+		response, err := admin.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.RequestsToJoinCommunity) > 1 {
+			return nil
+		}
+
+		return errors.New("not received any RequestsToJoinCommunity")
+	})
+	s.NoError(err)*/
+
+	// TODO finish this
+}
+
+func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
+	// Send pairing data
+	response, err := device1.SendPairInstallation(context.Background())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		device2,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
+	// Check device pairing is installed and enabled
+	s.Require().NoError(err)
+
+	found := false
+	for _, installation := range response.Installations {
+		if installation.ID == device1.installationID {
+			found = true
+			s.NotNil(installation.InstallationMetadata)
+			s.Equal(deviceName, installation.InstallationMetadata.Name)
+			s.Equal(deviceType, installation.InstallationMetadata.DeviceType)
+		}
+	}
+	s.True(found, "The target installation should be found")
+
+	// Ensure installation is enabled
+	err = device2.EnableInstallation(device1.installationID)
+	s.Require().NoError(err)
 }

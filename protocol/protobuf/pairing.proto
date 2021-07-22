@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/protocol/protobuf";
+option go_package = "./;protobuf";
 package protobuf;
 
 message PairInstallation {
@@ -31,8 +31,30 @@ message SyncInstallationPublicChat {
   string id = 2;
 }
 
+message SyncCommunity {
+  uint64 clock = 1;
+  bytes id = 2;
+  bytes private_key = 3;
+  bytes description = 4;
+  bool joined = 5;
+  bool verified = 6;
+  bool muted = 7;
+  repeated SyncCommunityRequestsToJoin requests_to_join = 8;
+}
+
+message SyncCommunityRequestsToJoin {
+  bytes id = 1;
+  string public_key = 2;
+  uint64 clock = 3;
+  string ens_name = 4;
+  string chat_id = 5;
+  bytes community_id = 6;
+  uint64 state = 7;
+}
+
 message SyncInstallation {
   repeated SyncInstallationContact contacts = 1;
   repeated SyncInstallationPublicChat public_chats = 2;
   SyncInstallationAccount account = 3;
+  repeated SyncCommunity communities = 4;
 }
