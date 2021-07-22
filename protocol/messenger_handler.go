@@ -545,6 +545,71 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 	return nil
 }
 
+func (m *Messenger) HandleDeleteMessage(response *MessengerResponse, deleteMessage DeleteMessage) error {
+	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
+		return err
+	}
+
+	messageID := deleteMessage.MessageId
+	// Check if it's already in the response
+	originalMessage := response.GetMessage(messageID)
+	// otherwise pull from database
+	if originalMessage == nil {
+		var err error
+		originalMessage, err = m.persistence.MessageByID(messageID)
+
+		if err != nil && err != common.ErrRecordNotFound {
+			return err
+		}
+	}
+
+	if originalMessage == nil {
+		return m.persistence.SaveDelete(deleteMessage)
+	}
+
+	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	// Check edit is valid
+	if originalMessage.From != deleteMessage.From {
+		return errors.New("invalid delete, not the right author")
+	}
+
+	// Update message and return it
+	originalMessage.Deleted = true
+
+	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.HideMessage(deleteMessage.MessageId)
+	if err != nil {
+		return err
+	}
+
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		// Get last message that is not hidden
+		messages, _, err := m.persistence.MessageByChatID(originalMessage.LocalChatID, "", 1)
+		if err != nil {
+			return err
+		}
+		if messages != nil {
+			chat.LastMessage = messages[0]
+			err := m.saveChat(chat)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	response.AddRemovedMessage(messageID)
+	response.AddChat(chat)
+
+	return nil
+}
+
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
@@ -619,6 +684,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	err = m.checkForEdits(receivedMessage)
+	if err != nil {
+		return err
+	}
+
+	err = m.checkForDeletes(receivedMessage)
 	if err != nil {
 		return err
 	}
@@ -1184,6 +1254,21 @@ func (m *Messenger) checkForEdits(message *common.Message) error {
 	}
 
 	return nil
+}
+
+func (m *Messenger) checkForDeletes(message *common.Message) error {
+	// Check for any pending deletes
+	// If any pending deletes are available and valid, apply them
+	messageDeletes, err := m.persistence.GetDeletes(message.ID, message.From)
+	if err != nil {
+		return err
+	}
+
+	if len(messageDeletes) == 0 {
+		return nil
+	}
+
+	return m.applyDeleteMessage(messageDeletes, message)
 }
 
 func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {
