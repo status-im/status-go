@@ -11,6 +11,7 @@ import (
 )
 
 const maxChatMessageTextLength = 4096
+const maxStatusMessageText = 128
 
 // maxWhisperDrift is how many milliseconds we allow the clock value to differ
 // from whisperTimestamp
@@ -37,6 +38,23 @@ func ValidateMembershipUpdateMessage(message *protocol.MembershipUpdateMessage, 
 
 	}
 	return nil
+}
+
+func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
+	if message.Clock == 0 {
+		return errors.New("clock can't be 0")
+	}
+
+	if message.StatusType == protobuf.StatusUpdate_UNKNOWN_STATUS_TYPE {
+		return errors.New("unknown status type")
+	}
+
+	if len([]rune(message.CustomText)) > maxStatusMessageText {
+		return fmt.Errorf("custom text shouldn't be longer than %d", maxStatusMessageText)
+	}
+
+	return nil
+
 }
 
 func ValidateEditMessage(message protobuf.EditMessage) error {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"strings"
@@ -16,6 +17,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -72,6 +75,36 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 
 	err = m.Init()
 	s.Require().NoError(err)
+
+	config := params.NodeConfig{
+		NetworkID: 10,
+		DataDir:   "test",
+	}
+
+	networks := json.RawMessage("{}")
+	settings := accounts.Settings{
+		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
+		AnonMetricsShouldSend:     false,
+		CurrentNetwork:            "mainnet_rpc",
+		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
+		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
+		KeyUID:                    "0x1122334455667788990011223344556677889900",
+		LatestDerivedPath:         0,
+		Name:                      "Test",
+		Networks:                  &networks,
+		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+		PreviewPrivacy:            false,
+		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
+		SigningPhrase:             "yurt joey vibe",
+		SendPushNotifications:     true,
+		ProfilePicturesVisibility: 1,
+		DefaultSyncPeriod:         86400,
+		UseMailservers:            true,
+		LinkPreviewRequestEnabled: true,
+		SendStatusUpdates:         true,
+		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
+
+	_ = m.settings.CreateSettings(settings, config)
 
 	return m
 }
@@ -146,6 +179,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
+	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -245,7 +279,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -440,8 +474,10 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
 
+	ctx := context.Background()
+
 	// We join the org
-	response, err = s.alice.JoinCommunity(community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -454,7 +490,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
 
-	_, err = s.alice.SendChatMessage(context.Background(), inputMessage)
+	_, err = s.alice.SendChatMessage(ctx, inputMessage)
 	s.NoError(err)
 
 	// Pull message and make sure org is received
@@ -476,6 +512,8 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 }
 
 func (s *MessengerCommunitiesSuite) TestImportCommunity() {
+	ctx := context.Background()
+
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -503,7 +541,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	privateKey, err := s.bob.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
-	_, err = s.alice.ImportCommunity(privateKey)
+	_, err = s.alice.ImportCommunity(ctx, privateKey)
 	s.Require().NoError(err)
 
 	// Invite user on bob side
@@ -539,6 +577,8 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
+	ctx := context.Background()
+
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
 		Name:        "status",
@@ -562,7 +602,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	message.CommunityID = community.IDString()
 
 	// We send a community link to alice
-	response, err = s.bob.SendChatMessage(context.Background(), message)
+	response, err = s.bob.SendChatMessage(ctx, message)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 

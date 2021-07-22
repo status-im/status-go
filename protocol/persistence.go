@@ -843,3 +843,60 @@ func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatID string, has
 
 	return nil
 }
+
+func (db sqlitePersistence) InsertStatusUpdate(userStatus UserStatus) error {
+	_, err := db.db.Exec(`INSERT INTO status_updates(
+		public_key,
+		status_type,
+		clock,
+		custom_text)
+		VALUES (?, ?, ?, ?)`,
+		userStatus.PublicKey,
+		userStatus.StatusType,
+		userStatus.Clock,
+		userStatus.CustomText,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) CleanOlderStatusUpdates() error {
+	now := time.Now()
+	oneHourAgo := now.Add(time.Duration(-1) * time.Hour)
+	_, err := db.db.Exec(`DELETE FROM status_updates WHERE clock < ?`,
+		uint64(oneHourAgo.Unix()),
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) StatusUpdates() (statusUpdates []UserStatus, err error) {
+	rows, err := db.db.Query(`
+		SELECT
+			public_key,
+			status_type,
+			clock,
+			custom_text
+		FROM status_updates
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userStatus UserStatus
+		err = rows.Scan(
+			&userStatus.PublicKey,
+			&userStatus.StatusType,
+			&userStatus.Clock,
+			&userStatus.CustomText,
+		)
+		if err != nil {
+			return
+		}
+		statusUpdates = append(statusUpdates, userStatus)
+	}
+
+	return
+}

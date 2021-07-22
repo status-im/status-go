@@ -131,12 +131,12 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
-func (m *Messenger) JoinCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
 
-	return m.joinCommunity(communityID)
+	return m.joinCommunity(ctx, communityID)
 }
 
-func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.JoinCommunity(communityID)
@@ -144,7 +144,7 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 		return nil, err
 	}
 
-	chatIDs := []string{community.IDString()}
+	chatIDs := community.DefaultFilters()
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 	response.AddChats(chats)
@@ -179,7 +179,16 @@ func (m *Messenger) joinCommunity(communityID types.HexBytes) (*MessengerRespons
 
 	response.AddCommunity(community)
 
-	return response, m.saveChats(chats)
+	if err = m.saveChats(chats); err != nil {
+		return nil, err
+	}
+
+	err = m.sendCurrentUserStatusToCommunity(ctx, community)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
@@ -461,6 +470,12 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
+	// Init the default community filters
+	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 
@@ -487,14 +502,14 @@ func (m *Messenger) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error
 	return m.communitiesManager.ExportCommunity(id)
 }
 
-func (m *Messenger) ImportCommunity(key *ecdsa.PrivateKey) (*MessengerResponse, error) {
+func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.ImportCommunity(key)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load filters
-	_, err = m.transport.InitPublicFilters([]string{community.IDString()})
+	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +524,7 @@ func (m *Messenger) ImportCommunity(key *ecdsa.PrivateKey) (*MessengerResponse, 
 		return nil, err
 	}
 
-	return m.JoinCommunity(community.ID())
+	return m.JoinCommunity(ctx, community.ID())
 }
 
 func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*MessengerResponse, error) {

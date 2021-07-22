@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package protobuf;
+
+message StatusUpdate {
+  
+  uint64 clock = 1;
+  
+  StatusType status_type = 2;
+    
+  string custom_text = 3;
+  
+  enum StatusType {
+    UNKNOWN_STATUS_TYPE = 0;
+    ONLINE = 1;
+    DO_NOT_DISTURB = 2;
+  };
+
+}

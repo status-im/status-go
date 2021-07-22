@@ -118,6 +118,8 @@ type Settings struct {
 	WalletVisibleTokens            *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
 	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
 	WebViewAllowPermissionRequests bool             `json:"webview-allow-permission-requests?,omitempty"`
+	SendStatusUpdates              bool             `json:"send-status-updates?,omitempty"`
+	CurrentUserStatus              *json.RawMessage `json:"current-user-status"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -386,6 +388,15 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET anon_metrics_should_send = ? WHERE synthetic_id = 'id'")
+	case "current-user-status":
+		value = &sqlite.JSONBlob{Data: value}
+		update, err = db.db.Prepare("UPDATE settings SET current_user_status = ? WHERE synthetic_id = 'id'")
+	case "send-status-updates?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET send_status_updates = ? WHERE synthetic_id = 'id'")
 	default:
 		return ErrInvalidConfig
 	}
@@ -402,7 +413,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -454,7 +465,10 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.WalletSetUpPassed,
 		&s.WalletVisibleTokens,
 		&s.WakuBloomFilterMode,
-		&s.WebViewAllowPermissionRequests)
+		&s.WebViewAllowPermissionRequests,
+		&sqlite.JSONBlob{Data: &s.CurrentUserStatus},
+		&s.SendStatusUpdates,
+	)
 	return s, err
 }
 
@@ -649,4 +663,18 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
 	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM accounts WHERE address = ?)", address).Scan(&exists)
 	return exists, err
+}
+
+func (db *Database) GetCurrentStatus(status interface{}) error {
+	err := db.db.QueryRow("SELECT current_user_status FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &status})
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	return err
+}
+
+func (db *Database) ShouldBroadcastUserStatus() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT send_status_updates FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	return result, err
 }

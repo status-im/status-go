@@ -458,6 +458,8 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.watchExpiredEmojis()
 	m.watchIdentityImageChanges()
+	m.broadcastLatestUserStatus()
+
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
 	}
@@ -1021,7 +1023,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	// uspert profile chat
+	// upsert profile chat
 	err = m.ensureMyOwnProfileChat()
 	if err != nil {
 		return err
@@ -2571,6 +2573,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.StatusUpdate:
+						p := msg.ParsedMessage.Interface().(protobuf.StatusUpdate)
+						logger.Debug("Handling StatusUpdate", zap.Any("message", p))
+						err = m.HandleStatusUpdate(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle StatusMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.SyncInstallationContact:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -2858,7 +2870,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Process any community changes
 			for _, changes := range messageState.Response.CommunityChanges {
 				if changes.ShouldMemberJoin {
-					response, err := m.joinCommunity(changes.Community.ID())
+					response, err := m.joinCommunity(context.TODO(), changes.Community.ID())
 					if err != nil {
 						logger.Error("cannot join community", zap.Error(err))
 						continue
