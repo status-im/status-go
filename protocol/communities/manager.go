@@ -135,6 +135,10 @@ func (m *Manager) Created() ([]*Community, error) {
 	return m.persistence.CreatedCommunities(m.identity)
 }
 
+func (m *Manager) SaveCommunity(community *Community) error {
+	return m.persistence.SaveCommunity(community)
+}
+
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
 func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community, error) {
 

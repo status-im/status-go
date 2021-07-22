@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -60,6 +61,46 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	_, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
 		return nil, err
+	}
+
+	if chat.ChatType == ChatTypeCommunityChat {
+		fmt.Print("Community ID ", chat.CommunityID, "\n")
+		// TODO FIX getting the right byte[]
+		key, err := hex.DecodeString(chat.CommunityID)
+		fmt.Print("Community ID byte array ", key, "\n")
+		if err != nil {
+			return nil, err
+		}
+		community, err := m.communitiesManager.GetByID(key)
+		if err != nil {
+			return nil, err
+		}
+		if community == nil {
+			return nil, errors.New("community not found")
+		}
+
+		chats := community.Chats()
+
+		if chats[chat.ID] == nil {
+			return nil, errors.New("community chat not found")
+		}
+
+		pinnedMessages := chats[chat.ID].GetPinnedMessages()
+
+		if pinnedMessages == nil {
+			pinnedMessages = make(map[string]*protobuf.PinMessage)
+		}
+
+		// Add Pin message
+		if message.PinMessage.Pinned {
+			pinnedMessages[message.ID] = &message.PinMessage
+
+			err = m.communitiesManager.SaveCommunity(community)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// TODO add code to remove the message
 	}
 
 	err = m.persistence.SavePinMessages([]*common.PinMessage{message})
