@@ -19,6 +19,10 @@
 package common
 
 import (
+	"encoding/hex"
+	"errors"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
@@ -43,7 +47,6 @@ func BytesToTopic(b []byte) (t TopicType) {
 func StringToTopic(s string) (t TopicType) {
 	str, _ := hexutil.Decode(s)
 	return BytesToTopic(str)
-
 }
 
 // String converts a topic byte array to a string representation.
@@ -59,4 +62,27 @@ func (t TopicType) MarshalText() ([]byte, error) {
 // UnmarshalText parses a hex representation to a topic.
 func (t *TopicType) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("Topic", input, t[:])
+}
+
+// Converts a topic to its 23/WAKU2-TOPICS representation
+func (t TopicType) ContentTopic() string {
+	enc := make([]byte, len(t)*2)
+	hex.Encode(enc, t[:])
+	return "/waku/1/" + string(enc) + "/rlp"
+}
+
+func V2TopicToV1Topic(s string) (*TopicType, error) {
+	p := strings.Split(s, "/")
+
+	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "proto" {
+		return nil, errors.New("invalid content topic format")
+	}
+
+	str, err := hexutil.Decode(p[3])
+	if err != nil {
+		return nil, err
+	}
+
+	result := BytesToTopic(str)
+	return &result, nil
 }
