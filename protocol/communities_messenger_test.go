@@ -1194,28 +1194,23 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
 	s.pairTwoDevices(s.alice, alicesOtherDevice, aim.Name, aim.DeviceType)
 
-	// Create a community admin device
-	adminIdentity, err := crypto.GenerateKey()
-	s.NoError(err)
-	admin, err := newMessengerWithKey(s.shh, adminIdentity, s.logger, nil)
-	s.NoError(err)
-
-	tcs2, err := admin.communitiesManager.All()
+	// Check bob the admin has only one community
+	tcs2, err := s.bob.communitiesManager.All()
 	s.NoError(err, "admin.communitiesManager.All")
 	s.Len(tcs2, 1, "Must have 1 communities")
 
-	// Admin creates a community
+	// Bob the admin creates a community
 	createCommunityReq := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
 	}
-	community, err := admin.communitiesManager.CreateCommunity(createCommunityReq)
+	community, err := s.bob.communitiesManager.CreateCommunity(createCommunityReq)
 	s.NoError(err, "CreateCommunity")
 
 	// Check that admin has 2 communities
-	acs, err := admin.communitiesManager.All()
+	acs, err := s.bob.communitiesManager.All()
 	s.NoError(err, "communitiesManager.All")
 	s.Len(acs, 2, "Must have 2 communities")
 
@@ -1228,12 +1223,31 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.NoError(err, "alicesOtherDevice.communitiesManager.All")
 	s.Len(tcs1, 1, "Must have 1 communities")
 
-	// Alice finds new community on the app
-	comPayload, err := community.ToBytes()
+	// Bob the admin opens up a 1-1 chat with alice
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	s.NoError(s.bob.SaveChat(chat))
+
+	// Bob the admin sends Alice an invite link to the new community
+	message := buildTestMessage(*chat)
+	message.CommunityID = community.IDString()
+	response, err := s.bob.SendChatMessage(context.Background(), message)
 	s.NoError(err)
-	_, err = s.alice.communitiesManager.HandleCommunityDescriptionMessage(community.PublicKey(), community.Description(), comPayload)
+	s.NotNil(response)
+
+	// Retrieve community link & community
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("message not received")
+		}
+		return nil
+	})
 	s.NoError(err)
 
+	// Check that alice now has 2 communities
 	cs, err = s.alice.communitiesManager.All()
 	s.NoError(err, "communitiesManager.All")
 	s.Len(cs, 2, "Must have 2 communities")
@@ -1242,23 +1256,61 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	}
 
 	// Alice requests to join the new community
-	_, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
-	s.NoError(err)
+	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
-	// Admin checks request to join has been received
-	/*err = tt.RetryWithBackOff(func() error {
-		response, err := admin.RetrieveAll()
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin1)
+	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
+	s.Require().True(requestToJoin1.Our)
+	s.Require().NotEmpty(requestToJoin1.ID)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+
+	// Make sure clock is not empty
+	s.Require().NotEmpty(requestToJoin1.Clock)
+
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin1.Clock)
+
+	// pull all communities to make sure we set RequestedToJoinAt
+	allCommunities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
+	} else {
+		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
+	}
+
+	// pull to make sure it has been saved
+	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Make sure the requests are fetched also by community
+	requestsToJoin, err = s.alice.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Bob the admin retrieves request to join
+	// TODO Failing here
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
 		}
-
-		if len(response.RequestsToJoinCommunity) > 1 {
-			return nil
+		if len(response.RequestsToJoinCommunity) == 0 {
+			return errors.New("request to join community not received")
 		}
-
-		return errors.New("not received any RequestsToJoinCommunity")
+		return nil
 	})
-	s.NoError(err)*/
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
 	// TODO finish this
 }

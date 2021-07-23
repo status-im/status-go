@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/pkg/errors"
 
@@ -469,6 +470,8 @@ func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signe
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
+	spew.Dump("HandleCommunityRequestToJoin")
+
 	if requestToJoinProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
