@@ -586,7 +586,7 @@ func (p *Peer) broadcast() error {
 		return nil
 	}
 
-	batchHash, err := p.sendBundle(bundle)
+	batchHash, err := p.SendBundle(bundle)
 	if err != nil {
 		p.logger.Debug("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		return err
@@ -609,7 +609,7 @@ func (p *Peer) broadcast() error {
 	return nil
 }
 
-func (p *Peer) sendBundle(bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
+func (p *Peer) SendBundle(bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
 	data, err := rlp.EncodeToBytes(bundle)
 	if err != nil {
 		return

@@ -1087,8 +1087,9 @@ func TestOnNewEnvelopesSoftBlacklist(t *testing.T) {
 	w1 := New(nil, nil)
 
 	envelope := &common.Envelope{}
+	stats := &common.StatsTracker{}
 	p2pPeer := p2p.NewPeer(enode.ID{0x4}, "test", []p2p.Cap{})
-	peer := v1.NewPeer(w1, p2pPeer, nil, nil)
+	peer := v1.NewPeer(w1, p2pPeer, nil, nil, stats)
 
 	// Pre-condition, we need to make sure this envelope returns an EnvelopeError
 	envelopeError, err := w1.OnNewEnvelopes([]*common.Envelope{envelope}, peer)

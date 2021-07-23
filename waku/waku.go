@@ -45,7 +45,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
 	v1 "github.com/status-im/status-go/waku/v1"
@@ -162,7 +161,7 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	}
 
 	waku.filters = common.NewFilters()
-	waku.stats = waku.initStats()
+	waku.stats = &common.StatsTracker{}
 
 	// p2p waku sub-protocol handler
 	waku.protocols = []p2p.Protocol{{
@@ -196,19 +195,8 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	return waku
 }
 
-func (w *Waku) initStats() *common.StatsTracker {
-	s := &common.StatsTracker{}
-	go func() {
-		for {
-			select {
-			case <-time.After(5 * time.Second):
-				signal.SendStats(s.GetStats())
-			case <-w.quit:
-				return
-			}
-		}
-	}()
-	return s
+func (w *Waku) GetStats() types.StatsSummary {
+	return w.stats.GetStats()
 }
 
 // MinPow returns the PoW value required by this node.

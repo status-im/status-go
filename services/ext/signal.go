@@ -45,6 +45,10 @@ func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse
 	signal.SendNewMessages(response)
 }
 
+func (h PublisherSignalHandler) Stats(stats types.StatsSummary) {
+	signal.SendStats(stats)
+}
+
 // MessengerSignalHandler sends signals on messenger events
 type MessengerSignalsHandler struct{}
 
