@@ -579,6 +579,70 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+// AllMessageByChatIdWhichMatchPattern returns all messages which match the search
+// term, for a given chatId in descending order.
+// Ordering is accomplished using two concatenated values: ClockValue and ID.
+// These two values are also used to compose a cursor which is returned to the result.
+func (db sqlitePersistence) AllMessageByChatIdWhichMatchTerm(chatId string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	if searchTerm == "" {
+		return nil, fmt.Errorf("empty search term")
+	}
+
+	searchCond := ""
+	if caseSensitive {
+		searchCond = "AND m1.text LIKE '%' || ? || '%'"
+	} else {
+		searchCond = "AND LOWER(m1.text) LIKE LOWER('%' || ? || '%')"
+	}
+
+	allFields := db.tableUserMessagesAllFieldsJoin()
+
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+				%s,
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
+			WHERE
+				NOT(m1.hide) AND m1.local_chat_id = ? %s
+			ORDER BY cursor DESC
+		`, allFields, searchCond),
+		chatId, searchTerm,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.Message
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, err
+		}
+		result = append(result, &message)
+	}
+
+	return result, nil
+}
+
 // PinnedMessageByChatID returns all pinned messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
