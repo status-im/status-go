@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  test:
+    image: alpine
+    entrypoint: sh /config/run-test.sh
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+    links:
+      - go
+      - nim
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.12
+  go:
+    build:
+      context: ../../
+      dockerfile: ./_assets/build/Dockerfile
+    command: -c=/config/statusgo.json
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.11
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+  nim:
+    build: ./nimbus
+    command: --log-level:debug --discovery:off --fleet:test --log-metrics --staticnode:"enode://94364334e8c98e288a6ed4e48b76faf3cccb9c8a03afa3bab6550b32b75a3df55aec88b74b9e1a86876bb57e96ab5f8de115d35fee8b143c3d3a797468f20684@172.16.238.11:30504"
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.10
+
+networks:
+  app_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+
+volumes:
+  config:
