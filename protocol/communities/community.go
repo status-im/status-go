@@ -60,7 +60,7 @@ func New(config Config) (*Community, error) {
 type CommunityChat struct {
 	ID             string                               `json:"id"`
 	Name           string                               `json:"name"`
-	Description    string                               `json:"descriptionPatate"`
+	Description    string                               `json:"description"`
 	Members        map[string]*protobuf.CommunityMember `json:"members"`
 	PinnedMessages map[string]*protobuf.PinMessage      `json:"pinnedMessages"`
 	Permissions    *protobuf.CommunityPermissions       `json:"permissions"`

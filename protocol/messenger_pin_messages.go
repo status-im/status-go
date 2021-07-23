@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -64,14 +63,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	}
 
 	if chat.ChatType == ChatTypeCommunityChat {
-		fmt.Print("Community ID ", chat.CommunityID, "\n")
-		// TODO FIX getting the right byte[]
-		key, err := hex.DecodeString(chat.CommunityID)
-		fmt.Print("Community ID byte array ", key, "\n")
-		if err != nil {
-			return nil, err
-		}
-		community, err := m.communitiesManager.GetByID(key)
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
 			return nil, err
 		}
@@ -81,11 +73,13 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 
 		chats := community.Chats()
 
-		if chats[chat.ID] == nil {
+		communityChat := chats[chat.CommunityChatID()]
+
+		if communityChat == nil {
 			return nil, errors.New("community chat not found")
 		}
 
-		pinnedMessages := chats[chat.ID].GetPinnedMessages()
+		pinnedMessages := communityChat.GetPinnedMessages()
 
 		if pinnedMessages == nil {
 			pinnedMessages = make(map[string]*protobuf.PinMessage)
@@ -93,14 +87,23 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 
 		// Add Pin message
 		if message.PinMessage.Pinned {
-			pinnedMessages[message.ID] = &message.PinMessage
-
-			err = m.communitiesManager.SaveCommunity(community)
-			if err != nil {
-				return nil, err
+			// TODO put 3 in a constant
+			if len(pinnedMessages) > 3 {
+				return nil, errors.New("maximum number of pinned messages already reached")
 			}
+
+			pinnedMessages[message.ID] = &message.PinMessage
+		} else {
+			delete(pinnedMessages, message.ID)
 		}
-		// TODO add code to remove the message
+
+		communityChat.PinnedMessages = pinnedMessages
+		chats[chat.CommunityChatID()] = communityChat
+
+		err = m.communitiesManager.SaveCommunity(community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = m.persistence.SavePinMessages([]*common.PinMessage{message})
