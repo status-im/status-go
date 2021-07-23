@@ -114,7 +114,8 @@ func TestSendBundle(t *testing.T) {
 
 	errc := make(chan error)
 	go func() {
-		p := NewPeer(nil, nil, rw1, nil, nil)
+		stats := &common.StatsTracker{}
+		p := NewPeer(nil, nil, rw1, nil, stats)
 		_, err := p.SendBundle(envelopes)
 		errc <- err
 	}()
