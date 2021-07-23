@@ -54,10 +54,12 @@ type Peer struct {
 	bytesRateLimitsMu    sync.Mutex
 	bytesRateLimits      common.RateLimits
 
+	stats *common.StatsTracker
+
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 }
 
-func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger) common.Peer {
+func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger, stats *common.StatsTracker) common.Peer {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -73,6 +75,7 @@ func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logg
 		quit:           make(chan struct{}),
 		bloomFilter:    common.MakeFullNodeBloom(),
 		fullNode:       true,
+		stats:          stats,
 	}
 }
 
@@ -90,47 +93,81 @@ func (p *Peer) Stop() {
 	p.logger.Debug("stopping peer", zap.String("peerID", types.EncodeHex(p.ID())))
 }
 
-func (p *Peer) NotifyAboutPowRequirementChange(pow float64) error {
+func (p *Peer) NotifyAboutPowRequirementChange(pow float64) (err error) {
 	i := math.Float64bits(pow)
-	return p2p.Send(p.rw, statusUpdateCode, StatusOptions{PoWRequirement: &i})
+	data := StatusOptions{PoWRequirement: &i}
+	err = p2p.Send(p.rw, statusUpdateCode, data)
+	if err != nil {
+		p.stats.AddUpload(data)
+	}
+	return
 }
 
-func (p *Peer) NotifyAboutBloomFilterChange(bloom []byte) error {
-	return p2p.Send(p.rw, statusUpdateCode, StatusOptions{BloomFilter: bloom})
+func (p *Peer) NotifyAboutBloomFilterChange(bloom []byte) (err error) {
+	data := StatusOptions{BloomFilter: bloom}
+	err = p2p.Send(p.rw, statusUpdateCode, data)
+	if err != nil {
+		p.stats.AddUpload(data)
+	}
+	return
 }
 
-func (p *Peer) NotifyAboutTopicInterestChange(topics []common.TopicType) error {
-	return p2p.Send(p.rw, statusUpdateCode, StatusOptions{TopicInterest: topics})
+func (p *Peer) NotifyAboutTopicInterestChange(topics []common.TopicType) (err error) {
+	data := StatusOptions{TopicInterest: topics}
+	err = p2p.Send(p.rw, statusUpdateCode, data)
+	if err != nil {
+		p.stats.AddUpload(data)
+	}
+	return
 }
 
 func (p *Peer) SetPeerTrusted(trusted bool) {
 	p.trusted = trusted
 }
 
-func (p *Peer) RequestHistoricMessages(envelope *common.Envelope) error {
-	return p2p.Send(p.rw, p2pRequestCode, envelope)
+func (p *Peer) RequestHistoricMessages(envelope *common.Envelope) (err error) {
+	err = p2p.Send(p.rw, p2pRequestCode, envelope)
+	if err != nil {
+		p.stats.AddUpload(envelope)
+	}
+	return
 }
 
-func (p *Peer) SendMessagesRequest(request common.MessagesRequest) error {
-	return p2p.Send(p.rw, p2pRequestCode, request)
+func (p *Peer) SendMessagesRequest(request common.MessagesRequest) (err error) {
+	err = p2p.Send(p.rw, p2pRequestCode, request)
+	if err != nil {
+		p.stats.AddUpload(request)
+	}
+	return
 }
 
-func (p *Peer) SendHistoricMessageResponse(payload []byte) error {
+func (p *Peer) SendHistoricMessageResponse(payload []byte) (err error) {
 	size, r, err := rlp.EncodeToReader(payload)
 	if err != nil {
 		return err
 	}
 
-	return p.rw.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
-
+	err = p.rw.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
+	if err != nil {
+		p.stats.AddUpload(payload)
+	}
+	return
 }
 
-func (p *Peer) SendP2PMessages(envelopes []*common.Envelope) error {
-	return p2p.Send(p.rw, p2pMessageCode, envelopes)
+func (p *Peer) SendP2PMessages(envelopes []*common.Envelope) (err error) {
+	err = p2p.Send(p.rw, p2pMessageCode, envelopes)
+	if err != nil {
+		p.stats.AddUpload(envelopes)
+	}
+	return
 }
 
-func (p *Peer) SendRawP2PDirect(envelopes []rlp.RawValue) error {
-	return p2p.Send(p.rw, p2pMessageCode, envelopes)
+func (p *Peer) SendRawP2PDirect(envelopes []rlp.RawValue) (err error) {
+	err = p2p.Send(p.rw, p2pMessageCode, envelopes)
+	if err != nil {
+		p.stats.AddUpload(envelopes)
+	}
+	return
 }
 
 func (p *Peer) SetRWWriter(rw p2p.MsgReadWriter) {
@@ -188,6 +225,8 @@ func (p *Peer) Run() error {
 			logger.Info("failed to read a message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
+
+		p.stats.AddDownloadBytes(uint64(packet.Size))
 
 		if packet.Size > p.host.MaxMessageSize() {
 			logger.Warn("oversize message received", zap.String("peerID", types.EncodeHex(p.ID())), zap.Uint32("size", packet.Size))
@@ -384,11 +423,18 @@ func (p *Peer) handleP2PRequestCompleteCode(packet p2p.Msg) error {
 // sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
 func (p *Peer) sendConfirmation(data []byte, envelopeErrors []common.EnvelopeError) (err error) {
 	batchHash := crypto.Keccak256Hash(data)
-	err = p2p.Send(p.rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
+	msg := NewMessagesResponse(batchHash, envelopeErrors)
+	err = p2p.Send(p.rw, messageResponseCode, msg)
 	if err != nil {
+		p.stats.AddUpload(msg)
 		return
 	}
+
 	err = p2p.Send(p.rw, batchAcknowledgedCode, batchHash) // DEPRECATED
+	if err != nil {
+		p.stats.AddUpload(batchHash)
+	}
+
 	return
 }
 
@@ -399,7 +445,11 @@ func (p *Peer) handshake() error {
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
 	go func() {
-		errc <- p2p.Send(p.rw, statusCode, opts)
+		err := p2p.Send(p.rw, statusCode, opts)
+		if err != nil {
+			p.stats.AddUpload(statusCode)
+		}
+		errc <- err
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -407,6 +457,9 @@ func (p *Peer) handshake() error {
 	if err != nil {
 		return err
 	}
+
+	p.stats.AddDownloadBytes(uint64(packet.Size))
+
 	if packet.Code != statusCode {
 		return fmt.Errorf("p [%x] sent packet %x before status packet", p.ID(), packet.Code)
 	}
@@ -418,6 +471,7 @@ func (p *Peer) handshake() error {
 	if err := s.Decode(&peerOptions); err != nil {
 		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
 	}
+
 	if err := p.setOptions(peerOptions.WithDefaults()); err != nil {
 		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
 	}
@@ -532,7 +586,7 @@ func (p *Peer) broadcast() error {
 		return nil
 	}
 
-	batchHash, err := sendBundle(p.rw, bundle)
+	batchHash, err := p.SendBundle(bundle)
 	if err != nil {
 		p.logger.Debug("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		return err
@@ -555,19 +609,25 @@ func (p *Peer) broadcast() error {
 	return nil
 }
 
-func sendBundle(rw p2p.MsgWriter, bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
+func (p *Peer) SendBundle(bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
 	data, err := rlp.EncodeToBytes(bundle)
 	if err != nil {
 		return
 	}
-	err = rw.WriteMsg(p2p.Msg{
+
+	msg := p2p.Msg{
 		Code:    messagesCode,
 		Size:    uint32(len(data)),
 		Payload: bytes.NewBuffer(data),
-	})
+	}
+
+	err = p.rw.WriteMsg(msg)
 	if err != nil {
 		return
 	}
+
+	p.stats.AddUpload(bundle)
+
 	return crypto.Keccak256Hash(data), nil
 }
 

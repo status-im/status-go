@@ -2291,6 +2291,10 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	return m.handleRetrievedMessages(chatWithMessages)
 }
 
+func (m *Messenger) GetStats() types.StatsSummary {
+	return m.transport.GetStats()
+}
+
 type CurrentMessageState struct {
 	// Message is the protobuf message received
 	Message protobuf.ChatMessage

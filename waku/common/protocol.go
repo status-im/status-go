@@ -37,6 +37,8 @@ type Peer interface {
 	SendP2PMessages([]*Envelope) error
 	SendRawP2PDirect([]rlp.RawValue) error
 
+	SendBundle(bundle []*Envelope) (rst common.Hash, err error)
+
 	// Mark marks an envelope known to the peer so that it won't be sent back.
 	Mark(*Envelope)
 	// Marked checks if an envelope is already known to the remote peer.

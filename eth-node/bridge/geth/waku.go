@@ -141,6 +141,10 @@ func (w *gethWakuWrapper) Subscribe(opts *types.SubscriptionOptions) (string, er
 	return id, nil
 }
 
+func (w *gethWakuWrapper) GetStats() types.StatsSummary {
+	return w.waku.GetStats()
+}
+
 func (w *gethWakuWrapper) GetFilter(id string) types.Filter {
 	return NewWakuFilterWrapper(w.waku.GetFilter(id), id)
 }

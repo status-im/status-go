@@ -40,6 +40,8 @@ type Waku interface {
 	GetSymKey(id string) ([]byte, error)
 	MaxMessageSize() uint32
 
+	GetStats() StatsSummary
+
 	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter
 	Unsubscribe(id string) error

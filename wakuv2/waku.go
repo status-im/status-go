@@ -78,6 +78,8 @@ type Waku struct {
 	expirations map[uint32]mapset.Set                       // Message expiration pool
 	poolMu      sync.RWMutex                                // Mutex to sync the message and expiration pools
 
+	stats *common.StatsTracker
+
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 	quit     chan struct{}                // Channel used for graceful exit
 
@@ -120,6 +122,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	waku.filters = common.NewFilters()
+	waku.stats = &common.StatsTracker{}
 
 	var privateKey *ecdsa.PrivateKey
 	var err error
@@ -174,6 +177,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	log.Info("setup the go-waku node successfully")
 
 	return waku, nil
+}
+
+func (w *Waku) GetStats() types.StatsSummary {
+	return w.stats.GetStats()
 }
 
 func (w *Waku) runMsgLoop() {
