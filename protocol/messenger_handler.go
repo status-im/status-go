@@ -59,7 +59,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 
 	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
-	waitingForApproval := len(chat.InvitationAdmin) > 0
+	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
 
 	if chat == nil || waitingForApproval {
 		if len(message.Events) == 0 {
@@ -67,7 +67,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		}
 
 		//approve invitations
-		if chat != nil && waitingForApproval {
+		if waitingForApproval {
 
 			groupChatInvitation := &GroupChatInvitation{
 				GroupChatInvitation: protobuf.GroupChatInvitation{
