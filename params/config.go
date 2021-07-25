@@ -175,6 +175,10 @@ type WakuV2Config struct {
 	// DiscoveryLimit indicates the maximum number of peers to discover
 	DiscoveryLimit int
 
+	// PersistPeers indicates if peer records are going to be stored in the DB so next time the node starts,
+	//it attempts to reconnect to these peers
+	PersistPeers bool
+
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
 

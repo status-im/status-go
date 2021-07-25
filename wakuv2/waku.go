@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net"
@@ -30,12 +31,15 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
 	"github.com/multiformats/go-multiaddr"
 
 	"go.uber.org/zap"
 
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
+
+	dssql "github.com/ipfs/go-ds-sql"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -59,6 +63,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/wakuv2/persistence"
 
 	libp2pdisc "github.com/libp2p/go-libp2p-core/discovery"
 	node "github.com/status-im/go-waku/waku/v2/node"
@@ -115,7 +120,7 @@ type Waku struct {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
+func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -165,15 +170,35 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
+	ctx := context.Background()
+
 	connStatusChan := make(chan node.ConnStatus, 100)
 
 	if cfg.KeepAliveInterval == 0 {
 		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
 	}
 
+	libp2pOpts := node.DefaultLibP2POptions
+	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
+
+	if appdb != nil && cfg.PersistPeers {
+		// Create persistent peerstore
+		queries, err := persistence.NewQueries("peerstore", appdb)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup peerstore table: %v", err)
+		}
+		datastore := dssql.NewDatastore(appdb, queries)
+		opts := pstoreds.DefaultOpts()
+		peerStore, err := pstoreds.NewPeerstore(ctx, datastore, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup peerstore: %v", err)
+		}
+		libp2pOpts = append(libp2pOpts, libp2p.Peerstore(peerStore))
+	}
+
 	opts := []node.WakuNodeOption{
 		node.WithLibP2POptions(
-			libp2p.BandwidthReporter(waku.bandwidthCounter),
+			libp2pOpts...,
 		),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
@@ -202,7 +227,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		opts = append(opts, node.WithWakuRelay(relayOpts...))
 	}
 
-	if waku.node, err = node.New(context.Background(), opts...); err != nil {
+	if waku.node, err = node.New(ctx, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 

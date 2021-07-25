@@ -258,6 +258,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			WakuRendezvousNodes:    nodeConfig.ClusterConfig.WakuRendezvousNodes,
 			PeerExchange:           nodeConfig.WakuV2Config.PeerExchange,
 			DiscoveryLimit:         nodeConfig.WakuV2Config.DiscoveryLimit,
+			PersistPeers:           nodeConfig.WakuV2Config.PersistPeers,
 		}
 
 		if cfg.Host == "" {
@@ -278,7 +279,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 		}
 		logging.SetAllLoggers(lvl)
 
-		w, err := wakuv2.New(nodeConfig.NodeKey, cfg, logutils.ZapLogger())
+		w, err := wakuv2.New(nodeConfig.NodeKey, cfg, logutils.ZapLogger(), b.appDB)
 
 		if err != nil {
 			return nil, err
