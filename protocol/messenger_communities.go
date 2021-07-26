@@ -454,6 +454,28 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	return &response, m.saveChats(chats)
 }
 
+func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	community, _, err := m.communitiesManager.DeleteChat(communityID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	err = m.deleteChat(chatID)
+	if err != nil {
+		return nil, err
+	}
+	response.AddRemovedChat(chatID)
+
+	_, err = m.transport.RemoveFilterByChatID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
