@@ -127,7 +127,7 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	}
 	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
-	s.Require().Equal(ErrInvalidEditAuthor, err)
+	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
 func (s *MessengerEditMessageSuite) TestEditMessageActivityCenter() {
@@ -204,7 +204,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageActivityCenter() {
 	}
 	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
-	s.Require().Equal(ErrInvalidEditAuthor, err)
+	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
 func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
