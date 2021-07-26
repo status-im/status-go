@@ -75,6 +75,21 @@ func ValidateEditMessage(message protobuf.EditMessage) error {
 	return ValidateText(message.Text)
 }
 
+func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
+	if len(message.ChatId) == 0 {
+		return errors.New("chat-id can't be empty")
+	}
+	if len(message.MessageId) == 0 {
+		return errors.New("message-id can't be empty")
+	}
+
+	if message.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP {
+		return errors.New("unknown message type")
+	}
+
+	return nil
+}
+
 func ValidateReceivedPairInstallation(message *protobuf.PairInstallation, whisperTimestamp uint64) error {
 	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err

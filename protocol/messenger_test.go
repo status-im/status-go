@@ -351,6 +351,27 @@ func buildTestMessage(chat Chat) *common.Message {
 	return message
 }
 
+func buildTestGapMessage(chat Chat) *common.Message {
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := &common.Message{}
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.ContentType = protobuf.ChatMessage_SYSTEM_MESSAGE_GAP
+	switch chat.ChatType {
+	case ChatTypePublic, ChatTypeProfile:
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
+	case ChatTypeOneToOne:
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
+	case ChatTypePrivateGroupChat:
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
+	}
+
+	return message
+}
+
 func (s *MessengerSuite) TestMarkMessagesSeen() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2

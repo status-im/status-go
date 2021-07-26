@@ -568,6 +568,10 @@ func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMes
 	return api.service.messenger.EditMessage(ctx, request)
 }
 
+func (api *PublicAPI) DeleteMessageAndSend(ctx context.Context, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteMessageAndSend(ctx, messageID)
+}
+
 func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPinMessage(ctx, message)
 }

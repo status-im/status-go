@@ -153,6 +153,9 @@ type Message struct {
 
 	// EditedAt indicates the clock value it was edited
 	EditedAt uint64 `json:"editedAt"`
+
+	// Deleted indicates if a message was deleted
+	Deleted bool `json:"deleted"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -194,6 +197,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Mentioned         bool                             `json:"mentioned,omitempty"`
 		Links             []string                         `json:"links,omitempty"`
 		EditedAt          uint64                           `json:"editedAt,omitempty"`
+		Deleted           bool                             `json:"deleted,omitempty"`
 	}{
 		ID:                m.ID,
 		WhisperTimestamp:  m.WhisperTimestamp,
@@ -226,6 +230,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		CommandParameters: m.CommandParameters,
 		GapParameters:     m.GapParameters,
 		EditedAt:          m.EditedAt,
+		Deleted:           m.Deleted,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
