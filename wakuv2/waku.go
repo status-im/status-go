@@ -160,8 +160,13 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	)
 
 	go func() {
-		for c := range connStatusChan {
-			signal.SendPeerStats(c)
+		for {
+			select {
+			case <-waku.quit:
+				return
+			case c := <-connStatusChan:
+				signal.SendPeerStats(c)
+			}
 		}
 	}()
 	if err != nil {
