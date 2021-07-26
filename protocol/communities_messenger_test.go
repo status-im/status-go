@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -1206,8 +1207,12 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 		Color:       "#000000",
 		Description: "new community description",
 	}
-	community, err := s.bob.communitiesManager.CreateCommunity(createCommunityReq)
+	mr, err := s.bob.CreateCommunity(createCommunityReq)
 	s.NoError(err, "CreateCommunity")
+	s.NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+
+	community := mr.Communities()[0]
 
 	// Check that admin has 2 communities
 	acs, err := s.bob.communitiesManager.All()
@@ -1224,15 +1229,19 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.Len(tcs1, 1, "Must have 1 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreatePublicChat("new community public", s.alice.transport)
 	s.NoError(s.bob.SaveChat(chat))
 
-	// Bob the admin sends Alice an invite link to the new community
+	// Bob the admin shares with Alice, via public chat, an invite link to the new community
 	message := buildTestMessage(*chat)
 	message.CommunityID = community.IDString()
 	response, err := s.bob.SendChatMessage(context.Background(), message)
 	s.NoError(err)
 	s.NotNil(response)
+
+	mr, err = s.alice.CreatePublicChat(&requests.CreatePublicChat{ID: chat.ID})
+	s.NoError(err)
+	s.NotNil(mr)
 
 	// Retrieve community link & community
 	err = tt.RetryWithBackOff(func() error {
@@ -1297,8 +1306,21 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.Require().NoError(err)
 	s.Require().Len(requestsToJoin, 1)
 
+	// Alice's other device retrieves sync message from the join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community with sync not received")
+		}
+		return nil
+	})
+	s.NoError(err)
+	s.Len(response.Communities(), 1)
+
 	// Bob the admin retrieves request to join
-	// TODO Failing here
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
@@ -1309,8 +1331,24 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 		}
 		return nil
 	})
-	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.NoError(err)
+	s.Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin2 := response.RequestsToJoinCommunity[0]
+
+	s.Require().NotNil(requestToJoin2)
+	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
+	s.Require().False(requestToJoin2.Our)
+	s.Require().NotEmpty(requestToJoin2.ID)
+	s.Require().NotEmpty(requestToJoin2.Clock)
+	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
+
+	com := response.Communities()[0]
+	coms, err :=alicesOtherDevice.communitiesManager.All()
+	spew.Dump(len(coms))
+
+	spew.Dump(len(response.Communities()), com.RequestsToJoin(), com.Name())
 
 	// TODO finish this
 }
@@ -1318,10 +1356,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
 	// Send pairing data
 	response, err := device1.SendPairInstallation(context.Background())
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().False(response.Chats()[0].Active)
+	s.NoError(err)
+	s.NotNil(response)
+	s.Len(response.Chats(), 1)
+	s.False(response.Chats()[0].Active)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1329,9 +1367,8 @@ func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, 
 		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
 		"installation not received",
 	)
-
-	// Check device pairing is installed and enabled
-	s.Require().NoError(err)
+	s.NoError(err)
+	s.NotNil(response)
 
 	found := false
 	for _, installation := range response.Installations {
@@ -1346,5 +1383,5 @@ func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, 
 
 	// Ensure installation is enabled
 	err = device2.EnableInstallation(device1.installationID)
-	s.Require().NoError(err)
+	s.NoError(err)
 }

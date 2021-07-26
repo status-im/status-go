@@ -1791,6 +1791,9 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 }
 
 func (m *Messenger) hasPairedDevices() bool {
+	logger := m.logger.Named("hasPairedDevices")
+	logger.Debug("fired")
+
 	var count int
 	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		if installation.Enabled {
@@ -1798,6 +1801,9 @@ func (m *Messenger) hasPairedDevices() bool {
 		}
 		return true
 	})
+	logger.Debug("installations info",
+		zap.Int("Number of installations", m.allInstallations.Len()),
+		zap.Int("Number of enabled installations", count))
 	return count > 1
 }
 
@@ -2277,9 +2283,13 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 }
 
 func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community) error {
+	logger := m.logger.Named("syncCommunity")
+	logger.Debug("fired")
 	if !m.hasPairedDevices() {
+		logger.Debug("device has no paired devices")
 		return nil
 	}
+	logger.Debug("device has paired device(s)")
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
@@ -2302,6 +2312,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	if err != nil {
 		return err
 	}
+	logger.Debug("message dispatched")
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
