@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -1210,7 +1209,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	mr, err := s.bob.CreateCommunity(createCommunityReq)
 	s.NoError(err, "CreateCommunity")
 	s.NotNil(mr)
-	s.Require().Len(mr.Communities(), 1)
+	s.Len(mr.Communities(), 1)
 
 	community := mr.Communities()[0]
 
@@ -1229,7 +1228,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.Len(tcs1, 1, "Must have 1 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreatePublicChat("new community public", s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
 	s.NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -1238,10 +1237,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	response, err := s.bob.SendChatMessage(context.Background(), message)
 	s.NoError(err)
 	s.NotNil(response)
-
-	mr, err = s.alice.CreatePublicChat(&requests.CreatePublicChat{ID: chat.ID})
-	s.NoError(err)
-	s.NotNil(mr)
 
 	// Retrieve community link & community
 	err = tt.RetryWithBackOff(func() error {
@@ -1266,45 +1261,45 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 
 	// Alice requests to join the new community
 	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.NoError(err)
+	s.NotNil(response)
+	s.Len(response.RequestsToJoinCommunity, 1)
 
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
-	s.Require().NotNil(requestToJoin1)
-	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
-	s.Require().True(requestToJoin1.Our)
-	s.Require().NotEmpty(requestToJoin1.ID)
-	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+	aRtj := response.RequestsToJoinCommunity[0]
+	s.NotNil(aRtj)
+	s.Equal(community.ID(), aRtj.CommunityID)
+	s.True(aRtj.Our)
+	s.NotEmpty(aRtj.ID)
+	s.NotEmpty(aRtj.Clock)
+	s.Equal(aRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(communities.RequestToJoinStatePending, aRtj.State)
 
 	// Make sure clock is not empty
-	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.NotEmpty(aRtj.Clock)
 
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin1.Clock)
+	s.Len(response.Communities(), 1)
+	s.Equal(response.Communities()[0].RequestedToJoinAt(), aRtj.Clock)
 
 	// pull all communities to make sure we set RequestedToJoinAt
 	allCommunities, err := s.alice.Communities()
-	s.Require().NoError(err)
-	s.Require().Len(allCommunities, 2)
+	s.NoError(err)
+	s.Len(allCommunities, 2)
 
 	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
+		s.Equal(allCommunities[0].RequestedToJoinAt(), aRtj.Clock)
 	} else {
-		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
+		s.Equal(allCommunities[1].RequestedToJoinAt(), aRtj.Clock)
 	}
 
 	// pull to make sure it has been saved
 	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
-	s.Require().NoError(err)
-	s.Require().Len(requestsToJoin, 1)
+	s.NoError(err)
+	s.Len(requestsToJoin, 1)
 
 	// Make sure the requests are fetched also by community
 	requestsToJoin, err = s.alice.PendingRequestsToJoinForCommunity(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(requestsToJoin, 1)
+	s.NoError(err)
+	s.Len(requestsToJoin, 1)
 
 	// Alice's other device retrieves sync message from the join
 	err = tt.RetryWithBackOff(func() error {
@@ -1312,13 +1307,40 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 		if err != nil {
 			return err
 		}
+
+		// Do we have a new community?
 		if len(response.Communities()) == 0 {
 			return errors.New("community with sync not received")
 		}
+
+		// Do we have a new pending request to join for the new community
+		requestsToJoin, err = alicesOtherDevice.PendingRequestsToJoinForCommunity(community.ID())
+		if err != nil {
+			return err
+		}
+		if len(requestsToJoin) == 0 {
+			return errors.New("no requests to join")
+		}
+
 		return nil
 	})
 	s.NoError(err)
 	s.Len(response.Communities(), 1)
+
+	// Get the pending requests to join for the new community on alicesOtherDevice
+	requestsToJoin, err = alicesOtherDevice.PendingRequestsToJoinForCommunity(community.ID())
+	s.NoError(err)
+	s.Len(requestsToJoin, 1)
+
+	// Check request to join on alicesOtherDevice matches the RTJ on alice
+	aodRtj := requestsToJoin[0]
+	s.Equal(aRtj.PublicKey, aodRtj.PublicKey)
+	s.Equal(aRtj.ID, aodRtj.ID)
+	s.Equal(aRtj.CommunityID, aodRtj.CommunityID)
+	s.Equal(aRtj.Clock, aodRtj.Clock)
+	s.Equal(aRtj.ENSName, aodRtj.ENSName)
+	s.Equal(aRtj.ChatID, aodRtj.ChatID)
+	s.Equal(aRtj.State, aodRtj.State)
 
 	// Bob the admin retrieves request to join
 	err = tt.RetryWithBackOff(func() error {
@@ -1334,23 +1356,23 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.NoError(err)
 	s.Len(response.RequestsToJoinCommunity, 1)
 
-	requestToJoin2 := response.RequestsToJoinCommunity[0]
+	// Check thsat bob the admin's newly recieved request to join matches what we expect
+	bobRtj := response.RequestsToJoinCommunity[0]
+	s.NotNil(bobRtj)
+	s.Equal(community.ID(), bobRtj.CommunityID)
+	s.False(bobRtj.Our)
+	s.NotEmpty(bobRtj.ID)
+	s.NotEmpty(bobRtj.Clock)
+	s.Equal(bobRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(communities.RequestToJoinStatePending, bobRtj.State)
 
-	s.Require().NotNil(requestToJoin2)
-	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
-	s.Require().False(requestToJoin2.Our)
-	s.Require().NotEmpty(requestToJoin2.ID)
-	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
-
-	com := response.Communities()[0]
-	coms, err :=alicesOtherDevice.communitiesManager.All()
-	spew.Dump(len(coms))
-
-	spew.Dump(len(response.Communities()), com.RequestsToJoin(), com.Name())
-
-	// TODO finish this
+	s.Equal(aRtj.PublicKey, bobRtj.PublicKey)
+	s.Equal(aRtj.ID, bobRtj.ID)
+	s.Equal(aRtj.CommunityID, bobRtj.CommunityID)
+	s.Equal(aRtj.Clock, bobRtj.Clock)
+	s.Equal(aRtj.ENSName, bobRtj.ENSName)
+	s.Equal(aRtj.ChatID, bobRtj.ChatID)
+	s.Equal(aRtj.State, bobRtj.State)
 }
 
 func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
