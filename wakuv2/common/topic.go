@@ -74,7 +74,7 @@ func (t TopicType) ContentTopic() string {
 func V2TopicToV1Topic(s string) (*TopicType, error) {
 	p := strings.Split(s, "/")
 
-	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "proto" {
+	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "rlp" {
 		return nil, errors.New("invalid content topic format")
 	}
 
