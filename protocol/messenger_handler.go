@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -59,13 +60,15 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 
 	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
-	if chat == nil || len(chat.InvitationAdmin) > 0 {
+	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
+
+	if chat == nil || waitingForApproval {
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
 		}
 
 		//approve invitations
-		if chat != nil && len(chat.InvitationAdmin) > 0 {
+		if waitingForApproval {
 
 			groupChatInvitation := &GroupChatInvitation{
 				GroupChatInvitation: protobuf.GroupChatInvitation{
@@ -101,8 +104,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		}
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
-		// unless is coming from us or a contact
-		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey
+		// unless is coming from us or a contact or were waiting for approval
+		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 		newChat.Active = isActive
 		chat = &newChat
 	} else {
@@ -144,6 +147,13 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	messageState.Response.AddChat(chat)
 	// Store in chats map as it might be a new one
 	messageState.AllChats.Store(chat.ID, chat)
+
+	if waitingForApproval {
+		_, err = m.ConfirmJoiningGroup(context.Background(), chat.ID)
+		if err != nil {
+			return err
+		}
+	}
 
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
