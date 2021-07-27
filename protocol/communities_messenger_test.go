@@ -1357,7 +1357,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity2() {
 	s.NoError(err)
 	s.Len(response.RequestsToJoinCommunity, 1)
 
-	// Check thsat bob the admin's newly recieved request to join matches what we expect
+	// Check that bob the admin's newly received request to join matches what we expect
 	bobRtj := response.RequestsToJoinCommunity[0]
 	s.NotNil(bobRtj)
 	s.Equal(community.ID(), bobRtj.CommunityID)
