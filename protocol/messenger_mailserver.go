@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ import (
 
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
+var mailserverRequestTimeout = 45 * time.Second
 
 func (m *Messenger) shouldSync() (bool, error) {
 	if m.mailserver == nil || !m.online() {
@@ -349,14 +351,19 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 
 func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 	m.logger.Info("syncing topic", zap.Any("topic", batch.Topics), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
-	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(context.Background(), m.mailserver, batch.From, batch.To, nil, nil, batch.Topics, true)
+	ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+	defer cancel()
+
+	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, nil, nil, batch.Topics, true)
 	if err != nil {
 		return err
 	}
 	for len(cursor) != 0 || storeCursor != nil {
 		m.logger.Info("retrieved cursor", zap.Any("cursor", cursor))
+		ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+		defer cancel()
 
-		cursor, storeCursor, err = m.transport.SendMessagesRequest(context.Background(), m.mailserver, batch.From, batch.To, cursor, storeCursor, true)
+		cursor, storeCursor, err = m.transport.SendMessagesRequest(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, true)
 		if err != nil {
 			return err
 		}
