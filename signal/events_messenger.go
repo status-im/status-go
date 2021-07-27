@@ -1,7 +1,5 @@
 package signal
 
-import "github.com/status-im/status-go/protocol/communities"
-
 const (
 
 	// EventMesssageDelivered triggered when we got acknowledge from datasync level, that means peer got message
@@ -32,6 +30,6 @@ func SendMessageDelivered(chatID string, messageID string) {
 }
 
 // SendMessageDelivered notifies about delivered message
-func SendCommunityInfoFound(community *communities.Community) {
+func SendCommunityInfoFound(community interface{}) {
 	send(EventCommunityInfoFound, community)
 }
