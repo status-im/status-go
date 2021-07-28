@@ -676,5 +676,10 @@ func (db *Database) GetCurrentStatus(status interface{}) error {
 func (db *Database) ShouldBroadcastUserStatus() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT send_status_updates FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	// If the `send_status_updates` value is nil the sql.ErrNoRows will be returned
+	// because this feature is opt out, `true` should be returned in the case where no value is found
+	if err == sql.ErrNoRows {
+		return true, nil
+	}
 	return result, err
 }
