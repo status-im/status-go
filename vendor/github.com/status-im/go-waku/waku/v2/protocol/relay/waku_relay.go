@@ -9,6 +9,7 @@ import (
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 
+	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
@@ -36,7 +37,7 @@ func NewWakuRelay(ctx context.Context, h host.Host, opts ...wakurelay.Option) (*
 	w.wakuRelayTopics = make(map[Topic]*wakurelay.Topic)
 	w.relaySubs = make(map[Topic]*wakurelay.Subscription)
 
-	ps, err := wakurelay.NewWakuRelaySub(ctx, h, opts...)
+	ps, err := wakurelay.NewWakuRelaySubWithMatcherFunc(ctx, h, protocol.PrefixTextMatch, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (w *WakuRelay) Topics() []Topic {
 	w.topicsMutex.Lock()
 
 	var result []Topic
-	for topic, _ := range w.topics {
+	for topic := range w.topics {
 		result = append(result, topic)
 	}
 	return result
@@ -109,7 +110,7 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic 
 	// Publish a `WakuMessage` to a PubSub topic.
 
 	if w.pubsub == nil {
-		return nil, errors.New("PubSub hasn't been set.")
+		return nil, errors.New("PubSub hasn't been set")
 	}
 
 	if message == nil {

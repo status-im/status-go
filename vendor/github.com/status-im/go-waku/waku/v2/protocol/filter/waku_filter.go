@@ -199,7 +199,7 @@ func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandl
 	wf.pushHandler = handler
 	wf.peerChan = peerChan
 
-	wf.h.SetStreamHandler(WakuFilterProtocolId, wf.onRequest)
+	wf.h.SetStreamHandlerMatch(WakuFilterProtocolId, protocol.PrefixTextMatch(WakuFilterCodec), wf.onRequest)
 	go wf.FilterListener()
 	go wf.peerListener()
 

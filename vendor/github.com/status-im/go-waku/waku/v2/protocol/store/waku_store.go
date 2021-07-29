@@ -30,9 +30,9 @@ import (
 
 var log = logging.Logger("wakustore")
 
-const WakuStoreProtocolId = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta3")
+const WakuStoreCodec = "/vac/waku/store/2.0.0-beta3"
+const WakuStoreProtocolId = libp2pProtocol.ID(WakuStoreCodec)
 const MaxPageSize = 100 // Maximum number of waku messages in each page
-const DefaultContentTopic = "/waku/2/default-content/proto"
 
 var (
 	ErrNoPeersAvailable      = errors.New("no suitable remote peers")
@@ -185,7 +185,7 @@ func (w *WakuStore) FindMessages(query *pb.HistoryQuery) *pb.HistoryResponse {
 type StoredMessage struct {
 	ID           []byte
 	PubsubTopic  string
-	ReceiverTime int64
+	ReceiverTime float64
 	Message      *pb.WakuMessage
 }
 
@@ -202,10 +202,10 @@ type IndexedWakuMessage struct {
 }
 
 type WakuStore struct {
-	ctx        context.Context
-	MsgC       chan *protocol.Envelope
-	messages   []IndexedWakuMessage
-	messageSet map[[32]byte]struct{}
+	ctx      context.Context
+	MsgC     chan *protocol.Envelope
+	messages []IndexedWakuMessage
+	seen     map[[32]byte]struct{}
 
 	messagesMutex sync.Mutex
 
@@ -221,6 +221,7 @@ func NewWakuStore(shouldStoreMessages bool, p MessageProvider) *WakuStore {
 	wakuStore.MsgC = make(chan *protocol.Envelope)
 	wakuStore.msgProvider = p
 	wakuStore.storeMsgs = shouldStoreMessages
+	wakuStore.seen = make(map[[32]byte]struct{})
 
 	return wakuStore
 }
@@ -247,7 +248,7 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *e
 		return
 	}
 
-	store.h.SetStreamHandler(WakuStoreProtocolId, store.onRequest)
+	store.h.SetStreamHandlerMatch(WakuStoreProtocolId, protocol.PrefixTextMatch(WakuStoreCodec), store.onRequest)
 
 	go store.storeIncomingMessages(ctx)
 
@@ -258,7 +259,7 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *e
 
 	storedMessages, err := store.msgProvider.GetAll()
 	if err != nil {
-		log.Error("could not load DBProvider messages")
+		log.Error("could not load DBProvider messages", err)
 		stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "store_load_failure")}, metrics.Errors.M(1))
 		return
 	}
@@ -283,11 +284,11 @@ func (store *WakuStore) storeMessageWithIndex(pubsubTopic string, idx *pb.Index,
 	var k [32]byte
 	copy(k[:], idx.Digest)
 
-	if _, ok := store.messageSet[k]; ok {
+	if _, ok := store.seen[k]; ok {
 		return
 	}
 
-	store.messageSet[k] = struct{}{}
+	store.seen[k] = struct{}{}
 	store.messages = append(store.messages, IndexedWakuMessage{msg: msg, index: idx, pubsubTopic: pubsubTopic})
 }
 
@@ -348,7 +349,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err = writer.WriteMsg(historyResponseRPC)
 	if err != nil {
 		log.Error("error writing response", err)
-		s.Reset()
+		_ = s.Reset()
 	} else {
 		log.Info(fmt.Sprintf("%s: Response sent  to %s", s.Conn().LocalPeer().String(), s.Conn().RemotePeer().String()))
 	}
@@ -362,7 +363,7 @@ func computeIndex(msg *pb.WakuMessage) (*pb.Index, error) {
 	digest := sha256.Sum256(data)
 	return &pb.Index{
 		Digest:       digest[:],
-		ReceiverTime: float64(time.Now().UnixNano()),
+		ReceiverTime: utils.GetUnixEpoch(),
 		SenderTime:   msg.Timestamp,
 	}, nil
 }
@@ -477,7 +478,9 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	}
 
 	defer connOpt.Close()
-	defer connOpt.Reset()
+	defer func() {
+		_ = connOpt.Reset()
+	}()
 
 	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(requestId)}
 
