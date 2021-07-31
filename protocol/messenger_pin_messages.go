@@ -62,6 +62,65 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
+	if chat.ChatType == ChatTypeCommunityChat {
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+		if community == nil {
+			return nil, errors.New("community not found")
+		}
+
+		chats := community.Chats()
+
+		communityChat := chats[chat.CommunityChatID()]
+
+		if communityChat == nil {
+			return nil, errors.New("community chat not found")
+		}
+
+		pinnedMessages := communityChat.GetPinnedMessages()
+
+		if pinnedMessages == nil {
+			pinnedMessages = make(map[string]*protobuf.PinnedMessage)
+		}
+
+		// Add Pin message
+		if message.PinMessage.Pinned {
+			// TODO put 3 in a constant
+			if len(pinnedMessages) > 3 {
+				return nil, errors.New("maximum number of pinned messages already reached")
+			}
+
+			msg, err := m.persistence.MessageByID(message.PinMessage.MessageId)
+			if err != nil {
+				return nil, err
+			}
+
+			pinnedMessage := protobuf.PinnedMessage{}
+
+			marshalledMessage, err := msg.MarshalJSON()
+			if err != nil {
+				return nil, err
+			}
+
+			pinnedMessage.RawMessage = string(marshalledMessage)
+			pinnedMessage.PinnedAt = message.PinMessage.Clock
+			pinnedMessage.PinnedBy = message.From
+
+			pinnedMessages[message.ID] = &pinnedMessage
+		} else {
+			delete(pinnedMessages, message.ID)
+		}
+
+		communityChat.PinnedMessages = pinnedMessages
+		chats[chat.CommunityChatID()] = communityChat
+		err = m.communitiesManager.SaveCommunity(community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = m.persistence.SavePinMessages([]*common.PinMessage{message})
 	if err != nil {
 		return nil, err

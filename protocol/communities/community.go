@@ -58,14 +58,15 @@ func New(config Config) (*Community, error) {
 }
 
 type CommunityChat struct {
-	ID          string                               `json:"id"`
-	Name        string                               `json:"name"`
-	Description string                               `json:"description"`
-	Members     map[string]*protobuf.CommunityMember `json:"members"`
-	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
-	CanPost     bool                                 `json:"canPost"`
-	Position    int                                  `json:"position"`
-	CategoryID  string                               `json:"categoryID"`
+	ID             string                               `json:"id"`
+	Name           string                               `json:"name"`
+	Description    string                               `json:"description"`
+	Members        map[string]*protobuf.CommunityMember `json:"members"`
+	PinnedMessages map[string]*protobuf.PinnedMessage   `json:"pinnedMessages"`
+	Permissions    *protobuf.CommunityPermissions       `json:"permissions"`
+	CanPost        bool                                 `json:"canPost"`
+	Position       int                                  `json:"position"`
+	CategoryID     string                               `json:"categoryID"`
 }
 
 type CommunityCategory struct {
@@ -127,14 +128,15 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				return nil, err
 			}
 			chat := CommunityChat{
-				ID:          id,
-				Name:        c.Identity.DisplayName,
-				Description: c.Identity.Description,
-				Permissions: c.Permissions,
-				Members:     c.Members,
-				CanPost:     canPost,
-				CategoryID:  c.CategoryId,
-				Position:    int(c.Position),
+				ID:             id,
+				Name:           c.Identity.DisplayName,
+				Description:    c.Identity.Description,
+				Permissions:    c.Permissions,
+				Members:        c.Members,
+				PinnedMessages: c.PinnedMessages,
+				CanPost:        canPost,
+				CategoryID:     c.CategoryId,
+				Position:       int(c.Position),
 			}
 			communityItem.Chats[id] = chat
 		}

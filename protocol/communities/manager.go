@@ -135,6 +135,10 @@ func (m *Manager) Created() ([]*Community, error) {
 	return m.persistence.CreatedCommunities(m.identity)
 }
 
+func (m *Manager) SaveCommunity(community *Community) error {
+	return m.persistence.SaveCommunity(community)
+}
+
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
 func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community, error) {
 
@@ -562,6 +566,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
+	fmt.Print("SSaving in HandleCommunityDescriptionMessage\n")
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
@@ -707,6 +712,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes) (*Community, error) {
 		return nil, ErrOrgNotFound
 	}
 	community.Join()
+	fmt.Print("SSaving in JoinCommunity\n")
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 option go_package = "github.com/protocol/protobuf";
 import "chat_identity.proto";
+import "pin_message.proto";
 
 package protobuf;
 
@@ -51,6 +52,7 @@ message CommunityChat {
   ChatIdentity identity = 3;
   string category_id = 4;
   int32 position = 5;
+  map<string,PinnedMessage> pinned_messages = 6;
 }
 
 message CommunityCategory {

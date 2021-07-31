@@ -360,6 +360,77 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 		chat.LastClockValue = message.Clock
 	}
 
+	fmt.Print("Got a pinned message\n")
+	if chat.ChatType == ChatTypeCommunityChat {
+		fmt.Print("It's a community chat\n")
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return err
+		}
+		if community == nil {
+			return errors.New("community not found")
+		}
+
+		chats := community.Chats()
+
+		communityChat := chats[chat.CommunityChatID()]
+
+		if communityChat == nil {
+			return errors.New("community chat not found")
+		}
+
+		fmt.Print("got most\n")
+		pinnedMessages := communityChat.GetPinnedMessages()
+
+		if pinnedMessages == nil {
+			pinnedMessages = make(map[string]*protobuf.PinnedMessage)
+		}
+
+		// Add Pin message
+		if message.Pinned {
+			fmt.Print("Pinned this message\n")
+			// TODO put 3 in a constant
+			if len(pinnedMessages) > 3 {
+				return errors.New("maximum number of pinned messages already reached")
+			}
+
+			msg, err := m.persistence.MessageByID(message.MessageId)
+			if err != nil {
+				return err
+			}
+
+			pinnedMessage := protobuf.PinnedMessage{}
+
+			marshalledMessage, err := msg.MarshalJSON()
+			if err != nil {
+				return err
+			}
+
+			pinnedMessage.RawMessage = string(marshalledMessage)
+			pinnedMessage.PinnedAt = message.Clock
+			pinnedMessage.PinnedBy = pinMessage.From
+
+			fmt.Print("Set the stuff\n")
+			pinnedMessages[pinMessage.ID] = &pinnedMessage
+		} else {
+			fmt.Print("Delete the pin\n")
+			delete(pinnedMessages, pinMessage.ID)
+		}
+
+		communityChat.PinnedMessages = pinnedMessages
+		chats[chat.CommunityChatID()] = communityChat
+
+		fmt.Print("Number pinned chats", len(communityChat.PinnedMessages), "\n")
+
+		fmt.Print("Save comm\n")
+		fmt.Print("Number pinned chats in community", len(community.Chats()[chat.CommunityChatID()].PinnedMessages), "\n")
+		// TODO figure out why this either doesn't save or the fetch doesn't get the pinned messages
+		err = m.communitiesManager.SaveCommunity(community)
+		if err != nil {
+			return err
+		}
+	}
+
 	state.Response.AddPinMessage(pinMessage)
 
 	// Set in the modified maps chat

@@ -20,6 +20,7 @@ type Persistence struct {
 }
 
 const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
+const communitiesBaseQuery2 = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted FROM communities_communities c`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()

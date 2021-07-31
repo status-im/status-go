@@ -13,3 +13,9 @@ message PinMessage {
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 5;
 }
+
+message PinnedMessage {
+  string rawMessage = 1;
+  uint64 pinnedAt = 2;
+  string pinnedBy = 3;
+}
