@@ -2318,15 +2318,6 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncCommunityFromID(ctx context.Context, communityID []byte) error {
-	comm, err := m.communitiesManager.GetByID(communityID)
-	if err != nil {
-		return err
-	}
-
-	return m.syncCommunity(ctx, comm)
-}
-
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {

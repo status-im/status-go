@@ -132,12 +132,19 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
-	err := m.syncCommunityFromID(context.Background(), communityID)
+	mr, err := m.joinCommunity(ctx, communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	return m.joinCommunity(ctx, communityID)
+	if com, ok := mr.communities[communityID.String()]; ok {
+		err = m.syncCommunity(context.Background(), com)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return mr, nil
 }
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
@@ -375,12 +382,19 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	err := m.syncCommunityFromID(context.Background(), communityID)
+	mr, err := m.leaveCommunity(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	return m.leaveCommunity(communityID)
+	if com, ok := mr.communities[communityID.String()]; ok {
+		err = m.syncCommunity(context.Background(), com)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return mr, nil
 }
 
 func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
@@ -855,6 +869,7 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
 	logger := m.logger.Named("handleSyncCommunity")
 
+	// Should handle community
 	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&syncCommunity)
 	if err != nil {
 		logger.Debug("m.communitiesManager.ShouldHandleSyncCommunity error", zap.Error(err))
@@ -941,6 +956,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		logger.Debug("m.communitiesManager.SetSyncClock", zap.Error(err))
 		return err
 	}
+
+	messageState.Response.AddSyncedCommunity(&syncCommunity)
 
 	// associate private key with community if set
 	if syncCommunity.PrivateKey == nil {
