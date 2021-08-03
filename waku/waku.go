@@ -87,6 +87,7 @@ type Waku struct {
 	expirations map[uint32]mapset.Set                // Message expiration pool
 	poolMu      sync.RWMutex                         // Mutex to sync the message and expiration pools
 
+	stats  *common.StatsTracker
 	peers  map[common.Peer]struct{} // Set of currently active peers
 	peerMu sync.RWMutex             // Mutex to sync the active peer set
 
@@ -160,6 +161,7 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	}
 
 	waku.filters = common.NewFilters()
+	waku.stats = &common.StatsTracker{}
 
 	// p2p waku sub-protocol handler
 	waku.protocols = []p2p.Protocol{{
@@ -191,6 +193,10 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	}
 
 	return waku
+}
+
+func (w *Waku) GetStats() types.StatsSummary {
+	return w.stats.GetStats()
 }
 
 // MinPow returns the PoW value required by this node.
@@ -1081,11 +1087,11 @@ func (w *Waku) Stop() error {
 }
 
 func (w *Waku) handlePeerV0(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
-	return w.HandlePeer(v0.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv0")), rw)
+	return w.HandlePeer(v0.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv0"), w.stats), rw)
 }
 
 func (w *Waku) handlePeerV1(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
-	return w.HandlePeer(v1.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv1")), rw)
+	return w.HandlePeer(v1.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv1"), w.stats), rw)
 }
 
 // HandlePeer is called by the underlying P2P layer when the waku sub-protocol

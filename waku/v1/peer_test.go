@@ -94,7 +94,7 @@ func TestPeerBasic(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d.", seed)
 	}
 
-	p := NewPeer(nil, nil, nil, nil)
+	p := NewPeer(nil, nil, nil, nil, nil)
 	p.Mark(env)
 	if !p.Marked(env) {
 		t.Fatalf("failed mark with seed %d.", seed)
@@ -114,7 +114,9 @@ func TestSendBundle(t *testing.T) {
 
 	errc := make(chan error)
 	go func() {
-		_, err := sendBundle(rw1, envelopes)
+		stats := &common.StatsTracker{}
+		p := NewPeer(nil, nil, rw1, nil, stats)
+		_, err := p.SendBundle(envelopes)
 		errc <- err
 	}()
 	require.NoError(t, p2p.ExpectMsg(rw2, messagesCode, envelopes))

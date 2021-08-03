@@ -56,12 +56,14 @@ func TestWakuV1(t *testing.T) {
 type WakuTestSuite struct {
 	suite.Suite
 	seed    int64
-	newPeer func(common.WakuHost, *p2p.Peer, p2p.MsgReadWriter, *zap.Logger) common.Peer
+	stats   *common.StatsTracker
+	newPeer func(common.WakuHost, *p2p.Peer, p2p.MsgReadWriter, *zap.Logger, *common.StatsTracker) common.Peer
 }
 
 // Set up random seed
 func (s *WakuTestSuite) SetupTest() {
 	s.seed = time.Now().Unix()
+	s.stats = &common.StatsTracker{}
 	mrand.Seed(s.seed)
 }
 
@@ -96,7 +98,7 @@ func (s *WakuTestSuite) TestHandleP2PMessageCode() {
 	rw1, rw2 := p2p.MsgPipe()
 
 	go func() {
-		s.Require().Error(w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw1, nil), rw1))
+		s.Require().Error(w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw1, nil, s.stats), rw1))
 	}()
 
 	timer := time.AfterFunc(time.Second*5, func() {
@@ -104,7 +106,7 @@ func (s *WakuTestSuite) TestHandleP2PMessageCode() {
 		handleError(s.T(), rw2.Close())
 	})
 
-	peer1 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw2, nil)
+	peer1 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw2, nil, s.stats)
 	peer1.SetPeerTrusted(true)
 
 	err = peer1.Start()
@@ -137,14 +139,14 @@ func (s *WakuTestSuite) testConfirmationsHandshake(expectConfirmations bool) {
 		handleError(s.T(), rw2.Close())
 	})
 
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}}), rw1, nil)
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}}), rw1, nil, s.stats)
 
 	go func() {
 		// This will always fail eventually as we close the channels
 		s.Require().Error(w1.HandlePeer(p1, rw1))
 	}()
 
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil, s.stats)
 	err := p2.Start()
 	s.Require().NoError(err)
 	peers := w1.getPeers()
@@ -181,8 +183,8 @@ func (s *WakuTestSuite) TestMessagesResponseWithError() {
 			s.T().Errorf("error closing MsgPipe 2, '%s'", err)
 		}
 	}()
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil)
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil, s.stats)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil, s.stats)
 
 	errorc := make(chan error, 1)
 	go func() { errorc <- w1.HandlePeer(p1, rw2) }()
@@ -244,8 +246,8 @@ func (s *WakuTestSuite) testConfirmationEvents(envelope common.Envelope, envelop
 
 	rw1, rw2 := p2p.MsgPipe()
 
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil)
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil, s.stats)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil, s.stats)
 
 	errorc := make(chan error, 1)
 	go func() { errorc <- w1.HandlePeer(p1, rw2) }()
@@ -342,14 +344,14 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	defer sub.Unsubscribe()
 
 	rw1, rw2 := p2p.MsgPipe()
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil, s.stats)
 
 	go func() { handleError(s.T(), w1.HandlePeer(p1, rw2)) }()
 
 	timer := time.AfterFunc(5*time.Second, func() {
 		handleError(s.T(), rw1.Close())
 	})
-	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
+	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil, s.stats)
 	s.Require().NoError(peer2.Start())
 
 	go func() { handleError(s.T(), peer2.Run()) }()
@@ -404,8 +406,8 @@ func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 		}
 	}()
 	w1, w2 := New(c, nil), New(c, nil)
-	p1 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}}), rw1, nil)
-	p2 := s.newPeer(w1, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 1}}), rw2, nil)
+	p1 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}}), rw1, nil, s.stats)
+	p2 := s.newPeer(w1, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 1}}), rw2, nil, s.stats)
 
 	errc := make(chan error)
 	go func() { errc <- w1.HandlePeer(p2, rw2) }()
@@ -439,7 +441,7 @@ func (s *WakuTestSuite) TestRequestSentEventWithExpiry() {
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}})
 	rw := discardPipe()
 	defer func() { handleError(s.T(), rw.Close()) }()
-	w.peers[s.newPeer(w, p, rw, nil)] = struct{}{}
+	w.peers[s.newPeer(w, p, rw, nil, s.stats)] = struct{}{}
 	events := make(chan common.EnvelopeEvent, 1)
 	sub := w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
@@ -490,14 +492,14 @@ func (s *WakuTestSuite) TestDeprecatedDeliverMail() {
 	})
 
 	rw1, rw2 := p2p.MsgPipe()
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil, s.stats)
 
 	go func() { handleError(s.T(), w1.HandlePeer(p1, rw2)) }()
 
 	timer := time.AfterFunc(5*time.Second, func() {
 		handleError(s.T(), rw1.Close())
 	})
-	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
+	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil, s.stats)
 	s.Require().NoError(peer2.Start())
 
 	go func() { handleError(s.T(), peer2.Run()) }()
@@ -542,7 +544,7 @@ func (s *WakuTestSuite) TestSendMessagesRequest() {
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, rw2 := p2p.MsgPipe()
 		w := New(nil, nil)
-		w.peers[s.newPeer(w, p, rw1, nil)] = struct{}{}
+		w.peers[s.newPeer(w, p, rw1, nil, s.stats)] = struct{}{}
 
 		go func() {
 			// Read out so that it's consumed
@@ -573,7 +575,7 @@ func (s *WakuTestSuite) TestRateLimiterIntegration() {
 			s.T().Errorf("error closing MsgPipe, '%s'", err)
 		}
 	}()
-	p := s.newPeer(w, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
+	p := s.newPeer(w, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil, s.stats)
 	errorc := make(chan error, 1)
 	go func() { errorc <- w.HandlePeer(p, rw2) }()
 
@@ -595,7 +597,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "1", []p2p.Cap{}), rw1, nil), rw1)
+		err := w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "1", []p2p.Cap{}), rw1, nil, s.stats), rw1)
 		errorc <- err
 	}()
 
@@ -603,7 +605,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	s.Require().NoError(w2.Start())
 	defer func() { handleError(s.T(), w2.Stop()) }()
 
-	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw2, nil)
+	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw2, nil, s.stats)
 	peer2.SetPeerTrusted(true)
 
 	events := make(chan common.EnvelopeEvent)
@@ -656,10 +658,10 @@ func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 	w2 := New(nil, nil)
 
 	go func() {
-		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil), rw1))
+		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil, s.stats), rw1))
 	}()
 
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil, s.stats)
 	err = p2.Start()
 	s.Require().NoError(err)
 
@@ -678,10 +680,10 @@ func (s *WakuTestSuite) TestHandshakeWithOldVersionWithoutLightModeFlag() {
 	w2 := New(nil, nil)
 
 	go func() {
-		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil), rw1))
+		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil, s.stats), rw1))
 	}()
 
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil, s.stats)
 	err := p2.Start()
 	s.Require().NoError(err)
 }
@@ -701,10 +703,10 @@ func (s *WakuTestSuite) TestTwoLightPeerHandshakeRestrictionOff() {
 	w2.settings.RestrictLightClientsConn = false
 
 	go func() {
-		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil), rw1))
+		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil, s.stats), rw1))
 	}()
 
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil, s.stats)
 	s.Require().NoError(p2.Start())
 }
 
@@ -723,10 +725,10 @@ func (s *WakuTestSuite) TestTwoLightPeerHandshakeError() {
 	w2.settings.RestrictLightClientsConn = true
 
 	go func() {
-		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil), rw1))
+		handleError(s.T(), w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1, nil, s.stats), rw1))
 	}()
 
-	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil, s.stats)
 	s.Require().Error(p2.Start())
 }
 

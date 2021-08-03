@@ -54,10 +54,12 @@ type Peer struct {
 	rateLimitsMu         sync.Mutex
 	rateLimits           common.RateLimits
 
+	stats *common.StatsTracker
+
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 }
 
-func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger) common.Peer {
+func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger, stats *common.StatsTracker) common.Peer {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -73,6 +75,7 @@ func NewPeer(host common.WakuHost, p2pPeer *p2p.Peer, rw p2p.MsgReadWriter, logg
 		quit:           make(chan struct{}),
 		bloomFilter:    common.MakeFullNodeBloom(),
 		fullNode:       true,
+		stats:          stats,
 	}
 }
 
@@ -542,7 +545,7 @@ func (p *Peer) broadcast() error {
 		return nil
 	}
 
-	batchHash, err := sendBundle(p.rw, bundle)
+	batchHash, err := p.SendBundle(bundle)
 	if err != nil {
 		p.logger.Debug("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		return err
@@ -565,12 +568,12 @@ func (p *Peer) broadcast() error {
 	return nil
 }
 
-func sendBundle(rw p2p.MsgWriter, bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
+func (p *Peer) SendBundle(bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
 	data, err := rlp.EncodeToBytes(bundle)
 	if err != nil {
 		return
 	}
-	err = rw.WriteMsg(p2p.Msg{
+	err = p.rw.WriteMsg(p2p.Msg{
 		Code:    messagesCode,
 		Size:    uint32(len(data)),
 		Payload: bytes.NewBuffer(data),
