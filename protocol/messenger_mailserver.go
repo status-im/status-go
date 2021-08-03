@@ -21,6 +21,9 @@ import (
 var tolerance uint32 = 60
 var mailserverRequestTimeout = 45 * time.Second
 
+// defaultCommunitySyncPeriod is how many days (in seconds) we allow a community to sync by default
+var defaultCommunitySyncPeriod uint32 = 60 * 60 * 24 * 15
+
 func (m *Messenger) shouldSync() (bool, error) {
 	if m.mailserver == nil || !m.online() {
 		return false, nil
@@ -177,11 +180,22 @@ func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
 	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod, nil
 }
 
+func (m *Messenger) defaultCommunitySyncPeriodFromNow() uint32 {
+	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultCommunitySyncPeriod
+}
+
 // capToDefaultSyncPeriod caps the sync period to the default
-func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
-	d, err := m.defaultSyncPeriodFromNow()
-	if err != nil {
-		return 0, err
+func (m *Messenger) capToDefaultSyncPeriod(period uint32, community bool) (uint32, error) {
+	var d uint32
+	var err error
+	if community {
+		d = m.defaultCommunitySyncPeriodFromNow()
+	} else {
+
+		d, err = m.defaultSyncPeriodFromNow()
+		if err != nil {
+			return 0, err
+		}
 	}
 	if d > period {
 		return d, nil
@@ -234,9 +248,15 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 
 		topicData, ok := topicsData[filter.Topic.String()]
 		if !ok {
-			lastRequest, err := m.defaultSyncPeriodFromNow()
-			if err != nil {
-				return nil, err
+			var lastRequest uint32
+			// If it's a community filter, we extend the period
+			if filter.Community {
+				lastRequest = m.defaultCommunitySyncPeriodFromNow()
+			} else {
+				lastRequest, err = m.defaultSyncPeriodFromNow()
+				if err != nil {
+					return nil, err
+				}
 			}
 			topicData = mailservers.MailserverTopic{
 				Topic:       filter.Topic.String(),
@@ -245,7 +265,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		}
 		batch, ok := batches[topicData.LastRequest]
 		if !ok {
-			from, err := m.capToDefaultSyncPeriod(uint32(topicData.LastRequest))
+			from, err := m.capToDefaultSyncPeriod(uint32(topicData.LastRequest), filter.Community)
 			if err != nil {
 				return nil, err
 			}
@@ -478,14 +498,6 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 	}
 
 	return m.persistence.DeleteMessages(messageIDs)
-}
-
-func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
-	return m.transport.LoadFilters(filters)
-}
-
-func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
-	return m.transport.RemoveFilters(filters)
 }
 
 func (m *Messenger) ConnectionChanged(state connection.State) {

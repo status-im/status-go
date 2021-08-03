@@ -132,12 +132,16 @@ func NewTransport(
 	return t, nil
 }
 
-func (t *Transport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
-	return t.filters.Init(chatIDs, publicKeys)
+func (t *Transport) InitFilters(publicChatIDs, communityChatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
+	return t.filters.Init(publicChatIDs, communityChatIDs, publicKeys)
 }
 
 func (t *Transport) InitPublicFilters(chatIDs []string) ([]*Filter, error) {
 	return t.filters.InitPublicFilters(chatIDs)
+}
+
+func (t *Transport) InitCommunityChatFilters(chatIDs []string) ([]*Filter, error) {
+	return t.filters.InitCommunityChatFilters(chatIDs)
 }
 
 func (t *Transport) Filters() []*Filter {
@@ -150,10 +154,6 @@ func (t *Transport) FilterByChatID(chatID string) *Filter {
 
 func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
 	return t.filters.FiltersByIdentities(identities)
-}
-
-func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
-	return t.filters.InitWithFilters(filters)
 }
 
 func (t *Transport) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, error) {
@@ -181,7 +181,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID)
+	return t.filters.LoadPublic(chatID, false)
 }
 
 func (t *Transport) LeavePublic(chatID string) error {
@@ -259,7 +259,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName)
+	filter, err := t.filters.LoadPublic(chatName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:])
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], true)
 	if err != nil {
 		return nil, err
 	}

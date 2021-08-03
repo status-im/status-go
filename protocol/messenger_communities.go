@@ -154,7 +154,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	}
 
 	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitCommunityChatFilters(chatIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +411,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitCommunityChatFilters(chatIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitCommunityChatFilters(chatIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +493,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 	}
 
 	// Init the default community filters
-	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
+	_, err = m.transport.InitCommunityChatFilters(community.DefaultFilters())
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +531,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	}
 
 	// Load filters
-	_, err = m.transport.InitPublicFilters(community.DefaultFilters())
+	_, err = m.transport.InitCommunityChatFilters(community.DefaultFilters())
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +688,7 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error
 	//response received
 	filter := m.transport.FilterByChatID(communityID)
 	if filter == nil {
-		filters, err := m.transport.InitPublicFilters([]string{communityID})
+		filters, err := m.transport.InitCommunityChatFilters([]string{communityID})
 		if err != nil {
 			return fmt.Errorf("Can't install filter for community: %v", err)
 		}
@@ -813,7 +813,7 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 	}
 
 	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitCommunityChatFilters(chatIDs)
 	if err != nil {
 		return err
 	}

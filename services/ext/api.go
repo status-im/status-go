@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
@@ -239,10 +238,6 @@ func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRe
 	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
-	return api.service.messenger.LoadFilters(chats)
-}
-
 func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
 	return api.service.messenger.SaveChat(chat)
 }
@@ -298,10 +293,6 @@ func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
 
 func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protocol.Contact {
 	return api.service.messenger.GetContactByID(id)
-}
-
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
-	return api.service.messenger.RemoveFilters(chats)
 }
 
 // EnableInstallation enables an installation for multi-device sync.

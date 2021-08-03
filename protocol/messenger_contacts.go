@@ -71,7 +71,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	}
 
 	// TODO: Add filters to response
-	_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
+	_, err = m.transport.InitFilters([]string{profileChat.ID}, nil, []*ecdsa.PublicKey{publicKey})
 	if err != nil {
 		return nil, err
 	}

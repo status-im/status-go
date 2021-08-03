@@ -72,7 +72,8 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 }
 
 func (f *FiltersManager) Init(
-	chatIDs []string,
+	publicChatIDs []string,
+	communityChatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
 ) ([]*Filter, error) {
 
@@ -95,8 +96,16 @@ func (f *FiltersManager) Init(
 	}
 
 	// Add public, one-to-one and negotiated filters.
-	for _, chatID := range chatIDs {
-		_, err := f.LoadPublic(chatID)
+	for _, chatID := range publicChatIDs {
+		_, err := f.LoadPublic(chatID, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Add community filters
+	for _, chatID := range communityChatIDs {
+		_, err := f.LoadPublic(chatID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -119,11 +128,18 @@ func (f *FiltersManager) Init(
 	return allFilters, nil
 }
 
+func (f *FiltersManager) InitCommunityChatFilters(chatIDs []string) ([]*Filter, error) {
+	return f.initSymmetricFilters(chatIDs, true)
+}
+
 func (f *FiltersManager) InitPublicFilters(chatIDs []string) ([]*Filter, error) {
+	return f.initSymmetricFilters(chatIDs, false)
+}
+
+func (f *FiltersManager) initSymmetricFilters(chatIDs []string, community bool) ([]*Filter, error) {
 	var filters []*Filter
-	// Add public, one-to-one and negotiated filters.
 	for _, chatID := range chatIDs {
-		f, err := f.LoadPublic(chatID)
+		f, err := f.LoadPublic(chatID, community)
 		if err != nil {
 			return nil, err
 		}
@@ -147,12 +163,13 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 		}
 		filterID := identityStr + "-admin"
 		filter := &Filter{
-			ChatID:   filterID,
-			FilterID: rawFilter.FilterID,
-			Topic:    rawFilter.Topic,
-			Identity: identityStr,
-			Listen:   true,
-			OneToOne: true,
+			ChatID:    filterID,
+			FilterID:  rawFilter.FilterID,
+			Topic:     rawFilter.Topic,
+			Identity:  identityStr,
+			Listen:    true,
+			OneToOne:  true,
+			Community: true,
 		}
 
 		f.filters[filterID] = filter
@@ -163,27 +180,6 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 }
 
 // DEPRECATED
-func (f *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
-	var (
-		chatIDs    []string
-		publicKeys []*ecdsa.PublicKey
-	)
-
-	for _, filter := range filters {
-		if filter.Identity != "" && filter.OneToOne {
-			publicKey, err := StrToPublicKey(filter.Identity)
-			if err != nil {
-				return nil, err
-			}
-			publicKeys = append(publicKeys, publicKey)
-		} else if filter.ChatID != "" {
-			chatIDs = append(chatIDs, filter.ChatID)
-		}
-	}
-
-	return f.Init(chatIDs, publicKeys)
-}
-
 func (f *FiltersManager) Reset() error {
 	var filters []*Filter
 
@@ -474,11 +470,14 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 }
 
 // LoadPublic adds a filter for a public chat.
-func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, community bool) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
 	if chat, ok := f.filters[chatID]; ok {
+		if community {
+			chat.Community = community
+		}
 		return chat, nil
 	}
 
@@ -488,12 +487,13 @@ func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 	}
 
 	chat := &Filter{
-		ChatID:   chatID,
-		FilterID: filterAndTopic.FilterID,
-		SymKeyID: filterAndTopic.SymKeyID,
-		Topic:    filterAndTopic.Topic,
-		Listen:   true,
-		OneToOne: false,
+		ChatID:    chatID,
+		FilterID:  filterAndTopic.FilterID,
+		SymKeyID:  filterAndTopic.SymKeyID,
+		Topic:     filterAndTopic.Topic,
+		Listen:    true,
+		OneToOne:  false,
+		Community: community,
 	}
 
 	f.filters[chatID] = chat

@@ -949,8 +949,9 @@ func (m *Messenger) Init() error {
 	logger := m.logger.With(zap.String("site", "Init"))
 
 	var (
-		publicChatIDs []string
-		publicKeys    []*ecdsa.PublicKey
+		publicChatIDs    []string
+		communityChatIDs []string
+		publicKeys       []*ecdsa.PublicKey
 	)
 
 	joinedCommunities, err := m.communitiesManager.Joined()
@@ -999,7 +1000,7 @@ func (m *Messenger) Init() error {
 		case ChatTypePublic, ChatTypeProfile:
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeCommunityChat:
-			publicChatIDs = append(publicChatIDs, chat.ID)
+			communityChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {
@@ -1057,7 +1058,7 @@ func (m *Messenger) Init() error {
 		m.allInstallations.Store(installation.ID, installation)
 	}
 
-	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
+	_, err = m.transport.InitFilters(publicChatIDs, communityChatIDs, publicKeys)
 	return err
 }
 
