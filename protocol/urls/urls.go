@@ -3,6 +3,7 @@ package urls
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,6 +17,12 @@ type YoutubeOembedData struct {
 	ProviderName string `json:"provider_name"`
 	Title        string `json:"title"`
 	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+type TwitterOembedData struct {
+	ProviderName string `json:"provider_name"`
+	AuthorName   string `json:"author_name"`
+	HTML         string `json:"html"`
 }
 
 type GiphyOembedData struct {
@@ -50,6 +57,7 @@ type Site struct {
 }
 
 const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
+const TwitterOembedLink = "https://publish.twitter.com/oembed?url=%s"
 const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
 const TenorOembedLink = "https://tenor.com/oembed?url=%s"
 
@@ -72,6 +80,11 @@ func LinkPreviewWhitelist() []Site {
 		Site{
 			Title:     "YouTube shortener",
 			Address:   "youtu.be",
+			ImageSite: false,
+		},
+		Site{
+			Title:     "Twitter",
+			Address:   "twitter.com",
 			ImageSite: false,
 		},
 		// Site{
@@ -129,7 +142,7 @@ func GetYoutubeOembed(url string) (data YoutubeOembedData, err error) {
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json %w", err)
 	}
 
 	return data, nil
@@ -146,6 +159,46 @@ func GetYoutubePreviewData(link string) (previewData LinkPreviewData, err error)
 	previewData.ThumbnailURL = oembedData.ThumbnailURL
 
 	return previewData, nil
+}
+
+func GetTwitterOembed(url string) (data TwitterOembedData, err error) {
+	oembedLink := fmt.Sprintf(TwitterOembedLink, url)
+	jsonBytes, err := GetURLContent(oembedLink)
+	if err != nil {
+		return data, fmt.Errorf("can't get bytes from twitter oembed response on %s link", oembedLink)
+	}
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, fmt.Errorf("can't unmarshall json %w", err)
+	}
+
+	return data, nil
+}
+
+func GetTwitterPreviewData(link string) (previewData LinkPreviewData, err error) {
+	oembedData, err := GetTwitterOembed(link)
+	if err != nil {
+		return previewData, err
+	}
+
+	previewData.Title = GetReadableTextFromTweetHTML(oembedData.HTML)
+	previewData.Site = oembedData.ProviderName
+
+	return previewData, nil
+}
+
+func GetReadableTextFromTweetHTML(s string) string {
+
+	s = strings.ReplaceAll(s, "\u003Cbr\u003E", "\n")   // Adds line break for all <br>
+	s = strings.ReplaceAll(s, "https://", "\nhttps://") // Displays links in next line
+	s = html.UnescapeString(s)                          // Parses html special characters like &#225;
+	s = stripHTMLTags(s)
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, "\n")
+	s = strings.TrimLeft(s, "\n")
+
+	return s
 }
 
 func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
@@ -175,7 +228,7 @@ func GetGiphyOembed(url string) (data GiphyOembedData, err error) {
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json %w", err)
 	}
 
 	return data, nil
@@ -236,7 +289,7 @@ func GetTenorOembed(url string) (data TenorOembedData, err error) {
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json %w", err)
 	}
 
 	return data, nil
@@ -276,6 +329,8 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetGiphyShortURLPreviewData(link)
 	case "tenor.com":
 		return GetTenorPreviewData(link)
+	case "twitter.com":
+		return GetTwitterPreviewData(link)
 	default:
 		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 	}
