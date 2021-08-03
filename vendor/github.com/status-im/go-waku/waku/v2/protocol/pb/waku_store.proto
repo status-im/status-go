@@ -33,8 +33,14 @@ message HistoryQuery {
 }
 
 message HistoryResponse {
-  repeated WakuMessage messages = 1;
-  PagingInfo pagingInfo = 2; // used for pagination
+  // the first field is reserved for future use
+  repeated WakuMessage messages = 2;
+  PagingInfo pagingInfo = 3;
+  enum Error {
+    NONE = 0;
+    INVALID_CURSOR = 1;
+  }
+  Error error = 4;
 }
 
 message HistoryRPC {

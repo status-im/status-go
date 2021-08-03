@@ -20,7 +20,8 @@ import (
 
 var log = logging.Logger("waku_lightpush")
 
-const WakuLightPushProtocolId = libp2pProtocol.ID("/vac/waku/lightpush/2.0.0-beta1")
+const WakuLightPushCodec = "/vac/waku/lightpush/2.0.0-beta1"
+const WakuLightPushProtocolId = libp2pProtocol.ID(WakuLightPushCodec)
 
 var (
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
@@ -39,7 +40,7 @@ func NewWakuLightPush(ctx context.Context, h host.Host, relay *relay.WakuRelay) 
 	wakuLP.ctx = ctx
 	wakuLP.h = h
 
-	wakuLP.h.SetStreamHandler(WakuLightPushProtocolId, wakuLP.onRequest)
+	wakuLP.h.SetStreamHandlerMatch(WakuLightPushProtocolId, protocol.PrefixTextMatch(WakuLightPushCodec), wakuLP.onRequest)
 	log.Info("Light Push protocol started")
 
 	return wakuLP
@@ -91,7 +92,7 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 		err = writer.WriteMsg(responsePushRPC)
 		if err != nil {
 			log.Error("error writing response", err)
-			s.Reset()
+			_ = s.Reset()
 		} else {
 			log.Info(fmt.Sprintf("%s: response sent  to %s", s.Conn().LocalPeer().String(), s.Conn().RemotePeer().String()))
 		}

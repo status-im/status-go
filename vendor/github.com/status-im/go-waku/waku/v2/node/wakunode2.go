@@ -377,7 +377,6 @@ func (w *WakuNode) startStore() {
 	w.opts.store.Start(w.ctx, w.host, peerChan)
 	w.peerListeners = append(w.peerListeners, peerChan)
 	w.opts.store.Resume(string(relay.GetTopic(nil)), nil)
-
 }
 
 func (w *WakuNode) AddStorePeer(address string) (*peer.ID, error) {
@@ -627,7 +626,7 @@ func (node *WakuNode) UnsubscribeFilter(ctx context.Context, request pb.FilterRe
 	}
 
 	for _, rId := range idsToRemove {
-		for id, _ := range node.filters {
+		for id := range node.filters {
 			if id == rId {
 				delete(node.filters, id)
 				break
@@ -694,8 +693,7 @@ func (w *WakuNode) DialPeer(address string) error {
 		return err
 	}
 
-	w.host.Connect(w.ctx, *info)
-	return nil
+	return w.host.Connect(w.ctx, *info)
 }
 
 func (w *WakuNode) ClosePeerByAddress(address string) error {

@@ -221,8 +221,7 @@ type RPC struct {
 
 type Option func(*PubSub) error
 
-// NewPubSub returns a new PubSub management object.
-func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option) (*PubSub, error) {
+func createPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option) (*PubSub, error) {
 	ps := &PubSub{
 		host:                  h,
 		ctx:                   ctx,
@@ -286,10 +285,45 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		return nil, err
 	}
 
+	return ps, nil
+}
+
+// NewPubSub returns a new PubSub management object.
+func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option) (*PubSub, error) {
+	ps, err := createPubSub(ctx, h, rt, opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	rt.Attach(ps)
 
 	for _, id := range rt.Protocols() {
 		h.SetStreamHandler(id, ps.handleNewStream)
+	}
+	h.Network().Notify((*PubSubNotif)(ps))
+
+	ps.val.Start(ps)
+
+	go ps.processLoop(ctx)
+
+	(*PubSubNotif)(ps).Initialize()
+
+	return ps, nil
+}
+
+type MatchFunction func(string) func(string) bool
+
+// NewPubSubWithMatcherFunc returns a new PubSub management object, using a matcher function for the protocol id
+func NewPubSubWithMatcherFunc(ctx context.Context, h host.Host, rt PubSubRouter, match MatchFunction, opts ...Option) (*PubSub, error) {
+	ps, err := createPubSub(ctx, h, rt, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.Attach(ps)
+
+	for _, id := range rt.Protocols() {
+		h.SetStreamHandlerMatch(id, match(string(id)), ps.handleNewStream)
 	}
 	h.Network().Notify((*PubSubNotif)(ps))
 

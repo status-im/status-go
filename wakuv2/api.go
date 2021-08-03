@@ -28,6 +28,7 @@ import (
 
 	"github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"github.com/status-im/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -247,7 +248,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Payload:      payload,
 		Version:      version,
 		ContentTopic: req.Topic.String(),
-		Timestamp:    float64(api.w.CurrentTime().UnixNano()) / 1000000000,
+		Timestamp:    utils.GetUnixEpoch(),
 	}
 
 	hash, err := api.w.Send(wakuMsg)

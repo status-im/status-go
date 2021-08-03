@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
-	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
@@ -30,7 +29,7 @@ type WakuNodeParameters struct {
 	enableStore bool
 	storeMsgs   bool
 	store       *store.WakuStore
-	filter      *filter.WakuFilter
+	// filter      *filter.WakuFilter
 
 	keepAliveInterval time.Duration
 
