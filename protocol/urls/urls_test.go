@@ -151,3 +151,45 @@ func TestStatusLinkPreviewData(t *testing.T) {
 // 	require.Equal(t, statusSecurityAudit.Title, previewData.Title)
 // 	require.Equal(t, statusSecurityAudit.ThumbnailURL, previewData.ThumbnailURL)
 // }
+
+func TestTwitterLinkPreviewData(t *testing.T) {
+
+	statusTweet1 := LinkPreviewData{
+		Site:  "Twitter",
+		Title: "Crypto isn't going anywhere.— Status (@ethstatus) July 26, 2021",
+	}
+
+	previewData1, err := GetLinkPreviewData("https://twitter.com/ethstatus/status/1419674733885407236")
+	require.NoError(t, err)
+	require.Equal(t, statusTweet1.Site, previewData1.Site)
+	require.Equal(t, statusTweet1.Title, previewData1.Title)
+	require.Equal(t, statusTweet1.ThumbnailURL, "")
+
+	statusTweet2 := LinkPreviewData{
+		Site: "Twitter",
+		Title: "🎉 Status v1.15 is a go! 🎉\n\n📌 Pin important messages in chats and groups" +
+			"\n✏️ Edit messages after sending\n🔬 Scan QR codes with the browser\n⚡️ FASTER app navigation!" +
+			"\nhttps://t.co/qKrhDArVKb— Status (@ethstatus) July 27, 2021",
+	}
+
+	previewData2, err := GetLinkPreviewData("https://twitter.com/ethstatus/status/1420035091997278214")
+	require.NoError(t, err)
+	require.Equal(t, statusTweet2.Site, previewData2.Site)
+	require.Equal(t, statusTweet2.Title, previewData2.Title)
+	require.Equal(t, statusTweet2.ThumbnailURL, "")
+
+	statusProfile := LinkPreviewData{
+		Site:  "Twitter",
+		Title: "Tweets by ethstatus",
+	}
+
+	previewData3, err := GetLinkPreviewData("https://twitter.com/ethstatus")
+	require.NoError(t, err)
+	require.Equal(t, statusProfile.Site, previewData3.Site)
+	require.Equal(t, statusProfile.Title, previewData3.Title)
+	require.Equal(t, statusProfile.ThumbnailURL, "")
+
+	_, err = GetLinkPreviewData("https://www.test.com/unknown")
+	require.Error(t, err)
+
+}
