@@ -165,7 +165,7 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	topic, err := V2TopicToV1Topic(recvMessage.Envelope.Message().ContentTopic)
+	topic, err := ExtractTopicFromContentTopic(recvMessage.Envelope.Message().ContentTopic)
 	if err != nil {
 		log.Trace(err.Error(), "topic", recvMessage.Envelope.Message().ContentTopic)
 		return

@@ -68,13 +68,13 @@ func (t *TopicType) UnmarshalText(input []byte) error {
 func (t TopicType) ContentTopic() string {
 	enc := make([]byte, len(t)*2)
 	hex.Encode(enc, t[:])
-	return "/waku/1/" + string(enc) + "/rlp"
+	return "/waku/2/" + string(enc) + "/proto"
 }
 
-func V2TopicToV1Topic(s string) (*TopicType, error) {
+func ExtractTopicFromContentTopic(s string) (*TopicType, error) {
 	p := strings.Split(s, "/")
 
-	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "rlp" {
+	if len(p) != 5 || p[1] != "waku" || p[2] != "2" || p[4] != "proto" {
 		return nil, errors.New("invalid content topic format")
 	}
 
