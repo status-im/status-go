@@ -3105,13 +3105,13 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	return m.persistence.MessageByChatID(chatID, cursor, limit)
 }
 
-func (m *Messenger) AllMessageByChatIdWhichMatchTerm(chatId string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
-	_, err := m.persistence.Chat(chatId)
+func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	_, err := m.persistence.Chat(chatID)
 	if err != nil {
 		return nil, err
 	}
 
-	return m.persistence.AllMessageByChatIdWhichMatchTerm(chatId, searchTerm, caseSensitive)
+	return m.persistence.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
 }
 
 func (m *Messenger) SaveMessages(messages []*common.Message) error {

@@ -588,11 +588,11 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
-// AllMessageByChatIdWhichMatchPattern returns all messages which match the search
-// term, for a given chatId in descending order.
+// AllMessageByChatIDWhichMatchPattern returns all messages which match the search
+// term, for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
-func (db sqlitePersistence) AllMessageByChatIdWhichMatchTerm(chatId string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
 	if searchTerm == "" {
 		return nil, fmt.Errorf("empty search term")
 	}
@@ -627,7 +627,7 @@ func (db sqlitePersistence) AllMessageByChatIdWhichMatchTerm(chatId string, sear
 				NOT(m1.hide) AND m1.local_chat_id = ? %s
 			ORDER BY cursor DESC
 		`, allFields, searchCond),
-		chatId, searchTerm,
+		chatID, searchTerm,
 	)
 
 	if err != nil {
@@ -636,7 +636,7 @@ func (db sqlitePersistence) AllMessageByChatIdWhichMatchTerm(chatId string, sear
 	defer rows.Close()
 
 	var (
-		result  []*common.Message
+		result []*common.Message
 	)
 	for rows.Next() {
 		var (
