@@ -1121,6 +1121,10 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 			}
 			// Set initial connection state
 			st.ConnectionChanged(b.connectionState)
+
+			messenger := st.Messenger()
+			// Init public status api
+			b.statusNode.StatusPublicService().Init(messenger)
 		}
 
 	}
