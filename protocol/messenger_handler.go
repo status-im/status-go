@@ -115,8 +115,13 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return errors.Wrap(err, "failed to get group creator")
 		}
 
+		profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
+		if err != nil {
+			return errors.Wrap(err, "failed to get profilePicturesVisibility setting")
+		}
+
 		if chat.Active && messageState.CurrentMessageState.Contact.ID != ourKey {
-			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact))
+			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility))
 		}
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)

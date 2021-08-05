@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -44,14 +45,14 @@ func (n NotificationBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, contacts *contactMap) (*localnotifications.Notification, error) {
+func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, contacts *contactMap, profilePicturesVisibility int) (*localnotifications.Notification, error) {
 	body := &NotificationBody{
 		Message: message,
 		Chat:    chat,
 		Contact: contact,
 	}
 
-	return body.toMessageNotification(id, contacts)
+	return body.toMessageNotification(id, contacts, profilePicturesVisibility)
 }
 
 func DeletedMessageNotification(id string, chat *Chat) *localnotifications.Notification {
@@ -74,16 +75,16 @@ func NewCommunityRequestToJoinNotification(id string, community *communities.Com
 	return body.toCommunityRequestToJoinNotification(id)
 }
 
-func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *Contact) *localnotifications.Notification {
+func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *Contact, profilePicturesVisibility int) *localnotifications.Notification {
 	body := &NotificationBody{
 		Chat:    chat,
 		Contact: contact,
 	}
 
-	return body.toPrivateGroupInviteNotification(id)
+	return body.toPrivateGroupInviteNotification(id, profilePicturesVisibility)
 }
 
-func (n NotificationBody) toMessageNotification(id string, contacts *contactMap) (*localnotifications.Notification, error) {
+func (n NotificationBody) toMessageNotification(id string, contacts *contactMap, profilePicturesVisibility int) (*localnotifications.Notification, error) {
 	var title string
 	if n.Chat.PrivateGroupChat() || n.Chat.Public() || n.Chat.CommunityChat() {
 		title = n.Chat.Name
@@ -123,7 +124,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap)
 		IsGroupConversation: true,
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.CanonicalName(),
-			Icon: n.Contact.CanonicalImage(),
+			Icon: n.Contact.CanonicalImage(accounts.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
 		Timestamp:      n.Message.WhisperTimestamp,
@@ -132,7 +133,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap)
 	}, nil
 }
 
-func (n NotificationBody) toPrivateGroupInviteNotification(id string) *localnotifications.Notification {
+func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePicturesVisibility int) *localnotifications.Notification {
 	return &localnotifications.Notification{
 		ID:       gethcommon.HexToHash(id),
 		Body:     n,
@@ -143,7 +144,7 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string) *localnoti
 		Deeplink: n.Chat.DeepLink(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.CanonicalName(),
-			Icon: n.Contact.CanonicalImage(),
+			Icon: n.Contact.CanonicalImage(accounts.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
 		Image: "",

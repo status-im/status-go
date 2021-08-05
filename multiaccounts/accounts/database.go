@@ -613,6 +613,15 @@ func (db *Database) GetNotificationsEnabled() (bool, error) {
 	return result, err
 }
 
+func (db *Database) GetProfilePicturesVisibility() (int, error) {
+	var result int
+	err := db.db.QueryRow("SELECT profile_pictures_visibility FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
 func (db *Database) CanUseMailservers() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT use_mailservers FROM settings WHERE synthetic_id = 'id'").Scan(&result)

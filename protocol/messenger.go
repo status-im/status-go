@@ -2564,7 +2564,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
 // []Response.Notifications if the message is m.New
-func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicKey, m *common.Message, responseTo *common.Message) error {
+func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicKey, m *common.Message, responseTo *common.Message, profilePicturesVisibility int) error {
 	if !m.New {
 		return nil
 	}
@@ -2586,7 +2586,7 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	}
 
 	if showMessageNotification(publicKey, m, chat, responseTo) {
-		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts)
+		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts, profilePicturesVisibility)
 		if err != nil {
 			return err
 		}
@@ -3275,13 +3275,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	if err != nil {
 		return nil, err
 	}
+
+	profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
 
 			if notificationsEnabled {
 				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo]); err != nil {
+				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
 					return nil, err
 				}
 			}
@@ -4202,8 +4208,14 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if err != nil {
 			return nil, err
 		}
+
+		profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
+		if err != nil {
+			return nil, err
+		}
+
 		if notificationsEnabled {
-			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts)
+			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts, profilePicturesVisibility)
 			if err != nil {
 				return nil, err
 			}

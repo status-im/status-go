@@ -6,9 +6,20 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
+
+// ContactDeviceInfo is a struct containing information about a particular device owned by a contact
+type ContactDeviceInfo struct {
+	// The installation id of the device
+	InstallationID string `json:"id"`
+	// Timestamp represents the last time we received this info
+	Timestamp int64 `json:"timestamp"`
+	// FCMToken is to be used for push notifications
+	FCMToken string `json:"fcmToken"`
+}
 
 func (c *Contact) CanonicalName() string {
 	if c.LocalNickname != "" {
@@ -22,7 +33,25 @@ func (c *Contact) CanonicalName() string {
 	return c.Alias
 }
 
-func (c *Contact) CanonicalImage() string {
+func (c *Contact) CanonicalImage(profilePicturesVisibility accounts.ProfilePicturesVisibilityType) string {
+	if profilePicturesVisibility == accounts.ProfilePicturesVisibilityNone || (profilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly && !c.Added) {
+		return c.Identicon
+	}
+
+	if largeImage, ok := c.Images[images.LargeDimName]; ok {
+		imageBase64, err := largeImage.GetDataURI()
+		if err == nil {
+			return imageBase64
+		}
+	}
+
+	if thumbImage, ok := c.Images[images.SmallDimName]; ok {
+		imageBase64, err := thumbImage.GetDataURI()
+		if err == nil {
+			return imageBase64
+		}
+	}
+
 	return c.Identicon
 }
 
