@@ -729,9 +729,22 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error {
+	_, err := m.requestCommunityInfoFromMailserver(communityID, true)
+	return err
+}
+
+// RequestCommunityInfoFromMailserverSync installs filter for community and requests its details
+// from mailserver. It will wait for a response and return it if any community is found
+func (m *Messenger) RequestCommunityInfoFromMailserverSync(communityID string) (*communities.Community, error) {
+	return m.requestCommunityInfoFromMailserver(communityID, false)
+}
+
+// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// from mailserver. When response received it will be passed through signals handler
+func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, async bool) (*communities.Community, error) {
 
 	if _, ok := m.requestedCommunities[communityID]; ok {
-		return nil
+		return nil, nil
 	}
 
 	//If filter wasn't installed we create it and remember for deinstalling after
@@ -740,10 +753,10 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error
 	if filter == nil {
 		filters, err := m.transport.InitPublicFilters([]string{communityID})
 		if err != nil {
-			return fmt.Errorf("Can't install filter for community: %v", err)
+			return nil, fmt.Errorf("Can't install filter for community: %v", err)
 		}
 		if len(filters) != 1 {
-			return fmt.Errorf("Unexpected amount of filters created")
+			return nil, fmt.Errorf("Unexpected amount of filters created")
 		}
 		filter = filters[0]
 		m.requestedCommunities[communityID] = filter
@@ -763,19 +776,44 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error
 		filter,
 		false)
 
-	//It is possible that we already processed last existing message for community
-	//and won't get any updates, so send stored info in this case after timeout
-	go func() {
-		time.Sleep(15 * time.Second)
-		m.mutex.Lock()
-		defer m.mutex.Unlock()
+	if err != nil {
+		return nil, err
+	}
 
-		if _, ok := m.requestedCommunities[communityID]; ok {
-			m.passStoredCommunityInfoToSignalHandler(communityID)
-		}
-	}()
+	if async {
+		//It is possible that we already processed last existing message for community
+		//and won't get any updates, so send stored info in this case after timeout
+		go func() {
+			time.Sleep(15 * time.Second)
+			m.mutex.Lock()
+			defer m.mutex.Unlock()
 
-	return err
+			if _, ok := m.requestedCommunities[communityID]; ok {
+				m.passStoredCommunityInfoToSignalHandler(communityID)
+			}
+		}()
+		return nil, nil
+	}
+	time.Sleep(15 * time.Second)
+
+	//send signal to client that message status updated
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, nil
+	}
+
+	//if there is no info helpful for client, we don't post it
+	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
+		return nil, nil
+	}
+
+	m.forgetCommunityRequest(communityID)
+
+	return community, nil
 }
 
 // forgetCommunityRequest removes community from requested ones and removes filter

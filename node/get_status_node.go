@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
@@ -89,6 +90,7 @@ type StatusNode struct {
 	rpcFiltersSrvc         *rpcfilters.Service
 	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
+	statusPublicSrvc       *status.Service
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service

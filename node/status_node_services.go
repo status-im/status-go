@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
@@ -60,6 +61,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = append(services, b.appmetricsService())
 	services = append(services, b.peerService())
 	services = append(services, b.personalService())
+	services = append(services, b.statusPublicService())
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
@@ -164,6 +166,17 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 
 	b.wakuV2ExtSrvc.SetP2PServer(b.gethNode.Server())
 	return b.wakuV2ExtSrvc, nil
+}
+
+func (b *StatusNode) statusPublicService() *status.Service {
+	if b.statusPublicSrvc == nil {
+		b.statusPublicSrvc = status.New()
+	}
+	return b.statusPublicSrvc
+}
+
+func (b *StatusNode) StatusPublicService() *status.Service {
+	return b.statusPublicSrvc
 }
 
 func (b *StatusNode) WakuService() *waku.Waku {

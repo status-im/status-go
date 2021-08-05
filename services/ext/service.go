@@ -482,3 +482,7 @@ func (s *Service) ConnectionChanged(state connection.State) {
 		s.messenger.ConnectionChanged(state)
 	}
 }
+
+func (s *Service) Messenger() *protocol.Messenger {
+	return s.messenger
+}

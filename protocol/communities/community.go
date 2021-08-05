@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -74,6 +75,73 @@ type CommunityCategory struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Position int    `json:"position"` // Position is used to sort the categories
+}
+
+func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
+	if o.config.MemberIdentity == nil {
+		return nil, errors.New("member identity not set")
+	}
+	communityItem := struct {
+		ID           types.HexBytes                  `json:"id"`
+		Verified     bool                            `json:"verified"`
+		Chats        map[string]CommunityChat        `json:"chats"`
+		Categories   map[string]CommunityCategory    `json:"categories"`
+		Name         string                          `json:"name"`
+		Description  string                          `json:"description"`
+		Images       map[string]images.IdentityImage `json:"images"`
+		Color        string                          `json:"color"`
+		MembersCount int                             `json:"membersCount"`
+		EnsName      string                          `json:"ensName"`
+		Link         string                          `json:"link"`
+	}{
+		ID:         o.ID(),
+		Verified:   o.config.Verified,
+		Chats:      make(map[string]CommunityChat),
+		Categories: make(map[string]CommunityCategory),
+	}
+	if o.config.CommunityDescription != nil {
+		for id, c := range o.config.CommunityDescription.Categories {
+			category := CommunityCategory{
+				ID:       id,
+				Name:     c.Name,
+				Position: int(c.Position),
+			}
+			communityItem.Categories[id] = category
+		}
+		for id, c := range o.config.CommunityDescription.Chats {
+			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
+			if err != nil {
+				return nil, err
+			}
+			chat := CommunityChat{
+				ID:          id,
+				Name:        c.Identity.DisplayName,
+				Description: c.Identity.Description,
+				Permissions: c.Permissions,
+				Members:     c.Members,
+				CanPost:     canPost,
+				CategoryID:  c.CategoryId,
+				Position:    int(c.Position),
+			}
+			communityItem.Chats[id] = chat
+		}
+		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
+		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
+		if o.config.CommunityDescription.Identity != nil {
+			communityItem.Name = o.Name()
+			communityItem.Color = o.config.CommunityDescription.Identity.Color
+			communityItem.Description = o.config.CommunityDescription.Identity.Description
+			for t, i := range o.config.CommunityDescription.Identity.Images {
+				if communityItem.Images == nil {
+					communityItem.Images = make(map[string]images.IdentityImage)
+				}
+				communityItem.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
+
+			}
+		}
+
+	}
+	return json.Marshal(communityItem)
 }
 
 func (o *Community) MarshalJSON() ([]byte, error) {
