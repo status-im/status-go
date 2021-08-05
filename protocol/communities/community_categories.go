@@ -151,6 +151,10 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 		return nil, ErrNotAdmin
 	}
 
+	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
+		return nil, ErrCategoryNotFound
+	}
+
 	if newPosition > 0 && newPosition >= len(o.config.CommunityDescription.Categories) {
 		newPosition = len(o.config.CommunityDescription.Categories) - 1
 	} else if newPosition < 0 {
@@ -200,8 +204,10 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 		return nil, ErrNotAdmin
 	}
 
-	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
-		return nil, ErrCategoryNotFound
+	if categoryID != "" {
+		if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
+			return nil, ErrCategoryNotFound
+		}
 	}
 
 	var chat *protobuf.CommunityChat
