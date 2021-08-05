@@ -33,6 +33,7 @@ type Config struct {
 	RequestedToJoinAt             uint64
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
+	SyncedAt                      uint64
 }
 
 type Community struct {

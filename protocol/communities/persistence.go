@@ -38,18 +38,7 @@ func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunit
 	// Keep the "*".
 	// When the test for this function fails because the table has changed we should update sync functionality
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
-
-	rcr := rawCommunityRow{}
-	syncedAt := sql.NullTime{}
-	err := qr.Scan(
-		&rcr.ID,
-		&rcr.PrivateKey,
-		&rcr.Description,
-		&rcr.Joined,
-		&rcr.Verified,
-		&syncedAt,
-		&rcr.Muted,
-	)
+	_, err := p.scanRowToStruct(qr.Scan)
 
 	switch err {
 	case sql.ErrNoRows:
@@ -83,9 +72,7 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 
 	for rows.Next() {
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
-		var joined bool
-		var verified bool
-		var muted bool
+		var joined, verified, muted bool
 		var requestedToJoinAt sql.NullInt64
 		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted, &requestedToJoinAt)
 		if err != nil {

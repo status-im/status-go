@@ -957,8 +957,6 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	messageState.Response.AddSyncedCommunity(&syncCommunity)
-
 	// associate private key with community if set
 	if syncCommunity.PrivateKey == nil {
 		logger.Debug("syncCommunity.PrivateKey is nil")

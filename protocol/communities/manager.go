@@ -905,3 +905,7 @@ func (m *Manager) SetSyncClock(id []byte, clock uint64) error {
 func (m *Manager) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
 	return m.persistence.SetPrivateKey(id, privKey)
 }
+
+func (m *Manager) GetSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
+	return m.persistence.getSyncedRawCommunity(id)
+}

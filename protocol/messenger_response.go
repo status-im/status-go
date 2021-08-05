@@ -3,11 +3,9 @@ package protocol
 import (
 	"encoding/json"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/protobuf"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -28,7 +26,6 @@ type MessengerResponse struct {
 	removedChats                map[string]bool
 	removedMessages             map[string]bool
 	communities                 map[string]*communities.Community
-	syncedCommunities           map[string]*protobuf.SyncCommunity
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
@@ -195,31 +192,6 @@ func (r *MessengerResponse) AddCommunity(c *communities.Community) {
 	}
 
 	r.communities[c.IDString()] = c
-}
-
-func (r *MessengerResponse) AddSyncedCommunity(sc *protobuf.SyncCommunity) {
-	if r.syncedCommunities == nil {
-		r.syncedCommunities = make(map[string]*protobuf.SyncCommunity)
-	}
-	r.syncedCommunities[types.HexBytes(sc.Id).String()] = sc
-}
-
-func (r *MessengerResponse) GetSyncedCommunity(communityIDString string) (*protobuf.SyncCommunity, bool) {
-	if r.syncedCommunities == nil {
-		return nil, false
-	}
-
-	c, ok := r.syncedCommunities[communityIDString]
-	return c, ok
-}
-
-func (r *MessengerResponse) GetSyncedCommunities() []*protobuf.SyncCommunity {
-	var cs []*protobuf.SyncCommunity
-	for _, c := range r.syncedCommunities {
-		cs = append(cs, c)
-	}
-
-	return cs
 }
 
 func (r *MessengerResponse) AddChat(c *Chat) {

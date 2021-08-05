@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -1131,17 +1132,18 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err := alicesOtherDevice.RetrieveAll()
+		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		if len(response.syncedCommunities) > 0 {
-			return nil
+		// Do we have a new synced community?
+		_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunity.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
 		}
 
-		return errors.New("not received any communities")
+		return nil
 	})
 	s.NoError(err)
 
@@ -1247,7 +1249,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 			return err
 		}
 		if len(response.Communities()) == 0 {
-			return errors.New("message not received")
+			return errors.New("no communities received from 1-1")
 		}
 		return nil
 	})
@@ -1310,9 +1312,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 			return err
 		}
 
-		// Do we have a new community?
-		if len(response.syncedCommunities) == 0 {
-			return errors.New("community with sync not received")
+		// Do we have a new synced community?
+		_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(community.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
 		}
 
 		// Do we have a new pending request to join for the new community
@@ -1485,7 +1488,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 			return err
 		}
 		if len(response.Communities()) == 0 {
-			return errors.New("no synced communities received")
+			return errors.New("no communities received from 1-1")
 		}
 		return nil
 	})
@@ -1518,9 +1521,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 			return err
 		}
 
-		// Do we have a new community?
-		if len(response.syncedCommunities) == 0 {
-			return errors.New("community with sync not received")
+		// Do we have a new synced community?
+		_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(community.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
 		}
 
 		return nil

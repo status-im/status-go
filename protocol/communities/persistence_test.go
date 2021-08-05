@@ -2,6 +2,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"database/sql"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -213,4 +214,44 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 	com.config.MarshaledCommunityDescription = md
 
 	return com
+}
+
+func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
+	sc := &protobuf.SyncCommunity{
+		Id:          []byte("0x123456"),
+		PrivateKey:  []byte("0xfedcba"),
+		Description: []byte("this is a description"),
+		Joined:      true,
+		Verified:    true,
+	}
+
+	// add a new community to the db
+	err := s.db.saveRawCommunityRowWithoutSyncedAt(fromSyncCommunityProtobuf(sc))
+	s.NoError(err, "saveRawCommunityRow")
+
+	// retrieve row from db synced_at must be zero
+	rcr, err := s.db.getRawCommunityRow(sc.Id)
+	s.NoError(err, "getRawCommunityRow")
+	s.Zero(rcr.SyncedAt, "synced_at must be zero value")
+
+	// retrieve synced row from db, should fail
+	src, err := s.db.getSyncedRawCommunity(sc.Id)
+	s.EqualError(err, sql.ErrNoRows.Error())
+	s.Nil(src)
+
+	// Set the synced_at value
+	clock := uint64(time.Now().Unix())
+	err = s.db.SetSyncClock(sc.Id, clock)
+	s.NoError(err, "SetSyncClock")
+
+	// retrieve row from db synced_at must not be zero
+	rcr, err = s.db.getRawCommunityRow(sc.Id)
+	s.NoError(err, "getRawCommunityRow")
+	s.NotZero(rcr.SyncedAt, "synced_at must be zero value")
+
+	// retrieve synced row from db, should succeed
+	src, err = s.db.getSyncedRawCommunity(sc.Id)
+	s.NoError(err)
+	s.NotNil(src)
+	s.Equal(clock, src.SyncedAt)
 }

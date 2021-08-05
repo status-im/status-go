@@ -38,8 +38,8 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Description,
 		&rcr.Joined,
 		&rcr.Verified,
-		&syncedAt,
 		&rcr.Muted,
+		&syncedAt,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
@@ -87,6 +87,12 @@ func (p *Persistence) getRawCommunityRow(id []byte) (*rawCommunityRow, error) {
 	return p.scanRowToStruct(qr.Scan)
 }
 
+func (p *Persistence) getSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
+	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
+	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > 0`, id)
+	return p.scanRowToStruct(qr.Scan)
+}
+
 func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 	_, err := p.db.Exec(
 		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "synced_at", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -96,6 +102,19 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 		rawCommRow.Joined,
 		rawCommRow.Verified,
 		rawCommRow.SyncedAt,
+		rawCommRow.Muted,
+	)
+	return err
+}
+
+func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow rawCommunityRow) error {
+	_, err := p.db.Exec(
+		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?)`,
+		rawCommRow.ID,
+		rawCommRow.PrivateKey,
+		rawCommRow.Description,
+		rawCommRow.Joined,
+		rawCommRow.Verified,
 		rawCommRow.Muted,
 	)
 	return err
