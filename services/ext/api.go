@@ -490,8 +490,19 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
-func (api *PublicAPI) AllChatMessagesWhichMatchTerm(chatID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
+func (api *PublicAPI) AllMessagesFromChatWhichMatchTerm(chatID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
 	messages, err := api.service.messenger.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationMessagesResponse{
+		Messages: messages,
+	}, nil
+}
+
+func (api *PublicAPI) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
+	messages, err := api.service.messenger.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
 	if err != nil {
 		return nil, err
 	}
