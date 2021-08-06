@@ -123,6 +123,8 @@ WHERE c.Joined OR r.state = ?`
 	}()
 
 	for rows.Next() {
+		var comm *Community
+
 		// Community specific fields
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
 		var joined, verified, muted bool
@@ -132,14 +134,14 @@ WHERE c.Joined OR r.state = ?`
 		var rtjPublicKey, rtjENSName, rtjChatID sql.NullString
 		var rtjClock, rtjState sql.NullInt64
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted,
 			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState)
 		if err != nil {
 			return nil, err
 		}
 
-		comm, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(rtjClock.Int64), p.logger)
+		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(rtjClock.Int64), p.logger)
 		if err != nil {
 			return nil, err
 		}

@@ -216,7 +216,6 @@ func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
 	logger := m.logger.Named("RequestToJoinCommunity")
-	logger.Debug("fired")
 	if err := request.Validate(); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
