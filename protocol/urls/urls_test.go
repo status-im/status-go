@@ -97,28 +97,27 @@ func TestGetGiphyShortURLPreviewData(t *testing.T) {
 	require.Equal(t, bostonDynamicsEthGifData.Title, previewData.Title)
 }
 
-// func TestGetTenorPreviewData(t *testing.T) {
-// 	validTenorLink := "https://tenor.com/view/robot-dance-do-you-love-me-boston-boston-dynamics-dance-gif-19998728"
-// 	previewData, err := GetTenorPreviewData(validTenorLink)
+func TestGetTenorPreviewData(t *testing.T) {
+	validTenorLink := "https://tenor.com/view/robot-lol-slip-banana-peels-gif-5665377"
+	previewData, err := GetTenorPreviewData(validTenorLink)
 
-// 	gifData := LinkPreviewData{
-// 		Site:         "Tenor",
-// 		Title:        "Annihere",
-// 		ThumbnailURL: "https://media.tenor.com/images/975f6b95d188c277ebba62d9b5511685/tenor.gif",
-// 		Height:       400,
-// 		Width:        600,
-// 	}
-// 	require.NoError(t, err)
-// 	require.Equal(t, gifData.Site, previewData.Site)
-// 	require.Equal(t, gifData.Title, previewData.Title)
-// 	require.Equal(t, gifData.ThumbnailURL, previewData.ThumbnailURL)
-// 	require.Equal(t, gifData.Height, previewData.Height)
-// 	require.Equal(t, gifData.Width, previewData.Width)
+	gifData := LinkPreviewData{
+		Site:         "Tenor",
+		Title:        "robot",
+		ThumbnailURL: "https://media.tenor.com/images/fba19655163e2796d19eeeb3ae7318a0/raw",
+		Height:       400,
+		Width:        600,
+	}
+	require.NoError(t, err)
+	require.Equal(t, gifData.Site, previewData.Site)
+	require.Equal(t, gifData.Title, previewData.Title)
+	require.Equal(t, gifData.Height, previewData.Height)
+	require.Equal(t, gifData.Width, previewData.Width)
 
-// 	invalidTenorLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
-// 	_, err = GetTenorPreviewData(invalidTenorLink)
-// 	require.Error(t, err)
-// }
+	invalidTenorLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
+	_, err = GetTenorPreviewData(invalidTenorLink)
+	require.Error(t, err)
+}
 
 func TestStatusLinkPreviewData(t *testing.T) {
 

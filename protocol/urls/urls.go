@@ -37,6 +37,7 @@ type TenorOembedData struct {
 	ProviderName string `json:"provider_name"`
 	ThumbnailURL string `json:"thumbnail_url"`
 	AuthorName   string `json:"author_name"`
+	Title        string `json:"title"`
 	Height       int    `json:"height"`
 	Width        int    `json:"width"`
 }
@@ -87,11 +88,11 @@ func LinkPreviewWhitelist() []Site {
 			Address:   "twitter.com",
 			ImageSite: false,
 		},
-		// Site{
-		// 	Title:     "Tenor GIFs",
-		// 	Address:   "tenor.com",
-		// 	ImageSite: true,
-		// },
+		Site{
+			Title:     "Tenor GIFs",
+			Address:   "tenor.com",
+			ImageSite: true,
+		},
 		Site{
 			Title:     "GIPHY GIFs shortener",
 			Address:   "gph.is",
@@ -301,7 +302,10 @@ func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return previewData, err
 	}
 
-	previewData.Title = oembedData.AuthorName // Tenor Oembed service doesn't return title of the Gif
+	previewData.Title = oembedData.Title
+	if len(previewData.Title) == 0 {
+		previewData.Title = oembedData.AuthorName
+	}
 	previewData.Site = oembedData.ProviderName
 	previewData.ThumbnailURL = oembedData.ThumbnailURL
 	previewData.Height = oembedData.Height
