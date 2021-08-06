@@ -29,8 +29,28 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 		return err
 	}
 
-	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?,?,?)`, id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Verified)
+	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, verified) VALUES (?, ?, ?, ?, ?)`, id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Verified)
 	return err
+}
+
+func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+	// TODO see if there is a way to make this more elegant
+	// Keep the "*".
+	// When the test for this function fails because the table has changed we should update sync functionality
+	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
+	_, err := p.scanRowToStruct(qr.Scan)
+
+	switch err {
+	case sql.ErrNoRows:
+		// Query does not match, therefore synced_at value is not older than the new clock value or id was not found
+		return true, nil
+	case nil:
+		// Error is nil, therefore query matched and synced_at is older than the new clock
+		return false, nil
+	default:
+		// Error is not nil and is not sql.ErrNoRows, therefore pass out the error
+		return false, err
+	}
 }
 
 func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query string) (response []*Community, err error) {
@@ -52,9 +72,7 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 
 	for rows.Next() {
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
-		var joined bool
-		var verified bool
-		var muted bool
+		var joined, verified, muted bool
 		var requestedToJoinAt sql.NullInt64
 		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted, &requestedToJoinAt)
 		if err != nil {
@@ -79,6 +97,63 @@ func (p *Persistence) AllCommunities(memberIdentity *ecdsa.PublicKey) ([]*Commun
 func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
 	query := communitiesBaseQuery + ` WHERE c.joined`
 	return p.queryCommunities(memberIdentity, query)
+}
+
+func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
+	query := `SELECT
+c.id, c.private_key, c.description, c.joined, c.verified, c.muted,
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state
+FROM communities_communities c
+LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
+WHERE c.Joined OR r.state = ?`
+
+	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			// Don't shadow original error
+			_ = rows.Close()
+			return
+
+		}
+		err = rows.Close()
+	}()
+
+	for rows.Next() {
+		var comm *Community
+
+		// Community specific fields
+		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
+		var joined, verified, muted bool
+
+		// Request to join specific fields
+		var rtjID, rtjCommunityID []byte
+		var rtjPublicKey, rtjENSName, rtjChatID sql.NullString
+		var rtjClock, rtjState sql.NullInt64
+
+		err = rows.Scan(
+			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &verified, &muted,
+			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState)
+		if err != nil {
+			return nil, err
+		}
+
+		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, verified, muted, uint64(rtjClock.Int64), p.logger)
+		if err != nil {
+			return nil, err
+		}
+
+		rtj := unmarshalRequestToJoinFromDB(rtjID, rtjCommunityID, rtjPublicKey, rtjENSName, rtjChatID, rtjClock, rtjState)
+		if !rtj.Empty() {
+			comm.AddRequestToJoin(rtj)
+		}
+		comms = append(comms, comm)
+	}
+
+	return comms, nil
 }
 
 func (p *Persistence) CreatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
@@ -147,6 +222,18 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		Joined:                        joined,
 	}
 	return New(config)
+}
+
+func unmarshalRequestToJoinFromDB(ID, communityID []byte, publicKey, ensName, chatID sql.NullString, clock, state sql.NullInt64) *RequestToJoin {
+	return &RequestToJoin{
+		ID:          ID,
+		PublicKey:   publicKey.String,
+		Clock:       uint64(clock.Int64),
+		ENSName:     ensName.String,
+		ChatID:      chatID.String,
+		CommunityID: communityID,
+		State:       RequestToJoinState(state.Int64),
+	}
 }
 
 func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
@@ -227,7 +314,7 @@ func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestTo
 	return requests, nil
 }
 
-func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state uint) error {
+func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
 	return err
 }
@@ -245,4 +332,14 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 	}
 
 	return request, nil
+}
+
+func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET synced_at = ? WHERE id = ? AND synced_at < ?`, clock, id, clock)
+	return err
+}
+
+func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET private_key = ? WHERE id = ?`, crypto.FromECDSA(privKey), id)
+	return err
 }

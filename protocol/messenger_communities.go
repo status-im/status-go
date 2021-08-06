@@ -132,15 +132,29 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+	mr, err := m.joinCommunity(ctx, communityID)
+	if err != nil {
+		return nil, err
+	}
 
-	return m.joinCommunity(ctx, communityID)
+	if com, ok := mr.communities[communityID.String()]; ok {
+		err = m.syncCommunity(context.Background(), com)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return mr, nil
 }
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+	logger := m.logger.Named("joinCommunity")
+
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.JoinCommunity(communityID)
 	if err != nil {
+		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
 		return nil, err
 	}
 
@@ -156,17 +170,20 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	// Load transport filters
 	filters, err := m.transport.InitPublicFilters(chatIDs)
 	if err != nil {
+		logger.Debug("m.transport.InitPublicFilters error", zap.Error(err))
 		return nil, err
 	}
 
 	willSync, err := m.scheduleSyncFilters(filters)
 	if err != nil {
+		logger.Debug("m.scheduleSyncFilters error", zap.Error(err))
 		return nil, err
 	}
 
 	if !willSync {
 		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
 		if err != nil {
+			logger.Debug("m.settings.GetDefaultSyncPeriod error", zap.Error(err))
 			return nil, err
 		}
 
@@ -180,11 +197,13 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	response.AddCommunity(community)
 
 	if err = m.saveChats(chats); err != nil {
+		logger.Debug("m.saveChats error", zap.Error(err))
 		return nil, err
 	}
 
 	err = m.sendCurrentUserStatusToCommunity(ctx, community)
 	if err != nil {
+		logger.Debug("m.sendCurrentUserStatusToCommunity error", zap.Error(err))
 		return nil, err
 	}
 
@@ -196,11 +215,17 @@ func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
 }
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
+	logger := m.logger.Named("RequestToJoinCommunity")
 	if err := request.Validate(); err != nil {
+		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
 	}
 
 	community, requestToJoin, err := m.communitiesManager.RequestToJoin(&m.identity.PublicKey, request)
+	if err != nil {
+		return nil, err
+	}
+	err = m.syncCommunity(context.Background(), community)
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +381,19 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+	mr, err := m.leaveCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
 
-	return m.leaveCommunity(communityID)
+	if com, ok := mr.communities[communityID.String()]; ok {
+		err = m.syncCommunity(context.Background(), com)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return mr, nil
 }
 
 func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
@@ -500,6 +536,10 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	err = m.syncCommunity(context.Background(), community)
+	if err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }
@@ -758,7 +798,7 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 	}
 
 	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.Description() == "" && community.MembersCount() == 0 {
+	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
 		return
 	}
 
@@ -819,6 +859,118 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 	}
 	_, err = m.scheduleSyncFilters(filters)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
+	logger := m.logger.Named("handleSyncCommunity")
+
+	// Should handle community
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&syncCommunity)
+	if err != nil {
+		logger.Debug("m.communitiesManager.ShouldHandleSyncCommunity error", zap.Error(err))
+		return err
+	}
+	logger.Debug("ShouldHandleSyncCommunity result", zap.Bool("shouldHandle", shouldHandle))
+	if !shouldHandle {
+		return nil
+	}
+
+	// Handle any community requests to join.
+	// MUST BE HANDLED BEFORE DESCRIPTION!
+	pending := false
+	for _, rtj := range syncCommunity.RequestsToJoin {
+		req := new(communities.RequestToJoin)
+		req.InitFromSyncProtobuf(rtj)
+
+		if req.State == communities.RequestToJoinStatePending {
+			pending = true
+		}
+
+		err = m.communitiesManager.SaveRequestToJoin(req)
+		if err != nil {
+			logger.Debug("m.communitiesManager.SaveRequestToJoin error", zap.Error(err))
+			return err
+		}
+	}
+	logger.Debug("community requests to join pending state", zap.Bool("pending", pending))
+
+	// Don't use the public key of the private key, uncompress the community id
+	orgPubKey, err := crypto.DecompressPubkey(syncCommunity.Id)
+	if err != nil {
+		logger.Debug("crypto.DecompressPubkey error", zap.Error(err))
+		return err
+	}
+	logger.Debug("crypto.DecompressPubkey result", zap.Any("orgPubKey", orgPubKey))
+
+	var amm protobuf.ApplicationMetadataMessage
+	err = proto.Unmarshal(syncCommunity.Description, &amm)
+	if err != nil {
+		logger.Debug("proto.Unmarshal protobuf.ApplicationMetadataMessage error", zap.Error(err))
+		return err
+	}
+
+	var cd protobuf.CommunityDescription
+	err = proto.Unmarshal(amm.Payload, &cd)
+	if err != nil {
+		logger.Debug("proto.Unmarshal protobuf.CommunityDescription error", zap.Error(err))
+		return err
+	}
+
+	err = m.handleCommunityDescription(messageState, orgPubKey, cd, syncCommunity.Description)
+	if err != nil {
+		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
+		return err
+	}
+
+	// if we are not waiting for approval, join or leave the community
+	if !pending {
+		var mr *MessengerResponse
+		if syncCommunity.Joined {
+			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
+			if err != nil {
+				logger.Debug("m.joinCommunity error", zap.Error(err))
+				return err
+			}
+		} else {
+			mr, err = m.leaveCommunity(syncCommunity.Id)
+			if err != nil {
+				logger.Debug("m.leaveCommunity error", zap.Error(err))
+				return err
+			}
+		}
+		err = messageState.Response.Merge(mr)
+		if err != nil {
+			logger.Debug("messageState.Response.Merge error", zap.Error(err))
+			return err
+		}
+	}
+
+	// update the clock value
+	err = m.communitiesManager.SetSyncClock(syncCommunity.Id, syncCommunity.Clock)
+	if err != nil {
+		logger.Debug("m.communitiesManager.SetSyncClock", zap.Error(err))
+		return err
+	}
+
+	// associate private key with community if set
+	if syncCommunity.PrivateKey == nil {
+		logger.Debug("syncCommunity.PrivateKey is nil")
+		return nil
+	}
+	logger.Debug("syncCommunity.PrivateKey is not nil")
+
+	orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
+	if err != nil {
+		logger.Debug("crypto.ToECDSA", zap.Error(err))
+		return err
+	}
+	err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
+	if err != nil {
+		logger.Debug("m.communitiesManager.SetPrivateKey", zap.Error(err))
 		return err
 	}
 
