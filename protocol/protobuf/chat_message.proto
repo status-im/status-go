@@ -23,6 +23,7 @@ message AudioMessage {
     UNKNOWN_AUDIO_TYPE = 0;
     AAC = 1;
     AMR = 2;
+    OGG = 3; // opus codec
   }
 }
 

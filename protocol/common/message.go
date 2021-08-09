@@ -255,6 +255,8 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		ChatID          string                           `json:"chatId"`
 		Sticker         *protobuf.StickerMessage         `json:"sticker"`
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
+		AudioBase64     string                           `json:"audioBase64"`
+		AudioType       protobuf.AudioMessage_AudioType  `json:"audioType"`
 		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
 	}{
@@ -267,8 +269,13 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		m.Payload = &protobuf.ChatMessage_Sticker{Sticker: aux.Sticker}
 	}
 	if aux.ContentType == protobuf.ChatMessage_AUDIO {
+		payload, _ := base64.StdEncoding.DecodeString(aux.AudioBase64)
 		m.Payload = &protobuf.ChatMessage_Audio{
-			Audio: &protobuf.AudioMessage{DurationMs: aux.AudioDurationMs},
+			Audio: &protobuf.AudioMessage{
+				DurationMs: aux.AudioDurationMs,
+				Type:       aux.AudioType,
+				Payload:    payload,
+			},
 		}
 	}
 	m.ResponseTo = aux.ResponseTo
@@ -483,6 +490,8 @@ func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
 		return "aac", nil
 	case protobuf.AudioMessage_AMR:
 		return "amr", nil
+	case protobuf.AudioMessage_OGG:
+		return "ogg", nil
 	}
 
 	return "", errors.New("audio format not supported")

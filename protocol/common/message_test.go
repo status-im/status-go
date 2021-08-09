@@ -65,6 +65,11 @@ func TestGetAudioMessageMIME(t *testing.T) {
 	mime, err = getAudioMessageMIME(amr)
 	require.NoError(t, err)
 	require.Equal(t, "amr", mime)
+
+	ogg := &protobuf.AudioMessage{Type: protobuf.AudioMessage_OGG}
+	mime, err = getAudioMessageMIME(ogg)
+	require.NoError(t, err)
+	require.Equal(t, "ogg", mime)
 }
 
 func TestPrepareContentMentions(t *testing.T) {
