@@ -155,7 +155,9 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	}
 
 	gasPrice := (*big.Int)(args.GasPrice)
-	if args.GasPrice == nil {
+	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
+	gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
+	if args.GasPrice == nil && args.MaxFeePerGas == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = t.gasCalculator.SuggestGasPrice(ctx)
@@ -180,13 +182,24 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 			gethTo = common.Address(*args.To)
 			gethToPtr = &gethTo
 		}
-		gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
-			From:     common.Address(args.From),
-			To:       gethToPtr,
-			GasPrice: gasPrice,
-			Value:    value,
-			Data:     args.GetInput(),
-		})
+		if args.GasPrice == nil {
+			gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
+				From:      common.Address(args.From),
+				To:        gethToPtr,
+				GasFeeCap: gasFeeCap,
+				GasTipCap: gasTipCap,
+				Value:     value,
+				Data:      args.GetInput(),
+			})
+		} else {
+			gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
+				From:     common.Address(args.From),
+				To:       gethToPtr,
+				GasPrice: gasPrice,
+				Value:    value,
+				Data:     args.GetInput(),
+			})
+		}
 		if err != nil {
 			return validatedArgs, hash, err
 		}
@@ -201,7 +214,12 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	newNonce := hexutil.Uint64(nonce)
 	newGas := hexutil.Uint64(gas)
 	validatedArgs.Nonce = &newNonce
-	validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
+	if args.GasPrice != nil {
+		validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
+	} else {
+		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasTipCap)
+		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasFeeCap)
+	}
 	validatedArgs.Gas = &newGas
 
 	tx := t.buildTransaction(validatedArgs)
