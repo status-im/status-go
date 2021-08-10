@@ -465,6 +465,9 @@ func (m *Message) GetSimplifiedText(identity string, canonicalNames map[string]s
 	if m.ContentType == protobuf.ChatMessage_COMMUNITY {
 		return "Community", nil
 	}
+	if m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP {
+		return "Group", nil
+	}
 
 	if m.ParsedTextAst == nil {
 		err := m.PrepareContent(identity)
