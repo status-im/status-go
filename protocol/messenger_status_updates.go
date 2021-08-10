@@ -119,19 +119,22 @@ func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 }
 
 func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, community *communities.Community) error {
+	logger := m.logger.Named("sendCurrentUserStatusToCommunity")
+
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
+		logger.Debug("m.settings.ShouldBroadcastUserStatus error", zap.Error(err))
 		return err
 	}
 
 	if !shouldBroadcastUserStatus {
-		m.logger.Debug("user status should not be broadcasted")
+		logger.Debug("user status should not be broadcasted")
 		return nil
 	}
 
 	status, err := m.GetCurrentUserStatus()
 	if err != nil {
-		m.logger.Debug("Error obtaining latest status", zap.Error(err))
+		logger.Debug("Error obtaining latest status", zap.Error(err))
 		return err
 	}
 
@@ -139,6 +142,9 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	err = m.settings.SaveSetting("current-user-status", status)
 	if err != nil {
+		logger.Debug("m.settings.SaveSetting error",
+			zap.Any("current-user-status", status),
+			zap.Error(err))
 		return err
 	}
 
@@ -150,6 +156,9 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	encodedMessage, err := proto.Marshal(statusUpdate)
 	if err != nil {
+		logger.Debug("proto.Marshal error",
+			zap.Any("protobuf.StatusUpdate", statusUpdate),
+			zap.Error(err))
 		return err
 	}
 
@@ -162,6 +171,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 	if err != nil {
+		logger.Debug("m.sender.SendPublic error", zap.Error(err))
 		return err
 	}
 

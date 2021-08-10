@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -17,7 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
-
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 

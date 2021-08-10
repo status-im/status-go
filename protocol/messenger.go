@@ -1791,6 +1791,8 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 }
 
 func (m *Messenger) hasPairedDevices() bool {
+	logger := m.logger.Named("hasPairedDevices")
+
 	var count int
 	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		if installation.Enabled {
@@ -1798,6 +1800,9 @@ func (m *Messenger) hasPairedDevices() bool {
 		}
 		return true
 	})
+	logger.Debug("installations info",
+		zap.Int("Number of installations", m.allInstallations.Len()),
+		zap.Int("Number of enabled installations", count))
 	return count > 1
 }
 
@@ -2139,7 +2144,33 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return true
 	})
 
+	cs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
+	if err != nil {
+		return err
+	}
+	for _, c := range cs {
+		if err = m.syncCommunity(ctx, c); err != nil {
+			return err
+		}
+	}
+
 	return err
+}
+
+func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
+	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
+
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	m.allChats.Store(chat.ID, chat)
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	return clock, chat
 }
 
 // SendPairInstallation sends a pair installation message
@@ -2156,17 +2187,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 		return nil, errors.New("no installation metadata")
 	}
 
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	pairMessage := &protobuf.PairInstallation{
 		Clock:          clock,
@@ -2179,7 +2200,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 	}
 
 	_, err = m.dispatchPairInstallationMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION,
 		ResendAutomatically: true,
@@ -2204,17 +2225,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	if !m.hasPairedDevices() {
 		return nil
 	}
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncInstallationPublicChat{
 		Clock: clock,
@@ -2226,7 +2237,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
 		ResendAutomatically: true,
@@ -2245,17 +2256,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncInstallationContact{
 		Clock:         clock,
@@ -2269,7 +2270,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT,
 		ResendAutomatically: true,
@@ -2277,6 +2278,41 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	if err != nil {
 		return err
 	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community) error {
+	logger := m.logger.Named("syncCommunity")
+	if !m.hasPairedDevices() {
+		logger.Debug("device has no paired devices")
+		return nil
+	}
+	logger.Debug("device has paired device(s)")
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage, err := community.ToSyncCommunityProtobuf(clock)
+	if err != nil {
+		return err
+	}
+
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+	logger.Debug("message dispatched")
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
@@ -2647,6 +2683,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 								logger.Warn("could not re-register for push notifications", zap.Error(err))
 								continue
 							}
+						}
+
+					case protobuf.SyncCommunity:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						community := msg.ParsedMessage.Interface().(protobuf.SyncCommunity)
+						logger.Debug("Handling SyncCommunity", zap.Any("message", community))
+
+						err = m.handleSyncCommunity(messageState, community)
+						if err != nil {
+							logger.Warn("failed to handle SyncCommunity", zap.Error(err))
+							allMessagesProcessed = false
+							continue
 						}
 
 					case protobuf.RequestAddressForTransaction:

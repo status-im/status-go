@@ -131,6 +131,10 @@ func (m *Manager) Joined() ([]*Community, error) {
 	return m.persistence.JoinedCommunities(m.identity)
 }
 
+func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
+	return m.persistence.JoinedAndPendingCommunitiesWithRequests(m.identity)
+}
+
 func (m *Manager) Created() ([]*Community, error) {
 	return m.persistence.CreatedCommunities(m.identity)
 }
@@ -861,8 +865,13 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 		return nil, nil, err
 	}
 	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
+	community.AddRequestToJoin(requestToJoin)
 
 	return community, requestToJoin, nil
+}
+
+func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
+	return m.persistence.SaveRequestToJoin(request)
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
@@ -883,4 +892,20 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 		return false, nil
 	}
 	return community.CanPost(pk, chatID, grant)
+}
+
+func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+	return m.persistence.ShouldHandleSyncCommunity(community)
+}
+
+func (m *Manager) SetSyncClock(id []byte, clock uint64) error {
+	return m.persistence.SetSyncClock(id, clock)
+}
+
+func (m *Manager) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
+	return m.persistence.SetPrivateKey(id, privKey)
+}
+
+func (m *Manager) GetSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
+	return m.persistence.getSyncedRawCommunity(id)
 }
