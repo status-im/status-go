@@ -4,6 +4,7 @@ import "errors"
 
 var ErrChatNotFound = errors.New("chat not found")
 var ErrCategoryNotFound = errors.New("category not found")
+var ErrNoChangeInPosition = errors.New("no change in category position")
 var ErrChatAlreadyAssigned = errors.New("chat already assigned to a category")
 var ErrOrgNotFound = errors.New("community not found")
 var ErrChatAlreadyExists = errors.New("chat already exists")

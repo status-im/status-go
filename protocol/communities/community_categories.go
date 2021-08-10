@@ -161,19 +161,51 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 		newPosition = 0
 	}
 
-	o.config.CommunityDescription.Categories[categoryID].Position = int32(newPosition)
+	category := o.config.CommunityDescription.Categories[categoryID]
+	if category.Position == int32(newPosition) {
+		return nil, ErrNoChangeInPosition
+	}
 
+	decrease := false
+	if category.Position > int32(newPosition) {
+		decrease = true
+	}
+
+	// Sorting the categories because maps are not guaranteed to keep order
 	s := make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
-	for catID, category := range o.config.CommunityDescription.Categories {
-
-		position := category.Position
-		if category.CategoryId != categoryID && position >= int32(newPosition) {
-			position = position + 1
-		}
-
+	for k, v := range o.config.CommunityDescription.Categories {
 		s = append(s, sorterHelperIdx{
-			pos:   position,
-			catID: catID,
+			pos:   v.Position,
+			catID: k,
+		})
+	}
+	sort.Sort(s)
+	var communityCategories []*protobuf.CommunityCategory
+	for _, currCat := range s {
+		communityCategories = append(communityCategories, o.config.CommunityDescription.Categories[currCat.catID])
+	}
+
+	var sortedCategoryIDs []string
+	for _, v := range communityCategories {
+		if v != category && ((decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition))) {
+			sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
+		}
+	}
+
+	sortedCategoryIDs = append(sortedCategoryIDs, categoryID)
+
+	for _, v := range communityCategories {
+		if v.CategoryId == categoryID || (decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition)) {
+			continue
+		}
+		sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
+	}
+
+	s = make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
+	for i, k := range sortedCategoryIDs {
+		s = append(s, sorterHelperIdx{
+			pos:   int32(i),
+			catID: k,
 		})
 	}
 
@@ -264,10 +296,19 @@ func (o *Community) SortCategoryChats(changes *CommunityChanges, categoryID stri
 }
 
 func (o *Community) insertAndSort(changes *CommunityChanges, categoryID string, chat *protobuf.CommunityChat, newPosition int) {
+	// We sort the chats here because maps are not guaranteed to keep order
 	var catChats []string
-	for k, c := range o.config.CommunityDescription.Chats {
-		if c.CategoryId == categoryID {
-			catChats = append(catChats, k)
+	sortedChats := make(sortSlice, 0, len(o.config.CommunityDescription.Chats))
+	for k, v := range o.config.CommunityDescription.Chats {
+		sortedChats = append(sortedChats, sorterHelperIdx{
+			pos:    v.Position,
+			chatID: k,
+		})
+	}
+	sort.Sort(sortedChats)
+	for _, k := range sortedChats {
+		if o.config.CommunityDescription.Chats[k.chatID].CategoryId == categoryID {
+			catChats = append(catChats, k.chatID)
 		}
 	}
 
@@ -277,28 +318,45 @@ func (o *Community) insertAndSort(changes *CommunityChanges, categoryID string, 
 		newPosition = 0
 	}
 
-	sortedChats := make(sortSlice, 0, len(catChats))
-	for _, k := range catChats {
-		position := chat.Position
-		if o.config.CommunityDescription.Chats[k] != chat && position >= int32(newPosition) {
-			position = position + 1
-		}
-
-		sortedChats = append(sortedChats, sorterHelperIdx{
-			pos:    position,
-			chatID: k,
-		})
+	if int32(newPosition) == chat.Position {
+		return
 	}
 
-	sort.Sort(sortedChats)
+	decrease := false
+	if chat.Position > int32(newPosition) {
+		decrease = true
+	}
 
-	for i, chatSortHelper := range sortedChats {
-		if o.config.CommunityDescription.Chats[chatSortHelper.chatID].Position != int32(i) {
-			o.config.CommunityDescription.Chats[chatSortHelper.chatID].Position = int32(i)
-			if changes.ChatsModified[chatSortHelper.chatID] != nil {
-				changes.ChatsModified[chatSortHelper.chatID].PositionModified = i
+	idx := -1
+	currChatID := ""
+	var sortedChatIDs []string
+	for i, k := range catChats {
+		if o.config.CommunityDescription.Chats[k] != chat && ((decrease && o.config.CommunityDescription.Chats[k].Position < int32(newPosition)) || (!decrease && o.config.CommunityDescription.Chats[k].Position <= int32(newPosition))) {
+			sortedChatIDs = append(sortedChatIDs, k)
+		} else {
+			if o.config.CommunityDescription.Chats[k] == chat {
+				idx = i
+				currChatID = k
+			}
+		}
+	}
+
+	sortedChatIDs = append(sortedChatIDs, currChatID)
+
+	for i, k := range catChats {
+		if i == idx || (decrease && o.config.CommunityDescription.Chats[k].Position < int32(newPosition)) || (!decrease && o.config.CommunityDescription.Chats[k].Position <= int32(newPosition)) {
+			continue
+		}
+		sortedChatIDs = append(sortedChatIDs, k)
+	}
+
+	for i, sortedChatID := range sortedChatIDs {
+		if o.config.CommunityDescription.Chats[sortedChatID].Position != int32(i) {
+			o.config.CommunityDescription.Chats[sortedChatID].Position = int32(i)
+			if changes.ChatsModified[sortedChatID] != nil {
+				changes.ChatsModified[sortedChatID].PositionModified = i
 			} else {
-				changes.ChatsModified[chatSortHelper.chatID] = &CommunityChatChanges{
+				changes.ChatsModified[sortedChatID] = &CommunityChatChanges{
 					MembersAdded:     make(map[string]*protobuf.CommunityMember),
 					MembersRemoved:   make(map[string]*protobuf.CommunityMember),
 					PositionModified: i,
