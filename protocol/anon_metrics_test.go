@@ -59,7 +59,7 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	config.MinimumAcceptedPoW = 0
 	shh := waku.New(&config, s.logger)
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start(nil))
+	s.Require().NoError(shh.Start())
 
 	// Generate private keys for Alice and Bob
 	s.aliceKey, err = crypto.GenerateKey()

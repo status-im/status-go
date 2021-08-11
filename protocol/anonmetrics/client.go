@@ -27,8 +27,8 @@ type Client struct {
 	Identity *ecdsa.PrivateKey
 	Logger   *zap.Logger
 
-	//messageProcessor is a message processor used to send metric batch messages
-	messageProcessor *common.MessageProcessor
+	//messageSender is a message processor used to send metric batch messages
+	messageSender *common.MessageSender
 
 	IntervalInc *FibonacciIntervalIncrementer
 
@@ -42,9 +42,9 @@ type Client struct {
 	DBLock sync.Mutex
 }
 
-func NewClient(processor *common.MessageProcessor) *Client {
+func NewClient(sender *common.MessageSender) *Client {
 	return &Client{
-		messageProcessor: processor,
+		messageSender: sender,
 		IntervalInc: &FibonacciIntervalIncrementer{
 			Last:    0,
 			Current: 1,
@@ -99,7 +99,7 @@ func (c *Client) sendUnprocessedMetrics() {
 		c.Logger.Debug("rawMessage prepared from unprocessed anonymous metrics", zap.Reflect("rawMessage", rawMessage))
 
 		// Send the metrics batch
-		_, err = c.messageProcessor.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
+		_, err = c.messageSender.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
 		if err != nil {
 			c.Logger.Error("failed to send metrics batch message", zap.Error(err))
 			return
@@ -182,7 +182,7 @@ func (c *Client) startDeleteLoop() {
 
 func (c *Client) Start() error {
 	c.Logger.Debug("Main Start() triggered")
-	if c.messageProcessor == nil {
+	if c.messageSender == nil {
 		return errors.New("can't start, missing message processor")
 	}
 

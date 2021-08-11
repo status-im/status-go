@@ -266,7 +266,7 @@ func NewMessenger(
 	// Initialise anon metrics client
 	var anonMetricsClient *anonmetrics.Client
 	if c.anonMetricsClientConfig != nil && c.anonMetricsClientConfig.ShouldSend {
-		anonMetricsClient = anonmetrics.NewClient(processor)
+		anonMetricsClient = anonmetrics.NewClient(sender)
 		anonMetricsClient.Config = c.anonMetricsClientConfig
 		anonMetricsClient.Identity = identity
 		anonMetricsClient.DB = appmetrics.NewDB(database)
