@@ -1,7 +1,7 @@
 // In order to run these tests, you must run a PostgreSQL database.
 //
 // Using Docker:
-//   docker run --name test-db -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
+//   docker run -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
 //
 
 package protocol
@@ -43,6 +43,7 @@ type MessengerAnonMetricsSuite struct {
 	logger *zap.Logger
 }
 
+// TODO reset anon metrics should create a new instance of the DB
 func (s *MessengerAnonMetricsSuite) resetAnonMetricsDB(db *sql.DB) error {
 	_, err := db.Exec("DELETE FROM app_metrics")
 	return err
@@ -126,12 +127,12 @@ func (s *MessengerAnonMetricsSuite) TestReceiveAnonMetric() {
 	s.Require().Len(bobMetrics, 5)
 
 	// Check the values of received and stored metrics against the broadcast metrics
-	for _, bobMetric := range bobMetrics {
-		s.Require().True(bobMetric.CreatedAt.Equal(amsdb.AppMetrics[0].CreatedAt), "created_at values are equal")
-		s.Require().Exactly(bobMetric.SessionID, amsdb.AppMetrics[0].SessionID, "session_id matched exactly")
-		s.Require().Exactly(bobMetric.Value, amsdb.AppMetrics[0].Value, "value matches exactly")
-		s.Require().Exactly(bobMetric.Event, amsdb.AppMetrics[0].Event, "event matches exactly")
-		s.Require().Exactly(bobMetric.OS, amsdb.AppMetrics[0].OS, "operating system matches exactly")
-		s.Require().Exactly(bobMetric.AppVersion, amsdb.AppMetrics[0].AppVersion, "app version matches exactly")
+	for i, bobMetric := range bobMetrics {
+		s.Require().True(bobMetric.CreatedAt.Equal(amsdb.AppMetrics[i].CreatedAt), "created_at values are equal")
+		s.Require().Exactly(bobMetric.SessionID, amsdb.AppMetrics[i].SessionID, "session_id matched exactly")
+		s.Require().Exactly(bobMetric.Value, amsdb.AppMetrics[i].Value, "value matches exactly")
+		s.Require().Exactly(bobMetric.Event, amsdb.AppMetrics[i].Event, "event matches exactly")
+		s.Require().Exactly(bobMetric.OS, amsdb.AppMetrics[i].OS, "operating system matches exactly")
+		s.Require().Exactly(bobMetric.AppVersion, amsdb.AppMetrics[i].AppVersion, "app version matches exactly")
 	}
 }
