@@ -77,6 +77,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
 
+	messageID := sendResponse.Messages()[0].ID
+
 	response, err := WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
@@ -91,8 +93,9 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
 
 	s.Require().NoError(err)
-	s.Require().Len(sendResponse.Messages(), 1)
-	s.Require().True(sendResponse.Messages()[0].Deleted)
+	s.Require().Len(sendResponse.Messages(), 0)
+	s.Require().Len(sendResponse.RemovedMessages(), 1)
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0])
 	s.Require().Len(sendResponse.Chats(), 1)
 	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
 
@@ -166,9 +169,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	s.Require().NoError(err)
 
 	// // Handle chat message
-	response = &MessengerResponse{}
 	state := &ReceivedMessageState{
-		Response: response,
+		Response: &MessengerResponse{},
 		CurrentMessageState: &CurrentMessageState{
 			Message:          inputMessage.ChatMessage,
 			MessageID:        messageID,
@@ -179,7 +181,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	}
 	err = s.m.HandleChatMessage(state)
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().True(response.Messages()[0].Deleted)
-
+	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
+	s.Require().Len(state.Response.RemovedMessages(), 0)
+	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }

@@ -701,12 +701,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
-	if err != nil {
-		return err
-	}
-
-	if receivedMessage.Deleted && chat.LastMessage != nil && chat.LastMessage.ID == receivedMessage.ID {
+	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
 		if err != nil {
@@ -715,10 +710,15 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		if messages != nil {
 			chat.LastMessage = messages[0]
 		}
+	} else {
+		err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
+		if err != nil {
+			return err
+		}
 	}
 
 	// If the chat is not active, create a notification in the center
-	if chat.OneToOne() && !chat.Active {
+	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active {
 		m.createMessageNotification(chat, state)
 	}
 
