@@ -26,6 +26,8 @@ func castToTransferView(t Transfer) TransferView {
 	view.BlockHash = t.BlockHash
 	view.Timestamp = hexutil.Uint64(t.Timestamp)
 	view.GasPrice = (*hexutil.Big)(t.Transaction.GasPrice())
+	view.MaxFeePerGas = (*hexutil.Big)(t.Transaction.GasFeeCap())
+	view.MaxPriorityFeePerGas = (*hexutil.Big)(t.Transaction.GasTipCap())
 	view.GasLimit = hexutil.Uint64(t.Transaction.Gas())
 	view.GasUsed = hexutil.Uint64(t.Receipt.GasUsed)
 	view.Nonce = hexutil.Uint64(t.Transaction.Nonce())
@@ -80,22 +82,24 @@ func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 // TransferView stores only fields used by a client and ensures that all relevant fields are
 // encoded in hex.
 type TransferView struct {
-	ID          common.Hash    `json:"id"`
-	Type        TransferType   `json:"type"`
-	Address     common.Address `json:"address"`
-	BlockNumber *hexutil.Big   `json:"blockNumber"`
-	BlockHash   common.Hash    `json:"blockhash"`
-	Timestamp   hexutil.Uint64 `json:"timestamp"`
-	GasPrice    *hexutil.Big   `json:"gasPrice"`
-	GasLimit    hexutil.Uint64 `json:"gasLimit"`
-	GasUsed     hexutil.Uint64 `json:"gasUsed"`
-	Nonce       hexutil.Uint64 `json:"nonce"`
-	TxStatus    hexutil.Uint64 `json:"txStatus"`
-	Input       hexutil.Bytes  `json:"input"`
-	TxHash      common.Hash    `json:"txHash"`
-	Value       *hexutil.Big   `json:"value"`
-	From        common.Address `json:"from"`
-	To          common.Address `json:"to"`
-	Contract    common.Address `json:"contract"`
-	NetworkID   uint64
+	ID                   common.Hash    `json:"id"`
+	Type                 TransferType   `json:"type"`
+	Address              common.Address `json:"address"`
+	BlockNumber          *hexutil.Big   `json:"blockNumber"`
+	BlockHash            common.Hash    `json:"blockhash"`
+	Timestamp            hexutil.Uint64 `json:"timestamp"`
+	GasPrice             *hexutil.Big   `json:"gasPrice"`
+	MaxFeePerGas         *hexutil.Big   `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *hexutil.Big   `json:"maxPriorityFeePerGas"`
+	GasLimit             hexutil.Uint64 `json:"gasLimit"`
+	GasUsed              hexutil.Uint64 `json:"gasUsed"`
+	Nonce                hexutil.Uint64 `json:"nonce"`
+	TxStatus             hexutil.Uint64 `json:"txStatus"`
+	Input                hexutil.Bytes  `json:"input"`
+	TxHash               common.Hash    `json:"txHash"`
+	Value                *hexutil.Big   `json:"value"`
+	From                 common.Address `json:"from"`
+	To                   common.Address `json:"to"`
+	Contract             common.Address `json:"contract"`
+	NetworkID            uint64
 }
