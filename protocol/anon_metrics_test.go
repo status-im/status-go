@@ -15,11 +15,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	appmetricsDB "github.com/status-im/status-go/appmetrics"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/anonmetrics"
+	"github.com/status-im/status-go/protocol/anonmetrics/migrations"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/waku"
@@ -43,10 +46,14 @@ type MessengerAnonMetricsSuite struct {
 	logger *zap.Logger
 }
 
-// TODO reset anon metrics should create a new instance of the DB
 func (s *MessengerAnonMetricsSuite) resetAnonMetricsDB(db *sql.DB) error {
-	_, err := db.Exec("DELETE FROM app_metrics")
-	return err
+	r := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+	m, err := anonmetrics.MakeMigration(db, r)
+	if err != nil {
+		return err
+	}
+
+	return m.Down()
 }
 
 func (s *MessengerAnonMetricsSuite) SetupTest() {
@@ -86,14 +93,14 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, s.logger, []Option{WithAnonMetricsServerConfig(amsc)})
 	s.Require().NoError(err)
 
-	err = s.resetAnonMetricsDB(s.bob.anonMetricsServer.PostgresDB)
-	s.Require().NoError(err)
-
 	_, err = s.bob.Start()
 	s.Require().NoError(err)
 }
 
 func (s *MessengerAnonMetricsSuite) TearDownTest() {
+	err := s.resetAnonMetricsDB(s.bob.anonMetricsServer.PostgresDB)
+	s.Require().NoError(err)
+
 	s.Require().NoError(s.alice.Shutdown())
 	s.Require().NoError(s.bob.Shutdown())
 	_ = s.logger.Sync()

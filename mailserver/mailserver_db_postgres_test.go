@@ -1,7 +1,7 @@
 // In order to run these tests, you must run a PostgreSQL database.
 //
 // Using Docker:
-//   docker run --name mailserver-db -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
+//   docker run -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
 //
 
 package mailserver

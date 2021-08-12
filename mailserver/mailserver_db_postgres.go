@@ -166,9 +166,7 @@ func (i *PostgresDB) BuildIterator(query CursorQuery) (Iterator, error) {
 func (i *PostgresDB) setup() error {
 	resources := bindata.Resource(
 		migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
+		migrations.Asset,
 	)
 
 	source, err := bindata.WithInstance(resources)

@@ -147,21 +147,7 @@ func NewMigratedDB(uri string, migrationResource *bindata.AssetSource) (*sql.DB,
 }
 
 func setup(d *sql.DB, migrationResource *bindata.AssetSource) error {
-	source, err := bindata.WithInstance(migrationResource)
-	if err != nil {
-		return err
-	}
-
-	driver, err := postgres.WithInstance(d, &postgres.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		source,
-		"postgres",
-		driver)
+	m, err := MakeMigration(d, migrationResource)
 	if err != nil {
 		return err
 	}
@@ -171,4 +157,22 @@ func setup(d *sql.DB, migrationResource *bindata.AssetSource) error {
 	}
 
 	return nil
+}
+
+func MakeMigration(d *sql.DB, migrationResource *bindata.AssetSource) (*migrate.Migrate, error) {
+	source, err := bindata.WithInstance(migrationResource)
+	if err != nil {
+		return nil, err
+	}
+
+	driver, err := postgres.WithInstance(d, &postgres.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	return migrate.NewWithInstance(
+		"go-bindata",
+		source,
+		"postgres",
+		driver)
 }
