@@ -269,3 +269,13 @@ func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Addres
 
 	return blocksToViews(result), nil
 }
+
+func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, owner common.Address) ([]OpenseaCollection, error) {
+	log.Debug("call to get opensea collections")
+	return api.s.opensea.fetchAllCollectionsByOwner(owner)
+}
+
+func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
+	log.Debug("call to get opensea assets")
+	return api.s.opensea.fetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
+}
