@@ -54,7 +54,8 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		response_to,
 		gap_from,
 		gap_to,
-		mentioned`
+		mentioned,
+		hide`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -298,6 +299,11 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	hide := false
+	if message.Deleted {
+		hide = true
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -342,6 +348,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		gapFrom,
 		gapTo,
 		message.Mentioned,
+		hide,
 	}, nil
 }
 
