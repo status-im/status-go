@@ -19,7 +19,6 @@
 package common
 
 import (
-	"encoding/hex"
 	"errors"
 	"strings"
 
@@ -66,15 +65,14 @@ func (t *TopicType) UnmarshalText(input []byte) error {
 
 // Converts a topic to its 23/WAKU2-TOPICS representation
 func (t TopicType) ContentTopic() string {
-	enc := make([]byte, len(t)*2)
-	hex.Encode(enc, t[:])
-	return "/waku/2/" + string(enc) + "/proto"
+	enc := hexutil.Encode(t[:])
+	return "/waku/1/" + enc + "/rfc26"
 }
 
 func ExtractTopicFromContentTopic(s string) (*TopicType, error) {
 	p := strings.Split(s, "/")
 
-	if len(p) != 5 || p[1] != "waku" || p[2] != "2" || p[4] != "proto" {
+	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "rfc26" {
 		return nil, errors.New("invalid content topic format")
 	}
 
