@@ -262,6 +262,16 @@ func DeleteMultiaccount(keyUID, keyStoreDir string) string {
 	return makeJSONResponse(nil)
 }
 
+// DeleteImportedKey
+func DeleteImportedKey(address, password, keyStoreDir string) string {
+	err := statusBackend.DeleteImportedKey(address, password, keyStoreDir)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(nil)
+}
+
 // InitKeystore initialize keystore before doing any operations with keys.
 func InitKeystore(keydir string) string {
 	err := statusBackend.AccountManager().InitKeystore(keydir)

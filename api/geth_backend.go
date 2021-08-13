@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,6 +202,29 @@ func (b *GethStatusBackend) DeleteMulticcount(keyUID string, keyStoreDir string)
 	}
 
 	return os.RemoveAll(keyStoreDir)
+}
+
+func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	err := filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.Contains(fileInfo.Name(), address) {
+			_, err := b.accountManager.VerifyAccountPassword(keyStoreDir, "0x"+address, password)
+			if err != nil {
+				b.log.Error("failed to verify account", "account", address, "error", err)
+				return err
+			}
+
+			return os.Remove(path)
+		}
+		return nil
+	})
+
+	return err
 }
 
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
