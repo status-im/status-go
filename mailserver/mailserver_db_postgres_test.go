@@ -16,14 +16,19 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/postgres"
 	waku "github.com/status-im/status-go/waku/common"
 )
 
 func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 	topic := []byte{0xaa, 0xbb, 0xcc, 0xdd}
 
-	db, err := NewPostgresDB("postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable")
+	err := postgres.ResetDefaultTestPostgresDB()
 	require.NoError(t, err)
+
+	db, err := NewPostgresDB(postgres.DefaultTestURI)
+	require.NoError(t, err)
+	defer db.Close()
 
 	envelope, err := newTestEnvelope(topic)
 	require.NoError(t, err)
@@ -55,8 +60,12 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 	topic := []byte{0x01, 0x02, 0x03, 0x04}
 
-	db, err := NewPostgresDB("postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable")
+	//err := postgres.ResetDefaultTestPostgresDB()
+	//require.NoError(t, err)
+
+	db, err := NewPostgresDB(postgres.DefaultTestURI)
 	require.NoError(t, err)
+	defer db.Close()
 
 	envelope, err := newTestEnvelope(topic)
 	require.NoError(t, err)
