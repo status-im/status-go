@@ -10,7 +10,7 @@
     "StaticNodes": [],
     "RendezvousNodes": [],
     "WakuNodes": [
-      "/ip4/47.242.210.73/tcp/30303/p2p/16Uiu2HAmSyrYVycqBCWcHyNVQS6zYQcdQbwyov1CDijboVRsQS37",
+      "/ip4/47.242.210.73/tcp/30303/p2p/16Uiu2HAkvWiyFsgRhuJEb9JfjYxEkoHLgnUQmr1N5mKWnYjxYRVm",
       "/ip4/134.209.139.210/tcp/30303/p2p/16Uiu2HAmPLe7Mzm8TsYUubgCAW1aJoeFScxrLj8ppHFivPo97bUZ",
       "/ip4/104.154.239.128/tcp/30303/p2p/16Uiu2HAmJb2e28qLXxT5kZxVUUoJt72EMzNGXB47Rxx5hw3q4YjS"
     ],
@@ -19,6 +19,6 @@
     ]
   },
   "WakuV2Config": {
-		"Enabled": true
-	}
+    "Enabled": true
+  }
 }
