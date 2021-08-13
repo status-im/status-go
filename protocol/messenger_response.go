@@ -320,6 +320,9 @@ func (r *MessengerResponse) AddMessage(message *common.Message) {
 	if r.messages == nil {
 		r.messages = make(map[string]*common.Message)
 	}
+	if message.Deleted {
+		return
+	}
 	r.messages[message.ID] = message
 }
 
