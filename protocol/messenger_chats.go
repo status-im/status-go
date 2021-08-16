@@ -20,6 +20,18 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
+func (m *Messenger) LatestActiveNChats(num int) []*Chat {
+	var chats []*Chat
+	var i = 0
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		chats = append(chats, chat)
+		i++
+		return i < num
+	})
+
+	return chats
+}
+
 func (m *Messenger) ActiveChats() []*Chat {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

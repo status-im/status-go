@@ -267,6 +267,10 @@ func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }
 
+func (api *PublicAPI) LatestActiveNChats(parent context.Context, num int) []*protocol.Chat {
+	return api.service.messenger.LatestActiveNChats(num)
+}
+
 func (api *PublicAPI) ActiveChats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.ActiveChats()
 }
