@@ -75,78 +75,104 @@ type WakuNode struct {
 	// Channel passed to WakuNode constructor
 	// receiving connection status notifications
 	connStatusChan chan ConnStatus
+	pingEventsChan chan interface{}
 }
 
+func (w *WakuNode) handleConnectednessChanged(ev event.EvtPeerConnectednessChanged) {
+
+	log.Info("### EvtPeerConnectednessChanged ", w.Host().ID(), " to ", ev.Peer, " : ", ev.Connectedness)
+	if ev.Connectedness == network.Connected {
+		_, ok := w.peers[ev.Peer]
+		if !ok {
+			peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
+			log.Info("protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+			w.peers[ev.Peer] = peerProtocols
+		} else {
+			log.Info("### Peer already exists")
+		}
+	} else if ev.Connectedness == network.NotConnected {
+		log.Info("Peer down: ", ev.Peer)
+		delete(w.peers, ev.Peer)
+		// for _, pl := range w.peerListeners {
+		// 	pl <- &ev
+		// }
+		// TODO
+		// There seems to be no proper way to
+		// remove a dropped peer from Host's Peerstore
+		// https://github.com/libp2p/go-libp2p-host/issues/13
+		//w.Host().Network().ClosePeer(ev.Peer)
+	}
+
+}
+func (w *WakuNode) handleProtocolsUpdated(ev event.EvtPeerProtocolsUpdated) {
+	log.Info("### EvtPeerProtocolsUpdated ", w.Host().ID(), " to ", ev.Peer, " added: ", ev.Added, ", removed: ", ev.Removed)
+	_, ok := w.peers[ev.Peer]
+	if ok {
+		peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
+		log.Info("updated protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+		w.peers[ev.Peer] = peerProtocols
+	}
+
+}
+func (w *WakuNode) handlePeerIdentificationCompleted(ev event.EvtPeerIdentificationCompleted) {
+
+	log.Info("### EvtPeerIdentificationCompleted ", w.Host().ID(), " to ", ev.Peer)
+	peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
+	log.Info("identified protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+	_, ok := w.peers[ev.Peer]
+	if ok {
+		peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
+		w.peers[ev.Peer] = peerProtocols
+	}
+
+}
+func (w *WakuNode) processHostEvent(e interface{}) {
+	if e == nil {
+		log.Info("processHostEvent nil event")
+		return
+	}
+	isOnline := w.IsOnline()
+	hasHistory := w.HasHistory()
+	switch e.(type) {
+	case event.EvtPeerConnectednessChanged:
+		w.handleConnectednessChanged(e.(event.EvtPeerConnectednessChanged))
+	case event.EvtPeerProtocolsUpdated:
+		w.handleProtocolsUpdated(e.(event.EvtPeerProtocolsUpdated))
+	case event.EvtPeerIdentificationCompleted:
+		w.handlePeerIdentificationCompleted(e.(event.EvtPeerIdentificationCompleted))
+	}
+
+	log.Info("###processHostEvent before isOnline()")
+	newIsOnline := w.IsOnline()
+	log.Info("###processHostEvent before hasHistory()")
+	newHasHistory := w.HasHistory()
+	log.Info("###ConnStatus isOnline: ", isOnline, "/", newIsOnline, " hasHistory: ",
+		hasHistory, "/", newHasHistory)
+	if w.connStatusChan != nil &&
+		(isOnline != newIsOnline || hasHistory != newHasHistory) {
+		log.Info("New ConnStatus: ", ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory})
+		w.connStatusChan <- ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory}
+	}
+
+}
 func (w *WakuNode) connectednessListener() {
 	for {
-		isOnline := w.IsOnline()
-		hasHistory := w.HasHistory()
-
+		var e interface{}
+		log.Info("connectednessListener before select")
 		select {
-		case e := <-w.connectednessEventSub.Out():
-			if e == nil {
-				break
-			}
-			ev := e.(event.EvtPeerConnectednessChanged)
-
-			log.Info("### EvtPeerConnectednessChanged ", w.Host().ID(), " to ", ev.Peer, " : ", ev.Connectedness)
-			if ev.Connectedness == network.Connected {
-				_, ok := w.peers[ev.Peer]
-				if !ok {
-					peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-					log.Info("protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
-					w.peers[ev.Peer] = peerProtocols
-				} else {
-					log.Info("### Peer already exists")
-				}
-			} else if ev.Connectedness == network.NotConnected {
-				log.Info("Peer down: ", ev.Peer)
-				delete(w.peers, ev.Peer)
-				for _, pl := range w.peerListeners {
-					pl <- &ev
-				}
-				// TODO
-				// There seems to be no proper way to
-				// remove a dropped peer from Host's Peerstore
-				// https://github.com/libp2p/go-libp2p-host/issues/13
-				//w.Host().Network().ClosePeer(ev.Peer)
-			}
-		case e := <-w.protocolEventSub.Out():
-			if e == nil {
-				break
-			}
-			ev := e.(event.EvtPeerProtocolsUpdated)
-
-			log.Info("### EvtPeerProtocolsUpdated ", w.Host().ID(), " to ", ev.Peer, " added: ", ev.Added, ", removed: ", ev.Removed)
-			_, ok := w.peers[ev.Peer]
-			if ok {
-				peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-				log.Info("updated protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
-				w.peers[ev.Peer] = peerProtocols
-			}
-
-		case e := <-w.identificationEventSub.Out():
-			if e == nil {
-				break
-			}
-			ev := e.(event.EvtPeerIdentificationCompleted)
-
-			log.Info("### EvtPeerIdentificationCompleted ", w.Host().ID(), " to ", ev.Peer)
-			peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-			log.Info("identified protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
-			_, ok := w.peers[ev.Peer]
-			if ok {
-				peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-				w.peers[ev.Peer] = peerProtocols
-			}
-
+		case e = <-w.connectednessEventSub.Out():
+			log.Info("connectednessListener connectednessEvent")
+		case e = <-w.protocolEventSub.Out():
+			log.Info("connectednessListener protocolEvent")
+		case e = <-w.identificationEventSub.Out():
+			log.Info("connectednessListener identificationEvent")
+		case e = <-w.pingEventsChan:
+			log.Info("connectednessListener pingEvent")
 		}
-		newIsOnline := w.IsOnline()
-		newHasHistory := w.HasHistory()
-		if w.connStatusChan != nil &&
-			(isOnline != newIsOnline || hasHistory != newHasHistory) {
-			w.connStatusChan <- ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory}
-		}
+		log.Info("connectednessListener after select")
+
+		w.processHostEvent(e)
+		log.Info("connectednessListener after processHostEvent")
 	}
 }
 
@@ -203,6 +229,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	if params.connStatusChan != nil {
 		w.connStatusChan = params.connStatusChan
 	}
+	w.pingEventsChan = make(chan interface{})
 	go w.connectednessListener()
 
 	if params.enableStore {
@@ -376,7 +403,9 @@ func (w *WakuNode) startStore() {
 	peerChan := make(chan *event.EvtPeerConnectednessChanged)
 	w.opts.store.Start(w.ctx, w.host, peerChan)
 	w.peerListeners = append(w.peerListeners, peerChan)
-	w.opts.store.Resume(string(relay.GetTopic(nil)), nil)
+	if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
+		log.Error("failed to resume", err)
+	}
 }
 
 func (w *WakuNode) AddStorePeer(address string) (*peer.ID, error) {
@@ -725,12 +754,69 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 	w.ping = ping.NewPingService(w.host)
 	ticker := time.NewTicker(t)
 	go func() {
+
+		peerMap := make(map[peer.ID]<-chan ping.Result)
+		em, _ := w.Host().EventBus().Emitter(new(event.EvtPeerConnectednessChanged))
+		defer em.Close()
+		var mu sync.Mutex
 		for {
 			select {
 			case <-ticker.C:
 				for _, peer := range w.host.Network().Peers() {
-					log.Info("Pinging", peer)
-					w.ping.Ping(w.ctx, peer)
+					mu.Lock()
+					_, ok := peerMap[peer]
+					mu.Unlock()
+					if !ok {
+						log.Info("###Pinging", peer)
+						result := w.ping.Ping(w.ctx, peer)
+						mu.Lock()
+						peerMap[peer] = result
+						mu.Unlock()
+
+						go func() {
+							peerFound := false
+							for p, _ := range w.peers {
+								if p == peer {
+									peerFound = true
+									break
+								}
+							}
+
+							log.Info("###PING before fetching result")
+							pingTicker := time.NewTicker(time.Duration(5) * time.Second)
+							isError := false
+							select {
+							case resVal := <-result:
+								isError = resVal.Error != nil
+							case <-pingTicker.C:
+								isError = true
+							}
+							pingTicker.Stop()
+							log.Info("###PING after fetching result")
+							if !peerFound && !isError {
+								log.Info("###PING peer added")
+								//EventBus Emitter doesn't seem to work when there's no connection
+								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
+									Peer:          peer,
+									Connectedness: network.Connected,
+								}
+							} else if peerFound && isError {
+								log.Info("###PING peer removed")
+								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
+									Peer:          peer,
+									Connectedness: network.NotConnected,
+								}
+								log.Info("###PING wrote to ping chan")
+							}
+
+							mu.Lock()
+							delete(peerMap, peer)
+							mu.Unlock()
+						}()
+					} else {
+						log.Info("###PING already pinged")
+					}
+
 				}
 			case <-w.quit:
 				ticker.Stop()
@@ -738,5 +824,4 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 			}
 		}
 	}()
-
 }

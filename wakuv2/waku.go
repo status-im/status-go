@@ -145,12 +145,14 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 
 	connStatusChan := make(chan node.ConnStatus)
 
+	keepAliveInt := 5
 	waku.node, err = node.New(context.Background(),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
 		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
 		node.WithConnStatusChan(connStatusChan),
+		node.WithKeepAlive(time.Duration(keepAliveInt)*time.Second),
 	)
 
 	go func() {
