@@ -783,7 +783,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 							}
 
 							log.Info("###PING before fetching result")
-							pingTicker := time.NewTicker(time.Duration(5) * time.Second)
+							pingTicker := time.NewTicker(time.Duration(1) * time.Second)
 							isError := false
 							select {
 							case resVal := <-result:
