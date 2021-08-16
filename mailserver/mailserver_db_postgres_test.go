@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/rlp"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -20,20 +21,33 @@ import (
 	waku "github.com/status-im/status-go/waku/common"
 )
 
-func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
+func TestMailServerPostgresDBSuite(t *testing.T) {
+	suite.Run(t, new(MailServerPostgresDBSuite))
+}
+
+type MailServerPostgresDBSuite struct {
+	suite.Suite
+
+	db *PostgresDB
+}
+
+func (s *MailServerPostgresDBSuite) SetupSuite() {
+	// ResetDefaultTestPostgresDB Required to completely reset the Postgres DB
+	err := postgres.ResetDefaultTestPostgresDB()
+	s.NoError(err)
+}
+
+func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithBloomFilter() {
 	topic := []byte{0xaa, 0xbb, 0xcc, 0xdd}
 
-	err := postgres.ResetDefaultTestPostgresDB()
-	require.NoError(t, err)
-
 	db, err := NewPostgresDB(postgres.DefaultTestURI)
-	require.NoError(t, err)
+	s.NoError(err)
 	defer db.Close()
 
 	envelope, err := newTestEnvelope(topic)
-	require.NoError(t, err)
+	s.NoError(err)
 	err = db.SaveEnvelope(envelope)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	iter, err := db.BuildIterator(CursorQuery{
 		start: NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
@@ -41,36 +55,33 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 		bloom: types.TopicToBloom(types.BytesToTopic(topic)),
 		limit: 10,
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 	hasNext := iter.Next()
-	require.True(t, hasNext)
+	s.True(hasNext)
 	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, rawValue)
+	s.NoError(err)
+	s.NotEmpty(rawValue)
 	var receivedEnvelope waku.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
-	require.NoError(t, err)
-	require.EqualValues(t, waku.BytesToTopic(topic), receivedEnvelope.Topic)
+	s.NoError(err)
+	s.EqualValues(waku.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
-	require.NoError(t, err)
-	require.NoError(t, iter.Error())
+	s.NoError(err)
+	s.NoError(iter.Error())
 }
 
-func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
+func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithTopic() {
 	topic := []byte{0x01, 0x02, 0x03, 0x04}
 
-	//err := postgres.ResetDefaultTestPostgresDB()
-	//require.NoError(t, err)
-
 	db, err := NewPostgresDB(postgres.DefaultTestURI)
-	require.NoError(t, err)
+	s.NoError(err)
 	defer db.Close()
 
 	envelope, err := newTestEnvelope(topic)
-	require.NoError(t, err)
+	s.NoError(err)
 	err = db.SaveEnvelope(envelope)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	iter, err := db.BuildIterator(CursorQuery{
 		start:  NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
@@ -78,20 +89,20 @@ func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 		topics: [][]byte{topic},
 		limit:  10,
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 	hasNext := iter.Next()
-	require.True(t, hasNext)
+	s.True(hasNext)
 	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, rawValue)
+	s.NoError(err)
+	s.NotEmpty(rawValue)
 	var receivedEnvelope waku.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
-	require.NoError(t, err)
-	require.EqualValues(t, waku.BytesToTopic(topic), receivedEnvelope.Topic)
+	s.NoError(err)
+	s.EqualValues(waku.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
-	require.NoError(t, err)
-	require.NoError(t, iter.Error())
+	s.NoError(err)
+	s.NoError(iter.Error())
 }
 
 func newTestEnvelope(topic []byte) (types.Envelope, error) {

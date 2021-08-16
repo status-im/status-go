@@ -14,12 +14,15 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	appmetricsDB "github.com/status-im/status-go/appmetrics"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/postgres"
 	"github.com/status-im/status-go/protocol/anonmetrics"
+	"github.com/status-im/status-go/protocol/anonmetrics/migrations"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/waku"
@@ -41,6 +44,12 @@ type MessengerAnonMetricsSuite struct {
 	// a single Waku service should be shared.
 	shh    types.Waku
 	logger *zap.Logger
+}
+
+func (s *MessengerAnonMetricsSuite) SetupSuite() {
+	// ResetDefaultTestPostgresDB Required to completely reset the Postgres DB
+	err := postgres.ResetDefaultTestPostgresDB()
+	s.NoError(err)
 }
 
 func (s *MessengerAnonMetricsSuite) SetupTest() {
@@ -73,9 +82,6 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Generate Bob Messenger as the Server
-	err = postgres.ResetDefaultTestPostgresDB()
-	s.Require().NoError(err)
-
 	amsc := &anonmetrics.ServerConfig{
 		Enabled:     true,
 		PostgresURI: postgres.DefaultTestURI,
@@ -88,8 +94,17 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 }
 
 func (s *MessengerAnonMetricsSuite) TearDownTest() {
-	s.Require().NoError(s.alice.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
+	// Down migrate the DB
+	postgresMigration := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+	m, err := anonmetrics.MakeMigration(s.bob.anonMetricsServer.PostgresDB, postgresMigration)
+	s.NoError(err)
+
+	err = m.Down()
+	s.NoError(err)
+
+	// Shutdown messengers
+	s.NoError(s.alice.Shutdown())
+	s.NoError(s.bob.Shutdown())
 	_ = s.logger.Sync()
 }
 
