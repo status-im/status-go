@@ -155,6 +155,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 
 	connStatusChan := make(chan node.ConnStatus)
 
+	keepAliveInt := 5
 	waku.node, err = node.New(context.Background(),
 		node.WithLibP2POptions(
 			libp2p.BandwidthReporter(waku.bandwidthCounter),
