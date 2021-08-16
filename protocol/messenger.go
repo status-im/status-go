@@ -265,7 +265,10 @@ func NewMessenger(
 
 	// Initialise anon metrics client
 	var anonMetricsClient *anonmetrics.Client
-	if c.anonMetricsClientConfig != nil && c.anonMetricsClientConfig.ShouldSend {
+	if c.anonMetricsClientConfig != nil &&
+		c.anonMetricsClientConfig.ShouldSend &&
+		c.anonMetricsClientConfig.Active == anonmetrics.ActiveClientPhrase {
+
 		anonMetricsClient = anonmetrics.NewClient(sender)
 		anonMetricsClient.Config = c.anonMetricsClientConfig
 		anonMetricsClient.Identity = identity
@@ -275,7 +278,10 @@ func NewMessenger(
 
 	// Initialise anon metrics server
 	var anonMetricsServer *anonmetrics.Server
-	if c.anonMetricsServerConfig != nil && c.anonMetricsServerConfig.Enabled {
+	if c.anonMetricsServerConfig != nil &&
+		c.anonMetricsServerConfig.Enabled &&
+		c.anonMetricsServerConfig.Active == anonmetrics.ActiveServerPhrase {
+
 		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")

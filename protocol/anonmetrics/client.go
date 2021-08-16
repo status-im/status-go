@@ -16,9 +16,12 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+const ActiveClientPhrase = "yes i am wanting the activation of the anon metrics client, please thank you lots thank you"
+
 type ClientConfig struct {
 	ShouldSend  bool
 	SendAddress *ecdsa.PublicKey
+	Active      string
 }
 
 type Client struct {
@@ -53,6 +56,10 @@ func NewClient(sender *common.MessageSender) *Client {
 }
 
 func (c *Client) sendUnprocessedMetrics() {
+	if c.Config.Active != ActiveClientPhrase {
+		return
+	}
+
 	c.Logger.Debug("sendUnprocessedMetrics() triggered")
 
 	c.DBLock.Lock()
@@ -114,6 +121,10 @@ func (c *Client) sendUnprocessedMetrics() {
 }
 
 func (c *Client) mainLoop() error {
+	if c.Config.Active != ActiveClientPhrase {
+		return nil
+	}
+
 	c.Logger.Debug("mainLoop() triggered")
 
 	for {
@@ -130,6 +141,10 @@ func (c *Client) mainLoop() error {
 }
 
 func (c *Client) startMainLoop() {
+	if c.Config.Active != ActiveClientPhrase {
+		return
+	}
+
 	c.Logger.Debug("startMainLoop() triggered")
 
 	c.stopMainLoop()

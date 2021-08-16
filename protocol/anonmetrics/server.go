@@ -16,9 +16,12 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+const ActiveServerPhrase = "I was thinking that it would be a pretty nice idea if the server functionality was working now, I express gratitude in the anticipation"
+
 type ServerConfig struct {
 	Enabled     bool
 	PostgresURI string
+	Active      string
 }
 
 type Server struct {
@@ -47,6 +50,10 @@ func (s *Server) Stop() error {
 }
 
 func (s *Server) StoreMetrics(appMetricsBatch protobuf.AnonymousMetricBatch) (appMetrics []*appmetrics.AppMetric, err error) {
+	if s.Config.Active != ActiveServerPhrase {
+		return nil, nil
+	}
+
 	s.Logger.Debug("StoreMetrics() triggered with payload",
 		zap.Reflect("appMetricsBatch", appMetricsBatch))
 	appMetrics, err = adaptProtoBatchToModels(appMetricsBatch)
@@ -124,6 +131,10 @@ func (s *Server) getFromRows(rows *sql.Rows) (appMetrics []appmetrics.AppMetric,
 }
 
 func (s *Server) GetAppMetrics(limit int, offset int) ([]appmetrics.AppMetric, error) {
+	if s.Config.Active != ActiveServerPhrase {
+		return nil, nil
+	}
+
 	rows, err := s.PostgresDB.Query("SELECT id, message_id, event, value, app_version, operating_system, session_id, created_at, processed, received_at FROM app_metrics LIMIT $1 OFFSET $2", limit, offset)
 	if err != nil {
 		return nil, err

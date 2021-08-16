@@ -27,8 +27,6 @@ func TestMailServerPostgresDBSuite(t *testing.T) {
 
 type MailServerPostgresDBSuite struct {
 	suite.Suite
-
-	db *PostgresDB
 }
 
 func (s *MailServerPostgresDBSuite) SetupSuite() {

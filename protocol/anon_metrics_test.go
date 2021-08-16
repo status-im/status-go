@@ -75,6 +75,7 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	amcc := &anonmetrics.ClientConfig{
 		ShouldSend:  true,
 		SendAddress: &s.bobKey.PublicKey,
+		Active:      anonmetrics.ActiveClientPhrase,
 	}
 	s.alice, err = newMessengerWithKey(s.shh, s.aliceKey, s.logger, []Option{WithAnonMetricsClientConfig(amcc)})
 	s.Require().NoError(err)
@@ -85,6 +86,7 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 	amsc := &anonmetrics.ServerConfig{
 		Enabled:     true,
 		PostgresURI: postgres.DefaultTestURI,
+		Active:      anonmetrics.ActiveServerPhrase,
 	}
 	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, s.logger, []Option{WithAnonMetricsServerConfig(amsc)})
 	s.Require().NoError(err)
