@@ -59,12 +59,6 @@ const WakuFilterCodec = "/vac/waku/filter/2.0.0-beta1"
 
 const WakuFilterProtocolId = libp2pProtocol.ID(WakuFilterCodec)
 
-// Error types (metric label values)
-const (
-	dialFailure      = "dial_failure"
-	decodeRpcFailure = "decode_rpc_failure"
-)
-
 func (filters *Filters) Notify(msg *pb.WakuMessage, requestId string) {
 	for key, filter := range *filters {
 		envelope := protocol.NewEnvelope(msg, filter.Topic)
@@ -252,7 +246,9 @@ func (wf *WakuFilter) FilterListener() {
 	}
 
 	for m := range wf.MsgC {
-		handle(m)
+		if err := handle(m); err != nil {
+			log.Error("failed to handle message", err)
+		}
 	}
 
 }
@@ -273,6 +269,10 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, request pb.FilterRequest) (
 			filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
 			log.Info("Sending filterRPC: ", filterRPC)
 			err = writer.WriteMsg(filterRPC)
+			if err != nil {
+				log.Error("failed to write message", err)
+				return "", err
+			}
 			return string(id), nil
 		} else {
 			// @TODO more sophisticated error handling here
@@ -300,6 +300,9 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, request pb.FilterRequest)
 			writer := protoio.NewDelimitedWriter(conn)
 			filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
 			err = writer.WriteMsg(filterRPC)
+			if err != nil {
+				log.Error("failed to write message", err)
+			}
 			//return some(id)
 		} else {
 			// @TODO more sophisticated error handling here
