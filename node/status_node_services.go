@@ -137,7 +137,7 @@ func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
 	}
 }
 
-func (b *StatusNode) nodeBridge() types.Node {
+func (b *StatusNode) NodeBridge() types.Node {
 	return gethbridge.NewNodeBridge(b.gethNode, b.wakuSrvc, b.wakuV2Srvc)
 }
 
@@ -147,7 +147,7 @@ func (b *StatusNode) wakuExtService(config *params.NodeConfig) (*wakuext.Service
 	}
 
 	if b.wakuExtSrvc == nil {
-		b.wakuExtSrvc = wakuext.New(config.ShhextConfig, b.nodeBridge(), ext.EnvelopeSignalHandler{}, b.db)
+		b.wakuExtSrvc = wakuext.New(config.ShhextConfig, b.NodeBridge(), ext.EnvelopeSignalHandler{}, b.db)
 	}
 
 	b.wakuExtSrvc.SetP2PServer(b.gethNode.Server())
@@ -159,7 +159,7 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 		return nil, errors.New("geth node not initialized")
 	}
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(config.ShhextConfig, b.nodeBridge(), ext.EnvelopeSignalHandler{}, b.db)
+		b.wakuV2ExtSrvc = wakuv2ext.New(config.ShhextConfig, b.NodeBridge(), ext.EnvelopeSignalHandler{}, b.db)
 	}
 
 	b.wakuV2ExtSrvc.SetP2PServer(b.gethNode.Server())
