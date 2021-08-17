@@ -1,4 +1,6 @@
-GIT_ROOT = $(shell git rev-parse --show-toplevel)
+export GIT_ROOT = $(shell git rev-parse --show-toplevel)
+# Useful for showing enode address
+PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -15,9 +17,16 @@ export CONTAINER_IMG  ?= statusteam/bootnode
 export CONTAINER_NAME ?= status-go-bootnode
 export LOG_LEVEL      ?= 3
 export LISTEN_PORT    ?= 30301
-export API_MODULES    ?= eth,net,web3,admin
-# Necessary to make bootnode available publicly
-export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
+export API_MODULES    ?= eth,web3,admin
+
+define INFO_MSG
+ * $(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
+
+$(YLW)Make sure that address and UDP port are available from the internet!$(RST)
+
+$(GRN)Your enode address is:$(RST)
+endef
+export INFO_MSG
 
 all: checks start show info enode
 
@@ -41,36 +50,38 @@ ifndef CONTAINER_NAME
 	$(error $(RED)$$CONTAINER_NAME not set! Export it as environment variable$(RST))
 endif
 
-start: keys/nodekey keys/nodeaddr
-	docker-compose up -d
-
-stop:
-	docker-compose down
+enode: keys/nodeaddr
+	@echo "enode://$(shell cat keys/nodeaddr)@$(PUBLIC_IP):$(LISTEN_PORT)"
 
 logs:
 	docker-compose logs -f -t --tail=100
 
-enode: keys/nodeaddr
-	@echo "enode://$(shell cat keys/nodeaddr)@$(PUBLIC_IP):$(LISTEN_PORT)"
-
 info:
-	@echo "$(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)"
-	@echo "$(YLW)Make sure that address and UDP port are available from the internet!$(RST)"
-	@echo "$(GRN)Your enode address is:$(RST)"
+	@echo "$$INFO_MSG"
 
 keys:
 	@mkdir -p keys
 
+start: keys/nodekey keys/nodeaddr
+	@echo " * $(GRN)Starting '$(CONTAINER_NAME)' container...$(RST)"
+	docker-compose up -d
+
+stop:
+	@echo " * $(YLW)Stopping '$(CONTAINER_NAME)' container...$(RST)"
+	docker-compose down
+
 keys/nodekey: keys ##@ Generate a node key
+	@echo " * $(GRN)Generating '$(CONTAINER_NAME)' keys...$(RST)"
 	@docker run --rm \
 		-u $(UID):$(GID) \
 		--entrypoint=bootnode \
 		-v $(PWD)/keys:/keys:rw \
 		$(CONTAINER_IMG) \
 		-genkey=/keys/nodekey
-	@echo "$(GRN)Created key for Bootnode: keys/nodekey$(RST)"
+	@echo " * $(GRN)Created key for Bootnode: keys/nodekey$(RST)"
 
 keys/nodeaddr: keys ##@ Save node address for given key
+	@echo " * $(GRN)Saving '$(CONTAINER_NAME)' enode address...$(RST)"
 	@docker run --rm \
 		-u $(UID):$(GID) \
 		--entrypoint=sh \

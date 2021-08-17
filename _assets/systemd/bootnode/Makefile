@@ -1,4 +1,6 @@
-export GIT_ROOT = $(shell git rev-parse --show-toplevel)
+export GIT_ROOT := $(shell git rev-parse --show-toplevel)
+# Useful for showing enode address
+PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -25,8 +27,6 @@ export KEY_PATH     ?= $(DATA_PATH)/nodekey
 export ADDR_PATH    ?= $(DATA_PATH)/nodeaddr
 export LOG_LEVEL    ?= 3
 export LISTEN_PORT  ?= 30301
-# Necessary to make bootnode available publicly
-export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
 # Info
 STATUS    = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
@@ -34,8 +34,9 @@ NODE_ADDR = $(shell cat $(ADDR_PATH))
 ENODE     = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)
 
 define INFO_MSG
-* $(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
-* $(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
+ * $(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
+
+$(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
 $(GRN)Your enode address is:$(RST)
 $(ENODE)
 endef
@@ -56,12 +57,6 @@ ifeq (active, $(STATUS))
 	$(error $(YLW)Service already started$(RST))
 endif
 
-info:
-	@echo "$$INFO_MSG"
-
-enode:
-	@echo "$(ENODE)"
-
 genkey: $(DATA_PATH)
 	@$(GIT_ROOT)/build/bin/bootnode -genkey=$(KEY_PATH)
 
@@ -77,33 +72,39 @@ status:
 logs:
 	journalctl $(JRNL_OPTS) statusd
 
+info:
+	@echo "$$INFO_MSG"
+
+enode:
+	@echo "$(ENODE)"
+
 enable:
-	@echo "* $(BLD)Enabling '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Enabling '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) enable $(SERVICE_NAME)
 
 disable:
-	@echo "* $(BLD)Disabling '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Disabling '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) disable "${SERVICE_NAME}"
 
 start:
-	@echo "* $(BLD)Starting '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Starting '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) start $(SERVICE_NAME)
 
 restart:
-	@echo "* $(BLD)Restarting '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Restarting '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) restart $(SERVICE_NAME)
 
 stop:
-	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Stopping '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) stop "${SERVICE_NAME}"
 
 forget:
-	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Stopping '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) daemon-reload
 	systemctl $(SCTL_OPTS) reset-failed
 
 $(GIT_ROOT)/build/bin/bootnode:
-	@echo "* $(BLD)Building bootnode binary...$(RST)"
+	@echo " * $(GRN)Building bootnode binary...$(RST)"
 	@cd "$(GIT_ROOT)" && make bootnode
 
 build: $(GIT_ROOT)/build/bin/bootnode
@@ -114,7 +115,7 @@ $(SERVICE_DIR):
 	@mkdir -p $(SERVICE_DIR)
 
 service: $(SERVICE_DIR)
-	@echo "* $(BLD)Generating '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Generating '$(SERVICE_NAME)' service...$(RST)"
 	@envsubst < ./service.template > $(SERVICE_PATH)
 
 $(DATA_PATH):

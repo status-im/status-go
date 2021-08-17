@@ -13,21 +13,18 @@ DATA_PATH="${DATA_PATH:-/var/tmp/status-go-mail}"
 CONFIG_PATH="${CONFIG_PATH:-${DATA_PATH}/config.json}"
 
 if ! [[ -x $(command -v jq) ]]; then
-  echo "Cannot generate config. jq utility is not installed."
+  echo "Cannot generate config. jq utility is not installed." >&2
   exit 1
 fi
 
 if [[ -e "${CONFIG_PATH}" ]]; then
-  echo "Config already exits. Remove it to generate a new one."
+  echo "Config already exits: ${CONFIG_PATH}" >&2
+  echo "Remove it to generate a new one." >&2
   exit 0
 fi
 
-# Necessary to make mailserver available publicly
-export PUBLIC_IP=$(curl -s https://ipecho.net/plain)
-
 # Assemble the filter for changing the config JSON
 JQ_FILTER_ARRAY=(
-  ".AdvertiseAddr = \"${PUBLIC_IP}\""
   ".ListenAddr = \"0.0.0.0:${LISTEN_PORT}\""
   ".HTTPEnabled = true"
   ".HTTPHost = \"0.0.0.0\""
@@ -39,7 +36,6 @@ JQ_FILTER_ARRAY=(
   ".WakuConfig.EnableMailServer = true"
   ".WakuConfig.DataDir = \"${DATA_PATH}/waku\""
   ".WakuConfig.MailServerPassword = \"${MAIL_PASSWORD}\""
-
 )
 
 JQ_FILTER=$(printf " | %s" "${JQ_FILTER_ARRAY[@]}")
