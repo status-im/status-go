@@ -599,23 +599,29 @@ func (m *Messenger) HandleDeleteMessage(response *MessengerResponse, deleteMessa
 	}
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(originalMessage.LocalChatID, "", 1)
-		if err != nil {
+		if err := m.updateLastMessage(chat); err != nil {
 			return err
-		}
-		if messages != nil {
-			chat.LastMessage = messages[0]
-			err := m.saveChat(chat)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	response.AddRemovedMessage(messageID)
 	response.AddChat(chat)
 
 	return nil
+}
+
+func (m *Messenger) updateLastMessage(chat *Chat) error {
+	// Get last message that is not hidden
+	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
+	if err != nil {
+		return err
+	}
+	if len(messages) > 0 {
+		chat.LastMessage = messages[0]
+	} else {
+		chat.LastMessage = nil
+	}
+
+	return m.saveChat(chat)
 }
 
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
