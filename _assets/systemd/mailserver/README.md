@@ -34,7 +34,6 @@ All the above commands are just wrappers around the [`systemctl`](http://man7.or
 All settings are passed through environment variables:
 
 * `SERVICE_NAME` - Name of the `systemd` service to be created. (Default: `statusd`)
-* `PUBLIC_IP` - Your IP visible from the internet and advertised by the Mailserver.
 * `LISTEN_PORT` - Mailserver TCP & UDP port, by default it's `30303` but you might want to use `443`.
 * `METRICS_PORT` - Port exposing metrics in [Prometheus](https://prometheus.io/docs/concepts/data_model/) format
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).

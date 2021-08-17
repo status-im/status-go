@@ -33,7 +33,6 @@ All the above commands are just wrappers around the [`systemctl`](http://man7.or
 All settings are passed through environment variables:
 
 * `SERVICE_NAME` - Name of the `systemd` service to be created. (Default: `statusd`)
-* `PUBLIC_IP` - Your IP visible from the internet and advertised by the Bootnode.
 * `LISTEN_PORT` - Bootnode TCP & UDP port, by default it's `30301` but you might want to use `443`.
 * `DATA_PATH` - Location of Bootnode storage and keys. (Default: `/var/tmp/status-go-boot`)
 * `KEY_PATH` - Location of Bootnode private key file. (Default: `/var/tmp/status-go-boot/nodekey`)

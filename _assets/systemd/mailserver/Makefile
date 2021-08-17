@@ -1,4 +1,6 @@
-export GIT_ROOT = $(shell git rev-parse --show-toplevel)
+export GIT_ROOT := $(shell git rev-parse --show-toplevel)
+# Useful for showing enode address
+PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -26,17 +28,18 @@ export LOG_LEVEL    ?= INFO
 export LISTEN_PORT  ?= 30303
 export METRICS_PORT ?= 9090
 export RPC_PORT     ?= 8545
-# Necessary to make mailserver available publicly
-export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
 # Info
 STATUS = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
 
 define INFO_MSG
-* $(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
-* $(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
+ * $(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
+
 $(GRN)Your enode address is:$(RST)
 $(shell $(GIT_ROOT)/_assets/scripts/get_enode.sh 2>/dev/null)
+
+$(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
+
 endef
 export INFO_MSG
 
@@ -74,32 +77,32 @@ logs:
 	journalctl $(JRNL_OPTS) statusd
 
 enable:
-	@echo "* $(BLD)Enabling '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Enabling '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) enable $(SERVICE_NAME)
 
 disable:
-	@echo "* $(BLD)Disabling '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Disabling '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) disable "${SERVICE_NAME}"
 
 start:
-	@echo "* $(BLD)Starting '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Starting '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) start $(SERVICE_NAME)
 
 restart:
-	@echo "* $(BLD)Restarting '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Restarting '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) restart $(SERVICE_NAME)
 
 stop:
-	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Stopping '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) stop "${SERVICE_NAME}"
 
 forget:
-	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(YLW)Stopping '$(SERVICE_NAME)' service...$(RST)"
 	systemctl $(SCTL_OPTS) daemon-reload
 	systemctl $(SCTL_OPTS) reset-failed
 
 $(GIT_ROOT)/build/bin/statusd:
-	@echo "* $(BLD)Building mailserver binary...$(RST)"
+	@echo " * $(GRN)Building mailserver binary...$(RST)"
 	@cd "$(GIT_ROOT)" && make statusgo
 
 build: $(GIT_ROOT)/build/bin/statusd
@@ -109,12 +112,12 @@ $(SERVICE_DIR):
 	@mkdir -p $(SERVICE_DIR)
 
 service: $(SERVICE_DIR)
-	@echo "* $(BLD)Generating '$(SERVICE_NAME)' service...$(RST)"
+	@echo " * $(GRN)Generating '$(SERVICE_NAME)' service...$(RST)"
 	@envsubst < ./service.template > $(SERVICE_PATH)
 
 rm-service:
 	rm -f $(SERVICE_PATH)
 
 config:
-	@echo "* $(BLD)Generating '$(SERVICE_NAME)' config...$(RST)"
+	@echo " * $(GRN)Generating '$(SERVICE_NAME)' config...$(RST)"
 	@$(GIT_ROOT)/_assets/scripts/gen_config.sh
