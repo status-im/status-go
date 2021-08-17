@@ -97,12 +97,62 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().Len(sendResponse.RemovedMessages(), 1)
 	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0])
 	s.Require().Len(sendResponse.Chats(), 1)
-	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	// LastMessage is removed
+	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
 
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = s.m.DeleteMessageAndSend(context.Background(), ogMessage.ID)
 
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
+}
+
+func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage1 := buildTestMessage(*theirChat)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage1)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	inputMessage2 := buildTestMessage(*theirChat)
+	sendResponse, err = theirMessenger.SendChatMessage(context.Background(), inputMessage2)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	messageID := sendResponse.Messages()[0].ID
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 2)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 0)
+	s.Require().Len(sendResponse.RemovedMessages(), 1)
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0])
+	s.Require().Len(sendResponse.Chats(), 1)
+	// LastMessage is updated to previous message
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().Equal(inputMessage1.ID, sendResponse.Chats()[0].LastMessage.ID)
+
 }
 
 func (s *MessengerDeleteMessageSuite) TestDeleteWrongMessageType() {

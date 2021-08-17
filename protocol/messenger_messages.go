@@ -146,9 +146,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	}
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		chat.LastMessage = message
-		err := m.saveChat(chat)
-		if err != nil {
+		if err := m.updateLastMessage(chat); err != nil {
 			return nil, err
 		}
 	}
