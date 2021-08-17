@@ -97,16 +97,20 @@ func (s *MessengerAnonMetricsSuite) SetupTest() {
 
 func (s *MessengerAnonMetricsSuite) TearDownTest() {
 	// Down migrate the DB
-	postgresMigration := bindata.Resource(migrations.AssetNames(), migrations.Asset)
-	m, err := anonmetrics.MakeMigration(s.bob.anonMetricsServer.PostgresDB, postgresMigration)
-	s.NoError(err)
+	if s.bob.anonMetricsServer != nil {
+		postgresMigration := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+		m, err := anonmetrics.MakeMigration(s.bob.anonMetricsServer.PostgresDB, postgresMigration)
+		s.NoError(err)
 
-	err = m.Down()
-	s.NoError(err)
+		err = m.Down()
+		s.NoError(err)
+	}
 
 	// Shutdown messengers
 	s.NoError(s.alice.Shutdown())
+	s.alice = nil
 	s.NoError(s.bob.Shutdown())
+	s.bob = nil
 	_ = s.logger.Sync()
 }
 
@@ -146,4 +150,60 @@ func (s *MessengerAnonMetricsSuite) TestReceiveAnonMetric() {
 		s.Require().Exactly(bobMetric.OS, amsdb.AppMetrics[i].OS, "operating system matches exactly")
 		s.Require().Exactly(bobMetric.AppVersion, amsdb.AppMetrics[i].AppVersion, "app version matches exactly")
 	}
+}
+
+// TestActivationIsOff tests if using the incorrect activation phrase for the anon metric client / server deactivates
+// the client / server. This test can be removed when / if the anon metrics functionality is reintroduced / re-approved.
+func (s *MessengerAnonMetricsSuite) TestActivationIsOff() {
+	var err error
+
+	// Check the set up messengers are in the expected state with the correct activation phrases
+	s.NotNil(s.alice.anonMetricsClient)
+	s.NotNil(s.bob.anonMetricsServer)
+
+	// Generate Alice Messenger as the client with an incorrect phrase
+	amcc := &anonmetrics.ClientConfig{
+		ShouldSend:  true,
+		SendAddress: &s.bobKey.PublicKey,
+		Active:      "the wrong client phrase",
+	}
+	s.alice, err = newMessengerWithKey(s.shh, s.aliceKey, s.logger, []Option{WithAnonMetricsClientConfig(amcc)})
+	s.NoError(err)
+	_, err = s.alice.Start()
+	s.Require().NoError(err)
+
+	s.Nil(s.alice.anonMetricsClient)
+
+	// Generate Alice Messenger as the client with an no activation phrase
+	amcc = &anonmetrics.ClientConfig{
+		ShouldSend:  true,
+		SendAddress: &s.bobKey.PublicKey,
+	}
+	s.alice, err = newMessengerWithKey(s.shh, s.aliceKey, s.logger, []Option{WithAnonMetricsClientConfig(amcc)})
+	s.NoError(err)
+	_, err = s.alice.Start()
+	s.Require().NoError(err)
+
+	s.Nil(s.alice.anonMetricsClient)
+
+	// Generate Bob Messenger as the Server with an incorrect phrase
+	amsc := &anonmetrics.ServerConfig{
+		Enabled:     true,
+		PostgresURI: postgres.DefaultTestURI,
+		Active:      "the wrong server phrase",
+	}
+	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, s.logger, []Option{WithAnonMetricsServerConfig(amsc)})
+	s.Require().NoError(err)
+
+	s.Nil(s.bob.anonMetricsServer)
+
+	// Generate Bob Messenger as the Server with no activation phrase
+	amsc = &anonmetrics.ServerConfig{
+		Enabled:     true,
+		PostgresURI: postgres.DefaultTestURI,
+	}
+	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, s.logger, []Option{WithAnonMetricsServerConfig(amsc)})
+	s.Require().NoError(err)
+
+	s.Nil(s.bob.anonMetricsServer)
 }
