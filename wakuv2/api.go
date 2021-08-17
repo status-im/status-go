@@ -247,7 +247,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      version,
-		ContentTopic: req.Topic.String(),
+		ContentTopic: req.Topic.ContentTopic(),
 		Timestamp:    utils.GetUnixEpoch(),
 	}
 
