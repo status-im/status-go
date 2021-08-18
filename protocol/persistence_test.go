@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
 
@@ -160,7 +161,7 @@ func TestMessageByChatID(t *testing.T) {
 			err   error
 		)
 
-		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize)
+		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize, requests.OrderingDirectionDesc)
 		require.NoError(t, err)
 		result = append(result, items...)
 
@@ -177,6 +178,89 @@ func TestMessageByChatID(t *testing.T) {
 		// Verify descending order.
 		sort.SliceIsSorted(result, func(i, j int) bool {
 			return result[i].Clock > result[j].Clock
+		}),
+	)
+}
+
+func TestMessageByChatIDAscending(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+	chatID := testPublicChatID
+	count := 1000
+	pageSize := 50
+
+	var messages []*common.Message
+	for i := 0; i < count; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+			From: "me",
+		})
+
+		// Add some other chats.
+		if count%5 == 0 {
+			messages = append(messages, &common.Message{
+				ID:          strconv.Itoa(count + i),
+				LocalChatID: "other-chat",
+				ChatMessage: protobuf.ChatMessage{
+					Clock: uint64(i),
+				},
+
+				From: "me",
+			})
+		}
+	}
+
+	// Add some out-of-order message. Add more than page size.
+	outOfOrderCount := pageSize + 1
+	allCount := count + outOfOrderCount
+	for i := 0; i < pageSize+1; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(count*2 + i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+
+			From: "me",
+		})
+	}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	var (
+		result []*common.Message
+		cursor string
+		iter   int
+	)
+	for {
+		var (
+			items []*common.Message
+			err   error
+		)
+
+		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize, requests.OrderingDirectionAsc)
+		require.NoError(t, err)
+		result = append(result, items...)
+
+		iter++
+		if len(cursor) == 0 || iter > count {
+			break
+		}
+	}
+	require.Equal(t, "", cursor) // for loop should exit because of cursor being empty
+	require.EqualValues(t, math.Ceil(float64(allCount)/float64(pageSize)), iter)
+	require.Equal(t, len(result), allCount)
+	require.True(
+		t,
+		// Verify ascending order.
+		sort.SliceIsSorted(result, func(i, j int) bool {
+			return result[i].Clock < result[j].Clock
 		}),
 	)
 }
@@ -347,7 +431,7 @@ func TestMessageReplies(t *testing.T) {
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 
 	require.Equal(t, "non-existing", retrievedMessages[0].ResponseTo)
@@ -396,7 +480,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 			err   error
 		)
 
-		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize)
+		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize, requests.OrderingDirectionDesc)
 		require.NoError(t, err)
 		result = append(result, items...)
 
@@ -451,14 +535,14 @@ func TestDeleteMessagesByChatID(t *testing.T) {
 	err = insertMinimalMessage(p, "2")
 	require.NoError(t, err)
 
-	m, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err := p.MessageByChatID(testPublicChatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(m))
 
 	err = p.DeleteMessagesByChatID(testPublicChatID)
 	require.NoError(t, err)
 
-	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(m))
 
@@ -667,7 +751,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	require.Equal(t, id3, reactions[0].MessageId)
 
 	// Try with a cursor
-	_, cursor, err := p.MessageByChatID(chatID, "", 1)
+	_, cursor, err := p.MessageByChatID(chatID, "", 1, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 
 	reactions, err = p.EmojiReactionsByChatID(chatID, cursor, 2)
@@ -719,7 +803,7 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 
-	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 }
@@ -761,7 +845,7 @@ func TestSaveMentions(t *testing.T) {
 	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Mentions, 1)
@@ -863,7 +947,7 @@ func TestSaveLinks(t *testing.T) {
 	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Links, 1)
@@ -940,7 +1024,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	require.False(t, publicChat.Active)
 
 	// It deletes messages
-	messages, _, err := p.MessageByChatID(publicChatID, "", 10)
+	messages, _, err := p.MessageByChatID(publicChatID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
@@ -1009,7 +1093,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	require.False(t, chat.Active)
 
 	// It deletes messages
-	messages, _, err := p.MessageByChatID(chat.ID, "", 10)
+	messages, _, err := p.MessageByChatID(chat.ID, "", 10, requests.OrderingDirectionDesc)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 

@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -12,6 +13,14 @@ import (
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")
 var ErrInvalidDeleteTypeAuthor = errors.New("message type cannot be deleted")
 var ErrInvalidEditContentType = errors.New("only text messages can be replaced")
+
+func (m *Messenger) MessageByID(id string) (*common.Message, error) {
+	return m.persistence.MessageByID(id)
+}
+
+func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
+	return m.persistence.MessagesExist(ids)
+}
 
 func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessage) (*MessengerResponse, error) {
 	err := request.Validate()
@@ -206,4 +215,142 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	}
 
 	return m.persistence.HideMessage(message.ID)
+}
+
+func (m *Messenger) MessagesByChatID(request *requests.MessagesByChatID) ([]*common.Message, string, error) {
+
+	if err := request.Validate(); err != nil {
+		return nil, "", err
+	}
+
+	chatID := request.ChatID
+	cursor := request.Cursor
+	limit := request.Limit
+	direction := request.Direction
+
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if chat.Timeline() {
+		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
+		contacts, err := m.persistence.Contacts()
+		if err != nil {
+			return nil, "", err
+		}
+		for _, contact := range contacts {
+			if contact.Added {
+				chatIDs = append(chatIDs, "@"+contact.ID)
+			}
+		}
+		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit, direction)
+	}
+	return m.persistence.MessageByChatID(chatID, cursor, limit, direction)
+}
+
+// DEPRECATED: use MessagesByChatID
+func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if chat.Timeline() {
+		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+			if contact.Added {
+				chatIDs = append(chatIDs, "@"+contact.ID)
+			}
+			return true
+		})
+		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit, requests.OrderingDirectionDesc)
+	}
+	return m.persistence.MessageByChatID(chatID, cursor, limit, requests.OrderingDirectionDesc)
+
+}
+
+func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	_, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.persistence.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
+}
+
+func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	return m.persistence.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
+}
+
+func (m *Messenger) SaveMessages(messages []*common.Message) error {
+	return m.persistence.SaveMessages(messages)
+}
+
+func (m *Messenger) DeleteMessage(id string) error {
+	return m.persistence.DeleteMessage(id)
+}
+
+func (m *Messenger) DeleteMessagesByChatID(id string) error {
+	return m.persistence.DeleteMessagesByChatID(id)
+}
+
+// MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
+// It returns the number of affected messages or error. If there is an error,
+// the number of affected messages is always zero.
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, error) {
+	count, countWithMentions, err := m.persistence.MarkMessagesSeen(chatID, ids)
+	if err != nil {
+		return 0, 0, err
+	}
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return 0, 0, err
+	}
+	m.allChats.Store(chatID, chat)
+	return count, countWithMentions, nil
+}
+
+func (m *Messenger) MarkAllRead(chatID string) error {
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	err := m.persistence.MarkAllRead(chatID)
+	if err != nil {
+		return err
+	}
+
+	chat.UnviewedMessagesCount = 0
+	chat.UnviewedMentionsCount = 0
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
+	return nil
+}
+
+func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
+	chatIDs, err := m.persistence.AllChatIDsByCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.MarkAllReadMultiple(chatIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, chatID := range chatIDs {
+		chat, ok := m.allChats.Load(chatID)
+
+		if ok {
+			chat.UnviewedMessagesCount = 0
+			chat.UnviewedMentionsCount = 0
+			m.allChats.Store(chat.ID, chat)
+		} else {
+			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
+		}
+	}
+
+	return chatIDs, err
 }

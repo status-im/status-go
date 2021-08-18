@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func (db sqlitePersistence) tableUserMessagesAllFields() string {
@@ -522,10 +523,21 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 // MessageByChatID returns all messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
-func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int) ([]*common.Message, string, error) {
-	cursorWhere := ""
-	if currCursor != "" {
-		cursorWhere = "AND cursor <= ?" //nolint: goconst
+func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int, direction requests.OrderingDirection) ([]*common.Message, string, error) {
+	ascending := direction == requests.OrderingDirectionAsc
+	var sortDirection string
+
+	var cursorWhere string
+	if ascending {
+		sortDirection = "ASC"
+		if currCursor != "" {
+			cursorWhere = "AND cursor >= ?" //nolint: goconst
+		}
+	} else {
+		sortDirection = "DESC"
+		if currCursor != "" {
+			cursorWhere = "AND cursor <= ?" //nolint: goconst
+		}
 	}
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := []interface{}{chatID}
@@ -554,9 +566,9 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 			m1.source = c.id
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id = ? %s
-			ORDER BY cursor DESC
+			ORDER BY cursor %s
 			LIMIT ?
-		`, allFields, cursorWhere),
+		`, allFields, cursorWhere, sortDirection),
 		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
@@ -865,7 +877,7 @@ func (db sqlitePersistence) PinnedMessageByChatID(chatID string, currCursor stri
 // MessageByChatIDs returns all messages for a given chatIDs in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
-func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string, limit int) ([]*common.Message, string, error) {
+func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string, limit int, direction requests.OrderingDirection) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
