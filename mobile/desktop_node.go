@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
@@ -73,22 +74,23 @@ func StartDesktopNode(configJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	interruptCh := make(chan struct{})
-
 	_, err = messenger.Start()
 	if err != nil {
 		log.Error("failed to start messenger", "error", err)
 		return makeJSONResponse(err)
 	}
 
-	go retrieveStats(messenger, 5*time.Second, interruptCh)
-
-	gethNode := statusBackend.StatusNode().GethNode()
-	if gethNode != nil {
-		// wait till node has been stopped
-		gethNode.Wait()
-		close(interruptCh)
-	}
+	api.RunAsync(func() error {
+		interruptCh := make(chan struct{})
+		go retrieveStats(messenger, 5*time.Second, interruptCh)
+		gethNode := statusBackend.StatusNode().GethNode()
+		if gethNode != nil {
+			// wait till node has been stopped
+			gethNode.Wait()
+			close(interruptCh)
+		}
+		return nil
+	})
 
 	return makeJSONResponse(nil)
 }
