@@ -1,7 +1,7 @@
 package logutils
 
 import (
-	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/ethereum/go-ethereum/log"
 )

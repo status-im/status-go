@@ -276,7 +276,16 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 
-	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
+	logSettings := logutils.LogSettings{
+		Enabled:         conf.LogEnabled,
+		MobileSystem:    conf.LogMobileSystem,
+		Level:           conf.LogLevel,
+		File:            conf.LogFile,
+		MaxSize:         conf.LogMaxSize,
+		MaxBackups:      conf.LogMaxBackups,
+		CompressRotated: conf.LogCompressRotated,
+	}
+	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
 		return err
 	}
 
@@ -336,7 +345,17 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
+
+	logSettings := logutils.LogSettings{
+		Enabled:         conf.LogEnabled,
+		MobileSystem:    conf.LogMobileSystem,
+		Level:           conf.LogLevel,
+		File:            conf.LogFile,
+		MaxSize:         conf.LogMaxSize,
+		MaxBackups:      conf.LogMaxBackups,
+		CompressRotated: conf.LogCompressRotated,
+	}
+	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
 		return err
 	}
 	b.account = &acc

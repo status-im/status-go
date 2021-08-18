@@ -5,28 +5,36 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/status-im/status-go/params"
 )
 
+type LogSettings struct {
+	Enabled         bool
+	MobileSystem    bool
+	Level           string
+	File            string
+	MaxSize         int
+	MaxBackups      int
+	CompressRotated bool
+}
+
 // OverrideWithStdLogger overwrites ethereum's root logger with a logger from golang std lib.
-func OverrideWithStdLogger(config *params.NodeConfig) error {
-	return enableRootLog(config.LogLevel, NewStdHandler(log.LogfmtFormat()))
+func OverrideWithStdLogger(logLevel string) error {
+	return enableRootLog(logLevel, NewStdHandler(log.LogfmtFormat()))
 }
 
 // OverrideRootLogWithConfig derives all configuration from params.NodeConfig and configures logger using it.
-func OverrideRootLogWithConfig(config *params.NodeConfig, colors bool) error {
-	if !config.LogEnabled {
+func OverrideRootLogWithConfig(settings LogSettings, colors bool) error {
+	if !settings.Enabled {
 		return nil
 	}
-	if config.LogMobileSystem {
-		return OverrideWithStdLogger(config)
+	if settings.MobileSystem {
+		return OverrideWithStdLogger(settings.Level)
 	}
-	return OverrideRootLog(config.LogEnabled, config.LogLevel, FileOptions{
-		Filename:   config.LogFile,
-		MaxSize:    config.LogMaxSize,
-		MaxBackups: config.LogMaxBackups,
-		Compress:   config.LogCompressRotated,
+	return OverrideRootLog(settings.Enabled, settings.Level, FileOptions{
+		Filename:   settings.File,
+		MaxSize:    settings.MaxSize,
+		MaxBackups: settings.MaxBackups,
+		Compress:   settings.CompressRotated,
 	}, colors)
 
 }

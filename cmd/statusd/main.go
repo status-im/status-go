@@ -255,8 +255,17 @@ func setupLogging(config *params.NodeConfig) {
 		config.LogLevel = *logLevel
 	}
 
+	logSettings := logutils.LogSettings{
+		Enabled:         config.LogEnabled,
+		MobileSystem:    config.LogMobileSystem,
+		Level:           config.LogLevel,
+		File:            config.LogFile,
+		MaxSize:         config.LogMaxSize,
+		MaxBackups:      config.LogMaxBackups,
+		CompressRotated: config.LogCompressRotated,
+	}
 	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLogWithConfig(config, colors); err != nil {
+	if err := logutils.OverrideRootLogWithConfig(logSettings, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 }
