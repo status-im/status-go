@@ -1,14 +1,20 @@
 package statusgo
 
 import (
+	"context"
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
+
+	"github.com/ethereum/go-ethereum/log"
+	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/metrics"
+	nodemetrics "github.com/status-im/status-go/metrics/node"
+	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	protocol "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/signal"
@@ -82,6 +88,11 @@ func StartDesktopNode(configJSON string) string {
 
 	api.RunAsync(func() error {
 		interruptCh := make(chan struct{})
+
+		go startCollectingNodeMetrics(interruptCh, statusBackend.StatusNode())
+		go gethmetrics.CollectProcessMetrics(3 * time.Second)
+		go metrics.NewMetricsServer(9090, gethmetrics.DefaultRegistry).Listen()
+
 		go retrieveStats(messenger, 5*time.Second, interruptCh)
 		gethNode := statusBackend.StatusNode().GethNode()
 		if gethNode != nil {
@@ -93,6 +104,35 @@ func StartDesktopNode(configJSON string) string {
 	})
 
 	return makeJSONResponse(nil)
+}
+
+// startCollectingStats collects various stats about the node and other protocols like Whisper.
+func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
+	log.Info("Starting collecting node metrics")
+
+	gethNode := statusNode.GethNode()
+	if gethNode == nil {
+		log.Error("Failed to run metrics because it could not get the node")
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		// Try to subscribe and collect metrics. In case of an error, retry.
+		for {
+			if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
+				log.Error("Failed to subscribe server events", "error", err)
+			} else {
+				// no error means that the subscription was terminated by purpose
+				return
+			}
+
+			time.Sleep(time.Second)
+		}
+	}()
+
+	<-interruptCh
 }
 
 func StopNode() string {
