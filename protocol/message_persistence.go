@@ -652,6 +652,106 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 	return result, nil
 }
 
+// AllMessagesFromChatsAndCommunitiesWhichMatchTerm returns all messages which match the search
+// term, if they belong to either any chat from the chatIds array or any channel of any community
+// from communityIds array.
+// Ordering is accomplished using two concatenated values: ClockValue and ID.
+// These two values are also used to compose a cursor which is returned to the result.
+func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	if searchTerm == "" {
+		return nil, fmt.Errorf("empty search term")
+	}
+
+	chatsCond := ""
+	if len(chatIds) > 0 {
+		inVector := strings.Repeat("?, ", len(chatIds)-1) + "?"
+		chatsCond = `m1.local_chat_id IN (%s)`
+		chatsCond = fmt.Sprintf(chatsCond, inVector)
+	}
+
+	communitiesCond := ""
+	if len(communityIds) > 0 {
+		inVector := strings.Repeat("?, ", len(communityIds)-1) + "?"
+		communitiesCond = `m1.local_chat_id IN (SELECT id FROM chats WHERE community_id IN (%s))`
+		communitiesCond = fmt.Sprintf(communitiesCond, inVector)
+	}
+
+	searchCond := ""
+	if caseSensitive {
+		searchCond = "m1.text LIKE '%' || ? || '%'"
+	} else {
+		searchCond = "LOWER(m1.text) LIKE LOWER('%' || ? || '%')"
+	}
+
+	finalCond := "AND %s AND %s"
+	if len(communityIds) > 0 && len(chatIds) > 0 {
+		finalCond = "AND (%s OR %s) AND %s"
+		finalCond = fmt.Sprintf(finalCond, chatsCond, communitiesCond, searchCond)
+	} else if len(chatIds) > 0 {
+		finalCond = fmt.Sprintf(finalCond, chatsCond, searchCond)
+	} else if len(communityIds) > 0 {
+		finalCond = fmt.Sprintf(finalCond, communitiesCond, searchCond)
+	} else {
+		return nil, fmt.Errorf("you must specify either community ids or chat ids or both")
+	}
+
+	var parameters []string
+	parameters = append(parameters, chatIds...)
+	parameters = append(parameters, communityIds...)
+	parameters = append(parameters, searchTerm)
+
+	idsArgs := make([]interface{}, 0, len(parameters))
+	for _, param := range parameters {
+		idsArgs = append(idsArgs, param)
+	}
+
+	allFields := db.tableUserMessagesAllFieldsJoin()
+
+	finalQuery := fmt.Sprintf(`
+		SELECT
+			%s,
+			substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+		FROM
+			user_messages m1
+		LEFT JOIN
+			user_messages m2
+		ON
+		m1.response_to = m2.id
+
+		LEFT JOIN
+			contacts c
+		ON
+
+		m1.source = c.id
+		WHERE
+			NOT(m1.hide) %s
+		ORDER BY cursor DESC
+	`, allFields, finalCond)
+
+	rows, err := db.db.Query(finalQuery, idsArgs...)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var (
+		result []*common.Message
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, err
+		}
+		result = append(result, &message)
+	}
+
+	return result, nil
+}
+
 // PinnedMessageByChatID returns all pinned messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.

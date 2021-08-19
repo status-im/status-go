@@ -3170,6 +3170,10 @@ func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm s
 	return m.persistence.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
 }
 
+func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	return m.persistence.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
+}
+
 func (m *Messenger) SaveMessages(messages []*common.Message) error {
 	return m.persistence.SaveMessages(messages)
 }
