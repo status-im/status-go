@@ -40,6 +40,7 @@ type Notification struct {
 	ConversationID      string
 	Timestamp           uint64
 	Author              NotificationAuthor
+	Deleted             bool
 }
 
 type NotificationAuthor struct {
@@ -66,6 +67,7 @@ type notificationAlias struct {
 	ConversationID      string             `json:"conversationId,omitempty"`
 	Timestamp           uint64             `json:"timestamp,omitempty"`
 	Author              NotificationAuthor `json:"notificationAuthor,omitempty"`
+	Deleted             bool               `json:"deleted,omitempty"`
 }
 
 // MessageEvent - structure used to pass messages from chat to bus
@@ -136,6 +138,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		ConversationID:      n.ConversationID,
 		Timestamp:           n.Timestamp,
 		Author:              n.Author,
+		Deleted:             n.Deleted,
 	}
 
 	return json.Marshal(alias)

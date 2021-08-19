@@ -553,14 +553,14 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 	return nil
 }
 
-func (m *Messenger) HandleDeleteMessage(response *MessengerResponse, deleteMessage DeleteMessage) error {
+func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage) error {
 	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
 		return err
 	}
 
 	messageID := deleteMessage.MessageId
 	// Check if it's already in the response
-	originalMessage := response.GetMessage(messageID)
+	originalMessage := state.Response.GetMessage(messageID)
 	// otherwise pull from database
 	if originalMessage == nil {
 		var err error
@@ -603,8 +603,10 @@ func (m *Messenger) HandleDeleteMessage(response *MessengerResponse, deleteMessa
 			return err
 		}
 	}
-	response.AddRemovedMessage(messageID)
-	response.AddChat(chat)
+
+	state.Response.AddRemovedMessage(messageID)
+	state.Response.AddChat(chat)
+	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
 
 	return nil
 }

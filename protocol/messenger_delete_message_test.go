@@ -212,14 +212,16 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 
-	response := &MessengerResponse{}
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(response, deleteMessage)
+	err = s.m.HandleDeleteMessage(state, deleteMessage)
 	s.Require().NoError(err)
 
 	// // Handle chat message
-	state := &ReceivedMessageState{
+	state = &ReceivedMessageState{
 		Response: &MessengerResponse{},
 		CurrentMessageState: &CurrentMessageState{
 			Message:          inputMessage.ChatMessage,

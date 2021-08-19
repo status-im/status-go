@@ -54,6 +54,17 @@ func NewMessageNotification(id string, message *common.Message, chat *Chat, cont
 	return body.toMessageNotification(id, contacts)
 }
 
+func DeletedMessageNotification(id string, chat *Chat) *localnotifications.Notification {
+	return &localnotifications.Notification{
+		BodyType:       localnotifications.TypeMessage,
+		ID:             gethcommon.HexToHash(id),
+		IsConversation: true,
+		ConversationID: chat.ID,
+		Deeplink:       chat.DeepLink(),
+		Deleted:        true,
+	}
+}
+
 func NewCommunityRequestToJoinNotification(id string, community *communities.Community, contact *Contact) *localnotifications.Notification {
 	body := &NotificationBody{
 		Community: community,
