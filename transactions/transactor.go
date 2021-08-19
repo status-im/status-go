@@ -382,7 +382,22 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 		tx = gethtypes.NewTx(txData)
 		t.logNewTx(args, gas, gasPrice, value)
 	} else {
-		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		if args.IsDynamicFeeTx() {
+			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
+			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
+
+			txData := &gethtypes.DynamicFeeTx{
+				Nonce:     nonce,
+				Value:     value,
+				Gas:       gas,
+				GasTipCap: gasTipCap,
+				GasFeeCap: gasFeeCap,
+				Data:      args.GetInput(),
+			}
+			tx = gethtypes.NewTx(txData)
+		} else {
+			tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		}
 		t.logNewContract(args, gas, gasPrice, value, nonce)
 	}
 
