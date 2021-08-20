@@ -25,6 +25,7 @@ func NewService(db *Database, accountsFeed *event.Feed) *Service {
 			publisher: feed,
 		},
 		accountsFeed: accountsFeed,
+		opensea:      newOpenseaClient(),
 	}
 }
 
@@ -37,6 +38,7 @@ type Service struct {
 	client              *walletClient
 	cryptoOnRampManager *CryptoOnRampManager
 	started             bool
+	opensea             *OpenseaClient
 
 	group        *Group
 	accountsFeed *event.Feed
