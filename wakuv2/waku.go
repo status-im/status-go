@@ -43,6 +43,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/metrics"
+
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
@@ -78,7 +81,7 @@ type Waku struct {
 	expirations map[uint32]mapset.Set                       // Message expiration pool
 	poolMu      sync.RWMutex                                // Mutex to sync the message and expiration pools
 
-	stats *common.StatsTracker
+	bandwidthCounter *metrics.BandwidthCounter
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 	quit     chan struct{}                // Channel used for graceful exit
@@ -122,7 +125,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	waku.filters = common.NewFilters()
-	waku.stats = &common.StatsTracker{}
+	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	var privateKey *ecdsa.PrivateKey
 	var err error
@@ -143,6 +146,9 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	waku.node, err = node.New(context.Background(),
+		node.WithLibP2POptions(
+			libp2p.BandwidthReporter(waku.bandwidthCounter),
+		),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
@@ -180,7 +186,11 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
-	return w.stats.GetStats()
+	stats := w.bandwidthCounter.GetBandwidthTotals()
+	return types.StatsSummary{
+		UploadRate:   uint64(stats.RateOut),
+		DownloadRate: uint64(stats.RateIn),
+	}
 }
 
 func (w *Waku) runMsgLoop() {
