@@ -10,6 +10,11 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+type RemovedMessage struct {
+	ChatID    string `json:"chatId"`
+	MessageID string `json:"messageId"`
+}
+
 type MessengerResponse struct {
 	Contacts                []*Contact
 	Installations           []*multidevice.Installation
@@ -24,7 +29,7 @@ type MessengerResponse struct {
 	notifications               map[string]*localnotifications.Notification
 	chats                       map[string]*Chat
 	removedChats                map[string]bool
-	removedMessages             map[string]bool
+	removedMessages             map[string]*RemovedMessage
 	communities                 map[string]*communities.Community
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	messages                    map[string]*common.Message
@@ -37,7 +42,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
 		Chats                   []*Chat                         `json:"chats,omitempty"`
 		RemovedChats            []string                        `json:"removedChats,omitempty"`
-		RemovedMessages         []string                        `json:"removedMessages,omitempty"`
+		RemovedMessages         []*RemovedMessage               `json:"removedMessages,omitempty"`
 		Messages                []*common.Message               `json:"messages,omitempty"`
 		Contacts                []*Contact                      `json:"contacts,omitempty"`
 		Installations           []*multidevice.Installation     `json:"installations,omitempty"`
@@ -94,10 +99,10 @@ func (r *MessengerResponse) RemovedChats() []string {
 	return chats
 }
 
-func (r *MessengerResponse) RemovedMessages() []string {
-	var messages []string
+func (r *MessengerResponse) RemovedMessages() []*RemovedMessage {
+	var messages []*RemovedMessage
 	for messageID := range r.removedMessages {
-		messages = append(messages, messageID)
+		messages = append(messages, r.removedMessages[messageID])
 	}
 	return messages
 }
@@ -240,18 +245,18 @@ func (r *MessengerResponse) AddRemovedChat(chatID string) {
 	r.removedChats[chatID] = true
 }
 
-func (r *MessengerResponse) AddRemovedMessages(messages []string) {
+func (r *MessengerResponse) AddRemovedMessages(messages []*RemovedMessage) {
 	for _, m := range messages {
 		r.AddRemovedMessage(m)
 	}
 }
 
-func (r *MessengerResponse) AddRemovedMessage(messageID string) {
+func (r *MessengerResponse) AddRemovedMessage(rm *RemovedMessage) {
 	if r.removedMessages == nil {
-		r.removedMessages = make(map[string]bool)
+		r.removedMessages = make(map[string]*RemovedMessage)
 	}
 
-	r.removedMessages[messageID] = true
+	r.removedMessages[rm.MessageID] = rm
 }
 
 func (r *MessengerResponse) AddActivityCenterNotifications(ns []*ActivityCenterNotification) {

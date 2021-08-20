@@ -593,7 +593,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
-	err = m.persistence.HideMessage(deleteMessage.MessageId)
+	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
 	if err != nil {
 		return err
 	}
@@ -612,7 +612,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	state.Response.AddRemovedMessage(messageID)
+	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
 

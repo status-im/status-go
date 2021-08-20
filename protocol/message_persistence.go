@@ -1196,6 +1196,12 @@ func (db sqlitePersistence) HideMessage(id string) error {
 	return err
 }
 
+// SetHideOnMessage set the hide flag, but not the seen flag, as it's needed by the client to understand whether the count should be updated
+func (db sqlitePersistence) SetHideOnMessage(id string) error {
+	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1 WHERE id = ?`, id)
+	return err
+}
+
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
 	return db.deleteMessagesByChatID(id, nil)
 }

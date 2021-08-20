@@ -95,7 +95,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().NoError(err)
 	s.Require().Len(sendResponse.Messages(), 0)
 	s.Require().Len(sendResponse.RemovedMessages(), 1)
-	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0])
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
 	s.Require().Len(sendResponse.Chats(), 1)
 	// LastMessage is removed
 	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
@@ -147,7 +147,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	s.Require().NoError(err)
 	s.Require().Len(sendResponse.Messages(), 0)
 	s.Require().Len(sendResponse.RemovedMessages(), 1)
-	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0])
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
 	s.Require().Len(sendResponse.Chats(), 1)
 	// LastMessage is updated to previous message
 	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)

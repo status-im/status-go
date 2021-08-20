@@ -153,7 +153,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	response := &MessengerResponse{}
 	response.AddMessage(message)
-	response.AddRemovedMessage(messageID)
+	response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	response.AddChat(chat)
 
 	return response, nil
