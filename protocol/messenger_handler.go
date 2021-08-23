@@ -598,6 +598,14 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
+	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
+	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteMessage.MessageId)
+
+	if err != nil {
+		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
+		return err
+	}
+
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
