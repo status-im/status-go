@@ -14,6 +14,8 @@ const (
 	REGISTER_RESPONSE
 	DISCOVER
 	DISCOVER_RESPONSE
+	REMOTEIP
+	REMOTEIP_RESPONSE
 
 	OK                  ResponseStatus = 0
 	E_INVALID_NAMESPACE ResponseStatus = 100
@@ -45,4 +47,12 @@ type DiscoverResponse struct {
 	Status  ResponseStatus
 	Message string
 	Records []enr.Record
+}
+
+type RemoteIp struct {
+}
+
+type RemoteIpResponse struct {
+	Status ResponseStatus
+	IP     string
 }

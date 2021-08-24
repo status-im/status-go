@@ -451,7 +451,7 @@ github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
-# github.com/status-im/rendezvous v1.3.2
+# github.com/status-im/rendezvous v1.3.1-0.20210824184947-7c79c858170c
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
