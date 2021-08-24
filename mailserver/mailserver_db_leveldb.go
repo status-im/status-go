@@ -33,7 +33,23 @@ func (i *LevelDBIterator) DBKey() (*DBKey, error) {
 	}, nil
 }
 
-func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
+func (i *LevelDBIterator) GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error) {
+	rawValue := make([]byte, len(i.Value()))
+	copy(rawValue, i.Value())
+
+	key, err := i.DBKey()
+	if err != nil {
+		return nil, err
+	}
+
+	if !topics[key.Topic()] {
+		return nil, nil
+	}
+
+	return rawValue, nil
+}
+
+func (i *LevelDBIterator) GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error) {
 	var envelopeBloom []byte
 	rawValue := make([]byte, len(i.Value()))
 	copy(rawValue, i.Value())

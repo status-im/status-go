@@ -38,7 +38,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
 	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
 	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
-	assert.NotEmpty(t, c.ClusterConfig.RendezvousNodes)
 	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert LES
 	assert.Equal(t, true, c.LightEthConfig.Enabled)

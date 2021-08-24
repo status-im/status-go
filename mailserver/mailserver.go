@@ -749,6 +749,15 @@ func (s *mailServer) processRequestInBundles(
 		"limit", limit,
 	)
 
+	var topicsMap map[types.TopicType]bool
+
+	if len(topics) != 0 {
+		topicsMap = make(map[types.TopicType]bool)
+		for _, t := range topics {
+			topicsMap[types.BytesToTopic(t)] = true
+		}
+	}
+
 	// We iterate over the envelopes.
 	// We collect envelopes in batches.
 	// If there still room and we haven't reached the limit
@@ -756,7 +765,16 @@ func (s *mailServer) processRequestInBundles(
 	// Otherwise publish what you have so far, reset the bundle to the
 	// current envelope, and leave if we hit the limit
 	for iter.Next() {
-		rawValue, err := iter.GetEnvelope(bloom)
+		var rawValue []byte
+		var err error
+		if len(topicsMap) != 0 {
+			rawValue, err = iter.GetEnvelopeByTopicsMap(topicsMap)
+
+		} else if len(bloom) != 0 {
+			rawValue, err = iter.GetEnvelopeByBloomFilter(bloom)
+		} else {
+			err = errors.New("either topics or bloom must be specified")
+		}
 		if err != nil {
 			log.Error(
 				"[mailserver:processRequestInBundles]Failed to get envelope from iterator",
@@ -765,6 +783,7 @@ func (s *mailServer) processRequestInBundles(
 			)
 			continue
 		}
+
 		if rawValue == nil {
 			continue
 		}

@@ -143,7 +143,7 @@ func countMessages(t *testing.T, db DB) int {
 
 	for i.Next() {
 		var env waku.Envelope
-		value, err := i.GetEnvelope(query.bloom)
+		value, err := i.GetEnvelopeByBloomFilter(query.bloom)
 		if err != nil {
 			t.Fatal(err)
 		}
