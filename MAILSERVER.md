@@ -46,8 +46,13 @@ There's two simple ways to verify your Mailserver is up and running.
 
 By making an HTTP request to the metrics port(`9090` by default) you can check if you Mailserver is receiving envelopes:
 ```sh
- $ curl -s localhost:9090/metrics | grep '^whisper_envelopes_received_total'
-whisper_envelopes_received_total 123
+ > curl -sS localhost:9090/metrics | grep '^waku_envelopes_received_total'
+waku_envelopes_received_total 123
+```
+Or numbers and types of peers connected:
+```sh
+ > curl -sS localhost:9090/metrics | grep '^p2p_peers_count'
+p2p_peers_count{platform="linux-amd64",type="Statusd",version="v0.79.0"} 3
 ```
 
 ## JSON RPC Calls
@@ -55,10 +60,16 @@ whisper_envelopes_received_total 123
 The JSON RPC port (`8545` by default) allows you to manage your node.
 You can list connected peers by doing:
 ```sh
- $ export DATA='{"jsonrpc":"2.0","method":"admin_peers", "params": [], "id":1}'
- $ curl -s -H 'content-type: application/json' -d $DATA localhost:8545 \
-     | jq -r '.result[].network.remoteAddress'
+ > export RPC_HOST=localhost RPC_PORT=8545
+ > _assets/scripts/rpc.sh admin_peers | jq -r '.result[].network.remoteAddress'
 34.68.132.118:30305
 134.209.136.123:30305
 178.128.141.249:443
+```
+Where [`rpc.sh`](./_assets/scripts/rpc.sh) is simply a thin wrapper around `curl`.
+
+You can use it to easily add peers too:
+```sh
+ > _assets/scripts/rpc.sh admin_addPeer enode://7aa648d6e855950b2e3d3bf220c496e0cae4adfddef3e1e6062e6b177aec93bc6cdcf1282cb40d1656932ebfdd565729da440368d7c4da7dbd4d004b1ac02bf8@178.128.142.26:443
+{"jsonrpc": "2.0", "id": 1, "result": true}
 ```
