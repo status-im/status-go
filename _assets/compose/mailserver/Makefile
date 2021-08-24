@@ -9,15 +9,16 @@ RST := $(shell tput -Txterm sgr0)
 BLD := $(shell tput bold)
 
 # Settings
-export CONTAINER_TAG  ?= v0.83.9
+export CONTAINER_TAG  ?= v0.84.0
 export CONTAINER_IMG  ?= statusteam/status-go
 export CONTAINER_NAME ?= status-go-mailserver
 export LOG_LEVEL      ?= INFO
 export LISTEN_PORT    ?= 30303
 export METRICS_PORT   ?= 9090
+export RPC_HOST       ?= 0.0.0.0
 export RPC_PORT       ?= 8545
-export API_MODULES    ?= eth,web3,admin,mailserver
-export DATA_PATH      ?= /var/tmp/status-go-mail
+export API_MODULES    ?= eth,web3,admin,waku,wakuext
+export DATA_PATH      ?= /var/tmp/$(CONTAINER_NAME)
 export REGISTER_TOPIC ?= whispermail
 export MAIL_PASSWORD  ?= status-offline-inbox
 
