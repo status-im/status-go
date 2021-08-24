@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 
 # Settings & defaults
+RPC_HOST="${RPC_HOST:-localhost}"
 RPC_PORT="${RPC_PORT:-8545}"
 LISTEN_PORT="${LSTEN_PORT:-30303}"
 API_MODULES="${API_MODULES:-eth,web3,admin}"
@@ -28,7 +30,7 @@ fi
 JQ_FILTER_ARRAY=(
   ".ListenAddr = \"0.0.0.0:${LISTEN_PORT}\""
   ".HTTPEnabled = true"
-  ".HTTPHost = \"0.0.0.0\""
+  ".HTTPHost = \"${RPC_HOST}\""
   ".HTTPPort= ${RPC_PORT}"
   ".MaxPeers = ${MAX_PEERS}"
   ".DataDir = \"${DATA_PATH}\""
