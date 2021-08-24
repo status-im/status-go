@@ -69,7 +69,7 @@ func calculatePeerCounts(server *p2p.Server) {
 	nodePeersGauge.Reset()
 
 	for _, p := range peers {
-		labels, err := labelsFromNodeName(p.Name())
+		labels, err := labelsFromNodeName(p.Fullname())
 		if err != nil {
 			logger.Warn("failed parsing peer name", "error", err, "name", p.Name())
 			continue
