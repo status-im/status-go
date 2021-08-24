@@ -4394,3 +4394,7 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact,
 	m.allContacts.Store(msg.From, c)
 	return c, nil
 }
+
+func (m *Messenger) BloomFilter() []byte {
+	return m.transport.BloomFilter()
+}

@@ -164,6 +164,10 @@ func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
+func (api *PublicWakuAPI) BloomFilter() []byte {
+	return nil
+}
+
 //go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
 
 // NewMessage represents a new waku message that is posted through the RPC.

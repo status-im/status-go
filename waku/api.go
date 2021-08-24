@@ -97,6 +97,10 @@ func (api *PublicWakuAPI) SetBloomFilter(ctx context.Context, bloom hexutil.Byte
 	return true, api.w.SetBloomFilter(bloom)
 }
 
+func (api *PublicWakuAPI) BloomFilter() []byte {
+	return api.w.BloomFilter()
+}
+
 // MarkTrustedPeer marks a peer trusted, which will allow it to send historic (expired) messages.
 // Note: This function is not adding new nodes, the node needs to exists as a peer.
 func (api *PublicWakuAPI) MarkTrustedPeer(ctx context.Context, url string) (bool, error) {
