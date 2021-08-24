@@ -26,6 +26,7 @@ To simply start a container run `make`, other commands include:
 
 All settings are passed through environment variables:
 
+* `PUBLIC_IP` - Your IP visible from the internet and advertised by the Mailserver.
 * `LISTEN_PORT` - Mailserver TCP & UDP port, by default it's `30303` but you might want to use `443`.
 * `METRICS_PORT` - Port exposing metrics in [Prometheus](https://prometheus.io/docs/concepts/data_model/) format
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).

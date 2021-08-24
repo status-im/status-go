@@ -1,6 +1,4 @@
 export GIT_ROOT := $(shell git rev-parse --show-toplevel)
-# Useful for showing enode address
-PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -27,6 +25,8 @@ export KEY_PATH     ?= $(DATA_PATH)/nodekey
 export ADDR_PATH    ?= $(DATA_PATH)/nodeaddr
 export LOG_LEVEL    ?= 3
 export LISTEN_PORT  ?= 30301
+# Useful for showing enode address
+export PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 # Info
 STATUS     = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))

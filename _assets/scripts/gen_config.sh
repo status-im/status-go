@@ -9,11 +9,14 @@ RPC_PORT="${RPC_PORT:-8545}"
 LISTEN_PORT="${LSTEN_PORT:-30303}"
 API_MODULES="${API_MODULES:-eth,web3,admin}"
 MAX_PEERS="${MAX_PEERS:-50}"
-FLEET_NAME="${FLEET_NAME:-eth.prod}"
+FLEET_NAME="${FLEET_NAME:-eth.staging}"
 REGISTER_TOPIC="${REGISTER_TOPIC:-whispermail}"
 MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
 DATA_PATH="${DATA_PATH:-/var/tmp/status-go-mail}"
 CONFIG_PATH="${CONFIG_PATH:-${DATA_PATH}/config.json}"
+# Necessary to make Rendezvous discovery protocol work
+PUBLIC_IP_AUTO=$(curl -s https://ipecho.net/plain)
+PUBLIC_IP="${PUBLIC_IP:-${PUBLIC_IP_AUTO}}"
 
 if ! [[ -x $(command -v jq) ]]; then
   echo "Cannot generate config. jq utility is not installed." >&2
@@ -28,6 +31,7 @@ fi
 
 # Assemble the filter for changing the config JSON
 JQ_FILTER_ARRAY=(
+  ".AdvertiseAddr = \"${PUBLIC_IP}\""
   ".ListenAddr = \"0.0.0.0:${LISTEN_PORT}\""
   ".HTTPEnabled = true"
   ".HTTPHost = \"${RPC_HOST}\""

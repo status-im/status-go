@@ -1,6 +1,4 @@
 export GIT_ROOT = $(shell git rev-parse --show-toplevel)
-# Useful for showing enode address
-PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -21,6 +19,8 @@ export API_MODULES    ?= eth,web3,admin,waku,wakuext
 export DATA_PATH      ?= /var/tmp/$(CONTAINER_NAME)
 export REGISTER_TOPIC ?= whispermail
 export MAIL_PASSWORD  ?= status-offline-inbox
+# Necessary to make Rendezvous discovery protocol work
+export PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 define INFO_MSG
  * $(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)

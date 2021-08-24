@@ -1,6 +1,4 @@
 export GIT_ROOT = $(shell git rev-parse --show-toplevel)
-# Useful for showing enode address
-PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -18,6 +16,8 @@ export CONTAINER_NAME ?= status-go-bootnode
 export LOG_LEVEL      ?= 3
 export LISTEN_PORT    ?= 30301
 export API_MODULES    ?= eth,web3,admin
+# Useful for showing enode address
+export PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 NODE_ADDR  = $(shell cat keys/nodeaddr)
 ENODE_ADDR = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)

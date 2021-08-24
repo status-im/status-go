@@ -1,6 +1,4 @@
 export GIT_ROOT := $(shell git rev-parse --show-toplevel)
-# Useful for showing enode address
-PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 RED := $(shell tput -Txterm setaf 1)
 GRN := $(shell tput -Txterm setaf 2)
@@ -28,6 +26,8 @@ export LOG_LEVEL    ?= INFO
 export LISTEN_PORT  ?= 30303
 export METRICS_PORT ?= 9090
 export RPC_PORT     ?= 8545
+# Necessary to make Rendezvous discovery protocol work
+export PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
 
 # Info
 STATUS = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))

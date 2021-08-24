@@ -18,9 +18,9 @@ wakufleets=(
 for fleet in ${fleets[@]}; do 
     echo "Processing $fleet fleet..."
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")
+    rdzv=$(echo $fleetJSON | jq ".rendezvous | map(.)" -r)
     boot=$(echo $fleetJSON | jq ".boot | map(.)" -r)
     mail=$(echo $fleetJSON | jq ".mail | map(.)" -r)
-
 
     # Get random nodes from whisper node list
     maxStaticNodeCount=3
@@ -31,6 +31,7 @@ for fleet in ${fleets[@]}; do
     git checkout $DIR/fleet-$fleet.json \
         && jq \
               ".ClusterConfig.BootNodes = $boot \
+             | .ClusterConfig.RendezvousNodes = $rdzv \
              | .ClusterConfig.TrustedMailServers = $mail \
              | .ClusterConfig.StaticNodes = $whisper" \
              $DIR/fleet-$fleet.json \

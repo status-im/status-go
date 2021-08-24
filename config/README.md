@@ -22,12 +22,14 @@ An example of most important settings would include:
     "NetworkID": 1,
     "DataDir": "/tmp/status-go-data",
     "NodeKey": "123qwe123qwe123qwe123",
-    "Rendezvous": false,
+    "Rendezvous": true,
     "NoDiscovery": false,
+    "AdvertiseAddr": "12.34.56.78",
     "ListenAddr": "0.0.0.0:30303",
     "RegisterTopics": ["whispermail"]
 }
 ```
+The `AdvertiseAddr` is necessary for `Rendezvous` discovery protocol.
 
 If you'd want to enable JSON RPC port you'd need:
 ```json
@@ -98,8 +100,13 @@ This config manages what peers and bootstrap nodes your `status-go` instance con
     ],
     "StaticNodes": [
       "enode://123qwe123qwe@12.34.56.78:30305"
+    ],
+    "RendezvousNodes": [
+      "/ip4/87.65.43.21/tcp/30703/ethv4/16Uiu2HAm312312312312312312312312"
     ]
   }
 }
 ```
 `BootNodes` help the `status-go` instance find peers. They are more important to have than `StaticNodes` or `TrustedMailServers`, which are just statically added peers on start.
+
+`RendezvousNodes` are an alternative protocol for doing the same peer discovery as `BootNodes` do.
