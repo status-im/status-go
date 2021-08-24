@@ -39,7 +39,7 @@ func TestPostgresDB_BuildIteratorWithBloomFilter(t *testing.T) {
 	require.NoError(t, err)
 	hasNext := iter.Next()
 	require.True(t, hasNext)
-	rawValue, err := iter.GetEnvelope(nil)
+	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawValue)
 	var receivedEnvelope waku.Envelope
@@ -72,7 +72,7 @@ func TestPostgresDB_BuildIteratorWithTopic(t *testing.T) {
 	require.NoError(t, err)
 	hasNext := iter.Next()
 	require.True(t, hasNext)
-	rawValue, err := iter.GetEnvelope(nil)
+	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawValue)
 	var receivedEnvelope waku.Envelope

@@ -105,7 +105,17 @@ func (i *postgresIterator) Release() error {
 	return i.Close()
 }
 
-func (i *postgresIterator) GetEnvelope(bloom []byte) ([]byte, error) {
+func (i *postgresIterator) GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error) {
+	var value []byte
+	var id []byte
+	if err := i.Scan(&id, &value); err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
+func (i *postgresIterator) GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error) {
 	var value []byte
 	var id []byte
 	if err := i.Scan(&id, &value); err != nil {

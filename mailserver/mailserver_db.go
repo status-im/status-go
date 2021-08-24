@@ -28,7 +28,8 @@ type Iterator interface {
 	DBKey() (*DBKey, error)
 	Release() error
 	Error() error
-	GetEnvelope(bloom []byte) ([]byte, error)
+	GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error)
+	GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error)
 }
 
 type CursorQuery struct {
