@@ -23,7 +23,7 @@ for fleet in ${fleets[@]}; do
 
 
     # Get random nodes from whisper node list
-    maxStaticNodeCount=2
+    maxStaticNodeCount=3
     staticNodeCount=$(echo $fleetJSON | jq ".whisper | length")
     index=$(($RANDOM % ($staticNodeCount - ($maxStaticNodeCount - 1))))
     whisper=$(echo $fleetJSON | jq ".whisper | map(.) | .[$index:($index + $maxStaticNodeCount)]" -r)
