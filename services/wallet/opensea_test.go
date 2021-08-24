@@ -24,8 +24,10 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 	defer srv.Close()
 
 	opensea := &OpenseaClient{
-		client: srv.Client(),
-		url:    srv.URL,
+		client:           srv.Client(),
+		url:              srv.URL,
+		collectionsCache: make(map[common.Address][]OpenseaCollection),
+		assetsCache:      make(map[common.Address]map[string][]OpenseaAsset),
 	}
 	res, err := opensea.fetchAllCollectionsByOwner(common.Address{1})
 	assert.Equal(t, expected, res)
@@ -54,8 +56,10 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 	defer srv.Close()
 
 	opensea := &OpenseaClient{
-		client: srv.Client(),
-		url:    srv.URL,
+		client:           srv.Client(),
+		url:              srv.URL,
+		collectionsCache: make(map[common.Address][]OpenseaCollection),
+		assetsCache:      make(map[common.Address]map[string][]OpenseaAsset),
 	}
 	res, err := opensea.fetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", 200)
 	assert.Equal(t, expected, res)

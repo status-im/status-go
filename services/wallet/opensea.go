@@ -45,8 +45,10 @@ type OpenseaCollection struct {
 }
 
 type OpenseaClient struct {
-	client *http.Client
-	url    string
+	client           *http.Client
+	url              string
+	collectionsCache map[common.Address][]OpenseaCollection
+	assetsCache      map[common.Address]map[string][]OpenseaAsset
 }
 
 // new opensea client.
@@ -55,10 +57,19 @@ func newOpenseaClient() *OpenseaClient {
 		Timeout: time.Second * 5,
 	}
 
-	return &OpenseaClient{client: client, url: "https://api.opensea.io/api/v1"}
+	return &OpenseaClient{
+		client:           client,
+		url:              "https://api.opensea.io/api/v1",
+		collectionsCache: make(map[common.Address][]OpenseaCollection),
+		assetsCache:      make(map[common.Address]map[string][]OpenseaAsset),
+	}
 }
 
 func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]OpenseaCollection, error) {
+	if cachedCollections, ok := o.collectionsCache[owner]; ok {
+		return cachedCollections, nil
+	}
+
 	offset := 0
 	var collections []OpenseaCollection
 	for {
@@ -80,10 +91,19 @@ func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]Open
 			break
 		}
 	}
+	o.collectionsCache[owner] = collections
 	return collections, nil
 }
 
 func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
+	if _, ok := o.assetsCache[owner]; !ok {
+		o.assetsCache[owner] = make(map[string][]OpenseaAsset)
+	}
+
+	if cachedAssets, ok := o.assetsCache[owner][collectionSlug]; ok {
+		return cachedAssets, nil
+	}
+
 	offset := 0
 	var assets []OpenseaAsset
 	for {
@@ -109,6 +129,8 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 			break
 		}
 	}
+
+	o.assetsCache[owner][collectionSlug] = assets
 	return assets, nil
 }
 
