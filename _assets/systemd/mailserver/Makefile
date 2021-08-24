@@ -34,8 +34,7 @@ STATUS = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
 
 define INFO_MSG
  * $(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
-
-$(GRN)Your enode address is:$(RST)
+ * $(GRN)Your enode address is:$(RST)
 $(shell $(GIT_ROOT)/_assets/scripts/get_enode.sh 2>/dev/null)
 
 $(YLW)Make sure that IP and TCP port are available from the internet!$(RST)

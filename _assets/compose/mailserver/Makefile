@@ -24,8 +24,7 @@ export MAIL_PASSWORD  ?= status-offline-inbox
 
 define INFO_MSG
  * $(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
-
-$(GRN)Your enode address is:$(RST)
+ * $(GRN)Your enode address is:$(RST)
 $(shell $(GIT_ROOT)/_assets/scripts/get_enode.sh 2>/dev/null)
 
 $(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
@@ -66,8 +65,9 @@ enode:
 enode-qr:
 	@$(GIT_ROOT)/_assets/scripts/get_enode.sh --qr
 
+logs: LOG_LINES ?= 100
 logs:
-	docker-compose logs -f -t --tail=100
+	docker-compose logs -f -t --tail=$(LOG_LINES)
 
 start: config
 	@echo " * $(GRN)Starting '$(CONTAINER_NAME)' container...$(RST)"

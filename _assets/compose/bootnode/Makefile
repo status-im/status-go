@@ -19,16 +19,20 @@ export LOG_LEVEL      ?= 3
 export LISTEN_PORT    ?= 30301
 export API_MODULES    ?= eth,web3,admin
 
+NODE_ADDR  = $(shell cat keys/nodeaddr)
+ENODE_ADDR = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)
+
 define INFO_MSG
  * $(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
+ * $(GRN)Your enode address is:$(RST)
+$(ENODE_ADDR)
 
 $(YLW)Make sure that address and UDP port are available from the internet!$(RST)
 
-$(GRN)Your enode address is:$(RST)
 endef
 export INFO_MSG
 
-all: checks start show info enode
+all: checks start show info enode-qr
 
 checks:
 ifeq (, $(shell which docker))
@@ -51,10 +55,14 @@ ifndef CONTAINER_NAME
 endif
 
 enode: keys/nodeaddr
-	@echo "enode://$(shell cat keys/nodeaddr)@$(PUBLIC_IP):$(LISTEN_PORT)"
+	@echo $(ENODE_ADDR)
 
+enode-qr: keys/nodeaddr
+	@qrencode -t UTF8 $(ENODE_ADDR)
+
+logs: LOG_LINES ?= 100
 logs:
-	docker-compose logs -f -t --tail=100
+	docker-compose logs -f -t --tail=$(LOG_LINES)
 
 info:
 	@echo "$$INFO_MSG"

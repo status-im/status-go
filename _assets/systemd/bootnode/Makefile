@@ -29,16 +29,16 @@ export LOG_LEVEL    ?= 3
 export LISTEN_PORT  ?= 30301
 
 # Info
-STATUS    = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
-NODE_ADDR = $(shell cat $(ADDR_PATH))
-ENODE     = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)
+STATUS     = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
+NODE_ADDR  = $(shell cat $(ADDR_PATH))
+ENODE_ADDR = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)
 
 define INFO_MSG
  * $(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)
+ * $(GRN)Your enode address is:$(RST)
+$(ENODE_ADDR)
 
 $(YLW)Make sure that IP and TCP port are available from the internet!$(RST)
-$(GRN)Your enode address is:$(RST)
-$(ENODE)
 endef
 export INFO_MSG
 
