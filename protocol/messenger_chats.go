@@ -20,16 +20,8 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
-func (m *Messenger) LatestActiveNChats(num int) []*Chat {
-	var chats []*Chat
-	var i = 0
-	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
-		chats = append(chats, chat)
-		i++
-		return i < num
-	})
-
-	return chats
+func (m *Messenger) LatestActiveChats() []*Chat {
+	return m.latestNActiveChats
 }
 
 func (m *Messenger) ActiveChats() []*Chat {
