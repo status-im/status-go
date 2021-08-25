@@ -104,7 +104,7 @@ func (r *Rendezvous) Stop() error {
 	return nil
 }
 
-func (r *Rendezvous) MakeRecord(srv ma.Multiaddr) (record enr.Record, err error) {
+func (r *Rendezvous) MakeRecord(srv *ma.Multiaddr) (record enr.Record, err error) {
 	r.recordMu.Lock()
 	defer r.recordMu.Unlock()
 	if r.record != nil {
@@ -118,11 +118,11 @@ func (r *Rendezvous) MakeRecord(srv ma.Multiaddr) (record enr.Record, err error)
 	}
 
 	ip := r.node.IP()
-	if ip.IsLoopback() || IsPrivate(ip) { // If AdvertiseAddr is not specified, 127.0.0.1 might be returned
+	if srv != nil && (ip.IsLoopback() || IsPrivate(ip)) { // If AdvertiseAddr is not specified, 127.0.0.1 might be returned
 		ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 		defer cancel()
 
-		ipAddr, err := r.client.RemoteIp(ctx, srv)
+		ipAddr, err := r.client.RemoteIp(ctx, *srv)
 		if err != nil {
 			log.Error("could not obtain the external ip address", "err", err)
 		} else {
@@ -165,7 +165,7 @@ func (r *Rendezvous) register(srv ma.Multiaddr, topic string, record enr.Record)
 // Register renews registration in the specified server.
 func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 	srv := r.getRandomServer()
-	record, err := r.MakeRecord(srv)
+	record, err := r.MakeRecord(&srv)
 	if err != nil {
 		return err
 	}

@@ -68,7 +68,7 @@ func TestMakeRecordReturnsCachedRecord(t *testing.T) {
 	record := enr.Record{}
 	require.NoError(t, enode.SignV4(&record, identity))
 	c := NewRendezvousWithENR(nil, record)
-	rst, err := c.MakeRecord(c.getRandomServer())
+	rst, err := c.MakeRecord(nil)
 	require.NoError(t, err)
 	require.NotNil(t, enode.V4ID{}.NodeAddr(&rst))
 	require.Equal(t, enode.V4ID{}.NodeAddr(&record), enode.V4ID{}.NodeAddr(&rst))
