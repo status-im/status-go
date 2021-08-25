@@ -6,8 +6,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-var ErrDeleteCommunityCategoryInvalidCommunityID = errors.New("set-community-chat-category: invalid community id")
-var ErrDeleteCommunityCategoryInvalidCategoryID = errors.New("set-community-chat-category: invalid category id")
+var ErrDeleteCommunityCategoryInvalidCommunityID = errors.New("delete-community-category: invalid community id")
+var ErrDeleteCommunityCategoryInvalidCategoryID = errors.New("delete-community-category: invalid category id")
 
 type DeleteCommunityCategory struct {
 	CommunityID types.HexBytes `json:"communityId"`

@@ -6,10 +6,9 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-var ErrReorderCommunityChatInvalidCommunityID = errors.New("edit-community-category: invalid community id")
-var ErrReorderCommunityChatInvalidCategoryID = errors.New("edit-community-category: invalid category id")
-var ErrReorderCommunityChatInvalidChatID = errors.New("edit-community-category: invalid chat id")
-var ErrReorderCommunityChatInvalidPosition = errors.New("edit-community-category: invalid position")
+var ErrReorderCommunityChatInvalidCommunityID = errors.New("reorder-community-chat: invalid community id")
+var ErrReorderCommunityChatInvalidChatID = errors.New("reorder-community-chat: invalid chat id")
+var ErrReorderCommunityChatInvalidPosition = errors.New("reorder-community-chat: invalid position")
 
 type ReorderCommunityChat struct {
 	CommunityID types.HexBytes `json:"communityId"`
@@ -21,10 +20,6 @@ type ReorderCommunityChat struct {
 func (j *ReorderCommunityChat) Validate() error {
 	if len(j.CommunityID) == 0 {
 		return ErrReorderCommunityChatInvalidCommunityID
-	}
-
-	if len(j.CategoryID) == 0 {
-		return ErrReorderCommunityChatInvalidCategoryID
 	}
 
 	if len(j.ChatID) == 0 {
