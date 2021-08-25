@@ -129,6 +129,7 @@ func (r *Rendezvous) MakeRecord(srv *ma.Multiaddr) (record enr.Record, err error
 			parsedIP := net.ParseIP(ipAddr)
 			if parsedIP != nil {
 				ip = parsedIP
+				log.Info("node's external IP address", "ipAddr", ipAddr)
 			} else {
 				log.Error("invalid ip address obtained from rendezvous server", "ipaddr", ipAddr, "err", err)
 			}
