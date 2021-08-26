@@ -40,6 +40,10 @@ func (w *gethPublicWakuV2APIWrapper) DeleteKeyPair(ctx context.Context, key stri
 	return w.api.DeleteKeyPair(ctx, key)
 }
 
+func (w *gethPublicWakuV2APIWrapper) BloomFilter() []byte {
+	return w.api.BloomFilter()
+}
+
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
 func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req types.Criteria) (string, error) {

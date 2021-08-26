@@ -62,6 +62,8 @@ type PublicWhisperAPI interface {
 	// GetFilterMessages returns the messages that match the filter criteria and
 	// are received between the last poll and now.
 	GetFilterMessages(id string) ([]*Message, error)
+	// BloomFilter returns the current bloomfilter of the node
+	BloomFilter() []byte
 }
 
 // PublicWakuAPI provides the waku RPC service that can be
@@ -84,4 +86,6 @@ type PublicWakuAPI interface {
 	// GetFilterMessages returns the messages that match the filter criteria and
 	// are received between the last poll and now.
 	GetFilterMessages(id string) ([]*Message, error)
+
+	BloomFilter() []byte
 }

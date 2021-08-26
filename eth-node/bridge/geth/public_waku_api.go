@@ -59,6 +59,10 @@ func (w *gethPublicWakuAPIWrapper) NewMessageFilter(req types.Criteria) (string,
 	return w.api.NewMessageFilter(criteria)
 }
 
+func (w *gethPublicWakuAPIWrapper) BloomFilter() []byte {
+	return w.api.BloomFilter()
+}
+
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
 func (w *gethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Message, error) {

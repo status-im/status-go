@@ -578,6 +578,10 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 	return t.cache.Clear()
 }
 
+func (t *Transport) BloomFilter() []byte {
+	return t.api.BloomFilter()
+}
+
 func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }

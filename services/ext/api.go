@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -877,6 +878,11 @@ func (api *PublicAPI) FillGaps(chatID string, messageIDs []string) error {
 
 func (api *PublicAPI) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	return api.service.messenger.SyncChatFromSyncedFrom(chatID)
+}
+
+// BloomFilter returns the current bloom filter bytes
+func (api *PublicAPI) BloomFilter() string {
+	return hexutil.Encode(api.service.messenger.BloomFilter())
 }
 
 // -----
