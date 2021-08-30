@@ -414,6 +414,14 @@ func (t *Transport) WakuVersion() uint {
 	return t.waku.Version()
 }
 
+func (t *Transport) PeerCount() int {
+	return t.waku.PeerCount()
+}
+
+func (t *Transport) Peers() map[string][]string {
+	return t.waku.Peers()
+}
+
 func (t *Transport) createMessagesRequestV1(
 	ctx context.Context,
 	peerID []byte,
@@ -584,4 +592,16 @@ func (t *Transport) BloomFilter() []byte {
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
+}
+
+func (t *Transport) AddStorePeer(address string) error {
+	return t.waku.AddStorePeer(address)
+}
+
+func (t *Transport) AddRelayPeer(address string) error {
+	return t.waku.AddRelayPeer(address)
+}
+
+func (t *Transport) DropPeer(peerID string) error {
+	return t.waku.DropPeer(peerID)
 }

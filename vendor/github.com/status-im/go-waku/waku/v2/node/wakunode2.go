@@ -721,6 +721,11 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	return w.connect(info)
 }
 
+func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
+	info := w.host.Peerstore().PeerInfo(peerID)
+	return w.host.Connect(w.ctx, info)
+}
+
 func (w *WakuNode) ClosePeerByAddress(address string) error {
 	p, err := ma.NewMultiaddr(address)
 	if err != nil {
@@ -766,7 +771,6 @@ func (w *WakuNode) Peers() PeerStats {
 }
 
 func (w *WakuNode) startKeepAlive(t time.Duration) {
-
 	log.Info("Setting up ping protocol with duration of ", t)
 
 	w.ping = ping.NewPingService(w.host)

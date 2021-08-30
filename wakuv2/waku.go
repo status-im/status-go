@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"go.uber.org/zap"
 
@@ -37,6 +37,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -65,6 +66,12 @@ type settings struct {
 	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
 	EnableConfirmations    bool            // Enable sending message confirmations
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
+}
+
+type ConnStatus struct {
+	IsOnline   bool                `json:"isOnline"`
+	HasHistory bool                `json:"hasHistory"`
+	Peers      map[string][]string `json:"peers"`
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -167,7 +174,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 			case <-waku.quit:
 				return
 			case c := <-connStatusChan:
-				signal.SendPeerStats(c)
+				signal.SendPeerStats(formatConnStatus(c))
 			}
 		}
 	}()
@@ -707,6 +714,28 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 	return exist
 }
 
+func (w *Waku) PeerCount() int {
+	return w.node.PeerCount()
+}
+
+func (w *Waku) Peers() map[string][]string {
+	return FormatPeerStats(w.node.Peers())
+}
+
+func (w *Waku) AddStorePeer(address string) error {
+	_, err := w.node.AddStorePeer(address)
+	return err
+}
+
+func (w *Waku) AddRelayPeer(address string) error {
+	// TODO:
+	return nil
+}
+
+func (w *Waku) DropPeer(peerID string) error {
+	return w.node.ClosePeerById(peer.ID(peerID))
+}
+
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {
@@ -740,4 +769,20 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	}
 
 	return id, nil
+}
+
+func FormatPeerStats(peers node.PeerStats) map[string][]string {
+	p := make(map[string][]string)
+	for k, v := range peers {
+		p[k.Pretty()] = v
+	}
+	return p
+}
+
+func formatConnStatus(c node.ConnStatus) ConnStatus {
+	return ConnStatus{
+		IsOnline:   c.IsOnline,
+		HasHistory: c.HasHistory,
+		Peers:      FormatPeerStats(c.Peers),
+	}
 }
