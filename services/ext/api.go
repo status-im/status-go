@@ -885,6 +885,18 @@ func (api *PublicAPI) BloomFilter() string {
 	return hexutil.Encode(api.service.messenger.BloomFilter())
 }
 
+func (api *PublicAPI) AddStorePeer(address string) error {
+	return api.service.messenger.AddStorePeer(address)
+}
+
+func (api *PublicAPI) AddRelayPeer(address string) error {
+	return api.service.messenger.AddRelayPeer(address)
+}
+
+func (api *PublicAPI) DropPeer(peerID string) error {
+	return api.service.messenger.DropPeer(peerID)
+}
+
 // -----
 // HELPER
 // -----
