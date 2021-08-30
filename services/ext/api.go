@@ -908,6 +908,10 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(peerID)
 }
 
+func (api *PublicAPI) Peers() map[string][]string {
+	return api.service.messenger.Peers()
+}
+
 // -----
 // HELPER
 // -----

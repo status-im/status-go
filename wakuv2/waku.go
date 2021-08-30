@@ -68,6 +68,12 @@ type settings struct {
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
 }
 
+type ConnStatus struct {
+	IsOnline   bool                `json:"isOnline"`
+	HasHistory bool                `json:"hasHistory"`
+	Peers      map[string][]string `json:"peers"`
+}
+
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
@@ -168,7 +174,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 			case <-waku.quit:
 				return
 			case c := <-connStatusChan:
-				signal.SendPeerStats(c)
+				signal.SendPeerStats(formatConnStatus(c))
 			}
 		}
 	}()
@@ -712,6 +718,10 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
+func (w *Waku) Peers() map[string][]string {
+	return FormatPeerStats(w.node.Peers())
+}
+
 func (w *Waku) AddStorePeer(address string) error {
 	_, err := w.node.AddStorePeer(address)
 	return err
@@ -759,4 +769,20 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	}
 
 	return id, nil
+}
+
+func FormatPeerStats(peers node.PeerStats) map[string][]string {
+	p := make(map[string][]string)
+	for k, v := range peers {
+		p[k.Pretty()] = v
+	}
+	return p
+}
+
+func formatConnStatus(c node.ConnStatus) ConnStatus {
+	return ConnStatus{
+		IsOnline:   c.IsOnline,
+		HasHistory: c.HasHistory,
+		Peers:      FormatPeerStats(c.Peers),
+	}
 }
