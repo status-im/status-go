@@ -11,7 +11,7 @@ MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
 
 # query local 
 RESP_JSON=$(
-    curl -sS --retry 3 --retry-all-errors \
+    curl -sS --retry 3 --retry-connrefused \
         -X POST http://${RPC_ADDR}:${RPC_PORT}/ \
         -H 'Content-type: application/json' \
         -d '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}'
