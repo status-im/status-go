@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"go.uber.org/zap"
 
@@ -705,6 +706,24 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 
 	_, exist := w.envelopes[hash]
 	return exist
+}
+
+func (w *Waku) PeerCount() int {
+	return w.node.PeerCount()
+}
+
+func (w *Waku) AddStorePeer(address string) error {
+	_, err := w.node.AddStorePeer(address)
+	return err
+}
+
+func (w *Waku) AddRelayPeer(address string) error {
+	// TODO:
+	return nil
+}
+
+func (w *Waku) DropPeer(peerID string) error {
+	return w.node.ClosePeerById(peer.ID(peerID))
 }
 
 // validatePrivateKey checks the format of the given private key.

@@ -13,6 +13,15 @@ type Waku interface {
 	// Waku protocol version
 	Version() uint
 
+	// PeerCount
+	PeerCount() int
+
+	AddStorePeer(address string) error
+
+	AddRelayPeer(address string) error
+
+	DropPeer(peerID string) error
+
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
 	// BloomFilter returns the aggregated bloom filter for all the topics of interest.

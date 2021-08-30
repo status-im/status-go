@@ -38,6 +38,26 @@ func (w *gethWakuWrapper) Version() uint {
 	return 1
 }
 
+// Added for compatibility with waku V2
+func (w *gethWakuWrapper) PeerCount() int {
+	return -1
+}
+
+// PeerCount function only added for compatibility with waku V2
+func (w *gethWakuWrapper) AddStorePeer(address string) error {
+	return errors.New("not available in WakuV1")
+}
+
+// AddRelayPeer function only added for compatibility with waku V2
+func (w *gethWakuWrapper) AddRelayPeer(address string) error {
+	return errors.New("not available in WakuV1")
+}
+
+// PeerCount function only added for compatibility with waku V2
+func (w *gethWakuWrapper) DropPeer(peerID string) error {
+	return errors.New("not available in WakuV1")
+}
+
 // MinPow returns the PoW value required by this node.
 func (w *gethWakuWrapper) MinPow() float64 {
 	return w.waku.MinPow()

@@ -42,7 +42,11 @@ func (w *gethWakuV2Wrapper) Version() uint {
 	return 2
 }
 
-// MinPow returns the PoW value required by this node.
+func (w *gethWakuV2Wrapper) PeerCount() int {
+	return w.waku.PeerCount()
+}
+
+// DEPRECATED: Not used in WakuV2
 func (w *gethWakuV2Wrapper) MinPow() float64 {
 	return 0
 }
@@ -52,10 +56,7 @@ func (w *gethWakuV2Wrapper) MaxMessageSize() uint32 {
 	return w.waku.MaxMessageSize()
 }
 
-// BloomFilter returns the aggregated bloom filter for all the topics of interest.
-// The nodes are required to send only messages that match the advertised bloom filter.
-// If a message does not match the bloom, it will tantamount to spam, and the peer will
-// be disconnected.
+// DEPRECATED: not used in WakuV2
 func (w *gethWakuV2Wrapper) BloomFilter() []byte {
 	return nil
 }
@@ -170,6 +171,7 @@ func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.Privat
 	}, id), nil
 }
 
+// DEPRECATED: Not used in waku V2
 func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesRequest) error {
 	return errors.New("DEPRECATED")
 }
@@ -215,13 +217,21 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 	return nil, nil
 }
 
-// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-// which is known to implement MailServer interface, and is supposed to process this
-// request and respond with a number of peer-to-peer messages (possibly expired),
-// which are not supposed to be forwarded any further.
-// The whisper protocol is agnostic of the format and contents of envelope.
+// DEPRECATED: Not used in waku V2
 func (w *gethWakuV2Wrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
 	return errors.New("DEPRECATED")
+}
+
+func (w *gethWakuV2Wrapper) AddStorePeer(address string) error {
+	return w.waku.AddStorePeer(address)
+}
+
+func (w *gethWakuV2Wrapper) AddRelayPeer(address string) error {
+	return w.waku.AddRelayPeer(address)
+}
+
+func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
+	return w.waku.DropPeer(peerID)
 }
 
 type wakuV2FilterWrapper struct {
