@@ -240,6 +240,10 @@ func (b *StatusNode) wakuV2Service(nodeKey string, wakuCfg *params.WakuV2Config,
 			StoreNodes:             clusterCfg.WakuStoreNodes,
 		}
 
+		if cfg.Host == "" {
+			cfg.Host = wakuv2.DefaultConfig.Host
+		}
+
 		if wakuCfg.MaxMessageSize > 0 {
 			cfg.MaxMessageSize = wakuCfg.MaxMessageSize
 		}
