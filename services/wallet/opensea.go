@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,23 @@ import (
 
 const AssetLimit = 50
 const CollectionLimit = 300
+
+type TraitValue string
+
+func (st *TraitValue) UnmarshalJSON(b []byte) error {
+	var item interface{}
+	if err := json.Unmarshal(b, &item); err != nil {
+		return err
+	}
+	switch v := item.(type) {
+	case int:
+		*st = TraitValue(strconv.Itoa(v))
+	case string:
+		*st = TraitValue(v)
+
+	}
+	return nil
+}
 
 type OpenseaAssetContainer struct {
 	Assets []OpenseaAsset `json:"assets"`
@@ -26,6 +44,12 @@ type OpenseaContract struct {
 	Address string `json:"address"`
 }
 
+type OpenseaTrait struct {
+	TraitType   string     `json:"trait_type"`
+	Value       TraitValue `json:"value"`
+	DisplayType string     `json:"display_type"`
+}
+
 type OpenseaAsset struct {
 	ID                int                    `json:"id"`
 	Name              string                 `json:"name"`
@@ -35,6 +59,7 @@ type OpenseaAsset struct {
 	ImageURL          string                 `json:"image_url"`
 	Contract          OpenseaContract        `json:"asset_contract"`
 	Collection        OpenseaAssetCollection `json:"collection"`
+	Traits            []OpenseaTrait         `json:"traits"`
 }
 
 type OpenseaCollection struct {
