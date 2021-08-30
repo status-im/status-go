@@ -65,6 +65,12 @@ type settings struct {
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
 }
 
+type ConnStatus struct {
+	IsOnline   bool                `json:"isOnline"`
+	HasHistory bool                `json:"hasHistory"`
+	Peers      map[string][]string `json:"peers"`
+}
+
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
