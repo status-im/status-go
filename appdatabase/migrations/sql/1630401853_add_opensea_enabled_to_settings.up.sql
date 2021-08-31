@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN opensea_enabled BOOLEAN DEFAULT false;
