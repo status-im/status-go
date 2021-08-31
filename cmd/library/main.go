@@ -33,6 +33,12 @@ func main() {
 		}
 	}
 
+	// To free memory allocated to strings
+	output += "//export Free\n"
+	output += "func Free (param unsafe.Pointer){\n"
+	output += "C.free(param);\n"
+	output += "}\n"
+
 	fmt.Println(output)
 }
 
@@ -135,5 +141,6 @@ func handleFile(parsedAST *ast.File) string {
 		}
 		output += handleFunction(name, obj.Decl.(*ast.FuncDecl))
 	}
+
 	return output
 }
