@@ -168,7 +168,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 			case <-waku.quit:
 				return
 			case c := <-connStatusChan:
-				signal.SendPeerStats(c)
+				signal.SendPeerStats(formatConnStatus(c))
 			}
 		}
 	}()
@@ -708,6 +708,10 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
+func (w *Waku) Peers() map[string][]string {
+	return FormatPeerStats(w.node.Peers())
+}
+
 func (w *Waku) AddStorePeer(address string) error {
 	_, err := w.node.AddStorePeer(address)
 	return err
@@ -755,4 +759,20 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	}
 
 	return id, nil
+}
+
+func FormatPeerStats(peers node.PeerStats) map[string][]string {
+	p := make(map[string][]string)
+	for k, v := range peers {
+		p[k.Pretty()] = v
+	}
+	return p
+}
+
+func formatConnStatus(c node.ConnStatus) ConnStatus {
+	return ConnStatus{
+		IsOnline:   c.IsOnline,
+		HasHistory: c.HasHistory,
+		Peers:      FormatPeerStats(c.Peers),
+	}
 }

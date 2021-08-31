@@ -58,6 +58,12 @@ func (w *gethWakuWrapper) DropPeer(peerID string) error {
 	return errors.New("not available in WakuV1")
 }
 
+// Peers function only added for compatibility with waku V2
+func (w *gethWakuWrapper) Peers() map[string][]string {
+	p := make(map[string][]string)
+	return p
+}
+
 // MinPow returns the PoW value required by this node.
 func (w *gethWakuWrapper) MinPow() float64 {
 	return w.waku.MinPow()

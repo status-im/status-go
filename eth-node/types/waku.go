@@ -16,6 +16,8 @@ type Waku interface {
 	// PeerCount
 	PeerCount() int
 
+	Peers() map[string][]string
+
 	AddStorePeer(address string) error
 
 	AddRelayPeer(address string) error

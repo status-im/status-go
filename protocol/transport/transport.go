@@ -418,6 +418,10 @@ func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 
+func (t *Transport) Peers() map[string][]string {
+	return t.waku.Peers()
+}
+
 func (t *Transport) createMessagesRequestV1(
 	ctx context.Context,
 	peerID []byte,

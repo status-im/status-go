@@ -230,6 +230,10 @@ func (w *gethWakuV2Wrapper) AddRelayPeer(address string) error {
 	return w.waku.AddRelayPeer(address)
 }
 
+func (w *gethWakuV2Wrapper) Peers() map[string][]string {
+	return w.waku.Peers()
+}
+
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
 	return w.waku.DropPeer(peerID)
 }
