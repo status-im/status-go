@@ -474,6 +474,11 @@ type ApplicationMessagesResponse struct {
 	Cursor   string            `json:"cursor"`
 }
 
+type MarkMessagSeenResponse struct {
+	Count             uint64 `json:"count"`
+	CountWithMentions uint64 `json:"countWithMentions"`
+}
+
 type ApplicationPinnedMessagesResponse struct {
 	PinnedMessages []*common.PinnedMessage `json:"pinnedMessages"`
 	Cursor         string                  `json:"cursor"`
@@ -556,8 +561,14 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
-	return api.service.messenger.MarkMessagesSeen(chatID, ids)
+func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessagSeenResponse, error) {
+	count, withMentions, err := api.service.messenger.MarkMessagesSeen(chatID, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MarkMessagSeenResponse{Count: count, CountWithMentions: withMentions}
+	return response, nil
 }
 
 func (api *PublicAPI) MarkAllRead(chatID string) error {

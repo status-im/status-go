@@ -3200,17 +3200,17 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
-func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
-	count, err := m.persistence.MarkMessagesSeen(chatID, ids)
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, error) {
+	count, countWithMentions, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	m.allChats.Store(chatID, chat)
-	return count, nil
+	return count, countWithMentions, nil
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
@@ -4084,6 +4084,8 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 
 		return true
 	})
+
+	m.logger.Info("FOOBAR", zap.Any("pubchat", publicChatIDs))
 	return &pushnotificationclient.RegistrationOptions{
 		ContactIDs:    contactIDs,
 		MutedChatIDs:  mutedChatIDs,
