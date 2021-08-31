@@ -90,13 +90,13 @@ func (w *WakuNode) handleConnectednessChanged(ev event.EvtPeerConnectednessChang
 		_, ok := w.peers[ev.Peer]
 		if !ok {
 			peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-			log.Info("protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+			log.Debug("protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
 			w.peers[ev.Peer] = peerProtocols
 		} else {
-			log.Info("### Peer already exists")
+			log.Debug("### Peer already exists")
 		}
 	} else if ev.Connectedness == network.NotConnected {
-		log.Info("Peer down: ", ev.Peer)
+		log.Debug("Peer down: ", ev.Peer)
 		delete(w.peers, ev.Peer)
 		// for _, pl := range w.peerListeners {
 		// 	pl <- &ev
@@ -114,7 +114,7 @@ func (w *WakuNode) handleProtocolsUpdated(ev event.EvtPeerProtocolsUpdated) {
 	_, ok := w.peers[ev.Peer]
 	if ok {
 		peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-		log.Info("updated protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+		log.Debug("updated protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
 		w.peers[ev.Peer] = peerProtocols
 	}
 
@@ -123,7 +123,7 @@ func (w *WakuNode) handlePeerIdentificationCompleted(ev event.EvtPeerIdentificat
 
 	log.Info("### EvtPeerIdentificationCompleted ", w.Host().ID(), " to ", ev.Peer)
 	peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
-	log.Info("identified protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
+	log.Debug("identified protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
 	_, ok := w.peers[ev.Peer]
 	if ok {
 		peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
@@ -133,7 +133,7 @@ func (w *WakuNode) handlePeerIdentificationCompleted(ev event.EvtPeerIdentificat
 }
 func (w *WakuNode) processHostEvent(e interface{}) {
 	if e == nil {
-		log.Info("processHostEvent nil event")
+		log.Debug("processHostEvent nil event")
 		return
 	}
 	isOnline := w.IsOnline()
@@ -147,11 +147,11 @@ func (w *WakuNode) processHostEvent(e interface{}) {
 		w.handlePeerIdentificationCompleted(e.(event.EvtPeerIdentificationCompleted))
 	}
 
-	log.Info("###processHostEvent before isOnline()")
+	log.Debug("###processHostEvent before isOnline()")
 	newIsOnline := w.IsOnline()
-	log.Info("###processHostEvent before hasHistory()")
+	log.Debug("###processHostEvent before hasHistory()")
 	newHasHistory := w.HasHistory()
-	log.Info("###ConnStatus isOnline: ", isOnline, "/", newIsOnline, " hasHistory: ",
+	log.Debug("###ConnStatus isOnline: ", isOnline, "/", newIsOnline, " hasHistory: ",
 		hasHistory, "/", newHasHistory)
 	if w.connStatusChan != nil &&
 		(isOnline != newIsOnline || hasHistory != newHasHistory) {
@@ -163,21 +163,21 @@ func (w *WakuNode) processHostEvent(e interface{}) {
 func (w *WakuNode) connectednessListener() {
 	for {
 		var e interface{}
-		log.Info("connectednessListener before select")
+		log.Debug("connectednessListener before select")
 		select {
 		case e = <-w.connectednessEventSub.Out():
-			log.Info("connectednessListener connectednessEvent")
+			log.Debug("connectednessListener connectednessEvent")
 		case e = <-w.protocolEventSub.Out():
-			log.Info("connectednessListener protocolEvent")
+			log.Debug("connectednessListener protocolEvent")
 		case e = <-w.identificationEventSub.Out():
-			log.Info("connectednessListener identificationEvent")
+			log.Debug("connectednessListener identificationEvent")
 		case e = <-w.pingEventsChan:
-			log.Info("connectednessListener pingEvent")
+			log.Debug("connectednessListener pingEvent")
 		}
-		log.Info("connectednessListener after select")
+		log.Debug("connectednessListener after select")
 
 		w.processHostEvent(e)
-		log.Info("connectednessListener after processHostEvent")
+		log.Debug("connectednessListener after processHostEvent")
 	}
 }
 
@@ -712,6 +712,11 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	return w.connect(info)
 }
 
+func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
+	info := w.host.Peerstore().PeerInfo(peerID)
+	return w.host.Connect(w.ctx, info)
+}
+
 func (w *WakuNode) ClosePeerByAddress(address string) error {
 	p, err := ma.NewMultiaddr(address)
 	if err != nil {
@@ -775,7 +780,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 					_, ok := peerMap[peer]
 					mu.Unlock()
 					if !ok {
-						log.Info("###Pinging", peer)
+						log.Debug("###Pinging", peer)
 						result := w.ping.Ping(w.ctx, peer)
 						mu.Lock()
 						peerMap[peer] = result
@@ -783,7 +788,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 
 						go func() {
 							peerFound := false
-							for p, _ := range w.peers {
+							for p := range w.peers {
 								if p == peer {
 									peerFound = true
 									break
@@ -800,21 +805,21 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 								isError = true
 							}
 							pingTicker.Stop()
-							log.Info("###PING after fetching result")
+							log.Debug("###PING after fetching result")
 							if !peerFound && !isError {
-								log.Info("###PING peer added")
+								log.Debug("###PING peer added")
 								//EventBus Emitter doesn't seem to work when there's no connection
 								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
 									Peer:          peer,
 									Connectedness: network.Connected,
 								}
 							} else if peerFound && isError {
-								log.Info("###PING peer removed")
+								log.Debug("###PING peer removed")
 								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
 									Peer:          peer,
 									Connectedness: network.NotConnected,
 								}
-								log.Info("###PING wrote to ping chan")
+								log.Debug("###PING wrote to ping chan")
 							}
 
 							mu.Lock()
@@ -822,9 +827,8 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 							mu.Unlock()
 						}()
 					} else {
-						log.Info("###PING already pinged")
+						log.Debug("###PING already pinged")
 					}
-
 				}
 			case <-w.quit:
 				ticker.Stop()
@@ -832,4 +836,13 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 			}
 		}
 	}()
+}
+
+func addrInfoFromMultiaddrString(address string) (*peer.AddrInfo, error) {
+	ma, err := ma.NewMultiaddr(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return peer.AddrInfoFromP2pAddr(ma)
 }
