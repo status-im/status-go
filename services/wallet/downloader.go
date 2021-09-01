@@ -50,7 +50,7 @@ type Transfer struct {
 
 // ETHTransferDownloader downloads regular eth transfers.
 type ETHTransferDownloader struct {
-	client   *walletClient
+	client   *chainClient
 	accounts []common.Address
 	signer   types.Signer
 	db       *Database
@@ -92,7 +92,7 @@ func (d *ETHTransferDownloader) GetTransfersByNumber(ctx context.Context, number
 
 func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
 	for _, address := range accounts {
-		preloadedTransfers, err := d.db.GetPreloadedTransactions(address, blk.Hash())
+		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chain.Uint64(), address, blk.Hash())
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +146,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *walletClient, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client *chainClient, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	return &ERC20TransfersDownloader{
 		client:    client,
@@ -158,7 +158,7 @@ func NewERC20TransfersDownloader(client *walletClient, accounts []common.Address
 
 // ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
-	client   *walletClient
+	client   *chainClient
 	accounts []common.Address
 
 	// hash of the Transfer event signature

@@ -104,7 +104,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 
 	if config.WalletConfig.Enabled {
 		walletService := b.walletService(config.NetworkID, accountsFeed)
-		b.walletSrvc.SetClient(b.rpcClient.Ethclient())
 		services = append(services, walletService)
 	}
 
@@ -367,9 +366,9 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 	return b.appMetricsSrvc
 }
 
-func (b *StatusNode) walletService(network uint64, accountsFeed *event.Feed) common.StatusService {
+func (b *StatusNode) walletService(chainID uint64, accountsFeed *event.Feed) common.StatusService {
 	if b.walletSrvc == nil {
-		b.walletSrvc = wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed)
+		b.walletSrvc = wallet.NewService(b.appDB, chainID, accountsFeed)
 	}
 	return b.walletSrvc
 }

@@ -18,7 +18,7 @@ type ethHistoricalCommand struct {
 	db           *Database
 	eth          TransferDownloader
 	address      common.Address
-	client       *walletClient
+	client       *chainClient
 	balanceCache *balanceCache
 	feed         *event.Feed
 	foundHeaders []*DBHeader
@@ -69,7 +69,7 @@ type erc20HistoricalCommand struct {
 	db      *Database
 	erc20   BatchDownloader
 	address common.Address
-	client  *walletClient
+	client  *chainClient
 	feed    *event.Feed
 
 	iterator     *IterativeDownloader
@@ -125,7 +125,7 @@ type controlCommand struct {
 	eth                *ETHTransferDownloader
 	erc20              *ERC20TransfersDownloader
 	chain              *big.Int
-	client             *walletClient
+	client             *chainClient
 	feed               *event.Feed
 	errorsCount        int
 	nonArchivalRPCNode bool
@@ -228,7 +228,7 @@ func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHTran
 	return allTransfers, nil
 }
 
-func loadTransfers(ctx context.Context, accounts []common.Address, db *Database, client *walletClient, chain *big.Int, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+func loadTransfers(ctx context.Context, accounts []common.Address, db *Database, client *chainClient, chain *big.Int, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
 	start := time.Now()
 	group := NewGroup(ctx)
 
@@ -237,7 +237,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, db *Database,
 		blocks, ok := blocksByAddress[address]
 
 		if !ok {
-			blocks, _ = db.GetBlocksByAddress(address, numberOfBlocksCheckedPerIteration)
+			blocks, _ = db.GetBlocksByAddress(chain.Uint64(), address, numberOfBlocksCheckedPerIteration)
 		}
 		for _, block := range blocks {
 			transfers := &transfersCommand{
@@ -285,7 +285,7 @@ func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHTrans
 	return loadTransfers(ctx, c.accounts, c.db, c.client, c.chain, limit, make(map[common.Address][]*big.Int))
 }
 
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *walletClient) (*big.Int, error) {
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *chainClient) (*big.Int, error) {
 	from := big.NewInt(0)
 	to := initialTo
 	goal := uint64(20)
@@ -341,7 +341,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	return from, nil
 }
 
-func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *walletClient) (map[common.Address]*big.Int, error) {
+func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *chainClient) (map[common.Address]*big.Int, error) {
 	res := map[common.Address]*big.Int{}
 
 	for _, address := range accounts {
@@ -374,7 +374,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	})
 
 	log.Info("current head is", "block number", head.Number)
-	lastKnownEthBlocks, accountsWithoutHistory, err := c.db.GetLastKnownBlockByAddresses(c.accounts)
+	lastKnownEthBlocks, accountsWithoutHistory, err := c.db.GetLastKnownBlockByAddresses(c.chain.Uint64(), c.accounts)
 	if err != nil {
 		log.Error("failed to load last head from database", "error", err)
 		if c.NewError(err) {
@@ -518,10 +518,11 @@ func (c *controlCommand) Command() Command {
 
 type transfersCommand struct {
 	db               *Database
+	chain            *big.Int
 	eth              *ETHTransferDownloader
 	block            *big.Int
 	address          common.Address
-	client           *walletClient
+	client           *chainClient
 	fetchedTransfers []Transfer
 }
 
@@ -539,7 +540,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	err = c.db.SaveTranfers(c.address, allTransfers, []*big.Int{c.block})
+	err = c.db.SaveTranfers(c.chain.Uint64(), c.address, allTransfers, []*big.Int{c.block})
 	if err != nil {
 		log.Error("SaveTranfers error", "error", err)
 		return err
@@ -554,7 +555,7 @@ type loadTransfersCommand struct {
 	accounts                []common.Address
 	db                      *Database
 	chain                   *big.Int
-	client                  *walletClient
+	client                  *chainClient
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
 }
@@ -591,7 +592,7 @@ type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
 	chain         *big.Int
-	client        *walletClient
+	client        *chainClient
 	balanceCache  *balanceCache
 	feed          *event.Feed
 	fromByAddress map[common.Address]*LastKnownBlock
@@ -666,7 +667,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
 			Nonce:   c.balanceCache.ReadCachedNonce(address, lastBlockNumber),
 		}
-		err = c.db.ProcessBlocks(address, newFromByAddress[address], to, uniqHeaders)
+		err = c.db.ProcessBlocks(c.chain.Uint64(), address, newFromByAddress[address], to, uniqHeaders)
 		if err != nil {
 			return err
 		}

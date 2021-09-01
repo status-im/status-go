@@ -70,27 +70,26 @@ func (blob *JSONBlob) Value() (driver.Value, error) {
 	return json.Marshal(blob.data)
 }
 
-func NewDB(db *sql.DB, network uint64) *Database {
-	return &Database{db: db, network: network}
+func NewDB(client *sql.DB) *Database {
+	return &Database{client: client}
 }
 
 // Database sql wrapper for operations with wallet objects.
 type Database struct {
-	db      *sql.DB
-	network uint64
+	client *sql.DB
 }
 
 // Close closes database.
-func (db Database) Close() error {
-	return db.db.Close()
+func (db *Database) Close() error {
+	return db.client.Close()
 }
 
-func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *LastKnownBlock, headers []*DBHeader) (err error) {
+func (db *Database) ProcessBlocks(chainID uint64, account common.Address, from *big.Int, to *LastKnownBlock, headers []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
 
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return err
 	}
@@ -102,12 +101,12 @@ func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *Last
 		_ = tx.Rollback()
 	}()
 
-	err = insertBlocksWithTransactions(tx, account, db.network, headers)
+	err = insertBlocksWithTransactions(chainID, tx, account, headers)
 	if err != nil {
 		return
 	}
 
-	err = upsertRange(tx, account, db.network, from, to)
+	err = upsertRange(chainID, tx, account, from, to)
 	if err != nil {
 		return
 	}
@@ -115,11 +114,11 @@ func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *Last
 	return
 }
 
-func (db Database) SaveBlocks(account common.Address, headers []*DBHeader) (err error) {
+func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return err
 	}
@@ -131,7 +130,7 @@ func (db Database) SaveBlocks(account common.Address, headers []*DBHeader) (err 
 		_ = tx.Rollback()
 	}()
 
-	err = insertBlocksWithTransactions(tx, account, db.network, headers)
+	err = insertBlocksWithTransactions(chainID, tx, account, headers)
 	if err != nil {
 		return
 	}
@@ -140,11 +139,11 @@ func (db Database) SaveBlocks(account common.Address, headers []*DBHeader) (err 
 }
 
 // ProcessTranfers atomically adds/removes blocks and adds new tranfers.
-func (db Database) ProcessTranfers(transfers []Transfer, removed []*DBHeader) (err error) {
+func (db *Database) ProcessTranfers(chainID uint64, transfers []Transfer, removed []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return err
 	}
@@ -159,7 +158,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, removed []*DBHeader) (e
 	if err != nil {
 		return
 	}
-	err = updateOrInsertTransfers(tx, db.network, transfers)
+	err = updateOrInsertTransfers(chainID, tx, transfers)
 	if err != nil {
 		return
 	}
@@ -167,11 +166,11 @@ func (db Database) ProcessTranfers(transfers []Transfer, removed []*DBHeader) (e
 }
 
 // SaveTranfers
-func (db Database) SaveTranfers(address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
+func (db *Database) SaveTranfers(chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
 	var (
 		tx *sql.Tx
 	)
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return err
 	}
@@ -183,12 +182,12 @@ func (db Database) SaveTranfers(address common.Address, transfers []Transfer, bl
 		_ = tx.Rollback()
 	}()
 
-	err = updateOrInsertTransfers(tx, db.network, transfers)
+	err = updateOrInsertTransfers(chainID, tx, transfers)
 	if err != nil {
 		return
 	}
 
-	err = markBlocksAsLoaded(tx, address, db.network, blocks)
+	err = markBlocksAsLoaded(chainID, tx, address, blocks)
 	if err != nil {
 		return
 	}
@@ -197,9 +196,9 @@ func (db Database) SaveTranfers(address common.Address, transfers []Transfer, bl
 }
 
 // GetTransfersInRange loads transfers for a given address between two blocks.
-func (db *Database) GetTransfersInRange(address common.Address, start, end *big.Int) (rst []Transfer, err error) {
-	query := newTransfersQuery().FilterNetwork(db.network).FilterAddress(address).FilterStart(start).FilterEnd(end).FilterLoaded(1)
-	rows, err := db.db.Query(query.String(), query.Args()...)
+func (db *Database) GetTransfersInRange(chainID uint64, address common.Address, start, end *big.Int) (rst []Transfer, err error) {
+	query := newTransfersQuery().FilterNetwork(chainID).FilterAddress(address).FilterStart(start).FilterEnd(end).FilterLoaded(1)
+	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
@@ -208,15 +207,15 @@ func (db *Database) GetTransfersInRange(address common.Address, start, end *big.
 }
 
 // GetTransfersByAddress loads transfers for a given address between two blocks.
-func (db *Database) GetTransfersByAddress(address common.Address, toBlock *big.Int, limit int64) (rst []Transfer, err error) {
+func (db *Database) GetTransfersByAddress(chainID uint64, address common.Address, toBlock *big.Int, limit int64) (rst []Transfer, err error) {
 	query := newTransfersQuery().
-		FilterNetwork(db.network).
+		FilterNetwork(chainID).
 		FilterAddress(address).
 		FilterEnd(toBlock).
 		FilterLoaded(1).
 		Limit(limit)
 
-	rows, err := db.db.Query(query.String(), query.Args()...)
+	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
@@ -225,15 +224,15 @@ func (db *Database) GetTransfersByAddress(address common.Address, toBlock *big.I
 }
 
 // GetTransfersByAddressAndBlock loads transfers for a given address and block.
-func (db *Database) GetTransfersByAddressAndBlock(address common.Address, block *big.Int, limit int64) (rst []Transfer, err error) {
+func (db *Database) GetTransfersByAddressAndBlock(chainID uint64, address common.Address, block *big.Int, limit int64) (rst []Transfer, err error) {
 	query := newTransfersQuery().
-		FilterNetwork(db.network).
+		FilterNetwork(chainID).
 		FilterAddress(address).
 		FilterBlockNumber(block).
 		FilterLoaded(1).
 		Limit(limit)
 
-	rows, err := db.db.Query(query.String(), query.Args()...)
+	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
@@ -242,12 +241,12 @@ func (db *Database) GetTransfersByAddressAndBlock(address common.Address, block 
 }
 
 // GetBlocksByAddress loads blocks for a given address.
-func (db *Database) GetBlocksByAddress(address common.Address, limit int) (rst []*big.Int, err error) {
+func (db *Database) GetBlocksByAddress(chainID uint64, address common.Address, limit int) (rst []*big.Int, err error) {
 	query := `SELECT blk_number FROM blocks
 	WHERE address = ? AND network_id = ? AND loaded = 0
 	ORDER BY blk_number DESC 
 	LIMIT ?`
-	rows, err := db.db.Query(query, address, db.network, limit)
+	rows, err := db.client.Query(query, address, chainID, limit)
 	if err != nil {
 		return
 	}
@@ -263,13 +262,13 @@ func (db *Database) GetBlocksByAddress(address common.Address, limit int) (rst [
 	return rst, nil
 }
 
-func (db *Database) RemoveBlockWithTransfer(address common.Address, block *big.Int) error {
+func (db *Database) RemoveBlockWithTransfer(chainID uint64, address common.Address, block *big.Int) error {
 	query := `DELETE FROM blocks
 	WHERE address = ? 
 	AND blk_number = ? 
 	AND network_id = ?`
 
-	_, err := db.db.Exec(query, address, (*SQLBigInt)(block), db.network)
+	_, err := db.client.Exec(query, address, (*SQLBigInt)(block), chainID)
 
 	if err != nil {
 		return err
@@ -278,11 +277,11 @@ func (db *Database) RemoveBlockWithTransfer(address common.Address, block *big.I
 	return nil
 }
 
-func (db *Database) GetLastBlockByAddress(address common.Address, limit int) (rst *big.Int, err error) {
+func (db *Database) GetLastBlockByAddress(chainID uint64, address common.Address, limit int) (rst *big.Int, err error) {
 	query := `SELECT * FROM 
 	(SELECT blk_number FROM blocks WHERE address = ? AND network_id = ? ORDER BY blk_number DESC LIMIT ?)
 	ORDER BY blk_number LIMIT 1`
-	rows, err := db.db.Query(query, address, db.network, limit)
+	rows, err := db.client.Query(query, address, chainID, limit)
 	if err != nil {
 		return
 	}
@@ -301,12 +300,12 @@ func (db *Database) GetLastBlockByAddress(address common.Address, limit int) (rs
 	return nil, nil
 }
 
-func (db *Database) GetLastSavedBlock() (rst *DBHeader, err error) {
+func (db *Database) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash 
 	FROM blocks 
 	WHERE network_id = ? 
 	ORDER BY blk_number DESC LIMIT 1`
-	rows, err := db.db.Query(query, db.network)
+	rows, err := db.client.Query(query, chainID)
 	if err != nil {
 		return
 	}
@@ -325,9 +324,9 @@ func (db *Database) GetLastSavedBlock() (rst *DBHeader, err error) {
 	return nil, nil
 }
 
-func (db *Database) GetBlocks() (rst []*DBHeader, err error) {
+func (db *Database) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash, address FROM blocks`
-	rows, err := db.db.Query(query, db.network)
+	rows, err := db.client.Query(query, chainID)
 	if err != nil {
 		return
 	}
@@ -347,12 +346,12 @@ func (db *Database) GetBlocks() (rst []*DBHeader, err error) {
 	return rst, nil
 }
 
-func (db *Database) GetLastSavedBlockBefore(block *big.Int) (rst *DBHeader, err error) {
+func (db *Database) GetLastSavedBlockBefore(chainID uint64, block *big.Int) (rst *DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash 
 	FROM blocks 
 	WHERE network_id = ? AND blk_number < ?
 	ORDER BY blk_number DESC LIMIT 1`
-	rows, err := db.db.Query(query, db.network, (*SQLBigInt)(block))
+	rows, err := db.client.Query(query, chainID, (*SQLBigInt)(block))
 	if err != nil {
 		return
 	}
@@ -371,14 +370,14 @@ func (db *Database) GetLastSavedBlockBefore(block *big.Int) (rst *DBHeader, err 
 	return nil, nil
 }
 
-func (db *Database) GetFirstKnownBlock(address common.Address) (rst *big.Int, err error) {
+func (db *Database) GetFirstKnownBlock(chainID uint64, address common.Address) (rst *big.Int, err error) {
 	query := `SELECT blk_from FROM blocks_ranges
 	WHERE address = ?
 	AND network_id = ?
 	ORDER BY blk_from
 	LIMIT 1`
 
-	rows, err := db.db.Query(query, address, db.network)
+	rows, err := db.client.Query(query, address, chainID)
 	if err != nil {
 		return
 	}
@@ -403,14 +402,14 @@ type LastKnownBlock struct {
 	Nonce   *int64
 }
 
-func (db *Database) GetLastKnownBlockByAddress(address common.Address) (block *LastKnownBlock, err error) {
+func (db *Database) GetLastKnownBlockByAddress(chainID uint64, address common.Address) (block *LastKnownBlock, err error) {
 	query := `SELECT blk_to, balance, nonce FROM blocks_ranges
 	WHERE address = ?
 	AND network_id = ?
 	ORDER BY blk_to DESC
 	LIMIT 1`
 
-	rows, err := db.db.Query(query, address, db.network)
+	rows, err := db.client.Query(query, address, chainID)
 	if err != nil {
 		return
 	}
@@ -433,10 +432,10 @@ func (db *Database) GetLastKnownBlockByAddress(address common.Address) (block *L
 	return nil, nil
 }
 
-func (db *Database) getLastKnownBalances(addresses []common.Address) (map[common.Address]*LastKnownBlock, error) {
+func (db *Database) getLastKnownBalances(chainID uint64, addresses []common.Address) (map[common.Address]*LastKnownBlock, error) {
 	result := map[common.Address]*LastKnownBlock{}
 	for _, address := range addresses {
-		block, error := db.GetLastKnownBlockByAddress(address)
+		block, error := db.GetLastKnownBlockByAddress(chainID, address)
 		if error != nil {
 			return nil, error
 		}
@@ -449,11 +448,11 @@ func (db *Database) getLastKnownBalances(addresses []common.Address) (map[common
 	return result, nil
 }
 
-func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address) (map[common.Address]*LastKnownBlock, []common.Address, error) {
+func (db *Database) GetLastKnownBlockByAddresses(chainID uint64, addresses []common.Address) (map[common.Address]*LastKnownBlock, []common.Address, error) {
 	res := map[common.Address]*LastKnownBlock{}
 	accountsWithoutHistory := []common.Address{}
 	for _, address := range addresses {
-		block, err := db.GetLastKnownBlockByAddress(address)
+		block, err := db.GetLastKnownBlockByAddress(chainID, address)
 		if err != nil {
 			log.Info("Can't get last block", "error", err)
 			return nil, nil, err
@@ -470,9 +469,9 @@ func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address) (ma
 }
 
 // GetTransfers load transfers transfer betweeen two blocks.
-func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error) {
-	query := newTransfersQuery().FilterNetwork(db.network).FilterStart(start).FilterEnd(end).FilterLoaded(1)
-	rows, err := db.db.Query(query.String(), query.Args()...)
+func (db *Database) GetTransfers(chainID uint64, start, end *big.Int) (rst []Transfer, err error) {
+	query := newTransfersQuery().FilterNetwork(chainID).FilterStart(start).FilterEnd(end).FilterLoaded(1)
+	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
@@ -480,14 +479,14 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	return query.Scan(rows)
 }
 
-func (db *Database) GetPreloadedTransactions(address common.Address, blockHash common.Hash) (rst []Transfer, err error) {
+func (db *Database) GetPreloadedTransactions(chainID uint64, address common.Address, blockHash common.Hash) (rst []Transfer, err error) {
 	query := newTransfersQuery().
-		FilterNetwork(db.network).
+		FilterNetwork(chainID).
 		FilterAddress(address).
 		FilterBlockHash(blockHash).
 		FilterLoaded(0)
 
-	rows, err := db.db.Query(query.String(), query.Args()...)
+	rows, err := db.client.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
@@ -495,10 +494,10 @@ func (db *Database) GetPreloadedTransactions(address common.Address, blockHash c
 	return query.Scan(rows)
 }
 
-func (db *Database) GetTransactionsLog(address common.Address, transactionHash common.Hash) (*types.Log, error) {
+func (db *Database) GetTransactionsLog(chainID uint64, address common.Address, transactionHash common.Hash) (*types.Log, error) {
 	l := &types.Log{}
-	err := db.db.QueryRow("SELECT log FROM transfers WHERE network_id = ? AND address = ? AND hash = ?",
-		db.network, address, transactionHash).
+	err := db.client.QueryRow("SELECT log FROM transfers WHERE network_id = ? AND address = ? AND hash = ?",
+		chainID, address, transactionHash).
 		Scan(&JSONBlob{l})
 	if err == nil {
 		return l, nil
@@ -510,12 +509,12 @@ func (db *Database) GetTransactionsLog(address common.Address, transactionHash c
 }
 
 // SaveHeaders stores a list of headers atomically.
-func (db *Database) SaveHeaders(headers []*types.Header, address common.Address) (err error) {
+func (db *Database) SaveHeaders(chainID uint64, headers []*types.Header, address common.Address) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
 	)
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return
 	}
@@ -532,7 +531,7 @@ func (db *Database) SaveHeaders(headers []*types.Header, address common.Address)
 	}()
 
 	for _, h := range headers {
-		_, err = insert.Exec(db.network, (*SQLBigInt)(h.Number), h.Hash(), address)
+		_, err = insert.Exec(chainID, (*SQLBigInt)(h.Number), h.Hash(), address)
 		if err != nil {
 			return
 		}
@@ -541,9 +540,9 @@ func (db *Database) SaveHeaders(headers []*types.Header, address common.Address)
 }
 
 // GetHeaderByNumber selects header using block number.
-func (db *Database) GetHeaderByNumber(number *big.Int) (header *DBHeader, err error) {
+func (db *Database) GetHeaderByNumber(chainID uint64, number *big.Int) (header *DBHeader, err error) {
 	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-	err = db.db.QueryRow("SELECT blk_hash, blk_number FROM blocks WHERE blk_number = ? AND network_id = ?", (*SQLBigInt)(number), db.network).Scan(&header.Hash, (*SQLBigInt)(header.Number))
+	err = db.client.QueryRow("SELECT blk_hash, blk_number FROM blocks WHERE blk_number = ? AND network_id = ?", (*SQLBigInt)(number), chainID).Scan(&header.Hash, (*SQLBigInt)(header.Number))
 	if err == nil {
 		return header, nil
 	}
@@ -553,193 +552,13 @@ func (db *Database) GetHeaderByNumber(number *big.Int) (header *DBHeader, err er
 	return nil, err
 }
 
-type Token struct {
-	Address common.Address `json:"address"`
-	Name    string         `json:"name"`
-	Symbol  string         `json:"symbol"`
-	Color   string         `json:"color"`
-
-	// Decimals defines how divisible the token is. For example, 0 would be
-	// indivisible, whereas 18 would allow very small amounts of the token
-	// to be traded.
-	Decimals uint `json:"decimals"`
-}
-
-func (db *Database) GetCustomTokens() ([]*Token, error) {
-	rows, err := db.db.Query(`SELECT address, name, symbol, decimals, color FROM tokens WHERE network_id = ?`, db.network)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var rst []*Token
-	for rows.Next() {
-		token := &Token{}
-		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color)
-		if err != nil {
-			return nil, err
-		}
-
-		rst = append(rst, token)
-	}
-
-	return rst, nil
-}
-
-func (db *Database) AddCustomToken(token Token) error {
-	insert, err := db.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
-	if err != nil {
-		return err
-	}
-	_, err = insert.Exec(db.network, token.Address, token.Name, token.Symbol, token.Decimals, token.Color)
-	return err
-}
-
-func (db *Database) DeleteCustomToken(address common.Address) error {
-	_, err := db.db.Exec(`DELETE FROM TOKENS WHERE address = ?`, address)
-	return err
-}
-
-type PendingTrxType string
-
-const (
-	RegisterENS    PendingTrxType = "RegisterENS"
-	ReleaseENS     PendingTrxType = "ReleaseENS"
-	SetPubKey      PendingTrxType = "SetPubKey"
-	BuyStickerPack PendingTrxType = "BuyStickerPack"
-	WalletTransfer PendingTrxType = "WalletTransfer"
-)
-
-type PendingTransaction struct {
-	Hash           common.Hash    `json:"hash"`
-	Timestamp      uint64         `json:"timestamp"`
-	Value          BigInt         `json:"value"`
-	From           common.Address `json:"from"`
-	To             common.Address `json:"to"`
-	Data           string         `json:"data"`
-	Symbol         string         `json:"symbol"`
-	GasPrice       BigInt         `json:"gasPrice"`
-	GasLimit       BigInt         `json:"gasLimit"`
-	Type           PendingTrxType `json:"type"`
-	AdditionalData string         `json:"additionalData"`
-}
-
-func (db *Database) getAllPendingTransactions() ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
-                                         symbol, gas_price, gas_limit, type, additional_data
-                                  FROM pending_transactions
-                                  WHERE network_id = ?`, db.network)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var transactions []*PendingTransaction
-	for rows.Next() {
-		transaction := &PendingTransaction{
-			Value:    BigInt{Int: new(big.Int)},
-			GasPrice: BigInt{Int: new(big.Int)},
-			GasLimit: BigInt{Int: new(big.Int)},
-		}
-		err := rows.Scan(&transaction.Hash,
-			&transaction.Timestamp,
-			(*SQLBigIntBytes)(transaction.Value.Int),
-			&transaction.From,
-			&transaction.To,
-			&transaction.Data,
-			&transaction.Symbol,
-			(*SQLBigIntBytes)(transaction.GasPrice.Int),
-			(*SQLBigIntBytes)(transaction.GasLimit.Int),
-			&transaction.Type,
-			&transaction.AdditionalData,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		transactions = append(transactions, transaction)
-	}
-
-	return transactions, nil
-}
-
-func (db *Database) getPendingOutboundTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
-                                         symbol, gas_price, gas_limit, type, additional_data
-                                  FROM pending_transactions
-                                  WHERE network_id = ?
-                                  AND from_address = ?`, db.network, address)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var transactions []*PendingTransaction
-	for rows.Next() {
-		transaction := &PendingTransaction{
-			Value:    BigInt{Int: new(big.Int)},
-			GasPrice: BigInt{Int: new(big.Int)},
-			GasLimit: BigInt{Int: new(big.Int)},
-		}
-		err := rows.Scan(&transaction.Hash,
-			&transaction.Timestamp,
-			(*SQLBigIntBytes)(transaction.Value.Int),
-			&transaction.From,
-			&transaction.To,
-			&transaction.Data,
-			&transaction.Symbol,
-			(*SQLBigIntBytes)(transaction.GasPrice.Int),
-			(*SQLBigIntBytes)(transaction.GasLimit.Int),
-			&transaction.Type,
-			&transaction.AdditionalData,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		transactions = append(transactions, transaction)
-	}
-
-	return transactions, nil
-}
-
-func (db *Database) addPendingTransaction(transaction PendingTransaction) error {
-	insert, err := db.db.Prepare(`INSERT OR REPLACE INTO pending_transactions
-                                      (network_id, hash, timestamp, value, from_address, to_address,
-                                       data, symbol, gas_price, gas_limit, type, additional_data)
-                                      VALUES
-                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return err
-	}
-	_, err = insert.Exec(db.network,
-		transaction.Hash,
-		transaction.Timestamp,
-		(*SQLBigIntBytes)(transaction.Value.Int),
-		transaction.From,
-		transaction.To,
-		transaction.Data,
-		transaction.Symbol,
-		(*SQLBigIntBytes)(transaction.GasPrice.Int),
-		(*SQLBigIntBytes)(transaction.GasLimit.Int),
-		transaction.Type,
-		transaction.AdditionalData,
-	)
-	return err
-}
-
-func (db *Database) deletePendingTransaction(hash common.Hash) error {
-	_, err := db.db.Exec(`DELETE FROM pending_transactions WHERE hash = ?`, hash)
-	return err
-}
-
 type Favourite struct {
 	Address common.Address `json:"address"`
 	Name    string         `json:"name"`
 }
 
 func (db *Database) GetFavourites() ([]*Favourite, error) {
-	rows, err := db.db.Query(`SELECT address, name FROM favourites`)
+	rows, err := db.client.Query(`SELECT address, name FROM favourites`)
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +579,7 @@ func (db *Database) GetFavourites() ([]*Favourite, error) {
 }
 
 func (db *Database) AddFavourite(favourite Favourite) error {
-	insert, err := db.db.Prepare("INSERT OR REPLACE INTO favourites (address, name) VALUES (?, ?)")
+	insert, err := db.client.Prepare("INSERT OR REPLACE INTO favourites (address, name) VALUES (?, ?)")
 	if err != nil {
 		return err
 	}
@@ -796,7 +615,7 @@ func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
 	return nil
 }
 
-func insertBlocksWithTransactions(creator statementCreator, account common.Address, network uint64, headers []*DBHeader) error {
+func insertBlocksWithTransactions(chainID uint64, creator statementCreator, account common.Address, headers []*DBHeader) error {
 	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(network_id, address, blk_number, blk_hash, loaded) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
@@ -816,13 +635,13 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 	}
 
 	for _, header := range headers {
-		_, err = insert.Exec(network, account, (*SQLBigInt)(header.Number), header.Hash, header.Loaded)
+		_, err = insert.Exec(chainID, account, (*SQLBigInt)(header.Number), header.Hash, header.Loaded)
 		if err != nil {
 			return err
 		}
 		if len(header.Erc20Transfers) > 0 {
 			for _, transfer := range header.Erc20Transfers {
-				res, err := updateTx.Exec(&JSONBlob{transfer.Log}, network, account, transfer.ID)
+				res, err := updateTx.Exec(&JSONBlob{transfer.Log}, chainID, account, transfer.ID)
 				if err != nil {
 					return err
 				}
@@ -834,7 +653,7 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 					continue
 				}
 
-				_, err = insertTx.Exec(network, account, account, transfer.ID, (*SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log})
+				_, err = insertTx.Exec(chainID, account, account, transfer.ID, (*SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log})
 				if err != nil {
 					log.Error("error saving erc20transfer", "err", err)
 					return err
@@ -845,18 +664,18 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 	return nil
 }
 
-func (db *Database) UpsertRange(account common.Address, network uint64, from, to, balance *big.Int, nonce uint64) error {
-	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to, "balance", balance, "nonce", nonce)
-	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
+func (db *Database) InsertRange(chainID uint64, account common.Address, from, to, balance *big.Int, nonce uint64) error {
+	log.Debug("insert blocks range", "account", account, "network id", chainID, "from", from, "to", to, "balance", balance, "nonce", nonce)
+	insert, err := db.client.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to), (*SQLBigIntBytes)(balance), &nonce)
+	_, err = insert.Exec(chainID, account, (*SQLBigInt)(from), (*SQLBigInt)(to), (*SQLBigIntBytes)(balance), &nonce)
 	return err
 }
 
-func upsertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *LastKnownBlock) (err error) {
-	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to.Number, "balance", to.Balance)
+func upsertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *LastKnownBlock) (err error) {
+	log.Debug("upsert blocks range", "account", account, "network id", chainID, "from", from, "to", to.Number, "balance", to.Balance)
 	update, err := creator.Prepare(`UPDATE blocks_ranges
                 SET blk_to = ?, balance = ?, nonce = ?
                 WHERE address = ?
@@ -867,7 +686,7 @@ func upsertRange(creator statementCreator, account common.Address, network uint6
 		return err
 	}
 
-	res, err := update.Exec((*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce, account, network, (*SQLBigInt)(from))
+	res, err := update.Exec((*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce, account, chainID, (*SQLBigInt)(from))
 
 	if err != nil {
 		return err
@@ -882,7 +701,7 @@ func upsertRange(creator statementCreator, account common.Address, network uint6
 			return err
 		}
 
-		_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce)
+		_, err = insert.Exec(chainID, account, (*SQLBigInt)(from), (*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce)
 		if err != nil {
 			return err
 		}
@@ -896,13 +715,13 @@ type BlocksRange struct {
 	to   *big.Int
 }
 
-func (db *Database) getOldRanges(account common.Address, network uint64) ([]*BlocksRange, error) {
+func (db *Database) getOldRanges(chainID uint64, account common.Address) ([]*BlocksRange, error) {
 	query := `select blk_from, blk_to from blocks_ranges
 	          where address = ?
 	          and network_id = ?
 	          order by blk_from`
 
-	rows, err := db.db.Query(query, account, db.network)
+	rows, err := db.client.Query(query, account, chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -969,23 +788,23 @@ func getNewRanges(ranges []*BlocksRange) ([]*BlocksRange, []*BlocksRange) {
 	return newRanges, deletedRanges
 }
 
-func (db *Database) mergeRanges(account common.Address, network uint64) (err error) {
+func (db *Database) mergeRanges(chainID uint64, account common.Address) (err error) {
 	var (
 		tx *sql.Tx
 	)
 
-	ranges, err := db.getOldRanges(account, network)
+	ranges, err := db.getOldRanges(chainID, account)
 	if err != nil {
 		return err
 	}
 
-	log.Info("merge old ranges", "account", account, "network", network, "ranges", len(ranges))
+	log.Info("merge old ranges", "account", account, "network", chainID, "ranges", len(ranges))
 
 	if len(ranges) <= 1 {
 		return nil
 	}
 
-	tx, err = db.db.Begin()
+	tx, err = db.client.Begin()
 	if err != nil {
 		return err
 	}
@@ -1001,14 +820,14 @@ func (db *Database) mergeRanges(account common.Address, network uint64) (err err
 	newRanges, deletedRanges := getNewRanges(ranges)
 
 	for _, rangeToDelete := range deletedRanges {
-		err = deleteRange(tx, account, network, rangeToDelete.from, rangeToDelete.to)
+		err = deleteRange(chainID, tx, account, rangeToDelete.from, rangeToDelete.to)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, newRange := range newRanges {
-		err = insertRange(tx, account, network, newRange.from, newRange.to)
+		err = insertRange(chainID, tx, account, newRange.from, newRange.to)
 		if err != nil {
 			return err
 		}
@@ -1017,8 +836,8 @@ func (db *Database) mergeRanges(account common.Address, network uint64) (err err
 	return nil
 }
 
-func deleteRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *big.Int) error {
-	log.Info("delete blocks range", "account", account, "network", network, "from", from, "to", to)
+func deleteRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *big.Int) error {
+	log.Info("delete blocks range", "account", account, "network", chainID, "from", from, "to", to)
 	delete, err := creator.Prepare(`DELETE FROM blocks_ranges
                                         WHERE address = ?
                                         AND network_id = ?
@@ -1029,22 +848,22 @@ func deleteRange(creator statementCreator, account common.Address, network uint6
 		return err
 	}
 
-	_, err = delete.Exec(account, network, (*SQLBigInt)(from), (*SQLBigInt)(to))
+	_, err = delete.Exec(account, chainID, (*SQLBigInt)(from), (*SQLBigInt)(to))
 	return err
 }
 
-func insertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *big.Int) error {
-	log.Info("insert blocks range", "account", account, "network", network, "from", from, "to", to)
+func insertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *big.Int) error {
+	log.Info("insert blocks range", "account", account, "network", chainID, "from", from, "to", to)
 	insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 
-	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to))
+	_, err = insert.Exec(chainID, account, (*SQLBigInt)(from), (*SQLBigInt)(to))
 	return err
 }
 
-func updateOrInsertTransfers(creator statementCreator, network uint64, transfers []Transfer) error {
+func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers []Transfer) error {
 	update, err := creator.Prepare(`UPDATE transfers
 	SET tx = ?, sender = ?, receipt = ?, timestamp = ?, loaded = 1
 	WHERE address =?  AND hash = ?`)
@@ -1073,7 +892,7 @@ func updateOrInsertTransfers(creator statementCreator, network uint64, transfers
 			continue
 		}
 
-		_, err = insert.Exec(network, t.ID, t.BlockHash, (*SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
+		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)
 			return err
@@ -1082,15 +901,15 @@ func updateOrInsertTransfers(creator statementCreator, network uint64, transfers
 	return nil
 }
 
-//markBlocksAsLoaded(tx, address, db.network, blocks)
-func markBlocksAsLoaded(creator statementCreator, address common.Address, network uint64, blocks []*big.Int) error {
+//markBlocksAsLoaded(tx, address, chainID, blocks)
+func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common.Address, blocks []*big.Int) error {
 	update, err := creator.Prepare("UPDATE blocks SET loaded=? WHERE address=? AND blk_number=? AND network_id=?")
 	if err != nil {
 		return err
 	}
 
 	for _, block := range blocks {
-		_, err := update.Exec(true, address, (*SQLBigInt)(block), network)
+		_, err := update.Exec(true, address, (*SQLBigInt)(block), chainID)
 		if err != nil {
 			return err
 		}

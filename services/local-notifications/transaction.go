@@ -113,7 +113,7 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 		for _, address := range payload.Accounts {
 			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) >= 0 {
 				log.Info("Handled transfer for address", "info", address)
-				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
+				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(s.chainID, address, payload.BlockNumber, int64(limit))
 				if err != nil {
 					log.Error("Could not fetch transfers", "error", err)
 				}

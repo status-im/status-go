@@ -20,7 +20,7 @@ import (
 )
 
 func createWalletDb(t *testing.T, db *sql.DB) (*wallet.Database, func()) {
-	return wallet.NewDB(db, 1777), func() {
+	return wallet.NewDB(db), func() {
 		require.NoError(t, db.Close())
 	}
 }
@@ -109,8 +109,8 @@ func TestTransactionNotification(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, walletDb.ProcessBlocks(header.Address, big.NewInt(1), lastBlock, []*wallet.DBHeader{header}))
-	require.NoError(t, walletDb.ProcessTranfers(transfers, []*wallet.DBHeader{}))
+	require.NoError(t, walletDb.ProcessBlocks(1777, header.Address, big.NewInt(1), lastBlock, []*wallet.DBHeader{header}))
+	require.NoError(t, walletDb.ProcessTranfers(1777, transfers, []*wallet.DBHeader{}))
 
 	feed.Send(wallet.Event{
 		Type:        wallet.EventRecentHistoryReady,

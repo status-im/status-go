@@ -2,46 +2,64 @@ package wallet
 
 import (
 	"context"
+	"database/sql"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 // NewService initializes service instance.
-func NewService(db *Database, accountsFeed *event.Feed) *Service {
+func NewService(db *sql.DB, chainID uint64, accountsFeed *event.Feed) *Service {
 	feed := &event.Feed{}
+	signals := &SignalsTransmitter{
+		publisher: feed,
+	}
+	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
+		dataSourceType: DataSourceStatic,
+	})
+	tokenManager := &TokenManager{db: db}
+	transactionManager := &TransactionManager{db: db}
+	networkManager := &NetworkManager{db: db, chainClients: make(map[uint64]*chainClient)}
+	err := networkManager.init()
+	if err != nil {
+		log.Error("Network manager failed to initialize", "error", err)
+	}
+
 	return &Service{
-		db:   db,
-		feed: feed,
-		signals: &SignalsTransmitter{
-			publisher: feed,
-		},
-		accountsFeed: accountsFeed,
-		opensea:      newOpenseaClient(),
+		feed:                feed,
+		db:                  NewDB(db),
+		networkManager:      networkManager,
+		tokenManager:        tokenManager,
+		transactionManager:  transactionManager,
+		accountsFeed:        accountsFeed,
+		opensea:             newOpenseaClient(),
+		signals:             signals,
+		cryptoOnRampManager: cryptoOnRampManager,
+		legacyChainID:       chainID,
 	}
 }
 
 // Service is a wallet service.
 type Service struct {
 	feed                *event.Feed
+	networkManager      *NetworkManager
+	tokenManager        *TokenManager
+	transactionManager  *TransactionManager
 	db                  *Database
 	reactor             *Reactor
 	signals             *SignalsTransmitter
-	client              *walletClient
 	cryptoOnRampManager *CryptoOnRampManager
-	started             bool
 	opensea             *OpenseaClient
-
-	group        *Group
-	accountsFeed *event.Feed
+	group               *Group
+	accountsFeed        *event.Feed
+	legacyChainID       uint64
+	started             bool
 }
 
 // Start signals transmitter.
@@ -55,32 +73,20 @@ func (s *Service) GetFeed() *event.Feed {
 	return s.feed
 }
 
-// SetClient sets ethclient
-func (s *Service) SetClient(client *ethclient.Client) {
-	s.client = &walletClient{client: client}
-}
-
-// MergeBlocksRanges merge old blocks ranges if possible
-func (s *Service) MergeBlocksRanges(accounts []common.Address, chain uint64) error {
-	for _, account := range accounts {
-		err := s.db.mergeRanges(account, chain)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
-func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
-	reactor := NewReactor(s.db, s.feed, client, chain)
-	err := reactor.Start(accounts)
+func (s *Service) StartReactor(accounts []common.Address, chainID uint64) error {
+	chainClient, err := s.networkManager.getChainClient(chainID)
 	if err != nil {
 		return err
 	}
+
+	reactor := NewReactor(s.db, s.feed, chainClient, chainID)
+	err = reactor.Start(accounts)
+	if err != nil {
+		return err
+	}
+
 	s.reactor = reactor
-	s.SetClient(client)
 	s.group.Add(func(ctx context.Context) error {
 		return WatchAccountsChanges(ctx, s.accountsFeed, accounts, reactor)
 	})
@@ -187,8 +193,9 @@ func (s *Service) IsStarted() bool {
 	return s.started
 }
 
-func (s *Service) SetInitialBlocksRange(network uint64) error {
-	accountsDB := accounts.NewDB(s.db.db)
+func (s *Service) SetInitialBlocksRange(chainID uint64) error {
+	db := s.db
+	accountsDB := accounts.NewDB(db.client)
 	watchAddress, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
@@ -198,14 +205,31 @@ func (s *Service) SetInitialBlocksRange(network uint64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	header, err := s.client.HeaderByNumber(ctx, nil)
+	chainClient, err := s.networkManager.getChainClient(chainID)
 	if err != nil {
 		return err
 	}
 
-	err = s.db.UpsertRange(common.Address(watchAddress), network, from, header.Number, big.NewInt(0), 0)
+	header, err := chainClient.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return err
 	}
+
+	err = db.InsertRange(chainID, common.Address(watchAddress), from, header.Number, big.NewInt(0), 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// MergeBlocksRanges merge old blocks ranges if possible
+func (s *Service) MergeBlocksRanges(accounts []common.Address, chainID uint64) error {
+	for _, account := range accounts {
+		err := s.db.mergeRanges(chainID, account)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

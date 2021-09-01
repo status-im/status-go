@@ -87,6 +87,7 @@ type transmitter struct {
 type Service struct {
 	started           bool
 	WatchingEnabled   bool
+	chainID           uint64
 	transmitter       *transmitter
 	walletTransmitter *transmitter
 	db                *Database
@@ -94,15 +95,16 @@ type Service struct {
 	accountsDB        *accounts.Database
 }
 
-func NewService(appDB *sql.DB, network uint64) *Service {
-	db := NewDB(appDB, network)
-	walletDB := wallet.NewDB(appDB, network)
+func NewService(appDB *sql.DB, chainID uint64) *Service {
+	db := NewDB(appDB, chainID)
+	walletDB := wallet.NewDB(appDB)
 	accountsDB := accounts.NewDB(appDB)
 	trans := &transmitter{}
 	walletTrans := &transmitter{}
 
 	return &Service{
 		db:                db,
+		chainID:           chainID,
 		walletDB:          walletDB,
 		accountsDB:        accountsDB,
 		transmitter:       trans,

@@ -19,7 +19,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
-	return NewDB(db, 1777), func() {
+	return NewDB(db), func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
@@ -33,8 +33,8 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 		Difficulty: big.NewInt(1),
 		Time:       1,
 	}
-	require.NoError(t, db.SaveHeaders([]*types.Header{header}, common.Address{1}))
-	rst, err := db.GetHeaderByNumber(header.Number)
+	require.NoError(t, db.SaveHeaders(777, []*types.Header{header}, common.Address{1}))
+	rst, err := db.GetHeaderByNumber(777, header.Number)
 	require.NoError(t, err)
 	require.Equal(t, header.Hash(), rst.Hash)
 }
@@ -42,7 +42,7 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 func TestDBGetHeaderByNumberNoRows(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	rst, err := db.GetHeaderByNumber(big.NewInt(1))
+	rst, err := db.GetHeaderByNumber(777, big.NewInt(1))
 	require.NoError(t, err)
 	require.Nil(t, rst)
 }
@@ -69,8 +69,8 @@ func TestDBProcessBlocks(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, db.ProcessBlocks(common.Address{1}, from, lastBlock, blocks))
-	t.Log(db.GetLastBlockByAddress(common.Address{1}, 40))
+	require.NoError(t, db.ProcessBlocks(777, common.Address{1}, from, lastBlock, blocks))
+	t.Log(db.GetLastBlockByAddress(777, common.Address{1}, 40))
 	transfers := []Transfer{
 		{
 			ID:          common.Hash{1},
@@ -82,7 +82,7 @@ func TestDBProcessBlocks(t *testing.T) {
 			From:        common.Address{1},
 		},
 	}
-	require.NoError(t, db.SaveTranfers(address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
+	require.NoError(t, db.SaveTranfers(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
 }
 
 func TestDBProcessTransfer(t *testing.T) {
@@ -111,8 +111,8 @@ func TestDBProcessTransfer(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, db.ProcessBlocks(common.Address{1}, big.NewInt(1), lastBlock, []*DBHeader{header}))
-	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{}))
+	require.NoError(t, db.ProcessBlocks(777, common.Address{1}, big.NewInt(1), lastBlock, []*DBHeader{header}))
+	require.NoError(t, db.ProcessTranfers(777, transfers, []*DBHeader{}))
 }
 
 func TestDBReorgTransfers(t *testing.T) {
@@ -138,8 +138,8 @@ func TestDBReorgTransfers(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, db.ProcessBlocks(original.Address, original.Number, lastBlock, []*DBHeader{original}))
-	require.NoError(t, db.ProcessTranfers([]Transfer{
+	require.NoError(t, db.ProcessBlocks(777, original.Address, original.Number, lastBlock, []*DBHeader{original}))
+	require.NoError(t, db.ProcessTranfers(777, []Transfer{
 		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{}))
 	nonce = int64(0)
@@ -148,12 +148,12 @@ func TestDBReorgTransfers(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, db.ProcessBlocks(replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
-	require.NoError(t, db.ProcessTranfers([]Transfer{
+	require.NoError(t, db.ProcessBlocks(777, replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
+	require.NoError(t, db.ProcessTranfers(777, []Transfer{
 		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{original}))
 
-	all, err := db.GetTransfers(big.NewInt(0), nil)
+	all, err := db.GetTransfers(777, big.NewInt(0), nil)
 	require.NoError(t, err)
 	require.Len(t, all, 1)
 	require.Equal(t, replacedTX.Hash(), all[0].Transaction.Hash())
@@ -191,100 +191,15 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, db.ProcessBlocks(headers[0].Address, headers[0].Number, lastBlock, headers))
-	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{}))
-	rst, err := db.GetTransfers(big.NewInt(7), nil)
+	require.NoError(t, db.ProcessBlocks(777, headers[0].Address, headers[0].Number, lastBlock, headers))
+	require.NoError(t, db.ProcessTranfers(777, transfers, []*DBHeader{}))
+	rst, err := db.GetTransfers(777, big.NewInt(7), nil)
 	require.NoError(t, err)
 	require.Len(t, rst, 3)
 
-	rst, err = db.GetTransfers(big.NewInt(2), big.NewInt(5))
+	rst, err = db.GetTransfers(777, big.NewInt(2), big.NewInt(5))
 	require.NoError(t, err)
 	require.Len(t, rst, 4)
-
-}
-
-func TestCustomTokens(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	rst, err := db.GetCustomTokens()
-	require.NoError(t, err)
-	require.Nil(t, rst)
-
-	token := Token{
-		Address:  common.Address{1},
-		Name:     "Zilliqa",
-		Symbol:   "ZIL",
-		Decimals: 12,
-		Color:    "#fa6565",
-	}
-
-	err = db.AddCustomToken(token)
-	require.NoError(t, err)
-
-	rst, err = db.GetCustomTokens()
-	require.NoError(t, err)
-	require.Equal(t, 1, len(rst))
-	require.Equal(t, token, *rst[0])
-
-	err = db.DeleteCustomToken(token.Address)
-	require.NoError(t, err)
-
-	rst, err = db.GetCustomTokens()
-	require.NoError(t, err)
-	require.Equal(t, 0, len(rst))
-}
-
-func TestPendingTransactions(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	trx := PendingTransaction{
-		Hash:           common.Hash{1},
-		From:           common.Address{1},
-		To:             common.Address{2},
-		Type:           RegisterENS,
-		AdditionalData: "someuser.stateofus.eth",
-		Value:          BigInt{big.NewInt(123)},
-		GasLimit:       BigInt{big.NewInt(21000)},
-		GasPrice:       BigInt{big.NewInt(1)},
-	}
-
-	rst, err := db.getAllPendingTransactions()
-	require.NoError(t, err)
-	require.Nil(t, rst)
-
-	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
-	require.NoError(t, err)
-	require.Nil(t, rst)
-
-	err = db.addPendingTransaction(trx)
-	require.NoError(t, err)
-
-	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(rst))
-	require.Equal(t, trx, *rst[0])
-
-	rst, err = db.getAllPendingTransactions()
-	require.NoError(t, err)
-	require.Equal(t, 1, len(rst))
-	require.Equal(t, trx, *rst[0])
-
-	rst, err = db.getPendingOutboundTransactionsByAddress(common.Address{2})
-	require.NoError(t, err)
-	require.Nil(t, rst)
-
-	err = db.deletePendingTransaction(trx.Hash)
-	require.NoError(t, err)
-
-	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(rst))
-
-	rst, err = db.getAllPendingTransactions()
-	require.NoError(t, err)
-	require.Equal(t, 0, len(rst))
 
 }
 
@@ -428,7 +343,7 @@ func TestGetNewRanges(t *testing.T) {
 	require.Equal(t, 4, len(d))
 }
 
-func TestUpsertRange(t *testing.T) {
+func TestInsertRange(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
@@ -440,10 +355,10 @@ func TestUpsertRange(t *testing.T) {
 	balance := big.NewInt(7657)
 	account := common.Address{2}
 
-	err := db.UpsertRange(account, db.network, r.from, r.to, balance, nonce)
+	err := db.InsertRange(777, account, r.from, r.to, balance, nonce)
 	require.NoError(t, err)
 
-	block, err := db.GetLastKnownBlockByAddress(account)
+	block, err := db.GetLastKnownBlockByAddress(777, account)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, block.Number.Cmp(r.to))
