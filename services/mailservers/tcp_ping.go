@@ -6,9 +6,10 @@ import (
 	"net"
 	"time"
 
+	multiaddr "github.com/multiformats/go-multiaddr"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-
 	"github.com/status-im/status-go/rtt"
 )
 
@@ -18,10 +19,12 @@ type PingQuery struct {
 }
 
 type PingResult struct {
-	ENode string  `json:"address"`
-	RTTMs *int    `json:"rttMs"`
-	Err   *string `json:"error"`
+	Address string  `json:"address"`
+	RTTMs   *int    `json:"rttMs"`
+	Err     *string `json:"error"`
 }
+
+type parseFn func(string) (string, error)
 
 func (pr *PingResult) Update(rttMs int, err error) {
 	if err != nil {
@@ -53,20 +56,18 @@ func enodeToAddr(enodeAddr string) (string, error) {
 	return fmt.Sprintf("%s:%d", net.IP(ip4).String(), tcp), nil
 }
 
-func parseEnodes(enodes []string) (map[string]*PingResult, []string) {
-	// parse enode addreses into normal host + port addresses
-	results := make(map[string]*PingResult, len(enodes))
+func parse(addresses []string, fn parseFn) (map[string]*PingResult, []string) {
+	results := make(map[string]*PingResult, len(addresses))
 	var toPing []string
 
-	for i := range enodes {
-		addr, err := enodeToAddr(enodes[i])
+	for i := range addresses {
+		addr, err := fn(addresses[i])
 		if err != nil {
-			// using enode since it's irrelevant but needs to be unique
 			errStr := err.Error()
-			results[enodes[i]] = &PingResult{ENode: enodes[i], Err: &errStr}
+			results[addresses[i]] = &PingResult{Address: addresses[i], Err: &errStr}
 			continue
 		}
-		results[addr] = &PingResult{ENode: enodes[i]}
+		results[addr] = &PingResult{Address: addresses[i]}
 		toPing = append(toPing, addr)
 	}
 	return results, toPing
@@ -80,11 +81,10 @@ func mapValues(m map[string]*PingResult) []*PingResult {
 	return rval
 }
 
-func (a *API) Ping(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
+func ping(ctx context.Context, pq PingQuery, p parseFn) ([]*PingResult, error) {
 	timeout := time.Duration(pq.TimeoutMs) * time.Millisecond
 
-	// parse enodes into pingable addresses
-	resultsMap, toPing := parseEnodes(pq.Addresses)
+	resultsMap, toPing := parse(pq.Addresses, p)
 
 	// run the checks concurrently
 	results, err := rtt.CheckHosts(toPing, timeout)
@@ -103,4 +103,31 @@ func (a *API) Ping(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
 	}
 
 	return mapValues(resultsMap), nil
+}
+
+func (a *API) Ping(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
+	return ping(ctx, pq, enodeToAddr)
+}
+
+func multiAddressToAddress(multiAddr string) (string, error) {
+
+	ma, err := multiaddr.NewMultiaddr(multiAddr)
+	if err != nil {
+		return "", err
+	}
+
+	ip4, err := ma.ValueForProtocol(multiaddr.P_IP4)
+	if err != nil {
+		return "", err
+	}
+
+	tcp, err := ma.ValueForProtocol(multiaddr.P_TCP)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:%s", ip4, tcp), nil
+}
+
+func (a *API) MultiAddressPing(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
+	return ping(ctx, pq, multiAddressToAddress)
 }
