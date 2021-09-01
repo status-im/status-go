@@ -4078,14 +4078,12 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
 		}
-		if chat.Active && chat.Public() {
+		if chat.Active && (chat.Public() || chat.CommunityChat()) {
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		}
-
 		return true
 	})
 
-	m.logger.Info("FOOBAR", zap.Any("pubchat", publicChatIDs))
 	return &pushnotificationclient.RegistrationOptions{
 		ContactIDs:    contactIDs,
 		MutedChatIDs:  mutedChatIDs,

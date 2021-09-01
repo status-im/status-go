@@ -100,6 +100,11 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 		}
 	}
 
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddChat(chat)
 
@@ -294,7 +299,7 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 }
 
 func (m *Messenger) saveChat(chat *Chat) error {
-	previousChat, ok := m.allChats.Load(chat.ID)
+	_, ok := m.allChats.Load(chat.ID)
 	if chat.OneToOne() {
 		name, identicon, err := generateAliasAndIdenticon(chat.ID)
 		if err != nil {
@@ -312,25 +317,12 @@ func (m *Messenger) saveChat(chat *Chat) error {
 		}
 	}
 
-	// We check if it's a new chat, or chat.Active has changed
-	// we check here, but we only re-register once the chat has been
-	// saved an added
-	shouldRegisterForPushNotifications := chat.Public() && (!ok && chat.Active) || (ok && chat.Active != previousChat.Active)
-
 	err := m.persistence.SaveChat(*chat)
 	if err != nil {
 		return err
 	}
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
-
-	if shouldRegisterForPushNotifications {
-		// Re-register for push notifications, as we want to receive mentions
-		if err := m.reregisterForPushNotifications(); err != nil {
-			return err
-		}
-
-	}
 
 	return nil
 }

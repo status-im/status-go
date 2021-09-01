@@ -456,7 +456,17 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 		return nil, err
 	}
 
-	return &response, m.saveChats(chats)
+	err = m.saveChats(chats)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
 
 func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*MessengerResponse, error) {
