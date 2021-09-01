@@ -201,6 +201,11 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		return nil, err
 	}
 
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, err
+	}
+
 	err = m.sendCurrentUserStatusToCommunity(ctx, community)
 	if err != nil {
 		logger.Debug("m.sendCurrentUserStatusToCommunity error", zap.Error(err))
