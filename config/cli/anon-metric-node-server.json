@@ -1,0 +1,30 @@
+{
+  "NetworkID": 1,
+  "DataDir": "/tmp/status-go-data",
+  "NodeKey": "b5c65bcfdb02261052b71cb5f6dec095d0e10df649b4a2b7d881e55e306cbebc",
+  "Rendezvous": true,
+  "NoDiscovery": false,
+  "ListenAddr": "0.0.0.0:30303",
+  "RegisterTopics": ["whispermail"],
+
+  "HTTPEnabled": true,
+  "HTTPHost": "127.0.0.1",
+  "HTTPPort": 8545,
+  "APIModules": "eth,net,web3,admin,appmetrics",
+
+  "WakuConfig": {
+    "Enabled": true,
+    "DataDir": "/var/tmp/statusd/waku"
+  },
+
+  "LogFile": "/var/log/status-go.log",
+  "LogLevel": "DEBUG",
+  "LogMaxSize": 200,
+  "LogMaxBackups": 5,
+  "LogCompressRotated": true,
+
+  "ShhextConfig": {
+    "AnonMetricsServerEnabled": true,
+    "AnonMetricsServerPostgresURI": ""
+  }
+}
