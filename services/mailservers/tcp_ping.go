@@ -53,7 +53,7 @@ func enodeToAddr(enodeAddr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s:%d", ip4, tcp), nil
+	return fmt.Sprintf("%s:%d", net.IP(ip4).String(), tcp), nil
 }
 
 func parse(addresses []string, fn parseFn) (map[string]*PingResult, []string) {
@@ -125,7 +125,7 @@ func multiAddressToAddress(multiAddr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s:%s", net.IP(ip4).String(), tcp), nil
+	return fmt.Sprintf("%s:%s", ip4, tcp), nil
 }
 
 func (a *API) MultiAddressPing(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
