@@ -163,7 +163,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
-		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
+		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
 		node.WithConnStatusChan(connStatusChan),
 		node.WithKeepAlive(time.Duration(keepAliveInt)*time.Second),
 	)
@@ -566,10 +566,10 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return w.node.Publish(context.Background(), msg, nil)
 }
 
-func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
+func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
-		strTopics[i] = t.String()
+		strTopics[i] = t.ContentTopic()
 	}
 
 	result, err := w.node.Query(context.Background(), strTopics, float64(from), float64(to), opts...)

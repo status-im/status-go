@@ -188,7 +188,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
-	if r.Cursor != nil {
+	if r.StoreCursor != nil {
 		options = append(options, store.WithCursor(&pb.Index{
 			Digest:       r.StoreCursor.Digest,
 			ReceiverTime: r.StoreCursor.ReceiverTime,
@@ -196,9 +196,9 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		}))
 	}
 
-	var topics []types.TopicType
+	var topics []wakucommon.TopicType
 	for _, topic := range r.Topics {
-		topics = append(topics, types.BytesToTopic(topic))
+		topics = append(topics, wakucommon.BytesToTopic(topic))
 	}
 
 	pbCursor, err := w.waku.Query(topics, uint64(r.From), uint64(r.To), options)

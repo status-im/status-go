@@ -26,9 +26,10 @@ type WakuNodeParameters struct {
 	enableFilter bool
 	wOpts        []wakurelay.Option
 
-	enableStore bool
-	storeMsgs   bool
-	store       *store.WakuStore
+	enableStore  bool
+	shouldResume bool
+	storeMsgs    bool
+	store        *store.WakuStore
 	// filter      *filter.WakuFilter
 
 	keepAliveInterval time.Duration
@@ -107,11 +108,12 @@ func WithWakuFilter(opts ...wakurelay.Option) WakuNodeOption {
 
 // WithWakuStore enables the Waku V2 Store protocol and if the messages should
 // be stored or not in a message provider
-func WithWakuStore(shouldStoreMessages bool) WakuNodeOption {
+func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableStore = true
 		params.storeMsgs = shouldStoreMessages
 		params.store = store.NewWakuStore(shouldStoreMessages, nil)
+		params.shouldResume = shouldResume
 		return nil
 	}
 }
