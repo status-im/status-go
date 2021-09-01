@@ -723,7 +723,7 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 
 func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	info := w.host.Peerstore().PeerInfo(peerID)
-	return w.host.Connect(w.ctx, info)
+	return w.connect(info)
 }
 
 func (w *WakuNode) ClosePeerByAddress(address string) error {
