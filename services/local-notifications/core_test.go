@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 
@@ -19,8 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
-func createWalletDb(t *testing.T, db *sql.DB) (*wallet.Database, func()) {
-	return wallet.NewDB(db), func() {
+func createWalletDb(t *testing.T, db *sql.DB) (*transfer.Database, func()) {
+	return transfer.NewDB(db), func() {
 		require.NoError(t, db.Close())
 	}
 }
@@ -84,7 +84,7 @@ func TestTransactionNotification(t *testing.T) {
 
 	s.StartWalletWatcher()
 
-	header := &wallet.DBHeader{
+	header := &transfer.DBHeader{
 		Number:  big.NewInt(1),
 		Hash:    common.Hash{1},
 		Address: common.Address{1},
@@ -92,10 +92,10 @@ func TestTransactionNotification(t *testing.T) {
 	tx := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	receipt := types.NewReceipt(nil, false, 100)
 	receipt.Logs = []*types.Log{}
-	transfers := []wallet.Transfer{
+	transfers := []transfer.Transfer{
 		{
 			ID:          common.Hash{1},
-			Type:        wallet.TransferType("eth"),
+			Type:        transfer.Type("eth"),
 			BlockHash:   header.Hash,
 			BlockNumber: header.Number,
 			Transaction: tx,
@@ -104,22 +104,22 @@ func TestTransactionNotification(t *testing.T) {
 		},
 	}
 	nonce := int64(0)
-	lastBlock := &wallet.LastKnownBlock{
+	lastBlock := &transfer.LastKnownBlock{
 		Number:  big.NewInt(1),
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
 	}
-	require.NoError(t, walletDb.ProcessBlocks(1777, header.Address, big.NewInt(1), lastBlock, []*wallet.DBHeader{header}))
-	require.NoError(t, walletDb.ProcessTranfers(1777, transfers, []*wallet.DBHeader{}))
+	require.NoError(t, walletDb.ProcessBlocks(1777, header.Address, big.NewInt(1), lastBlock, []*transfer.DBHeader{header}))
+	require.NoError(t, walletDb.ProcessTranfers(1777, transfers, []*transfer.DBHeader{}))
 
-	feed.Send(wallet.Event{
-		Type:        wallet.EventRecentHistoryReady,
+	feed.Send(transfer.Event{
+		Type:        transfer.EventRecentHistoryReady,
 		BlockNumber: big.NewInt(0),
 		Accounts:    []common.Address{header.Address},
 	})
 
-	feed.Send(wallet.Event{
-		Type:        wallet.EventNewTransfers,
+	feed.Send(transfer.Event{
+		Type:        transfer.EventNewTransfers,
 		BlockNumber: header.Number,
 		Accounts:    []common.Address{header.Address},
 	})

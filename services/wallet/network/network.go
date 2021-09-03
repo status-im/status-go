@@ -1,4 +1,4 @@
-package wallet
+package network
 
 import (
 	"bytes"
@@ -152,14 +152,18 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*Network, error) {
 	return res, err
 }
 
-type NetworkManager struct {
+type Manager struct {
 	db           *sql.DB
-	chainClients map[uint64]*chainClient
+	chainClients map[uint64]*ChainClient
 }
 
-func (nm *NetworkManager) init() error {
+func NewManager(db *sql.DB) *Manager {
+	return &Manager{db: db, chainClients: make(map[uint64]*ChainClient)}
+}
+
+func (nm *Manager) Init() error {
 	for _, network := range DefaultNetworks {
-		err := nm.upsert(network)
+		err := nm.Upsert(network)
 		if err != nil {
 			return err
 		}
@@ -168,12 +172,12 @@ func (nm *NetworkManager) init() error {
 	return nil
 }
 
-func (nm *NetworkManager) getChainClient(chainID uint64) (*chainClient, error) {
+func (nm *Manager) GetChainClient(chainID uint64) (*ChainClient, error) {
 	if chainClient, ok := nm.chainClients[chainID]; ok {
 		return chainClient, nil
 	}
 
-	network := nm.find(chainID)
+	network := nm.Find(chainID)
 	if network == nil {
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}
@@ -183,12 +187,24 @@ func (nm *NetworkManager) getChainClient(chainID uint64) (*chainClient, error) {
 		return nil, fmt.Errorf("dial upstream server: %s", err)
 	}
 
-	chainClient := &chainClient{eth: ethclient.NewClient(rpcClient)}
+	chainClient := &ChainClient{eth: ethclient.NewClient(rpcClient), ChainID: chainID}
 	nm.chainClients[chainID] = chainClient
 	return chainClient, nil
 }
 
-func (nm *NetworkManager) upsert(network *Network) error {
+func (nm *Manager) GetChainClients(chainIDs []uint64) (res []*ChainClient, err error) {
+	for _, chainID := range chainIDs {
+		client, err := nm.GetChainClient(chainID)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, client)
+	}
+
+	return res, nil
+}
+
+func (nm *Manager) Upsert(network *Network) error {
 	_, err := nm.db.Exec(
 		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
@@ -198,12 +214,12 @@ func (nm *NetworkManager) upsert(network *Network) error {
 	return err
 }
 
-func (nm *NetworkManager) delete(chainID uint64) error {
+func (nm *Manager) Delete(chainID uint64) error {
 	_, err := nm.db.Exec("DELETE FROM networks WHERE chain_id = ?", chainID)
 	return err
 }
 
-func (nm *NetworkManager) find(chainID uint64) *Network {
+func (nm *Manager) Find(chainID uint64) *Network {
 	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
 	if len(networks) != 1 || err != nil {
 		return nil
@@ -211,7 +227,7 @@ func (nm *NetworkManager) find(chainID uint64) *Network {
 	return networks[0]
 }
 
-func (nm *NetworkManager) get(onlyEnabled bool) ([]*Network, error) {
+func (nm *Manager) Get(onlyEnabled bool) ([]*Network, error) {
 	query := newNetworksQuery()
 	if onlyEnabled {
 		query.filterEnabled(true)

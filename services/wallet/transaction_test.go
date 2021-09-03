@@ -11,10 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
+	tmpfile, err := ioutil.TempFile("", "wallet-transactions-tests-")
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
@@ -34,9 +35,9 @@ func TestPendingTransactions(t *testing.T) {
 		To:             common.Address{2},
 		Type:           RegisterENS,
 		AdditionalData: "someuser.stateofus.eth",
-		Value:          BigInt{big.NewInt(123)},
-		GasLimit:       BigInt{big.NewInt(21000)},
-		GasPrice:       BigInt{big.NewInt(1)},
+		Value:          bigint.BigInt{big.NewInt(123)},
+		GasLimit:       bigint.BigInt{big.NewInt(21000)},
+		GasPrice:       bigint.BigInt{big.NewInt(1)},
 		ChainID:        777,
 	}
 

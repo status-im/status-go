@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id FROM transfers"
@@ -36,7 +37,7 @@ func (q *transfersQuery) FilterStart(start *big.Int) *transfersQuery {
 		q.andOrWhere()
 		q.added = true
 		q.buf.WriteString(" blk_number >= ?")
-		q.args = append(q.args, (*SQLBigInt)(start))
+		q.args = append(q.args, (*bigint.SQLBigInt)(start))
 	}
 	return q
 }
@@ -46,7 +47,7 @@ func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 		q.andOrWhere()
 		q.added = true
 		q.buf.WriteString(" blk_number <= ?")
-		q.args = append(q.args, (*SQLBigInt)(end))
+		q.args = append(q.args, (*bigint.SQLBigInt)(end))
 	}
 	return q
 }
@@ -88,7 +89,7 @@ func (q *transfersQuery) FilterBlockNumber(blockNumber *big.Int) *transfersQuery
 	q.andOrWhere()
 	q.added = true
 	q.buf.WriteString(" blk_number = ?")
-	q.args = append(q.args, (*SQLBigInt)(blockNumber))
+	q.args = append(q.args, (*bigint.SQLBigInt)(blockNumber))
 	return q
 }
 
@@ -117,7 +118,7 @@ func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
 		}
 		err = rows.Scan(
 			&transfer.ID, &transfer.Type, &transfer.BlockHash,
-			(*SQLBigInt)(transfer.BlockNumber), &transfer.Timestamp, &transfer.Address,
+			(*bigint.SQLBigInt)(transfer.BlockNumber), &transfer.Timestamp, &transfer.Address,
 			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log}, &transfer.NetworkID)
 		if err != nil {
 			return nil, err

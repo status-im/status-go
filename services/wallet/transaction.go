@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/network"
 )
 
 type TransactionManager struct {
@@ -29,13 +31,13 @@ const (
 type PendingTransaction struct {
 	Hash           common.Hash    `json:"hash"`
 	Timestamp      uint64         `json:"timestamp"`
-	Value          BigInt         `json:"value"`
+	Value          bigint.BigInt  `json:"value"`
 	From           common.Address `json:"from"`
 	To             common.Address `json:"to"`
 	Data           string         `json:"data"`
 	Symbol         string         `json:"symbol"`
-	GasPrice       BigInt         `json:"gasPrice"`
-	GasLimit       BigInt         `json:"gasLimit"`
+	GasPrice       bigint.BigInt  `json:"gasPrice"`
+	GasLimit       bigint.BigInt  `json:"gasLimit"`
 	Type           PendingTrxType `json:"type"`
 	AdditionalData string         `json:"additionalData"`
 	ChainID        uint64         `json:"network_id"`
@@ -55,19 +57,19 @@ func (tm *TransactionManager) getAllPendings(chainID uint64) ([]*PendingTransact
 	var transactions []*PendingTransaction
 	for rows.Next() {
 		transaction := &PendingTransaction{
-			Value:    BigInt{Int: new(big.Int)},
-			GasPrice: BigInt{Int: new(big.Int)},
-			GasLimit: BigInt{Int: new(big.Int)},
+			Value:    bigint.BigInt{Int: new(big.Int)},
+			GasPrice: bigint.BigInt{Int: new(big.Int)},
+			GasLimit: bigint.BigInt{Int: new(big.Int)},
 		}
 		err := rows.Scan(&transaction.Hash,
 			&transaction.Timestamp,
-			(*SQLBigIntBytes)(transaction.Value.Int),
+			(*bigint.SQLBigIntBytes)(transaction.Value.Int),
 			&transaction.From,
 			&transaction.To,
 			&transaction.Data,
 			&transaction.Symbol,
-			(*SQLBigIntBytes)(transaction.GasPrice.Int),
-			(*SQLBigIntBytes)(transaction.GasLimit.Int),
+			(*bigint.SQLBigIntBytes)(transaction.GasPrice.Int),
+			(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 			&transaction.Type,
 			&transaction.AdditionalData,
 			&transaction.ChainID,
@@ -96,19 +98,19 @@ func (tm *TransactionManager) getPendingByAddress(chainID uint64, address common
 	var transactions []*PendingTransaction
 	for rows.Next() {
 		transaction := &PendingTransaction{
-			Value:    BigInt{Int: new(big.Int)},
-			GasPrice: BigInt{Int: new(big.Int)},
-			GasLimit: BigInt{Int: new(big.Int)},
+			Value:    bigint.BigInt{Int: new(big.Int)},
+			GasPrice: bigint.BigInt{Int: new(big.Int)},
+			GasLimit: bigint.BigInt{Int: new(big.Int)},
 		}
 		err := rows.Scan(&transaction.Hash,
 			&transaction.Timestamp,
-			(*SQLBigIntBytes)(transaction.Value.Int),
+			(*bigint.SQLBigIntBytes)(transaction.Value.Int),
 			&transaction.From,
 			&transaction.To,
 			&transaction.Data,
 			&transaction.Symbol,
-			(*SQLBigIntBytes)(transaction.GasPrice.Int),
-			(*SQLBigIntBytes)(transaction.GasLimit.Int),
+			(*bigint.SQLBigIntBytes)(transaction.GasPrice.Int),
+			(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 			&transaction.Type,
 			&transaction.AdditionalData,
 			&transaction.ChainID,
@@ -136,13 +138,13 @@ func (tm *TransactionManager) addPending(transaction PendingTransaction) error {
 		transaction.ChainID,
 		transaction.Hash,
 		transaction.Timestamp,
-		(*SQLBigIntBytes)(transaction.Value.Int),
+		(*bigint.SQLBigIntBytes)(transaction.Value.Int),
 		transaction.From,
 		transaction.To,
 		transaction.Data,
 		transaction.Symbol,
-		(*SQLBigIntBytes)(transaction.GasPrice.Int),
-		(*SQLBigIntBytes)(transaction.GasLimit.Int),
+		(*bigint.SQLBigIntBytes)(transaction.GasPrice.Int),
+		(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 		transaction.Type,
 		transaction.AdditionalData,
 	)
@@ -154,11 +156,10 @@ func (tm *TransactionManager) deletePending(chainID uint64, hash common.Hash) er
 	return err
 }
 
-func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *chainClient, feed *event.Feed) error {
+func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *network.ChainClient) error {
 	watchTxCommand := &watchTransactionCommand{
 		hash:   transactionHash,
 		client: client,
-		feed:   feed,
 	}
 
 	commandContext, cancel := context.WithTimeout(ctx, 10*time.Minute)
@@ -168,13 +169,12 @@ func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.
 }
 
 type watchTransactionCommand struct {
-	client *chainClient
+	client *network.ChainClient
 	hash   common.Hash
-	feed   *event.Feed
 }
 
-func (c *watchTransactionCommand) Command() Command {
-	return FiniteCommand{
+func (c *watchTransactionCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 10 * time.Second,
 		Runable:  c.Run,
 	}.Run

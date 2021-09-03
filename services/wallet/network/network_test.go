@@ -1,4 +1,4 @@
-package wallet
+package network
 
 import (
 	"database/sql"
@@ -26,11 +26,11 @@ func TestInitNetwork(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &NetworkManager{db: db}
-	err := nm.init()
+	nm := &Manager{db: db}
+	err := nm.Init()
 	require.NoError(t, err)
 
-	network := nm.find(1)
+	network := nm.Find(1)
 	require.NotNil(t, network)
 	require.Equal(t, (uint64)(1), network.ChainID)
 }
@@ -39,11 +39,11 @@ func TestGet(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &NetworkManager{db: db}
-	err := nm.init()
+	nm := &Manager{db: db}
+	err := nm.Init()
 	require.NoError(t, err)
 
-	networks, err := nm.get(true)
+	networks, err := nm.Get(true)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(networks))
 }
@@ -52,13 +52,13 @@ func TestDelete(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &NetworkManager{db: db}
-	err := nm.init()
+	nm := &Manager{db: db}
+	err := nm.Init()
 	require.NoError(t, err)
 
-	err = nm.delete(1)
+	err = nm.Delete(1)
 	require.NoError(t, err)
-	networks, err := nm.get(true)
+	networks, err := nm.Get(true)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(networks))
 }
@@ -67,19 +67,19 @@ func TestUpsert(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &NetworkManager{db: db}
-	err := nm.init()
+	nm := &Manager{db: db}
+	err := nm.Init()
 	require.NoError(t, err)
 
-	network := nm.find(1)
+	network := nm.Find(1)
 	require.NotNil(t, network)
 
 	newName := "New Chain Name"
 	network.ChainName = newName
-	err = nm.upsert(network)
+	err = nm.Upsert(network)
 	require.Nil(t, err)
 
-	network = nm.find(1)
+	network = nm.Find(1)
 	require.NotNil(t, network)
 	require.Equal(t, newName, network.ChainName)
 }

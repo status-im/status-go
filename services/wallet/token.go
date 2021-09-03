@@ -11,7 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/ierc20"
+	"github.com/status-im/status-go/services/wallet/network"
 )
 
 var requestTimeout = 20 * time.Second
@@ -67,9 +69,9 @@ func (tm *TokenManager) deleteCustom(chainID uint64, address common.Address) err
 	return err
 }
 
-func (tm *TokenManager) getBalances(parent context.Context, clients []*chainClient, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *TokenManager) getBalances(parent context.Context, clients []*network.ChainClient, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
-		group    = NewAtomicGroup(parent)
+		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)

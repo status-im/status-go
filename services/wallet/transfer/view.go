@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"math/big"
@@ -9,16 +9,41 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func castToTransferViews(transfers []Transfer) []TransferView {
-	views := make([]TransferView, len(transfers))
+// View stores only fields used by a client and ensures that all relevant fields are
+// encoded in hex.
+type View struct {
+	ID                   common.Hash    `json:"id"`
+	Type                 Type           `json:"type"`
+	Address              common.Address `json:"address"`
+	BlockNumber          *hexutil.Big   `json:"blockNumber"`
+	BlockHash            common.Hash    `json:"blockhash"`
+	Timestamp            hexutil.Uint64 `json:"timestamp"`
+	GasPrice             *hexutil.Big   `json:"gasPrice"`
+	MaxFeePerGas         *hexutil.Big   `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *hexutil.Big   `json:"maxPriorityFeePerGas"`
+	GasLimit             hexutil.Uint64 `json:"gasLimit"`
+	GasUsed              hexutil.Uint64 `json:"gasUsed"`
+	Nonce                hexutil.Uint64 `json:"nonce"`
+	TxStatus             hexutil.Uint64 `json:"txStatus"`
+	Input                hexutil.Bytes  `json:"input"`
+	TxHash               common.Hash    `json:"txHash"`
+	Value                *hexutil.Big   `json:"value"`
+	From                 common.Address `json:"from"`
+	To                   common.Address `json:"to"`
+	Contract             common.Address `json:"contract"`
+	NetworkID            uint64         `json:"network_id"`
+}
+
+func castToTransferViews(transfers []Transfer) []View {
+	views := make([]View, len(transfers))
 	for i := range transfers {
-		views[i] = castToTransferView(transfers[i])
+		views[i] = CastToTransferView(transfers[i])
 	}
 	return views
 }
 
-func castToTransferView(t Transfer) TransferView {
-	view := TransferView{}
+func CastToTransferView(t Transfer) View {
+	view := View{}
 	view.ID = t.ID
 	view.Type = t.Type
 	view.Address = t.Address
@@ -51,11 +76,6 @@ func castToTransferView(t Transfer) TransferView {
 	return view
 }
 
-// CastToTransferView transforms a raw Transfer into an enriched one
-func CastToTransferView(t Transfer) TransferView {
-	return castToTransferView(t)
-}
-
 func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	if len(ethlog.Topics) < 3 {
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
@@ -77,29 +97,4 @@ func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	}
 	amount = new(big.Int).SetBytes(ethlog.Data)
 	return
-}
-
-// TransferView stores only fields used by a client and ensures that all relevant fields are
-// encoded in hex.
-type TransferView struct {
-	ID                   common.Hash    `json:"id"`
-	Type                 TransferType   `json:"type"`
-	Address              common.Address `json:"address"`
-	BlockNumber          *hexutil.Big   `json:"blockNumber"`
-	BlockHash            common.Hash    `json:"blockhash"`
-	Timestamp            hexutil.Uint64 `json:"timestamp"`
-	GasPrice             *hexutil.Big   `json:"gasPrice"`
-	MaxFeePerGas         *hexutil.Big   `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *hexutil.Big   `json:"maxPriorityFeePerGas"`
-	GasLimit             hexutil.Uint64 `json:"gasLimit"`
-	GasUsed              hexutil.Uint64 `json:"gasUsed"`
-	Nonce                hexutil.Uint64 `json:"nonce"`
-	TxStatus             hexutil.Uint64 `json:"txStatus"`
-	Input                hexutil.Bytes  `json:"input"`
-	TxHash               common.Hash    `json:"txHash"`
-	Value                *hexutil.Big   `json:"value"`
-	From                 common.Address `json:"from"`
-	To                   common.Address `json:"to"`
-	Contract             common.Address `json:"contract"`
-	NetworkID            uint64
 }

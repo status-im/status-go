@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/network"
 )
 
 var (
@@ -29,42 +31,29 @@ type BalanceReader interface {
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 }
 
-// NewReactor creates instance of the Reactor.
-func NewReactor(db *Database, feed *event.Feed, client *chainClient, chainID uint64) *Reactor {
-	return &Reactor{
-		db:     db,
-		client: client,
-		feed:   feed,
-		chain:  new(big.Int).SetUint64(chainID),
-	}
-}
-
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client *chainClient
-	db     *Database
-	feed   *event.Feed
-	chain  *big.Int
-
+	db    *Database
+	block *Block
+	feed  *event.Feed
 	mu    sync.Mutex
-	group *Group
+	group *async.Group
 }
 
-func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
-	signer := types.NewLondonSigner(r.chain)
+func (r *Reactor) newControlCommand(chainClient *network.ChainClient, accounts []common.Address) *controlCommand {
+	signer := types.NewLondonSigner(chainClient.ToBigInt())
 	ctl := &controlCommand{
-		db:       r.db,
-		chain:    r.chain,
-		client:   r.client,
-		accounts: accounts,
-		eth: &ETHTransferDownloader{
-			chain:    r.chain,
-			client:   r.client,
-			accounts: accounts,
-			signer:   signer,
-			db:       r.db,
+		db:          r.db,
+		chainClient: chainClient,
+		accounts:    accounts,
+		block:       r.block,
+		eth: &ETHDownloader{
+			chainClient: chainClient,
+			accounts:    accounts,
+			signer:      signer,
+			db:          r.db,
 		},
-		erc20:       NewERC20TransfersDownloader(r.client, accounts, signer),
+		erc20:       NewERC20TransfersDownloader(chainClient, accounts, signer),
 		feed:        r.feed,
 		errorsCount: 0,
 	}
@@ -73,20 +62,23 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) Start(accounts []common.Address) error {
+func (r *Reactor) start(chainClients []*network.ChainClient, accounts []common.Address) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	if r.group != nil {
 		return errAlreadyRunning
 	}
-	r.group = NewGroup(context.Background())
-	ctl := r.newControlCommand(accounts)
-	r.group.Add(ctl.Command())
+	r.group = async.NewGroup(context.Background())
+	for _, chainClient := range chainClients {
+		ctl := r.newControlCommand(chainClient, accounts)
+		r.group.Add(ctl.Command())
+	}
 	return nil
 }
 
 // Stop stops reactor loop and waits till it exits.
-func (r *Reactor) Stop() {
+func (r *Reactor) stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.group == nil {
@@ -95,4 +87,9 @@ func (r *Reactor) Stop() {
 	r.group.Stop()
 	r.group.Wait()
 	r.group = nil
+}
+
+func (r *Reactor) restart(chainClients []*network.ChainClient, accounts []common.Address) error {
+	r.stop()
+	return r.start(chainClients, accounts)
 }

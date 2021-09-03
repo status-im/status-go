@@ -1,4 +1,4 @@
-package wallet
+package bigint
 
 import (
 	"database/sql/driver"

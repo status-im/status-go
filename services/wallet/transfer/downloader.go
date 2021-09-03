@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"context"
@@ -12,14 +12,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/services/wallet/network"
 )
 
-// TransferType type of the asset that was transferred.
-type TransferType string
+// Type type of the asset that was transferred.
+type Type string
 
 const (
-	ethTransfer   TransferType = "eth"
-	erc20Transfer TransferType = "erc20"
+	ethTransfer   Type = "eth"
+	erc20Transfer Type = "erc20"
 
 	erc20TransferEventSignature = "Transfer(address,address,uint256)"
 )
@@ -32,7 +33,7 @@ var (
 
 // Transfer stores information about transfer.
 type Transfer struct {
-	Type        TransferType       `json:"type"`
+	Type        Type               `json:"type"`
 	ID          common.Hash        `json:"-"`
 	Address     common.Address     `json:"address"`
 	BlockNumber *big.Int           `json:"blockNumber"`
@@ -48,26 +49,25 @@ type Transfer struct {
 	Log *types.Log `json:"log"`
 }
 
-// ETHTransferDownloader downloads regular eth transfers.
-type ETHTransferDownloader struct {
-	client   *chainClient
-	accounts []common.Address
-	signer   types.Signer
-	db       *Database
-	chain    *big.Int
+// ETHDownloader downloads regular eth transfers.
+type ETHDownloader struct {
+	chainClient *network.ChainClient
+	accounts    []common.Address
+	signer      types.Signer
+	db          *Database
 }
 
 var errLogsDownloaderStuck = errors.New("logs downloader stuck")
 
 // GetTransfers checks if the balance was changed between two blocks.
 // If so it downloads transaction that transfer ethereum from that block.
-func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHeader) (rst []Transfer, err error) {
+func (d *ETHDownloader) GetTransfers(ctx context.Context, header *DBHeader) (rst []Transfer, err error) {
 	// TODO(dshulyak) consider caching balance and reset it on reorg
 	changed := d.accounts
 	if len(changed) == 0 {
 		return nil, nil
 	}
-	blk, err := d.client.BlockByHash(ctx, header.Hash)
+	blk, err := d.chainClient.BlockByHash(ctx, header.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHead
 	return rst, nil
 }
 
-func (d *ETHTransferDownloader) GetTransfersByNumber(ctx context.Context, number *big.Int) ([]Transfer, error) {
-	blk, err := d.client.BlockByNumber(ctx, number)
+func (d *ETHDownloader) GetTransfersByNumber(ctx context.Context, number *big.Int) ([]Transfer, error) {
+	blk, err := d.chainClient.BlockByNumber(ctx, number)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +90,9 @@ func (d *ETHTransferDownloader) GetTransfersByNumber(ctx context.Context, number
 	return rst, err
 }
 
-func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
+func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
 	for _, address := range accounts {
-		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chain.Uint64(), address, blk.Hash())
+		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chainClient.ChainID, address, blk.Hash())
 		if err != nil {
 			return nil, err
 		}
@@ -106,8 +106,8 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 		}
 
 		for _, tx := range blk.Transactions() {
-			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chain) != 0 {
-				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chain)
+			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chainClient.ToBigInt()) != 0 {
+				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chainClient.ChainID)
 				continue
 			}
 			from, err := types.Sender(d.signer, tx)
@@ -117,7 +117,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 			}
 
 			if from == address || (tx.To() != nil && *tx.To() == address) {
-				receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
+				receipt, err := d.chainClient.TransactionReceipt(ctx, tx.Hash())
 				if err != nil {
 					return nil, err
 				}
@@ -146,7 +146,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *chainClient, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client *network.ChainClient, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	return &ERC20TransfersDownloader{
 		client:    client,
@@ -158,7 +158,7 @@ func NewERC20TransfersDownloader(client *chainClient, accounts []common.Address,
 
 // ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
-	client   *chainClient
+	client   *network.ChainClient
 	accounts []common.Address
 
 	// hash of the Transfer event signature
@@ -182,9 +182,9 @@ func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]co
 	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
 }
 
-func (d *ETHTransferDownloader) transferFromLog(parent context.Context, ethlog types.Log, address common.Address, id common.Hash) (Transfer, error) {
+func (d *ETHDownloader) transferFromLog(parent context.Context, ethlog types.Log, address common.Address, id common.Hash) (Transfer, error) {
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	tx, _, err := d.client.TransactionByHash(ctx, ethlog.TxHash)
+	tx, _, err := d.chainClient.TransactionByHash(ctx, ethlog.TxHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err
@@ -194,13 +194,13 @@ func (d *ETHTransferDownloader) transferFromLog(parent context.Context, ethlog t
 		return Transfer{}, err
 	}
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	receipt, err := d.client.TransactionReceipt(ctx, ethlog.TxHash)
+	receipt, err := d.chainClient.TransactionReceipt(ctx, ethlog.TxHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err
 	}
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	blk, err := d.client.BlockByHash(ctx, ethlog.BlockHash)
+	blk, err := d.chainClient.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err

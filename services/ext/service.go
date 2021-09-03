@@ -38,7 +38,7 @@ import (
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transfer"
 
 	"go.uber.org/zap"
 )
@@ -267,7 +267,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 
 	// Token transfer, check the logs
 	if len(coremessage.Data()) != 0 {
-		if wallet.IsTokenTransfer(receipt.Logs) {
+		if transfer.IsTokenTransfer(receipt.Logs) {
 			return coremessage, coretypes.TransactionStatus(receipt.Status), nil
 		}
 		return coremessage, coretypes.TransactionStatusFailed, nil
