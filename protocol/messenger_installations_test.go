@@ -201,9 +201,11 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		}
 
 		allChats = append(allChats, response.Chats()...)
-
-		if len(allChats) >= 2 && len(response.Contacts) == 1 {
+		if len(response.Contacts) == 1 {
 			actualContact = response.Contacts[0]
+		}
+
+		if len(allChats) >= 1 && actualContact != nil {
 			return nil
 		}
 

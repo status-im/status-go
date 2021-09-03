@@ -79,19 +79,22 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	return response, nil
 }
 
-func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	response := new(MessengerResponse)
-
+func (m *Messenger) removeContact(ctx context.Context, response *MessengerResponse, pubKey string) error {
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
-		return nil, ErrContactNotFound
+		return ErrContactNotFound
 	}
 
 	contact.Remove()
 
 	err := m.persistence.SaveContact(contact, nil)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	err = m.syncContact(context.Background(), contact)
+	if err != nil {
+		return err
 	}
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
@@ -100,7 +103,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 	// And we re-register for push notications
 	err = m.reregisterForPushNotifications()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create the corresponding profile chat
@@ -110,15 +113,25 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 	if ok {
 		chatResponse, err := m.deactivateChat(profileChatID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		err = response.Merge(chatResponse)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	response.Contacts = []*Contact{contact}
+	return nil
+}
+func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
+	response := new(MessengerResponse)
+
+	err := m.removeContact(ctx, response, pubKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 
@@ -140,6 +153,7 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 }
 
 func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
+	contact.Block()
 	chats, err := m.persistence.BlockContact(contact)
 	if err != nil {
 		return nil, err
@@ -150,6 +164,11 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 		m.allChats.Store(chat.ID, chat)
 	}
 	m.allChats.Delete(contact.ID)
+
+	err = m.syncContact(context.Background(), contact)
+	if err != nil {
+		return nil, err
+	}
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
@@ -169,7 +188,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	contact.Identicon = identicon
 	contact.Alias = name
 
-	if m.isNewContact(contact) || m.hasNicknameChanged(contact) {
+	if m.shouldSyncContact(contact) {
 		if m.isNewContact(contact) {
 			publicKey, err := contact.PublicKey()
 			if err != nil {
@@ -298,12 +317,15 @@ func (m *Messenger) isNewContact(contact *Contact) bool {
 	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
 }
 
-func (m *Messenger) hasNicknameChanged(contact *Contact) bool {
+func (m *Messenger) shouldSyncContact(contact *Contact) bool {
 	previousContact, ok := m.allContacts.Load(contact.ID)
 	if !ok {
-		return false
+		return contact.IsAdded()
 	}
-	return contact.LocalNickname != previousContact.LocalNickname
+
+	return contact.LocalNickname != previousContact.LocalNickname ||
+		contact.IsAdded() != previousContact.IsAdded() ||
+		previousContact.IsBlocked() != contact.IsBlocked()
 }
 
 func (m *Messenger) removedContact(contact *Contact) bool {

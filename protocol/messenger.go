@@ -2184,7 +2184,8 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	}
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.IsAdded() && contact.ID != myID {
+		if contact.ID != myID &&
+			(contact.LocalNickname != "" || contact.IsAdded() || contact.IsBlocked()) {
 			if err = m.syncContact(ctx, contact); err != nil {
 				return false
 			}
@@ -2301,17 +2302,36 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 // syncContact sync as contact with paired devices
 func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	var err error
+	if contact.IsSyncing {
+		return nil
+	}
 	if !m.hasPairedDevices() {
 		return nil
 	}
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	syncMessage := &protobuf.SyncInstallationContact{
+	var ensName string
+	if contact.ENSVerified {
+		ensName = contact.Name
+	}
+
+	oneToOneChat, ok := m.allChats.Load(contact.ID)
+	muted := false
+	if ok {
+		muted = oneToOneChat.Muted
+	}
+
+	syncMessage := &protobuf.SyncInstallationContactV2{
 		Clock:         clock,
 		Id:            contact.ID,
-		EnsName:       contact.Name,
+		EnsName:       ensName,
 		LocalNickname: contact.LocalNickname,
+		Added:         contact.IsAdded(),
+		Blocked:       contact.IsBlocked(),
+		Muted:         muted,
+		Removed:       contact.Removed,
 	}
+
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
@@ -2691,12 +2711,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.SyncInstallationContact:
+						logger.Warn("SyncInstallationContact is not supported")
+						continue
+
+					case protobuf.SyncInstallationContactV2:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContact)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContactV2)
 						logger.Debug("Handling SyncInstallationContact", zap.Any("message", p))
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
@@ -2811,7 +2835,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.ContactUpdate:
-						logger.Debug("Handling ContactUpdate")
+						if common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("coming from us, ignoring")
+							continue
+						}
+
 						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
 						err = m.HandleContactUpdate(messageState, contactUpdate)
 						if err != nil {
@@ -3334,7 +3362,17 @@ func (m *Messenger) MuteChat(chatID string) error {
 		}
 	}
 
-	err := m.persistence.MuteChat(chatID)
+	var contact *Contact
+	if chat.OneToOne() {
+		contact, _ = m.allContacts.Load(chatID)
+	}
+
+	return m.muteChat(chat, contact)
+}
+
+func (m *Messenger) muteChat(chat *Chat, contact *Contact) error {
+	m.logger.Info("MUTING", zap.Any("CHAT ID", chat.ID))
+	err := m.persistence.MuteChat(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -3342,6 +3380,13 @@ func (m *Messenger) MuteChat(chatID string) error {
 	chat.Muted = true
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
+
+	if contact != nil {
+		err := m.syncContact(context.Background(), contact)
+		if err != nil {
+			return err
+		}
+	}
 
 	return m.reregisterForPushNotifications()
 }
@@ -3354,7 +3399,16 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 		return errors.New("chat not found")
 	}
 
-	err := m.persistence.UnmuteChat(chatID)
+	var contact *Contact
+	if chat.OneToOne() {
+		contact, _ = m.allContacts.Load(chatID)
+	}
+
+	return m.unmuteChat(chat, contact)
+}
+
+func (m *Messenger) unmuteChat(chat *Chat, contact *Contact) error {
+	err := m.persistence.UnmuteChat(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -3362,6 +3416,13 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 	chat.Muted = false
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
+
+	if contact != nil {
+		err := m.syncContact(context.Background(), contact)
+		if err != nil {
+			return err
+		}
+	}
 	return m.reregisterForPushNotifications()
 }
 

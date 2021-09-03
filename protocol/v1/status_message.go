@@ -198,7 +198,7 @@ func (m *StatusMessage) HandleApplication() error {
 
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
 		log.Printf("Sync installation contact")
-		return m.unmarshalProtobufData(new(protobuf.SyncInstallationContact))
+		return m.unmarshalProtobufData(new(protobuf.SyncInstallationContactV2))
 
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
 		return m.unmarshalProtobufData(new(protobuf.SyncInstallationPublicChat))

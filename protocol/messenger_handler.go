@@ -258,16 +258,27 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
-func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContact) error {
-	chat, ok := state.AllChats.Load(state.CurrentMessageState.Contact.ID)
-	if !ok {
-		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
+func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
+	removedOrBlcoked := message.Removed || message.Blocked
+	chat, ok := state.AllChats.Load(message.Id)
+	if !ok && (message.Added || message.Muted) && !removedOrBlcoked {
+		pubKey, err := common.HexToPubkey(message.Id)
+		if err != nil {
+			return nil
+		}
+
+		chat = OneToOneFromPublicKey(pubKey, state.Timesource)
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
 	contact, ok := state.AllContacts.Load(message.Id)
 	if !ok {
+		if message.Removed {
+			// Nothing to do in case if contact doesn't exist
+			return nil
+		}
+
 		var err error
 		contact, err = buildContactFromPkString(message.Id)
 		if err != nil {
@@ -276,22 +287,72 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	}
 
 	if contact.LastUpdated < message.Clock {
-		if !contact.IsAdded() {
+		contact.IsSyncing = true
+		defer func() {
+			contact.IsSyncing = false
+		}()
+
+		if message.Added {
 			contact.SystemTags = append(contact.SystemTags, contactAdded)
 		}
-		if contact.Name != message.EnsName {
+		if message.EnsName != "" && contact.Name != message.EnsName {
 			contact.Name = message.EnsName
-			contact.ENSVerified = false
+			publicKey, err := contact.PublicKey()
+			if err != nil {
+				return nil
+			}
+
+			err = m.ENSVerified(common.PubkeyToHex(publicKey), message.EnsName)
+			if err != nil {
+				contact.ENSVerified = false
+			}
+			contact.ENSVerified = true
 		}
 		contact.LastUpdated = message.Clock
 		contact.LocalNickname = message.LocalNickname
+
+		if message.Blocked != contact.IsBlocked() {
+			if message.Blocked {
+				chats, err := m.BlockContact(contact)
+				if err != nil {
+					return err
+				}
+				state.Response.AddChats(chats)
+			} else {
+				contact.Unblock()
+			}
+		}
+		if chat != nil && message.Muted != chat.Muted {
+			if message.Muted {
+				err := m.muteChat(chat, contact)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := m.unmuteChat(chat, contact)
+				if err != nil {
+					return err
+				}
+			}
+
+			state.Response.AddChat(chat)
+		}
+
+		if message.Removed {
+			err := m.removeContact(context.Background(), state.Response, contact.ID)
+			if err != nil {
+				return err
+			}
+		}
 
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
-	// TODO(samyoul) remove storing of an updated reference pointer?
-	state.AllChats.Store(chat.ID, chat)
+	if chat != nil {
+		// TODO(samyoul) remove storing of an updated reference pointer?
+		state.AllChats.Store(chat.ID, chat)
+	}
 
 	return nil
 }

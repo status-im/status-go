@@ -77,7 +77,7 @@ type Chat struct {
 
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat
-	Muted bool `json:"muted,omitempty"`
+	Muted bool `json:"muted"`
 
 	// Public key of administrator who created invitation link
 	InvitationAdmin string `json:"invitationAdmin,omitempty"`
