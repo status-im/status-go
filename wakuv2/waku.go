@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"go.uber.org/zap"
@@ -38,6 +37,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
