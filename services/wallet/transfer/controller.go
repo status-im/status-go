@@ -20,13 +20,15 @@ type Controller struct {
 	signals        *SignalsTransmitter
 	block          *Block
 	reactor        *Reactor
-	Feed           *event.Feed
+	accountFeed    *event.Feed
+	TransferFeed   *event.Feed
 	group          *async.Group
 }
 
-func NewTransferController(db *sql.DB, networkManager *network.Manager, feed *event.Feed) *Controller {
+func NewTransferController(db *sql.DB, networkManager *network.Manager, accountFeed *event.Feed) *Controller {
+	transferFeed := &event.Feed{}
 	signals := &SignalsTransmitter{
-		publisher: feed,
+		publisher: transferFeed,
 	}
 	block := &Block{db}
 	return &Controller{
@@ -34,7 +36,8 @@ func NewTransferController(db *sql.DB, networkManager *network.Manager, feed *ev
 		block:          block,
 		networkManager: networkManager,
 		signals:        signals,
-		Feed:           feed,
+		accountFeed:    accountFeed,
+		TransferFeed:   transferFeed,
 	}
 }
 
@@ -102,7 +105,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 
 	c.reactor = &Reactor{
 		db:    c.db,
-		feed:  c.Feed,
+		feed:  c.TransferFeed,
 		block: c.block,
 	}
 	err = c.reactor.start(chainClients, accounts)
@@ -111,16 +114,16 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	c.group.Add(func(ctx context.Context) error {
-		return watchAccountsChanges(ctx, c.Feed, c.reactor, chainClients, accounts)
+		return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts)
 	})
 	return nil
 }
 
 // watchAccountsChanges subsribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
-func watchAccountsChanges(ctx context.Context, feed *event.Feed, reactor *Reactor, chainClients []*network.ChainClient, initial []common.Address) error {
+func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*network.ChainClient, initial []common.Address) error {
 	accounts := make(chan []accounts.Account, 1) // it may block if the rate of updates will be significantly higher
-	sub := feed.Subscribe(accounts)
+	sub := accountFeed.Subscribe(accounts)
 	defer sub.Unsubscribe()
 	listen := make(map[common.Address]struct{}, len(initial))
 	for _, address := range initial {
@@ -180,9 +183,10 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 
 	transfersCount := big.NewInt(int64(len(rst)))
 	chainClient, err := c.networkManager.GetChainClient(chainID)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
+
 	if fetchMore && limit.ToInt().Cmp(transfersCount) == 1 {
 		block, err := c.block.GetFirstKnownBlock(chainID, address)
 		if err != nil {
@@ -197,7 +201,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 		from, err := findFirstRange(ctx, address, block, chainClient)
 		if err != nil {
 			if nonArchivalNodeError(err) {
-				c.Feed.Send(Event{
+				c.TransferFeed.Send(Event{
 					Type: EventNonArchivalNodeDetected,
 				})
 				from = big.NewInt(0).Sub(block, big.NewInt(100))
@@ -217,7 +221,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 			db:            c.db,
 			chainClient:   chainClient,
 			balanceCache:  balanceCache,
-			feed:          c.Feed,
+			feed:          c.TransferFeed,
 			fromByAddress: fromByAddress,
 			toByAddress:   toByAddress,
 		}
@@ -244,6 +248,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 			if err != nil {
 				return nil, err
 			}
+
 			rst, err = c.db.GetTransfersByAddress(chainID, address, toBlockBN, limit.ToInt().Int64())
 			if err != nil {
 				return nil, err

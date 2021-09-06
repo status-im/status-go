@@ -13,7 +13,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client, networks []network.Network, feed *event.Feed) *Service {
+func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client, networks []network.Network, accountFeed *event.Feed) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
@@ -26,7 +26,7 @@ func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 		log.Error("Network manager failed to initialize", "error", err)
 	}
 
-	transferController := transfer.NewTransferController(db, networkManager, feed)
+	transferController := transfer.NewTransferController(db, networkManager, accountFeed)
 
 	return &Service{
 		favouriteManager:    favouriteManager,
@@ -62,7 +62,7 @@ func (s *Service) Start() error {
 
 // GetFeed returns signals feed.
 func (s *Service) GetFeed() *event.Feed {
-	return s.transferController.Feed
+	return s.transferController.TransferFeed
 }
 
 // Stop reactor, signals transmitter and close db.

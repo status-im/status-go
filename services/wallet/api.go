@@ -58,7 +58,7 @@ func (api *API) GetCachedBalances2(ctx context.Context, chainID uint64, addresse
 // GetTokensBalances return mapping of token balances for every account.
 func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	client, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 	return api.s.tokenManager.getBalances(ctx, []*network.ChainClient{client}, accounts, addresses)
@@ -66,7 +66,7 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []com
 
 func (api *API) GetTokensBalances2(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	clients, err := api.s.networkManager.GetChainClients(chainIDs)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 	return api.s.tokenManager.getBalances(ctx, clients, accounts, addresses)
@@ -157,7 +157,7 @@ func (api *API) DeletePendingTransaction2(ctx context.Context, chainID uint64, t
 
 func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
 	chainClient, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
@@ -166,7 +166,7 @@ func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Has
 
 func (api *API) WatchTransaction2(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
 	chainClient, err := api.s.networkManager.GetChainClient(chainID)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
