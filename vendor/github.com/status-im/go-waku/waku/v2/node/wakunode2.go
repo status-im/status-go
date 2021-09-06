@@ -399,8 +399,11 @@ func (w *WakuNode) startStore() {
 	peerChan := make(chan *event.EvtPeerConnectednessChanged)
 	w.opts.store.Start(w.ctx, w.host, peerChan)
 	w.peerListeners = append(w.peerListeners, peerChan)
-	if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
-		log.Error("failed to resume", err)
+
+	if w.opts.shouldResume {
+		if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
+			log.Error("failed to resume", err)
+		}
 	}
 }
 
@@ -714,7 +717,7 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 
 func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	info := w.host.Peerstore().PeerInfo(peerID)
-	return w.host.Connect(w.ctx, info)
+	return w.connect(info)
 }
 
 func (w *WakuNode) ClosePeerByAddress(address string) error {
