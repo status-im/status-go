@@ -7,6 +7,8 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"ioutil"
+	"net/http"
 	"os"
 
 	"golang.org/x/image/webp"
@@ -25,6 +27,20 @@ func Decode(fileName string) (image.Image, error) {
 	}
 
 	return decodeImageData(fb, file)
+}
+
+func DecodeFromURL(path string) (image.Image, error) {
+	res, err := http.Get(path)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyBytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeImageData(bodyBytes, res.Body)
 }
 
 func prepareFileForDecode(file *os.File) ([]byte, error) {
