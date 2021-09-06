@@ -11,6 +11,74 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 )
 
+var initNetworks = []Network{
+	{
+		ChainID:                1,
+		ChainName:              "Ethereum Mainnet",
+		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
+		BlockExplorerURL:       "https://etherscan.io/",
+		IconURL:                "",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  1,
+		Enabled:                true,
+	},
+	{
+		ChainID:                3,
+		ChainName:              "Ropsten",
+		RPCURL:                 "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
+		BlockExplorerURL:       "https://ropsten.etherscan.io/",
+		IconURL:                "",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  1,
+		Enabled:                false,
+	},
+	{
+		ChainID:                4,
+		ChainName:              "Rinkeby",
+		RPCURL:                 "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
+		BlockExplorerURL:       "https://rinkeby.etherscan.io/",
+		IconURL:                "",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  1,
+		Enabled:                false,
+	},
+	{
+		ChainID:                5,
+		ChainName:              "Goerli",
+		RPCURL:                 "http://goerli.blockscout.com/",
+		BlockExplorerURL:       "https://goerli.etherscan.io/",
+		IconURL:                "",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  1,
+		Enabled:                false,
+	},
+	{
+		ChainID:                10,
+		ChainName:              "Optimistic Ethereum",
+		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
+		BlockExplorerURL:       "https://optimistic.etherscan.io",
+		IconURL:                "",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  2,
+		Enabled:                true,
+	},
+}
+
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-network-tests-")
 	require.NoError(t, err)
@@ -27,7 +95,7 @@ func TestInitNetwork(t *testing.T) {
 	defer stop()
 
 	nm := &Manager{db: db}
-	err := nm.Init()
+	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
 	network := nm.Find(1)
@@ -40,7 +108,7 @@ func TestGet(t *testing.T) {
 	defer stop()
 
 	nm := &Manager{db: db}
-	err := nm.Init()
+	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
 	networks, err := nm.Get(true)
@@ -53,7 +121,7 @@ func TestDelete(t *testing.T) {
 	defer stop()
 
 	nm := &Manager{db: db}
-	err := nm.Init()
+	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
 	err = nm.Delete(1)
@@ -68,7 +136,7 @@ func TestUpsert(t *testing.T) {
 	defer stop()
 
 	nm := &Manager{db: db}
-	err := nm.Init()
+	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
 	network := nm.Find(1)

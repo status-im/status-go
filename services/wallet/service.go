@@ -3,6 +3,7 @@ package wallet
 import (
 	"database/sql"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -12,15 +13,15 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, chainID uint64, feed *event.Feed) *Service {
+func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client, networks []network.Network, feed *event.Feed) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
 	tokenManager := &TokenManager{db: db}
 	transactionManager := &TransactionManager{db: db}
 	favouriteManager := &FavouriteManager{db: db}
-	networkManager := network.NewManager(db)
-	err := networkManager.Init()
+	networkManager := network.NewManager(db, legacyChainID, legacyClient)
+	err := networkManager.Init(networks)
 	if err != nil {
 		log.Error("Network manager failed to initialize", "error", err)
 	}
@@ -35,7 +36,7 @@ func NewService(db *sql.DB, chainID uint64, feed *event.Feed) *Service {
 		transferController:  transferController,
 		opensea:             newOpenseaClient(),
 		cryptoOnRampManager: cryptoOnRampManager,
-		legacyChainID:       chainID,
+		legacyChainID:       legacyChainID,
 	}
 }
 

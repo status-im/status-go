@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/services/wallet/network"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -433,6 +434,9 @@ type NodeConfig struct {
 
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
+
+	// Initial networks to load
+	Networks []network.Network
 
 	// ClusterConfig extra configuration for supporting cluster peers.
 	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`

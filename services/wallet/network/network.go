@@ -23,74 +23,6 @@ type Network struct {
 	Enabled                bool   `json:"enabled"`
 }
 
-var DefaultNetworks = []*Network{
-	{
-		ChainID:                1,
-		ChainName:              "Ethereum Mainnet",
-		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 false,
-		Layer:                  1,
-		Enabled:                true,
-	},
-	{
-		ChainID:                3,
-		ChainName:              "Ropsten",
-		RPCURL:                 "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://ropsten.etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                false,
-	},
-	{
-		ChainID:                4,
-		ChainName:              "Rinkeby",
-		RPCURL:                 "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://rinkeby.etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                false,
-	},
-	{
-		ChainID:                5,
-		ChainName:              "Goerli",
-		RPCURL:                 "http://goerli.blockscout.com/",
-		BlockExplorerURL:       "https://goerli.etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                false,
-	},
-	{
-		ChainID:                10,
-		ChainName:              "Optimistic Ethereum",
-		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://optimistic.etherscan.io",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 false,
-		Layer:                  2,
-		Enabled:                true,
-	},
-}
-
 const baseQuery = "SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled FROM networks"
 
 func newNetworksQuery() *networksQuery {
@@ -153,17 +85,24 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*Network, error) {
 }
 
 type Manager struct {
-	db           *sql.DB
-	chainClients map[uint64]*ChainClient
+	db            *sql.DB
+	legacyChainID uint64
+	legacyClient  *ethclient.Client
+	chainClients  map[uint64]*ChainClient
 }
 
-func NewManager(db *sql.DB) *Manager {
-	return &Manager{db: db, chainClients: make(map[uint64]*ChainClient)}
+func NewManager(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client) *Manager {
+	return &Manager{
+		db:            db,
+		legacyChainID: legacyChainID,
+		legacyClient:  legacyClient,
+		chainClients:  make(map[uint64]*ChainClient),
+	}
 }
 
-func (nm *Manager) Init() error {
-	for _, network := range DefaultNetworks {
-		err := nm.Upsert(network)
+func (nm *Manager) Init(networks []Network) error {
+	for i := range networks {
+		err := nm.Upsert(&networks[i])
 		if err != nil {
 			return err
 		}
@@ -173,6 +112,10 @@ func (nm *Manager) Init() error {
 }
 
 func (nm *Manager) GetChainClient(chainID uint64) (*ChainClient, error) {
+	if chainID == nm.legacyChainID {
+		return &ChainClient{eth: nm.legacyClient, ChainID: chainID}, nil
+	}
+
 	if chainClient, ok := nm.chainClients[chainID]; ok {
 		return chainClient, nil
 	}
