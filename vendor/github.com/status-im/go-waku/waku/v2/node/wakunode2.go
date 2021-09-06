@@ -84,8 +84,11 @@ type WakuNode struct {
 }
 
 func (w *WakuNode) handleConnectednessChanged(ev event.EvtPeerConnectednessChanged) {
+	log.Debug("### EvtPeerConnectednessChanged ", w.Host().ID(), " to ", ev.Peer, " : ", ev.Connectedness)
 
-	log.Info("### EvtPeerConnectednessChanged ", w.Host().ID(), " to ", ev.Peer, " : ", ev.Connectedness)
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	if ev.Connectedness == network.Connected {
 		_, ok := w.peers[ev.Peer]
 		if !ok {
@@ -110,7 +113,11 @@ func (w *WakuNode) handleConnectednessChanged(ev event.EvtPeerConnectednessChang
 
 }
 func (w *WakuNode) handleProtocolsUpdated(ev event.EvtPeerProtocolsUpdated) {
-	log.Info("### EvtPeerProtocolsUpdated ", w.Host().ID(), " to ", ev.Peer, " added: ", ev.Added, ", removed: ", ev.Removed)
+	log.Debug("### EvtPeerProtocolsUpdated ", w.Host().ID(), " to ", ev.Peer, " added: ", ev.Added, ", removed: ", ev.Removed)
+
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	_, ok := w.peers[ev.Peer]
 	if ok {
 		peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
@@ -120,8 +127,11 @@ func (w *WakuNode) handleProtocolsUpdated(ev event.EvtPeerProtocolsUpdated) {
 
 }
 func (w *WakuNode) handlePeerIdentificationCompleted(ev event.EvtPeerIdentificationCompleted) {
+	log.Debug("### EvtPeerIdentificationCompleted ", w.Host().ID(), " to ", ev.Peer)
 
-	log.Info("### EvtPeerIdentificationCompleted ", w.Host().ID(), " to ", ev.Peer)
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	peerProtocols, _ := w.host.Peerstore().GetProtocols(ev.Peer)
 	log.Debug("identified protocols found for peer: ", ev.Peer, ", protocols: ", peerProtocols)
 	_, ok := w.peers[ev.Peer]
@@ -138,13 +148,13 @@ func (w *WakuNode) processHostEvent(e interface{}) {
 	}
 	isOnline := w.IsOnline()
 	hasHistory := w.HasHistory()
-	switch e.(type) {
+	switch e := e.(type) {
 	case event.EvtPeerConnectednessChanged:
-		w.handleConnectednessChanged(e.(event.EvtPeerConnectednessChanged))
+		w.handleConnectednessChanged(e)
 	case event.EvtPeerProtocolsUpdated:
-		w.handleProtocolsUpdated(e.(event.EvtPeerProtocolsUpdated))
+		w.handleProtocolsUpdated(e)
 	case event.EvtPeerIdentificationCompleted:
-		w.handlePeerIdentificationCompleted(e.(event.EvtPeerIdentificationCompleted))
+		w.handlePeerIdentificationCompleted(e)
 	}
 
 	log.Debug("###processHostEvent before isOnline()")
@@ -153,10 +163,10 @@ func (w *WakuNode) processHostEvent(e interface{}) {
 	newHasHistory := w.HasHistory()
 	log.Debug("###ConnStatus isOnline: ", isOnline, "/", newIsOnline, " hasHistory: ",
 		hasHistory, "/", newHasHistory)
-	if w.connStatusChan != nil &&
-		(isOnline != newIsOnline || hasHistory != newHasHistory) {
-		log.Info("New ConnStatus: ", ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory})
-		w.connStatusChan <- ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory}
+	if w.connStatusChan != nil {
+		connStatus := ConnStatus{IsOnline: newIsOnline, HasHistory: newHasHistory, Peers: w.Peers()}
+		log.Debug("New ConnStatus: ", connStatus)
+		w.connStatusChan <- connStatus
 	}
 
 }
@@ -294,11 +304,10 @@ func (w *WakuNode) ID() string {
 	return w.host.ID().Pretty()
 }
 
-func (w *WakuNode) GetPeerStats() PeerStats {
-	return w.peers
-}
-
 func (w *WakuNode) IsOnline() bool {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	hasRelay := false
 	hasLightPush := false
 	hasStore := false
@@ -327,6 +336,9 @@ func (w *WakuNode) IsOnline() bool {
 }
 
 func (w *WakuNode) HasHistory() bool {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	for _, v := range w.peers {
 		for _, protocol := range v {
 			if protocol == string(store.WakuStoreProtocolId) {
@@ -399,13 +411,6 @@ func (w *WakuNode) startStore() {
 	peerChan := make(chan *event.EvtPeerConnectednessChanged)
 	w.opts.store.Start(w.ctx, w.host, peerChan)
 	w.peerListeners = append(w.peerListeners, peerChan)
-
-	if w.opts.shouldResume {
-		if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
-			log.Error("failed to resume", err)
-		}
-	}
-}
 
 	if w.opts.shouldResume {
 		if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
@@ -715,11 +720,6 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	return w.connect(info)
 }
 
-func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
-	info := w.host.Peerstore().PeerInfo(peerID)
-	return w.connect(info)
-}
-
 func (w *WakuNode) ClosePeerByAddress(address string) error {
 	p, err := ma.NewMultiaddr(address)
 	if err != nil {
@@ -750,6 +750,8 @@ func (w *WakuNode) ClosePeerById(id peer.ID) error {
 }
 
 func (w *WakuNode) PeerCount() int {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
 	return len(w.peers)
 }
 
@@ -791,15 +793,16 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 
 						go func() {
 							peerFound := false
+							w.peersMutex.Lock()
 							for p := range w.peers {
 								if p == peer {
 									peerFound = true
 									break
 								}
 							}
-
-							log.Info("###PING before fetching result")
-							pingTicker := time.NewTicker(time.Duration(5) * time.Second)
+							defer w.peersMutex.Unlock()
+							log.Debug("###PING before fetching result")
+							pingTicker := time.NewTicker(time.Duration(1) * time.Second)
 							isError := false
 							select {
 							case resVal := <-result:

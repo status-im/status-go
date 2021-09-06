@@ -158,7 +158,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
 	}
 
-	connStatusChan := make(chan node.ConnStatus)
+	connStatusChan := make(chan node.ConnStatus, 100)
 
 	if cfg.KeepAliveInterval == 0 {
 		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
