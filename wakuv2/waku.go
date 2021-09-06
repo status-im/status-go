@@ -47,6 +47,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/metrics"
 
+	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
@@ -63,6 +64,7 @@ import (
 const messageQueueLimit = 1024
 
 type settings struct {
+	LightClient            bool            // Indicates if the node is a light client
 	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
 	EnableConfirmations    bool            // Enable sending message confirmations
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
@@ -79,7 +81,8 @@ type ConnStatus struct {
 type Waku struct {
 	node *node.WakuNode // reference to a libp2p waku node
 
-	filters *common.Filters // Message filters installed with Subscribe function
+	filters          *common.Filters         // Message filters installed with Subscribe function
+	filterMsgChannel chan *protocol.Envelope // Channel for wakuv2 filter messages
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -130,10 +133,12 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	waku.settings = settings{
 		MaxMsgSize:             cfg.MaxMessageSize,
 		SoftBlacklistedPeerIDs: make(map[string]bool),
+		LightClient:            cfg.LightClient,
 	}
 
 	waku.filters = common.NewFilters()
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
+	waku.filterMsgChannel = make(chan *protocol.Envelope, 1024)
 
 	var privateKey *ecdsa.PrivateKey
 	var err error
@@ -155,18 +160,33 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 
 	connStatusChan := make(chan node.ConnStatus)
 
-	keepAliveInt := 1
-	waku.node, err = node.New(context.Background(),
+	if cfg.KeepAliveInterval == 0 {
+		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
+	}
+
+	opts := []node.WakuNodeOption{
 		node.WithLibP2POptions(
 			libp2p.BandwidthReporter(waku.bandwidthCounter),
 		),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
-		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
 		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
 		node.WithConnStatusChan(connStatusChan),
-		node.WithKeepAlive(time.Duration(keepAliveInt)*time.Second),
-	)
+		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+	}
+
+	if cfg.LightClient {
+		opts = append(opts, node.WithLightPush())
+		opts = append(opts, node.WithWakuFilter())
+	} else {
+		opts = append(opts, node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))))
+	}
+
+	if waku.node, err = node.New(context.Background(), opts...); err != nil {
+		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
+	}
+
+	waku.addPeers(cfg)
 
 	go func() {
 		for {
@@ -178,34 +198,53 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 			}
 		}
 	}()
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
-	}
 
-	for _, bootnode := range cfg.BootNodes {
-		err := waku.node.DialPeer(bootnode)
-		if err != nil {
-			log.Warn("Could not dial peer", err)
-		} else {
-			log.Info("Bootnode dialed successfully", bootnode)
-		}
-	}
-
-	for _, storenode := range cfg.StoreNodes {
-		peerID, err := waku.node.AddStorePeer(storenode)
-		if err != nil {
-			log.Warn("Could not add store peer", err)
-		} else {
-			log.Info("Storepeeer dialed successfully", "peerId", peerID.Pretty())
-		}
-	}
-
-	go waku.runMsgLoop()
+	go waku.runFilterMsgLoop()
+	go waku.runRelayMsgLoop()
 
 	log.Info("setup the go-waku node successfully")
 
 	return waku, nil
+}
+
+func (w *Waku) addPeers(cfg *Config) {
+	if !cfg.LightClient {
+		for _, relaynode := range cfg.RelayNodes {
+			err := w.node.DialPeer(relaynode)
+			if err != nil {
+				log.Warn("could not dial peer", err)
+			} else {
+				log.Info("relay peer dialed successfully", relaynode)
+			}
+		}
+	}
+
+	for _, storenode := range cfg.StoreNodes {
+		peerID, err := w.node.AddStorePeer(storenode)
+		if err != nil {
+			log.Warn("could not add store peer", err)
+		} else {
+			log.Info("store peer added successfully", "peerId", peerID.Pretty())
+		}
+	}
+
+	for _, filternode := range cfg.FilterNodes {
+		peerID, err := w.node.AddFilterPeer(filternode)
+		if err != nil {
+			log.Warn("could not add filter peer", err)
+		} else {
+			log.Info("filter peer added successfully", "peerId", peerID.Pretty())
+		}
+	}
+
+	for _, lightpushnode := range cfg.LightpushNodes {
+		peerID, err := w.node.AddLightPushPeer(lightpushnode)
+		if err != nil {
+			log.Warn("could not add lightpush peer", err)
+		} else {
+			log.Info("lightpush peer added successfully", "peerId", peerID.Pretty())
+		}
+	}
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -216,7 +255,11 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
-func (w *Waku) runMsgLoop() {
+func (w *Waku) runRelayMsgLoop() {
+	if w.settings.LightClient {
+		return
+	}
+
 	sub, err := w.node.Subscribe(nil)
 	if err != nil {
 		fmt.Println("Could not subscribe:", err)
@@ -225,10 +268,46 @@ func (w *Waku) runMsgLoop() {
 
 	for env := range sub.C {
 		envelopeErrors, err := w.OnNewEnvelopes(env)
-
 		// TODO: should these be handled?
 		_ = envelopeErrors
 		_ = err
+	}
+}
+
+func (w *Waku) runFilterMsgLoop() {
+	if !w.settings.LightClient {
+		return
+	}
+
+	for {
+		select {
+		case <-w.quit:
+			return
+		case env := <-w.filterMsgChannel:
+			envelopeErrors, err := w.OnNewEnvelopes(env)
+			// TODO: should these be handled?
+			_ = envelopeErrors
+			_ = err
+		}
+	}
+}
+
+func (w *Waku) subscribeWakuFilterTopic(topics [][]byte) {
+	pubsubTopic := relay.GetTopic(nil)
+	filterRequest := pb.FilterRequest{
+		Topic:     string(pubsubTopic),
+		Subscribe: true,
+	}
+	var contentFilters []*pb.FilterRequest_ContentFilter
+	for _, topic := range topics {
+		t := &pb.FilterRequest_ContentFilter{ContentTopic: common.BytesToTopic(topic).ContentTopic()}
+		contentFilters = append(contentFilters, t)
+	}
+	filterRequest.ContentFilters = contentFilters
+	err := w.node.SubscribeFilter(context.Background(), filterRequest, w.filterMsgChannel)
+	if err != nil {
+		w.logger.Warn("could not add wakuv2 filter for topics", zap.Any("topics", topics))
+		return
 	}
 }
 
@@ -527,6 +606,10 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 		return s, err
 	}
 
+	if w.settings.LightClient {
+		w.subscribeWakuFilterTopic(f.Topics)
+	}
+
 	return s, nil
 }
 
@@ -536,9 +619,25 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 }
 
 // Unsubscribe removes an installed message handler.
-// TODO: This does not seem to update the bloom filter, but does update
-// the topic interest map
 func (w *Waku) Unsubscribe(id string) error {
+	filter := w.filters.Get(id)
+	if filter != nil && w.settings.LightClient {
+		pubsubTopic := relay.GetTopic(nil)
+		filterRequest := pb.FilterRequest{
+			Topic:     string(pubsubTopic),
+			Subscribe: true,
+		}
+
+		var contentFilters []*pb.FilterRequest_ContentFilter
+		for _, topic := range filter.Topics {
+			t := &pb.FilterRequest_ContentFilter{ContentTopic: common.BytesToTopic(topic).ContentTopic()}
+			contentFilters = append(contentFilters, t)
+		}
+		filterRequest.ContentFilters = contentFilters
+
+		w.node.UnsubscribeFilter(context.Background(), filterRequest)
+	}
+
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
@@ -547,8 +646,6 @@ func (w *Waku) Unsubscribe(id string) error {
 }
 
 // Unsubscribe removes an installed message handler.
-// TODO: This does not seem to update the bloom filter, but does update
-// the topic interest map
 func (w *Waku) UnsubscribeMany(ids []string) error {
 	for _, id := range ids {
 		w.logger.Debug("cleaning up filter", zap.String("id", id))
@@ -605,6 +702,7 @@ func (w *Waku) Start() error {
 func (w *Waku) Stop() error {
 	w.node.Stop()
 	close(w.quit)
+	close(w.filterMsgChannel)
 	return nil
 }
 

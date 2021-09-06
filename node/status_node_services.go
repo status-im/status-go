@@ -249,8 +249,12 @@ func (b *StatusNode) wakuV2Service(nodeKey string, wakuCfg *params.WakuV2Config,
 			SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
 			Host:                   wakuCfg.Host,
 			Port:                   wakuCfg.Port,
-			BootNodes:              clusterCfg.WakuNodes,
-			StoreNodes:             clusterCfg.WakuStoreNodes,
+			LightClient:            wakuCfg.LightClient,
+			KeepAliveInterval:      wakuCfg.KeepAliveInterval,
+			RelayNodes:             clusterCfg.RelayNodes,
+			StoreNodes:             clusterCfg.StoreNodes,
+			FilterNodes:            clusterCfg.FilterNodes,
+			LightpushNodes:         clusterCfg.LightpushNodes,
 		}
 
 		if cfg.Host == "" {
