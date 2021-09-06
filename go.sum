@@ -1113,8 +1113,8 @@ github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf h1:0w1mjNUqEHoL
 github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
-github.com/status-im/rendezvous v1.3.2 h1:eLTQ1EEg/qTsFDM6lwIf7tAFqiD3zEHnbWKaS3fvd/E=
-github.com/status-im/rendezvous v1.3.2/go.mod h1:CK8B3kCbx3QrE0V64aAocU8oh9KRktoKSU0sqiF6MwI=
+github.com/status-im/rendezvous v1.3.1-0.20210824184947-7c79c858170c h1:l83ciN0A5LW7c6NMa/j0x2mH1vsv3hbAAUTEwZw6qF4=
+github.com/status-im/rendezvous v1.3.1-0.20210824184947-7c79c858170c/go.mod h1:CK8B3kCbx3QrE0V64aAocU8oh9KRktoKSU0sqiF6MwI=
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088 h1:ClCAP2FPCvl8hGMhbUx/tq/sOu2wibztAa5jAvQEe4Q=
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088/go.mod h1:+92j1tN27DypDeBFxkg0uzkqfh1bNHTZe3Bv2PjvxpM=
 github.com/status-im/status-go/extkeys v1.1.2 h1:FSjARgDathJ3rIapJt851LsIXP9Oyuu2M2jPJKuzloU=

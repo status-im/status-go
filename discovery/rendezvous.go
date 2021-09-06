@@ -104,7 +104,7 @@ func (r *Rendezvous) Stop() error {
 	return nil
 }
 
-func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
+func (r *Rendezvous) MakeRecord(srv *ma.Multiaddr) (record enr.Record, err error) {
 	r.recordMu.Lock()
 	defer r.recordMu.Unlock()
 	if r.record != nil {
@@ -116,7 +116,27 @@ func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
 	if r.identity == nil {
 		return record, errIdentityIsNil
 	}
-	record.Set(enr.IP(r.node.IP()))
+
+	ip := r.node.IP()
+	if srv != nil && (ip.IsLoopback() || IsPrivate(ip)) { // If AdvertiseAddr is not specified, 127.0.0.1 might be returned
+		ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
+		defer cancel()
+
+		ipAddr, err := r.client.RemoteIp(ctx, *srv)
+		if err != nil {
+			log.Error("could not obtain the external ip address", "err", err)
+		} else {
+			parsedIP := net.ParseIP(ipAddr)
+			if parsedIP != nil {
+				ip = parsedIP
+				log.Info("node's external IP address", "ipAddr", ipAddr)
+			} else {
+				log.Error("invalid ip address obtained from rendezvous server", "ipaddr", ipAddr, "err", err)
+			}
+		}
+	}
+
+	record.Set(enr.IP(ip))
 	record.Set(enr.TCP(r.node.TCP()))
 	record.Set(enr.UDP(r.node.UDP()))
 	// public key is added to ENR when ENR is signed
@@ -127,8 +147,7 @@ func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
 	return record, nil
 }
 
-func (r *Rendezvous) register(topic string, record enr.Record) error {
-	srv := r.servers[rand.Intn(len(r.servers))] // nolint: gosec
+func (r *Rendezvous) register(srv ma.Multiaddr, topic string, record enr.Record) error {
 	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 	defer cancel()
 
@@ -146,7 +165,8 @@ func (r *Rendezvous) register(topic string, record enr.Record) error {
 
 // Register renews registration in the specified server.
 func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
-	record, err := r.MakeRecord()
+	srv := r.getRandomServer()
+	record, err := r.MakeRecord(&srv)
 	if err != nil {
 		return err
 	}
@@ -155,7 +175,7 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 	ticker := time.NewTicker(r.registrationPeriod / 2)
 	defer ticker.Stop()
 
-	if err := r.register(topic, record); err == context.Canceled {
+	if err := r.register(srv, topic, record); err == context.Canceled {
 		return err
 	}
 
@@ -164,7 +184,7 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 		case <-stop:
 			return nil
 		case <-ticker.C:
-			if err := r.register(topic, record); err == context.Canceled {
+			if err := r.register(r.getRandomServer(), topic, record); err == context.Canceled {
 				return err
 			} else if err == errDiscoveryIsStopped {
 				return nil
@@ -230,6 +250,10 @@ func (r *Rendezvous) Discover(
 	}
 }
 
+func (r *Rendezvous) getRandomServer() ma.Multiaddr {
+	return r.servers[rand.Intn(len(r.servers))] // nolint: gosec
+}
+
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
 		key    enode.Secp256k1
@@ -252,4 +276,28 @@ func enrToNode(record enr.Record) (*discv5.Node, error) {
 	// ignore absence of udp port, as it is optional
 	_ = record.Load(&uport)
 	return discv5.NewNode(nodeID, net.IP(ip), uint16(uport), uint16(tport)), nil
+}
+
+// IsPrivate reports whether ip is a private address, according to
+// RFC 1918 (IPv4 addresses) and RFC 4193 (IPv6 addresses).
+// Copied/Adapted from https://go-review.googlesource.com/c/go/+/272668/11/src/net/ip.go
+// Copyright (c) The Go Authors. All rights reserved.
+// @TODO: once Go 1.17 is released in Q42021, remove this function as it will become part of the language
+func IsPrivate(ip net.IP) bool {
+	if ip4 := ip.To4(); ip4 != nil {
+		// Following RFC 4193, Section 3. Local IPv6 Unicast Addresses which says:
+		//   The Internet Assigned Numbers Authority (IANA) has reserved the
+		//   following three blocks of the IPv4 address space for private internets:
+		//     10.0.0.0        -   10.255.255.255  (10/8 prefix)
+		//     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+		//     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+		return ip4[0] == 10 ||
+			(ip4[0] == 172 && ip4[1]&0xf0 == 16) ||
+			(ip4[0] == 192 && ip4[1] == 168)
+	}
+	// Following RFC 4193, Section 3. Private Address Space which says:
+	//   The Internet Assigned Numbers Authority (IANA) has reserved the
+	//   following block of the IPv6 address space for local internets:
+	//     FC00::  -  FDFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF (FC00::/7 prefix)
+	return len(ip) == net.IPv6len && ip[0]&0xfe == 0xfc
 }

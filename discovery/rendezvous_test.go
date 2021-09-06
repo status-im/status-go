@@ -68,7 +68,7 @@ func TestMakeRecordReturnsCachedRecord(t *testing.T) {
 	record := enr.Record{}
 	require.NoError(t, enode.SignV4(&record, identity))
 	c := NewRendezvousWithENR(nil, record)
-	rst, err := c.MakeRecord()
+	rst, err := c.MakeRecord(nil)
 	require.NoError(t, err)
 	require.NotNil(t, enode.V4ID{}.NodeAddr(&rst))
 	require.Equal(t, enode.V4ID{}.NodeAddr(&record), enode.V4ID{}.NodeAddr(&rst))
@@ -79,7 +79,7 @@ func TestRendezvousRegisterAndDiscoverExitGracefully(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r.Start())
 	require.NoError(t, r.Stop())
-	require.EqualError(t, errDiscoveryIsStopped, r.register("", enr.Record{}).Error())
+	require.EqualError(t, errDiscoveryIsStopped, r.register(r.getRandomServer(), "", enr.Record{}).Error())
 	_, err = r.discoverRequest(nil, "")
 	require.EqualError(t, errDiscoveryIsStopped, err.Error())
 }

@@ -115,12 +115,46 @@ func (c Client) Discover(ctx context.Context, srv ma.Multiaddr, topic string, li
 	return val.Records, nil
 }
 
+func (c Client) RemoteIp(ctx context.Context, srv ma.Multiaddr) (value string, err error) {
+	s, err := c.newStream(ctx, srv)
+	if err != nil {
+		return
+	}
+	defer s.Close()
+
+	if err = rlp.Encode(s, protocol.REMOTEIP); err != nil {
+		return
+	}
+
+	rs := rlp.NewStream(s, 0)
+	typ, err := rs.Uint()
+	if err != nil {
+		return
+	}
+	if protocol.MessageType(typ) != protocol.REMOTEIP_RESPONSE {
+		err = fmt.Errorf("expected %v as response, but got %v", protocol.REMOTEIP_RESPONSE, typ)
+		return
+	}
+	var val protocol.RemoteIpResponse
+	if err = rs.Decode(&val); err != nil {
+		return
+	}
+	if val.Status != protocol.OK {
+		err = fmt.Errorf("remoteip request failed. status code %v", val.Status)
+		return
+	}
+	logger.Debug("received response to remoteip request", "status", val.Status, "ip", val.IP)
+	value = val.IP
+
+	return
+}
+
 func (c Client) newStream(ctx context.Context, srv ma.Multiaddr) (rw network.Stream, err error) {
 	pid, err := srv.ValueForProtocol(ethv4.P_ETHv4)
 	if err != nil {
 		return
 	}
-	peerid, err := peer.IDB58Decode(pid)
+	peerid, err := peer.Decode(pid)
 	if err != nil {
 		return
 	}

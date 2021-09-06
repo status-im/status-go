@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/protocol"
 )
@@ -132,7 +133,7 @@ func (srv *Server) startListener() error {
 				return
 			}
 			s.SetReadDeadline(time.Now().Add(srv.readTimeout))
-			resptype, resp, err := srv.msgParser(protocol.MessageType(typ), rs)
+			resptype, resp, err := srv.msgParser(s, protocol.MessageType(typ), rs)
 			if err == io.EOF {
 				return
 			}
@@ -198,7 +199,7 @@ type Decoder interface {
 	Decode(val interface{}) error
 }
 
-func (srv *Server) msgParser(typ protocol.MessageType, d Decoder) (resptype protocol.MessageType, resp interface{}, err error) {
+func (srv *Server) msgParser(s network.Stream, typ protocol.MessageType, d Decoder) (resptype protocol.MessageType, resp interface{}, err error) {
 	switch typ {
 	case protocol.REGISTER:
 		var msg protocol.Register
@@ -229,6 +230,14 @@ func (srv *Server) msgParser(typ protocol.MessageType, d Decoder) (resptype prot
 		metrics.ObserveDiscoveryDuration(time.Since(start).Seconds(), msg.Topic)
 		metrics.ObserveDiscoverSize(float64(len(records)), msg.Topic)
 		return resptype, protocol.DiscoverResponse{Status: protocol.OK, Records: records}, nil
+	case protocol.REMOTEIP:
+		resptype = protocol.REMOTEIP_RESPONSE
+		ip, err := s.Conn().RemoteMultiaddr().ValueForProtocol(multiaddr.P_IP4)
+		if err != nil {
+			metrics.CountError("remoteip")
+			return resptype, protocol.RemoteIpResponse{Status: protocol.E_INTERNAL_ERROR}, err
+		}
+		return resptype, protocol.RemoteIpResponse{Status: protocol.OK, IP: ip}, nil
 	default:
 		metrics.CountError("unknown")
 		// don't send the response

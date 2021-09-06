@@ -340,6 +340,9 @@ type NodeConfig struct {
 
 	// AdvertiseAddr is a public IP address the node wants to be found with.
 	// It is especially useful when using floating IPs attached to a server.
+	// This configuration value is used by rendezvous protocol, and it's optional
+	// If no value is specified, it will attempt to determine the node's external
+	// IP address. A value can be specified in case the returned address is incorrect
 	AdvertiseAddr string
 
 	// Name sets the instance name of the node. It must not contain the / character.
