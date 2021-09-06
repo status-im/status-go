@@ -157,7 +157,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
 		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
-		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
+		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
 		node.WithConnStatusChan(connStatusChan),
 		node.WithKeepAlive(time.Duration(keepAliveInt)*time.Second),
 	)
