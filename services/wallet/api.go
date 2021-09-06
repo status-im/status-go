@@ -24,7 +24,7 @@ func (api *API) SetInitialBlocksRange(ctx context.Context) error {
 	return api.s.transferController.SetInitialBlocksRange([]uint64{api.s.legacyChainID})
 }
 
-func (api *API) SetInitialBlocksRange2(ctx context.Context, chainIDs []uint64) error {
+func (api *API) SetInitialBlocksRangeForChainIDs(ctx context.Context, chainIDs []uint64) error {
 	return api.s.transferController.SetInitialBlocksRange(chainIDs)
 }
 
@@ -32,7 +32,7 @@ func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Addre
 	return api.s.transferController.CheckRecentHistory([]uint64{api.s.legacyChainID}, addresses)
 }
 
-func (api *API) CheckRecentHistory2(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
+func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
 	return api.s.transferController.CheckRecentHistory(chainIDs, addresses)
 }
 
@@ -42,8 +42,8 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 	return api.s.transferController.GetTransfersByAddress(ctx, api.s.legacyChainID, address, toBlock, limit, fetchMore)
 }
 
-func (api *API) GetTransfersByAddress2(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
-	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
+func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
+	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainID] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
 	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, toBlock, limit, fetchMore)
 }
 
@@ -51,7 +51,7 @@ func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Addres
 	return api.s.transferController.GetCachedBalances(ctx, api.s.legacyChainID, addresses)
 }
 
-func (api *API) GetCachedBalances2(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
+func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
 	return api.s.transferController.GetCachedBalances(ctx, chainID, addresses)
 }
 
@@ -64,7 +64,7 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []com
 	return api.s.tokenManager.getBalances(ctx, []*network.ChainClient{client}, accounts, addresses)
 }
 
-func (api *API) GetTokensBalances2(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	clients, err := api.s.networkManager.GetChainClients(chainIDs)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) e
 	return err
 }
 
-func (api *API) DeleteCustomToken2(ctx context.Context, chainID uint64, address common.Address) error {
+func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, address common.Address) error {
 	log.Debug("call to remove custom token")
 	err := api.s.tokenManager.deleteCustom(chainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
@@ -110,7 +110,7 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransacti
 	return rst, err
 }
 
-func (api *API) GetPendingTransactions2(ctx context.Context, chainID uint64) ([]*PendingTransaction, error) {
+func (api *API) GetPendingTransactionsByChainID(ctx context.Context, chainID uint64) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
 	rst, err := api.s.transactionManager.getAllPendings(chainID)
 	log.Debug("result from database for pending transactions", "len", len(rst))
@@ -124,7 +124,7 @@ func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, add
 	return rst, err
 }
 
-func (api *API) GetPendingOutboundTransactionsByAddress2(ctx context.Context, chainID uint64, address common.Address) ([]*PendingTransaction, error) {
+func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending outbound transactions by address")
 	rst, err := api.s.transactionManager.getPendingByAddress(chainID, address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
@@ -148,7 +148,7 @@ func (api *API) DeletePendingTransaction(ctx context.Context, transactionHash co
 	return err
 }
 
-func (api *API) DeletePendingTransaction2(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
+func (api *API) DeletePendingTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
 	log.Debug("call to remove pending transaction")
 	err := api.s.transactionManager.deletePending(chainID, transactionHash)
 	log.Debug("result from database for remove pending transaction", "err", err)
@@ -164,7 +164,7 @@ func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Has
 	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
 }
 
-func (api *API) WatchTransaction2(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
+func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
 	chainClient, err := api.s.networkManager.GetChainClient(chainID)
 	if err != nil {
 		return err
