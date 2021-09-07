@@ -101,6 +101,63 @@ type Chat struct {
 	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
 }
 
+type ChatPreview struct {
+	// ID is the id of the chat, for public chats it is the name e.g. status, for one-to-one
+	// is the hex encoded public key and for group chats is a random uuid appended with
+	// the hex encoded pk of the creator of the chat
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+	// Active indicates whether the chat has been soft deleted
+	Active bool `json:"active"`
+
+	ChatType ChatType `json:"chatType"`
+
+	// Timestamp indicates the last time this chat has received/sent a message
+	Timestamp int64 `json:"timestamp"`
+	// LastClockValue indicates the last clock value to be used when sending messages
+	LastClockValue uint64 `json:"lastClockValue"`
+	// DeletedAtClockValue indicates the clock value at time of deletion, messages
+	// with lower clock value of this should be discarded
+	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
+
+	// Denormalized fields
+	UnviewedMessagesCount uint `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount uint `json:"unviewedMentionsCount"`
+
+	// Generated username name of the chat for one-to-ones
+	Alias string `json:"alias,omitempty"`
+	// Identicon generated from public key
+	Identicon string `json:"identicon"`
+
+	// Muted is used to check whether we want to receive
+	// push notifications for this chat
+	Muted bool `json:"muted,omitempty"`
+
+	// Public key of user profile
+	Profile string `json:"profile,omitempty"`
+
+	// CommunityID is the id of the community it belongs to
+	CommunityID string `json:"communityId,omitempty"`
+
+	// CategoryID is the id of the community category this chat belongs to.
+	CategoryID string `json:"categoryId,omitempty"`
+
+	// Joined is a timestamp that indicates when the chat was joined
+	Joined int64 `json:"joined,omitempty"`
+
+	// SyncedTo is the time up until it has synced with a mailserver
+	SyncedTo uint32 `json:"syncedTo,omitempty"`
+
+	// SyncedFrom is the time from when it was synced with a mailserver
+	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
+
+	Text string `json:"text,omitempty"`
+
+	ContentType protobuf.ChatMessage_ContentType `json:"contentType,omitempty"`
+}
+
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 	// For one to one chatID is an encoded public key
 	if c.ChatType != ChatTypeOneToOne {
