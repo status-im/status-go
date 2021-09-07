@@ -101,6 +101,11 @@ func NewManager(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 }
 
 func (nm *Manager) Init(networks []Network) error {
+	currentNetworks, _ := nm.Get(false)
+	if len(currentNetworks) > 0 {
+		return nil
+	}
+
 	for i := range networks {
 		err := nm.Upsert(&networks[i])
 		if err != nil {
