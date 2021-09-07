@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 )
@@ -20,8 +21,57 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
-func (m *Messenger) LatestActiveChats() []*Chat {
-	return m.latestNActiveChats
+func (m *Messenger) ChatsPreview() []*ChatPreview {
+	var chats []*ChatPreview
+
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		if chat.Active {
+			chatPreview := &ChatPreview{
+				ID:                    chat.ID,
+				Name:                  chat.Name,
+				Description:           chat.Description,
+				Color:                 chat.Color,
+				Active:                chat.Active,
+				ChatType:              chat.ChatType,
+				Timestamp:             chat.Timestamp,
+				LastClockValue:        chat.LastClockValue,
+				DeletedAtClockValue:   chat.DeletedAtClockValue,
+				UnviewedMessagesCount: chat.UnviewedMessagesCount,
+				UnviewedMentionsCount: chat.UnviewedMentionsCount,
+				Alias:                 chat.Alias,
+				Identicon:             chat.Identicon,
+				Muted:                 chat.Muted,
+				Profile:               chat.Profile,
+				CommunityID:           chat.CommunityID,
+				CategoryID:            chat.CategoryID,
+				Joined:                chat.Joined,
+				SyncedTo:              chat.SyncedTo,
+				SyncedFrom:            chat.SyncedFrom,
+			}
+			if chat.LastMessage != nil {
+				chatPreview.ContentType = chat.LastMessage.ContentType
+				if chat.LastMessage.ContentType == protobuf.ChatMessage_TEXT_PLAIN {
+					if len(chat.LastMessage.Text) > 200 {
+						chatPreview.Text = chat.LastMessage.Text[:200]
+					} else {
+						chatPreview.Text = chat.LastMessage.Text
+					}
+				}
+			}
+
+			chats = append(chats, chatPreview)
+		}
+
+		return true
+	})
+
+	return chats
+}
+
+func (m *Messenger) Chat(chatID string) *Chat {
+	chat, _ := m.allChats.Load(chatID)
+
+	return chat
 }
 
 func (m *Messenger) ActiveChats() []*Chat {

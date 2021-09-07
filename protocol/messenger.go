@@ -97,7 +97,6 @@ type Messenger struct {
 	shouldPublishContactCode   bool
 	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
-	latestNActiveChats         []*Chat
 	allContacts                *contactMap
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
@@ -1031,7 +1030,6 @@ func (m *Messenger) Init() error {
 	// Get chat IDs and public keys from the existing chats.
 	// TODO: Get only active chats by the query.
 	chats, err := m.persistence.Chats()
-	i := 0
 	if err != nil {
 		return err
 	}
@@ -1042,14 +1040,6 @@ func (m *Messenger) Init() error {
 		}
 
 		m.allChats.Store(chat.ID, chat)
-
-		// if a user has thousands of chats
-		// we want to have quick access to the latest 60 sorted active chats, to show them first to the user
-		// 60 is the 3 screens of chats, so when user will scroll to the end we'll load all chats
-		if i < 60 {
-			m.latestNActiveChats = append(m.latestNActiveChats, chat)
-			i++
-		}
 
 		if !chat.Active || chat.Timeline() {
 			continue
