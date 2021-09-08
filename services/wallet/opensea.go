@@ -50,6 +50,24 @@ type OpenseaTrait struct {
 	DisplayType string     `json:"display_type"`
 }
 
+type OpenseaPaymentToken struct {
+	ID       int    `json:"id"`
+	Symbol   string `json:"symbol"`
+	Address  string `json:"address"`
+	ImageURL string `json:"image_url"`
+	Name     string `json:"name"`
+	Decimals int    `json:"decimals"`
+	EthPrice string `json:"eth_price"`
+	UsdPrice string `json:"usd_price"`
+}
+
+type OpenseaLastSale struct {
+	PaymentToken OpenseaPaymentToken `json:"payment_token"`
+}
+
+type OpenseaSellOrder struct {
+	CurrentPrice string `json:"current_price"`
+}
 type OpenseaAsset struct {
 	ID                int                    `json:"id"`
 	Name              string                 `json:"name"`
@@ -60,13 +78,21 @@ type OpenseaAsset struct {
 	Contract          OpenseaContract        `json:"asset_contract"`
 	Collection        OpenseaAssetCollection `json:"collection"`
 	Traits            []OpenseaTrait         `json:"traits"`
+	LastSale          OpenseaLastSale        `json:"last_sale"`
+	SellOrders        []OpenseaSellOrder     `json:"sell_orders"`
+}
+
+type OpenseaCollectionTrait struct {
+	Min float64 `json:"min"`
+	Max float64 `json:"max"`
 }
 
 type OpenseaCollection struct {
-	Name            string `json:"name"`
-	Slug            string `json:"slug"`
-	ImageURL        string `json:"image_url"`
-	OwnedAssetCount int    `json:"owned_asset_count"`
+	Name            string                            `json:"name"`
+	Slug            string                            `json:"slug"`
+	ImageURL        string                            `json:"image_url"`
+	OwnedAssetCount int                               `json:"owned_asset_count"`
+	Traits          map[string]OpenseaCollectionTrait `json:"traits"`
 }
 
 type OpenseaClient struct {
