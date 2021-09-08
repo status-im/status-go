@@ -646,6 +646,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
+
 	receivedMessage := &common.Message{
 		ID:               state.CurrentMessageState.MessageID,
 		ChatMessage:      state.CurrentMessageState.Message,
@@ -655,6 +656,8 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		Identicon:        state.CurrentMessageState.Contact.Identicon,
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
+
+	logger.Info("HANDLING chat message", zap.String("mid", receivedMessage.ID))
 
 	err := receivedMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
@@ -723,6 +726,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
+	logger.Info("Checked for deletes message", zap.String("mid", receivedMessage.ID), zap.Any("received", receivedMessage), zap.Bool("DEleTED", receivedMessage.Deleted))
 	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
@@ -1304,6 +1308,7 @@ func (m *Messenger) checkForEdits(message *common.Message) error {
 }
 
 func (m *Messenger) checkForDeletes(message *common.Message) error {
+	m.logger.Info("Checking for deletes", zap.String("mid", message.ID))
 	// Check for any pending deletes
 	// If any pending deletes are available and valid, apply them
 	messageDeletes, err := m.persistence.GetDeletes(message.ID, message.From)
@@ -1312,9 +1317,11 @@ func (m *Messenger) checkForDeletes(message *common.Message) error {
 	}
 
 	if len(messageDeletes) == 0 {
+		m.logger.Info("no deletes", zap.String("mid", message.ID))
 		return nil
 	}
 
+	m.logger.Info("applying deletes", zap.String("mid", message.ID))
 	return m.applyDeleteMessage(messageDeletes, message)
 }
 
