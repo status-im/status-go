@@ -259,6 +259,11 @@ func (r *MessengerResponse) AddRemovedMessage(rm *RemovedMessage) {
 	}
 
 	r.removedMessages[rm.MessageID] = rm
+	// Remove original message from the map
+
+	if len(r.messages) != 0 && r.messages[rm.MessageID] != nil {
+		delete(r.messages, rm.MessageID)
+	}
 }
 
 func (r *MessengerResponse) AddActivityCenterNotifications(ns []*ActivityCenterNotification) {
