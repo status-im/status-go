@@ -2651,7 +2651,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeleteMessage:
-						logger.Debug("Handling DeleteMessage")
+						logger.Info("Handling DeleteMessage", zap.String("message-id", messageID))
 						deleteProto := msg.ParsedMessage.Interface().(protobuf.DeleteMessage)
 						deleteMessage := DeleteMessage{
 							DeleteMessage: deleteProto,

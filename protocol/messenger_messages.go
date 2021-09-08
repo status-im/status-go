@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -84,6 +85,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 }
 
 func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) (*MessengerResponse, error) {
+	m.logger.Info("DELETING MESSAGE", zap.String("mid", messageID))
 	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err

@@ -563,6 +563,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	originalMessage := state.Response.GetMessage(messageID)
 	// otherwise pull from database
 	if originalMessage == nil {
+		m.logger.Info("ORIGINAL MESSAGE NIL", zap.String("mid", messageID))
 		var err error
 		originalMessage, err = m.persistence.MessageByID(messageID)
 
@@ -572,9 +573,11 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	}
 
 	if originalMessage == nil {
+		m.logger.Info("ORIGINAL MESSAGE NIL 2", zap.String("mid", messageID))
 		return m.persistence.SaveDelete(deleteMessage)
 	}
 
+	m.logger.Info("We have original message", zap.String("mid", messageID))
 	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
 	if !ok {
 		return errors.New("chat not found")
@@ -588,17 +591,19 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	// Update message and return it
 	originalMessage.Deleted = true
 
+	m.logger.Info("Saving original message", zap.String("mid", messageID))
 	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
 	if err != nil {
 		return err
 	}
 
+	m.logger.Info("Setting hide on message", zap.String("mid", messageID))
 	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
 	if err != nil {
 		return err
 	}
 
-	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
+	m.logger.Info("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
 	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteMessage.MessageId)
 
 	if err != nil {
@@ -612,6 +617,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
+	m.logger.Info("Adding removed message", zap.String("mid", messageID))
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
