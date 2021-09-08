@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
@@ -2504,4 +2505,62 @@ func (s *MessengerSuite) TestChatIdentity() {
 	s.Require().Exactly(len(iis), len(ci.Images))
 
 	spew.Dump(ci, len(ci.Images))
+}
+
+func (s *MessengerSuite) TestPublicMessageOnCommunityChat() {
+	alice := s.newMessenger(s.shh)
+	bob := s.newMessenger(s.shh)
+
+	// Create a community
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	response, err := bob.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	community := response.Communities()[0]
+
+	// Create a community chat
+	response, err = bob.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "community-name",
+		},
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	chat := response.Chats()[0]
+
+	inputMessage := buildTestMessage(*chat)
+	inputMessage.ID = "1"
+	inputMessage.Seen = false
+	inputMessage.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage.Mentioned = true
+	inputMessage.MessageType = protobuf.MessageType_PUBLIC_GROUP
+
+	contact, err := BuildContactFromPublicKey(&alice.identity.PublicKey)
+	s.Require().NoError(err)
+
+	// send a public chat message to a community on_request chat
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		CurrentMessageState: &CurrentMessageState{
+			Message:          inputMessage.ChatMessage,
+			MessageID:        "0xabc",
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &alice.identity.PublicKey,
+		},
+	}
+	err = bob.HandleChatMessage(state)
+	s.Require().Error(err)
+	s.Require().Equal(ErrMessageForWrongChatType, err)
 }
