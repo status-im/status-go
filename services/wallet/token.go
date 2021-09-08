@@ -27,7 +27,7 @@ type Token struct {
 	// indivisible, whereas 18 would allow very small amounts of the token
 	// to be traded.
 	Decimals uint   `json:"decimals"`
-	ChainID  uint64 `json:"chain_id"`
+	ChainID  uint64 `json:"chainId"`
 }
 
 type TokenManager struct {

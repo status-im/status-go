@@ -21,7 +21,7 @@ func (b *BigInt) UnmarshalJSON(p []byte) error {
 	z := new(big.Int)
 	_, ok := z.SetString(strings.Trim(string(p), "\""), 10)
 	if !ok {
-		return fmt.Errorf("not a valid big integer: %s", "123")
+		return fmt.Errorf("not a valid big integer: %s", string(p))
 	}
 	b.Int = z
 	return nil

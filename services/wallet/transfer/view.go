@@ -31,7 +31,7 @@ type View struct {
 	From                 common.Address `json:"from"`
 	To                   common.Address `json:"to"`
 	Contract             common.Address `json:"contract"`
-	NetworkID            uint64         `json:"network_id"`
+	NetworkID            uint64         `json:"networkId"`
 }
 
 func castToTransferViews(transfers []Transfer) []View {

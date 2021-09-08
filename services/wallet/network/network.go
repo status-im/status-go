@@ -10,15 +10,15 @@ import (
 )
 
 type Network struct {
-	ChainID                uint64 `json:"chain_id"`
-	ChainName              string `json:"chain_name"`
-	RPCURL                 string `json:"rpc_url"`
-	BlockExplorerURL       string `json:"block_explorer_url,omitempty"`
-	IconURL                string `json:"icon_url,omitempty"`
-	NativeCurrencyName     string `json:"native_currency_name,omitempty"`
-	NativeCurrencySymbol   string `json:"native_currency_symbol,omitempty"`
-	NativeCurrencyDecimals uint64 `json:"native_currency_decimals"`
-	IsTest                 bool   `json:"is_test"`
+	ChainID                uint64 `json:"chainId"`
+	ChainName              string `json:"chainName"`
+	RPCURL                 string `json:"rpcUrl"`
+	BlockExplorerURL       string `json:"blockExplorerUrl,omitempty"`
+	IconURL                string `json:"iconUrl,omitempty"`
+	NativeCurrencyName     string `json:"nativeCurrencyName,omitempty"`
+	NativeCurrencySymbol   string `json:"nativeCurrencySymbol,omitempty"`
+	NativeCurrencyDecimals uint64 `json:"nativeCurrencyDecimals"`
+	IsTest                 bool   `json:"isTest"`
 	Layer                  uint64 `json:"layer"`
 	Enabled                bool   `json:"enabled"`
 }
