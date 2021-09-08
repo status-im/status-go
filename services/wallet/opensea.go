@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,6 +15,11 @@ import (
 
 const AssetLimit = 50
 const CollectionLimit = 300
+
+var BaseURLs = map[uint64]string{
+	1: "https://api.opensea.io/api/v1",
+	4: "https://rinkeby-api.opensea.io/api/v1",
+}
 
 type TraitValue string
 
@@ -106,12 +112,15 @@ type OpenseaClient struct {
 }
 
 // new opensea client.
-func newOpenseaClient() *OpenseaClient {
+func newOpenseaClient(chainID uint64) (*OpenseaClient, error) {
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
+	if url, ok := BaseURLs[chainID]; ok {
+		return &OpenseaClient{client: client, url: url}, nil
+	}
 
-	return &OpenseaClient{client: client, url: "https://api.opensea.io/api/v1"}
+	return nil, errors.New("ChainID not supported")
 }
 
 func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]OpenseaCollection, error) {

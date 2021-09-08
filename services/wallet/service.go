@@ -36,7 +36,6 @@ func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 		savedAddressesManager: savedAddressesManager,
 		transactionManager:    transactionManager,
 		transferController:    transferController,
-		opensea:               newOpenseaClient(),
 		cryptoOnRampManager:   cryptoOnRampManager,
 		legacyChainID:         legacyChainID,
 	}
@@ -51,7 +50,6 @@ type Service struct {
 	favouriteManager      *FavouriteManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
-	opensea               *OpenseaClient
 	legacyChainID         uint64
 	started               bool
 }
