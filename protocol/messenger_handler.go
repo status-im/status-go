@@ -26,6 +26,7 @@ const (
 )
 
 var ErrMessageNotAllowed = errors.New("message from a non-contact")
+var ErrMessageForWrongChatType = errors.New("message for the wrong chat type")
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
@@ -1017,6 +1018,9 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			return nil, errors.New("received a public chatEntity from non-existing chat")
+		}
+		if !chat.Public() {
+			return nil, ErrMessageForWrongChatType
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(chatEntity.GetSigPubKey(), &m.identity.PublicKey):
