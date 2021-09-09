@@ -80,6 +80,7 @@ type OpenseaAsset struct {
 	Traits            []OpenseaTrait         `json:"traits"`
 	LastSale          OpenseaLastSale        `json:"last_sale"`
 	SellOrders        []OpenseaSellOrder     `json:"sell_orders"`
+	BackgroundColor   string                 `json:"background_color"`
 }
 
 type OpenseaCollectionTrait struct {
