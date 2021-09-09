@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"context"
@@ -10,15 +10,17 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/network"
 )
 
 var numberOfBlocksCheckedPerIteration = 40
 
 type ethHistoricalCommand struct {
 	db           *Database
-	eth          TransferDownloader
+	eth          Downloader
 	address      common.Address
-	client       *walletClient
+	chainClient  *network.ChainClient
 	balanceCache *balanceCache
 	feed         *event.Feed
 	foundHeaders []*DBHeader
@@ -29,8 +31,8 @@ type ethHistoricalCommand struct {
 	to, resultingFrom *big.Int
 }
 
-func (c *ethHistoricalCommand) Command() Command {
-	return FiniteCommand{
+func (c *ethHistoricalCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
@@ -44,7 +46,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.from.Number != nil && c.from.Nonce != nil {
 		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
 	}
-	from, headers, err := findBlocksWithEthTransfers(ctx, c.client, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit)
+	from, headers, err := findBlocksWithEthTransfers(ctx, c.chainClient, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit)
 
 	if err != nil {
 		c.error = err
@@ -66,11 +68,11 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 }
 
 type erc20HistoricalCommand struct {
-	db      *Database
-	erc20   BatchDownloader
-	address common.Address
-	client  *walletClient
-	feed    *event.Feed
+	db          *Database
+	erc20       BatchDownloader
+	address     common.Address
+	chainClient *network.ChainClient
+	feed        *event.Feed
 
 	iterator     *IterativeDownloader
 	to           *big.Int
@@ -78,8 +80,8 @@ type erc20HistoricalCommand struct {
 	foundHeaders []*DBHeader
 }
 
-func (c *erc20HistoricalCommand) Command() Command {
-	return FiniteCommand{
+func (c *erc20HistoricalCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
@@ -89,7 +91,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	start := time.Now()
 	if c.iterator == nil {
 		c.iterator, err = SetupIterativeDownloader(
-			c.db, c.client, c.address,
+			c.db, c.chainClient, c.address,
 			c.erc20, erc20BatchSize, c.to, c.from)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
@@ -122,244 +124,23 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 type controlCommand struct {
 	accounts           []common.Address
 	db                 *Database
-	eth                *ETHTransferDownloader
+	block              *Block
+	eth                *ETHDownloader
 	erc20              *ERC20TransfersDownloader
-	chain              *big.Int
-	client             *walletClient
+	chainClient        *network.ChainClient
 	feed               *event.Feed
 	errorsCount        int
 	nonArchivalRPCNode bool
 }
 
-// run fast indexing for every accont up to canonical chain head minus safety depth.
-// every account will run it from last synced header.
-func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *balanceCache, fromByAddress map[common.Address]*LastKnownBlock, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int, map[common.Address][]*DBHeader, error) {
-	start := time.Now()
-	group := NewGroup(ctx)
-
-	commands := make([]*ethHistoricalCommand, len(c.accounts))
-	for i, address := range c.accounts {
-		eth := &ethHistoricalCommand{
-			db:           c.db,
-			client:       c.client,
-			balanceCache: bCache,
-			address:      address,
-			eth: &ETHTransferDownloader{
-				chain:    c.chain,
-				client:   c.client,
-				accounts: []common.Address{address},
-				signer:   types.NewLondonSigner(c.chain),
-				db:       c.db,
-			},
-			feed:    c.feed,
-			from:    fromByAddress[address],
-			to:      toByAddress[address],
-			noLimit: c.noLimit,
-		}
-		commands[i] = eth
-		group.Add(eth.Command())
-	}
-	select {
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	case <-group.WaitAsync():
-		resultingFromByAddress := map[common.Address]*big.Int{}
-		headers := map[common.Address][]*DBHeader{}
-		for _, command := range commands {
-			if command.error != nil {
-				return nil, nil, command.error
-			}
-			resultingFromByAddress[command.address] = command.resultingFrom
-			headers[command.address] = command.foundHeaders
-		}
-		log.Info("fast indexer finished", "in", time.Since(start))
-		return resultingFromByAddress, headers, nil
-	}
-}
-
-// run fast indexing for every accont up to canonical chain head minus safety depth.
-// every account will run it from last synced header.
-func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, fromByAddress map[common.Address]*big.Int, toByAddress map[common.Address]*big.Int) (map[common.Address][]*DBHeader, error) {
-	start := time.Now()
-	group := NewGroup(ctx)
-
-	commands := make([]*erc20HistoricalCommand, len(c.accounts))
-	for i, address := range c.accounts {
-		erc20 := &erc20HistoricalCommand{
-			db:           c.db,
-			erc20:        NewERC20TransfersDownloader(c.client, []common.Address{address}, types.NewLondonSigner(c.chain)),
-			client:       c.client,
-			feed:         c.feed,
-			address:      address,
-			from:         fromByAddress[address],
-			to:           toByAddress[address],
-			foundHeaders: []*DBHeader{},
-		}
-		commands[i] = erc20
-		group.Add(erc20.Command())
-	}
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-group.WaitAsync():
-		headres := map[common.Address][]*DBHeader{}
-		for _, command := range commands {
-			headres[command.address] = command.foundHeaders
-		}
-		log.Info("fast indexer Erc20 finished", "in", time.Since(start))
-		return headres, nil
-	}
-}
-
-func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHTransferDownloader, address common.Address, blocks []*big.Int) ([]Transfer, error) {
-	allTransfers := []Transfer{}
-
-	for _, block := range blocks {
-		transfers, err := downloader.GetTransfersByNumber(ctx, block)
-		if err != nil {
-			return nil, err
-		}
-		log.Debug("loadTransfers", "block", block, "new transfers", len(transfers))
-		if len(transfers) > 0 {
-			allTransfers = append(allTransfers, transfers...)
-		}
-	}
-
-	return allTransfers, nil
-}
-
-func loadTransfers(ctx context.Context, accounts []common.Address, db *Database, client *walletClient, chain *big.Int, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
-	start := time.Now()
-	group := NewGroup(ctx)
-
-	commands := []*transfersCommand{}
-	for _, address := range accounts {
-		blocks, ok := blocksByAddress[address]
-
-		if !ok {
-			blocks, _ = db.GetBlocksByAddress(address, numberOfBlocksCheckedPerIteration)
-		}
-		for _, block := range blocks {
-			transfers := &transfersCommand{
-				db:      db,
-				client:  client,
-				address: address,
-				eth: &ETHTransferDownloader{
-					chain:    chain,
-					client:   client,
-					accounts: []common.Address{address},
-					signer:   types.NewLondonSigner(chain),
-					db:       db,
-				},
-				block: block,
-			}
-			commands = append(commands, transfers)
-			group.Add(transfers.Command())
-		}
-	}
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-group.WaitAsync():
-		transfersByAddress := map[common.Address][]Transfer{}
-		for _, command := range commands {
-			if len(command.fetchedTransfers) == 0 {
-				continue
-			}
-
-			transfers, ok := transfersByAddress[command.address]
-			if !ok {
-				transfers = []Transfer{}
-			}
-
-			for _, transfer := range command.fetchedTransfers {
-				transfersByAddress[command.address] = append(transfers, transfer)
-			}
-		}
-		log.Info("loadTransfers finished", "in", time.Since(start))
-		return transfersByAddress, nil
-	}
-}
-
-func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHTransferDownloader, limit int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.db, c.client, c.chain, limit, make(map[common.Address][]*big.Int))
-}
-
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *walletClient) (*big.Int, error) {
-	from := big.NewInt(0)
-	to := initialTo
-	goal := uint64(20)
-
-	if from.Cmp(to) == 0 {
-		return to, nil
-	}
-
-	firstNonce, err := client.NonceAt(c, account, to)
-	log.Info("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if firstNonce <= goal {
-		return zero, nil
-	}
-
-	nonceDiff := firstNonce
-	iterations := 0
-	for iterations < 50 {
-		iterations = iterations + 1
-
-		if nonceDiff > goal {
-			// from = (from + to) / 2
-			from = from.Add(from, to)
-			from = from.Div(from, big.NewInt(2))
-		} else {
-			// from = from - (from + to) / 2
-			// to = from
-			diff := big.NewInt(0).Sub(to, from)
-			diff.Div(diff, big.NewInt(2))
-			to = big.NewInt(from.Int64())
-			from.Sub(from, diff)
-		}
-		fromNonce, err := client.NonceAt(c, account, from)
-		if err != nil {
-			return nil, err
-		}
-		nonceDiff = firstNonce - fromNonce
-
-		log.Info("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
-
-		if goal <= nonceDiff && nonceDiff <= (goal+5) {
-			log.Info("range found", "account", account, "from", from, "to", to)
-			return from, nil
-		}
-	}
-
-	log.Info("range found", "account", account, "from", from, "to", to)
-
-	return from, nil
-}
-
-func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *walletClient) (map[common.Address]*big.Int, error) {
-	res := map[common.Address]*big.Int{}
-
-	for _, address := range accounts {
-		from, err := findFirstRange(c, address, initialTo, client)
-		if err != nil {
-			return nil, err
-		}
-
-		res[address] = from
-	}
-
-	return res, nil
+func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHDownloader, limit int) (map[common.Address][]Transfer, error) {
+	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int))
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
 	log.Info("start control command")
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	head, err := c.client.HeaderByNumber(ctx, nil)
+	head, err := c.chainClient.HeaderByNumber(ctx, nil)
 	cancel()
 	if err != nil {
 		if c.NewError(err) {
@@ -374,7 +155,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	})
 
 	log.Info("current head is", "block number", head.Number)
-	lastKnownEthBlocks, accountsWithoutHistory, err := c.db.GetLastKnownBlockByAddresses(c.accounts)
+	lastKnownEthBlocks, accountsWithoutHistory, err := c.block.GetLastKnownBlockByAddresses(c.chainClient.ChainID, c.accounts)
 	if err != nil {
 		log.Error("failed to load last head from database", "error", err)
 		if c.NewError(err) {
@@ -386,7 +167,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	fromMap := map[common.Address]*big.Int{}
 
 	if !c.nonArchivalRPCNode {
-		fromMap, err = findFirstRanges(parent, accountsWithoutHistory, head.Number, c.client)
+		fromMap, err = findFirstRanges(parent, accountsWithoutHistory, head.Number, c.chainClient)
 		if err != nil {
 			if c.NewError(err) {
 				return nil
@@ -416,8 +197,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	cmnd := &findAndCheckBlockRangeCommand{
 		accounts:      c.accounts,
 		db:            c.db,
-		chain:         c.chain,
-		client:        c.client,
+		chainClient:   c.chainClient,
 		balanceCache:  bCache,
 		feed:          c.feed,
 		fromByAddress: fromByAddress,
@@ -439,12 +219,11 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
-	downloader := &ETHTransferDownloader{
-		chain:    c.chain,
-		client:   c.client,
-		accounts: c.accounts,
-		signer:   types.NewLondonSigner(c.chain),
-		db:       c.db,
+	downloader := &ETHDownloader{
+		chainClient: c.chainClient,
+		accounts:    c.accounts,
+		signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
+		db:          c.db,
 	}
 	_, err = c.LoadTransfers(parent, downloader, 40)
 	if err != nil {
@@ -509,8 +288,8 @@ func (c *controlCommand) NewError(err error) bool {
 	return false
 }
 
-func (c *controlCommand) Command() Command {
-	return FiniteCommand{
+func (c *controlCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
@@ -518,15 +297,15 @@ func (c *controlCommand) Command() Command {
 
 type transfersCommand struct {
 	db               *Database
-	eth              *ETHTransferDownloader
+	eth              *ETHDownloader
 	block            *big.Int
 	address          common.Address
-	client           *walletClient
+	chainClient      *network.ChainClient
 	fetchedTransfers []Transfer
 }
 
-func (c *transfersCommand) Command() Command {
-	return FiniteCommand{
+func (c *transfersCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
@@ -539,7 +318,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	err = c.db.SaveTranfers(c.address, allTransfers, []*big.Int{c.block})
+	err = c.db.SaveTranfers(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.block})
 	if err != nil {
 		log.Error("SaveTranfers error", "error", err)
 		return err
@@ -553,30 +332,29 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 type loadTransfersCommand struct {
 	accounts                []common.Address
 	db                      *Database
-	chain                   *big.Int
-	client                  *walletClient
+	block                   *Block
+	chainClient             *network.ChainClient
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
 }
 
-func (c *loadTransfersCommand) Command() Command {
-	return FiniteCommand{
+func (c *loadTransfersCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
 }
 
-func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, downloader *ETHTransferDownloader, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.db, c.client, c.chain, limit, blocksByAddress)
+func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, downloader *ETHDownloader, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, blocksByAddress)
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
-	downloader := &ETHTransferDownloader{
-		chain:    c.chain,
-		client:   c.client,
-		accounts: c.accounts,
-		signer:   types.NewLondonSigner(c.chain),
-		db:       c.db,
+	downloader := &ETHDownloader{
+		chainClient: c.chainClient,
+		accounts:    c.accounts,
+		signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
+		db:          c.db,
 	}
 	transfersByAddress, err := c.LoadTransfers(parent, downloader, 40, c.blocksByAddress)
 	if err != nil {
@@ -590,8 +368,7 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
-	chain         *big.Int
-	client        *walletClient
+	chainClient   *network.ChainClient
 	balanceCache  *balanceCache
 	feed          *event.Feed
 	fromByAddress map[common.Address]*LastKnownBlock
@@ -601,8 +378,8 @@ type findAndCheckBlockRangeCommand struct {
 	error         error
 }
 
-func (c *findAndCheckBlockRangeCommand) Command() Command {
-	return FiniteCommand{
+func (c *findAndCheckBlockRangeCommand) Command() async.Command {
+	return async.FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
@@ -666,7 +443,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
 			Nonce:   c.balanceCache.ReadCachedNonce(address, lastBlockNumber),
 		}
-		err = c.db.ProcessBlocks(address, newFromByAddress[address], to, uniqHeaders)
+		err = c.db.ProcessBlocks(c.chainClient.ChainID, address, newFromByAddress[address], to, uniqHeaders)
 		if err != nil {
 			return err
 		}
@@ -675,4 +452,223 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	c.foundHeaders = foundHeaders
 
 	return
+}
+
+// run fast indexing for every accont up to canonical chain head minus safety depth.
+// every account will run it from last synced header.
+func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *balanceCache, fromByAddress map[common.Address]*LastKnownBlock, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int, map[common.Address][]*DBHeader, error) {
+	start := time.Now()
+	group := async.NewGroup(ctx)
+
+	commands := make([]*ethHistoricalCommand, len(c.accounts))
+	for i, address := range c.accounts {
+		eth := &ethHistoricalCommand{
+			db:           c.db,
+			chainClient:  c.chainClient,
+			balanceCache: bCache,
+			address:      address,
+			eth: &ETHDownloader{
+				chainClient: c.chainClient,
+				accounts:    []common.Address{address},
+				signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
+				db:          c.db,
+			},
+			feed:    c.feed,
+			from:    fromByAddress[address],
+			to:      toByAddress[address],
+			noLimit: c.noLimit,
+		}
+		commands[i] = eth
+		group.Add(eth.Command())
+	}
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case <-group.WaitAsync():
+		resultingFromByAddress := map[common.Address]*big.Int{}
+		headers := map[common.Address][]*DBHeader{}
+		for _, command := range commands {
+			if command.error != nil {
+				return nil, nil, command.error
+			}
+			resultingFromByAddress[command.address] = command.resultingFrom
+			headers[command.address] = command.foundHeaders
+		}
+		log.Info("fast indexer finished", "in", time.Since(start))
+		return resultingFromByAddress, headers, nil
+	}
+}
+
+// run fast indexing for every accont up to canonical chain head minus safety depth.
+// every account will run it from last synced header.
+func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, fromByAddress map[common.Address]*big.Int, toByAddress map[common.Address]*big.Int) (map[common.Address][]*DBHeader, error) {
+	start := time.Now()
+	group := async.NewGroup(ctx)
+
+	commands := make([]*erc20HistoricalCommand, len(c.accounts))
+	for i, address := range c.accounts {
+		erc20 := &erc20HistoricalCommand{
+			db:           c.db,
+			erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{address}, types.NewLondonSigner(c.chainClient.ToBigInt())),
+			chainClient:  c.chainClient,
+			feed:         c.feed,
+			address:      address,
+			from:         fromByAddress[address],
+			to:           toByAddress[address],
+			foundHeaders: []*DBHeader{},
+		}
+		commands[i] = erc20
+		group.Add(erc20.Command())
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-group.WaitAsync():
+		headres := map[common.Address][]*DBHeader{}
+		for _, command := range commands {
+			headres[command.address] = command.foundHeaders
+		}
+		log.Info("fast indexer Erc20 finished", "in", time.Since(start))
+		return headres, nil
+	}
+}
+
+func loadTransfers(ctx context.Context, accounts []common.Address, block *Block, db *Database, chainClient *network.ChainClient, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+	start := time.Now()
+	group := async.NewGroup(ctx)
+
+	commands := []*transfersCommand{}
+	for _, address := range accounts {
+		blocks, ok := blocksByAddress[address]
+
+		if !ok {
+			blocks, _ = block.GetBlocksByAddress(chainClient.ChainID, address, numberOfBlocksCheckedPerIteration)
+		}
+		for _, block := range blocks {
+			transfers := &transfersCommand{
+				db:          db,
+				chainClient: chainClient,
+				address:     address,
+				eth: &ETHDownloader{
+					chainClient: chainClient,
+					accounts:    []common.Address{address},
+					signer:      types.NewLondonSigner(chainClient.ToBigInt()),
+					db:          db,
+				},
+				block: block,
+			}
+			commands = append(commands, transfers)
+			group.Add(transfers.Command())
+		}
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-group.WaitAsync():
+		transfersByAddress := map[common.Address][]Transfer{}
+		for _, command := range commands {
+			if len(command.fetchedTransfers) == 0 {
+				continue
+			}
+
+			transfers, ok := transfersByAddress[command.address]
+			if !ok {
+				transfers = []Transfer{}
+			}
+
+			for _, transfer := range command.fetchedTransfers {
+				transfersByAddress[command.address] = append(transfers, transfer)
+			}
+		}
+		log.Info("loadTransfers finished", "in", time.Since(start))
+		return transfersByAddress, nil
+	}
+}
+
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *network.ChainClient) (*big.Int, error) {
+	from := big.NewInt(0)
+	to := initialTo
+	goal := uint64(20)
+
+	if from.Cmp(to) == 0 {
+		return to, nil
+	}
+
+	firstNonce, err := client.NonceAt(c, account, to)
+	log.Info("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if firstNonce <= goal {
+		return zero, nil
+	}
+
+	nonceDiff := firstNonce
+	iterations := 0
+	for iterations < 50 {
+		iterations = iterations + 1
+
+		if nonceDiff > goal {
+			// from = (from + to) / 2
+			from = from.Add(from, to)
+			from = from.Div(from, big.NewInt(2))
+		} else {
+			// from = from - (from + to) / 2
+			// to = from
+			diff := big.NewInt(0).Sub(to, from)
+			diff.Div(diff, big.NewInt(2))
+			to = big.NewInt(from.Int64())
+			from.Sub(from, diff)
+		}
+		fromNonce, err := client.NonceAt(c, account, from)
+		if err != nil {
+			return nil, err
+		}
+		nonceDiff = firstNonce - fromNonce
+
+		log.Info("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
+
+		if goal <= nonceDiff && nonceDiff <= (goal+5) {
+			log.Info("range found", "account", account, "from", from, "to", to)
+			return from, nil
+		}
+	}
+
+	log.Info("range found", "account", account, "from", from, "to", to)
+
+	return from, nil
+}
+
+func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *network.ChainClient) (map[common.Address]*big.Int, error) {
+	res := map[common.Address]*big.Int{}
+
+	for _, address := range accounts {
+		from, err := findFirstRange(c, address, initialTo, client)
+		if err != nil {
+			return nil, err
+		}
+
+		res[address] = from
+	}
+
+	return res, nil
+}
+
+func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHDownloader, address common.Address, blocks []*big.Int) ([]Transfer, error) {
+	allTransfers := []Transfer{}
+
+	for _, block := range blocks {
+		transfers, err := downloader.GetTransfersByNumber(ctx, block)
+		if err != nil {
+			return nil, err
+		}
+		log.Debug("loadTransfers", "block", block, "new transfers", len(transfers))
+		if len(transfers) > 0 {
+			allTransfers = append(allTransfers, transfers...)
+		}
+	}
+
+	return allTransfers, nil
 }

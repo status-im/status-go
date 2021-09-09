@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 type transactionState string
@@ -50,12 +50,12 @@ func (t transactionBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
+func (s *Service) buildTransactionNotification(rawTransfer transfer.Transfer) *Notification {
 	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
 
 	var deeplink string
 	var state transactionState
-	transfer := wallet.CastToTransferView(rawTransfer)
+	transfer := transfer.CastToTransferView(rawTransfer)
 
 	switch {
 	case transfer.TxStatus == hexutil.Uint64(0):
@@ -113,7 +113,7 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 		for _, address := range payload.Accounts {
 			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) >= 0 {
 				log.Info("Handled transfer for address", "info", address)
-				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
+				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(s.chainID, address, payload.BlockNumber, int64(limit))
 				if err != nil {
 					log.Error("Could not fetch transfers", "error", err)
 				}
@@ -158,7 +158,7 @@ func (s *Service) StartWalletWatcher() {
 	}
 
 	s.walletTransmitter.quit = make(chan struct{})
-	events := make(chan wallet.Event, 10)
+	events := make(chan transfer.Event, 10)
 	sub := s.walletTransmitter.publisher.Subscribe(events)
 
 	s.walletTransmitter.wg.Add(1)
@@ -179,7 +179,7 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-				if event.Type == wallet.EventNewTransfers && len(maxKnownBlocks) > 0 {
+				if event.Type == transfer.EventNewTransfers && len(maxKnownBlocks) > 0 {
 					newBlocks := false
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
@@ -198,7 +198,7 @@ func (s *Service) StartWalletWatcher() {
 							MaxKnownBlocks: maxKnownBlocks,
 						})
 					}
-				} else if event.Type == wallet.EventRecentHistoryReady {
+				} else if event.Type == transfer.EventRecentHistoryReady {
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
 							maxKnownBlocks[address] = event.BlockNumber

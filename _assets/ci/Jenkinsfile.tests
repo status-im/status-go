@@ -58,7 +58,7 @@ pipeline {
       docker.image('postgres:9.6-alpine').withRun(
         '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
       ) { c ->
-        sh 'make test-unit'
+        sh 'make test-unit V=1'
       }
     } } } }
   } // stages

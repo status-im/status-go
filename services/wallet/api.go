@@ -2,18 +2,12 @@ package wallet
 
 import (
 	"context"
-	"errors"
-	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-)
-
-var (
-	// ErrServiceNotInitialized returned when wallet is not initialized/started,.
-	ErrServiceNotInitialized = errors.New("wallet service is not initialized")
+	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 func NewAPI(s *Service) *API {
@@ -27,247 +21,174 @@ type API struct {
 
 // SetInitialBlocksRange sets initial blocks range
 func (api *API) SetInitialBlocksRange(ctx context.Context) error {
-	return api.s.SetInitialBlocksRange(api.s.db.network)
+	return api.s.transferController.SetInitialBlocksRange([]uint64{api.s.legacyChainID})
+}
+
+func (api *API) SetInitialBlocksRangeForChainIDs(ctx context.Context, chainIDs []uint64) error {
+	return api.s.transferController.SetInitialBlocksRange(chainIDs)
+}
+
+func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
+	return api.s.transferController.CheckRecentHistory([]uint64{api.s.legacyChainID}, addresses)
+}
+
+func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
+	return api.s.transferController.CheckRecentHistory(chainIDs, addresses)
 }
 
 // GetTransfersByAddress returns transfers for a single address
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]TransferView, error) {
+func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
-	if api.s.db == nil {
-		log.Error("[WalletAPI:: GetTransfersByAddress] db is not initialized")
-		return nil, ErrServiceNotInitialized
-	}
+	return api.s.transferController.GetTransfersByAddress(ctx, api.s.legacyChainID, address, toBlock, limit, fetchMore)
+}
 
-	var toBlockBN *big.Int
-	if toBlock != nil {
-		toBlockBN = toBlock.ToInt()
-	}
+func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
+	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainID] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
+	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, toBlock, limit, fetchMore)
+}
 
-	rst, err := api.s.db.GetTransfersByAddress(address, toBlockBN, limit.ToInt().Int64())
-	if err != nil {
-		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
-		return nil, err
-	}
+func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
+	return api.s.transferController.GetCachedBalances(ctx, api.s.legacyChainID, addresses)
+}
 
-	transfersCount := big.NewInt(int64(len(rst)))
-	if fetchMore && limit.ToInt().Cmp(transfersCount) == 1 {
-		block, err := api.s.db.GetFirstKnownBlock(address)
-		if err != nil {
-			return nil, err
-		}
-
-		// if zero block was already checked there is nothing to find more
-		if block == nil || big.NewInt(0).Cmp(block) == 0 {
-			return castToTransferViews(rst), nil
-		}
-
-		from, err := findFirstRange(ctx, address, block, api.s.client)
-		if err != nil {
-			if nonArchivalNodeError(err) {
-				api.s.feed.Send(Event{
-					Type: EventNonArchivalNodeDetected,
-				})
-				from = big.NewInt(0).Sub(block, big.NewInt(100))
-			} else {
-				log.Error("first range error", "error", err)
-				return nil, err
-			}
-		}
-		fromByAddress := map[common.Address]*LastKnownBlock{address: &LastKnownBlock{
-			Number: from,
-		}}
-		toByAddress := map[common.Address]*big.Int{address: block}
-
-		balanceCache := newBalanceCache()
-		blocksCommand := &findAndCheckBlockRangeCommand{
-			accounts:      []common.Address{address},
-			db:            api.s.db,
-			chain:         api.s.reactor.chain,
-			client:        api.s.client,
-			balanceCache:  balanceCache,
-			feed:          api.s.feed,
-			fromByAddress: fromByAddress,
-			toByAddress:   toByAddress,
-		}
-
-		if err = blocksCommand.Command()(ctx); err != nil {
-			return nil, err
-		}
-
-		blocks, err := api.s.db.GetBlocksByAddress(address, numberOfBlocksCheckedPerIteration)
-		if err != nil {
-			return nil, err
-		}
-
-		log.Info("checking blocks again", "blocks", len(blocks))
-		if len(blocks) > 0 {
-			txCommand := &loadTransfersCommand{
-				accounts: []common.Address{address},
-				db:       api.s.db,
-				chain:    api.s.reactor.chain,
-				client:   api.s.client,
-			}
-
-			err = txCommand.Command()(ctx)
-			if err != nil {
-				return nil, err
-			}
-			rst, err = api.s.db.GetTransfersByAddress(address, toBlockBN, limit.ToInt().Int64())
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return castToTransferViews(rst), nil
+func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
+	return api.s.transferController.GetCachedBalances(ctx, chainID, addresses)
 }
 
 // GetTokensBalances return mapping of token balances for every account.
-func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	if api.s.client == nil {
-		return nil, ErrServiceNotInitialized
+func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+	client, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
+	if err != nil {
+		return nil, err
 	}
-	return GetTokensBalances(ctx, api.s.client, accounts, tokens)
+	return api.s.tokenManager.getBalances(ctx, []*network.ChainClient{client}, accounts, addresses)
+}
+
+func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+	clients, err := api.s.networkManager.GetChainClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+	return api.s.tokenManager.getBalances(ctx, clients, accounts, addresses)
 }
 
 func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
 	log.Debug("call to get custom tokens")
-	rst, err := api.s.db.GetCustomTokens()
+	rst, err := api.s.tokenManager.getCustoms()
 	log.Debug("result from database for custom tokens", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) AddCustomToken(ctx context.Context, token Token) error {
 	log.Debug("call to create or edit custom token")
-	err := api.s.db.AddCustomToken(token)
+	if token.ChainID == 0 {
+		token.ChainID = api.s.legacyChainID
+	}
+	err := api.s.tokenManager.upsertCustom(token)
 	log.Debug("result from database for create or edit custom token", "err", err)
 	return err
 }
 
 func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove custom token")
-	err := api.s.db.DeleteCustomToken(address)
+	err := api.s.tokenManager.deleteCustom(api.s.legacyChainID, address)
+	log.Debug("result from database for remove custom token", "err", err)
+	return err
+}
+
+func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, address common.Address) error {
+	log.Debug("call to remove custom token")
+	err := api.s.tokenManager.deleteCustom(chainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
 	return err
 }
 
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
-	rst, err := api.s.db.getAllPendingTransactions()
+	rst, err := api.s.transactionManager.getAllPendings(api.s.legacyChainID)
+	log.Debug("result from database for pending transactions", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) GetPendingTransactionsByChainID(ctx context.Context, chainID uint64) ([]*PendingTransaction, error) {
+	log.Debug("call to get pending transactions")
+	rst, err := api.s.transactionManager.getAllPendings(chainID)
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
-	log.Debug("call to get pending transactions by address")
-	rst, err := api.s.db.getPendingOutboundTransactionsByAddress(address)
+	log.Debug("call to get pending outbound transactions by address")
+	rst, err := api.s.transactionManager.getPendingByAddress(api.s.legacyChainID, address)
+	log.Debug("result from database for pending transactions by address", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address) ([]*PendingTransaction, error) {
+	log.Debug("call to get pending outbound transactions by address")
+	rst, err := api.s.transactionManager.getPendingByAddress(chainID, address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) StorePendingTransaction(ctx context.Context, trx PendingTransaction) error {
 	log.Debug("call to create or edit pending transaction")
-	err := api.s.db.addPendingTransaction(trx)
+	if trx.ChainID == 0 {
+		trx.ChainID = api.s.legacyChainID
+	}
+	err := api.s.transactionManager.addPending(trx)
 	log.Debug("result from database for creating or editing a pending transaction", "err", err)
 	return err
 }
 
 func (api *API) DeletePendingTransaction(ctx context.Context, transactionHash common.Hash) error {
 	log.Debug("call to remove pending transaction")
-	err := api.s.db.deletePendingTransaction(transactionHash)
+	err := api.s.transactionManager.deletePending(api.s.legacyChainID, transactionHash)
 	log.Debug("result from database for remove pending transaction", "err", err)
 	return err
 }
 
+func (api *API) DeletePendingTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
+	log.Debug("call to remove pending transaction")
+	err := api.s.transactionManager.deletePending(chainID, transactionHash)
+	log.Debug("result from database for remove pending transaction", "err", err)
+	return err
+}
+
+func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
+	chainClient, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
+	if err != nil {
+		return err
+	}
+
+	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
+}
+
+func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
+	chainClient, err := api.s.networkManager.GetChainClient(chainID)
+	if err != nil {
+		return err
+	}
+
+	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
+}
+
 func (api *API) GetFavourites(ctx context.Context) ([]*Favourite, error) {
 	log.Debug("call to get favourites")
-	rst, err := api.s.db.GetFavourites()
+	rst, err := api.s.favouriteManager.GetFavourites()
 	log.Debug("result from database for favourites", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) AddFavourite(ctx context.Context, favourite Favourite) error {
 	log.Debug("call to create or update favourites")
-	err := api.s.db.AddFavourite(favourite)
+	err := api.s.favouriteManager.AddFavourite(favourite)
 	log.Debug("result from database for create or update favourites", "err", err)
 	return err
 }
 
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
-	if api.s.cryptoOnRampManager == nil {
-		// TODO Add settings and then build options based on settings
-		opts := &CryptoOnRampOptions{
-			dataSourceType: DataSourceStatic,
-		}
-		api.s.cryptoOnRampManager = NewCryptoOnRampManager(opts)
-	}
-
-	rs, err := api.s.cryptoOnRampManager.Get()
-	if err != nil {
-		return nil, err
-	}
-
-	return rs, nil
-}
-
-func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
-	watchTxCommand := &watchTransactionCommand{
-		hash:   transactionHash,
-		client: api.s.client,
-		feed:   api.s.feed,
-	}
-
-	commandContext, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-
-	return watchTxCommand.Command()(commandContext)
-}
-
-func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
-	if len(addresses) == 0 {
-		log.Info("no addresses provided")
-		return nil
-	}
-	err := api.s.MergeBlocksRanges(addresses, api.s.db.network)
-	if err != nil {
-		return err
-	}
-
-	return api.s.StartReactor(
-		api.s.client.client,
-		addresses,
-		new(big.Int).SetUint64(api.s.db.network))
-}
-
-type LastKnownBlockView struct {
-	Address common.Address `json:"address"`
-	Number  *big.Int       `json:"blockNumber"`
-	Balance BigInt         `json:"balance"`
-	Nonce   *int64         `json:"nonce"`
-}
-
-func blocksToViews(blocks map[common.Address]*LastKnownBlock) []LastKnownBlockView {
-	blocksViews := []LastKnownBlockView{}
-	for address, block := range blocks {
-		view := LastKnownBlockView{
-			Address: address,
-			Number:  block.Number,
-			Balance: BigInt{block.Balance},
-			Nonce:   block.Nonce,
-		}
-		blocksViews = append(blocksViews, view)
-	}
-
-	return blocksViews
-}
-
-func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]LastKnownBlockView, error) {
-	result, error := api.s.db.getLastKnownBalances(addresses)
-	if error != nil {
-		return nil, error
-	}
-
-	return blocksToViews(result), nil
+	return api.s.cryptoOnRampManager.Get()
 }
 
 func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, owner common.Address) ([]OpenseaCollection, error) {
@@ -278,4 +199,19 @@ func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, owner common.A
 func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
 	log.Debug("call to get opensea assets")
 	return api.s.opensea.fetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
+}
+
+func (api *API) AddEthereumChain(ctx context.Context, network network.Network) error {
+	log.Debug("call to AddEthereumChain")
+	return api.s.networkManager.Upsert(&network)
+}
+
+func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
+	log.Debug("call to DeleteEthereumChain")
+	return api.s.networkManager.Delete(chainID)
+}
+
+func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*network.Network, error) {
+	log.Debug("call to GetEthereumChains")
+	return api.s.networkManager.Get(onlyEnabled)
 }

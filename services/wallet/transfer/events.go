@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"math/big"
@@ -22,7 +22,7 @@ const (
 	EventNonArchivalNodeDetected EventType = "non-archival-node-detected"
 )
 
-// Event is a type for wallet events.
+// Event is a type for transfer events.
 type Event struct {
 	Type        EventType        `json:"type"`
 	BlockNumber *big.Int         `json:"blockNumber"`

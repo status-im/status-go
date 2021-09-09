@@ -2,6 +2,7 @@ package appmetrics
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -63,7 +64,7 @@ func TestDatabase_GetUnprocessedMetrics(t *testing.T) {
 
 	for i := 0; i < numberOfSessionSaves; i++ {
 		for ii := 1; ii < numberOfSessions+1; ii++ {
-			err := db.SaveAppMetrics(GenerateMetrics(metricsPerSession), "rand-omse-ssid-"+string(ii))
+			err := db.SaveAppMetrics(GenerateMetrics(metricsPerSession), "rand-omse-ssid-"+fmt.Sprint(ii))
 			require.NoError(t, err)
 
 			uam, err = db.GetUnprocessed()

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -87,22 +87,24 @@ type transmitter struct {
 type Service struct {
 	started           bool
 	WatchingEnabled   bool
+	chainID           uint64
 	transmitter       *transmitter
 	walletTransmitter *transmitter
 	db                *Database
-	walletDB          *wallet.Database
+	walletDB          *transfer.Database
 	accountsDB        *accounts.Database
 }
 
-func NewService(appDB *sql.DB, network uint64) *Service {
-	db := NewDB(appDB, network)
-	walletDB := wallet.NewDB(appDB, network)
+func NewService(appDB *sql.DB, chainID uint64) *Service {
+	db := NewDB(appDB, chainID)
+	walletDB := transfer.NewDB(appDB)
 	accountsDB := accounts.NewDB(appDB)
 	trans := &transmitter{}
 	walletTrans := &transmitter{}
 
 	return &Service{
 		db:                db,
+		chainID:           chainID,
 		walletDB:          walletDB,
 		accountsDB:        accountsDB,
 		transmitter:       trans,

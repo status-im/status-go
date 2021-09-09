@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/network"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -103,8 +104,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	}
 
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(config.NetworkID, accountsFeed)
-		b.walletSrvc.SetClient(b.rpcClient.Ethclient())
+		walletService := b.walletService(config.NetworkID, config.Networks, accountsFeed)
 		services = append(services, walletService)
 	}
 
@@ -367,9 +367,9 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 	return b.appMetricsSrvc
 }
 
-func (b *StatusNode) walletService(network uint64, accountsFeed *event.Feed) common.StatusService {
+func (b *StatusNode) walletService(chainID uint64, networks []network.Network, accountsFeed *event.Feed) common.StatusService {
 	if b.walletSrvc == nil {
-		b.walletSrvc = wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed)
+		b.walletSrvc = wallet.NewService(b.appDB, chainID, b.rpcClient.Ethclient(), networks, accountsFeed)
 	}
 	return b.walletSrvc
 }
