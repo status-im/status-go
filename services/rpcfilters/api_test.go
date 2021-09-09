@@ -21,6 +21,7 @@ func TestFilterLiveness(t *testing.T) {
 		filterLivenessLoop:   10 * time.Millisecond,
 		filterLivenessPeriod: 15 * time.Millisecond,
 		client:               func() ContextCaller { return &callTracker{} },
+		chainID:              func() uint64 { return 1 },
 	}
 	id, err := api.NewFilter(filters.FilterCriteria{})
 	require.NoError(t, err)
@@ -60,6 +61,7 @@ func TestGetFilterChangesResetsTimer(t *testing.T) {
 		filterLivenessLoop:   10 * time.Millisecond,
 		filterLivenessPeriod: 15 * time.Millisecond,
 		client:               func() ContextCaller { return &callTracker{} },
+		chainID:              func() uint64 { return 1 },
 	}
 	id, err := api.NewFilter(filters.FilterCriteria{})
 	require.NoError(t, err)
@@ -86,6 +88,7 @@ func TestGetFilterLogs(t *testing.T) {
 	api := &PublicAPI{
 		filters: make(map[rpc.ID]filter),
 		client:  func() ContextCaller { return tracker },
+		chainID: func() uint64 { return 1 },
 	}
 	block := big.NewInt(10)
 	id, err := api.NewFilter(filters.FilterCriteria{

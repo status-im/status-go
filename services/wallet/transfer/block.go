@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 type BlocksRange struct {
@@ -63,7 +63,7 @@ func (b *Block) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) 
 	return nil
 }
 
-func (b *Block) setInitialBlocksRange(chainClient *network.ChainClient) error {
+func (b *Block) setInitialBlocksRange(chainClient *chain.Client) error {
 	accountsDB := accounts.NewDB(b.db)
 	watchAddress, err := accountsDB.GetWalletAddress()
 	if err != nil {

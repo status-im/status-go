@@ -6,7 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
@@ -21,7 +22,7 @@ type API struct {
 
 // SetInitialBlocksRange sets initial blocks range
 func (api *API) SetInitialBlocksRange(ctx context.Context) error {
-	return api.s.transferController.SetInitialBlocksRange([]uint64{api.s.legacyChainID})
+	return api.s.transferController.SetInitialBlocksRange([]uint64{api.s.rpcClient.UpstreamChainID})
 }
 
 func (api *API) SetInitialBlocksRangeForChainIDs(ctx context.Context, chainIDs []uint64) error {
@@ -29,7 +30,7 @@ func (api *API) SetInitialBlocksRangeForChainIDs(ctx context.Context, chainIDs [
 }
 
 func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
-	return api.s.transferController.CheckRecentHistory([]uint64{api.s.legacyChainID}, addresses)
+	return api.s.transferController.CheckRecentHistory([]uint64{api.s.rpcClient.UpstreamChainID}, addresses)
 }
 
 func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
@@ -39,7 +40,7 @@ func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []ui
 // GetTransfersByAddress returns transfers for a single address
 func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
-	return api.s.transferController.GetTransfersByAddress(ctx, api.s.legacyChainID, address, toBlock, limit, fetchMore)
+	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, toBlock, limit, fetchMore)
 }
 
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
@@ -48,7 +49,7 @@ func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uin
 }
 
 func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
-	return api.s.transferController.GetCachedBalances(ctx, api.s.legacyChainID, addresses)
+	return api.s.transferController.GetCachedBalances(ctx, api.s.rpcClient.UpstreamChainID, addresses)
 }
 
 func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
@@ -57,15 +58,15 @@ func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, 
 
 // GetTokensBalances return mapping of token balances for every account.
 func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	client, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
+	chainClient, err := chain.NewLegacyClient(api.s.rpcClient)
 	if err != nil {
 		return nil, err
 	}
-	return api.s.tokenManager.getBalances(ctx, []*network.ChainClient{client}, accounts, addresses)
+	return api.s.tokenManager.getBalances(ctx, []*chain.Client{chainClient}, accounts, addresses)
 }
 
 func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	clients, err := api.s.networkManager.GetChainClients(chainIDs)
+	clients, err := chain.NewClients(api.s.rpcClient, chainIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
 func (api *API) AddCustomToken(ctx context.Context, token Token) error {
 	log.Debug("call to create or edit custom token")
 	if token.ChainID == 0 {
-		token.ChainID = api.s.legacyChainID
+		token.ChainID = api.s.rpcClient.UpstreamChainID
 	}
 	err := api.s.tokenManager.upsertCustom(token)
 	log.Debug("result from database for create or edit custom token", "err", err)
@@ -91,7 +92,7 @@ func (api *API) AddCustomToken(ctx context.Context, token Token) error {
 
 func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove custom token")
-	err := api.s.tokenManager.deleteCustom(api.s.legacyChainID, address)
+	err := api.s.tokenManager.deleteCustom(api.s.rpcClient.UpstreamChainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
 	return err
 }
@@ -105,7 +106,7 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 
 func (api *API) GetSavedAddresses(ctx context.Context) ([]*SavedAddress, error) {
 	log.Debug("call to get saved addresses")
-	rst, err := api.s.savedAddressesManager.GetSavedAddresses(api.s.legacyChainID)
+	rst, err := api.s.savedAddressesManager.GetSavedAddresses(api.s.rpcClient.UpstreamChainID)
 	log.Debug("result from database for saved addresses", "len", len(rst))
 	return rst, err
 }
@@ -113,7 +114,7 @@ func (api *API) GetSavedAddresses(ctx context.Context) ([]*SavedAddress, error) 
 func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
 	log.Debug("call to create or edit saved address")
 	if sa.ChainID == 0 {
-		sa.ChainID = api.s.legacyChainID
+		sa.ChainID = api.s.rpcClient.UpstreamChainID
 	}
 	err := api.s.savedAddressesManager.AddSavedAddress(sa)
 	log.Debug("result from database for create or edit saved address", "err", err)
@@ -122,14 +123,14 @@ func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
 
 func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove saved address")
-	err := api.s.savedAddressesManager.DeleteSavedAddress(api.s.legacyChainID, address)
+	err := api.s.savedAddressesManager.DeleteSavedAddress(api.s.rpcClient.UpstreamChainID, address)
 	log.Debug("result from database for remove saved address", "err", err)
 	return err
 }
 
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
-	rst, err := api.s.transactionManager.getAllPendings(api.s.legacyChainID)
+	rst, err := api.s.transactionManager.getAllPendings(api.s.rpcClient.UpstreamChainID)
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
 }
@@ -143,7 +144,7 @@ func (api *API) GetPendingTransactionsByChainID(ctx context.Context, chainID uin
 
 func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending outbound transactions by address")
-	rst, err := api.s.transactionManager.getPendingByAddress(api.s.legacyChainID, address)
+	rst, err := api.s.transactionManager.getPendingByAddress(api.s.rpcClient.UpstreamChainID, address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }
@@ -158,7 +159,7 @@ func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Co
 func (api *API) StorePendingTransaction(ctx context.Context, trx PendingTransaction) error {
 	log.Debug("call to create or edit pending transaction")
 	if trx.ChainID == 0 {
-		trx.ChainID = api.s.legacyChainID
+		trx.ChainID = api.s.rpcClient.UpstreamChainID
 	}
 	err := api.s.transactionManager.addPending(trx)
 	log.Debug("result from database for creating or editing a pending transaction", "err", err)
@@ -167,7 +168,7 @@ func (api *API) StorePendingTransaction(ctx context.Context, trx PendingTransact
 
 func (api *API) DeletePendingTransaction(ctx context.Context, transactionHash common.Hash) error {
 	log.Debug("call to remove pending transaction")
-	err := api.s.transactionManager.deletePending(api.s.legacyChainID, transactionHash)
+	err := api.s.transactionManager.deletePending(api.s.rpcClient.UpstreamChainID, transactionHash)
 	log.Debug("result from database for remove pending transaction", "err", err)
 	return err
 }
@@ -180,20 +181,18 @@ func (api *API) DeletePendingTransactionByChainID(ctx context.Context, chainID u
 }
 
 func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
-	chainClient, err := api.s.networkManager.GetChainClient(api.s.legacyChainID)
+	chainClient, err := chain.NewLegacyClient(api.s.rpcClient)
 	if err != nil {
 		return err
 	}
-
 	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
 }
 
 func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
-	chainClient, err := api.s.networkManager.GetChainClient(chainID)
+	chainClient, err := chain.NewClient(api.s.rpcClient, chainID)
 	if err != nil {
 		return err
 	}
-
 	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
 }
 
@@ -237,15 +236,15 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 
 func (api *API) AddEthereumChain(ctx context.Context, network network.Network) error {
 	log.Debug("call to AddEthereumChain")
-	return api.s.networkManager.Upsert(&network)
+	return api.s.rpcClient.NetworkManager.Upsert(&network)
 }
 
 func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 	log.Debug("call to DeleteEthereumChain")
-	return api.s.networkManager.Delete(chainID)
+	return api.s.rpcClient.NetworkManager.Delete(chainID)
 }
 
 func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*network.Network, error) {
 	log.Debug("call to GetEthereumChains")
-	return api.s.networkManager.Get(onlyEnabled)
+	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }

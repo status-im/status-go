@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 )
 
@@ -28,7 +30,7 @@ var (
 )
 
 // Handler defines handler for RPC methods.
-type Handler func(context.Context, ...interface{}) (interface{}, error)
+type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
 
 // Client represents RPC client with custom routing
 // scheme. It automatically decides where RPC call
@@ -38,11 +40,14 @@ type Client struct {
 
 	upstreamEnabled bool
 	upstreamURL     string
+	UpstreamChainID uint64
 
-	local    *gethrpc.Client
-	upstream *gethrpc.Client
+	local      *gethrpc.Client
+	upstream   *gethrpc.Client
+	rpcClients map[uint64]*gethrpc.Client
 
-	router *router
+	router         *router
+	NetworkManager *network.Manager
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
@@ -54,16 +59,26 @@ type Client struct {
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Client, error) {
-	c := Client{
-		local:    client,
-		handlers: make(map[string]Handler),
-		log:      log.New("package", "status-go/rpc.Client"),
-	}
-
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []network.Network, db *sql.DB) (*Client, error) {
 	var err error
 
+	log := log.New("package", "status-go/rpc.Client")
+	networkManager := network.NewManager(db)
+	err = networkManager.Init(networks)
+	if err != nil {
+		log.Error("Network manager failed to initialize", "error", err)
+	}
+
+	c := Client{
+		local:          client,
+		NetworkManager: networkManager,
+		handlers:       make(map[string]Handler),
+		rpcClients:     make(map[uint64]*gethrpc.Client),
+		log:            log,
+	}
+
 	if upstream.Enabled {
+		c.UpstreamChainID = upstreamChainID
 		c.upstreamEnabled = upstream.Enabled
 		c.upstreamURL = upstream.URL
 		c.upstream, err = gethrpc.Dial(c.upstreamURL)
@@ -77,12 +92,41 @@ func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Clie
 	return &c, nil
 }
 
-// Ethclient returns ethclient.Client with upstream or local client.
-func (c *Client) Ethclient() *ethclient.Client {
-	if c.upstreamEnabled {
-		return ethclient.NewClient(c.upstream)
+func (c *Client) getRPCClientWithCache(chainID uint64) (*gethrpc.Client, error) {
+	if !c.upstreamEnabled {
+		return c.local, nil
 	}
-	return ethclient.NewClient(c.local)
+
+	if c.UpstreamChainID == chainID {
+		return c.upstream, nil
+	}
+
+	if rpcClient, ok := c.rpcClients[chainID]; ok {
+		return rpcClient, nil
+	}
+
+	network := c.NetworkManager.Find(chainID)
+	if network == nil {
+		return nil, fmt.Errorf("could not find network: %d", chainID)
+	}
+
+	rpcClient, err := gethrpc.Dial(network.RPCURL)
+	if err != nil {
+		return nil, fmt.Errorf("dial upstream server: %s", err)
+	}
+
+	c.rpcClients[chainID] = rpcClient
+	return rpcClient, nil
+}
+
+// Ethclient returns ethclient.Client per chain
+func (c *Client) EthClient(chainID uint64) (*ethclient.Client, error) {
+	rpcClient, err := c.getRPCClientWithCache(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ethclient.NewClient(rpcClient), nil
 }
 
 // UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.
@@ -111,9 +155,9 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 // can also pass nil, in which case the result is ignored.
 //
 // It uses custom routing scheme for calls.
-func (c *Client) Call(result interface{}, method string, args ...interface{}) error {
+func (c *Client) Call(result interface{}, chainID uint64, method string, args ...interface{}) error {
 	ctx := context.Background()
-	return c.CallContext(ctx, result, method, args...)
+	return c.CallContext(ctx, result, chainID, method, args...)
 }
 
 // CallContext performs a JSON-RPC call with the given arguments. If the context is
@@ -124,7 +168,7 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 //
 // It uses custom routing scheme for calls.
 // If there are any local handlers registered for this call, they will handle it.
-func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+func (c *Client) CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
 	rpcstats.CountCall(method)
 	if c.router.routeBlocked(method) {
 		return ErrMethodNotFound
@@ -132,10 +176,10 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 
 	// check locally registered handlers first
 	if handler, ok := c.handler(method); ok {
-		return c.callMethod(ctx, result, handler, args...)
+		return c.callMethod(ctx, result, chainID, handler, args...)
 	}
 
-	return c.CallContextIgnoringLocalHandlers(ctx, result, method, args...)
+	return c.CallContextIgnoringLocalHandlers(ctx, result, chainID, method, args...)
 }
 
 // CallContextIgnoringLocalHandlers performs a JSON-RPC call with the given
@@ -145,16 +189,17 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 // be ignored. It is useful if the call is happening from within a local
 // handler itself.
 // Upstream calls routing will be used anyway.
-func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
 	if c.router.routeBlocked(method) {
 		return ErrMethodNotFound
 	}
 
 	if c.router.routeRemote(method) {
-		c.RLock()
-		client := c.upstream
-		c.RUnlock()
-		return client.CallContext(ctx, result, method, args...)
+		ethClient, err := c.getRPCClientWithCache(chainID)
+		if err != nil {
+			return err
+		}
+		return ethClient.CallContext(ctx, result, method, args...)
 	}
 
 	if c.local == nil {
@@ -179,8 +224,8 @@ func (c *Client) RegisterHandler(method string, handler Handler) {
 // It handles proper params and result converting
 //
 // TODO(divan): use cancellation via context here?
-func (c *Client) callMethod(ctx context.Context, result interface{}, handler Handler, args ...interface{}) error {
-	response, err := handler(ctx, args...)
+func (c *Client) callMethod(ctx context.Context, result interface{}, chainID uint64, handler Handler, args ...interface{}) error {
+	response, err := handler(ctx, chainID, args...)
 	if err != nil {
 		return err
 	}

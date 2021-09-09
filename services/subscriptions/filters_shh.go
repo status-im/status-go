@@ -19,7 +19,7 @@ func installShhFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 
 	var result string
 
-	err := rpcClient.Call(&result, method, args...)
+	err := rpcClient.Call(&result, rpcClient.UpstreamChainID, method, args...)
 
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func installShhFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 func (wf *whisperFilter) getChanges() ([]interface{}, error) {
 	var result []interface{}
 
-	err := wf.rpcClient.Call(&result, "shh_getFilterMessages", wf.getID())
+	err := wf.rpcClient.Call(&result, wf.rpcClient.UpstreamChainID, "shh_getFilterMessages", wf.getID())
 
 	return result, err
 }
@@ -46,7 +46,7 @@ func (wf *whisperFilter) getID() string {
 }
 
 func (wf *whisperFilter) uninstall() error {
-	return wf.rpcClient.Call(nil, "shh_deleteMessageFilter", wf.getID())
+	return wf.rpcClient.Call(nil, wf.rpcClient.UpstreamChainID, "shh_deleteMessageFilter", wf.getID())
 }
 
 func validateShhMethod(method string) error {

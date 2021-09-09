@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 var numberOfBlocksCheckedPerIteration = 40
@@ -20,7 +20,7 @@ type ethHistoricalCommand struct {
 	db           *Database
 	eth          Downloader
 	address      common.Address
-	chainClient  *network.ChainClient
+	chainClient  *chain.Client
 	balanceCache *balanceCache
 	feed         *event.Feed
 	foundHeaders []*DBHeader
@@ -71,7 +71,7 @@ type erc20HistoricalCommand struct {
 	db          *Database
 	erc20       BatchDownloader
 	address     common.Address
-	chainClient *network.ChainClient
+	chainClient *chain.Client
 	feed        *event.Feed
 
 	iterator     *IterativeDownloader
@@ -127,7 +127,7 @@ type controlCommand struct {
 	block              *Block
 	eth                *ETHDownloader
 	erc20              *ERC20TransfersDownloader
-	chainClient        *network.ChainClient
+	chainClient        *chain.Client
 	feed               *event.Feed
 	errorsCount        int
 	nonArchivalRPCNode bool
@@ -300,7 +300,7 @@ type transfersCommand struct {
 	eth              *ETHDownloader
 	block            *big.Int
 	address          common.Address
-	chainClient      *network.ChainClient
+	chainClient      *chain.Client
 	fetchedTransfers []Transfer
 }
 
@@ -333,7 +333,7 @@ type loadTransfersCommand struct {
 	accounts                []common.Address
 	db                      *Database
 	block                   *Block
-	chainClient             *network.ChainClient
+	chainClient             *chain.Client
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
 }
@@ -368,7 +368,7 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
-	chainClient   *network.ChainClient
+	chainClient   *chain.Client
 	balanceCache  *balanceCache
 	feed          *event.Feed
 	fromByAddress map[common.Address]*LastKnownBlock
@@ -533,7 +533,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	}
 }
 
-func loadTransfers(ctx context.Context, accounts []common.Address, block *Block, db *Database, chainClient *network.ChainClient, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+func loadTransfers(ctx context.Context, accounts []common.Address, block *Block, db *Database, chainClient *chain.Client, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
 	start := time.Now()
 	group := async.NewGroup(ctx)
 
@@ -585,7 +585,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, block *Block,
 	}
 }
 
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *network.ChainClient) (*big.Int, error) {
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *chain.Client) (*big.Int, error) {
 	from := big.NewInt(0)
 	to := initialTo
 	goal := uint64(20)
@@ -641,7 +641,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	return from, nil
 }
 
-func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *network.ChainClient) (map[common.Address]*big.Int, error) {
+func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *chain.Client) (map[common.Address]*big.Int, error) {
 	res := map[common.Address]*big.Int{}
 
 	for _, address := range accounts {

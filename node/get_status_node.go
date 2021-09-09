@@ -231,7 +231,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	if err != nil {
 		return
 	}
-	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.UpstreamConfig)
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.UpstreamConfig, n.config.Networks, n.appDB)
 	if err != nil {
 		return
 	}
@@ -350,7 +350,7 @@ func (n *StatusNode) startDiscovery() error {
 	if err := n.register.Start(); err != nil {
 		return err
 	}
-	return n.peerPool.Start(n.gethNode.Server(), n.rpcClient)
+	return n.peerPool.Start(n.gethNode.Server())
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.

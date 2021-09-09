@@ -37,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/network"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -104,7 +103,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	}
 
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(config.NetworkID, config.Networks, accountsFeed)
+		walletService := b.walletService(accountsFeed)
 		services = append(services, walletService)
 	}
 
@@ -367,9 +366,9 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 	return b.appMetricsSrvc
 }
 
-func (b *StatusNode) walletService(chainID uint64, networks []network.Network, accountsFeed *event.Feed) common.StatusService {
+func (b *StatusNode) walletService(accountsFeed *event.Feed) common.StatusService {
 	if b.walletSrvc == nil {
-		b.walletSrvc = wallet.NewService(b.appDB, chainID, b.rpcClient.Ethclient(), networks, accountsFeed)
+		b.walletSrvc = wallet.NewService(b.appDB, b.rpcClient, accountsFeed)
 	}
 	return b.walletSrvc
 }
@@ -386,7 +385,6 @@ func (b *StatusNode) peerService() *peer.Service {
 		b.peerSrvc = peer.New()
 	}
 	return b.peerSrvc
-
 }
 
 func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (err error) {

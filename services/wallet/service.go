@@ -3,17 +3,17 @@ package wallet
 import (
 	"database/sql"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/services/wallet/network"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client, networks []network.Network, accountFeed *event.Feed) *Service {
+func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
@@ -21,36 +21,28 @@ func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db}
 	favouriteManager := &FavouriteManager{db: db}
-	networkManager := network.NewManager(db, legacyChainID, legacyClient)
-	err := networkManager.Init(networks)
-	if err != nil {
-		log.Error("Network manager failed to initialize", "error", err)
-	}
-
-	transferController := transfer.NewTransferController(db, networkManager, accountFeed)
+	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
 
 	return &Service{
+		rpcClient:             rpcClient,
 		favouriteManager:      favouriteManager,
-		networkManager:        networkManager,
 		tokenManager:          tokenManager,
 		savedAddressesManager: savedAddressesManager,
 		transactionManager:    transactionManager,
 		transferController:    transferController,
 		cryptoOnRampManager:   cryptoOnRampManager,
-		legacyChainID:         legacyChainID,
 	}
 }
 
 // Service is a wallet service.
 type Service struct {
-	networkManager        *network.Manager
+	rpcClient             *rpc.Client
 	savedAddressesManager *SavedAddressesManager
 	tokenManager          *TokenManager
 	transactionManager    *TransactionManager
 	favouriteManager      *FavouriteManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
-	legacyChainID         uint64
 	started               bool
 }
 
@@ -76,8 +68,8 @@ func (s *Service) Stop() error {
 }
 
 // APIs returns list of available RPC APIs.
-func (s *Service) APIs() []rpc.API {
-	return []rpc.API{
+func (s *Service) APIs() []gethrpc.API {
+	return []gethrpc.API{
 		{
 			Namespace: "wallet",
 			Version:   "0.1.0",

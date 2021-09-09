@@ -9,19 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
+	getRpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 // ContextCaller provides CallContext method as ethereums rpc.Client.
 type ContextCaller interface {
-	CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error
+	CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
 }
 
-func pollLogs(client ContextCaller, f *logsFilter, timeout, period time.Duration) {
+func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, period time.Duration) {
 	query := func() {
 		ctx, cancel := context.WithTimeout(f.ctx, timeout)
 		defer cancel()
-		logs, err := getLogs(ctx, client, f.criteria())
+		logs, err := getLogs(ctx, client, chainID, f.criteria())
 		if err != nil {
 			log.Error("Error fetch logs", "criteria", f.crit, "error", err)
 			return
@@ -43,8 +43,8 @@ func pollLogs(client ContextCaller, f *logsFilter, timeout, period time.Duration
 		}
 	}
 }
-func getLogs(ctx context.Context, client ContextCaller, crit ethereum.FilterQuery) (rst []types.Log, err error) {
-	return rst, client.CallContext(ctx, &rst, "eth_getLogs", toFilterArg(crit))
+func getLogs(ctx context.Context, client ContextCaller, chainID uint64, crit ethereum.FilterQuery) (rst []types.Log, err error) {
+	return rst, client.CallContext(ctx, &rst, chainID, "eth_getLogs", toFilterArg(crit))
 }
 
 func toFilterArg(q ethereum.FilterQuery) interface{} {
@@ -61,9 +61,9 @@ func toFilterArg(q ethereum.FilterQuery) interface{} {
 }
 
 func toBlockNumArg(number *big.Int) string {
-	if number == nil || number.Int64() == rpc.LatestBlockNumber.Int64() {
+	if number == nil || number.Int64() == getRpc.LatestBlockNumber.Int64() {
 		return "latest"
-	} else if number.Int64() == rpc.PendingBlockNumber.Int64() {
+	} else if number.Int64() == getRpc.PendingBlockNumber.Int64() {
 		return "pending"
 	}
 	return hexutil.EncodeBig(number)

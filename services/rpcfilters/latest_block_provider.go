@@ -48,7 +48,7 @@ func (p *latestBlockProviderRPC) GetLatestBlock() (blockInfo, error) {
 
 	var result blockInfo
 
-	err := rpcClient.Call(&result, "eth_getBlockByNumber", "latest", false)
+	err := rpcClient.Call(&result, rpcClient.UpstreamChainID, "eth_getBlockByNumber", "latest", false)
 
 	if err != nil {
 		return blockInfo{}, err

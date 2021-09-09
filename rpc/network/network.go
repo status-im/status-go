@@ -3,10 +3,6 @@ package network
 import (
 	"bytes"
 	"database/sql"
-	"fmt"
-
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Network struct {
@@ -85,22 +81,20 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*Network, error) {
 }
 
 type Manager struct {
-	db            *sql.DB
-	legacyChainID uint64
-	legacyClient  *ethclient.Client
-	chainClients  map[uint64]*ChainClient
+	db *sql.DB
 }
 
-func NewManager(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client) *Manager {
+func NewManager(db *sql.DB) *Manager {
 	return &Manager{
-		db:            db,
-		legacyChainID: legacyChainID,
-		legacyClient:  legacyClient,
-		chainClients:  make(map[uint64]*ChainClient),
+		db: db,
 	}
 }
 
 func (nm *Manager) Init(networks []Network) error {
+	if networks == nil {
+		return nil
+	}
+
 	currentNetworks, _ := nm.Get(false)
 	if len(currentNetworks) > 0 {
 		return nil
@@ -114,42 +108,6 @@ func (nm *Manager) Init(networks []Network) error {
 	}
 
 	return nil
-}
-
-func (nm *Manager) GetChainClient(chainID uint64) (*ChainClient, error) {
-	if chainID == nm.legacyChainID {
-		return &ChainClient{eth: nm.legacyClient, ChainID: chainID}, nil
-	}
-
-	if chainClient, ok := nm.chainClients[chainID]; ok {
-		return chainClient, nil
-	}
-
-	network := nm.Find(chainID)
-	if network == nil {
-		return nil, fmt.Errorf("could not find network: %d", chainID)
-	}
-
-	rpcClient, err := rpc.Dial(network.RPCURL)
-	if err != nil {
-		return nil, fmt.Errorf("dial upstream server: %s", err)
-	}
-
-	chainClient := &ChainClient{eth: ethclient.NewClient(rpcClient), ChainID: chainID}
-	nm.chainClients[chainID] = chainClient
-	return chainClient, nil
-}
-
-func (nm *Manager) GetChainClients(chainIDs []uint64) (res []*ChainClient, err error) {
-	for _, chainID := range chainIDs {
-		client, err := nm.GetChainClient(chainID)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, client)
-	}
-
-	return res, nil
 }
 
 func (nm *Manager) Upsert(network *Network) error {
