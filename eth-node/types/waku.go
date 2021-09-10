@@ -18,9 +18,13 @@ type Waku interface {
 
 	Peers() map[string][]string
 
-	AddStorePeer(address string) error
+	AddStorePeer(address string) (string, error)
 
-	AddRelayPeer(address string) error
+	AddRelayPeer(address string) (string, error)
+
+	DialPeer(address string) error
+
+	DialPeerByID(peerID string) error
 
 	DropPeer(peerID string) error
 

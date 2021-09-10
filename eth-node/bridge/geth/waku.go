@@ -44,12 +44,22 @@ func (w *gethWakuWrapper) PeerCount() int {
 }
 
 // PeerCount function only added for compatibility with waku V2
-func (w *gethWakuWrapper) AddStorePeer(address string) error {
-	return errors.New("not available in WakuV1")
+func (w *gethWakuWrapper) AddStorePeer(address string) (string, error) {
+	return "", errors.New("not available in WakuV1")
 }
 
 // AddRelayPeer function only added for compatibility with waku V2
-func (w *gethWakuWrapper) AddRelayPeer(address string) error {
+func (w *gethWakuWrapper) AddRelayPeer(address string) (string, error) {
+	return "", errors.New("not available in WakuV1")
+}
+
+// DialPeer function only added for compatibility with waku V2
+func (w *gethWakuWrapper) DialPeer(address string) error {
+	return errors.New("not available in WakuV1")
+}
+
+// DialPeerByID function only added for compatibility with waku V2
+func (w *gethWakuWrapper) DialPeerByID(peerID string) error {
 	return errors.New("not available in WakuV1")
 }
 

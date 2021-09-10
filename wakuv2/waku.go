@@ -722,14 +722,28 @@ func (w *Waku) Peers() map[string][]string {
 	return FormatPeerStats(w.node.Peers())
 }
 
-func (w *Waku) AddStorePeer(address string) error {
-	_, err := w.node.AddStorePeer(address)
-	return err
+func (w *Waku) AddStorePeer(address string) (string, error) {
+	peerID, err := w.node.AddStorePeer(address)
+	if err != nil {
+		return "", err
+	}
+	return string(*peerID), nil
 }
 
-func (w *Waku) AddRelayPeer(address string) error {
-	// TODO:
-	return nil
+func (w *Waku) AddRelayPeer(address string) (string, error) {
+	peerID, err := w.node.AddRelayPeer(address)
+	if err != nil {
+		return "", err
+	}
+	return string(*peerID), nil
+}
+
+func (w *Waku) DialPeer(address string) error {
+	return w.node.DialPeer(address)
+}
+
+func (w *Waku) DialPeerByID(peerID string) error {
+	return w.node.DialPeerByID(peer.ID(peerID))
 }
 
 func (w *Waku) DropPeer(peerID string) error {

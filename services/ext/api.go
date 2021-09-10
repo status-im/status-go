@@ -904,12 +904,20 @@ func (api *PublicAPI) BloomFilter() string {
 	return hexutil.Encode(api.service.messenger.BloomFilter())
 }
 
-func (api *PublicAPI) AddStorePeer(address string) error {
+func (api *PublicAPI) AddStorePeer(address string) (string, error) {
 	return api.service.messenger.AddStorePeer(address)
 }
 
-func (api *PublicAPI) AddRelayPeer(address string) error {
+func (api *PublicAPI) AddRelayPeer(address string) (string, error) {
 	return api.service.messenger.AddRelayPeer(address)
+}
+
+func (api *PublicAPI) DialPeer(address string) error {
+	return api.service.messenger.DialPeer(address)
+}
+
+func (api *PublicAPI) DialPeerByID(peerID string) error {
+	return api.service.messenger.DialPeerByID(peerID)
 }
 
 func (api *PublicAPI) DropPeer(peerID string) error {
