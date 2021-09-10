@@ -18,6 +18,7 @@ func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 		dataSourceType: DataSourceStatic,
 	})
 	tokenManager := &TokenManager{db: db}
+	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db}
 	favouriteManager := &FavouriteManager{db: db}
 	networkManager := network.NewManager(db, legacyChainID, legacyClient)
@@ -29,28 +30,30 @@ func NewService(db *sql.DB, legacyChainID uint64, legacyClient *ethclient.Client
 	transferController := transfer.NewTransferController(db, networkManager, accountFeed)
 
 	return &Service{
-		favouriteManager:    favouriteManager,
-		networkManager:      networkManager,
-		tokenManager:        tokenManager,
-		transactionManager:  transactionManager,
-		transferController:  transferController,
-		opensea:             newOpenseaClient(),
-		cryptoOnRampManager: cryptoOnRampManager,
-		legacyChainID:       legacyChainID,
+		favouriteManager:      favouriteManager,
+		networkManager:        networkManager,
+		tokenManager:          tokenManager,
+		savedAddressesManager: savedAddressesManager,
+		transactionManager:    transactionManager,
+		transferController:    transferController,
+		opensea:               newOpenseaClient(),
+		cryptoOnRampManager:   cryptoOnRampManager,
+		legacyChainID:         legacyChainID,
 	}
 }
 
 // Service is a wallet service.
 type Service struct {
-	networkManager      *network.Manager
-	tokenManager        *TokenManager
-	transactionManager  *TransactionManager
-	favouriteManager    *FavouriteManager
-	cryptoOnRampManager *CryptoOnRampManager
-	transferController  *transfer.Controller
-	opensea             *OpenseaClient
-	legacyChainID       uint64
-	started             bool
+	networkManager        *network.Manager
+	savedAddressesManager *SavedAddressesManager
+	tokenManager          *TokenManager
+	transactionManager    *TransactionManager
+	favouriteManager      *FavouriteManager
+	cryptoOnRampManager   *CryptoOnRampManager
+	transferController    *transfer.Controller
+	opensea               *OpenseaClient
+	legacyChainID         uint64
+	started               bool
 }
 
 // Start signals transmitter.

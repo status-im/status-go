@@ -103,6 +103,30 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 	return err
 }
 
+func (api *API) GetSavedAddresses(ctx context.Context) ([]*SavedAddress, error) {
+	log.Debug("call to get saved addresses")
+	rst, err := api.s.savedAddressesManager.GetSavedAddresses(api.s.legacyChainID)
+	log.Debug("result from database for saved addresses", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
+	log.Debug("call to create or edit saved address")
+	if sa.ChainID == 0 {
+		sa.ChainID = api.s.legacyChainID
+	}
+	err := api.s.savedAddressesManager.AddSavedAddress(sa)
+	log.Debug("result from database for create or edit saved address", "err", err)
+	return err
+}
+
+func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address) error {
+	log.Debug("call to remove saved address")
+	err := api.s.savedAddressesManager.DeleteSavedAddress(api.s.legacyChainID, address)
+	log.Debug("result from database for remove saved address", "err", err)
+	return err
+}
+
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
 	rst, err := api.s.transactionManager.getAllPendings(api.s.legacyChainID)
