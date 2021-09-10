@@ -31,7 +31,6 @@ pipeline {
   environment {
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
-    GO111MODULE = "off"
     /* Other stuff */
     TARGET      = 'ios'
     GOPATH      = "${env.WORKSPACE}"

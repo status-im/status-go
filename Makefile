@@ -76,7 +76,9 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -mod=vendor -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	go build -mod=vendor -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/statusd ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -94,11 +96,15 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
-	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
+	go build -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/bootnode ./cmd/bootnode/
 	@echo "Compilation done."
 
 node-canary: ##@build Build P2P node canary using status-go deps
-	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
+	go build -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/node-canary ./cmd/node-canary/
 	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -107,14 +113,22 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	gomobile init
-	gomobile bind -v -target=android -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	GO111MODULE=off gomobile init
+	gomobile bind -v \
+		-target=android -ldflags="-s -w" \
+		$(BUILD_FLAGS_MOBILE) \
+		-o build/bin/statusgo.aar \
+		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	gomobile init
-	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	GO111MODULE=off gomobile init
+	gomobile bind -v \
+		-target=ios -ldflags="-s -w" \
+		$(BUILD_FLAGS_MOBILE) \
+		-o build/bin/Statusgo.framework \
+		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -122,7 +136,11 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	mkdir -p $(GOBIN)/statusgo-lib
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	go build \
+		$(BUILD_FLAGS) \
+		-buildmode=c-archive \
+		-o $(GOBIN)/libstatus.a \
+		$(GOBIN)/statusgo-lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -131,7 +149,11 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	mkdir -p $(GOBIN)/statusgo-lib
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building shared library..."
-	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build -buildmode=c-shared -o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+		$(BUILD_FLAGS) \
+		-buildmode=c-shared \
+		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		$(GOBIN)/statusgo-lib
 	@echo "Shared library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -180,14 +202,43 @@ endif
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
-install-os-dependencies:
+setup: ##@setup Install all tools
+setup: setup-build setup-dev tidy ##@other Prepare project for development and building
+
+setup-dev: ##@setup Install all necessary tools for development
+setup-dev: install-lint install-mock install-modvendor install-protobuf tidy install-os-deps ##@other Prepare project for development
+
+setup-build: ##@setup Install all necessary build tools
+setup-build: install-lint install-release install-gomobile ##@other Prepare project for build
+
+install-os-deps: ##@install Operating System Dependencies
 	_assets/scripts/install_deps.sh
 
-setup-dev: lint-install mock-install modvendor-install gen-install tidy install-os-dependencies ##@other Prepare project for development
+install-gomobile: install-xtools
+	#GO111MODULE=on go get golang.org/x/mobile/cmd/gomobile
+	export GO111MODULE=on; \
+		go install golang.org/x/mobile/cmd/...@5d9a3325; \
+		go get -t golang.org/x/mobile@5d9a3325; \
+		go mod download golang.org/x/exp;
 
-setup-build: lint-install release-install gomobile-install ##@other Prepare project for build
+install-lint: ##@install Install Linting Tools
+	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.33.0
 
-setup: setup-build setup-dev tidy ##@other Prepare project for development and building
+install-mock: ##@install Install Module Mocking Tools
+	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
+
+install-modvendor: ##@install Install Module Vendoring Tool
+	GO111MODULE=on go install github.com/goware/modvendor@v0.4.0
+
+install-protobuf: ##@install Install Protobuf Generation Tools
+	GO111MODULE=on go install github.com/kevinburke/go-bindata/go-bindata@v3.13.0
+	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.4
+
+install-release: ##@install Install Github Release Tools
+	GO111MODULE=on go install github.com/c4milo/github-release@v1.1.0
+
+install-xtools: ##@install Install Miscellaneous Go Tools
+	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/...
@@ -239,29 +290,6 @@ release: check-existing-release
 	    echo "Aborting." && exit 1; \
 	fi
 
-gomobile-install: xtools-install
-	go get golang.org/x/mobile/cmd/gomobile
-
-release-install:
-	go get -u github.com/c4milo/github-release
-
-gen-install:
-	go get github.com/kevinburke/go-bindata/go-bindata@v3.13.0
-	go get github.com/golang/protobuf/protoc-gen-go@v1.3.4
-
-xtools-install:
-	# special fix for gomobile issues
-	go get golang.org/x/tools/go/packages
-
-modvendor-install:
-	# a tool to vendor non-go files
-	# TODO: switch to original repo when https://github.com/goware/modvendor/pull/13 is merged
-	GO111MODULE=off go get -u github.com/adambabik/modvendor
-
-mock-install: ##@other Install mocking tools
-	# keep in sync with go.mod and github.com/golang/mock
-	go get github.com/golang/mock/mockgen@v1.4.1
-
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
@@ -294,10 +322,6 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
-
-lint-install:
-	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.33.0
 
 lint:
 	@echo "lint"
