@@ -1,11 +1,19 @@
 package protocol
 
-func (m *Messenger) AddStorePeer(address string) error {
+func (m *Messenger) AddStorePeer(address string) (string, error) {
 	return m.transport.AddStorePeer(address)
 }
 
-func (m *Messenger) AddRelayPeer(address string) error {
+func (m *Messenger) AddRelayPeer(address string) (string, error) {
 	return m.transport.AddStorePeer(address)
+}
+
+func (m *Messenger) DialPeer(address string) error {
+	return m.transport.DialPeer(address)
+}
+
+func (m *Messenger) DialPeerByID(peerID string) error {
+	return m.transport.DialPeerByID(peerID)
 }
 
 func (m *Messenger) DropPeer(peerID string) error {
