@@ -222,16 +222,24 @@ func (w *gethWakuV2Wrapper) RequestHistoricMessagesWithTimeout(peerID []byte, en
 	return errors.New("DEPRECATED")
 }
 
-func (w *gethWakuV2Wrapper) AddStorePeer(address string) error {
+func (w *gethWakuV2Wrapper) AddStorePeer(address string) (string, error) {
 	return w.waku.AddStorePeer(address)
 }
 
-func (w *gethWakuV2Wrapper) AddRelayPeer(address string) error {
+func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (string, error) {
 	return w.waku.AddRelayPeer(address)
 }
 
 func (w *gethWakuV2Wrapper) Peers() map[string][]string {
 	return w.waku.Peers()
+}
+
+func (w *gethWakuV2Wrapper) DialPeer(address string) error {
+	return w.waku.DialPeer(address)
+}
+
+func (w *gethWakuV2Wrapper) DialPeerByID(peerID string) error {
+	return w.waku.DialPeerByID(peerID)
 }
 
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {

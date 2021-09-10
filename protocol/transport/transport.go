@@ -594,12 +594,20 @@ func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }
 
-func (t *Transport) AddStorePeer(address string) error {
+func (t *Transport) AddStorePeer(address string) (string, error) {
 	return t.waku.AddStorePeer(address)
 }
 
-func (t *Transport) AddRelayPeer(address string) error {
+func (t *Transport) AddRelayPeer(address string) (string, error) {
 	return t.waku.AddRelayPeer(address)
+}
+
+func (t *Transport) DialPeer(address string) error {
+	return t.waku.DialPeer(address)
+}
+
+func (t *Transport) DialPeerByID(peerID string) error {
+	return t.waku.DialPeerByID(peerID)
 }
 
 func (t *Transport) DropPeer(peerID string) error {
