@@ -113,7 +113,8 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	gomobile init
+	export GO111MODULE=off; \
+	gomobile init; \
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
 		$(BUILD_FLAGS_MOBILE) \
@@ -123,7 +124,8 @@ statusgo-android: ##@cross-compile Build status-go for Android
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	gomobile init
+	export GO111MODULE=off; \
+	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
 		$(BUILD_FLAGS_MOBILE) \
@@ -202,14 +204,42 @@ endif
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
-install-os-dependencies:
+setup: ##@setup Install all tools
+setup: setup-build setup-dev tidy
+
+setup-dev: ##@setup Install all necessary tools for development
+setup-dev: install-lint install-mock install-modvendor install-protobuf tidy install-os-deps
+
+setup-build: ##@setup Install all necessary build tools
+setup-build: install-lint install-release install-gomobile
+
+install-os-deps: ##@install Operating System Dependencies
 	_assets/scripts/install_deps.sh
 
-setup-dev: lint-install mock-install modvendor-install gen-install tidy install-os-dependencies ##@other Prepare project for development
+install-gomobile: install-xtools
+install-gomobile: ##@install Go Mobile Build Tools
+	GO111MODULE=on  go install golang.org/x/mobile/cmd/...@5d9a3325
+	GO111MODULE=on  go mod download golang.org/x/exp@ec7cb31e
+	GO111MODULE=off go get -d golang.org/x/mobile/cmd/gobind
 
-setup-build: lint-install release-install gomobile-install ##@other Prepare project for build
+install-lint: ##@install Install Linting Tools
+	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.33.0
 
-setup: setup-build setup-dev tidy ##@other Prepare project for development and building
+install-mock: ##@install Install Module Mocking Tools
+	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
+
+install-modvendor: ##@install Install Module Vendoring Tool
+	GO111MODULE=on go install github.com/goware/modvendor@v0.4.0
+
+install-protobuf: ##@install Install Protobuf Generation Tools
+	GO111MODULE=on go install github.com/kevinburke/go-bindata/go-bindata@v3.13.0
+	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.4
+
+install-release: ##@install Install Github Release Tools
+	GO111MODULE=on go install github.com/c4milo/github-release@v1.1.0
+
+install-xtools: ##@install Install Miscellaneous Go Tools
+	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/...
@@ -261,29 +291,6 @@ release: check-existing-release
 	    echo "Aborting." && exit 1; \
 	fi
 
-gomobile-install: xtools-install
-	go get golang.org/x/mobile/cmd/gomobile
-
-release-install:
-	go get -u github.com/c4milo/github-release
-
-gen-install:
-	go get github.com/kevinburke/go-bindata/go-bindata@v3.13.0
-	go get github.com/golang/protobuf/protoc-gen-go@v1.3.4
-
-xtools-install:
-	# special fix for gomobile issues
-	go get golang.org/x/tools/go/packages
-
-modvendor-install:
-	# a tool to vendor non-go files
-	# TODO: switch to original repo when https://github.com/goware/modvendor/pull/13 is merged
-	GO111MODULE=off go get -u github.com/adambabik/modvendor
-
-mock-install: ##@other Install mocking tools
-	# keep in sync with go.mod and github.com/golang/mock
-	go get github.com/golang/mock/mockgen@v1.4.1
-
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
@@ -316,10 +323,6 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
-
-lint-install:
-	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.33.0
 
 lint:
 	@echo "lint"
