@@ -76,7 +76,9 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -mod=vendor -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	go build -mod=vendor -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/statusd ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -94,11 +96,15 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
-	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
+	go build -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/bootnode ./cmd/bootnode/
 	@echo "Compilation done."
 
 node-canary: ##@build Build P2P node canary using status-go deps
-	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
+	go build -i -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/node-canary ./cmd/node-canary/
 	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -108,13 +114,21 @@ statusgo-cross: statusgo-android statusgo-ios
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	gomobile init
-	gomobile bind -v -target=android -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	gomobile bind -v \
+		-target=android -ldflags="-s -w" \
+		$(BUILD_FLAGS_MOBILE) \
+		-o build/bin/statusgo.aar \
+		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	gomobile init
-	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	gomobile bind -v \
+		-target=ios -ldflags="-s -w" \
+		$(BUILD_FLAGS_MOBILE) \
+		-o build/bin/Statusgo.framework \
+		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -122,7 +136,11 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	mkdir -p $(GOBIN)/statusgo-lib
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	go build \
+		$(BUILD_FLAGS) \
+		-buildmode=c-archive \
+		-o $(GOBIN)/libstatus.a \
+		$(GOBIN)/statusgo-lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -131,7 +149,11 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	mkdir -p $(GOBIN)/statusgo-lib
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building shared library..."
-	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build -buildmode=c-shared -o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+		$(BUILD_FLAGS) \
+		-buildmode=c-shared \
+		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		$(GOBIN)/statusgo-lib
 	@echo "Shared library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
