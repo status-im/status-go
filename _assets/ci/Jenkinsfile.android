@@ -31,7 +31,6 @@ pipeline {
   environment {
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
-    GO111MODULE = "off"
     /* Other stuff */
     TARGET      = 'android'
     GOPATH      = "${env.WORKSPACE}"
@@ -54,12 +53,12 @@ pipeline {
     } } } }
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
-      sh 'make setup-build modvendor-install'
+      sh 'make setup-build install-modvendor'
     } } }
 
     stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
       /* fail build if vendoring hasn't been done */
-      sh 'GO111MODULE=on make vendor'
+      sh 'make vendor'
       sh 'git diff --exit-code --no-color --stat vendor/'
     } } }
 
