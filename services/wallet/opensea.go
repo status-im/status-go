@@ -22,7 +22,10 @@ func (st *TraitValue) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &item); err != nil {
 		return err
 	}
+
 	switch v := item.(type) {
+	case float64:
+		*st = TraitValue(strconv.FormatFloat(v, 'f', 2, 64))
 	case int:
 		*st = TraitValue(strconv.Itoa(v))
 	case string:
@@ -48,6 +51,7 @@ type OpenseaTrait struct {
 	TraitType   string     `json:"trait_type"`
 	Value       TraitValue `json:"value"`
 	DisplayType string     `json:"display_type"`
+	MaxValue    string     `json:"max_value"`
 }
 
 type OpenseaPaymentToken struct {
