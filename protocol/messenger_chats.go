@@ -314,7 +314,7 @@ func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
 
 	// We re-register as our options have changed and we don't want to
 	// receive PN from mentions in this chat anymore
-	if chat.Public() {
+	if chat.Public() || chat.ProfileUpdates() {
 		err := m.reregisterForPushNotifications()
 		if err != nil {
 			return nil, err
