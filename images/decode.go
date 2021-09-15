@@ -1,13 +1,14 @@
 package images
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io"
-	"ioutil"
+	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -40,7 +41,7 @@ func DecodeFromURL(path string) (image.Image, error) {
 		return nil, err
 	}
 
-	return decodeImageData(bodyBytes, res.Body)
+	return decodeImageData(bodyBytes, bytes.NewReader(bodyBytes))
 }
 
 func prepareFileForDecode(file *os.File) ([]byte, error) {
