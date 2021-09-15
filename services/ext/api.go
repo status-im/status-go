@@ -575,7 +575,7 @@ func (api *PublicAPI) MarkAllRead(chatID string) error {
 	return api.service.messenger.MarkAllRead(chatID)
 }
 
-func (api *PublicAPI) MarkAllReadInCommunity(communityID string) error {
+func (api *PublicAPI) MarkAllReadInCommunity(communityID string) ([]string, error) {
 	return api.service.messenger.MarkAllReadInCommunity(communityID)
 }
 

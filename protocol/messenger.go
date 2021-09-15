@@ -3294,15 +3294,15 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	return nil
 }
 
-func (m *Messenger) MarkAllReadInCommunity(communityID string) error {
+func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
 	chatIDs, err := m.persistence.AllChatIDsByCommunity(communityID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.persistence.MarkAllReadMultiple(chatIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, chatID := range chatIDs {
@@ -3317,7 +3317,7 @@ func (m *Messenger) MarkAllReadInCommunity(communityID string) error {
 		}
 	}
 
-	return err
+	return chatIDs, err
 }
 
 // MuteChat signals to the messenger that we don't want to be notified
