@@ -3294,6 +3294,32 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	return nil
 }
 
+func (m *Messenger) MarkAllReadInCommunity(communityID string) error {
+	chatIDs, err := m.persistence.AllChatIDsByCommunity(communityID)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.MarkAllReadMultiple(chatIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, chatID := range chatIDs {
+		chat, ok := m.allChats.Load(chatID)
+
+		if ok {
+			chat.UnviewedMessagesCount = 0
+			chat.UnviewedMentionsCount = 0
+			m.allChats.Store(chat.ID, chat)
+		} else {
+			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
+		}
+	}
+
+	return err
+}
+
 // MuteChat signals to the messenger that we don't want to be notified
 // on new messages from this chat
 func (m *Messenger) MuteChat(chatID string) error {
