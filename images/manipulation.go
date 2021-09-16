@@ -47,7 +47,7 @@ func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 // CropImage takes an image, usually downloaded from a URL
 // If the image is square, the full image is returned
 // It the image is rectangular, the largest central square is returned
-// calculations here
+// calculations at _docs/image-center-crop-calculations.png
 func CropCenter(img image.Image) (image.Image, error) {
 	maxBounds := img.Bounds().Max
 
