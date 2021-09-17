@@ -593,7 +593,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 
 	//request info already stored on mailserver, but its success is not crucial
 	// for import
-	_ = m.RequestCommunityInfoFromMailserver(community.IDString())
+	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString())
 
 	// We add ourselves
 	_, err = m.communitiesManager.InviteUsersToCommunity(community.ID(), []*ecdsa.PublicKey{&m.identity.PublicKey})
@@ -733,20 +733,19 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error {
-	_, err := m.requestCommunityInfoFromMailserver(communityID, true)
-	return err
+func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
+	return m.requestCommunityInfoFromMailserver(communityID)
 }
 
 // RequestCommunityInfoFromMailserverSync installs filter for community and requests its details
 // from mailserver. It will wait for a response and return it if any community is found
 func (m *Messenger) RequestCommunityInfoFromMailserverSync(communityID string) (*communities.Community, error) {
-	return m.requestCommunityInfoFromMailserver(communityID, false)
+	return m.requestCommunityInfoFromMailserver(communityID)
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, async bool) (*communities.Community, error) {
+func (m *Messenger) requestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
 
 	if _, ok := m.requestedCommunities[communityID]; ok {
 		return nil, nil
@@ -779,32 +778,35 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, async
 		nil,
 		nil,
 		filter,
-		false)
+		true)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if async {
-		//It is possible that we already processed last existing message for community
-		//and won't get any updates, so send stored info in this case after timeout
-		go func() {
-			time.Sleep(15 * time.Second)
-			m.mutex.Lock()
-			defer m.mutex.Unlock()
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	var community *communities.Community
 
-			if _, ok := m.requestedCommunities[communityID]; ok {
-				m.passStoredCommunityInfoToSignalHandler(communityID)
+	fetching := true
+
+	for fetching {
+		select {
+		case <-time.After(200 * time.Millisecond):
+			//send signal to client that message status updated
+			community, err = m.communitiesManager.GetByIDString(communityID)
+			if err != nil {
+				return nil, err
 			}
-		}()
-		return nil, nil
-	}
-	time.Sleep(15 * time.Second)
 
-	//send signal to client that message status updated
-	community, err := m.communitiesManager.GetByIDString(communityID)
-	if err != nil {
-		return nil, err
+			if community != nil && community.Name() != "" && community.DescriptionText() != "" {
+				fetching = false
+			}
+
+		case <-ctx.Done():
+			fetching = false
+		}
 	}
 
 	if community == nil {
@@ -812,7 +814,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, async
 	}
 
 	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
+	if community.Name() == "" && community.DescriptionText() == "" {
 		return nil, nil
 	}
 
