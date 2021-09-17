@@ -846,7 +846,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) error {
+func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
 	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
 }
 
