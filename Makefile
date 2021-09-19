@@ -26,6 +26,7 @@ else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
 else
  GOBIN_SHARED_LIB_EXT := so
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
 endif
 
 help: ##@other Show this help
@@ -160,6 +161,12 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 		-buildmode=c-shared \
 		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
 		$(GOBIN)/statusgo-lib
+ifeq ($(detected_OS),Linux)
+	cd $(GOBIN) && \
+	ls -lah . && \
+	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
+	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+endif
 	@echo "Shared library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
