@@ -575,6 +575,10 @@ func (api *PublicAPI) MarkAllRead(chatID string) error {
 	return api.service.messenger.MarkAllRead(chatID)
 }
 
+func (api *PublicAPI) MarkAllReadInCommunity(communityID string) ([]string, error) {
+	return api.service.messenger.MarkAllReadInCommunity(communityID)
+}
+
 func (api *PublicAPI) AddContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddContact(ctx, pubKey)
 }

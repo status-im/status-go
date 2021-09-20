@@ -752,6 +752,28 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 	return result, nil
 }
 
+func (db sqlitePersistence) AllChatIDsByCommunity(communityID string) ([]string, error) {
+	rows, err := db.db.Query("SELECT id FROM chats WHERE community_id = ?", communityID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []string
+
+	for rows.Next() {
+		var chatID string
+		err = rows.Scan(&chatID)
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, chatID)
+	}
+
+	return rst, nil
+}
+
 // PinnedMessageByChatID returns all pinned messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
@@ -1251,6 +1273,40 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 		return err
 	}
 	_, err = tx.Exec(`UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0 WHERE id = ?`, chatID)
+	return err
+}
+
+func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	idsArgs := make([]interface{}, 0, len(chatIDs))
+	for _, id := range chatIDs {
+		idsArgs = append(idsArgs, id)
+	}
+
+	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
+
+	q := "UPDATE user_messages SET seen = 1 WHERE local_chat_id IN (%s) AND seen != 1"
+	q = fmt.Sprintf(q, inVector)
+	_, err = tx.Exec(q, idsArgs...)
+	if err != nil {
+		return err
+	}
+
+	q = "UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0 WHERE id IN (%s)"
+	q = fmt.Sprintf(q, inVector)
+	_, err = tx.Exec(q, idsArgs...)
 	return err
 }
 
