@@ -11,8 +11,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/image/webp"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func Decode(fileName string) (image.Image, error) {
@@ -38,11 +41,13 @@ func DecodeFromURL(path string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-defer func() {
-	if err := res.Body.Close(); err != nil {
-		log.Error("failed to close profile pic http request body", "err", err)
-	}
-}()
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Error("failed to close profile pic http request body", "err", err)
+		}
+	}()
+
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err

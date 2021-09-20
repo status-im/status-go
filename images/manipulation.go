@@ -49,25 +49,25 @@ func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 // It the image is rectangular, the largest central square is returned
 // calculations at _docs/image-center-crop-calculations.png
 func CropCenter(img image.Image) (image.Image, error) {
+	var cropRect image.Rectangle
 	maxBounds := img.Bounds().Max
 
 	if maxBounds.X == maxBounds.Y {
 		return img, nil
+	}
+
+	if maxBounds.X > maxBounds.Y {
+		// the final output should be YxY
+		cropRect = image.Rectangle{
+			Min: image.Point{X: maxBounds.X/2 - maxBounds.Y/2, Y: 0},
+			Max: image.Point{X: maxBounds.X/2 + maxBounds.Y/2, Y: maxBounds.Y},
+		}
 	} else {
-		if maxBounds.X > maxBounds.Y {
-			// the final output should be YxY
-			cropRect := image.Rectangle{
-				Min: image.Point{X: maxBounds.X/2 - maxBounds.Y/2, Y: 0},
-				Max: image.Point{X: maxBounds.X/2 + maxBounds.Y/2, Y: maxBounds.Y},
-			}
-			return Crop(img, cropRect)
-		} else {
-			// the final output should be XxX
-			cropRect := image.Rectangle{
-				Min: image.Point{X: 0, Y: maxBounds.Y/2 - maxBounds.X/2},
-				Max: image.Point{X: maxBounds.X, Y: maxBounds.Y/2 + maxBounds.X/2},
-			}
-			return Crop(img, cropRect)
+		// the final output should be XxX
+		cropRect = image.Rectangle{
+			Min: image.Point{X: 0, Y: maxBounds.Y/2 - maxBounds.X/2},
+			Max: image.Point{X: maxBounds.X, Y: maxBounds.Y/2 + maxBounds.X/2},
 		}
 	}
+	return Crop(img, cropRect)
 }

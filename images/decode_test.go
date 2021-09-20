@@ -130,7 +130,6 @@ func TestDecodeFromURL(t *testing.T) {
 				Max: image.Point{X: 10, Y: 10},
 			},
 		},
-
 	}
 
 	for _, c := range cs {
