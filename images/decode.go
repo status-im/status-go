@@ -31,11 +31,18 @@ func Decode(fileName string) (image.Image, error) {
 }
 
 func DecodeFromURL(path string) (image.Image, error) {
-	res, err := http.Get(path)
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	res, err := client.Get(path)
 	if err != nil {
 		return nil, err
 	}
-
+defer func() {
+	if err := res.Body.Close(); err != nil {
+		log.Error("failed to close profile pic http request body", "err", err)
+	}
+}()
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
