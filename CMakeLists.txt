@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.0)
 project(status-go)
 
 SET(LIB_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus.a)
-SET(LIB_SHARED_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus.so)
-SET(LIB_HEADER_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus.h)
+SET(LIB_SHARED_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus${CMAKE_SHARED_LIBRARY_SUFFIX})
+SET(LIB_HEADER_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/)
 
 add_custom_command(OUTPUT  ${LIB_SHARED_FILE}
                    COMMAND make statusgo-shared-library
                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_custom_target(statusgo_shared_target DEPENDS ${LIB_SHARED_FILE})
+add_custom_target(statusgo_shared_target DEPENDS ${LIB_SHARED_FILE} ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(statusgo_shared SHARED IMPORTED GLOBAL)
 
