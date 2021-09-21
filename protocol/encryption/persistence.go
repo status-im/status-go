@@ -727,3 +727,129 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 		return nil, err
 	}
 }
+
+type HRCache struct {
+	GroupID string
+	KeyID   uint32
+	Key     []byte
+	Hash    []byte
+	SeqNo   uint32
+}
+
+// GetHashRatchetKeyByID retrieves a hash ratchet key by group ID and seqNo.
+// If cache data with given seqNo (e.g. 0) is not found,
+// then the query will return the cache data with the latest seqNo
+func (s *sqlitePersistence) GetHashRatchetKeyByID(groupID []byte, keyID uint32, seqNo uint32) (*HRCache, error) {
+	stmt, err := s.DB.Prepare(
+		`WITH input AS (
+       select ? AS group_id, ? AS key_id, ? as seq_no
+     ),
+     cec AS (
+       SELECT e.key, c.seq_no, c.hash FROM hash_ratchet_encryption e, input i
+			 LEFT JOIN hash_ratchet_encryption_cache c ON e.group_id=c.group_id AND e.key_id=c.key_id
+       WHERE e.key_id=i.key_id AND e.group_id=i.group_id),
+    seq_nos AS (
+    select CASE 
+		  	WHEN EXISTS (SELECT c.seq_no from cec c, input i where c.seq_no=i.seq_no) 
+				THEN i.seq_no 
+			  ELSE (select max(seq_no) from cec) 
+			END as seq_no from input i
+    )
+		 SELECT c.key, c.seq_no, c.hash FROM cec c, input i, seq_nos s
+    where case when not exists(select seq_no from seq_nos where seq_no is not null) 
+    then 1 else c.seq_no = s.seq_no end`)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var key, hash []byte
+	var seqNoPtr *uint32
+
+	err = stmt.QueryRow(groupID, keyID, seqNo).Scan(&key, &seqNoPtr, &hash)
+	var seqNoResult uint32
+	if seqNoPtr == nil {
+		seqNoResult = 0
+	} else {
+		seqNoResult = *seqNoPtr
+	}
+
+	res := &HRCache{
+		KeyID: keyID,
+		Key:   key,
+		Hash:  hash,
+		SeqNo: seqNoResult,
+	}
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		return res, nil
+	default:
+		return nil, err
+	}
+}
+
+// GetCurrentKeyIDForGroup retrieves a key ID for given group ID
+// (with an assumption that key ids are shared in the group, and
+// at any given time there is a single key used)
+func (s *sqlitePersistence) GetCurrentKeyForGroup(groupID string) (uint32, error) {
+
+	stmt, err := s.DB.Prepare(`SELECT key_id
+				   FROM hash_ratchet_encryption
+				     WHERE group_id = ? order by key_id desc limit 1`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	var keyID uint32
+	err = stmt.QueryRow([]byte(groupID)).Scan(&keyID)
+
+	switch err {
+	case sql.ErrNoRows:
+		return 0, nil
+	case nil:
+		return keyID, nil
+	default:
+		return 0, err
+	}
+}
+
+// SaveHashRachetKeyHash saves a hash ratchet key cache data
+func (s *sqlitePersistence) SaveHashRatchetKeyHash(
+	groupID []byte,
+	keyID uint32,
+	hash []byte,
+	seqNo uint32,
+) error {
+
+	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption_cache(group_id,key_id,hash,seq_no)
+           VALUES(?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(groupID, keyID, hash, seqNo)
+
+	return err
+}
+
+// SaveHashRatchetKey saves a hash ratchet key
+func (s *sqlitePersistence) SaveHashRatchetKey(
+	groupID string,
+	keyID uint32,
+	key []byte,
+) error {
+	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption(group_id, key_id, key)
+           VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec([]byte(groupID), keyID, key)
+
+	return err
+}

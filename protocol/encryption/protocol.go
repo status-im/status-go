@@ -179,8 +179,8 @@ func (p *Protocol) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload [
 	return &ProtocolMessageSpec{Message: message, Public: true}, nil
 }
 
-// BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
-func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessageSpec, error) {
+// BuildEncryptedMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
+func (p *Protocol) BuildEncryptedMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessageSpec, error) {
 
 	// Get recipients installations.
 	activeInstallations, err := p.multidevice.GetActiveInstallations(publicKey)
@@ -189,15 +189,15 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 	}
 
 	// Encrypt payload
-	directMessagesByInstalls, installations, err := p.encryptor.EncryptPayload(publicKey, myIdentityKey, activeInstallations, payload)
+	encryptedMessagesByInstalls, installations, err := p.encryptor.EncryptPayload(publicKey, myIdentityKey, activeInstallations, payload)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build message
 	message := &ProtocolMessage{
-		InstallationId: p.encryptor.config.InstallationID,
-		DirectMessage:  directMessagesByInstalls,
+		InstallationId:   p.encryptor.config.InstallationID,
+		EncryptedMessage: encryptedMessagesByInstalls,
 	}
 
 	err = p.addBundle(myIdentityKey, message)
@@ -208,7 +208,7 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 	// Check who we are sending the message to, and see if we have a shared secret
 	// across devices
 	var installationIDs []string
-	for installationID := range message.GetDirectMessage() {
+	for installationID := range message.GetEncryptedMessage() {
 		if installationID != noInstallationID {
 			installationIDs = append(installationIDs, installationID)
 		}
@@ -228,6 +228,62 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 	return spec, nil
 }
 
+// BuildHashRatchetKeyExchangeMessage builds a 1:1 message
+// containing newly generated hash ratchet key
+func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID string, keyID uint32) (*ProtocolMessageSpec, error) {
+
+	logger := p.logger.With(zap.String("site", "BuildHashRatchetKeyExchangeMessage"))
+	keyData, err := p.encryptor.persistence.GetHashRatchetKeyByID([]byte(groupID), keyID, 0)
+	if err != nil {
+		return nil, err
+	}
+	response, err := p.BuildEncryptedMessage(myIdentityKey, publicKey, keyData.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Loop through installations and assign HRHeader
+	// SeqNo=0 has a special meaning for HandleMessage
+	// and signifies a message with hash ratchet key payload
+	for _, v := range response.Message.EncryptedMessage {
+		v.HRHeader = &HRHeader{
+			KeyId:   keyID,
+			SeqNo:   0,
+			GroupId: groupID,
+		}
+
+	}
+
+	logger.Info("Key saved", zap.Any("err", err))
+	return response, err
+}
+
+// BuildHashRatchetMessage returns a hash ratchet chat message
+func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*ProtocolMessageSpec, error) {
+
+	keyID, err := p.encryptor.persistence.GetCurrentKeyForGroup(string(groupID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Encrypt payload
+	encryptedMessagesByInstalls, err := p.encryptor.EncryptHashRatchetPayload(groupID, keyID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build message
+	message := &ProtocolMessage{
+		InstallationId:   p.encryptor.config.InstallationID,
+		EncryptedMessage: encryptedMessagesByInstalls,
+	}
+
+	spec := &ProtocolMessageSpec{
+		Message: message,
+	}
+	return spec, nil
+}
+
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
 func (p *Protocol) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) (*ProtocolMessageSpec, error) {
 	// Encrypt payload
@@ -238,8 +294,8 @@ func (p *Protocol) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *
 
 	// Build message
 	message := &ProtocolMessage{
-		InstallationId: p.encryptor.config.InstallationID,
-		DirectMessage:  encryptionResponse,
+		InstallationId:   p.encryptor.config.InstallationID,
+		EncryptedMessage: encryptionResponse,
 	}
 
 	err = p.addBundle(myIdentityKey, message)
@@ -405,16 +461,29 @@ func (p *Protocol) HandleMessage(
 	}
 
 	// Decrypt message
-	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
+	if encryptedMessage := protocolMessage.GetEncryptedMessage(); encryptedMessage != nil {
 		message, err := p.encryptor.DecryptPayload(
 			myIdentityKey,
 			theirPublicKey,
 			protocolMessage.GetInstallationId(),
-			directMessage,
+			encryptedMessage,
 			messageID,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		dmProtocol := encryptedMessage[p.encryptor.config.InstallationID]
+		if dmProtocol == nil {
+			dmProtocol = encryptedMessage[noInstallationID]
+		}
+		hrHeader := dmProtocol.HRHeader
+		if hrHeader != nil && hrHeader.SeqNo == 0 {
+			// Payload contains hash ratchet key
+			err = p.encryptor.persistence.SaveHashRatchetKey(hrHeader.GroupId, hrHeader.KeyId, message)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		bundles := protocolMessage.GetBundles()

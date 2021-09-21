@@ -25,11 +25,15 @@ var (
 	// but from a device that has not been paired.
 	// This should not happen because the protocol forbids sending a message to
 	// non-paired devices, however, in theory it is possible to receive such a message.
-	ErrNotPairedDevice = errors.New("received a message from not paired device")
+	ErrNotPairedDevice         = errors.New("received a message from not paired device")
+	ErrHashRatchetSeqNoTooHigh = errors.New("Hash ratchet seq no is too high")
 )
 
 // If we have no bundles, we use a constant so that the message can reach any device.
-const noInstallationID = "none"
+const (
+	noInstallationID         = "none"
+	maxHashRatchetSeqNoDelta = 1000
+)
 
 type confirmationData struct {
 	header *dr.MessageHeader
@@ -233,8 +237,8 @@ func (s *encryptor) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bund
 	return s.persistence.AddPublicBundle(b)
 }
 
-// DecryptPayload decrypts the payload of a DirectMessageProtocol, given an identity private key and the sender's public key
-func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*DirectMessageProtocol, messageID []byte) ([]byte, error) {
+// DecryptPayload decrypts the payload of a EncryptedMessageProtocol, given an identity private key and the sender's public key
+func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -324,6 +328,10 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 		return s.DecryptWithDH(myIdentityKey, decompressedKey, payload)
 	}
 
+	// Try Hash Ratchet
+	if header := msg.GetHRHeader(); header != nil {
+		return s.decryptWithHR([]byte(header.GroupId), header.KeyId, header.SeqNo, payload)
+	}
 	return nil, errors.New("no key specified")
 }
 
@@ -428,7 +436,7 @@ func (s *encryptor) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 	return plaintext, nil
 }
 
-func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (*DirectMessageProtocol, error) {
+func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (*EncryptedMessageProtocol, error) {
 	symmetricKey, ourEphemeralKey, err := PerformActiveDH(theirIdentityKey)
 	if err != nil {
 		return nil, err
@@ -439,7 +447,7 @@ func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []b
 		return nil, err
 	}
 
-	return &DirectMessageProtocol{
+	return &EncryptedMessageProtocol{
 		DHHeader: &DHHeader{
 			Key: crypto.CompressPubkey(ourEphemeralKey),
 		},
@@ -447,8 +455,8 @@ func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []b
 	}, nil
 }
 
-func (s *encryptor) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (map[string]*DirectMessageProtocol, error) {
-	response := make(map[string]*DirectMessageProtocol)
+func (s *encryptor) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
+	response := make(map[string]*EncryptedMessageProtocol)
 	dmp, err := s.encryptWithDH(theirIdentityKey, payload)
 	if err != nil {
 		return nil, err
@@ -463,8 +471,8 @@ func (s *encryptor) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installat
 	return s.persistence.GetPublicBundle(theirIdentityKey, installations)
 }
 
-// EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
-func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*DirectMessageProtocol, []*multidevice.Installation, error) {
+// EncryptPayload returns a new EncryptedMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
+func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*EncryptedMessageProtocol, []*multidevice.Installation, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptPayload"),
 		zap.String("their-identity-key", types.EncodeHex(crypto.FromECDSAPub(theirIdentityKey))))
@@ -475,15 +483,15 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// We don't have any, send a message with DH
 	if len(installations) == 0 {
+		// We don't have any, send a message with DH
 		logger.Debug("no installations, sending to all devices")
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}
 
 	theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
-	response := make(map[string]*DirectMessageProtocol)
+	response := make(map[string]*EncryptedMessageProtocol)
 
 	for _, installation := range installations {
 		installationID := installation.ID
@@ -513,7 +521,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 				return nil, nil, err
 			}
 
-			dmp := DirectMessageProtocol{
+			dmp := EncryptedMessageProtocol{
 				Payload:  encryptedPayload,
 				DRHeader: drHeader,
 			}
@@ -570,7 +578,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 				return nil, nil, err
 			}
 
-			dmp := &DirectMessageProtocol{
+			dmp := &EncryptedMessageProtocol{
 				Payload:    encryptedPayload,
 				X3DHHeader: x3dhHeader,
 				DRHeader:   drHeader,
@@ -592,6 +600,131 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	return response, targetedInstallations, nil
 }
 
+func (s *encryptor) getNextHashRatchetKeyID(groupID string) (uint32, error) {
+	latestKeyID, err := s.persistence.GetCurrentKeyForGroup(groupID)
+	if err != nil {
+		return 0, err
+	}
+	currentTime := (uint32)(time.Now().UnixNano() / int64(time.Millisecond))
+	keyIDBump := (uint32)(10)
+	if latestKeyID < currentTime {
+		return currentTime + keyIDBump, nil
+	}
+
+	return latestKeyID + 1, nil
+}
+
+// Generates and stores a hash ratchet key given a group ID
+func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
+
+	// Randomly generate a hash ratchet key
+	hrKey, err := crypto.GenerateKey()
+	if err != nil {
+		return 0, err
+	}
+	hrKeyBytes := crypto.FromECDSA(hrKey)
+
+	keyID, err := s.getNextHashRatchetKeyID(string(groupID))
+	if err != nil {
+		return 0, err
+	}
+
+	err = s.persistence.SaveHashRatchetKey(string(groupID), keyID, hrKeyBytes)
+
+	return keyID, err
+}
+
+// EncryptHashRatchetPayload returns a new EncryptedMessageProtocol with a given payload encrypted, given a group's key
+func (s *encryptor) EncryptHashRatchetPayload(groupID []byte, keyID uint32, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
+	logger := s.logger.With(
+		zap.String("site", "EncryptHashRatchetPayload"),
+		zap.Any("group-id", groupID),
+		zap.Any("key-id", keyID))
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	logger.Debug("encrypting hash ratchet message")
+	dmp, err := s.encryptWithHR(groupID, keyID, payload)
+	response := make(map[string]*EncryptedMessageProtocol)
+	response[noInstallationID] = dmp
+	return response, err
+}
+
 func samePublicKeys(pubKey1, pubKey2 ecdsa.PublicKey) bool {
 	return pubKey1.X.Cmp(pubKey2.X) == 0 && pubKey1.Y.Cmp(pubKey2.Y) == 0
+}
+
+func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) (*EncryptedMessageProtocol, error) {
+	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, 0) // Get latest seqNo
+
+	if err != nil {
+		return nil, err
+	}
+
+	var dbHash []byte
+	if len(hrCache.Hash) == 0 {
+		dbHash = hrCache.Key
+	} else {
+		dbHash = hrCache.Hash
+	}
+
+	hash := crypto.Keccak256Hash(dbHash)
+	encryptedPayload, err := crypto.EncryptSymmetric(hash.Bytes(), payload)
+	if err != nil {
+		return nil, err
+	}
+	newSeqNo := hrCache.SeqNo + 1
+	err = s.persistence.SaveHashRatchetKeyHash(groupID, keyID, hash.Bytes(), newSeqNo)
+	if err != nil {
+		return nil, err
+	}
+	dmp := &EncryptedMessageProtocol{
+		HRHeader: &HRHeader{
+			GroupId: string(groupID),
+			KeyId:   keyID,
+			SeqNo:   newSeqNo,
+		},
+		Payload: encryptedPayload,
+	}
+	return dmp, nil
+}
+
+func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, payload []byte) ([]byte, error) {
+
+	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, seqNo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle mesages with seqNo less than the one in db
+	// 1. Check cache. If present for a particular seqNo, all good
+	// 2. Otherwise, get the latest one for that keyId
+	// 3. Every time the key is generated, it has to be saved in the cache along with the hash
+	var hash []byte = hrCache.Hash
+	if hrCache.SeqNo == seqNo {
+		// We already have the hash for this seqNo
+		hash = hrCache.Hash
+	} else {
+		if hrCache.SeqNo == 0 {
+			// No cache records found for this keyId
+			hash = hrCache.Key
+		}
+		// We should not have "holes" in seq numbers,
+		// so a case when hrCache.SeqNo > seqNo shouldn't occur
+		if seqNo-hrCache.SeqNo > maxHashRatchetSeqNoDelta {
+			return nil, ErrHashRatchetSeqNoTooHigh
+		}
+		for i := hrCache.SeqNo; i < seqNo; i++ {
+			hash = crypto.Keccak256Hash(hash).Bytes()
+			err := s.persistence.SaveHashRatchetKeyHash(groupID, keyID, hash, i+1)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	decryptedPayload, err := crypto.DecryptSymmetric(hash, payload)
+
+	return decryptedPayload, err
 }
