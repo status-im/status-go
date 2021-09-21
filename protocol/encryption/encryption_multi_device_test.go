@@ -237,9 +237,9 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevices() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	msg, err := bob1.BuildDirectMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
+	msg, err := bob1.BuildEncryptedMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
 	s.Require().NoError(err)
-	payload := msg.Message.GetDirectMessage()
+	payload := msg.Message.GetEncryptedMessage()
 	s.Require().Equal(3, len(payload))
 	s.Require().NotNil(payload["alice1"])
 	s.Require().NotNil(payload["alice3"])
@@ -267,9 +267,9 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevices() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	msg, err = bob1.BuildDirectMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
+	msg, err = bob1.BuildEncryptedMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
 	s.Require().NoError(err)
-	payload = msg.Message.GetDirectMessage()
+	payload = msg.Message.GetEncryptedMessage()
 	s.Require().Equal(3, len(payload))
 	s.Require().NotNil(payload["alice1"])
 	s.Require().NotNil(payload["alice2"])
@@ -312,9 +312,9 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevicesRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	msg1, err := bob1.BuildDirectMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
+	msg1, err := bob1.BuildEncryptedMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
 	s.Require().NoError(err)
-	payload := msg1.Message.GetDirectMessage()
+	payload := msg1.Message.GetEncryptedMessage()
 	s.Require().Equal(3, len(payload))
 	// Alice1 is the oldest bundle and is rotated out
 	// as we send maximum to 3 devices
@@ -324,7 +324,7 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevicesRefreshedBundle() {
 	s.Require().NotNil(payload["alice4"])
 
 	// We send a message to bob from alice1, the timestamp should be refreshed
-	msg2, err := alice1.BuildDirectMessage(aliceKey, &bobKey.PublicKey, []byte("test"))
+	msg2, err := alice1.BuildEncryptedMessage(aliceKey, &bobKey.PublicKey, []byte("test"))
 	s.Require().NoError(err)
 
 	alice1Bundle = msg2.Message.GetBundles()[0]
@@ -334,9 +334,9 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevicesRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	msg3, err := bob1.BuildDirectMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
+	msg3, err := bob1.BuildEncryptedMessage(bobKey, &aliceKey.PublicKey, []byte("test"))
 	s.Require().NoError(err)
-	payload = msg3.Message.GetDirectMessage()
+	payload = msg3.Message.GetEncryptedMessage()
 	s.Require().Equal(3, len(payload))
 	// Alice 1 is added back to the list of active devices
 	s.Require().NotNil(payload["alice1"])

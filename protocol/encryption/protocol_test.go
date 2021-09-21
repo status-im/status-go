@@ -78,7 +78,7 @@ func (s *ProtocolServiceTestSuite) TestBuildPublicMessage() {
 	s.NotNilf(msg.Message.GetBundles(), "It adds a bundle to the message")
 }
 
-func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
+func (s *ProtocolServiceTestSuite) TestBuildEncryptedMessage() {
 	bobKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	aliceKey, err := crypto.GenerateKey()
@@ -86,7 +86,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	payload := []byte("test")
 
-	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildEncryptedMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
 	s.NotNil(msgSpec, "It creates a message spec")
 
@@ -95,7 +95,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	s.NotNilf(msg.GetBundles(), "It adds a bundle to the message")
 
-	directMessage := msg.GetDirectMessage()
+	directMessage := msg.GetEncryptedMessage()
 	s.NotNilf(directMessage, "It sets the direct message")
 
 	encryptedPayload := directMessage["none"].GetPayload()
@@ -104,7 +104,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	s.NotEqualf(payload, encryptedPayload, "It encrypts the payload")
 }
 
-func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
+func (s *ProtocolServiceTestSuite) TestBuildAndReadEncryptedMessage() {
 	bobKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	aliceKey, err := crypto.GenerateKey()
@@ -113,7 +113,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	payload := []byte("test")
 
 	// Message is sent with DH
-	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildEncryptedMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.Require().NoError(err)
 	s.Require().NotNil(msgSpec)
 
@@ -140,7 +140,7 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 	_, err = s.bob.Start(bobKey)
 	s.Require().NoError(err)
 
-	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildEncryptedMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
 	s.NotNil(msgSpec, "It creates a message spec")
 	s.Require().NotNil(msgSpec.SharedSecret)

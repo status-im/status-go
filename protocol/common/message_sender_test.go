@@ -204,7 +204,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 		s.logger,
 	)
 
-	messageSpec, err := senderEncryptionProtocol.BuildDirectMessage(
+	messageSpec, err := senderEncryptionProtocol.BuildEncryptedMessage(
 		relayerKey,
 		&s.sender.identity.PublicKey,
 		marshalledDataSyncMessage,

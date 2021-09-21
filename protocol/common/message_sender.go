@@ -309,7 +309,7 @@ func (s *MessageSender) sendPrivate(
 		s.transport.Track(messageIDs, hash, newMessage)
 
 	} else {
-		messageSpec, err := s.protocol.BuildDirectMessage(rawMessage.Sender, recipient, wrappedMessage)
+		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to encrypt message")
 		}
@@ -660,7 +660,7 @@ func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.Publi
 		hexMessageIDs = append(hexMessageIDs, mid.String())
 	}
 
-	messageSpec, err := s.protocol.BuildDirectMessage(s.identity, publicKey, marshalledDatasyncPayload)
+	messageSpec, err := s.protocol.BuildEncryptedMessage(s.identity, publicKey, marshalledDatasyncPayload)
 	if err != nil {
 		return errors.Wrap(err, "failed to encrypt message")
 	}

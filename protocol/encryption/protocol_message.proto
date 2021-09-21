@@ -54,11 +54,22 @@ message X3DHHeader {
   bytes id = 4;
 }
 
+// Hash Ratchet Header
+message HRHeader {
+  // community key ID
+  uint32 key_id = 1;
+  // Community message number for this key_id
+  uint32 seq_no = 2;
+  // Community ID
+  string group_id = 3;
+}
+
 // Direct message value
-message DirectMessageProtocol {
+message EncryptedMessageProtocol {
   X3DHHeader X3DH_header = 1;
-  DRHeader DR_header = 2;
+  DRHeader DR_header = 2; 
   DHHeader DH_header = 101;
+  HRHeader HR_header = 102;
   // Encrypted payload
   bytes payload = 3;
 }
@@ -72,7 +83,8 @@ message ProtocolMessage {
   repeated Bundle bundles = 3;
 
   // One to one message, encrypted, indexed by installation_id
-  map<string,DirectMessageProtocol> direct_message = 101;
+  // TODO map here is redundant in case of community messages
+  map<string,EncryptedMessageProtocol> encrypted_message = 101;
 
   // Public chats, not encrypted
   bytes public_message = 102;
