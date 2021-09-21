@@ -21,27 +21,41 @@ func (c *ProcessedMessageIDsCache) Clear() error {
 
 func (c *ProcessedMessageIDsCache) Hits(ids []string) (map[string]bool, error) {
 	hits := make(map[string]bool)
-	idsArgs := make([]interface{}, 0, len(ids))
-	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
-	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "SELECT id FROM transport_message_cache WHERE id IN (" + inVector + ")" // nolint: gosec
+	// Split the results into batches of 999 items.
+	// To prevent excessive memory allocations, the maximum value of a host parameter number
+	// is SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
+	batch := 999
+	for i := 0; i < len(ids); i += batch {
+		j := i + batch
+		if j > len(ids) {
+			j = len(ids)
+		}
 
-	rows, err := c.db.Query(query, idsArgs...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+		currentBatch := ids[i:j]
 
-	for rows.Next() {
-		var id string
-		err := rows.Scan(&id)
+		idsArgs := make([]interface{}, 0, len(currentBatch))
+		for _, id := range currentBatch {
+			idsArgs = append(idsArgs, id)
+		}
+
+		inVector := strings.Repeat("?, ", len(currentBatch)-1) + "?"
+		query := "SELECT id FROM transport_message_cache WHERE id IN (" + inVector + ")" // nolint: gosec
+
+		rows, err := c.db.Query(query, idsArgs...)
 		if err != nil {
 			return nil, err
 		}
-		hits[id] = true
+		defer rows.Close()
+
+		for rows.Next() {
+			var id string
+			err := rows.Scan(&id)
+			if err != nil {
+				return nil, err
+			}
+			hits[id] = true
+		}
 	}
 
 	return hits, nil
