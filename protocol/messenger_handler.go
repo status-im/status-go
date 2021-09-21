@@ -1072,7 +1072,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 		if !ok {
 			return nil, errors.New("received a public chatEntity from non-existing chat")
 		}
-		if !chat.Public() {
+		if !chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
 			return nil, ErrMessageForWrongChatType
 		}
 		return chat, nil
