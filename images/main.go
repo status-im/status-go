@@ -5,22 +5,10 @@ import (
 	"image"
 )
 
-func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityImage, error) {
-	img, err := Decode(filepath)
-	if err != nil {
-		return nil, err
-	}
-
-	cropRect := image.Rectangle{
-		Min: image.Point{X: aX, Y: aY},
-		Max: image.Point{X: bX, Y: bY},
-	}
-	cImg, err := Crop(img, cropRect)
-	if err != nil {
-		return nil, err
-	}
-
+func GenerateImageVariants(cImg image.Image) ([]*IdentityImage, error) {
 	var iis []*IdentityImage
+	var err error
+
 	for _, s := range ResizeDimensions {
 		rImg := Resize(s, cImg)
 
@@ -43,4 +31,36 @@ func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityIma
 	}
 
 	return iis, nil
+}
+
+func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityImage, error) {
+	img, err := Decode(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	cropRect := image.Rectangle{
+		Min: image.Point{X: aX, Y: aY},
+		Max: image.Point{X: bX, Y: bY},
+	}
+	cImg, err := Crop(img, cropRect)
+	if err != nil {
+		return nil, err
+	}
+
+	return GenerateImageVariants(cImg)
+}
+
+func GenerateIdentityImagesFromURL(url string) ([]*IdentityImage, error) {
+	img, err := DecodeFromURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	cImg, err := CropCenter(img)
+	if err != nil {
+		return nil, err
+	}
+
+	return GenerateImageVariants(cImg)
 }

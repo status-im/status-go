@@ -1,15 +1,21 @@
 package images
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/image/webp"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func Decode(fileName string) (image.Image, error) {
@@ -25,6 +31,29 @@ func Decode(fileName string) (image.Image, error) {
 	}
 
 	return decodeImageData(fb, file)
+}
+
+func DecodeFromURL(path string) (image.Image, error) {
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	res, err := client.Get(path)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Error("failed to close profile pic http request body", "err", err)
+		}
+	}()
+
+	bodyBytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeImageData(bodyBytes, bytes.NewReader(bodyBytes))
 }
 
 func prepareFileForDecode(file *os.File) ([]byte, error) {

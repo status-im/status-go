@@ -59,6 +59,20 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 	return iis, err
 }
 
+func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]*images.IdentityImage, error) {
+	iis, err := images.GenerateIdentityImagesFromURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	err = api.db.StoreIdentityImages(keyUID, iis)
+	if err != nil {
+		return nil, err
+	}
+
+	return iis, err
+}
+
 // DeleteIdentityImage deletes an IdentityImage from the db with the given name
 func (api *MultiAccountsAPI) DeleteIdentityImage(keyUID string) error {
 	return api.db.DeleteIdentityImage(keyUID)

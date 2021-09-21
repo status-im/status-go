@@ -84,6 +84,67 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+func TestDecodeFromURL(t *testing.T) {
+	cs := []struct {
+		Filepath string
+		Nil      bool
+		Bounds   image.Rectangle
+	}{
+		{
+			"https://via.placeholder.com/2x1.png",
+			false,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 2, Y: 1},
+			},
+		},
+		{
+			"https://via.placeholder.com/1.jpg",
+			false,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 1, Y: 1},
+			},
+		},
+		{
+			"https://via.placeholder.com/1.gif",
+			false,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 1, Y: 1},
+			},
+		},
+		{
+			"https://via.placeholder.com/1.webp",
+			false,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 1, Y: 1},
+			},
+		},
+		{
+			"https://via.placeholder.com/1.webp",
+			true,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 10, Y: 10},
+			},
+		},
+	}
+
+	for _, c := range cs {
+		img, err := DecodeFromURL(c.Filepath)
+
+		if c.Nil {
+			require.Nil(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Exactly(t, c.Bounds, img.Bounds())
+		}
+
+	}
+}
+
 func TestGetType(t *testing.T) {
 	cs := []struct {
 		Buf   []byte
