@@ -65,3 +65,15 @@ func (m MessengerSignalsHandler) CommunityInfoFound(community *communities.Commu
 func (m *MessengerSignalsHandler) MessengerResponse(response *protocol.MessengerResponse) {
 	PublisherSignalHandler{}.NewMessages(response)
 }
+
+func (m *MessengerSignalsHandler) HistoryRequestStarted() {
+	signal.SendHistoricMessagesRequestStarted()
+}
+
+func (m *MessengerSignalsHandler) HistoryRequestFailed(err error) {
+	signal.SendHistoricMessagesRequestFailed(err)
+}
+
+func (m *MessengerSignalsHandler) HistoryRequestCompleted() {
+	signal.SendHistoricMessagesRequestCompleted()
+}

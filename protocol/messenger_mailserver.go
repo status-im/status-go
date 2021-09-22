@@ -262,11 +262,25 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 	}
 
 	m.logger.Info("syncing topics", zap.Any("batches", batches))
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted()
+	}
+
 	for _, batch := range batches {
 		err := m.processMailserverBatch(batch)
 		if err != nil {
+			m.logger.Info("error syncing topics", zap.Any("error", err))
+			if m.config.messengerSignalsHandler != nil {
+				m.config.messengerSignalsHandler.HistoryRequestFailed(err)
+			}
 			return nil, err
 		}
+	}
+
+	m.logger.Info("topics synced")
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
 	err = m.mailserversDatabase.AddTopics(syncedTopics)
