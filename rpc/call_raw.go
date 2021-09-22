@@ -35,8 +35,9 @@ type jsonrpcMessage struct {
 
 type jsonrpcRequest struct {
 	jsonrpcMessage
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params,omitempty"`
+	ChainID uint64          `json:"chainId"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
 }
 
 type jsonrpcSuccessfulResponse struct {
@@ -110,14 +111,18 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 // callSingleMethod executes single JSON-RPC message and constructs proper response.
 func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) string {
 	// unmarshal JSON body into json-rpc request
-	method, params, id, err := methodAndParamsFromBody(msg)
+	chainID, method, params, id, err := methodAndParamsFromBody(msg)
 	if err != nil {
 		return newErrorResponse(errInvalidMessageCode, err, id)
 	}
 
+	if chainID == 0 {
+		chainID = c.UpstreamChainID
+	}
+
 	// route and execute
 	var result json.RawMessage
-	err = c.CallContext(ctx, &result, method, params...)
+	err = c.CallContext(ctx, &result, chainID, method, params...)
 
 	// as we have to return original JSON, we have to
 	// analyze returned error and reconstruct original
@@ -138,21 +143,20 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 // JSON-RPC body into values ready to use with ethereum-go's
 // RPC client Call() function. A lot of empty interface usage is
 // due to the underlying code design :/
-func methodAndParamsFromBody(body json.RawMessage) (string, []interface{}, json.RawMessage, error) {
+func methodAndParamsFromBody(body json.RawMessage) (uint64, string, []interface{}, json.RawMessage, error) {
 	msg, err := unmarshalMessage(body)
 	if err != nil {
-		return "", nil, nil, err
+		return 0, "", nil, nil, err
 	}
-
 	params := []interface{}{}
 	if msg.Params != nil {
 		err = json.Unmarshal(msg.Params, &params)
 		if err != nil {
-			return "", nil, nil, err
+			return 0, "", nil, nil, err
 		}
 	}
 
-	return msg.Method, params, msg.ID, nil
+	return msg.ChainID, msg.Method, params, msg.ID, nil
 }
 
 // unmarshalMessage tries to unmarshal JSON-RPC message.

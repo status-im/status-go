@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
@@ -128,7 +127,7 @@ func (p *PeerPool) setDiscoveryTimeout() {
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
-func (p *PeerPool) Start(server *p2p.Server, rpcClient contracts.RPCClient) error {
+func (p *PeerPool) Start(server *p2p.Server) error {
 	if !p.discovery.Running() {
 		return ErrDiscv5NotRunning
 	}
@@ -156,7 +155,7 @@ func (p *PeerPool) Start(server *p2p.Server, rpcClient contracts.RPCClient) erro
 		var topicPool TopicPoolInterface
 		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if topic == MailServerDiscoveryTopic {
-			v, err := p.initVerifier(rpcClient)
+			v, err := p.initVerifier()
 			if err != nil {
 				return err
 			}
@@ -176,7 +175,7 @@ func (p *PeerPool) Start(server *p2p.Server, rpcClient contracts.RPCClient) erro
 	return nil
 }
 
-func (p *PeerPool) initVerifier(rpcClient contracts.RPCClient) (v Verifier, err error) {
+func (p *PeerPool) initVerifier() (v Verifier, err error) {
 	return verifier.NewLocalVerifier(p.opts.TrustedMailServers), nil
 }
 

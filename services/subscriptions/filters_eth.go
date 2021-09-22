@@ -19,7 +19,7 @@ func installEthFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 
 	var result string
 
-	err := rpcClient.Call(&result, method, args...)
+	err := rpcClient.Call(&result, rpcClient.UpstreamChainID, method, args...)
 
 	if err != nil {
 		return nil, err
@@ -41,13 +41,13 @@ func (ef *ethFilter) getID() string {
 func (ef *ethFilter) getChanges() ([]interface{}, error) {
 	var result []interface{}
 
-	err := ef.rpcClient.Call(&result, "eth_getFilterChanges", ef.getID())
+	err := ef.rpcClient.Call(&result, ef.rpcClient.UpstreamChainID, "eth_getFilterChanges", ef.getID())
 
 	return result, err
 }
 
 func (ef *ethFilter) uninstall() error {
-	return ef.rpcClient.Call(nil, "eth_uninstallFilter", ef.getID())
+	return ef.rpcClient.Call(nil, ef.rpcClient.UpstreamChainID, "eth_uninstallFilter", ef.getID())
 }
 
 func validateEthMethod(method string) error {

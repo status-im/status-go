@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
+	getrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
@@ -36,14 +36,15 @@ type filter interface {
 // PublicAPI represents filter API that is exported to `eth` namespace
 type PublicAPI struct {
 	filtersMu sync.Mutex
-	filters   map[rpc.ID]filter
+	filters   map[getrpc.ID]filter
 
 	// filterLivenessLoop defines how often timeout loop is executed
 	filterLivenessLoop time.Duration
 	// filter liveness increased by this period when changes are requested
 	filterLivenessPeriod time.Duration
 
-	client func() ContextCaller
+	client  func() ContextCaller
+	chainID func() uint64
 
 	latestBlockChangedEvent        *latestBlockChangedEvent
 	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
@@ -52,11 +53,12 @@ type PublicAPI struct {
 // NewPublicAPI returns a reference to the PublicAPI object
 func NewPublicAPI(s *Service) *PublicAPI {
 	api := &PublicAPI{
-		filters:                        make(map[rpc.ID]filter),
+		filters:                        make(map[getrpc.ID]filter),
 		latestBlockChangedEvent:        s.latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: s.transactionSentToUpstreamEvent,
 
 		client:               func() ContextCaller { return s.rpc.RPCClient() },
+		chainID:              func() uint64 { return s.rpc.RPCClient().UpstreamChainID },
 		filterLivenessLoop:   defaultFilterLivenessPeriod,
 		filterLivenessPeriod: defaultFilterLivenessPeriod + 10*time.Second,
 	}
@@ -89,8 +91,8 @@ func (api *PublicAPI) timeoutLoop(quit chan struct{}) {
 	}
 }
 
-func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (rpc.ID, error) {
-	id := rpc.ID(uuid.New())
+func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (getrpc.ID, error) {
+	id := getrpc.ID(uuid.New())
 	ctx, cancel := context.WithCancel(context.Background())
 	f := &logsFilter{
 		id:           id,
@@ -105,18 +107,18 @@ func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (rpc.ID, error) {
 	api.filtersMu.Lock()
 	api.filters[id] = f
 	api.filtersMu.Unlock()
-	go pollLogs(api.client(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
+	go pollLogs(api.client(), api.chainID(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
 	return id, nil
 }
 
 // NewBlockFilter is an implemenation of `eth_newBlockFilter` API
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newblockfilter
-func (api *PublicAPI) NewBlockFilter() rpc.ID {
+func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
 	f := newHashFilter()
-	id := rpc.ID(uuid.New())
+	id := getrpc.ID(uuid.New())
 
 	api.filters[id] = f
 
@@ -142,12 +144,12 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 
 // NewPendingTransactionFilter is an implementation of `eth_newPendingTransactionFilter` API
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newpendingtransactionfilter
-func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
+func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
 	f := newHashFilter()
-	id := rpc.ID(uuid.New())
+	id := getrpc.ID(uuid.New())
 
 	api.filters[id] = f
 
@@ -174,7 +176,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
 
 // UninstallFilter is an implemenation of `eth_uninstallFilter` API
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_uninstallfilter
-func (api *PublicAPI) UninstallFilter(id rpc.ID) bool {
+func (api *PublicAPI) UninstallFilter(id getrpc.ID) bool {
 	api.filtersMu.Lock()
 	f, found := api.filters[id]
 	if found {
@@ -193,7 +195,7 @@ func (api *PublicAPI) UninstallFilter(id rpc.ID) bool {
 // If the filter could not be found an empty array of logs is returned.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs
-func (api *PublicAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]types.Log, error) {
+func (api *PublicAPI) GetFilterLogs(ctx context.Context, id getrpc.ID) ([]types.Log, error) {
 	api.filtersMu.Lock()
 	f, exist := api.filters[id]
 	api.filtersMu.Unlock()
@@ -206,7 +208,7 @@ func (api *PublicAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]types.Log
 	}
 	ctx, cancel := context.WithTimeout(ctx, defaultLogsQueryTimeout)
 	defer cancel()
-	rst, err := getLogs(ctx, api.client(), logs.originalCrit)
+	rst, err := getLogs(ctx, api.client(), api.chainID(), logs.originalCrit)
 	return rst, err
 }
 
@@ -214,7 +216,7 @@ func (api *PublicAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]types.Log
 // last time it was called. This can be used for polling.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterchanges
-func (api *PublicAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
+func (api *PublicAPI) GetFilterChanges(id getrpc.ID) (interface{}, error) {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 

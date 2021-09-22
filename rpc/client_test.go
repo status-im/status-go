@@ -2,19 +2,38 @@ package rpc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/network"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
+func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
+	tmpfile, err := ioutil.TempFile("", "rpc-network-tests-")
+	require.NoError(t, err)
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "rpc-network-tests")
+	require.NoError(t, err)
+	return db, func() {
+		require.NoError(t, db.Close())
+		require.NoError(t, os.Remove(tmpfile.Name()))
+	}
+}
+
 func TestBlockedRoutesCall(t *testing.T) {
+	db, close := setupTestNetworkDB(t)
+	defer close()
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
 			"id": 1,
@@ -27,7 +46,7 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, params.UpstreamRPCConfig{Enabled: false, URL: ""})
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []network.Network{}, db)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -36,21 +55,24 @@ func TestBlockedRoutesCall(t *testing.T) {
 			err    error
 		)
 
-		err = c.Call(&result, m)
+		err = c.Call(&result, 1, m)
 		require.EqualError(t, err, ErrMethodNotFound.Error())
 		require.Nil(t, result)
 
-		err = c.CallContext(context.Background(), &result, m)
+		err = c.CallContext(context.Background(), &result, 1, m)
 		require.EqualError(t, err, ErrMethodNotFound.Error())
 		require.Nil(t, result)
 
-		err = c.CallContextIgnoringLocalHandlers(context.Background(), &result, m)
+		err = c.CallContextIgnoringLocalHandlers(context.Background(), &result, 1, m)
 		require.EqualError(t, err, ErrMethodNotFound.Error())
 		require.Nil(t, result)
 	}
 }
 
 func TestBlockedRoutesRawCall(t *testing.T) {
+	db, close := setupTestNetworkDB(t)
+	defer close()
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
 			"id": 1,
@@ -63,7 +85,7 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, params.UpstreamRPCConfig{Enabled: false, URL: ""})
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []network.Network{}, db)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -78,6 +100,9 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 }
 
 func TestUpdateUpstreamURL(t *testing.T) {
+	db, close := setupTestNetworkDB(t)
+	defer close()
+
 	ts := createTestServer("")
 	defer ts.Close()
 
@@ -87,7 +112,7 @@ func TestUpdateUpstreamURL(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL})
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []network.Network{}, db)
 	require.NoError(t, err)
 	require.Equal(t, ts.URL, c.upstreamURL)
 

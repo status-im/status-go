@@ -57,6 +57,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 		params     []interface{}
 		method     string
 		id         json.RawMessage
+		chainID    uint64
 		shouldFail bool
 	}{
 		{
@@ -70,6 +71,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			},
 			"subtract",
 			json.RawMessage(`42`),
+			0,
 			false,
 		},
 		{
@@ -78,6 +80,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"test",
 			nil,
+			0,
 			false,
 		},
 		{
@@ -86,6 +89,16 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"test",
 			nil,
+			0,
+			false,
+		},
+		{
+			"params_chain_id",
+			json.RawMessage(`{"jsonrpc": "2.0", "chainId": 2, "method": "test"}`),
+			[]interface{}{},
+			"test",
+			nil,
+			2,
 			false,
 		},
 		{
@@ -94,6 +107,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{string("3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e")},
 			"shh_getFilterMessages",
 			json.RawMessage(`44`),
+			0,
 			false,
 		},
 		{
@@ -102,6 +116,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"",
 			nil,
+			0,
 			true,
 		},
 		{
@@ -110,18 +125,20 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"",
 			nil,
+			0,
 			true,
 		},
 	}
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			method, params, id, err := methodAndParamsFromBody(test.body)
+			chainID, method, params, id, err := methodAndParamsFromBody(test.body)
 			if test.shouldFail {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
+			require.Equal(t, test.chainID, chainID)
 			require.Equal(t, test.method, method)
 			require.Equal(t, test.params, params)
 			require.EqualValues(t, test.id, id)

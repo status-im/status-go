@@ -27,7 +27,7 @@ func newRPCWrapper(client *rpc.Client) *rpcWrapper {
 // This is the nonce that should be used for the next transaction.
 func (w *rpcWrapper) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
 	var result hexutil.Uint64
-	err := w.rpcClient.CallContext(ctx, &result, "eth_getTransactionCount", account, "pending")
+	err := w.rpcClient.CallContext(ctx, &result, w.rpcClient.UpstreamChainID, "eth_getTransactionCount", account, "pending")
 	return uint64(result), err
 }
 
@@ -35,7 +35,7 @@ func (w *rpcWrapper) PendingNonceAt(ctx context.Context, account common.Address)
 // execution of a transaction.
 func (w *rpcWrapper) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	var hex hexutil.Big
-	if err := w.rpcClient.CallContext(ctx, &hex, "eth_gasPrice"); err != nil {
+	if err := w.rpcClient.CallContext(ctx, &hex, w.rpcClient.UpstreamChainID, "eth_gasPrice"); err != nil {
 		return nil, err
 	}
 	return (*big.Int)(&hex), nil
@@ -47,7 +47,7 @@ func (w *rpcWrapper) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // but it should provide a basis for setting a reasonable default.
 func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
 	var hex hexutil.Uint64
-	err := w.rpcClient.CallContext(ctx, &hex, "eth_estimateGas", toCallArg(msg))
+	err := w.rpcClient.CallContext(ctx, &hex, w.rpcClient.UpstreamChainID, "eth_estimateGas", toCallArg(msg))
 	if err != nil {
 		return 0, err
 	}
@@ -63,7 +63,7 @@ func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *gethtypes.Transact
 	if err != nil {
 		return err
 	}
-	return w.rpcClient.CallContext(ctx, nil, "eth_sendRawTransaction", types.EncodeHex(data))
+	return w.rpcClient.CallContext(ctx, nil, w.rpcClient.UpstreamChainID, "eth_sendRawTransaction", types.EncodeHex(data))
 }
 
 func toCallArg(msg ethereum.CallMsg) interface{} {

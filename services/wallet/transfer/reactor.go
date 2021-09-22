@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 var (
@@ -40,7 +40,7 @@ type Reactor struct {
 	group *async.Group
 }
 
-func (r *Reactor) newControlCommand(chainClient *network.ChainClient, accounts []common.Address) *controlCommand {
+func (r *Reactor) newControlCommand(chainClient *chain.Client, accounts []common.Address) *controlCommand {
 	signer := types.NewLondonSigner(chainClient.ToBigInt())
 	ctl := &controlCommand{
 		db:          r.db,
@@ -62,7 +62,7 @@ func (r *Reactor) newControlCommand(chainClient *network.ChainClient, accounts [
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) start(chainClients []*network.ChainClient, accounts []common.Address) error {
+func (r *Reactor) start(chainClients []*chain.Client, accounts []common.Address) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -89,7 +89,7 @@ func (r *Reactor) stop() {
 	r.group = nil
 }
 
-func (r *Reactor) restart(chainClients []*network.ChainClient, accounts []common.Address) error {
+func (r *Reactor) restart(chainClients []*chain.Client, accounts []common.Address) error {
 	r.stop()
 	return r.start(chainClients, accounts)
 }

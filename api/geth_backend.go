@@ -934,7 +934,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 	for _, client := range clients {
 		client.RegisterHandler(
 			params.AccountsMethodName,
-			func(context.Context, ...interface{}) (interface{}, error) {
+			func(context.Context, uint64, ...interface{}) (interface{}, error) {
 				return b.accountManager.Accounts()
 			},
 		)
@@ -951,7 +951,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 	return nil
 }
 
-func unsupportedMethodHandler(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+func unsupportedMethodHandler(ctx context.Context, chainID uint64, rpcParams ...interface{}) (interface{}, error) {
 	return nil, ErrUnsupportedRPCMethod
 }
 

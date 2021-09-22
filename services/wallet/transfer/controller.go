@@ -10,34 +10,35 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 type Controller struct {
-	db             *Database
-	networkManager *network.Manager
-	signals        *SignalsTransmitter
-	block          *Block
-	reactor        *Reactor
-	accountFeed    *event.Feed
-	TransferFeed   *event.Feed
-	group          *async.Group
+	db           *Database
+	rpcClient    *rpc.Client
+	signals      *SignalsTransmitter
+	block        *Block
+	reactor      *Reactor
+	accountFeed  *event.Feed
+	TransferFeed *event.Feed
+	group        *async.Group
 }
 
-func NewTransferController(db *sql.DB, networkManager *network.Manager, accountFeed *event.Feed) *Controller {
+func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Controller {
 	transferFeed := &event.Feed{}
 	signals := &SignalsTransmitter{
 		publisher: transferFeed,
 	}
 	block := &Block{db}
 	return &Controller{
-		db:             NewDB(db),
-		block:          block,
-		networkManager: networkManager,
-		signals:        signals,
-		accountFeed:    accountFeed,
-		TransferFeed:   transferFeed,
+		db:           NewDB(db),
+		block:        block,
+		rpcClient:    rpcClient,
+		signals:      signals,
+		accountFeed:  accountFeed,
+		TransferFeed: transferFeed,
 	}
 }
 
@@ -60,7 +61,7 @@ func (c *Controller) Stop() {
 }
 
 func (c *Controller) SetInitialBlocksRange(chainIDs []uint64) error {
-	chainClients, err := c.networkManager.GetChainClients(chainIDs)
+	chainClients, err := chain.NewClients(c.rpcClient, chainIDs)
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		return err
 	}
 
-	chainClients, err := c.networkManager.GetChainClients(chainIDs)
+	chainClients, err := chain.NewClients(c.rpcClient, chainIDs)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 
 // watchAccountsChanges subsribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
-func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*network.ChainClient, initial []common.Address) error {
+func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*chain.Client, initial []common.Address) error {
 	accounts := make(chan []accounts.Account, 1) // it may block if the rate of updates will be significantly higher
 	sub := accountFeed.Subscribe(accounts)
 	defer sub.Unsubscribe()
@@ -182,7 +183,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 	}
 
 	transfersCount := big.NewInt(int64(len(rst)))
-	chainClient, err := c.networkManager.GetChainClient(chainID)
+	chainClient, err := chain.NewClient(c.rpcClient, chainID)
 	if err != nil {
 		return nil, err
 	}

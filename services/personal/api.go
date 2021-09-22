@@ -61,6 +61,7 @@ func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr types.Address, err 
 	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
 		&gethAddr,
+		api.rpcClient.UpstreamChainID,
 		params.PersonalRecoverMethodName,
 		rpcParams.Message, rpcParams.Signature)
 	addr = types.Address(gethAddr)
@@ -81,6 +82,7 @@ func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.Select
 	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
 		&gethResult,
+		api.rpcClient.UpstreamChainID,
 		params.PersonalSignMethodName,
 		rpcParams.Data, rpcParams.Address, rpcParams.Password)
 	result = types.HexBytes(gethResult)

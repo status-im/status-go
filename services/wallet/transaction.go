@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/network"
+	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 type TransactionManager struct {
@@ -156,7 +156,7 @@ func (tm *TransactionManager) deletePending(chainID uint64, hash common.Hash) er
 	return err
 }
 
-func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *network.ChainClient) error {
+func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *chain.Client) error {
 	watchTxCommand := &watchTransactionCommand{
 		hash:   transactionHash,
 		client: client,
@@ -169,7 +169,7 @@ func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.
 }
 
 type watchTransactionCommand struct {
-	client *network.ChainClient
+	client *chain.Client
 	hash   common.Hash
 }
 

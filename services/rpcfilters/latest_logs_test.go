@@ -24,7 +24,7 @@ type callTracker struct {
 	criteria []map[string]interface{}
 }
 
-func (c *callTracker) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+func (c *callTracker) CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.calls++
@@ -50,7 +50,7 @@ func runLogsFetcherTest(t *testing.T, f *logsFilter, replies [][]types.Log, quer
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pollLogs(&c, f, time.Second, 100*time.Millisecond)
+		pollLogs(&c, 1, f, time.Second, 100*time.Millisecond)
 		wg.Done()
 	}()
 	tick := time.Tick(10 * time.Millisecond)
