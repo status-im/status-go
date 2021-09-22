@@ -76,16 +76,18 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*network.C
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)
 	for _, client := range clients {
-		for _, token := range tokens {
-			caller, err := ierc20.NewIERC20Caller(token, client)
+		for tokenIdx := range tokens {
+			caller, err := ierc20.NewIERC20Caller(tokens[tokenIdx], client)
 			if err != nil {
 				return nil, err
 			}
-			for _, account := range accounts {
+			for accountIdx := range accounts {
+				// Below, we set account and token from idx on purpose to avoid override
+				account := accounts[accountIdx]
+				token := tokens[tokenIdx]
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-
 					balance, err := caller.BalanceOf(&bind.CallOpts{
 						Context: ctx,
 					}, account)
