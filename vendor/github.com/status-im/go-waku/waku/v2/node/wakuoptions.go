@@ -96,12 +96,10 @@ func WithWakuRelay(opts ...wakurelay.Option) WakuNodeOption {
 	}
 }
 
-// WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
-// accepts a list of WakuFilter gossipsub options to setup the protocol
-func WithWakuFilter(opts ...wakurelay.Option) WakuNodeOption {
+// WithWakuFilter enables the Waku V2 Filter protocol.
+func WithWakuFilter() WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilter = true
-		params.wOpts = opts
 		return nil
 	}
 }

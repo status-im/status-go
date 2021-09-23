@@ -163,7 +163,10 @@ type WakuV2Config struct {
 	// Port number in which to start libp2p protocol (0 for random)
 	Port int
 
-	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
+	// Interval of time in seconds to send a ping to peers to keep the connection to them alive
+	KeepAliveInterval int
+
+	// LightClient should be true if the node will not relay messages and only rely on lightpush/filter nodes
 	LightClient bool
 
 	// FullNode should be true if waku should always acta as a full node
@@ -274,11 +277,17 @@ type ClusterConfig struct {
 	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
 
-	// WakuNodes is a list of wakuv2 libp2p nodes
-	WakuNodes []string
+	// RelayNodes is a list of wakuv2 relay nodes (libp2p)
+	RelayNodes []string
 
-	// WakuStoreNodes is a list of wakuv2 store nodes
-	WakuStoreNodes []string
+	// StoreNodes is a list of wakuv2 store nodes (libp2p)
+	StoreNodes []string
+
+	// FilterNodes is a list of wakuv2 filter nodes (libp2p)
+	FilterNodes []string
+
+	// LightpushNodes is a list of wakuv2 lightpush nodes (libp2p)
+	LightpushNodes []string
 }
 
 // String dumps config object as nicely indented JSON
