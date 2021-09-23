@@ -307,11 +307,10 @@ func (w *WakuNode) ID() string {
 	return w.host.ID().Pretty()
 }
 
-func (w *WakuNode) GetPeerStats() PeerStats {
-	return w.peers
-}
-
 func (w *WakuNode) IsOnline() bool {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	hasRelay := false
 	hasLightPush := false
 	hasStore := false
@@ -340,6 +339,9 @@ func (w *WakuNode) IsOnline() bool {
 }
 
 func (w *WakuNode) HasHistory() bool {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
+
 	for _, v := range w.peers {
 		for _, protocol := range v {
 			if protocol == string(store.WakuStoreProtocolId) {
@@ -721,11 +723,6 @@ func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
 	return w.connect(info)
 }
 
-func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
-	info := w.host.Peerstore().PeerInfo(peerID)
-	return w.connect(info)
-}
-
 func (w *WakuNode) ClosePeerByAddress(address string) error {
 	p, err := ma.NewMultiaddr(address)
 	if err != nil {
@@ -756,6 +753,8 @@ func (w *WakuNode) ClosePeerById(id peer.ID) error {
 }
 
 func (w *WakuNode) PeerCount() int {
+	w.peersMutex.Lock()
+	defer w.peersMutex.Unlock()
 	return len(w.peers)
 }
 
@@ -771,6 +770,7 @@ func (w *WakuNode) Peers() PeerStats {
 }
 
 func (w *WakuNode) startKeepAlive(t time.Duration) {
+
 	log.Info("Setting up ping protocol with duration of ", t)
 
 	w.ping = ping.NewPingService(w.host)
@@ -804,15 +804,16 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 
 						go func(peer peer.ID) {
 							peerFound := false
+							w.peersMutex.Lock()
 							for p := range w.peers {
 								if p == peer {
 									peerFound = true
 									break
 								}
 							}
-
-							//log.Info("###PING " + s + " before fetching result")
-							//logwriter.Write([]byte("###PING " + s + " before fetching result"))
+							defer w.peersMutex.Unlock()
+							log.Debug("###PING before fetching result")
+							
 							pingTicker := time.NewTicker(time.Duration(1) * time.Second)
 							isError := false
 							select {

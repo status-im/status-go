@@ -28,12 +28,17 @@ type Config struct {
 	SoftBlacklistedPeerIDs []string `toml:",omitempty"`
 	Host                   string   `toml:",omitempty"`
 	Port                   int      `toml:",omitempty"`
-	BootNodes              []string `toml:",omitempty"`
+	KeepAliveInterval      int      `toml:",omitempty"`
+	LightClient            bool     `toml:",omitempty"`
+	RelayNodes             []string `toml:",omitempty"`
 	StoreNodes             []string `toml:",omitempty"`
+	FilterNodes            []string `toml:",omitempty"`
+	LightpushNodes         []string `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
-	MaxMessageSize: common.DefaultMaxMessageSize,
-	Host:           "0.0.0.0",
-	Port:           60000,
+	MaxMessageSize:    common.DefaultMaxMessageSize,
+	Host:              "0.0.0.0",
+	Port:              60000,
+	KeepAliveInterval: 1, // second
 }
