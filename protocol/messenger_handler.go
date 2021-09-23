@@ -365,11 +365,6 @@ func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState
 	}
 
 	chat := CreatePublicChat(chatID, state.Timesource)
-
-	timestamp := uint32(state.Timesource.GetCurrentTime() / 1000)
-	chat.SyncedTo = timestamp
-	chat.SyncedFrom = timestamp
-
 	state.AllChats.Store(chat.ID, chat)
 
 	state.Response.AddChat(chat)

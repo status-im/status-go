@@ -102,13 +102,7 @@ func (m *Messenger) initChatSyncFields(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	chatID := request.ID
-
+func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse) (*MessengerResponse, error) {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = CreatePublicChat(chatID, m.getTimesource())
@@ -155,10 +149,20 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
 	response.AddChat(chat)
 
 	return response, nil
+}
+
+func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	chatID := request.ID
+	response := &MessengerResponse{}
+
+	return m.createPublicChat(chatID, response)
 }
 
 func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*MessengerResponse, error) {

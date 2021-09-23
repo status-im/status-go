@@ -2741,18 +2741,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						// We join and re-register as we want to receive mentions from the newly joined public chat
 						if addedChat != nil {
-							_, err = m.Join(addedChat)
+							_, err = m.createPublicChat(addedChat.ID, messageState.Response)
 							if err != nil {
 								allMessagesProcessed = false
 								logger.Error("error joining chat", zap.Error(err))
-								continue
-							}
-							logger.Debug("newly synced public chat, re-registering for push notifications")
-							err := m.reregisterForPushNotifications()
-							if err != nil {
-
-								allMessagesProcessed = false
-								logger.Warn("could not re-register for push notifications", zap.Error(err))
 								continue
 							}
 						}
