@@ -707,6 +707,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
+	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		receivedMessage.Seen = true
+	}
+
 	err := receivedMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
