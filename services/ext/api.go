@@ -875,6 +875,10 @@ func (api *PublicAPI) MarkActivityCenterNotificationsRead(ids []types.HexBytes) 
 	return api.service.messenger.MarkActivityCenterNotificationsRead(ids)
 }
 
+func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
+	return api.service.messenger.MarkActivityCenterNotificationsUnread(ids)
+}
+
 func (api *PublicAPI) AcceptAllActivityCenterNotifications() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptAllActivityCenterNotifications()
 }
