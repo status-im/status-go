@@ -16,6 +16,10 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ids []types.HexBytes) er
 	return m.persistence.MarkActivityCenterNotificationsRead(ids)
 }
 
+func (m *Messenger) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
+	return m.persistence.MarkActivityCenterNotificationsUnread(ids)
+}
+
 func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*ActivityCenterNotification) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 	var chats []*Chat
