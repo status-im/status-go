@@ -60,6 +60,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
 	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
+	ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	if chat == nil || waitingForApproval {
 		if len(message.Events) == 0 {
@@ -96,7 +97,6 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return err
 		}
 
-		ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
 		// A new chat must contain us
 		if !group.IsMember(ourKey) {
 			return errors.New("can't create a new group chat without us being a member")
@@ -107,6 +107,16 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 		newChat.Active = isActive
 		chat = &newChat
+
+		chat.updateChatFromGroupMembershipChanges(group)
+
+		if err != nil {
+			return errors.Wrap(err, "failed to get group creator")
+		}
+
+		if chat.Active && messageState.CurrentMessageState.Contact.ID != ourKey {
+			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact))
+		}
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
 		if err != nil {
@@ -121,9 +131,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if err != nil {
 			return errors.Wrap(err, "failed to create a group with new membership updates")
 		}
+		chat.updateChatFromGroupMembershipChanges(group)
 	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
 
 	if !chat.Active {
 		m.createMessageNotification(chat, messageState)
@@ -181,6 +190,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
 	}
+
 	err := m.addActivityCenterNotification(messageState, notification)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
