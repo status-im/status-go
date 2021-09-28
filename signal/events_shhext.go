@@ -34,6 +34,15 @@ const (
 
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
+
+	// EventHistoryRequestStarted is triggered before processing a mailserver batch
+	EventHistoryRequestStarted = "history.request.started"
+
+	// EventHistoryRequestCompleted is triggered after processing a mailserver batch
+	EventHistoryRequestCompleted = "history.request.completed"
+
+	// EventHistoryRequestFailed is triggered when requesting history messages fails
+	EventHistoryRequestFailed = "history.request.failed"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -49,6 +58,10 @@ type MailServerResponseSignal struct {
 	LastEnvelopeHash types.Hash `json:"lastEnvelopeHash"`
 	Cursor           string     `json:"cursor"`
 	ErrorMsg         string     `json:"errorMessage"`
+}
+
+type HistoryMessagesSignal struct {
+	ErrorMsg string `json:"errorMessage,omitempty"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -101,6 +114,18 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 	}
 
 	send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
+}
+
+func SendHistoricMessagesRequestStarted() {
+	send(EventHistoryRequestStarted, HistoryMessagesSignal{})
+}
+
+func SendHistoricMessagesRequestFailed(err error) {
+	send(EventHistoryRequestFailed, HistoryMessagesSignal{ErrorMsg: err.Error()})
+}
+
+func SendHistoricMessagesRequestCompleted() {
+	send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
