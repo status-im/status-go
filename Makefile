@@ -16,6 +16,10 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
+  ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
+    # Building on M1 is still not supported, so in the meantime we crosscompile to amd64
+    GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=amd64
+  endif
 else ifeq ($(detected_OS),Windows)
  # on Windows need `--export-all-symbols` flag else expected symbols will not be found in libstatus.dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,--export-all-symbols"
@@ -151,7 +155,7 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	mkdir -p $(GOBIN)/statusgo-lib
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building shared library..."
-	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
 		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
