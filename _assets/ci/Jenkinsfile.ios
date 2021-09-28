@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.2.17'
+library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
   agent { label 'macos' }
@@ -32,25 +32,27 @@ pipeline {
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
     /* Other stuff */
-    TARGET      = 'ios'
-    GOPATH      = "${env.WORKSPACE}"
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    ARTIFACT    = "${env.WORKSPACE}/status-go-ios-${utils.timestamp()}-${utils.gitCommit()}.zip"
-    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET = 'ios'
+    GOPATH = "${env.WORKSPACE}"
+    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
+    stage('Prep') { steps { dir(env.REPO) { script {
+      env.ARTIFACT = "${env.WORKSPACE}/" + utils.pkgFilename(
+        name: "status-go",
+        type: "ios",
+        ext: "zip"
+      )
+      println("Output: ${env.ARTIFACT}")
     } } } }
 
-    stage('Setup') { steps { dir(env.STATUS_PATH) {
+    stage('Setup') { steps { dir(env.REPO) {
       sh 'unset TMPDIR && make setup-build'
     } } }
 
-    stage('Compile') { steps { dir(env.STATUS_PATH) {
+    stage('Compile') { steps { dir(env.REPO) {
       sh 'make statusgo-ios'
       sh 'go get golang.org/x/tools/go/packages'
       dir('build/bin') {
@@ -70,6 +72,6 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always { dir(env.STATUS_PATH) { sh 'make clean' } }
+    always { dir(env.REPO) { sh 'make clean' } }
   } // post
 } // pipeline

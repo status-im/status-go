@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.2.17'
+library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
   agent { label 'linux' }
@@ -29,30 +29,32 @@ pipeline {
   }
 
   environment {
-    TARGET      = 'linux'
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    GOPATH      = "${env.WORKSPACE}"
-    ARTIFACT    = "${env.WORKSPACE}/status-go-desktop-${utils.timestamp()}-${utils.gitCommit()}.zip"
-    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET = 'linux'
+    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH = "${env.WORKSPACE}"
+    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
+    stage('Prep') { steps { dir(env.REPO) { script {
+      env.ARTIFACT = "${env.WORKSPACE}/" + utils.pkgFilename(
+        name: "status-go",
+        type: "desktop",
+        ext: "zip"
+      )
+      println("Output: ${env.ARTIFACT}")
     } } } }
 
-    stage('Setup') { steps { dir(env.STATUS_PATH) {
+    stage('Setup') { steps { dir(env.REPO) {
       sh 'make setup-build'
     } } }
 
     /* Sanity-check C bindings */
-    stage('Sanity check bindings') { steps { dir(env.STATUS_PATH) {
+    stage('Sanity check bindings') { steps { dir(env.REPO) {
       sh 'make statusgo-library'
     } } }
 
-    stage('Compress') { steps { dir(env.STATUS_PATH) {
+    stage('Compress') { steps { dir(env.REPO) {
       sh "zip -q -r ${env.ARTIFACT} . -x *.git"
     } } }
 
@@ -67,6 +69,6 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always { dir(env.STATUS_PATH) { sh 'make clean' } }
+    always { dir(env.REPO) { sh 'make clean' } }
   } // post
 } // pipeline
