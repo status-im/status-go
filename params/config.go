@@ -288,6 +288,9 @@ type ClusterConfig struct {
 
 	// LightpushNodes is a list of wakuv2 lightpush nodes (libp2p)
 	LightpushNodes []string
+
+	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
+	PeerExchange bool
 }
 
 // String dumps config object as nicely indented JSON

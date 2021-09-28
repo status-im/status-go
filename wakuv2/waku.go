@@ -179,7 +179,16 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		opts = append(opts, node.WithLightPush())
 		opts = append(opts, node.WithWakuFilter())
 	} else {
-		opts = append(opts, node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))))
+		relayOpts := []wakurelay.Option{
+			wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
+			wakurelay.WithPeerExchange(cfg.PeerExchange),
+		}
+
+		if cfg.PeerExchange {
+			relayOpts = append(relayOpts, wakurelay.WithPeerExchange(true))
+		}
+
+		opts = append(opts, node.WithWakuRelay(relayOpts...))
 	}
 
 	if waku.node, err = node.New(context.Background(), opts...); err != nil {

@@ -254,6 +254,7 @@ func (b *StatusNode) wakuV2Service(nodeKey string, wakuCfg *params.WakuV2Config,
 			StoreNodes:             clusterCfg.StoreNodes,
 			FilterNodes:            clusterCfg.FilterNodes,
 			LightpushNodes:         clusterCfg.LightpushNodes,
+			PeerExchange:           clusterCfg.PeerExchange,
 		}
 
 		if cfg.Host == "" {
