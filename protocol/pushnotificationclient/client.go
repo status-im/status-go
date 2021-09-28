@@ -192,16 +192,22 @@ type Client struct {
 
 	// registrationSubscriptions is a list of chan of client subscribed to the registration event
 	registrationSubscriptions []chan struct{}
+
+	// pendingRegistrations is a map of pending registrations.
+	// in theory we should store them in the database, but for now we can keep them in memory at
+	// the cost of having to register multiple times in case the program stops
+	pendingRegistrations map[string]bool
 }
 
 func New(persistence *Persistence, config *Config, sender *common.MessageSender, messagePersistence MessagePersistence) *Client {
 	return &Client{
-		quit:               make(chan struct{}),
-		config:             config,
-		messageSender:      sender,
-		messagePersistence: messagePersistence,
-		persistence:        persistence,
-		reader:             rand.Reader,
+		quit:                 make(chan struct{}),
+		config:               config,
+		messageSender:        sender,
+		messagePersistence:   messagePersistence,
+		persistence:          persistence,
+		pendingRegistrations: make(map[string]bool),
+		reader:               rand.Reader,
 	}
 }
 
@@ -398,6 +404,14 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
 func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, response protobuf.PushNotificationRegistrationResponse) error {
 	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
+
+	if len(response.RequestId) == 0 {
+		return errors.New("empty requestId")
+	}
+
+	if !c.pendingRegistrations[hex.EncodeToString(response.RequestId)] {
+		return errors.New("not for one of our requests")
+	}
 
 	// Not successful ignore for now
 	if !response.Success {
@@ -1278,6 +1292,8 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 	if err != nil {
 		return err
 	}
+
+	c.pendingRegistrations[hex.EncodeToString(common.Shake256(encryptedRegistration))] = true
 	return nil
 }
 
@@ -1318,7 +1334,6 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	// one info per installation id, grouped by server
 	actionableInfos := make(map[string][]*PushNotificationInfo)
 
-	c.config.Logger.Info("INFOS", zap.Any("info", info))
 	for _, i := range info {
 
 		if !installationIDsMap[i.InstallationID] {
