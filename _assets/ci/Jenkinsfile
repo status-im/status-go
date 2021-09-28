@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.2.16'
+library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
   agent { label 'linux' }
@@ -28,9 +28,9 @@ pipeline {
   }
 
   environment {
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    GOPATH      = "${env.WORKSPACE}"
-    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH = "${env.WORKSPACE}"
+    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* This will override the var in Makefile */
     RELEASE_DIR = "${env.WORKSPACE}/pkg"
   }
@@ -71,32 +71,18 @@ pipeline {
     stage('Release') {
       when { expression { params.RELEASE == true } }
       steps { script {
-        def suffix = "-"+utils.suffix()
-        /* rename build files to not include versions */
-        dir(env.RELEASE_DIR) {
-          findFiles(glob: 'status-go-*').each { pkg ->
-            sh "mv ${pkg.path} ${pkg.path.replace(suffix, "")}"
-          }
-        }
-        /* perform the release */
-        dir(env.STATUS_PATH) {
-          withCredentials([[
-            $class: 'UsernamePasswordMultiBinding',
-            credentialsId: 'status-im-auto',
-            usernameVariable: 'GITHUB_USER',
-            passwordVariable: 'GITHUB_TOKEN'
-          ]]) {
-            env.RELEASE_BRANCH = utils.branchName()
-            env.RELEASE_DIR = env.RELEASE_DIR
-            sh 'yes | make release'
-          }
-        }
+        dir (env.REPO) { version = utils.getVersion() }
+        github.publishReleaseFiles(
+          repo: 'status-go',
+          version: version,
+          desc: ':warning: Fill me in!',
+       )
       } }
     } // stage(Release)
   } // stages
 
   post {
-    always { dir(env.STATUS_PATH) {
+    always { dir(env.REPO) {
       sh 'make clean-release'
     } }
   }

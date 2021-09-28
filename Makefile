@@ -271,30 +271,6 @@ lint-fix:
 		-w {} \;
 	$(MAKE) vendor
 
-check-existing-release:
-	@git ls-remote --exit-code origin "$(RELEASE_TAG)" >/dev/null || exit 0; \
-	echo "$(YELLOW)Release tag already exists: $(RELEASE_TAG)$(RESET)"; \
-	echo "Remove the tag/release if you want to re-create it."; \
-	exit 1;
-
-release: check-existing-release
-	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
-	if [ $$REPLY = "y" ]; then \
-		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
-		comparison="$$latest_tag..HEAD"; \
-		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
-		changelog=$$(git log $$comparison --oneline --no-merges --format="* %h %s"); \
-		github-release \
-			$(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) \
-			"status-im/status-go" \
-			"$(RELEASE_TAG)" \
-			"$(RELEASE_BRANCH)" \
-			"$(changelog)" \
-			"$(RELEASE_DIR)/*" ; \
-	else \
-	    echo "Aborting." && exit 1; \
-	fi
-
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go

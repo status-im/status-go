@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.2.17'
+library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
   agent { label 'linux' }
@@ -32,11 +32,10 @@ pipeline {
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
     /* Other stuff */
-    TARGET      = 'android'
-    GOPATH      = "${env.WORKSPACE}"
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    ARTIFACT    = "${env.WORKSPACE}/status-go-android-${utils.timestamp()}-${utils.gitCommit()}.aar"
-    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET = 'android'
+    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH = "${env.WORKSPACE}"
+    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* Android SDK */
     ANDROID_HOME     = '/usr/lib/android-sdk'
     ANDROID_SDK_ROOT = '/usr/lib/android-sdk'
@@ -46,23 +45,26 @@ pipeline {
   }
 
   stages {
-    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
+    stage('Prep') { steps { dir(env.REPO) { script {
+      env.ARTIFACT = "${env.WORKSPACE}/" + utils.pkgFilename(
+        name: "status-go",
+        type: "android",
+        ext: "aar"
+      )
+      println("Output: ${env.ARTIFACT}")
     } } } }
 
-    stage('Setup') { steps { dir(env.STATUS_PATH) {
+    stage('Setup') { steps { dir(env.REPO) {
       sh 'make setup-build install-modvendor'
     } } }
 
-    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
+    stage('Vendoring check') { steps { dir(env.REPO) {
       /* fail build if vendoring hasn't been done */
       sh 'make vendor'
       sh 'git diff --exit-code --no-color --stat vendor/'
     } } }
 
-    stage('Compile') { steps { dir(env.STATUS_PATH) {
+    stage('Compile') { steps { dir(env.REPO) {
       sh 'make statusgo-android'
       sh "cp build/bin/statusgo.aar ${env.ARTIFACT}"
     } } }
@@ -78,6 +80,6 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always { dir(env.STATUS_PATH) { sh 'make clean' } }
+    always { dir(env.REPO) { sh 'make clean' } }
   } // post
 } // pipeline

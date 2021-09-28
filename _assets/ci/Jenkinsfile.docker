@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.2.17'
+library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
   agent { label 'linux' }
@@ -29,28 +29,26 @@ pipeline {
   }
 
   environment {
-    TARGET      = "docker"
-    GOPATH      = "${env.WORKSPACE}"
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET = "docker"
+    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH = "${env.WORKSPACE}"
+    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* docker image settings */
     IMAGE_NAME  = "statusteam/status-go"
     IMAGE_TAG   = "deploy-test"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
+    stage('Prep') { steps { dir(env.REPO) { script {
+      println("Output: ${env.IMAGE_NAME}:${env.IMAGE_TAG}")
     } } } }
 
-    stage('Build') { steps { dir(env.STATUS_PATH) { script {
+    stage('Build') { steps { dir(env.REPO) { script {
       sh 'make docker-image'
       image = docker.image("${env.IMAGE_NAME}:v${utils.getVersion()}")
     } } } }
 
-    stage('Push') { steps { dir(env.STATUS_PATH) { script {
+    stage('Push') { steps { dir(env.REPO) { script {
       withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
         image.push()
       }
@@ -58,7 +56,7 @@ pipeline {
 
     stage('Deploy') {
       when { expression { params.RELEASE == true } }
-      steps { dir(env.STATUS_PATH) { script {
+      steps { dir(env.REPO) { script {
         withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
           image.push(env.IMAGE_TAG)
         }
@@ -67,7 +65,7 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always  { dir(env.STATUS_PATH) {
+    always  { dir(env.REPO) {
       sh 'make clean-docker-images'
     } }
   } // post
