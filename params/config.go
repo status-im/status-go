@@ -597,6 +597,9 @@ type ShhextConfig struct {
 
 	// AnonMetricsServerPostgresURI is the uri used to connect to a postgres db
 	AnonMetricsServerPostgresURI string
+
+	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
+	BandwidthStatsEnabled bool
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
