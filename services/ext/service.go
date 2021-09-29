@@ -164,7 +164,11 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	}
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
-	go s.retrieveStats(5*time.Second, s.cancelMessenger)
+
+	if s.config.BandwidthStatsEnabled {
+		go s.retrieveStats(5*time.Second, s.cancelMessenger)
+	}
+
 	return response, nil
 }
 
