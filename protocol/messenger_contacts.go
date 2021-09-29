@@ -87,6 +87,12 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
+	// Publish contact code
+	err = m.publishContactCode()
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 
@@ -229,6 +235,20 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 	// Reregister only when data has changed
 	if shouldReregisterForPushNotifications {
+		// Reset last published time for ChatIdentity so new contact can receive data
+		contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+		m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
+		err = m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
+		if err != nil {
+			m.logger.Error("ResetWhenChatIdentityLastPublished error", zap.Error(err))
+			return err
+		}
+		// Publish contact code
+		err := m.publishContactCode()
+		if err != nil {
+			return err
+		}
+
 		return m.reregisterForPushNotifications()
 	}
 
