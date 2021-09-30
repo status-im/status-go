@@ -352,11 +352,11 @@ func (w *WakuNode) HasHistory() bool {
 	return false
 }
 
-func (w *WakuNode) ListenAddresses() []string {
+func (w *WakuNode) ListenAddresses() []ma.Multiaddr {
 	hostInfo, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", w.host.ID().Pretty()))
-	var result []string
+	var result []ma.Multiaddr
 	for _, addr := range w.host.Addrs() {
-		result = append(result, addr.Encapsulate(hostInfo).String())
+		result = append(result, addr.Encapsulate(hostInfo))
 	}
 	return result
 }
@@ -690,7 +690,16 @@ func (node *WakuNode) LightPush(ctx context.Context, message *pb.WakuMessage, to
 	}
 }
 
-func (w *WakuNode) DialPeer(address string) error {
+func (w *WakuNode) DialPeerWithMultiAddress(ctx context.Context, address ma.Multiaddr) error {
+	info, err := peer.AddrInfoFromP2pAddr(address)
+	if err != nil {
+		return err
+	}
+
+	return w.connect(ctx, *info)
+}
+
+func (w *WakuNode) DialPeer(ctx context.Context, address string) error {
 	p, err := ma.NewMultiaddr(address)
 	if err != nil {
 		return err
@@ -701,11 +710,11 @@ func (w *WakuNode) DialPeer(address string) error {
 		return err
 	}
 
-	return w.connect(*info)
+	return w.connect(ctx, *info)
 }
 
-func (w *WakuNode) connect(info peer.AddrInfo) error {
-	err := w.host.Connect(w.ctx, info)
+func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
+	err := w.host.Connect(ctx, info)
 	if err != nil {
 		return err
 	}
@@ -718,9 +727,9 @@ func (w *WakuNode) connect(info peer.AddrInfo) error {
 	return nil
 }
 
-func (w *WakuNode) DialPeerByID(peerID peer.ID) error {
+func (w *WakuNode) DialPeerByID(ctx context.Context, peerID peer.ID) error {
 	info := w.host.Peerstore().PeerInfo(peerID)
-	return w.connect(info)
+	return w.connect(ctx, info)
 }
 
 func (w *WakuNode) ClosePeerByAddress(address string) error {
@@ -802,18 +811,18 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 						peerMap[p] = result
 						mu.Unlock()
 
-						go func(peer peer.ID) {
+						go func(peerID peer.ID) {
 							peerFound := false
 							w.peersMutex.Lock()
 							for p := range w.peers {
-								if p == peer {
+								if p == peerID {
 									peerFound = true
 									break
 								}
 							}
 							defer w.peersMutex.Unlock()
 							log.Debug("###PING before fetching result")
-							
+
 							pingTicker := time.NewTicker(time.Duration(1) * time.Second)
 							isError := false
 							select {
@@ -826,28 +835,30 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 							if !peerFound && !isError {
 								//EventBus Emitter doesn't seem to work when there's no connection
 								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
-									Peer:          peer,
+									Peer:          peerID,
 									Connectedness: network.Connected,
 								}
-								peerConns := w.host.Network().ConnsToPeer(peer)
+								peerConns := w.host.Network().ConnsToPeer(peerID)
 								if len(peerConns) > 0 {
 									// log.Info("###PING " + s + " IdentifyWait")
 									// logwriter.Write([]byte("###PING " + s + " IdentifyWait"))
 									//w.idService.IdentifyWait(peerConns[0])
 								} else {
-									w.DialPeerByID(peer)
+									go func(peerID peer.ID) {
+										ctx, cancel := context.WithTimeout(w.ctx, time.Duration(5)*time.Second)
+										defer cancel()
+										w.DialPeerByID(ctx, peerID)
+									}(peerID)
 								}
 							} else if peerFound && isError {
-								// log.Info("###PING " + s + " peer removed")
-								// logwriter.Write([]byte("###PING " + s + " peer removed"))
 								w.pingEventsChan <- event.EvtPeerConnectednessChanged{
-									Peer:          peer,
+									Peer:          peerID,
 									Connectedness: network.NotConnected,
 								}
 							}
 
 							mu.Lock()
-							delete(peerMap, peer)
+							delete(peerMap, peerID)
 							mu.Unlock()
 						}(p)
 					} else {
