@@ -16,6 +16,7 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-install_name,@rpath/libstatus.dylib"
   ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
     # Building on M1 is still not supported, so in the meantime we crosscompile to amd64
     GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=amd64
