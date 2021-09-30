@@ -62,6 +62,7 @@ import (
 )
 
 const messageQueueLimit = 1024
+const requestTimeout = 5 * time.Second
 
 type settings struct {
 	LightClient            bool            // Indicates if the node is a light client
@@ -219,12 +220,16 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 func (w *Waku) addPeers(cfg *Config) {
 	if !cfg.LightClient {
 		for _, relaynode := range cfg.RelayNodes {
-			err := w.node.DialPeer(relaynode)
-			if err != nil {
-				log.Warn("could not dial peer", err)
-			} else {
-				log.Info("relay peer dialed successfully", relaynode)
-			}
+			go func(node string) {
+				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+				defer cancel()
+				err := w.node.DialPeer(ctx, node)
+				if err != nil {
+					log.Warn("could not dial peer", err)
+				} else {
+					log.Info("relay peer dialed successfully", node)
+				}
+			}(relaynode)
 		}
 	}
 
@@ -846,11 +851,15 @@ func (w *Waku) AddRelayPeer(address string) (string, error) {
 }
 
 func (w *Waku) DialPeer(address string) error {
-	return w.node.DialPeer(address)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	return w.node.DialPeer(ctx, address)
 }
 
 func (w *Waku) DialPeerByID(peerID string) error {
-	return w.node.DialPeerByID(peer.ID(peerID))
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	return w.node.DialPeerByID(ctx, peer.ID(peerID))
 }
 
 func (w *Waku) DropPeer(peerID string) error {
