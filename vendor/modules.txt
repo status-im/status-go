@@ -131,7 +131,8 @@ github.com/go-playground/locales/currency
 github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
-# github.com/gogo/protobuf v1.3.1
+# github.com/gogo/protobuf v1.3.2
+github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
 # github.com/golang-migrate/migrate/v4 v4.8.0
 github.com/golang-migrate/migrate/v4
@@ -424,9 +425,12 @@ github.com/shopspring/decimal
 github.com/spacemonkeygo/spacelog
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 github.com/status-im/doubleratchet
+# github.com/status-im/go-libp2p-rendezvous v0.0.0-20210930154620-020ef08b264a
+github.com/status-im/go-libp2p-rendezvous
+github.com/status-im/go-libp2p-rendezvous/pb
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20210930231040-ecfdec1b0a3b
+# github.com/status-im/go-waku v0.0.0-20211001195506-ecf72cb14920
 github.com/status-im/go-waku/waku/v2/metrics
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol

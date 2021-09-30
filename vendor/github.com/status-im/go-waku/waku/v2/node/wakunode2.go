@@ -26,6 +26,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 
+	rendezvous "github.com/status-im/go-libp2p-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -59,6 +60,8 @@ type WakuNode struct {
 	relay     *relay.WakuRelay
 	filter    *filter.WakuFilter
 	lightPush *lightpush.WakuLightPush
+
+	rendezvous *rendezvous.RendezvousService
 
 	ping *ping.PingService
 
@@ -197,13 +200,13 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	params := new(WakuNodeParameters)
 
 	ctx, cancel := context.WithCancel(ctx)
-	_ = cancel
 
 	params.libP2POpts = DefaultLibP2POptions
 
 	for _, opt := range opts {
 		err := opt(params)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 	}
@@ -218,6 +221,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 
 	host, err := libp2p.New(ctx, params.libP2POpts...)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -260,6 +264,11 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
+	if params.enableRendezvous {
+		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
+		params.wOpts = append(params.wOpts, wakurelay.WithDiscovery(rendezvous, params.rendezvousOpts...))
+	}
+
 	err = w.mountRelay(params.enableRelay, params.wOpts...)
 	if err != nil {
 		return nil, err
@@ -271,6 +280,13 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 
 	if params.keepAliveInterval > time.Duration(0) {
 		w.startKeepAlive(params.keepAliveInterval)
+	}
+
+	if params.enableRendezvousServer {
+		err := w.mountRendezvous()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, addr := range w.ListenAddresses() {
@@ -286,9 +302,14 @@ func (w *WakuNode) Stop() {
 	defer w.cancel()
 
 	close(w.quit)
+
 	defer w.connectednessEventSub.Close()
 	defer w.protocolEventSub.Close()
 	defer w.identificationEventSub.Close()
+
+	if w.rendezvous != nil {
+		w.rendezvous.Stop()
+	}
 
 	for _, topic := range w.relay.Topics() {
 		for _, sub := range w.subscriptions[topic] {
@@ -297,6 +318,8 @@ func (w *WakuNode) Stop() {
 	}
 
 	w.subscriptions = nil
+
+	w.host.Close()
 }
 
 func (w *WakuNode) Host() host.Host {
@@ -320,13 +343,13 @@ func (w *WakuNode) IsOnline() bool {
 			if !hasRelay && protocol == string(wakurelay.WakuRelayID_v200) {
 				hasRelay = true
 			}
-			if !hasLightPush && protocol == string(lightpush.WakuLightPushProtocolId) {
+			if !hasLightPush && protocol == string(lightpush.LightPushID_v20beta1) {
 				hasLightPush = true
 			}
-			if !hasStore && protocol == string(store.WakuStoreProtocolId) {
+			if !hasStore && protocol == string(store.StoreID_v20beta3) {
 				hasStore = true
 			}
-			if !hasFilter && protocol == string(filter.WakuFilterProtocolId) {
+			if !hasFilter && protocol == string(filter.FilterID_v20beta1) {
 				hasFilter = true
 			}
 			if hasRelay || hasLightPush && (hasStore || hasFilter) {
@@ -344,7 +367,7 @@ func (w *WakuNode) HasHistory() bool {
 
 	for _, v := range w.peers {
 		for _, protocol := range v {
-			if protocol == string(store.WakuStoreProtocolId) {
+			if protocol == string(store.StoreID_v20beta3) {
 				return true
 			}
 		}
@@ -402,12 +425,15 @@ func (w *WakuNode) mountLightPush() {
 	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay)
 }
 
-func (w *WakuNode) AddPeer(info *peer.AddrInfo, protocolId string) error {
-	log.Info(fmt.Sprintf("adding peer %s with protocol %s", info.ID.Pretty(), protocolId))
+func (w *WakuNode) mountRendezvous() error {
+	w.rendezvous = rendezvous.NewRendezvousService(w.host, w.opts.rendevousStorage)
 
-	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+	if err := w.rendezvous.Start(); err != nil {
+		return err
+	}
 
-	return w.host.Peerstore().AddProtocols(info.ID, protocolId)
+	log.Info("Rendezvous service started")
+	return nil
 }
 
 func (w *WakuNode) startStore() {
@@ -422,29 +448,20 @@ func (w *WakuNode) startStore() {
 	}
 }
 
-func (w *WakuNode) addPeerWithProtocol(address string, proto p2pproto.ID) (*peer.ID, error) {
-	info, err := addrInfoFromMultiaddrString(address)
+func (w *WakuNode) addPeer(info *peer.AddrInfo, protocolID p2pproto.ID) error {
+	log.Info(fmt.Sprintf("adding peer %s", info.ID.Pretty()))
+	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+	return w.host.Peerstore().AddProtocols(info.ID, string(protocolID))
+
+}
+
+func (w *WakuNode) AddPeer(address ma.Multiaddr, protocolID p2pproto.ID) (*peer.ID, error) {
+	info, err := peer.AddrInfoFromP2pAddr(address)
 	if err != nil {
 		return nil, err
 	}
 
-	return &info.ID, w.AddPeer(info, string(proto))
-}
-
-func (w *WakuNode) AddStorePeer(address string) (*peer.ID, error) {
-	return w.addPeerWithProtocol(address, store.WakuStoreProtocolId)
-}
-
-func (w *WakuNode) AddRelayPeer(address string) (*peer.ID, error) {
-	return w.addPeerWithProtocol(address, wakurelay.WakuRelayID_v200)
-}
-
-func (w *WakuNode) AddFilterPeer(address string) (*peer.ID, error) {
-	return w.addPeerWithProtocol(address, filter.WakuFilterProtocolId)
-}
-
-func (w *WakuNode) AddLightPushPeer(address string) (*peer.ID, error) {
-	return w.addPeerWithProtocol(address, lightpush.WakuLightPushProtocolId)
+	return &info.ID, w.addPeer(info, protocolID)
 }
 
 func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime float64, endTime float64, opts ...store.HistoryRequestOption) (*pb.HistoryResponse, error) {
@@ -785,7 +802,6 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 	w.ping = ping.NewPingService(w.host)
 	ticker := time.NewTicker(t)
 	go func() {
-
 		// This map contains peers that we're
 		// waiting for the ping response from
 		peerMap := make(map[peer.ID]<-chan ping.Result)
@@ -847,7 +863,9 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 									go func(peerID peer.ID) {
 										ctx, cancel := context.WithTimeout(w.ctx, time.Duration(5)*time.Second)
 										defer cancel()
-										w.DialPeerByID(ctx, peerID)
+										if err := w.DialPeerByID(ctx, peerID); err != nil {
+											log.Warn("could not dial peer ", peerID)
+										}
 									}(peerID)
 								}
 							} else if peerFound && isError {
@@ -872,13 +890,4 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 			}
 		}
 	}()
-}
-
-func addrInfoFromMultiaddrString(address string) (*peer.AddrInfo, error) {
-	ma, err := ma.NewMultiaddr(address)
-	if err != nil {
-		return nil, err
-	}
-
-	return peer.AddrInfoFromP2pAddr(ma)
 }

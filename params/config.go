@@ -172,6 +172,9 @@ type WakuV2Config struct {
 	// FullNode should be true if waku should always acta as a full node
 	FullNode bool
 
+	// DiscoveryLimit indicates the maximum number of peers to discover
+	DiscoveryLimit int
+
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
 
@@ -228,6 +231,9 @@ type WakuV2Config struct {
 
 	// A name->libp2p_addr map for Wakuv2 custom nodes
 	CustomNodes map[string]string
+
+	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
+	PeerExchange bool
 }
 
 // ----------
@@ -289,8 +295,8 @@ type ClusterConfig struct {
 	// LightpushNodes is a list of wakuv2 lightpush nodes (libp2p)
 	LightpushNodes []string
 
-	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
-	PeerExchange bool
+	// WakuRendezvousNodes is a list of go-waku rendezvous nodes to be used for ambient discovery
+	WakuRendezvousNodes []string
 }
 
 // String dumps config object as nicely indented JSON

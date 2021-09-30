@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 
 	"go.uber.org/zap"
 
@@ -46,15 +47,20 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/metrics"
+	libp2pproto "github.com/libp2p/go-libp2p-core/protocol"
 
+	rendezvous "github.com/status-im/go-libp2p-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/status-im/go-waku/waku/v2/protocol/filter"
+	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2/common"
 
+	libp2pdisc "github.com/libp2p/go-libp2p-core/discovery"
 	node "github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
@@ -176,6 +182,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 	}
 
+	if cfg.Rendezvous {
+		opts = append(opts, node.WithRendezvous(wakurelay.WithDiscoveryOpts(libp2pdisc.Limit(cfg.DiscoveryLimit))))
+	}
+
 	if cfg.LightClient {
 		opts = append(opts, node.WithLightPush())
 		opts = append(opts, node.WithWakuFilter())
@@ -196,7 +206,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
 	}
 
-	waku.addPeers(cfg)
+	waku.addWakuV2Peers(cfg)
 
 	go func() {
 		for {
@@ -217,7 +227,29 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	return waku, nil
 }
 
-func (w *Waku) addPeers(cfg *Config) {
+func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID) {
+	for _, addrString := range addresses {
+		if addrString == "" {
+			continue
+		}
+
+		addr, err := multiaddr.NewMultiaddr(addrString)
+		if err != nil {
+			log.Warn("invalid peer multiaddress", addrString, err)
+			continue
+		}
+
+		peerID, err := w.node.AddPeer(addr, protocol)
+		if err != nil {
+			log.Warn("could not add peer", addr, err)
+			continue
+		}
+
+		log.Info("peer added successfully", peerID)
+	}
+}
+
+func (w *Waku) addWakuV2Peers(cfg *Config) {
 	if !cfg.LightClient {
 		for _, relaynode := range cfg.RelayNodes {
 			go func(node string) {
@@ -233,32 +265,10 @@ func (w *Waku) addPeers(cfg *Config) {
 		}
 	}
 
-	for _, storenode := range cfg.StoreNodes {
-		peerID, err := w.node.AddStorePeer(storenode)
-		if err != nil {
-			log.Warn("could not add store peer", err)
-		} else {
-			log.Info("store peer added successfully", "peerId", peerID.Pretty())
-		}
-	}
-
-	for _, filternode := range cfg.FilterNodes {
-		peerID, err := w.node.AddFilterPeer(filternode)
-		if err != nil {
-			log.Warn("could not add filter peer", err)
-		} else {
-			log.Info("filter peer added successfully", "peerId", peerID.Pretty())
-		}
-	}
-
-	for _, lightpushnode := range cfg.LightpushNodes {
-		peerID, err := w.node.AddLightPushPeer(lightpushnode)
-		if err != nil {
-			log.Warn("could not add lightpush peer", err)
-		} else {
-			log.Info("lightpush peer added successfully", "peerId", peerID.Pretty())
-		}
-	}
+	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta3)
+	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1)
+	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1)
+	w.addPeers(cfg.WakuRendezvousNodes, rendezvous.RendezvousID_v001)
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -835,7 +845,12 @@ func (w *Waku) Peers() map[string][]string {
 }
 
 func (w *Waku) AddStorePeer(address string) (string, error) {
-	peerID, err := w.node.AddStorePeer(address)
+	addr, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta3)
 	if err != nil {
 		return "", err
 	}
@@ -843,7 +858,12 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 }
 
 func (w *Waku) AddRelayPeer(address string) (string, error) {
-	peerID, err := w.node.AddRelayPeer(address)
+	addr, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := w.node.AddPeer(addr, wakurelay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

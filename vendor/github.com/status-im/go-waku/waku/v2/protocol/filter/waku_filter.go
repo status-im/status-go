@@ -55,9 +55,7 @@ type (
 // should be direct payload exchange (a la req-resp), not be coupled with the
 // relay protocol.
 
-const WakuFilterCodec = "/vac/waku/filter/2.0.0-beta1"
-
-const WakuFilterProtocolId = libp2pProtocol.ID(WakuFilterCodec)
+const FilterID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter/2.0.0-beta1")
 
 func (filters *Filters) Notify(msg *pb.WakuMessage, requestId string) {
 	for key, filter := range *filters {
@@ -192,7 +190,7 @@ func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandl
 	wf.pushHandler = handler
 	wf.peerChan = peerChan
 
-	wf.h.SetStreamHandlerMatch(WakuFilterProtocolId, protocol.PrefixTextMatch(WakuFilterCodec), wf.onRequest)
+	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
 	go wf.FilterListener()
 	go wf.peerListener()
 
@@ -222,7 +220,7 @@ func (wf *WakuFilter) FilterListener() {
 					pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: msgArr}}
 					log.Info("pushing a message to light node: ", pushRPC)
 
-					conn, err := wf.h.NewStream(wf.ctx, peer.ID(subscriber.peer), WakuFilterProtocolId)
+					conn, err := wf.h.NewStream(wf.ctx, peer.ID(subscriber.peer), FilterID_v20beta1)
 
 					if err != nil {
 						// @TODO more sophisticated error handling here
@@ -258,9 +256,9 @@ func (wf *WakuFilter) FilterListener() {
 // select a peer with filter support, dial it,
 // and submit FilterRequest wrapped in FilterRPC
 func (wf *WakuFilter) Subscribe(ctx context.Context, request pb.FilterRequest) (string, error) { //.async, gcsafe.} {
-	peer, err := utils.SelectPeer(wf.h, string(WakuFilterProtocolId))
+	peer, err := utils.SelectPeer(wf.h, string(FilterID_v20beta1))
 	if err == nil {
-		conn, err := wf.h.NewStream(ctx, *peer, WakuFilterProtocolId)
+		conn, err := wf.h.NewStream(ctx, *peer, FilterID_v20beta1)
 
 		if conn != nil {
 			defer conn.Close()
@@ -292,9 +290,9 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, request pb.FilterRequest) (
 
 func (wf *WakuFilter) Unsubscribe(ctx context.Context, request pb.FilterRequest) {
 	// @TODO: NO REAL REASON TO GENERATE REQUEST ID FOR UNSUBSCRIBE OTHER THAN CREATING SANE-LOOKING RPC.
-	peer, err := utils.SelectPeer(wf.h, string(WakuFilterProtocolId))
+	peer, err := utils.SelectPeer(wf.h, string(FilterID_v20beta1))
 	if err == nil {
-		conn, err := wf.h.NewStream(ctx, *peer, WakuFilterProtocolId)
+		conn, err := wf.h.NewStream(ctx, *peer, FilterID_v20beta1)
 
 		if conn != nil {
 			defer conn.Close()

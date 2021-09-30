@@ -86,7 +86,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	}
 
 	if config.WakuV2Config.Enabled {
-		waku2Service, err := b.wakuV2Service(config.NodeKey, &config.WakuV2Config, &config.ClusterConfig)
+		waku2Service, err := b.wakuV2Service(config)
 		if err != nil {
 			return err
 		}
@@ -241,28 +241,35 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 
 }
 
-func (b *StatusNode) wakuV2Service(nodeKey string, wakuCfg *params.WakuV2Config, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
 			MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
-			SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
-			Host:                   wakuCfg.Host,
-			Port:                   wakuCfg.Port,
-			LightClient:            wakuCfg.LightClient,
-			KeepAliveInterval:      wakuCfg.KeepAliveInterval,
-			RelayNodes:             clusterCfg.RelayNodes,
-			StoreNodes:             clusterCfg.StoreNodes,
-			FilterNodes:            clusterCfg.FilterNodes,
-			LightpushNodes:         clusterCfg.LightpushNodes,
-			PeerExchange:           clusterCfg.PeerExchange,
+			SoftBlacklistedPeerIDs: nodeConfig.WakuV2Config.SoftBlacklistedPeerIDs,
+			Host:                   nodeConfig.WakuV2Config.Host,
+			Port:                   nodeConfig.WakuV2Config.Port,
+			LightClient:            nodeConfig.WakuV2Config.LightClient,
+			KeepAliveInterval:      nodeConfig.WakuV2Config.KeepAliveInterval,
+			RelayNodes:             nodeConfig.ClusterConfig.RelayNodes,
+			StoreNodes:             nodeConfig.ClusterConfig.StoreNodes,
+			FilterNodes:            nodeConfig.ClusterConfig.FilterNodes,
+			LightpushNodes:         nodeConfig.ClusterConfig.LightpushNodes,
+			Rendezvous:             nodeConfig.Rendezvous,
+			WakuRendezvousNodes:    nodeConfig.ClusterConfig.WakuRendezvousNodes,
+			PeerExchange:           nodeConfig.WakuV2Config.PeerExchange,
+			DiscoveryLimit:         nodeConfig.WakuV2Config.DiscoveryLimit,
 		}
 
 		if cfg.Host == "" {
 			cfg.Host = wakuv2.DefaultConfig.Host
 		}
 
-		if wakuCfg.MaxMessageSize > 0 {
-			cfg.MaxMessageSize = wakuCfg.MaxMessageSize
+		if cfg.DiscoveryLimit == 0 {
+			cfg.DiscoveryLimit = wakuv2.DefaultConfig.DiscoveryLimit
+		}
+
+		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
+			cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
 		}
 
 		lvl, err := logging.LevelFromString("info")
@@ -271,7 +278,7 @@ func (b *StatusNode) wakuV2Service(nodeKey string, wakuCfg *params.WakuV2Config,
 		}
 		logging.SetAllLoggers(lvl)
 
-		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger())
+		w, err := wakuv2.New(nodeConfig.NodeKey, cfg, logutils.ZapLogger())
 
 		if err != nil {
 			return nil, err
