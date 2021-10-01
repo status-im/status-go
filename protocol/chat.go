@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"math/rand"
 
@@ -154,6 +155,9 @@ type ChatPreview struct {
 
 	// SyncedFrom is the time from when it was synced with a mailserver
 	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
+
+	// ParsedText is the parsed markdown for displaying
+	ParsedText json.RawMessage `json:"parsedText,omitempty"`
 
 	Text string `json:"text,omitempty"`
 
