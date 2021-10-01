@@ -8,6 +8,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+
+	"strings"
 )
 
 func (m *Messenger) Chats() []*Chat {
@@ -52,10 +54,19 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 			if chat.LastMessage != nil {
 				chatPreview.ContentType = chat.LastMessage.ContentType
 				if chat.LastMessage.ContentType == protobuf.ChatMessage_TEXT_PLAIN {
-					if len(chat.LastMessage.Text) > 200 {
-						chatPreview.Text = chat.LastMessage.Text[:200]
-					} else {
-						chatPreview.Text = chat.LastMessage.Text
+
+					simplifiedText, err := chat.LastMessage.GetSimplifiedText("", nil)
+
+					if err == nil {
+						if len(simplifiedText) > 100 {
+							chatPreview.Text = simplifiedText[:100]
+						} else {
+							chatPreview.Text = simplifiedText
+						}
+						if strings.Contains(chatPreview.Text, "0x") {
+							//if there is a mention, we would like to send parsed text as well
+							chatPreview.ParsedText = chat.LastMessage.ParsedText
+						}
 					}
 				}
 			}
