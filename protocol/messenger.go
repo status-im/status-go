@@ -1132,7 +1132,7 @@ func (m *Messenger) Init() error {
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
-		if !contact.IsAdded() || contact.IsBlocked() {
+		if !contact.Added || contact.Blocked {
 			continue
 		}
 		publicKey, err := contact.PublicKey()
@@ -2230,7 +2230,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.ID != myID &&
-			(contact.LocalNickname != "" || contact.IsAdded() || contact.IsBlocked()) {
+			(contact.LocalNickname != "" || contact.Added || contact.Blocked) {
 			if err = m.syncContact(ctx, contact); err != nil {
 				return false
 			}
@@ -2371,8 +2371,8 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 		Id:            contact.ID,
 		EnsName:       ensName,
 		LocalNickname: contact.LocalNickname,
-		Added:         contact.IsAdded(),
-		Blocked:       contact.IsBlocked(),
+		Added:         contact.Added,
+		Blocked:       contact.Blocked,
 		Muted:         muted,
 		Removed:       contact.Removed,
 	}
@@ -2627,7 +2627,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
-				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.IsBlocked() {
+				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
 					continue
 				}
 
@@ -3272,7 +3272,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.IsAdded() {
+			if contact.Added {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true
@@ -4230,14 +4230,14 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var publicChatIDs []string
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.IsAdded() && !contact.IsBlocked() {
+		if contact.Added && !contact.Blocked {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
 				return true
 			}
 			contactIDs = append(contactIDs, pk)
-		} else if contact.IsBlocked() {
+		} else if contact.Blocked {
 			mutedChatIDs = append(mutedChatIDs, contact.ID)
 		}
 		return true
@@ -4428,7 +4428,7 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.IsAdded() {
+			if contact.Added {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true

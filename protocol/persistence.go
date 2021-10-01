@@ -453,6 +453,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.last_updated,
 			c.added,
 			c.blocked,
+			c.has_added_us,
 			c.local_nickname,
 			i.image_type,
 			i.payload
@@ -475,6 +476,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			ensVerified  sql.NullBool
 			added        sql.NullBool
 			blocked      sql.NullBool
+			hasAddedUs   sql.NullBool
 			imagePayload []byte
 		)
 
@@ -490,6 +492,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.LastUpdated,
 			&added,
 			&blocked,
+			&hasAddedUs,
 			&nickname,
 			&imageType,
 			&imagePayload,
@@ -516,6 +519,10 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if blocked.Valid {
 			contact.Blocked = blocked.Bool
+		}
+
+		if hasAddedUs.Valid {
+			contact.HasAddedUs = hasAddedUs.Bool
 		}
 
 		previousContact, ok := allContacts[contact.ID]
@@ -658,10 +665,11 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			local_nickname,
 			added,
 			blocked,
+			has_added_us,
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -677,6 +685,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.LocalNickname,
 		contact.Added,
 		contact.Blocked,
+		contact.HasAddedUs,
 		//TODO we need to drop these columns
 		"",
 		"",

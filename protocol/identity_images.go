@@ -29,7 +29,7 @@ func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityIm
 		ii.Payload = encryptedPayload
 		ii.Encrypted = true
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if !contact.IsAdded() {
+			if !contact.Added {
 				return true
 			}
 			var pubK *ecdsa.PublicKey

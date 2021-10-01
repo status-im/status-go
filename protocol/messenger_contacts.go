@@ -26,7 +26,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		}
 	}
 
-	if !contact.IsAdded() {
+	if !contact.Added {
 		contact.Added = true
 	}
 
@@ -263,7 +263,7 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 	// TODO: This should not be sending paired messages, as we do it above
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.IsAdded() {
+		if contact.Added {
 			if _, err = m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
 				return false
 			}
@@ -343,18 +343,18 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 
 func (m *Messenger) isNewContact(contact *Contact) bool {
 	previousContact, ok := m.allContacts.Load(contact.ID)
-	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
+	return contact.Added && (!ok || !previousContact.Added)
 }
 
 func (m *Messenger) shouldSyncContact(contact *Contact) bool {
 	previousContact, ok := m.allContacts.Load(contact.ID)
 	if !ok {
-		return contact.IsAdded()
+		return contact.Added
 	}
 
 	return contact.LocalNickname != previousContact.LocalNickname ||
-		contact.IsAdded() != previousContact.IsAdded() ||
-		previousContact.IsBlocked() != contact.IsBlocked()
+		contact.Added != previousContact.Added ||
+		previousContact.Blocked != contact.Blocked
 }
 
 func (m *Messenger) removedContact(contact *Contact) bool {
@@ -362,5 +362,5 @@ func (m *Messenger) removedContact(contact *Contact) bool {
 	if !ok {
 		return false
 	}
-	return previousContact.IsAdded() && !contact.IsAdded()
+	return previousContact.Added && !contact.Added
 }
