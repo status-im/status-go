@@ -74,7 +74,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 	// It should not add the contact, as that's left to `SaveContact`
-	s.Require().False(contact.IsAdded())
+	s.Require().False(contact.Added)
 
 	// add contact
 	contact.Added = true
@@ -96,6 +96,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(theirName, receivedContact.Name)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
+	s.Require().True(receivedContact.HasAddedUs)
 
 	newPicture := "new-picture"
 	err = theirMessenger.SendContactUpdates(context.Background(), newName, newPicture)
@@ -138,7 +139,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	s.Require().Len(response.Chats(), 2)
 
 	// It should add the contact
-	s.Require().True(contact.IsAdded())
+	s.Require().True(contact.Added)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(

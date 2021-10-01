@@ -48,8 +48,9 @@ type Contact struct {
 
 	Images map[string]images.IdentityImage `json:"images"`
 
-	Added   bool `json:"added"`
-	Blocked bool `json:"blocked"`
+	Added      bool `json:"added"`
+	Blocked    bool `json:"blocked"`
+	HasAddedUs bool `json:"hasAddedUs"`
 
 	IsSyncing bool
 	Removed   bool
@@ -61,14 +62,6 @@ func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	return crypto.UnmarshalPubkey(b)
-}
-
-func (c Contact) IsAdded() bool {
-	return c.Added
-}
-
-func (c Contact) IsBlocked() bool {
-	return c.Blocked
 }
 
 func (c *Contact) Block() {

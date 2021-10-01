@@ -105,7 +105,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
 		// unless is coming from us or a contact or were waiting for approval
-		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
+		isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 		newChat.Active = isActive
 		chat = &newChat
 
@@ -322,7 +322,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		contact.LastUpdated = message.Clock
 		contact.LocalNickname = message.LocalNickname
 
-		if message.Blocked != contact.IsBlocked() {
+		if message.Blocked != contact.Blocked {
 			if message.Blocked {
 				chats, err := m.BlockContact(contact)
 				if err != nil {
@@ -462,6 +462,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 			contact.Name = message.EnsName
 			contact.ENSVerified = false
 		}
+		contact.HasAddedUs = true
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
@@ -1118,7 +1119,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 		// We set the chat as inactive and will create a notification
 		// if it's not coming from a contact
 		contact, ok := m.allContacts.Load(chatID)
-		chat.Active = chat.Active || (ok && contact.IsAdded())
+		chat.Active = chat.Active || (ok && contact.Added)
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
 		chatID := chatEntity.GetChatId()
@@ -1452,7 +1453,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	}
 
 	// Otherwise we check if we added it
-	return contact.IsAdded(), nil
+	return contact.Added, nil
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {

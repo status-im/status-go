@@ -116,7 +116,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	actualContact := response.Contacts[0]
 	s.Require().Equal(contact.ID, actualContact.ID)
-	s.Require().True(actualContact.IsAdded())
+	s.Require().True(actualContact.Added)
 
 	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(chat)
@@ -224,7 +224,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().NotNil(statusChat)
 
-	s.Require().True(actualContact.IsAdded())
+	s.Require().True(actualContact.Added)
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
