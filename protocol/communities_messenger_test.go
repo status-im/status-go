@@ -204,6 +204,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
+			Emoji:       "😎",
 			Description: "status-core community chat",
 		},
 	}
@@ -216,6 +217,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	createdChat := response.Chats()[0]
 	s.Require().Equal(community.IDString(), createdChat.CommunityID)
 	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
+	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
 	s.Require().NotEmpty(createdChat.ID)
 	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
 	s.Require().True(createdChat.Active)
@@ -298,6 +300,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	createdChat = response.Chats()[0]
 	s.Require().Equal(community.IDString(), createdChat.CommunityID)
 	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
+	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
 	s.Require().NotEmpty(createdChat.ID)
 	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
 	s.Require().Equal(categoryID, createdChat.CategoryID)
@@ -312,6 +315,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core-ui",
+			Emoji:       "👍",
 			Description: "status-core-ui community chat",
 		},
 	}
@@ -344,6 +348,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	createdChat = response.Chats()[0]
 	s.Require().Equal(community.IDString(), createdChat.CommunityID)
 	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
+	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
 	s.Require().NotEmpty(createdChat.ID)
 	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
 	s.Require().True(createdChat.Active)

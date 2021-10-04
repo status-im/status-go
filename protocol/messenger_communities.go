@@ -898,9 +898,13 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 			chatIDs = append(chatIDs, chat.ID)
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name ||
-			oldChat.Description != chat.Description {
+			oldChat.Description != chat.Description ||
+			oldChat.Emoji != chat.Emoji ||
+			oldChat.Color != chat.Color {
 			oldChat.Name = chat.Name
 			oldChat.Description = chat.Description
+			oldChat.Emoji = chat.Emoji
+			oldChat.Color = chat.Color
 			// TODO(samyoul) remove storing of an updated reference pointer?
 			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)

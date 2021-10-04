@@ -20,6 +20,7 @@ type CreateCommunity struct {
 	Name        string                               `json:"name"`
 	Description string                               `json:"description"`
 	Color       string                               `json:"color"`
+	Emoji       string                               `json:"emoji"`
 	Membership  protobuf.CommunityPermissions_Access `json:"membership"`
 	EnsOnly     bool                                 `json:"ensOnly"`
 	Image       string                               `json:"image"`
@@ -61,6 +62,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 	ci := &protobuf.ChatIdentity{
 		DisplayName: c.Name,
 		Color:       c.Color,
+		Emoji:       c.Emoji,
 		Description: c.Description,
 	}
 

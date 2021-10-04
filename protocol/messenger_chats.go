@@ -31,6 +31,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				Name:                  chat.Name,
 				Description:           chat.Description,
 				Color:                 chat.Color,
+				Emoji:                 chat.Emoji,
 				Active:                chat.Active,
 				ChatType:              chat.ChatType,
 				Timestamp:             chat.Timestamp,
