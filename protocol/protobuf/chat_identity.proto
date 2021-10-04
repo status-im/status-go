@@ -23,6 +23,8 @@ message ChatIdentity {
   string description = 5;
 
   string color = 6;
+
+  string emoji = 7;
 }
 
 // ProfileImage represents data associated with a user's profile image

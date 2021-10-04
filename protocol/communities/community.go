@@ -63,6 +63,8 @@ func New(config Config) (*Community, error) {
 type CommunityChat struct {
 	ID          string                               `json:"id"`
 	Name        string                               `json:"name"`
+	Color       string                               `json:"color"`
+	Emoji       string                               `json:"emoji"`
 	Description string                               `json:"description"`
 	Members     map[string]*protobuf.CommunityMember `json:"members"`
 	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
@@ -116,6 +118,8 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			chat := CommunityChat{
 				ID:          id,
 				Name:        c.Identity.DisplayName,
+				Color:       c.Identity.Color,
+				Emoji:       c.Identity.Emoji,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
 				Members:     c.Members,
@@ -199,6 +203,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			chat := CommunityChat{
 				ID:          id,
 				Name:        c.Identity.DisplayName,
+				Emoji:       c.Identity.Emoji,
+				Color:       c.Identity.Color,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
 				Members:     c.Members,
@@ -651,6 +657,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.Identity.DisplayName = description.Identity.DisplayName
 	o.config.CommunityDescription.Identity.Description = description.Identity.Description
 	o.config.CommunityDescription.Identity.Color = description.Identity.Color
+	o.config.CommunityDescription.Identity.Emoji = description.Identity.Emoji
 	o.config.CommunityDescription.Identity.Images = description.Identity.Images
 	o.increaseClock()
 }

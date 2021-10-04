@@ -46,6 +46,7 @@ type Chat struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
+	Emoji       string `json:"emoji"`
 	// Active indicates whether the chat has been soft deleted
 	Active bool `json:"active"`
 
@@ -109,6 +110,7 @@ type ChatPreview struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
+	Emoji       string `json:"emoji"`
 	// Active indicates whether the chat has been soft deleted
 	Active bool `json:"active"`
 
@@ -373,6 +375,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		Description: orgChat.Identity.Description,
 		Active:      true,
 		Color:       color,
+		Emoji:       orgChat.Identity.Emoji,
 		ID:          orgID + chatID,
 		Timestamp:   int64(timesource.GetCurrentTime()),
 		Joined:      int64(timesource.GetCurrentTime()),

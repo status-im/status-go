@@ -130,8 +130,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -141,6 +141,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.ID,
 		chat.Name,
 		chat.Color,
+		chat.Emoji,
 		chat.Active,
 		chat.ChatType,
 		chat.Timestamp,
@@ -232,6 +233,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.id,
 			chats.name,
 			chats.color,
+			chats.emoji,
 			chats.active,
 			chats.type,
 			chats.timestamp,
@@ -275,6 +277,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.ID,
 			&chat.Name,
 			&chat.Color,
+			&chat.Emoji,
 			&chat.Active,
 			&chat.ChatType,
 			&chat.Timestamp,
@@ -361,6 +364,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			id,
 			name,
 			color,
+			emoji,
 			active,
 			type,
 			timestamp,
@@ -382,6 +386,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 	`, chatID).Scan(&chat.ID,
 		&chat.Name,
 		&chat.Color,
+		&chat.Emoji,
 		&chat.Active,
 		&chat.ChatType,
 		&chat.Timestamp,

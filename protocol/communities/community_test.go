@@ -159,6 +159,8 @@ func (s *CommunitySuite) TestEditChat() {
 	identity := &protobuf.ChatIdentity{
 		DisplayName: "new-chat-display-name",
 		Description: "new-chat-description",
+		Emoji:       "😎",
+		Color:       "#000000",
 	}
 	permissions := &protobuf.CommunityPermissions{
 		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -175,6 +177,8 @@ func (s *CommunitySuite) TestEditChat() {
 	editedIdentity := &protobuf.ChatIdentity{
 		DisplayName: "edited-new-chat-display-name",
 		Description: "edited-new-chat-description",
+		Emoji:       "🤘",
+		Color:       "#FFFFFF",
 	}
 	editedPermissions := &protobuf.CommunityPermissions{
 		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
