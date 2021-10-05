@@ -116,9 +116,12 @@ func (m *Messenger) initChatSyncFields(chat *Chat) error {
 
 func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse) (*MessengerResponse, error) {
 	chat, ok := m.allChats.Load(chatID)
+	wasActive := false
 	if !ok {
 		chat = CreatePublicChat(chatID, m.getTimesource())
 
+	} else {
+		wasActive = chat.Active
 	}
 	chat.Active = true
 	chat.DeletedAtClockValue = 0
@@ -150,7 +153,7 @@ func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse)
 	}
 
 	// Sync if it was created
-	if !ok {
+	if !ok || !wasActive {
 		if err := m.syncPublicChat(context.Background(), chat); err != nil {
 			return nil, err
 		}
@@ -310,10 +313,10 @@ func (m *Messenger) DeactivateChat(request *requests.DeactivateChat) (*Messenger
 		return nil, err
 	}
 
-	return m.deactivateChat(request.ID)
+	return m.deactivateChat(request.ID, true)
 }
 
-func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
+func (m *Messenger) deactivateChat(chatID string, shouldBeSynced bool) (*MessengerResponse, error) {
 	var response MessengerResponse
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -347,6 +350,13 @@ func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
 
 	response.AddChat(chat)
 	// TODO: Remove filters
+
+	if shouldBeSynced {
+		err := m.syncChatRemoving(context.Background(), chat.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &response, nil
 }

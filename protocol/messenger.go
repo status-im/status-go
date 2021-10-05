@@ -1781,9 +1781,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
 }
 
-func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
-	var response MessengerResponse
-
+func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerResponse, chatID string, remove bool, shouldBeSynced bool) (*MessengerResponse, error) {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
@@ -1843,9 +1841,21 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 		chat.Active = false
 	}
 
+	if remove && shouldBeSynced {
+		err := m.syncChatRemoving(ctx, chat.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	response.AddChat(chat)
 
-	return &response, m.saveChat(chat)
+	return response, m.saveChat(chat)
+}
+
+func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
+	var response MessengerResponse
+	return m.leaveGroupChat(ctx, &response, chatID, remove, true)
 }
 
 func (m *Messenger) reregisterForPushNotifications() error {
@@ -2215,8 +2225,16 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	}
 
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
-		if !chat.Timeline() && !chat.ProfileUpdates() && chat.Public() && chat.Active {
+		isPublicChat := !chat.Timeline() && !chat.ProfileUpdates() && chat.Public()
+		if isPublicChat && chat.Active {
 			err = m.syncPublicChat(ctx, chat)
+			if err != nil {
+				return false
+			}
+		}
+
+		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active {
+			err := m.syncChatRemoving(ctx, chatID)
 			if err != nil {
 				return false
 			}
@@ -2334,6 +2352,36 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncChatRemoving(ctx context.Context, id string) error {
+	var err error
+	if !m.hasPairedDevices() {
+		return nil
+	}
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage := &protobuf.SyncChatRemoved{
+		Clock: clock,
+		Id:    id,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED,
 		ResendAutomatically: true,
 	})
 	if err != nil {
@@ -2791,6 +2839,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 								logger.Error("error joining chat", zap.Error(err))
 								continue
 							}
+						}
+
+					case protobuf.SyncChatRemoved:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncChatRemoved)
+						logger.Debug("Handling SyncChatRemoved", zap.Any("message", p))
+						err := m.HandleSyncChatRemoved(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle sync removing chat", zap.Error(err))
+							continue
 						}
 
 					case protobuf.SyncCommunity:
@@ -3400,7 +3462,6 @@ func (m *Messenger) MuteChat(chatID string) error {
 }
 
 func (m *Messenger) muteChat(chat *Chat, contact *Contact) error {
-	m.logger.Info("MUTING", zap.Any("CHAT ID", chat.ID))
 	err := m.persistence.MuteChat(chat.ID)
 	if err != nil {
 		return err
