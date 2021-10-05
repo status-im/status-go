@@ -72,3 +72,8 @@ message SyncInstallation {
   SyncInstallationAccount account = 3;
   repeated SyncCommunity communities = 4;
 }
+
+message SyncChatRemoved {
+  uint64 clock = 1;
+  string id = 2;
+}

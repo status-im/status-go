@@ -248,6 +248,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.ChatIdentity))
 	case protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH:
 		return m.unmarshalProtobufData(new(protobuf.AnonymousMetricBatch))
+	case protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED:
+		return m.unmarshalProtobufData(new(protobuf.SyncChatRemoved))
 	}
 	return nil
 }

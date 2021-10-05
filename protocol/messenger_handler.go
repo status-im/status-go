@@ -370,16 +370,47 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) *Chat {
 	chatID := message.Id
-	_, ok := state.AllChats.Load(chatID)
-	if ok {
+	existingChat, ok := state.AllChats.Load(chatID)
+	if ok && (existingChat.Active || uint32(message.GetClock()/1000) < existingChat.SyncedTo) {
 		return nil
 	}
 
-	chat := CreatePublicChat(chatID, state.Timesource)
+	chat := existingChat
+	if !ok {
+		chat = CreatePublicChat(chatID, state.Timesource)
+	} else {
+		existingChat.Joined = int64(state.Timesource.GetCurrentTime())
+	}
+
 	state.AllChats.Store(chat.ID, chat)
 
 	state.Response.AddChat(chat)
 	return chat
+}
+
+func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message protobuf.SyncChatRemoved) error {
+	chat, ok := m.allChats.Load(message.Id)
+	if !ok {
+		return ErrChatNotFound
+	}
+
+	if chat.Joined > int64(message.Clock) {
+		return nil
+	}
+
+	if chat.PrivateGroupChat() {
+		_, err := m.leaveGroupChat(context.Background(), state.Response, message.Id, true, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	response, err := m.deactivateChat(message.Id, false)
+	if err != nil {
+		return err
+	}
+
+	return state.Response.Merge(response)
 }
 
 func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {

@@ -18,6 +18,7 @@ import (
 )
 
 const statusChatID = "status"
+const removedChatID = "deactivated"
 
 func TestMessengerInstallationSuite(t *testing.T) {
 	suite.Run(t, new(MessengerInstallationSuite))
@@ -154,8 +155,17 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
+	// add and deactivate chat
+	chat2 := CreatePublicChat(removedChatID, s.m.transport)
+	err = s.m.SaveChat(chat2)
+	s.Require().NoError(err)
+	_, err = s.m.deactivateChat(removedChatID, true)
+	s.Require().NoError(err)
+
 	// pair
 	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	err = theirMessenger.SaveChat(chat2)
 	s.Require().NoError(err)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
@@ -205,7 +215,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 			actualContact = response.Contacts[0]
 		}
 
-		if len(allChats) >= 1 && actualContact != nil {
+		if len(allChats) >= 3 && actualContact != nil {
 			return nil
 		}
 
@@ -216,9 +226,13 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	var statusChat *Chat
+	var removedChat *Chat
 	for _, c := range allChats {
 		if c.ID == statusChatID {
 			statusChat = c
+		}
+		if c.ID == removedChatID {
+			removedChat = c
 		}
 	}
 
@@ -227,6 +241,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().True(actualContact.Added)
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
 	s.Require().NoError(theirMessenger.Shutdown())
+
+	s.Require().NotNil(removedChat)
+	s.Require().False(removedChat.Active)
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
