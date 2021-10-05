@@ -45,5 +45,5 @@ var DefaultConfig = Config{
 	Host:              "0.0.0.0",
 	Port:              60000,
 	KeepAliveInterval: 1, // second
-	DiscoveryLimit:    1000,
+	DiscoveryLimit:    40,
 }

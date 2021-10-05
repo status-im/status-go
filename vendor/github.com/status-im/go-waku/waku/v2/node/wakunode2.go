@@ -26,7 +26,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 
-	rendezvous "github.com/status-im/go-libp2p-rendezvous"
+	rendezvous "github.com/status-im/go-waku-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -252,41 +252,8 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.pingEventsChan = make(chan interface{})
 	go w.connectednessListener()
 
-	if params.enableStore {
-		w.startStore()
-	}
-
-	if params.enableFilter {
-		w.filters = make(filter.Filters)
-		err := w.mountFilter()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if params.enableRendezvous {
-		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
-		params.wOpts = append(params.wOpts, wakurelay.WithDiscovery(rendezvous, params.rendezvousOpts...))
-	}
-
-	err = w.mountRelay(params.enableRelay, params.wOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if params.enableLightPush {
-		w.mountLightPush()
-	}
-
-	if params.keepAliveInterval > time.Duration(0) {
-		w.startKeepAlive(params.keepAliveInterval)
-	}
-
-	if params.enableRendezvousServer {
-		err := w.mountRendezvous()
-		if err != nil {
-			return nil, err
-		}
+	if w.opts.keepAliveInterval > time.Duration(0) {
+		w.startKeepAlive(w.opts.keepAliveInterval)
 	}
 
 	for _, addr := range w.ListenAddresses() {
@@ -294,6 +261,43 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	}
 
 	return w, nil
+}
+
+func (w *WakuNode) Start() error {
+	if w.opts.enableStore {
+		w.startStore()
+	}
+
+	if w.opts.enableFilter {
+		w.filters = make(filter.Filters)
+		err := w.mountFilter()
+		if err != nil {
+			return err
+		}
+	}
+
+	if w.opts.enableRendezvous {
+		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
+		w.opts.wOpts = append(w.opts.wOpts, wakurelay.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
+	}
+
+	err := w.mountRelay(w.opts.enableRelay, w.opts.wOpts...)
+	if err != nil {
+		return err
+	}
+
+	if w.opts.enableLightPush {
+		w.mountLightPush()
+	}
+
+	if w.opts.enableRendezvousServer {
+		err := w.mountRendezvous()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *WakuNode) Stop() {
@@ -421,6 +425,7 @@ func (w *WakuNode) mountFilter() error {
 	return nil
 
 }
+
 func (w *WakuNode) mountLightPush() {
 	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay)
 }

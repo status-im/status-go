@@ -430,7 +430,7 @@ github.com/status-im/go-libp2p-rendezvous
 github.com/status-im/go-libp2p-rendezvous/pb
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20211001195506-ecf72cb14920
+# github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c
 github.com/status-im/go-waku/waku/v2/metrics
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol
@@ -440,6 +440,9 @@ github.com/status-im/go-waku/waku/v2/protocol/pb
 github.com/status-im/go-waku/waku/v2/protocol/relay
 github.com/status-im/go-waku/waku/v2/protocol/store
 github.com/status-im/go-waku/waku/v2/utils
+# github.com/status-im/go-waku-rendezvous v0.0.0-20211005020656-b53661c58574
+github.com/status-im/go-waku-rendezvous
+github.com/status-im/go-waku-rendezvous/pb
 # github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a
 github.com/status-im/go-wakurelay-pubsub
 github.com/status-im/go-wakurelay-pubsub/pb

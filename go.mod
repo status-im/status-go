@@ -48,7 +48,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/go-libp2p-rendezvous v0.0.0-20210930154620-020ef08b264a
-	github.com/status-im/go-waku v0.0.0-20211001195506-ecf72cb14920
+	github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c
 	github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
 	github.com/status-im/migrate/v4 v4.6.2-status.2
