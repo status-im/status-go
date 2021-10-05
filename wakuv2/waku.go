@@ -49,7 +49,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	libp2pproto "github.com/libp2p/go-libp2p-core/protocol"
 
-	rendezvous "github.com/status-im/go-libp2p-rendezvous"
+	rendezvous "github.com/status-im/go-waku-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -203,10 +203,14 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	if waku.node, err = node.New(context.Background(), opts...); err != nil {
-		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
+		return nil, fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 
 	waku.addWakuV2Peers(cfg)
+
+	if err = waku.node.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start go-waku node: %v", err)
+	}
 
 	go func() {
 		for {

@@ -1074,8 +1074,6 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/go-ethereum v1.10.4-status.3 h1:RF618iSCvqJtXu3ZSg7XNg6MJaSTgZNJQZkjpTgV3C8=
 github.com/status-im/go-ethereum v1.10.4-status.3/go.mod h1:GvIhpdCOgMHI6i5xVPEZOrv/qSMeOFHbZh77AoyZUoE=
-github.com/status-im/go-libp2p-rendezvous v0.0.0-20210930154620-020ef08b264a h1:/37EOjcoN5Lr8/ZQawuhKfNKF723myJUdlOTDVTciu4=
-github.com/status-im/go-libp2p-rendezvous v0.0.0-20210930154620-020ef08b264a/go.mod h1:Q/GA4TCj4QLJCO02GN4O1CgkuTkn8oKbQSn1+yratvE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
 github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c h1:NBAVMzp24RPq6cMkAgZfObU26naB6t5kXqCNe1wump4=
