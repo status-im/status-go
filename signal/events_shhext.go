@@ -38,7 +38,10 @@ const (
 	// EventHistoryRequestStarted is triggered before processing a mailserver batch
 	EventHistoryRequestStarted = "history.request.started"
 
-	// EventHistoryRequestCompleted is triggered after processing a mailserver batch
+	// EventHistoryBatchProcessed is triggered after processing a mailserver batch
+	EventHistoryBatchProcessed = "history.request.batch.processed"
+
+	// EventHistoryRequestCompleted is triggered after processing all mailserver batches
 	EventHistoryRequestCompleted = "history.request.completed"
 
 	// EventHistoryRequestFailed is triggered when requesting history messages fails
@@ -61,7 +64,10 @@ type MailServerResponseSignal struct {
 }
 
 type HistoryMessagesSignal struct {
-	ErrorMsg string `json:"errorMessage,omitempty"`
+	RequestID  string `json:"requestId"`
+	BatchIndex int    `json:"batchIndex"`
+	NumBatches int    `json:"numBatches,omitempty"`
+	ErrorMsg   string `json:"errorMessage,omitempty"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -116,16 +122,20 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 	send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
 }
 
-func SendHistoricMessagesRequestStarted() {
-	send(EventHistoryRequestStarted, HistoryMessagesSignal{})
+func SendHistoricMessagesRequestStarted(requestID string, numBatches int) {
+	send(EventHistoryRequestStarted, HistoryMessagesSignal{RequestID: requestID, NumBatches: numBatches})
 }
 
-func SendHistoricMessagesRequestFailed(err error) {
-	send(EventHistoryRequestFailed, HistoryMessagesSignal{ErrorMsg: err.Error()})
+func SendHistoricMessagesRequestBatchProcessed(requestID string, batchIndex int, numBatches int) {
+	send(EventHistoryBatchProcessed, HistoryMessagesSignal{RequestID: requestID, BatchIndex: batchIndex, NumBatches: numBatches})
 }
 
-func SendHistoricMessagesRequestCompleted() {
-	send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
+func SendHistoricMessagesRequestFailed(requestID string, err error) {
+	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: requestID, ErrorMsg: err.Error()})
+}
+
+func SendHistoricMessagesRequestCompleted(requestID string) {
+	send(EventHistoryRequestCompleted, HistoryMessagesSignal{RequestID: requestID})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received

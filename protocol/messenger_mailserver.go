@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -261,26 +262,34 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		syncedTopics = append(syncedTopics, topicData)
 	}
 
-	m.logger.Debug("syncing topics")
+	requestID := uuid.NewRandom().String()
+
+	m.logger.Debug("syncing topics", zap.Any("batches", batches), zap.Any("requestId", requestID))
 
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted()
+		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, len(batches))
 	}
 
+	i := 0
 	for _, batch := range batches {
+		i++
 		err := m.processMailserverBatch(batch)
 		if err != nil {
-			m.logger.Error("error syncing topics", zap.Error(err))
+			m.logger.Error("error syncing topics", zap.Any("requestId", requestID), zap.Error(err))
 			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.HistoryRequestFailed(err)
+				m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
 			}
 			return nil, err
+		}
+
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, i, len(batches))
 		}
 	}
 
 	m.logger.Debug("topics synced")
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestCompleted()
+		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
 	}
 
 	err = m.mailserversDatabase.AddTopics(syncedTopics)
@@ -435,9 +444,23 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		Topics:  topics,
 	}
 
+	requestID := uuid.NewRandom().String()
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+	}
+
 	err = m.processMailserverBatch(batch)
 	if err != nil {
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
+		}
 		return 0, err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
 	}
 
 	if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
@@ -493,9 +516,23 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		Topics:  topics,
 	}
 
+	requestID := uuid.NewRandom().String()
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+	}
+
 	err = m.processMailserverBatch(batch)
 	if err != nil {
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
+		}
 		return err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
 	}
 
 	return m.persistence.DeleteMessages(messageIDs)
