@@ -1,0 +1,3 @@
+DROP INDEX user_messages_deletes_message_id_source;
+
+CREATE INDEX user_messages_deletes_message_id_source ON user_messages_deletes(message_id, source);
