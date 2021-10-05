@@ -70,7 +70,6 @@ func (c *Contact) Block() {
 
 func (c *Contact) Unblock() {
 	c.Blocked = false
-	c.Added = true
 }
 
 func (c *Contact) Remove() {
