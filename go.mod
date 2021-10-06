@@ -49,7 +49,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/go-waku v0.0.0-20210930231040-ecfdec1b0a3b
 	github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a
-	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
+	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.1-0.20210824184947-7c79c858170c
 	github.com/status-im/status-go/extkeys v1.1.2
