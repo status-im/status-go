@@ -151,6 +151,9 @@ func (s *WakuTestSuite) testConfirmationsHandshake(expectConfirmations bool) {
 	s.Require().NoError(err)
 	peers := w1.getPeers()
 	s.Require().Len(peers, 1)
+	// We need to let the loop run, not very elegant, but otherwise is
+	// flaky
+	time.Sleep(10 * time.Millisecond)
 	s.Require().Equal(expectConfirmations, peers[0].ConfirmationsEnabled())
 	timer.Stop()
 	s.Require().NoError(rw1.Close())
