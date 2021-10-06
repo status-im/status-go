@@ -331,8 +331,11 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 		if err != nil {
 			return err
 		}
-		if len(response.Communities()) == 0 {
+		if len(response.Communities()) != 1 {
 			return errors.New("community not received")
+		}
+		if len(response.Communities()[0].Chats()) != 2 {
+			return errors.New("chats not created")
 		}
 		return nil
 	})
@@ -342,18 +345,24 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Chats(), 2)
 
-	// The chat should be created
-	createdChat = response.Chats()[0]
-	s.Require().Equal(community.IDString(), createdChat.CommunityID)
-	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
-	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
-	s.Require().NotEmpty(createdChat.ID)
-	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
-	s.Require().True(createdChat.Active)
-	s.Require().NotEmpty(createdChat.Timestamp)
-	s.Require().True(strings.HasPrefix(createdChat.ID, community.IDString()))
+	// The chat should be created, we pick only the last chat
+	createdChats := response.Chats()
+	var actualChat *Chat
+	if createdChats[0].Name == orgChat.Identity.DisplayName {
+		actualChat = createdChats[0]
+	} else if createdChats[1].Name == orgChat.Identity.DisplayName {
+		actualChat = createdChats[1]
+	}
+	s.Require().Equal(community.IDString(), actualChat.CommunityID)
+	s.Require().Equal(orgChat.Identity.DisplayName, actualChat.Name)
+	s.Require().Equal(orgChat.Identity.Emoji, actualChat.Emoji)
+	s.Require().NotEmpty(actualChat.ID)
+	s.Require().Equal(ChatTypeCommunityChat, actualChat.ChatType)
+	s.Require().True(actualChat.Active)
+	s.Require().NotEmpty(actualChat.Timestamp)
+	s.Require().True(strings.HasPrefix(actualChat.ID, community.IDString()))
 
 	// We leave the org
 	response, err = s.alice.LeaveCommunity(community.ID())
