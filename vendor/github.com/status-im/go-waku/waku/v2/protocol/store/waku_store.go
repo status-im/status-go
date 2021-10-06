@@ -30,8 +30,7 @@ import (
 
 var log = logging.Logger("wakustore")
 
-const WakuStoreCodec = "/vac/waku/store/2.0.0-beta3"
-const WakuStoreProtocolId = libp2pProtocol.ID(WakuStoreCodec)
+const StoreID_v20beta3 = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta3")
 const MaxPageSize = 100 // Maximum number of waku messages in each page
 
 var (
@@ -248,7 +247,7 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *e
 		return
 	}
 
-	store.h.SetStreamHandlerMatch(WakuStoreProtocolId, protocol.PrefixTextMatch(WakuStoreCodec), store.onRequest)
+	store.h.SetStreamHandlerMatch(StoreID_v20beta3, protocol.PrefixTextMatch(string(StoreID_v20beta3)), store.onRequest)
 
 	go store.storeIncomingMessages(ctx)
 
@@ -440,7 +439,7 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 
 func WithAutomaticPeerSelection() HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeer(params.s.h, string(WakuStoreProtocolId))
+		p, err := utils.SelectPeer(params.s.h, string(StoreID_v20beta3))
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -483,7 +482,7 @@ func DefaultOptions() []HistoryRequestOption {
 }
 
 func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
-	connOpt, err := store.h.NewStream(ctx, selectedPeer, WakuStoreProtocolId)
+	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta3)
 	if err != nil {
 		log.Info("failed to connect to remote peer", err)
 		return nil, err
@@ -615,7 +614,7 @@ func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, err
 			return -1, ErrFailedToResumeHistory
 		}
 	} else {
-		p, err := utils.SelectPeer(store.h, string(WakuStoreProtocolId))
+		p, err := utils.SelectPeer(store.h, string(StoreID_v20beta3))
 
 		if err != nil {
 			log.Info("Error selecting peer: ", err)

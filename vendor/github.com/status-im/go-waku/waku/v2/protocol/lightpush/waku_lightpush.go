@@ -20,8 +20,7 @@ import (
 
 var log = logging.Logger("waku_lightpush")
 
-const WakuLightPushCodec = "/vac/waku/lightpush/2.0.0-beta1"
-const WakuLightPushProtocolId = libp2pProtocol.ID(WakuLightPushCodec)
+const LightPushID_v20beta1 = libp2pProtocol.ID("/vac/waku/lightpush/2.0.0-beta1")
 
 var (
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
@@ -40,7 +39,7 @@ func NewWakuLightPush(ctx context.Context, h host.Host, relay *relay.WakuRelay) 
 	wakuLP.ctx = ctx
 	wakuLP.h = h
 
-	wakuLP.h.SetStreamHandlerMatch(WakuLightPushProtocolId, protocol.PrefixTextMatch(WakuLightPushCodec), wakuLP.onRequest)
+	wakuLP.h.SetStreamHandlerMatch(LightPushID_v20beta1, protocol.PrefixTextMatch(string(LightPushID_v20beta1)), wakuLP.onRequest)
 	log.Info("Light Push protocol started")
 
 	return wakuLP
@@ -124,7 +123,7 @@ func WithPeer(p peer.ID) LightPushOption {
 
 func WithAutomaticPeerSelection() LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeer(params.lp.h, string(WakuLightPushProtocolId))
+		p, err := utils.SelectPeer(params.lp.h, string(LightPushID_v20beta1))
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -170,7 +169,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 		return nil, ErrInvalidId
 	}
 
-	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, WakuLightPushProtocolId)
+	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
 	if err != nil {
 		log.Info("failed to connect to remote peer", err)
 		return nil, err

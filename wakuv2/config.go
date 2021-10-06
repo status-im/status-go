@@ -35,6 +35,9 @@ type Config struct {
 	StoreNodes             []string `toml:",omitempty"`
 	FilterNodes            []string `toml:",omitempty"`
 	LightpushNodes         []string `toml:",omitempty"`
+	Rendezvous             bool     `toml:",omitempty"`
+	WakuRendezvousNodes    []string `toml:",omitempty"`
+	DiscoveryLimit         int      `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
@@ -42,4 +45,5 @@ var DefaultConfig = Config{
 	Host:              "0.0.0.0",
 	Port:              60000,
 	KeepAliveInterval: 1, // second
+	DiscoveryLimit:    40,
 }
