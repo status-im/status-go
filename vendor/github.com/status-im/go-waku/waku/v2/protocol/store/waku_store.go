@@ -13,7 +13,6 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -211,8 +210,6 @@ type WakuStore struct {
 	storeMsgs   bool
 	msgProvider MessageProvider
 	h           host.Host
-
-	peerChan chan *event.EvtPeerConnectednessChanged
 }
 
 func NewWakuStore(shouldStoreMessages bool, p MessageProvider) *WakuStore {
@@ -229,18 +226,9 @@ func (store *WakuStore) SetMsgProvider(p MessageProvider) {
 	store.msgProvider = p
 }
 
-func (store *WakuStore) peerListener() {
-	for e := range store.peerChan {
-		if e.Connectedness == network.NotConnected {
-			log.Info("Notification received ", e.Peer)
-		}
-	}
-}
-
-func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *event.EvtPeerConnectednessChanged) {
+func (store *WakuStore) Start(ctx context.Context, h host.Host) {
 	store.h = h
 	store.ctx = ctx
-	store.peerChan = peerChan
 
 	if !store.storeMsgs {
 		log.Info("Store protocol started (messages aren't stored)")
@@ -278,8 +266,6 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host, peerChan chan *e
 			log.Error("failed to record with tags")
 		}
 	}
-
-	go store.peerListener()
 
 	log.Info("Store protocol started")
 }

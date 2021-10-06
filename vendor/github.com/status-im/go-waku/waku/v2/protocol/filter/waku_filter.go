@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	logging "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -34,7 +33,7 @@ type (
 	Filters map[string]Filter
 
 	Subscriber struct {
-		peer      string
+		peer      peer.ID
 		requestId string
 		filter    pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
 	}
@@ -47,7 +46,6 @@ type (
 		subscribers []Subscriber
 		pushHandler MessagePushHandler
 		MsgC        chan *protocol.Envelope
-		peerChan    chan *event.EvtPeerConnectednessChanged
 	}
 )
 
@@ -107,16 +105,16 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 		// We're on a full node.
 		// This is a filter request coming from a light node.
 		if filterRPCRequest.Request.Subscribe {
-			subscriber := Subscriber{peer: string(s.Conn().RemotePeer()), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
+			subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
 			wf.subscribers = append(wf.subscribers, subscriber)
 			log.Info("filter full node, add a filter subscriber: ", subscriber.peer)
 
 			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len(wf.subscribers))))
 		} else {
-			peerId := string(s.Conn().RemotePeer())
-			log.Info("filter full node, remove a filter subscriber: ", peerId)
+			peerId := s.Conn().RemotePeer()
+			log.Info("filter full node, remove a filter subscriber: ", peerId.Pretty())
 			contentFilters := filterRPCRequest.Request.ContentFilters
-			var peerIdsToRemove []string
+			var peerIdsToRemove []peer.ID
 			for _, subscriber := range wf.subscribers {
 				if subscriber.peer != peerId {
 					continue
@@ -158,26 +156,7 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 	}
 }
 
-func (wf *WakuFilter) peerListener() {
-	for e := range wf.peerChan {
-		if e.Connectedness == network.NotConnected {
-			log.Info("filter Notification received ", e.Peer)
-			i := 0
-			// Delete subscribers matching deleted peer
-			for _, s := range wf.subscribers {
-				if s.peer != string(e.Peer) {
-					wf.subscribers[i] = s
-					i++
-				}
-			}
-
-			log.Info("filter, deleted subscribers: ", len(wf.subscribers)-i)
-			wf.subscribers = wf.subscribers[:i]
-		}
-	}
-}
-
-func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandler, peerChan chan *event.EvtPeerConnectednessChanged) *WakuFilter {
+func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandler) *WakuFilter {
 	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
 	if err != nil {
 		log.Error(err)
@@ -188,11 +167,9 @@ func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandl
 	wf.MsgC = make(chan *protocol.Envelope)
 	wf.h = host
 	wf.pushHandler = handler
-	wf.peerChan = peerChan
 
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
 	go wf.FilterListener()
-	go wf.peerListener()
 
 	return wf
 }
@@ -221,7 +198,7 @@ func (wf *WakuFilter) FilterListener() {
 					log.Info("pushing a message to light node: ", pushRPC)
 
 					conn, err := wf.h.NewStream(wf.ctx, peer.ID(subscriber.peer), FilterID_v20beta1)
-
+					// TODO: keep track of errors to automatically unsubscribe a peer?
 					if err != nil {
 						// @TODO more sophisticated error handling here
 						log.Error("failed to open peer stream")

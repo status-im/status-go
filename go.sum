@@ -1076,12 +1076,12 @@ github.com/status-im/go-ethereum v1.10.4-status.3 h1:RF618iSCvqJtXu3ZSg7XNg6MJaS
 github.com/status-im/go-ethereum v1.10.4-status.3/go.mod h1:GvIhpdCOgMHI6i5xVPEZOrv/qSMeOFHbZh77AoyZUoE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
-github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c h1:NBAVMzp24RPq6cMkAgZfObU26naB6t5kXqCNe1wump4=
-github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c/go.mod h1:5ZtKtIFFYFWX44SHrRX1Kn2uMYfy/qOmkU7Hd3T4qVU=
+github.com/status-im/go-waku v0.0.0-20211006192541-761ae88bbdea h1:nzHN/fknFXRCzgjHTYqWPJZ5BDKjKRCmY4wtE7fuaMI=
+github.com/status-im/go-waku v0.0.0-20211006192541-761ae88bbdea/go.mod h1:SsSaPcFPFHeld/8SpJiOHM5PGXqR+V2fzsrOLD5Zkl8=
 github.com/status-im/go-waku-rendezvous v0.0.0-20211005020656-b53661c58574 h1:v2gpjWKyI+vZZugjjhPDqIhg6uNrGLusHh3ilvbv8/Y=
 github.com/status-im/go-waku-rendezvous v0.0.0-20211005020656-b53661c58574/go.mod h1:Fa1uJjMz9MpfZc2tC5xdN9q90xg1VphSnevxWiBbFO0=
-github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a h1:eCna/q/PuZVqtmOMBqytw9yzZwMNKpao4au0OJDvesI=
-github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a/go.mod h1:LSCVYR7mnBBsxVJghrGpQ3yJAAATEe6XeQQqGCZhwrE=
+github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20211006151908-91851dda6375 h1:4lYWWH3SPnVrCmDmqUpQlXy65uFUZZCjH6gS9899iJc=
+github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20211006151908-91851dda6375/go.mod h1:LSCVYR7mnBBsxVJghrGpQ3yJAAATEe6XeQQqGCZhwrE=
 github.com/status-im/keycard-go v0.0.0-20190316090335-8537d3370df4/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 h1:Oo2KZNP70KE0+IUJSidPj/BFS/RXNHmKIJOdckzml2E=
 github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
