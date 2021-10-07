@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -926,6 +927,15 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 
 func (api *PublicAPI) Peers() map[string][]string {
 	return api.service.messenger.Peers()
+}
+
+func (api *PublicAPI) ChangeIdentityImageShowTo(showTo accounts.ProfilePicturesShowToType) error {
+	err := api.service.accountsDB.SaveSetting("profile-pictures-show-to", showTo)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.PublishIdentityImage()
 }
 
 // -----

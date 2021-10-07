@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -51,11 +50,8 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	}
 
 	// Reset last published time for ChatIdentity so new contact can receive data
-	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
-	m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
-	err = m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
+	err = m.resetLastPublishedTimeForChatIdentity()
 	if err != nil {
-		m.logger.Error("ResetWhenChatIdentityLastPublished error", zap.Error(err))
 		return nil, err
 	}
 
@@ -94,6 +90,13 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
+	// Reset last published time for ChatIdentity so new contact can receive data
+	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
+	return m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
 }
 
 func (m *Messenger) removeContact(ctx context.Context, response *MessengerResponse, pubKey string) error {
@@ -233,16 +236,12 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 	// Reregister only when data has changed
 	if shouldReregisterForPushNotifications {
-		// Reset last published time for ChatIdentity so new contact can receive data
-		contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
-		m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
-		err = m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
+		err := m.resetLastPublishedTimeForChatIdentity()
 		if err != nil {
-			m.logger.Error("ResetWhenChatIdentityLastPublished error", zap.Error(err))
 			return err
 		}
 		// Publish contact code
-		err := m.publishContactCode()
+		err = m.publishContactCode()
 		if err != nil {
 			return err
 		}
