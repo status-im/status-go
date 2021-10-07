@@ -699,38 +699,32 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 func (c *Client) subscribeForMessageEvents() {
 	go func() {
 		c.config.Logger.Debug("subscribing for message events")
-		sentMessagesSubscription := c.messageSender.SubscribeToSentMessages()
-		scheduledMessagesSubscription := c.messageSender.SubscribeToScheduledMessages()
+		messageEventsSubscription := c.messageSender.SubscribeToMessageEvents()
 		for {
 			select {
-			// order is important, since both are asynchronous, we want to process
-			// first scheduled messages, and after sent messages, otherwise we might
-			// have some race conditions.
-			// This does not completely rules them out, but reduced the window
-			// where it might happen, a single channel should be used
-			// if this actually happens.
-			case m, more := <-scheduledMessagesSubscription:
+			case m, more := <-messageEventsSubscription:
 				if !more {
-					c.config.Logger.Debug("no more scheduled messages, quitting")
+					c.config.Logger.Debug("no more message events, quitting")
 					return
 				}
-				c.config.Logger.Debug("handling message scheduled")
-				if err := c.handleMessageScheduled(m); err != nil {
-					c.config.Logger.Error("failed to handle message", zap.Error(err))
-				}
-
-			case m, more := <-sentMessagesSubscription:
-				if !more {
-					c.config.Logger.Debug("no more sent messages, quitting")
-					return
-				}
-				c.config.Logger.Debug("handling message sent")
-				if err := c.handleMessageSent(m); err != nil {
-					c.config.Logger.Error("failed to handle message", zap.Error(err))
+				switch m.Type {
+				case common.MessageScheduled:
+					c.config.Logger.Debug("handling message scheduled")
+					if err := c.handleMessageScheduled(m.RawMessage); err != nil {
+						c.config.Logger.Error("failed to handle message", zap.Error(err))
+					}
+				case common.MessageSent:
+					c.config.Logger.Debug("handling message sent")
+					if err := c.handleMessageSent(m.SentMessage); err != nil {
+						c.config.Logger.Error("failed to handle message", zap.Error(err))
+					}
+				default:
+					c.config.Logger.Warn("message event type not supported")
 				}
 			case <-c.quit:
 				return
 			}
+
 		}
 	}()
 }
