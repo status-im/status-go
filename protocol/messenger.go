@@ -1002,19 +1002,32 @@ func (m *Messenger) watchIdentityImageChanges() {
 		for {
 			select {
 			case <-channel:
-				if m.online() {
-					if err := m.publishContactCode(); err != nil {
-						m.logger.Error("failed to publish contact code", zap.Error(err))
-					}
-
-				} else {
-					m.shouldPublishContactCode = true
+				err := m.PublishIdentityImage()
+				if err != nil {
+					m.logger.Error("failed to publish identity image", zap.Error(err))
 				}
 			case <-m.quit:
 				return
 			}
 		}
 	}()
+}
+
+func (m *Messenger) PublishIdentityImage() error {
+	// Reset last published time for ChatIdentity so new contact can receive data
+	err := m.resetLastPublishedTimeForChatIdentity()
+	if err != nil {
+		m.logger.Error("failed to reset publish time", zap.Error(err))
+		return err
+	}
+
+	// If not online, we schedule it
+	if !m.online() {
+		m.shouldPublishContactCode = true
+		return nil
+	}
+
+	return m.publishContactCode()
 }
 
 // handlePushNotificationClientRegistration handles registration events
