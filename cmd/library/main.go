@@ -11,7 +11,7 @@ import (
 )
 
 func isCodeFile(info os.FileInfo) bool {
-	return !strings.HasSuffix(info.Name(), "test.go")
+	return !strings.HasSuffix(info.Name(), "test.go") && info.Name() != "status_geth.go"
 }
 
 func main() {
@@ -38,6 +38,8 @@ func main() {
 	output += "func Free (param unsafe.Pointer){\n"
 	output += "C.free(param);\n"
 	output += "}\n"
+
+	output += sequel
 
 	fmt.Println(output)
 }
