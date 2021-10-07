@@ -43,6 +43,19 @@ type SentMessage struct {
 	MessageIDs [][]byte
 }
 
+type MessageEventType uint32
+
+const (
+	MessageScheduled = iota + 1
+	MessageSent
+)
+
+type MessageEvent struct {
+	Type        MessageEventType
+	SentMessage *SentMessage
+	RawMessage  *RawMessage
+}
+
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
@@ -56,10 +69,8 @@ type MessageSender struct {
 	ephemeralKeys      map[string]*ecdsa.PrivateKey
 	ephemeralKeysMutex sync.Mutex
 
-	// sentMessagesSubscriptions contains all the subscriptions for sent messages
-	sentMessagesSubscriptions []chan<- *SentMessage
-	// sentMessagesSubscriptions contains all the subscriptions for scheduled messages
-	scheduledMessagesSubscriptions []chan<- *RawMessage
+	// messageEventsSubscriptions contains all the subscriptions for message events
+	messageEventsSubscriptions []chan<- *MessageEvent
 
 	featureFlags FeatureFlags
 
@@ -117,10 +128,10 @@ func NewMessageSender(
 }
 
 func (s *MessageSender) Stop() {
-	for _, c := range s.sentMessagesSubscriptions {
+	for _, c := range s.messageEventsSubscriptions {
 		close(c)
 	}
-	s.sentMessagesSubscriptions = nil
+	s.messageEventsSubscriptions = nil
 	s.datasync.Stop() // idempotent op
 }
 
@@ -734,39 +745,40 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 	return hash, newMessage, nil
 }
 
-// SubscribeToSentMessages returns a channel where we publish every time a message is sent
-func (s *MessageSender) SubscribeToSentMessages() <-chan *SentMessage {
-	c := make(chan *SentMessage, 100)
-	s.sentMessagesSubscriptions = append(s.sentMessagesSubscriptions, c)
+func (s *MessageSender) SubscribeToMessageEvents() <-chan *MessageEvent {
+	c := make(chan *MessageEvent, 100)
+	s.messageEventsSubscriptions = append(s.messageEventsSubscriptions, c)
 	return c
 }
 
 func (s *MessageSender) notifyOnSentMessage(sentMessage *SentMessage) {
+	event := &MessageEvent{
+		Type:        MessageSent,
+		SentMessage: sentMessage,
+	}
 	// Publish on channels, drop if buffer is full
-	for _, c := range s.sentMessagesSubscriptions {
+	for _, c := range s.messageEventsSubscriptions {
 		select {
-		case c <- sentMessage:
+		case c <- event:
 		default:
-			s.logger.Warn("sent messages subscription channel full, dropping message")
+			s.logger.Warn("message events subscription channel full when publishing sent event, dropping message")
 		}
 	}
 
 }
 
-// SubscribeToScheduledMessages returns a channel where we publish every time a message is scheduled for sending
-func (s *MessageSender) SubscribeToScheduledMessages() <-chan *RawMessage {
-	c := make(chan *RawMessage, 100)
-	s.scheduledMessagesSubscriptions = append(s.scheduledMessagesSubscriptions, c)
-	return c
-}
-
 func (s *MessageSender) notifyOnScheduledMessage(message *RawMessage) {
+	event := &MessageEvent{
+		Type:       MessageScheduled,
+		RawMessage: message,
+	}
+
 	// Publish on channels, drop if buffer is full
-	for _, c := range s.scheduledMessagesSubscriptions {
+	for _, c := range s.messageEventsSubscriptions {
 		select {
-		case c <- message:
+		case c <- event:
 		default:
-			s.logger.Warn("scheduled messages subscription channel full, dropping message")
+			s.logger.Warn("message events subscription channel full when publishing scheduled event, dropping message")
 		}
 	}
 }
