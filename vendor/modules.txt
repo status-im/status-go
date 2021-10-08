@@ -427,7 +427,7 @@ github.com/spacemonkeygo/spacelog
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20211005021624-79e21dbb993c
+# github.com/status-im/go-waku v0.0.0-20211006192541-761ae88bbdea
 github.com/status-im/go-waku/waku/v2/metrics
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol
@@ -440,7 +440,7 @@ github.com/status-im/go-waku/waku/v2/utils
 # github.com/status-im/go-waku-rendezvous v0.0.0-20211005020656-b53661c58574
 github.com/status-im/go-waku-rendezvous
 github.com/status-im/go-waku-rendezvous/pb
-# github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20210729162817-adc68830282a
+# github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20211006151908-91851dda6375
 github.com/status-im/go-wakurelay-pubsub
 github.com/status-im/go-wakurelay-pubsub/pb
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969

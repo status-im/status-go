@@ -14,7 +14,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -507,8 +506,6 @@ func WithMaxMessageSize(maxMessageSize int) Option {
 
 // processLoop handles all inputs arriving on the channels
 func (p *PubSub) processLoop(ctx context.Context) {
-	em, _ := p.host.EventBus().Emitter(new(event.EvtPeerConnectednessChanged))
-
 	defer func() {
 		// Clean up go routines.
 		for _, ch := range p.peers {
@@ -516,7 +513,6 @@ func (p *PubSub) processLoop(ctx context.Context) {
 		}
 		p.peers = nil
 		p.topics = nil
-		em.Close() // MUST call this after being done with the emitter
 	}()
 
 	for {
@@ -536,8 +532,6 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			messages <- p.getHelloPacket()
 			go p.handleNewPeer(ctx, pid, messages)
 			p.peers[pid] = messages
-
-			em.Emit(event.EvtPeerConnectednessChanged{Peer: pid, Connectedness: network.Connected})
 
 		case s := <-p.newPeerStream:
 			pid := s.Conn().RemotePeer()
@@ -560,7 +554,6 @@ func (p *PubSub) processLoop(ctx context.Context) {
 
 		case pid := <-p.newPeerError:
 			delete(p.peers, pid)
-			em.Emit(event.EvtPeerConnectednessChanged{Peer: pid, Connectedness: network.NotConnected})
 
 		case pid := <-p.peerDead:
 			ch, ok := p.peers[pid]
@@ -590,7 +583,6 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			}
 
 			p.rt.RemovePeer(pid)
-			em.Emit(event.EvtPeerConnectednessChanged{Peer: pid, Connectedness: network.NotConnected})
 
 		case treq := <-p.getTopics:
 			var out []string
