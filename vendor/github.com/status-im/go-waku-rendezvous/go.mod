@@ -9,10 +9,7 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/multiformats/go-multiaddr v0.3.1 // indirect
-	github.com/onsi/ginkgo v1.12.0 // indirect
-	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.6.1 // indirect
-	github.com/syndtr/goleveldb v1.0.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

@@ -15,6 +15,7 @@ import (
 	inet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/record"
 )
 
 var (
@@ -124,7 +125,6 @@ func (rp *rendezvousPoint) Register(ctx context.Context, ns string, ttl int) (ti
 	}
 
 	return time.Duration(response.Ttl) * time.Second, nil
-	return time.Duration(1) * time.Second, nil
 }
 
 func (rc *rendezvousClient) Register(ctx context.Context, ns string, ttl int) (time.Duration, error) {
@@ -205,7 +205,7 @@ func (rp *rendezvousPoint) discoverQuery(ns string, limit int, r ggio.Reader, w 
 	}
 
 	if res.GetType() != pb.Message_DISCOVER_RESPONSE {
-		return nil, fmt.Errorf("Unexpected response: %s", res.GetType().String())
+		return nil, fmt.Errorf("unexpected response: %s", res.GetType().String())
 	}
 
 	status := res.GetDiscoverResponse().GetStatus()
@@ -217,7 +217,8 @@ func (rp *rendezvousPoint) discoverQuery(ns string, limit int, r ggio.Reader, w 
 	result := make([]Registration, 0, len(regs))
 	for _, reg := range regs {
 
-		envelope, err := pbToEnvelope(reg.GetPeer())
+		reg.GetSignedPeerRecord()
+		envelope, err := record.UnmarshalEnvelope(reg.GetSignedPeerRecord())
 		if err != nil {
 			log.Errorf("Invalid peer info: %s", err.Error())
 			continue

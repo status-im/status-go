@@ -6,7 +6,6 @@ package libp2p
 import (
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	circuit "github.com/libp2p/go-libp2p-circuit"
@@ -23,6 +22,7 @@ import (
 	autorelay "github.com/libp2p/go-libp2p/p2p/host/relay"
 
 	ma "github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 // ListenAddrStrings configures libp2p to listen on the given (unparsed)
@@ -185,6 +185,9 @@ func Identity(sk crypto.PrivKey) Option {
 }
 
 // ConnectionManager configures libp2p to use the given connection manager.
+//
+// The current "standard" connection manager lives in github.com/libp2p/go-libp2p-connmgr. See
+// https://pkg.go.dev/github.com/libp2p/go-libp2p-connmgr?utm_source=godoc#NewConnManager.
 func ConnectionManager(connman connmgr.ConnManager) Option {
 	return func(cfg *Config) error {
 		if cfg.ConnManager != nil {
@@ -323,62 +326,6 @@ func AutoNATServiceRateLimit(global, perPeer int, interval time.Duration) Option
 	}
 }
 
-// FilterAddresses configures libp2p to never dial nor accept connections from
-// the given addresses. FilterAddresses should be used for cases where the
-// addresses you want to deny are known ahead of time.
-//
-// Note: Using Filter + FilterAddresses at the same time is fine, but you cannot
-// configure a both ConnectionGater and filtered addresses.
-//
-// Deprecated: Please use ConnectionGater() instead.
-func FilterAddresses(addrs ...*net.IPNet) Option {
-	return func(cfg *Config) error {
-		var f *filtersConnectionGater
-
-		// preserve backwards compatibility.
-		// if we have a connection gater, try to cast it to a *filtersConnectionGater.
-		if cfg.ConnectionGater != nil {
-			var ok bool
-			if f, ok = cfg.ConnectionGater.(*filtersConnectionGater); !ok {
-				return errors.New("cannot configure both Filters and Connection Gater. " +
-					"\n Please consider configuring just a ConnectionGater instead.")
-			}
-		}
-
-		if f == nil {
-			f = (*filtersConnectionGater)(ma.NewFilters())
-			cfg.ConnectionGater = f
-		}
-
-		for _, addr := range addrs {
-			(*ma.Filters)(f).AddFilter(*addr, ma.ActionDeny)
-		}
-
-		return nil
-	}
-}
-
-// Filters configures libp2p to use the given filters for accepting/denying
-// certain addresses. Filters offers more control and should be used when the
-// addresses you want to accept/deny are not known ahead of time and can
-// dynamically change.
-//
-// Note: You cannot configure both a ConnectionGater and a Filter at the same
-// time. Under the hood, the Filters object is converted to a ConnectionGater.
-//
-// Deprecated: use ConnectionGater() instead.
-func Filters(filters *ma.Filters) Option {
-	return func(cfg *Config) error {
-		if cfg.ConnectionGater != nil {
-			return errors.New("cannot configure both Filters and Connection Gater. " +
-				"\n Please consider configuring just a ConnectionGater instead.")
-
-		}
-		cfg.ConnectionGater = (*filtersConnectionGater)(filters)
-		return nil
-	}
-}
-
 // ConnectionGater configures libp2p to use the given ConnectionGater
 // to actively reject inbound/outbound connections based on the lifecycle stage
 // of the connection.
@@ -459,6 +406,14 @@ var NoTransports = func(cfg *Config) error {
 func UserAgent(userAgent string) Option {
 	return func(cfg *Config) error {
 		cfg.UserAgent = userAgent
+		return nil
+	}
+}
+
+// MultiaddrResolver sets the libp2p dns resolver
+func MultiaddrResolver(rslv *madns.Resolver) Option {
+	return func(cfg *Config) error {
+		cfg.MultiaddrResolver = rslv
 		return nil
 	}
 }

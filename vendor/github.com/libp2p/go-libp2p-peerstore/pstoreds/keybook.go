@@ -51,7 +51,7 @@ func (kb *dsKeyBook) PubKey(p peer.ID) ic.PubKey {
 			log.Errorf("error when extracting pubkey from peer ID for peer %s: %s\n", p.Pretty(), err)
 			return nil
 		}
-		pkb, err := pk.Bytes()
+		pkb, err := ic.MarshalPublicKey(pk)
 		if err != nil {
 			log.Errorf("error when turning extracted pubkey into bytes for peer %s: %s\n", p.Pretty(), err)
 			return nil
@@ -75,7 +75,7 @@ func (kb *dsKeyBook) AddPubKey(p peer.ID, pk ic.PubKey) error {
 	}
 
 	key := kbBase.ChildString(base32.RawStdEncoding.EncodeToString([]byte(p))).Child(pubSuffix)
-	val, err := pk.Bytes()
+	val, err := ic.MarshalPublicKey(pk)
 	if err != nil {
 		log.Errorf("error while converting pubkey byte string for peer %s: %s\n", p.Pretty(), err)
 		return err
@@ -111,7 +111,7 @@ func (kb *dsKeyBook) AddPrivKey(p peer.ID, sk ic.PrivKey) error {
 	}
 
 	key := kbBase.ChildString(base32.RawStdEncoding.EncodeToString([]byte(p))).Child(privSuffix)
-	val, err := sk.Bytes()
+	val, err := ic.MarshalPrivateKey(sk)
 	if err != nil {
 		log.Errorf("error while converting privkey byte string for peer %s: %s\n", p.Pretty(), err)
 		return err

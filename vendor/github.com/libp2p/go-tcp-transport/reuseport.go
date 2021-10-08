@@ -23,7 +23,7 @@ func init() {
 	}
 	v, exist := os.LookupEnv(deprecatedEnvReuseport)
 	if exist {
-		log.Warning("IPFS_REUSEPORT is deprecated, use LIBP2P_TCP_REUSEPORT instead")
+		log.Warn("IPFS_REUSEPORT is deprecated, use LIBP2P_TCP_REUSEPORT instead")
 		if v == "false" || v == "f" || v == "0" {
 			envReuseportVal = false
 			log.Infof("REUSEPORT disabled (IPFS_REUSEPORT=%s)", v)

@@ -51,6 +51,8 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/metrics"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	libp2pproto "github.com/libp2p/go-libp2p-core/protocol"
 
 	rendezvous "github.com/status-im/go-waku-rendezvous"
@@ -69,7 +71,6 @@ import (
 	node "github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
-	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
 
 const messageQueueLimit = 1024
@@ -205,27 +206,27 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 			libp2pOpts...,
 		),
 		node.WithPrivateKey(privateKey),
-		node.WithHostAddress([]net.Addr{hostAddr}),
+		node.WithHostAddress([]*net.TCPAddr{hostAddr}),
 		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
 		node.WithConnStatusChan(connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 	}
 
 	if cfg.Rendezvous {
-		opts = append(opts, node.WithRendezvous(wakurelay.WithDiscoveryOpts(libp2pdisc.Limit(cfg.DiscoveryLimit))))
+		opts = append(opts, node.WithRendezvous(pubsub.WithDiscoveryOpts(libp2pdisc.Limit(cfg.DiscoveryLimit))))
 	}
 
 	if cfg.LightClient {
 		opts = append(opts, node.WithLightPush())
 		opts = append(opts, node.WithWakuFilter())
 	} else {
-		relayOpts := []wakurelay.Option{
-			wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
-			wakurelay.WithPeerExchange(cfg.PeerExchange),
+		relayOpts := []pubsub.Option{
+			pubsub.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
+			pubsub.WithPeerExchange(cfg.PeerExchange),
 		}
 
 		if cfg.PeerExchange {
-			relayOpts = append(relayOpts, wakurelay.WithPeerExchange(true))
+			relayOpts = append(relayOpts, pubsub.WithPeerExchange(true))
 		}
 
 		opts = append(opts, node.WithWakuRelay(relayOpts...))
@@ -317,7 +318,7 @@ func (w *Waku) runRelayMsgLoop() {
 		return
 	}
 
-	sub, err := w.node.Subscribe(nil)
+	sub, err := w.node.Subscribe(context.Background(), nil)
 	if err != nil {
 		fmt.Println("Could not subscribe:", err)
 		return
@@ -351,17 +352,18 @@ func (w *Waku) runFilterMsgLoop() {
 
 func (w *Waku) subscribeWakuFilterTopic(topics [][]byte) {
 	pubsubTopic := relay.GetTopic(nil)
-	filterRequest := pb.FilterRequest{
-		Topic:     string(pubsubTopic),
-		Subscribe: true,
-	}
-	var contentFilters []*pb.FilterRequest_ContentFilter
+
+	var contentTopics []string
 	for _, topic := range topics {
-		t := &pb.FilterRequest_ContentFilter{ContentTopic: common.BytesToTopic(topic).ContentTopic()}
-		contentFilters = append(contentFilters, t)
+		contentTopics = append(contentTopics, common.BytesToTopic(topic).ContentTopic())
 	}
-	filterRequest.ContentFilters = contentFilters
-	err := w.node.SubscribeFilter(context.Background(), filterRequest, w.filterMsgChannel)
+
+	var err error
+	filter := filter.ContentFilter{
+		Topic:         string(pubsubTopic),
+		ContentTopics: contentTopics,
+	}
+	_, w.filterMsgChannel, err = w.node.SubscribeFilter(context.Background(), filter)
 	if err != nil {
 		w.logger.Warn("could not add wakuv2 filter for topics", zap.Any("topics", topics))
 		return
@@ -677,22 +679,17 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 
 // Unsubscribe removes an installed message handler.
 func (w *Waku) Unsubscribe(id string) error {
-	filter := w.filters.Get(id)
-	if filter != nil && w.settings.LightClient {
-		pubsubTopic := relay.GetTopic(nil)
-		filterRequest := pb.FilterRequest{
-			Topic:     string(pubsubTopic),
-			Subscribe: true,
+	f := w.filters.Get(id)
+	if f != nil && w.settings.LightClient {
+		contentFilter := filter.ContentFilter{
+			Topic: string(relay.GetTopic(nil)),
 		}
-
-		var contentFilters []*pb.FilterRequest_ContentFilter
-		for _, topic := range filter.Topics {
-			t := &pb.FilterRequest_ContentFilter{ContentTopic: common.BytesToTopic(topic).ContentTopic()}
-			contentFilters = append(contentFilters, t)
+		for _, topic := range f.Topics {
+			contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
 		}
-		filterRequest.ContentFilters = contentFilters
-
-		w.node.UnsubscribeFilter(context.Background(), filterRequest)
+		if err := w.node.UnsubscribeFilter(context.Background(), contentFilter); err != nil {
+			return fmt.Errorf("failed to unsubscribe: %w", err)
+		}
 	}
 
 	ok := w.filters.Uninstall(id)
@@ -896,7 +893,7 @@ func (w *Waku) AddRelayPeer(address string) (string, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wakurelay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

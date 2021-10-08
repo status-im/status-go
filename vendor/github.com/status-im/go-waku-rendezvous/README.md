@@ -3,12 +3,12 @@
 ### Overview
 
 Similar to [status-im/rendezvous](https://github.com/status-im/rendezvous) 
-in using a smaller liveness TTL for records (20s), and not using `UNREGISTER 
-REQUEST`, due to assuming that the TTL is very low (making it incompatible 
+in using a smaller liveness TTL for records (20s), and not using unregistering 
+records, due to assuming that the TTL is very low (making it incompatible 
 with libp2p original rendezvous spec). This module is intended to be used 
 in go-waku as a lightweight mechanism for generalized peer discovery.
 
-Another difference compared to [libp2p/rendezvous](https://github.com/libp2p/specs/blob/master/rendezvous/README.md) and status-im/rendezvous is the usage of [routing records](https://github.com/libp2p/specs/blob/master/RFC/0003-routing-records.md) and [signed envelopes](https://github.com/libp2p/specs/blob/master/RFC/0002-signed-envelopes.md)
+A difference compared to status-im/rendezvous is the usage of [routing records](https://github.com/libp2p/specs/blob/master/RFC/0003-routing-records.md) and [signed envelopes](https://github.com/libp2p/specs/blob/master/RFC/0002-signed-envelopes.md) instead of ENR records
 
 **Protocol identifier**: `/vac/waku/rendezvous/0.0.1`
 
@@ -46,12 +46,40 @@ import (
   "database/sql"
   "github.com/syndtr/goleveldb/leveldb"
   "github.com/syndtr/goleveldb/leveldb/opt"
+  "github.com/syndtr/goleveldb/leveldb/util"
   "github.com/libp2p/go-libp2p"
   "github.com/libp2p/go-libp2p-core/host"
   "github.com/libp2p/go-libp2p-core/peer"
   pubsub "github.com/status-im/go-libp2p-pubsub"
   rendezvous "github.com/status-im/go-waku-rendezvous"
 )
+
+type RendezVousLevelDB struct {
+	db *leveldb.DB
+}
+
+func NewRendezVousLevelDB(dBPath string) (*RendezVousLevelDB, error) {
+	db, err := leveldb.OpenFile(dBPath, &opt.Options{OpenFilesCacheCapacity: 3})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &RendezVousLevelDB{db}, nil
+}
+
+func (r *RendezVousLevelDB) Delete(key []byte) error {
+	return r.db.Delete(key, nil)
+}
+
+func (r *RendezVousLevelDB) Put(key []byte, value []byte) error {
+	return r.db.Put(key, value, nil)
+}
+
+func (r *RendezVousLevelDB) NewIterator(prefix []byte) rendezvous.Iterator {
+	return r.db.NewIterator(util.BytesPrefix(prefix), nil)
+}
+
 
 // create a new libp2p Host that listens on a random TCP port
 h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
@@ -60,7 +88,7 @@ if err != nil {
 }
 
 // LevelDB storage for peer records
-db, err := leveldb.OpenFile("/tmp/rendezvous", &opt.Options{OpenFilesCacheCapacity: 3})
+db, err := NewRendezVousLevelDB("/tmp/rendezvous")
 if err != nil {
   panic(err)
 }
@@ -98,7 +126,7 @@ message Message {
 
   message Register {
     string ns = 1;
-    record.pb.Envelope peer = 2;
+    bytes signedPeerRecord = 2;
     int64 ttl = 3; // in seconds
   }
 

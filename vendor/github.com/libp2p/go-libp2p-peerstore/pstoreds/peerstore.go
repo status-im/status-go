@@ -52,10 +52,10 @@ func DefaultOpts() Options {
 type pstoreds struct {
 	peerstore.Metrics
 
-	dsKeyBook
-	dsAddrBook
-	dsProtoBook
-	dsPeerMetadata
+	*dsKeyBook
+	*dsAddrBook
+	*dsProtoBook
+	*dsPeerMetadata
 }
 
 // NewPeerstore creates a peerstore backed by the provided persistent datastore.
@@ -79,10 +79,10 @@ func NewPeerstore(ctx context.Context, store ds.Batching, opts Options) (*pstore
 
 	ps := &pstoreds{
 		Metrics:        pstore.NewMetrics(),
-		dsKeyBook:      *keyBook,
-		dsAddrBook:     *addrBook,
-		dsPeerMetadata: *peerMetadata,
-		dsProtoBook:    *protoBook,
+		dsKeyBook:      keyBook,
+		dsAddrBook:     addrBook,
+		dsPeerMetadata: peerMetadata,
+		dsProtoBook:    protoBook,
 	}
 	return ps, nil
 }

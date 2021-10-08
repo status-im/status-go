@@ -7,14 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/record"
-
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	logging "github.com/ipfs/go-log"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/record"
 	pb "github.com/libp2p/go-libp2p-peerstore/pb"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 
@@ -299,7 +298,16 @@ func (ab *dsAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, ttl tim
 
 func (ab *dsAddrBook) latestPeerRecordSeq(p peer.ID) uint64 {
 	pr, err := ab.loadRecord(p, true, false)
-	if err != nil || len(pr.Addrs) == 0 || pr.CertifiedRecord == nil || len(pr.CertifiedRecord.Raw) == 0 {
+	if err != nil {
+		// We ignore the error because we don't want to fail storing a new record in this
+		// case.
+		log.Errorw("unable to load record", "peer", p, "error", err)
+		return 0
+	}
+	pr.RLock()
+	defer pr.RUnlock()
+
+	if len(pr.Addrs) == 0 || pr.CertifiedRecord == nil || len(pr.CertifiedRecord.Raw) == 0 {
 		return 0
 	}
 	return pr.CertifiedRecord.Seq
@@ -444,6 +452,10 @@ func (ab *dsAddrBook) ClearAddrs(p peer.ID) {
 }
 
 func (ab *dsAddrBook) setAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration, mode ttlWriteMode, signed bool) (err error) {
+	if len(addrs) == 0 {
+		return nil
+	}
+
 	pr, err := ab.loadRecord(p, true, false)
 	if err != nil {
 		return fmt.Errorf("failed to load peerstore entry for peer %v while setting addrs, err: %v", p, err)
@@ -458,36 +470,37 @@ func (ab *dsAddrBook) setAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duratio
 	// }
 
 	newExp := time.Now().Add(ttl).Unix()
-	// TODO this is very inefficient O(m*n); we could build a map to use as an
-	// index, and test against it. That would turn it into O(m+n). This code
-	// will be refactored entirely anyway, and it's not being used by users
-	// (that we know of); so OK to keep it for now.
-	updateExisting := func(entryList []*pb.AddrBookRecord_AddrEntry, incoming ma.Multiaddr) *pb.AddrBookRecord_AddrEntry {
-		for _, have := range entryList {
-			if incoming.Equal(have.Addr) {
-				switch mode {
-				case ttlOverride:
-					have.Ttl = int64(ttl)
-					have.Expiry = newExp
-				case ttlExtend:
-					if int64(ttl) > have.Ttl {
-						have.Ttl = int64(ttl)
-					}
-					if newExp > have.Expiry {
-						have.Expiry = newExp
-					}
-				default:
-					panic("BUG: unimplemented ttl mode")
-				}
-				return have
-			}
+	addrsMap := make(map[string]*pb.AddrBookRecord_AddrEntry, len(pr.Addrs))
+	for _, addr := range pr.Addrs {
+		addrsMap[string(addr.Addr.Bytes())] = addr
+	}
+
+	updateExisting := func(incoming ma.Multiaddr) *pb.AddrBookRecord_AddrEntry {
+		existingEntry := addrsMap[string(incoming.Bytes())]
+		if existingEntry == nil {
+			return nil
 		}
-		return nil
+
+		switch mode {
+		case ttlOverride:
+			existingEntry.Ttl = int64(ttl)
+			existingEntry.Expiry = newExp
+		case ttlExtend:
+			if int64(ttl) > existingEntry.Ttl {
+				existingEntry.Ttl = int64(ttl)
+			}
+			if newExp > existingEntry.Expiry {
+				existingEntry.Expiry = newExp
+			}
+		default:
+			panic("BUG: unimplemented ttl mode")
+		}
+		return existingEntry
 	}
 
 	var entries []*pb.AddrBookRecord_AddrEntry
 	for _, incoming := range addrs {
-		existingEntry := updateExisting(pr.Addrs, incoming)
+		existingEntry := updateExisting(incoming)
 
 		if existingEntry == nil {
 			// 	if signed {
@@ -552,12 +565,12 @@ func (ab *dsAddrBook) deleteAddrs(p peer.ID, addrs []ma.Multiaddr) (err error) {
 		return fmt.Errorf("failed to load peerstore entry for peer %v while deleting addrs, err: %v", p, err)
 	}
 
+	pr.Lock()
+	defer pr.Unlock()
+
 	if pr.Addrs == nil {
 		return nil
 	}
-
-	pr.Lock()
-	defer pr.Unlock()
 
 	pr.Addrs = deleteInPlace(pr.Addrs, addrs)
 

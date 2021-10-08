@@ -4,7 +4,8 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol"
 )
 
-// Adapted from https://github.com/dustin/go-broadcast/commit/f664265f5a662fb4d1df7f3533b1e8d0e0277120 which was released under MIT license
+// Adapted from https://github.com/dustin/go-broadcast/commit/f664265f5a662fb4d1df7f3533b1e8d0e0277120
+// by Dustin Sallings (c) 2013, which was released under MIT license
 
 type broadcaster struct {
 	input chan *protocol.Envelope

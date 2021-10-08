@@ -10,7 +10,6 @@ import (
 	"math"
 	"sort"
 	"sync"
-	"time"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -78,7 +77,7 @@ func paginateWithIndex(list []IndexedWakuMessage, pinfo *pb.PagingInfo) (resMess
 		initQuery = true // an empty cursor means it is an initial query
 		switch dir {
 		case pb.PagingInfo_FORWARD:
-			cursor = list[0].index // perform paging from the begining of the list
+			cursor = list[0].index // perform paging from the beginning of the list
 		case pb.PagingInfo_BACKWARD:
 			cursor = list[len(list)-1].index // perform paging from the end of the list
 		}
@@ -113,7 +112,7 @@ func paginateWithIndex(list []IndexedWakuMessage, pinfo *pb.PagingInfo) (resMess
 		retrievedPageSize = minOf(int(pageSize), MaxPageSize, remainingMessages)
 		s = foundIndex - retrievedPageSize
 		e = foundIndex - 1
-		newCursor = msgList[s].index // the new cursor points to the begining of the page
+		newCursor = msgList[s].index // the new cursor points to the beginning of the page
 	}
 
 	// retrieve the messages
@@ -468,9 +467,11 @@ func DefaultOptions() []HistoryRequestOption {
 }
 
 func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
+	log.Info(fmt.Sprintf("Resuming message history with peer %s", selectedPeer))
+
 	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta3)
 	if err != nil {
-		log.Info("failed to connect to remote peer", err)
+		log.Error("Failed to connect to remote peer", err)
 		return nil, err
 	}
 
@@ -572,11 +573,9 @@ func (store *WakuStore) findLastSeen() float64 {
 // if no peerList is passed, one of the peers in the underlying peer manager unit of the store protocol is picked randomly to fetch the history from. The history gets fetched successfully if the dialed peer has been online during the queried time window.
 // the resume proc returns the number of retrieved messages if no error occurs, otherwise returns the error string
 
-func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, error) {
-	currentTime := float64(time.Now().UnixNano())
+func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error) {
+	currentTime := utils.GetUnixEpoch()
 	lastSeenTime := store.findLastSeen()
-
-	log.Info("resume ", int64(currentTime))
 
 	var offset float64 = 200000
 	currentTime = currentTime + offset
@@ -594,7 +593,7 @@ func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, err
 	var response *pb.HistoryResponse
 	if len(peerList) > 0 {
 		var err error
-		response, err = store.queryLoop(store.ctx, rpc, peerList)
+		response, err = store.queryLoop(ctx, rpc, peerList)
 		if err != nil {
 			log.Error("failed to resume history", err)
 			return -1, ErrFailedToResumeHistory
@@ -607,7 +606,7 @@ func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, err
 			return -1, ErrNoPeersAvailable
 		}
 
-		response, err = store.queryFrom(store.ctx, rpc, *p, protocol.GenerateRequestId())
+		response, err = store.queryFrom(ctx, rpc, *p, protocol.GenerateRequestId())
 		if err != nil {
 			log.Error("failed to resume history", err)
 			return -1, ErrFailedToResumeHistory
@@ -622,3 +621,7 @@ func (store *WakuStore) Resume(pubsubTopic string, peerList []peer.ID) (int, err
 }
 
 // TODO: queryWithAccounting
+
+func (w *WakuStore) Stop() {
+	w.h.RemoveStreamHandler(StoreID_v20beta3)
+}

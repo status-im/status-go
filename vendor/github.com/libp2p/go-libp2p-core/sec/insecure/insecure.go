@@ -31,15 +31,7 @@ type Transport struct {
 	key ci.PrivKey
 }
 
-// New constructs a new insecure transport.
-// Deprecated: use NewWithIdentity instead.
-func New(id peer.ID) *Transport {
-	return &Transport{
-		id: id,
-	}
-}
-
-// New constructs a new insecure transport. The provided private key
+// NewWithIdentity constructs a new insecure transport. The provided private key
 // is stored and returned from LocalPrivateKey to satisfy the
 // SecureTransport interface, and the public key is sent to
 // remote peers. No security is provided.

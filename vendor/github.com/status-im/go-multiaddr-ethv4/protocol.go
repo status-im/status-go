@@ -49,7 +49,7 @@ func ethv4BtS(b []byte) (string, error) {
 
 // PeerIDToNodeID casts peer.ID (b58 encoded string) to discover.NodeID
 func PeerIDToNodeID(pid string) (n enode.ID, err error) {
-	nodeid, err := peer.IDB58Decode(pid)
+	nodeid, err := peer.Decode(pid)
 	if err != nil {
 		return n, err
 	}

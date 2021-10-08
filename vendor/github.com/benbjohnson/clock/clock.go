@@ -317,6 +317,13 @@ func (t *Ticker) Stop() {
 	}
 }
 
+// Reset resets the ticker to a new duration.
+func (t *Ticker) Reset(dur time.Duration) {
+	if t.ticker != nil {
+		t.ticker.Reset(dur)
+	}
+}
+
 type internalTicker Ticker
 
 func (t *internalTicker) Next() time.Time { return t.next }

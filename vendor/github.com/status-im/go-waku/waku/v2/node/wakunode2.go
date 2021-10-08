@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	p2pproto "github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
@@ -29,7 +30,7 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
-	wakurelay "github.com/status-im/go-wakurelay-pubsub"
+	"github.com/status-im/go-waku/waku/v2/utils"
 )
 
 var log = logging.Logger("wakunode")
@@ -45,6 +46,7 @@ type WakuNode struct {
 	lightPush  *lightpush.WakuLightPush
 	rendezvous *rendezvous.RendezvousService
 	ping       *ping.PingService
+	store      *store.WakuStore
 
 	subscriptions      map[relay.Topic][]*Subscription
 	subscriptionsMutex sync.Mutex
@@ -86,7 +88,11 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	}
 
 	if params.privKey != nil {
-		params.libP2POpts = append(params.libP2POpts, libp2p.Identity(*params.privKey))
+		params.libP2POpts = append(params.libP2POpts, params.Identity())
+	}
+
+	if params.addressFactory != nil {
+		params.libP2POpts = append(params.libP2POpts, libp2p.AddrsFactory(params.addressFactory))
 	}
 
 	host, err := libp2p.New(ctx, params.libP2POpts...)
@@ -116,7 +122,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		w.connStatusChan = params.connStatusChan
 	}
 
-	w.connectionNotif = NewConnectionNotifier(host)
+	w.connectionNotif = NewConnectionNotifier(ctx, host)
 	w.host.Network().Notify(w.connectionNotif)
 	go w.connectednessListener()
 
@@ -146,7 +152,7 @@ func (w *WakuNode) Start() error {
 
 	if w.opts.enableRendezvous {
 		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
-		w.opts.wOpts = append(w.opts.wOpts, wakurelay.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
+		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
 	}
 
 	err := w.mountRelay(w.opts.enableRelay, w.opts.wOpts...)
@@ -183,13 +189,30 @@ func (w *WakuNode) Stop() {
 		w.rendezvous.Stop()
 	}
 
-	for _, topic := range w.relay.Topics() {
-		for _, sub := range w.subscriptions[topic] {
-			sub.Unsubscribe()
+	if w.relay != nil {
+		for _, topic := range w.relay.Topics() {
+			for _, sub := range w.subscriptions[topic] {
+				sub.Unsubscribe()
+			}
 		}
+		w.subscriptions = nil
 	}
 
-	w.subscriptions = nil
+	if w.filter != nil {
+		w.filter.Stop()
+		for _, filter := range w.filters {
+			close(filter.Chan)
+		}
+		w.filters = nil
+	}
+
+	if w.lightPush != nil {
+		w.lightPush.Stop()
+	}
+
+	if w.store != nil {
+		w.store.Stop()
+	}
 
 	w.host.Close()
 }
@@ -219,12 +242,12 @@ func (w *WakuNode) Filter() *filter.WakuFilter {
 	return w.filter
 }
 
-func (w *WakuNode) mountRelay(shouldRelayMessages bool, opts ...wakurelay.Option) error {
+func (w *WakuNode) mountRelay(shouldRelayMessages bool, opts ...pubsub.Option) error {
 	var err error
 	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, opts...)
 
 	if shouldRelayMessages {
-		_, err := w.Subscribe(nil)
+		_, err := w.Subscribe(w.ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -263,20 +286,50 @@ func (w *WakuNode) mountRendezvous() error {
 }
 
 func (w *WakuNode) startStore() {
-	w.opts.store.Start(w.ctx, w.host)
+	w.store = w.opts.store
+	w.store.Start(w.ctx, w.host)
 
 	if w.opts.shouldResume {
-		if _, err := w.opts.store.Resume(string(relay.GetTopic(nil)), nil); err != nil {
-			log.Error("failed to resume", err)
-		}
+		// TODO: extract this to a function and run it when you go offline
+		// TODO: determine if a store is listening to a topic
+		go func() {
+			for {
+				t := time.NewTicker(time.Second)
+			peerVerif:
+				for {
+					select {
+					case <-w.quit:
+						return
+					case <-t.C:
+						_, err := utils.SelectPeer(w.host, string(store.StoreID_v20beta3))
+						if err == nil {
+							break peerVerif
+						}
+					}
+				}
+
+				ctxWithTimeout, ctxCancel := context.WithTimeout(w.ctx, 20*time.Second)
+				defer ctxCancel()
+				if err := w.Resume(ctxWithTimeout, nil); err != nil {
+					log.Info("Retrying in 10s...")
+					time.Sleep(10 * time.Second)
+				} else {
+					break
+				}
+			}
+		}()
 	}
 }
 
 func (w *WakuNode) addPeer(info *peer.AddrInfo, protocolID p2pproto.ID) error {
-	log.Info(fmt.Sprintf("adding peer %s", info.ID.Pretty()))
+	log.Info(fmt.Sprintf("Adding peer %s to peerstore", info.ID.Pretty()))
 	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
-	return w.host.Peerstore().AddProtocols(info.ID, string(protocolID))
+	err := w.host.Peerstore().AddProtocols(info.ID, string(protocolID))
+	if err != nil {
+		return err
+	}
 
+	return nil
 }
 
 func (w *WakuNode) AddPeer(address ma.Multiaddr, protocolID p2pproto.ID) (*peer.ID, error) {
@@ -289,7 +342,7 @@ func (w *WakuNode) AddPeer(address ma.Multiaddr, protocolID p2pproto.ID) (*peer.
 }
 
 func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime float64, endTime float64, opts ...store.HistoryRequestOption) (*pb.HistoryResponse, error) {
-	if w.opts.store == nil {
+	if w.store == nil {
 		return nil, errors.New("WakuStore is not set")
 	}
 
@@ -302,7 +355,7 @@ func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime 
 	query.StartTime = startTime
 	query.EndTime = endTime
 	query.PagingInfo = new(pb.PagingInfo)
-	result, err := w.opts.store.Query(ctx, query, opts...)
+	result, err := w.store.Query(ctx, query, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,21 +363,21 @@ func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime 
 }
 
 func (w *WakuNode) Resume(ctx context.Context, peerList []peer.ID) error {
-	if w.opts.store == nil {
+	if w.store == nil {
 		return errors.New("WakuStore is not set")
 	}
 
-	result, err := w.opts.store.Resume(string(relay.DefaultWakuTopic), peerList)
+	result, err := w.store.Resume(ctx, string(relay.DefaultWakuTopic), peerList)
 	if err != nil {
 		return err
 	}
 
-	log.Info("the number of retrieved messages since the last online time: ", result)
+	log.Info("Retrieved messages since the last online time: ", result)
 
 	return nil
 }
 
-func (node *WakuNode) Subscribe(topic *relay.Topic) (*Subscription, error) {
+func (node *WakuNode) Subscribe(ctx context.Context, topic *relay.Topic) (*Subscription, error) {
 	// Subscribes to a PubSub topic.
 	// NOTE The data field SHOULD be decoded as a WakuMessage.
 	if node.relay == nil {
@@ -363,105 +416,135 @@ func (node *WakuNode) Subscribe(topic *relay.Topic) (*Subscription, error) {
 
 	node.bcaster.Register(subscription.C)
 
-	go func(t relay.Topic) {
-		nextMsgTicker := time.NewTicker(time.Millisecond * 10)
-		defer nextMsgTicker.Stop()
-
-		ctx, err := tag.New(node.ctx, tag.Insert(metrics.KeyType, "relay"))
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		for {
-			select {
-			case <-subscription.quit:
-				subscription.mutex.Lock()
-				node.bcaster.Unregister(subscription.C) // Remove from broadcast list
-				close(subscription.C)
-				subscription.mutex.Unlock()
-			case <-nextMsgTicker.C:
-				msg, err := sub.Next(node.ctx)
-				if err != nil {
-					subscription.mutex.Lock()
-					for _, subscription := range node.subscriptions[t] {
-						subscription.Unsubscribe()
-					}
-					subscription.mutex.Unlock()
-					return
-				}
-
-				stats.Record(ctx, metrics.Messages.M(1))
-
-				wakuMessage := &pb.WakuMessage{}
-				if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
-					log.Error("could not decode message", err)
-					return
-				}
-
-				envelope := protocol.NewEnvelope(wakuMessage, string(t))
-
-				node.bcaster.Submit(envelope)
-			}
-		}
-	}(t)
+	go node.subscribeToTopic(t, subscription, sub)
 
 	return subscription, nil
 }
 
-// Wrapper around WakuFilter.Subscribe
-// that adds a Filter object to node.filters
-func (node *WakuNode) SubscribeFilter(ctx context.Context, request pb.FilterRequest, ch filter.ContentFilterChan) error {
-	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
-	// ContentFilterChan takes MessagePush structs
+func (node *WakuNode) subscribeToTopic(t relay.Topic, subscription *Subscription, sub *pubsub.Subscription) {
+	nextMsgTicker := time.NewTicker(time.Millisecond * 10)
+	defer nextMsgTicker.Stop()
 
-	// Status: Implemented.
-
-	// Sanity check for well-formed subscribe FilterRequest
-	//doAssert(request.subscribe, "invalid subscribe request")
-
-	log.Info("SubscribeFilter, request: ", request)
-
-	var id string
-	var err error
-
-	if node.filter == nil {
-		return errors.New("WakuFilter is not set")
+	ctx, err := tag.New(node.ctx, tag.Insert(metrics.KeyType, "relay"))
+	if err != nil {
+		log.Error(err)
+		return
 	}
 
-	id, err = node.filter.Subscribe(ctx, request)
-	if id == "" || err != nil {
+	for {
+		select {
+		case <-subscription.quit:
+			subscription.mutex.Lock()
+			node.bcaster.Unregister(subscription.C) // Remove from broadcast list
+			close(subscription.C)
+			subscription.mutex.Unlock()
+		case <-nextMsgTicker.C:
+			msg, err := sub.Next(ctx)
+			if err != nil {
+				subscription.mutex.Lock()
+				for _, subscription := range node.subscriptions[t] {
+					subscription.Unsubscribe()
+				}
+				subscription.mutex.Unlock()
+				return
+			}
+
+			stats.Record(ctx, metrics.Messages.M(1))
+
+			wakuMessage := &pb.WakuMessage{}
+			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
+				log.Error("could not decode message", err)
+				return
+			}
+
+			envelope := protocol.NewEnvelope(wakuMessage, string(t))
+
+			node.bcaster.Submit(envelope)
+		}
+	}
+}
+
+// Wrapper around WakuFilter.Subscribe
+// that adds a Filter object to node.filters
+func (node *WakuNode) SubscribeFilter(ctx context.Context, f filter.ContentFilter) (filterID string, ch chan *protocol.Envelope, err error) {
+	if node.filter == nil {
+		err = errors.New("WakuFilter is not set")
+		return
+	}
+
+	// TODO: should be possible to pass the peerID as option or autoselect peer.
+	// TODO: check if there's an existing pubsub topic that uses the same peer. If so, reuse filter, and return same channel and filterID
+
+	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
+	// ContentFilterChan takes MessagePush structs
+	subs, err := node.filter.Subscribe(ctx, f)
+	if subs.RequestID == "" || err != nil {
 		// Failed to subscribe
-		log.Error("remote subscription to filter failed", request)
-		//waku_node_errors.inc(labelValues = ["subscribe_filter_failure"])
+		log.Error("remote subscription to filter failed", err)
+		return
+	}
+
+	ch = make(chan *protocol.Envelope, 1024) // To avoid blocking
+
+	// Register handler for filter, whether remote subscription succeeded or not
+	node.filters[subs.RequestID] = filter.Filter{
+		PeerID:         subs.Peer,
+		Topic:          f.Topic,
+		ContentFilters: f.ContentTopics,
+		Chan:           ch,
+	}
+
+	return subs.RequestID, ch, nil
+}
+
+// UnsubscribeFilterByID removes a subscription to a filter node completely
+// using the filterID returned when the subscription was created
+func (node *WakuNode) UnsubscribeFilterByID(ctx context.Context, filterID string) error {
+
+	var f filter.Filter
+	var ok bool
+	if f, ok = node.filters[filterID]; !ok {
+		return errors.New("filter not found")
+	}
+
+	cf := filter.ContentFilter{
+		Topic:         f.Topic,
+		ContentTopics: f.ContentFilters,
+	}
+
+	err := node.filter.Unsubscribe(ctx, cf, f.PeerID)
+	if err != nil {
 		return err
 	}
 
-	// Register handler for filter, whether remote subscription succeeded or not
-	node.filters[id] = filter.Filter{
-		Topic:          request.Topic,
-		ContentFilters: request.ContentFilters,
-		Chan:           ch,
-	}
+	close(f.Chan)
+	delete(node.filters, filterID)
 
 	return nil
 }
 
-func (node *WakuNode) UnsubscribeFilter(ctx context.Context, request pb.FilterRequest) {
-
-	log.Info("UnsubscribeFilter, request: ", request)
-	// Send message to full node in order to unsubscribe
-	node.filter.Unsubscribe(ctx, request)
-
+// Unsubscribe filter removes content topics from a filter subscription. If all
+// the contentTopics are removed the subscription is dropped completely
+func (node *WakuNode) UnsubscribeFilter(ctx context.Context, cf filter.ContentFilter) error {
 	// Remove local filter
 	var idsToRemove []string
 	for id, f := range node.filters {
+		if f.Topic != cf.Topic {
+			continue
+		}
+
+		// Send message to full node in order to unsubscribe
+		err := node.filter.Unsubscribe(ctx, cf, f.PeerID)
+		if err != nil {
+			return err
+		}
+
 		// Iterate filter entries to remove matching content topics
 		// make sure we delete the content filter
 		// if no more topics are left
-		for _, cfToDelete := range request.ContentFilters {
+		for _, cfToDelete := range cf.ContentTopics {
 			for i, cf := range f.ContentFilters {
-				if cf.ContentTopic == cfToDelete.ContentTopic {
+				if cf == cfToDelete {
 					l := len(f.ContentFilters) - 1
 					f.ContentFilters[l], f.ContentFilters[i] = f.ContentFilters[i], f.ContentFilters[l]
 					f.ContentFilters = f.ContentFilters[:l]
@@ -478,11 +561,14 @@ func (node *WakuNode) UnsubscribeFilter(ctx context.Context, request pb.FilterRe
 	for _, rId := range idsToRemove {
 		for id := range node.filters {
 			if id == rId {
+				close(node.filters[id].Chan)
 				delete(node.filters, id)
 				break
 			}
 		}
 	}
+
+	return nil
 }
 
 func (node *WakuNode) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic) ([]byte, error) {
@@ -559,6 +645,8 @@ func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	if err != nil {
 		return err
 	}
+
+	stats.Record(ctx, metrics.Dials.M(1))
 	return nil
 }
 
@@ -611,13 +699,26 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 
 	w.ping = ping.NewPingService(w.host)
 	ticker := time.NewTicker(t)
+
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				for _, peer := range w.host.Network().Peers() {
-					log.Debug("Pinging", peer)
-					w.ping.Ping(w.ctx, peer)
+				for _, p := range w.host.Network().Peers() {
+					log.Debug("Pinging ", p)
+					go func(peer peer.ID) {
+						ctx, cancel := context.WithTimeout(w.ctx, 3*time.Second)
+						defer cancel()
+						pr := w.ping.Ping(ctx, peer)
+						select {
+						case res := <-pr:
+							if res.Error != nil {
+								log.Error(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
+							}
+						case <-ctx.Done():
+							log.Error(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
+						}
+					}(p)
 				}
 			case <-w.quit:
 				ticker.Stop()

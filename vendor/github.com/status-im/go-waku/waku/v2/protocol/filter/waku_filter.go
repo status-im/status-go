@@ -3,6 +3,7 @@ package filter
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	logging "github.com/ipfs/go-log"
@@ -21,14 +22,30 @@ import (
 
 var log = logging.Logger("wakufilter")
 
+var (
+	ErrNoPeersAvailable = errors.New("no suitable remote peers")
+)
+
 type (
-	ContentFilterChan chan *protocol.Envelope
+	FilterSubscribeParameters struct {
+		host         host.Host
+		selectedPeer peer.ID
+	}
+
+	FilterSubscribeOption func(*FilterSubscribeParameters)
 
 	Filter struct {
+		PeerID         peer.ID
 		Topic          string
-		ContentFilters []*pb.FilterRequest_ContentFilter
-		Chan           ContentFilterChan
+		ContentFilters []string
+		Chan           chan *protocol.Envelope
 	}
+
+	ContentFilter struct {
+		Topic         string
+		ContentTopics []string
+	}
+
 	// @TODO MAYBE MORE INFO?
 	Filters map[string]Filter
 
@@ -36,6 +53,11 @@ type (
 		peer      peer.ID
 		requestId string
 		filter    pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
+	}
+
+	FilterSubscription struct {
+		RequestID string
+		Peer      peer.ID
 	}
 
 	MessagePushHandler func(requestId string, msg pb.MessagePush)
@@ -55,6 +77,29 @@ type (
 
 const FilterID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter/2.0.0-beta1")
 
+func WithPeer(p peer.ID) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) {
+		params.selectedPeer = p
+	}
+}
+
+func WithAutomaticPeerSelection() FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) {
+		p, err := utils.SelectPeer(params.host, string(FilterID_v20beta1))
+		if err == nil {
+			params.selectedPeer = *p
+		} else {
+			log.Info("Error selecting peer: ", err)
+		}
+	}
+}
+
+func DefaultOptions() []FilterSubscribeOption {
+	return []FilterSubscribeOption{
+		WithAutomaticPeerSelection(),
+	}
+}
+
 func (filters *Filters) Notify(msg *pb.WakuMessage, requestId string) {
 	for key, filter := range *filters {
 		envelope := protocol.NewEnvelope(msg, filter.Topic)
@@ -69,8 +114,8 @@ func (filters *Filters) Notify(msg *pb.WakuMessage, requestId string) {
 
 		// TODO: In case of no topics we should either trigger here for all messages,
 		// or we should not allow such filter to exist in the first place.
-		for _, contentFilter := range filter.ContentFilters {
-			if msg.ContentTopic == contentFilter.ContentTopic {
+		for _, contentTopic := range filter.ContentFilters {
+			if msg.ContentTopic == contentTopic {
 				filter.Chan <- envelope
 				break
 			}
@@ -93,14 +138,13 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 
 	log.Info(fmt.Sprintf("%s: received request from %s", s.Conn().LocalPeer(), s.Conn().RemotePeer()))
 
-	stats.Record(wf.ctx, metrics.Messages.M(1))
-
 	if filterRPCRequest.Push != nil && len(filterRPCRequest.Push.Messages) > 0 {
 		// We're on a light node.
 		// This is a message push coming from a full node.
+		wf.pushHandler(filterRPCRequest.RequestId, *filterRPCRequest.Push)
 
 		log.Info("filter light node, received a message push. ", len(filterRPCRequest.Push.Messages), " messages")
-		wf.pushHandler(filterRPCRequest.RequestId, *filterRPCRequest.Push)
+		stats.Record(wf.ctx, metrics.Messages.M(int64(len(filterRPCRequest.Push.Messages))))
 	} else if filterRPCRequest.Request != nil {
 		// We're on a full node.
 		// This is a filter request coming from a light node.
@@ -232,63 +276,91 @@ func (wf *WakuFilter) FilterListener() {
 // Having a FilterRequest struct,
 // select a peer with filter support, dial it,
 // and submit FilterRequest wrapped in FilterRPC
-func (wf *WakuFilter) Subscribe(ctx context.Context, request pb.FilterRequest) (string, error) { //.async, gcsafe.} {
-	peer, err := utils.SelectPeer(wf.h, string(FilterID_v20beta1))
-	if err == nil {
-		conn, err := wf.h.NewStream(ctx, *peer, FilterID_v20beta1)
+func (wf *WakuFilter) Subscribe(ctx context.Context, filter ContentFilter, opts ...FilterSubscribeOption) (subscription *FilterSubscription, err error) {
+	params := new(FilterSubscribeParameters)
+	params.host = wf.h
 
-		if conn != nil {
-			defer conn.Close()
-
-			// This is the only successful path to subscription
-			id := protocol.GenerateRequestId()
-
-			writer := protoio.NewDelimitedWriter(conn)
-			filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
-			log.Info("sending filterRPC: ", filterRPC)
-			err = writer.WriteMsg(filterRPC)
-			if err != nil {
-				log.Error("failed to write message", err)
-				return "", err
-			}
-			return string(id), nil
-		} else {
-			// @TODO more sophisticated error handling here
-			log.Error("failed to connect to remote peer")
-			//waku_filter_errors.inc(labelValues = [dialFailure])
-			return "", err
-		}
-	} else {
-		log.Info("error selecting peer: ", err)
+	optList := DefaultOptions()
+	optList = append(optList, opts...)
+	for _, opt := range optList {
+		opt(params)
 	}
 
-	return "", nil
+	if params.selectedPeer == "" {
+		return nil, ErrNoPeersAvailable
+	}
+
+	var contentFilters []*pb.FilterRequest_ContentFilter
+	for _, ct := range filter.ContentTopics {
+		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
+	}
+
+	request := pb.FilterRequest{
+		Subscribe:      true,
+		Topic:          filter.Topic,
+		ContentFilters: contentFilters,
+	}
+
+	var conn network.Stream
+	conn, err = wf.h.NewStream(ctx, params.selectedPeer, FilterID_v20beta1)
+	if err != nil {
+		return
+	}
+
+	defer conn.Close()
+
+	// This is the only successful path to subscription
+	requestID := hex.EncodeToString(protocol.GenerateRequestId())
+
+	writer := protoio.NewDelimitedWriter(conn)
+	filterRPC := &pb.FilterRPC{RequestId: requestID, Request: &request}
+	log.Info("sending filterRPC: ", filterRPC)
+	err = writer.WriteMsg(filterRPC)
+	if err != nil {
+		log.Error("failed to write message", err)
+		return
+	}
+
+	subscription = new(FilterSubscription)
+	subscription.Peer = params.selectedPeer
+	subscription.RequestID = requestID
+
+	return
 }
 
-func (wf *WakuFilter) Unsubscribe(ctx context.Context, request pb.FilterRequest) {
-	// @TODO: NO REAL REASON TO GENERATE REQUEST ID FOR UNSUBSCRIBE OTHER THAN CREATING SANE-LOOKING RPC.
-	peer, err := utils.SelectPeer(wf.h, string(FilterID_v20beta1))
-	if err == nil {
-		conn, err := wf.h.NewStream(ctx, *peer, FilterID_v20beta1)
+func (wf *WakuFilter) Unsubscribe(ctx context.Context, filter ContentFilter, peer peer.ID) error {
+	conn, err := wf.h.NewStream(ctx, peer, FilterID_v20beta1)
 
-		if conn != nil {
-			defer conn.Close()
-
-			// This is the only successful path to subscription
-			id := protocol.GenerateRequestId()
-
-			writer := protoio.NewDelimitedWriter(conn)
-			filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
-			err = writer.WriteMsg(filterRPC)
-			if err != nil {
-				log.Error("failed to write message", err)
-			}
-		} else {
-			// @TODO more sophisticated error handling here
-			log.Error("failed to connect to remote peer", err)
-			//waku_filter_errors.inc(labelValues = [dialFailure])
-		}
-	} else {
-		log.Info("Error selecting peer: ", err)
+	if err != nil {
+		return err
 	}
+
+	defer conn.Close()
+
+	// This is the only successful path to subscription
+	id := protocol.GenerateRequestId()
+
+	var contentFilters []*pb.FilterRequest_ContentFilter
+	for _, ct := range filter.ContentTopics {
+		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
+	}
+
+	request := pb.FilterRequest{
+		Subscribe:      false,
+		Topic:          filter.Topic,
+		ContentFilters: contentFilters,
+	}
+
+	writer := protoio.NewDelimitedWriter(conn)
+	filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
+	err = writer.WriteMsg(filterRPC)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (wf *WakuFilter) Stop() {
+	wf.h.RemoveStreamHandler(FilterID_v20beta1)
 }
