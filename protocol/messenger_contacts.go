@@ -164,6 +164,17 @@ func (m *Messenger) Contacts() []*Contact {
 	return contacts
 }
 
+func (m *Messenger) AddedContacts() []*Contact {
+	var contacts []*Contact
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+		if contact.Added {
+			contacts = append(contacts, contact)
+		}
+		return true
+	})
+	return contacts
+}
+
 // GetContactByID assumes pubKey includes 0x prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	contact, _ := m.allContacts.Load(pubKey)

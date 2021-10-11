@@ -30,6 +30,7 @@ type MessengerSignalsHandler interface {
 	HistoryRequestBatchProcessed(requestID string, batchIndex int, batchNum int)
 	HistoryRequestCompleted(requestID string)
 	HistoryRequestFailed(requestID string, err error)
+	BackupPerformed(uint64)
 }
 
 type config struct {

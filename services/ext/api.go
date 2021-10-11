@@ -946,6 +946,10 @@ func (api *PublicAPI) ChangeIdentityImageShowTo(showTo accounts.ProfilePicturesS
 	return api.service.messenger.PublishIdentityImage()
 }
 
+func (api *PublicAPI) BackupData() (uint64, error) {
+	return api.service.messenger.BackupData(context.Background())
+}
+
 // -----
 // HELPER
 // -----

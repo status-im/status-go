@@ -526,6 +526,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchExpiredEmojis()
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
+	m.startBackupLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
@@ -1997,7 +1998,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := spec
-		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) {
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || spec.SkipEncryption {
 			id, err = m.sender.SendPrivate(ctx, publicKey, &spec)
 
 			if err != nil {
@@ -2867,6 +2868,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.Backup:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.Backup)
+						logger.Debug("Handling Backup", zap.Any("message", p))
+						err = m.HandleBackup(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle Backup", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

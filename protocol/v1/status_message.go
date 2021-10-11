@@ -255,6 +255,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncChatRemoved))
 	case protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ:
 		return m.unmarshalProtobufData(new(protobuf.SyncChatMessagesRead))
+	case protobuf.ApplicationMetadataMessage_BACKUP:
+		return m.unmarshalProtobufData(new(protobuf.Backup))
 	}
 	return nil
 }

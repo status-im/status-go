@@ -3,6 +3,13 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
+message Backup {
+  uint64 clock = 1;
+  string id = 2;
+
+  repeated SyncInstallationContactV2 contacts = 3;
+}
+
 message PairInstallation {
   uint64 clock = 1;
   string installation_id = 2;
