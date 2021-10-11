@@ -274,6 +274,16 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
+func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) error {
+	for _, contact := range message.Contacts {
+		err := m.HandleSyncInstallationContact(state, *contact)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
 	removedOrBlcoked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)

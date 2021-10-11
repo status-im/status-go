@@ -421,7 +421,7 @@ func _1636536507_add_index_bundlesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1636536507_add_index_bundles.up.sql", size: 347, mode: os.FileMode(0644), modTime: time.Unix(1636546585, 0)}
+	info := bindataFileInfo{name: "1636536507_add_index_bundles.up.sql", size: 347, mode: os.FileMode(0644), modTime: time.Unix(1636971544, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf1, 0xb9, 0x3c, 0x16, 0xfc, 0xfb, 0xb2, 0xb4, 0x3b, 0xfe, 0xdc, 0xf5, 0x9c, 0x42, 0xa0, 0xa0, 0xd4, 0xd, 0x5b, 0x97, 0x10, 0x80, 0x95, 0xe, 0x13, 0xc1, 0x18, 0x8, 0xee, 0xf, 0x99, 0xee}}
 	return a, nil
 }

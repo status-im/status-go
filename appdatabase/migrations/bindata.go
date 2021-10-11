@@ -50,6 +50,7 @@
 // 1630485153_networks.up.sql (394B)
 // 1632262444_profile_pictures_show_to.up.sql (81B)
 // 1635942153_add_telemetry_server_url_to_settings.up.sql (128B)
+// 1635942154_add_backup_setting.up.sql (186B)
 // doc.go (74B)
 
 package migrations
@@ -1119,6 +1120,26 @@ func _1635942153_add_telemetry_server_url_to_settingsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1635942154_add_backup_settingUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\xce\x31\x0a\xc2\x40\x10\x46\xe1\x3e\xa7\xf8\x8f\xa0\xf5\x62\x31\x71\x47\x10\xc6\x59\x89\x33\x75\xd8\xe8\x22\x62\x08\xc2\xae\xf7\xb7\xb0\x11\x2d\x3c\xc0\xfb\x78\x24\xc6\x03\x8c\x7a\x61\xd4\xd2\xda\x6d\xb9\x56\x50\x8c\xd8\x26\xf1\x83\x62\xca\xe7\xfb\xf3\x31\x96\x25\x4f\x73\xb9\xa0\x4f\x49\x98\x14\x9a\x0c\xea\x22\x88\xbc\x23\x17\x83\x0d\xce\xa1\xfb\xa7\xcd\xb9\xb6\xf1\x4d\x62\xaf\xf6\xcb\xac\x42\xe7\xc7\x48\xf6\x91\x9f\xd8\xbe\x2f\x36\x58\x87\xee\x15\x00\x00\xff\xff\x6b\x1d\x44\xa1\xba\x00\x00\x00")
+
+func _1635942154_add_backup_settingUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1635942154_add_backup_settingUpSql,
+		"1635942154_add_backup_setting.up.sql",
+	)
+}
+
+func _1635942154_add_backup_settingUpSql() (*asset, error) {
+	bytes, err := _1635942154_add_backup_settingUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1635942154_add_backup_setting.up.sql", size: 186, mode: os.FileMode(0644), modTime: time.Unix(1636971544, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x42, 0xc3, 0x25, 0xc6, 0xd2, 0x86, 0x53, 0xa3, 0x52, 0x71, 0x1b, 0x54, 0xc9, 0x0, 0xf0, 0xe6, 0x46, 0x3c, 0x64, 0xa0, 0x2b, 0xfb, 0xb2, 0x2e, 0xc6, 0x67, 0x67, 0x6c, 0x6c, 0x40, 0xee, 0x2f}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -1330,6 +1351,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1635942153_add_telemetry_server_url_to_settings.up.sql": _1635942153_add_telemetry_server_url_to_settingsUpSql,
 
+	"1635942154_add_backup_setting.up.sql": _1635942154_add_backup_settingUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1424,7 +1447,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1630485153_networks.up.sql":                             &bintree{_1630485153_networksUpSql, map[string]*bintree{}},
 	"1632262444_profile_pictures_show_to.up.sql":             &bintree{_1632262444_profile_pictures_show_toUpSql, map[string]*bintree{}},
 	"1635942153_add_telemetry_server_url_to_settings.up.sql": &bintree{_1635942153_add_telemetry_server_url_to_settingsUpSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"1635942154_add_backup_setting.up.sql":                   &bintree{_1635942154_add_backup_settingUpSql, map[string]*bintree{}},
+	"doc.go":                                                 &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
