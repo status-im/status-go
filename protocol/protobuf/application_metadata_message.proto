@@ -48,5 +48,6 @@ message ApplicationMetadataMessage {
     SYNC_INSTALLATION_COMMUNITY = 32;
     ANONYMOUS_METRIC_BATCH = 33;
     SYNC_CHAT_REMOVED = 34;
+    SYNC_CHAT_MESSAGES_READ = 35;
   }
 }

@@ -12,6 +12,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -19,11 +20,11 @@ import (
 
 const publicChatName = "status"
 
-func TestMessengerSyncChatRemovedSuite(t *testing.T) {
-	suite.Run(t, new(MessengerSyncChatRemovedSuite))
+func TestMessengerSyncChatSuite(t *testing.T) {
+	suite.Run(t, new(MessengerSyncChatSuite))
 }
 
-type MessengerSyncChatRemovedSuite struct {
+type MessengerSyncChatSuite struct {
 	suite.Suite
 	privateKey *ecdsa.PrivateKey
 	alice1     *Messenger
@@ -34,7 +35,7 @@ type MessengerSyncChatRemovedSuite struct {
 	logger *zap.Logger
 }
 
-func (s *MessengerSyncChatRemovedSuite) newMessenger() *Messenger {
+func (s *MessengerSyncChatSuite) newMessenger() *Messenger {
 	if s.privateKey == nil {
 		privateKey, err := crypto.GenerateKey()
 		s.Require().NoError(err)
@@ -47,7 +48,16 @@ func (s *MessengerSyncChatRemovedSuite) newMessenger() *Messenger {
 	return messenger
 }
 
-func (s *MessengerSyncChatRemovedSuite) SetupTest() {
+func (s *MessengerSyncChatSuite) otherNewMessenger() *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	return messenger
+}
+
+func (s *MessengerSyncChatSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
 	config := waku.DefaultConfig
@@ -64,13 +74,13 @@ func (s *MessengerSyncChatRemovedSuite) SetupTest() {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncChatRemovedSuite) TearDownTest() {
+func (s *MessengerSyncChatSuite) TearDownTest() {
 	s.Require().NoError(s.alice1.Shutdown())
 	s.Require().NoError(s.alice2.Shutdown())
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerSyncChatRemovedSuite) Pair() {
+func (s *MessengerSyncChatSuite) Pair() {
 	err := s.alice2.SetInstallationMetadata(s.alice2.installationID, &multidevice.InstallationMetadata{
 		Name:       "alice2",
 		DeviceType: "alice2",
@@ -100,7 +110,7 @@ func (s *MessengerSyncChatRemovedSuite) Pair() {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncChatRemovedSuite) TestRemovePubChat() {
+func (s *MessengerSyncChatSuite) TestRemovePubChat() {
 	chat := CreatePublicChat(publicChatName, s.alice1.transport)
 	err := s.alice1.SaveChat(chat)
 	s.Require().NoError(err)
@@ -141,4 +151,70 @@ func (s *MessengerSyncChatRemovedSuite) TestRemovePubChat() {
 
 	s.Require().NotNil(statusChat)
 	s.Require().False(statusChat.Active)
+}
+
+func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
+	s.Pair()
+	chatID := "foobarsynctest"
+	_, err := s.alice1.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	_, err = s.alice2.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	otherMessenger := s.otherNewMessenger()
+	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	chat := otherMessenger.Chat(chatID)
+	message := buildTestMessage(*chat)
+
+	_, err = otherMessenger.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+
+	var receivedPubChatMessage *common.Message
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		messages := response.Messages()
+		if len(messages) > 0 {
+			receivedPubChatMessage = messages[0]
+			return nil
+		}
+
+		return errors.New("Not received all messages")
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(receivedPubChatMessage.ChatId, chatID)
+
+	alice2chat := s.alice2.Chat(chatID)
+	s.Require().Equal(alice2chat.UnviewedMessagesCount, uint(1))
+
+	err = s.alice1.MarkAllRead(chatID)
+	s.Require().NoError(err)
+
+	var receivedChat *Chat
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		chats := response.Chats()
+		if len(chats) > 0 {
+			receivedChat = chats[0]
+			return nil
+		}
+
+		return errors.New("Not received all messages")
+	})
+	s.Require().NoError(err)
+
+	s.Require().Equal(receivedChat.ID, chatID)
+	s.Require().Equal(receivedChat.UnviewedMessagesCount, uint(0))
 }

@@ -131,8 +131,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -162,6 +162,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.SyncedTo,
 		chat.Description,
 		chat.Highlight,
+		chat.ReadMessagesAtClockValue,
 	)
 
 	if err != nil {
@@ -240,6 +241,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.type,
 			chats.timestamp,
 			chats.deleted_at_clock_value,
+                        chats.read_messages_at_clock_value,
 			chats.unviewed_message_count,
 			chats.unviewed_mentions_count,
 			chats.last_clock_value,
@@ -285,6 +287,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.ChatType,
 			&chat.Timestamp,
 			&chat.DeletedAtClockValue,
+			&chat.ReadMessagesAtClockValue,
 			&chat.UnviewedMessagesCount,
 			&chat.UnviewedMentionsCount,
 			&chat.LastClockValue,
@@ -372,6 +375,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			active,
 			type,
 			timestamp,
+			read_messages_at_clock_value,
 			deleted_at_clock_value,
 			unviewed_message_count,
 			unviewed_mentions_count,
@@ -395,6 +399,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Active,
 		&chat.ChatType,
 		&chat.Timestamp,
+		&chat.ReadMessagesAtClockValue,
 		&chat.DeletedAtClockValue,
 		&chat.UnviewedMessagesCount,
 		&chat.UnviewedMentionsCount,

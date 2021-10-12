@@ -418,6 +418,26 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 	return state.Response.Merge(response)
 }
 
+func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, message protobuf.SyncChatMessagesRead) error {
+	m.logger.Info("HANDLING SYNC MESSAGES READ", zap.Any("ID", message.Id))
+	chat, ok := m.allChats.Load(message.Id)
+	if !ok {
+		return ErrChatNotFound
+	}
+
+	if chat.ReadMessagesAtClockValue > message.Clock {
+		return nil
+	}
+
+	err := m.markAllRead(message.Id, message.Clock, false)
+	if err != nil {
+		return err
+	}
+
+	state.Response.AddChat(chat)
+	return nil
+}
+
 func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
@@ -765,6 +785,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+	if chat.ReadMessagesAtClockValue > state.CurrentMessageState.WhisperTimestamp {
+		receivedMessage.Seen = true
+	}
+
 	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
@@ -807,7 +831,9 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
+		if !receivedMessage.Seen {
+			m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
+		}
 	} else {
 		// Our own message, mark as sent
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent

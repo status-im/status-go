@@ -2266,6 +2266,13 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 			}
 		}
 
+		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat() || chat.CommunityChat()) && chat.Active {
+			err := m.syncChatMessagesRead(ctx, chatID, chat.ReadMessagesAtClockValue)
+			if err != nil {
+				return false
+			}
+		}
+
 		return true
 	})
 	if err != nil {
@@ -2884,6 +2891,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.SyncChatMessagesRead:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncChatMessagesRead)
+						logger.Debug("Handling SyncChatMessagesRead", zap.Any("message", p))
+						err := m.HandleSyncChatMessagesRead(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle sync removing chat", zap.Error(err))
+							continue
+						}
+
 					case protobuf.SyncCommunity:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -3420,23 +3441,78 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	return count, countWithMentions, nil
 }
 
-func (m *Messenger) MarkAllRead(chatID string) error {
+func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage := &protobuf.SyncChatMessagesRead{
+		Clock: clock,
+		Id:    chatID,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ,
+		ResendAutomatically: true,
+	})
+
+	return err
+}
+
+func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool) error {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
 
-	err := m.persistence.MarkAllRead(chatID)
+	seen, mentioned, err := m.persistence.MarkAllRead(chatID, clock)
 	if err != nil {
 		return err
 	}
 
-	chat.UnviewedMessagesCount = 0
-	chat.UnviewedMentionsCount = 0
+	if shouldBeSynced {
+		err := m.syncChatMessagesRead(context.Background(), chatID, clock)
+		if err != nil {
+			return err
+		}
+	}
+
+	chat.ReadMessagesAtClockValue = clock
 	chat.Highlight = false
+
+	if chat.UnviewedMessagesCount >= uint(seen) {
+		chat.UnviewedMessagesCount -= uint(seen)
+	} else {
+		chat.UnviewedMessagesCount = 0
+	}
+
+	if chat.UnviewedMentionsCount >= uint(mentioned) {
+		chat.UnviewedMentionsCount -= uint(mentioned)
+	} else {
+		chat.UnviewedMentionsCount = 0
+	}
+
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 	return nil
+}
+
+func (m *Messenger) MarkAllRead(chatID string) error {
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return errors.New("chat not found")
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	return m.markAllRead(chatID, clock, true)
 }
 
 func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {

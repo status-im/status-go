@@ -77,3 +77,8 @@ message SyncChatRemoved {
   uint64 clock = 1;
   string id = 2;
 }
+
+message SyncChatMessagesRead {
+  uint64 clock = 1;
+  string id = 2;
+}

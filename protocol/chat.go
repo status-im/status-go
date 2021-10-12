@@ -60,7 +60,9 @@ type Chat struct {
 	// DeletedAtClockValue indicates the clock value at time of deletion, messages
 	// with lower clock value of this should be discarded
 	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
-
+	// ReadMessagesAtClockValue indicates the clock value of time till all
+	// messages are considered as read
+	ReadMessagesAtClockValue uint64
 	// Denormalized fields
 	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount uint            `json:"unviewedMentionsCount"`
@@ -365,14 +367,16 @@ func OneToOneFromPublicKey(pk *ecdsa.PublicKey, timesource common.TimeSource) *C
 }
 
 func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource common.TimeSource) *Chat {
+	timestamp := timesource.GetCurrentTime()
 	return &Chat{
-		ID:        oneToOneChatID(publicKey),
-		Name:      name,
-		Timestamp: int64(timesource.GetCurrentTime()),
-		Active:    true,
-		Joined:    int64(timesource.GetCurrentTime()),
-		ChatType:  ChatTypeOneToOne,
-		Highlight: true,
+		ID:                       oneToOneChatID(publicKey),
+		Name:                     name,
+		Timestamp:                int64(timestamp),
+		ReadMessagesAtClockValue: 0,
+		Active:                   true,
+		Joined:                   int64(timestamp),
+		ChatType:                 ChatTypeOneToOne,
+		Highlight:                true,
 	}
 }
 
@@ -382,18 +386,20 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
 	}
 
+	timestamp := timesource.GetCurrentTime()
 	return &Chat{
-		CommunityID: orgID,
-		CategoryID:  orgChat.CategoryId,
-		Name:        orgChat.Identity.DisplayName,
-		Description: orgChat.Identity.Description,
-		Active:      true,
-		Color:       color,
-		Emoji:       orgChat.Identity.Emoji,
-		ID:          orgID + chatID,
-		Timestamp:   int64(timesource.GetCurrentTime()),
-		Joined:      int64(timesource.GetCurrentTime()),
-		ChatType:    ChatTypeCommunityChat,
+		CommunityID:              orgID,
+		CategoryID:               orgChat.CategoryId,
+		Name:                     orgChat.Identity.DisplayName,
+		Description:              orgChat.Identity.Description,
+		Active:                   true,
+		Color:                    color,
+		Emoji:                    orgChat.Identity.Emoji,
+		ID:                       orgID + chatID,
+		Timestamp:                int64(timestamp),
+		Joined:                   int64(timestamp),
+		ReadMessagesAtClockValue: 0,
+		ChatType:                 ChatTypeCommunityChat,
 	}
 }
 
@@ -427,14 +433,16 @@ func CreateCommunityChats(org *communities.Community, timesource common.TimeSour
 }
 
 func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
+	timestamp := timesource.GetCurrentTime()
 	return &Chat{
-		ID:        name,
-		Name:      name,
-		Active:    true,
-		Timestamp: int64(timesource.GetCurrentTime()),
-		Joined:    int64(timesource.GetCurrentTime()),
-		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
-		ChatType:  ChatTypePublic,
+		ID:                       name,
+		Name:                     name,
+		Active:                   true,
+		Timestamp:                int64(timestamp),
+		Joined:                   int64(timestamp),
+		ReadMessagesAtClockValue: 0,
+		Color:                    chatColors[rand.Intn(len(chatColors))], // nolint: gosec
+		ChatType:                 ChatTypePublic,
 	}
 }
 
@@ -462,13 +470,14 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 	synced := uint32(timestamp / 1000)
 
 	return Chat{
-		Active:     true,
-		Color:      chatColors[rand.Intn(len(chatColors))], // nolint: gosec
-		Timestamp:  int64(timestamp),
-		SyncedTo:   synced,
-		SyncedFrom: synced,
-		ChatType:   ChatTypePrivateGroupChat,
-		Highlight:  true,
+		Active:                   true,
+		Color:                    chatColors[rand.Intn(len(chatColors))], // nolint: gosec
+		Timestamp:                int64(timestamp),
+		ReadMessagesAtClockValue: 0,
+		SyncedTo:                 synced,
+		SyncedFrom:               synced,
+		ChatType:                 ChatTypePrivateGroupChat,
+		Highlight:                true,
 	}
 }
 

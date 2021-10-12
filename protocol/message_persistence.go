@@ -1254,10 +1254,10 @@ func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err e
 	return
 }
 
-func (db sqlitePersistence) MarkAllRead(chatID string) error {
+func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int64, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer func() {
 		if err == nil {
@@ -1268,12 +1268,44 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen != 1`, chatID)
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND not(seen) AND clock_value <= ? AND not(mentioned)`, chatID, clock)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
-	_, err = tx.Exec(`UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0, highlight = 0 WHERE id = ?`, chatID)
-	return err
+
+	seen, err := seenResult.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentionedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND not(seen) != 1 AND clock_value <= ? AND mentioned`, chatID, clock)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentioned, err := mentionedResult.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	_, err = tx.Exec(
+		`UPDATE chats
+		   SET unviewed_message_count =
+		   (SELECT COUNT(1)
+		   FROM user_messages
+		   WHERE local_chat_id = ? AND seen = 0),
+		   unviewed_mentions_count =
+		   (SELECT COUNT(1)
+		   FROM user_messages
+		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+                   highlight = 0
+		WHERE id = ?`, chatID, chatID, chatID)
+
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return (seen + mentioned), mentioned, nil
 }
 
 func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
