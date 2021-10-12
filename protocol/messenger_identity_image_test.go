@@ -512,7 +512,8 @@ func resultExpectedVS(vs accounts.ProfilePicturesVisibilityType, bc bool) (bool,
 	case accounts.ProfilePicturesVisibilityEveryone:
 		return true, nil
 	case accounts.ProfilePicturesVisibilityNone:
-		return false, nil
+		// If we are contacts, we save the image regardless
+		return bc, nil
 	default:
 		return false, errors.New("unknown ProfilePicturesVisibilityType")
 	}
