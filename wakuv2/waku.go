@@ -181,7 +181,11 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	libp2pOpts := node.DefaultLibP2POptions
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
 
-	if appdb != nil && cfg.PersistPeers {
+	if cfg.PersistPeers {
+		if appdb == nil {
+			return nil, fmt.Errorf("a db connection must be provided in order to persist the peers")
+		}
+
 		// Create persistent peerstore
 		queries, err := persistence.NewQueries("peerstore", appdb)
 		if err != nil {
