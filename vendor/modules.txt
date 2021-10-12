@@ -132,8 +132,10 @@ github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
 # github.com/gogo/protobuf v1.3.2
+github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 # github.com/golang-migrate/migrate/v4 v4.8.0
 github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
@@ -183,6 +185,11 @@ github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
 # github.com/ipfs/go-cid v0.0.7
 github.com/ipfs/go-cid
+# github.com/ipfs/go-datastore v0.4.4
+github.com/ipfs/go-datastore
+github.com/ipfs/go-datastore/query
+# github.com/ipfs/go-ds-sql v0.2.0
+github.com/ipfs/go-ds-sql
 # github.com/ipfs/go-ipfs-util v0.0.2
 github.com/ipfs/go-ipfs-util
 # github.com/ipfs/go-log v1.0.4
@@ -271,6 +278,7 @@ github.com/libp2p/go-libp2p-core/routing
 github.com/libp2p/go-libp2p-core/sec
 github.com/libp2p/go-libp2p-core/sec/insecure
 github.com/libp2p/go-libp2p-core/sec/insecure/pb
+github.com/libp2p/go-libp2p-core/test
 github.com/libp2p/go-libp2p-core/transport
 # github.com/libp2p/go-libp2p-discovery v0.5.0
 github.com/libp2p/go-libp2p-discovery
@@ -286,6 +294,8 @@ github.com/libp2p/go-libp2p-noise/pb
 # github.com/libp2p/go-libp2p-peerstore v0.2.6
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
+github.com/libp2p/go-libp2p-peerstore/pb
+github.com/libp2p/go-libp2p-peerstore/pstoreds
 github.com/libp2p/go-libp2p-peerstore/pstoremem
 # github.com/libp2p/go-libp2p-pnet v0.2.0
 github.com/libp2p/go-libp2p-pnet

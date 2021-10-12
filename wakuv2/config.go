@@ -28,6 +28,7 @@ type Config struct {
 	SoftBlacklistedPeerIDs []string `toml:",omitempty"`
 	Host                   string   `toml:",omitempty"`
 	Port                   int      `toml:",omitempty"`
+	PersistPeers           bool     `toml:",omitempty"`
 	PeerExchange           bool     `toml:",omitempty"`
 	KeepAliveInterval      int      `toml:",omitempty"`
 	LightClient            bool     `toml:",omitempty"`

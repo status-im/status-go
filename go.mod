@@ -21,6 +21,7 @@ require (
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
+	github.com/ipfs/go-ds-sql v0.2.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
@@ -29,6 +30,7 @@ require (
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
 	github.com/mattn/go-colorable v0.1.4 // indirect
