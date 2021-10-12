@@ -1359,7 +1359,10 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 
 	// If we don't want to view profile images from anyone, don't process identity images.
 	// We don't want to store the profile images of other users, even if we don't display images.
-	if viewFromNoOne {
+	inOurContacts, ok := m.allContacts.Load(state.CurrentMessageState.Contact.ID)
+
+	isContact := ok && inOurContacts.Added
+	if viewFromNoOne && !isContact {
 		return nil
 	}
 
