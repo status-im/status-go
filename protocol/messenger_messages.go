@@ -249,6 +249,19 @@ func (m *Messenger) MessagesByChatID(request *requests.MessagesByChatID) ([]*com
 	return m.persistence.MessageByChatID(chatID, cursor, limit, direction)
 }
 
+func (m *Messenger) MessageContext(request *requests.MessageContext) (*MessageQueryResult, error) {
+
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	chatID := request.ChatID
+	messageID := request.MessageID
+	limit := request.Limit
+
+	return m.persistence.MessageContext(chatID, messageID, limit)
+}
+
 // DEPRECATED: use MessagesByChatID
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
 	chat, err := m.persistence.Chat(chatID)

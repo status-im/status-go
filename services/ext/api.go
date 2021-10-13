@@ -505,6 +505,10 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
+func (api *PublicAPI) MessageContext(request *requests.MessageContext) (*protocol.MessageQueryResult, error) {
+	return api.service.messenger.MessageContext(request)
+}
+
 func (api *PublicAPI) MessagesByChatID(request *requests.MessagesByChatID) (*ApplicationMessagesResponse, error) {
 	messages, cursor, err := api.service.messenger.MessagesByChatID(request)
 	if err != nil {

@@ -1392,3 +1392,73 @@ func TestSaveCommunityChat(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, chat, retrievedChat)
 }
+
+func TestMessageContext(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+	chatID := testPublicChatID
+	count := 10
+
+	var messages []*common.Message
+
+	for i := 0; i < count; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+
+			From: "me",
+		})
+	}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	// Test in the middle
+	// Query with 4 and limit 3, we should get
+	// 1 -- 2 -- 3 -- [4] -- 5 -- 6 -- 7
+	// and 0, 8 cursors
+	queryResult, err := p.MessageContext(chatID, messages[4].ID, 3)
+	require.NoError(t, err)
+	require.NotNil(t, queryResult)
+
+	require.Len(t, queryResult.Messages, 7)
+	require.Equal(t, clockAndIDToCursor(0, "0"), queryResult.PrevPageCursor)
+	require.Equal(t, clockAndIDToCursor(8, "8"), queryResult.NextPageCursor)
+	require.Equal(t, uint64(1), queryResult.Messages[0].Clock)
+	require.Equal(t, uint64(7), queryResult.Messages[6].Clock)
+
+	// Test at the beginning
+	// Query with 2 and limit 3, we should get
+	// 0 -- 1 -- [2] -- 3 -- 4 -- 5
+	// and nil, 6 cursors
+
+	queryResult, err = p.MessageContext(chatID, messages[2].ID, 3)
+	require.NoError(t, err)
+	require.NotNil(t, queryResult)
+
+	require.Len(t, queryResult.Messages, 6)
+	require.Equal(t, "", queryResult.PrevPageCursor)
+	require.Equal(t, clockAndIDToCursor(6, "6"), queryResult.NextPageCursor)
+	require.Equal(t, uint64(0), queryResult.Messages[0].Clock)
+	require.Equal(t, uint64(5), queryResult.Messages[5].Clock)
+
+	// Test at the end
+	// Query with 8 and limit 3, we should get
+	// 5 -- 6 -- 7 -- [8] -- 9
+	// and 4, nil cursors
+
+	queryResult, err = p.MessageContext(chatID, messages[8].ID, 3)
+	require.NoError(t, err)
+	require.NotNil(t, queryResult)
+
+	require.Len(t, queryResult.Messages, 5)
+	require.Equal(t, clockAndIDToCursor(4, "4"), queryResult.PrevPageCursor)
+	require.Equal(t, "", queryResult.NextPageCursor)
+	require.Equal(t, uint64(5), queryResult.Messages[0].Clock)
+	require.Equal(t, uint64(9), queryResult.Messages[4].Clock)
+
+}

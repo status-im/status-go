@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -516,6 +517,144 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 		}
 		result = append(result, &message)
 	}
+
+	return result, nil
+}
+
+type MessageQueryResult struct {
+	Messages       []*common.Message `json:"messages"`
+	NextPageCursor string            `json:"nextPageCursor"`
+	PrevPageCursor string            `json:"prevPageCursor"`
+	MessageIndex   int               `json:"messageIndex"`
+}
+
+func clockAndIDToCursor(clock uint64, id string) string {
+	return fmt.Sprintf("%064d%s", clock, id)
+}
+
+func (db sqlitePersistence) MessageContext(chatID string, messageID string, limit int) (*MessageQueryResult, error) {
+	var err error
+	result := &MessageQueryResult{}
+
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	message, err := db.messageByID(tx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if message == nil {
+		return nil, errors.New("message not found")
+	}
+	cursor := clockAndIDToCursor(message.Clock, message.ID)
+
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := tx.Query(
+		fmt.Sprintf(`
+				SELECT
+					%s,
+					substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+				FROM
+					user_messages m1
+				LEFT JOIN
+					user_messages m2
+				ON
+				m1.response_to = m2.id
+
+				LEFT JOIN
+				      contacts c
+				ON
+
+				m1.source = c.id
+				WHERE NOT(m1.hide) AND m1.local_chat_id = ? AND cursor < ?
+				ORDER BY CURSOR DESC
+				LIMIT ?`, allFields), chatID, cursor, limit+1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*common.Message
+	var cursors []string
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err = db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, err
+		}
+		cursors = append(cursors, cursor)
+		messages = append(messages, &message)
+	}
+
+	if len(messages) == limit+1 {
+		result.PrevPageCursor = cursors[limit]
+		messages = messages[:limit]
+	}
+
+	// reverse for proper ordering
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	rows, err = tx.Query(
+		fmt.Sprintf(`
+				SELECT
+					%s,
+					substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+				FROM
+					user_messages m1
+				LEFT JOIN
+					user_messages m2
+				ON
+				m1.response_to = m2.id
+
+				LEFT JOIN
+				      contacts c
+				ON
+
+				m1.source = c.id
+				WHERE NOT(m1.hide) AND m1.local_chat_id = ? AND cursor >= ?
+				ORDER BY CURSOR ASC
+				LIMIT ?`, allFields), chatID, cursor, limit+2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cursors = nil
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err = db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, err
+		}
+		messages = append(messages, &message)
+		cursors = append(cursors, cursor)
+	}
+
+	if len(cursors) == limit+2 {
+		result.NextPageCursor = cursors[limit+1]
+		messages = messages[:len(messages)-1]
+	}
+
+	result.Messages = messages
 
 	return result, nil
 }
