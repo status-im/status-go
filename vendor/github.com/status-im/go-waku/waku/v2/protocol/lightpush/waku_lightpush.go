@@ -203,3 +203,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 
 	return pushResponseRPC.Response, nil
 }
+
+func (w *WakuLightPush) Stop() {
+	w.h.RemoveStreamHandler(LightPushID_v20beta1)
+}

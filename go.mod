@@ -18,24 +18,24 @@ require (
 	github.com/ethereum/go-ethereum v1.10.4
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
-	github.com/golang/mock v1.4.4
+	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/ipfs/go-ds-sql v0.2.0
-	github.com/ipfs/go-log v1.0.4
+	github.com/ipfs/go-log v1.0.5
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.9.0
-	github.com/libp2p/go-libp2p v0.13.0
-	github.com/libp2p/go-libp2p-core v0.8.5
-	github.com/libp2p/go-libp2p-peerstore v0.2.6
+	github.com/libp2p/go-libp2p v0.15.1
+	github.com/libp2p/go-libp2p-core v0.9.0
+	github.com/libp2p/go-libp2p-peerstore v0.3.0
+	github.com/libp2p/go-libp2p-pubsub v0.5.5
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
 	github.com/mattn/go-colorable v0.1.4 // indirect
-	github.com/mattn/go-isatty v0.0.10 // indirect
-	github.com/multiformats/go-multiaddr v0.3.2
+	github.com/multiformats/go-multiaddr v0.4.0
 	github.com/multiformats/go-multibase v0.0.3
 	github.com/multiformats/go-varint v0.0.6
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
@@ -49,12 +49,11 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20211006192541-761ae88bbdea
-	github.com/status-im/go-waku-rendezvous v0.0.0-20211005020656-b53661c58574
-	github.com/status-im/go-wakurelay-pubsub v0.4.3-0.20211006151908-91851dda6375
+	github.com/status-im/go-waku v0.0.0-20211018124348-4227a9d69d19
+	github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432
 	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2
-	github.com/status-im/rendezvous v1.3.1-0.20210824184947-7c79c858170c
+	github.com/status-im/rendezvous v1.3.4-0.20211008144244-bdf13155817d
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.7.0
@@ -63,11 +62,11 @@ require (
 	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/xeipuuv/gojsonschema v1.2.0
-	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+	go.uber.org/zap v1.19.0
+	golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 	golang.org/x/tools v0.1.2 // indirect
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.27.1
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

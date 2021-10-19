@@ -21,6 +21,8 @@ import (
 // Session is used to wrap a reliable ordered connection and to
 // multiplex it into multiple streams.
 type Session struct {
+	rtt int64 // to be accessed atomically, in nanoseconds
+
 	// remoteGoAway indicates the remote side does
 	// not want futher connections. Must be first for alignment.
 	remoteGoAway int32
@@ -129,6 +131,7 @@ func newSession(config *Config, conn net.Conn, client bool, readBuf int) *Sessio
 	}
 	go s.recv()
 	go s.send()
+	go s.measureRTT()
 	return s
 }
 
@@ -289,6 +292,19 @@ func (s *Session) goAway(reason uint32) header {
 	atomic.SwapInt32(&s.localGoAway, 1)
 	hdr := encode(typeGoAway, 0, 0, reason)
 	return hdr
+}
+
+func (s *Session) measureRTT() {
+	rtt, err := s.Ping()
+	if err != nil {
+		return
+	}
+	atomic.StoreInt64(&s.rtt, rtt.Nanoseconds())
+}
+
+// 0 if we don't yet have a measurement
+func (s *Session) getRTT() time.Duration {
+	return time.Duration(atomic.LoadInt64(&s.rtt))
 }
 
 // Ping is used to measure the RTT response time
@@ -627,12 +643,7 @@ func (s *Session) handleStreamMessage(hdr header) error {
 
 	// Check if this is a window update
 	if hdr.MsgType() == typeWindowUpdate {
-		if err := stream.incrSendWindow(hdr, flags); err != nil {
-			if sendErr := s.sendMsg(s.goAway(goAwayProtoErr), nil, nil); sendErr != nil {
-				s.logger.Printf("[WARN] yamux: failed to send go away: %v", sendErr)
-			}
-			return err
-		}
+		stream.incrSendWindow(hdr, flags)
 		return nil
 	}
 

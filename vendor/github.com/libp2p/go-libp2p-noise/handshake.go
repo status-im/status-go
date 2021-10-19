@@ -5,13 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	pool "github.com/libp2p/go-buffer-pool"
-	"golang.org/x/crypto/poly1305"
 	"time"
+
+	"golang.org/x/crypto/poly1305"
 
 	"github.com/flynn/noise"
 	"github.com/gogo/protobuf/proto"
 
+	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 
@@ -94,8 +95,8 @@ func (s *secureSession) runHandshake(ctx context.Context) error {
 		}
 	} else {
 		// stage 0 //
-		plaintext, err := s.readHandshakeMessage(hs)
-		if err != nil {
+		// We don't expect any payload on the first message.
+		if _, err := s.readHandshakeMessage(hs); err != nil {
 			return fmt.Errorf("error reading handshake message: %w", err)
 		}
 
@@ -108,7 +109,7 @@ func (s *secureSession) runHandshake(ctx context.Context) error {
 		}
 
 		// stage 2 //
-		plaintext, err = s.readHandshakeMessage(hs)
+		plaintext, err := s.readHandshakeMessage(hs)
 		if err != nil {
 			return fmt.Errorf("error reading handshake message: %w", err)
 		}
@@ -198,7 +199,7 @@ func (s *secureSession) readHandshakeMessage(hs *noise.HandshakeState) ([]byte, 
 func (s *secureSession) generateHandshakePayload(localStatic noise.DHKey) ([]byte, error) {
 	// obtain the public key from the handshake session so we can sign it with
 	// our libp2p secret key.
-	localKeyRaw, err := s.LocalPublicKey().Bytes()
+	localKeyRaw, err := crypto.MarshalPublicKey(s.LocalPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("error serializing libp2p identity key: %w", err)
 	}

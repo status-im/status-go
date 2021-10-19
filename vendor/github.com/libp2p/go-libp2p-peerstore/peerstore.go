@@ -19,19 +19,6 @@ type peerstore struct {
 	pstore.PeerMetadata
 }
 
-// NewPeerstore creates a data structure that stores peer data, backed by the
-// supplied implementations of KeyBook, AddrBook and PeerMetadata.
-// Deprecated: use pstoreds.NewPeerstore or peerstoremem.NewPeerstore instead.
-func NewPeerstore(kb pstore.KeyBook, ab pstore.AddrBook, pb pstore.ProtoBook, md pstore.PeerMetadata) pstore.Peerstore {
-	return &peerstore{
-		KeyBook:      kb,
-		AddrBook:     ab,
-		ProtoBook:    pb,
-		PeerMetadata: md,
-		Metrics:      NewMetrics(),
-	}
-}
-
 func (ps *peerstore) Close() (err error) {
 	var errs []error
 	weakClose := func(name string, c interface{}) {

@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/record"
-	record_pb "github.com/libp2p/go-libp2p-core/record/pb"
 
 	pb "github.com/status-im/go-waku-rendezvous/pb"
 
@@ -61,12 +59,7 @@ func newRegisterMessage(privKey libp2pCrypto.PrivKey, ns string, pi peer.AddrInf
 		return nil, err
 	}
 
-	peerEnvelop := &record_pb.Envelope{}
-	if err = proto.Unmarshal(envPayload, peerEnvelop); err != nil {
-		return nil, err
-	}
-
-	msg.Register.Peer = peerEnvelop
+	msg.Register.SignedPeerRecord = envPayload
 
 	return msg, nil
 }
@@ -85,33 +78,7 @@ func newDiscoverMessage(ns string, limit int) *pb.Message {
 	return msg
 }
 
-func marshalEnvelope(pbEnvelope *record_pb.Envelope) ([]byte, error) {
-	return proto.Marshal(pbEnvelope)
-}
-
-func pbToEnvelope(pbEnvelope *record_pb.Envelope) (*record.Envelope, error) {
-	if pbEnvelope == nil {
-		return nil, errors.New("missing envelope information")
-	}
-
-	envelopeBytes, err := proto.Marshal(pbEnvelope)
-	if err != nil {
-		return nil, err
-	}
-
-	return record.UnmarshalEnvelope(envelopeBytes)
-}
-
-func pbToPeerRecord(pbEnvelope *record_pb.Envelope) (peer.AddrInfo, error) {
-	if pbEnvelope == nil {
-		return peer.AddrInfo{}, errors.New("missing envelope information")
-	}
-
-	envelopeBytes, err := proto.Marshal(pbEnvelope)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
+func unmarshalSignedPeerRecord(envelopeBytes []byte) (peer.AddrInfo, error) {
 	envelope, rec, err := record.ConsumeEnvelope(envelopeBytes, peer.PeerRecordEnvelopeDomain)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -150,16 +117,10 @@ func newDiscoverResponse(regs []RegistrationRecord) (*pb.Message_DiscoverRespons
 
 	rregs := make([]*pb.Message_Register, len(regs))
 	for i, reg := range regs {
-
-		var env = &record_pb.Envelope{}
-		if err := env.Unmarshal(reg.PeerEnvelope); err != nil {
-			return nil, err
-		}
-
 		rreg := new(pb.Message_Register)
 		rns := reg.Ns
 		rreg.Ns = rns
-		rreg.Peer = env
+		rreg.SignedPeerRecord = reg.PeerEnvelope
 		rttl := int64(reg.Ttl)
 		rreg.Ttl = rttl
 		rregs[i] = rreg

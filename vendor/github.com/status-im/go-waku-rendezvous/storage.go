@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 const (
@@ -16,6 +14,21 @@ const (
 
 	TopicBodyDelimiter = 0xff
 )
+
+type Iterator interface {
+	Release()
+	Next() bool
+	Prev() bool
+	Value() []byte
+	Key() []byte
+	Seek([]byte) bool
+}
+
+type DB interface {
+	Put([]byte, []byte) error
+	Delete([]byte) error
+	NewIterator([]byte) Iterator
+}
 
 type RegistrationRecord struct {
 	PeerEnvelope []byte
@@ -54,7 +67,7 @@ func (k RecordsKey) String() string {
 }
 
 // NewStorage creates instance of the storage.
-func NewStorage(db *leveldb.DB) Storage {
+func NewStorage(db DB) Storage {
 	return Storage{
 		db: db,
 	}
@@ -62,7 +75,7 @@ func NewStorage(db *leveldb.DB) Storage {
 
 // Storage manages records.
 type Storage struct {
-	db *leveldb.DB
+	db DB
 }
 
 // Add stores record using specified topic.
@@ -82,16 +95,16 @@ func (s Storage) Add(ns string, id peer.ID, envelope []byte, ttl int, deadline t
 	if err != nil {
 		return "", err
 	}
-	return key.String(), s.db.Put(key, data.Bytes(), nil)
+	return key.String(), s.db.Put(key, data.Bytes())
 }
 
 // RemoveBykey removes record from storage.
 func (s *Storage) RemoveByKey(key string) error {
-	return s.db.Delete([]byte(key), nil)
+	return s.db.Delete([]byte(key))
 }
 
 func (s *Storage) IterateAllKeys(iterator func(key RecordsKey, Deadline time.Time) error) error {
-	iter := s.db.NewIterator(util.BytesPrefix([]byte{RecordsPrefix}), nil)
+	iter := s.db.NewIterator([]byte{RecordsPrefix})
 	defer iter.Release()
 
 	for iter.Next() {
@@ -117,7 +130,7 @@ func (s *Storage) GetRandom(ns string, limit int64) (rst []RegistrationRecord, e
 	key[prefixlen] = TopicBodyDelimiter
 	prefixlen++
 
-	iter := s.db.NewIterator(util.BytesPrefix(key[:prefixlen]), nil)
+	iter := s.db.NewIterator(key[:prefixlen])
 	defer iter.Release()
 	uids := map[string]struct{}{}
 	// it might be too much cause we do crypto/rand.Read. requires profiling

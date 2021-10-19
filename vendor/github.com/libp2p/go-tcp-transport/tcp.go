@@ -2,7 +2,10 @@ package tcp
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
+	"runtime"
 	"time"
 
 	logging "github.com/ipfs/go-log"
@@ -13,7 +16,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // DefaultConnectTimeout is the (default) maximum amount of time the TCP
@@ -21,6 +24,42 @@ import (
 var DefaultConnectTimeout = 5 * time.Second
 
 var log = logging.Logger("tcp-tpt")
+
+const keepAlivePeriod = 30 * time.Second
+
+type canKeepAlive interface {
+	SetKeepAlive(bool) error
+	SetKeepAlivePeriod(time.Duration) error
+}
+
+var _ canKeepAlive = &net.TCPConn{}
+
+func tryKeepAlive(conn net.Conn, keepAlive bool) {
+	keepAliveConn, ok := conn.(canKeepAlive)
+	if !ok {
+		log.Errorf("Can't set TCP keepalives.")
+		return
+	}
+	if err := keepAliveConn.SetKeepAlive(keepAlive); err != nil {
+		// Sometimes we seem to get "invalid argument" results from this function on Darwin.
+		// This might be due to a closed connection, but I can't reproduce that on Linux.
+		//
+		// But there's nothing we can do about invalid arguments, so we'll drop this to a
+		// debug.
+		if errors.Is(err, os.ErrInvalid) {
+			log.Debugw("failed to enable TCP keepalive", "error", err)
+		} else {
+			log.Errorw("failed to enable TCP keepalive", "error", err)
+		}
+		return
+	}
+
+	if runtime.GOOS != "openbsd" {
+		if err := keepAliveConn.SetKeepAlivePeriod(keepAlivePeriod); err != nil {
+			log.Errorw("failed set keepalive period", "error", err)
+		}
+	}
+}
 
 // try to set linger on the connection, if possible.
 func tryLinger(conn net.Conn, sec int) {
@@ -33,17 +72,18 @@ func tryLinger(conn net.Conn, sec int) {
 	}
 }
 
-type lingerListener struct {
+type tcpListener struct {
 	manet.Listener
 	sec int
 }
 
-func (ll *lingerListener) Accept() (manet.Conn, error) {
+func (ll *tcpListener) Accept() (manet.Conn, error) {
 	c, err := ll.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
 	tryLinger(c, ll.sec)
+	tryKeepAlive(c, true)
 	return c, nil
 }
 
@@ -106,7 +146,12 @@ func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) 
 	// linger is 0, connections are _reset_ instead of closed with a FIN.
 	// This means we can immediately reuse the 5-tuple and reconnect.
 	tryLinger(conn, 0)
-	return t.Upgrader.UpgradeOutbound(ctx, t, conn, p)
+	tryKeepAlive(conn, true)
+	c, err := newTracingConn(conn, true)
+	if err != nil {
+		return nil, err
+	}
+	return t.Upgrader.UpgradeOutbound(ctx, t, c, p)
 }
 
 // UseReuseport returns true if reuseport is enabled and available.
@@ -127,7 +172,7 @@ func (t *TcpTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	list = &lingerListener{list, 0}
+	list = newTracingListener(&tcpListener{list, 0})
 	return t.Upgrader.UpgradeListener(t, list), nil
 }
 

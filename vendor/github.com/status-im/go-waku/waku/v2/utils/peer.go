@@ -10,6 +10,8 @@ import (
 
 var log = logging.Logger("utils")
 
+// SelectPeer is used to return a peer that supports a given protocol.
+// It currently selects the first peer returned by the peerstore
 func SelectPeer(host host.Host, protocolId string) (*peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
@@ -38,5 +40,5 @@ func SelectPeer(host host.Host, protocolId string) (*peer.ID, error) {
 		return &peers[0], nil
 	}
 
-	return nil, errors.New("No suitable peers found")
+	return nil, errors.New("no suitable peers found")
 }

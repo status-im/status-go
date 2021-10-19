@@ -1,16 +1,19 @@
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
+	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
-	wakurelay "github.com/status-im/go-wakurelay-pubsub"
+	"go.opencensus.io/stats"
 )
 
 // A map of peer IDs to supported protocols
@@ -24,13 +27,15 @@ type ConnStatus struct {
 
 type ConnectionNotifier struct {
 	h              host.Host
+	ctx            context.Context
 	DisconnectChan chan peer.ID
 	quit           chan struct{}
 }
 
-func NewConnectionNotifier(h host.Host) ConnectionNotifier {
+func NewConnectionNotifier(ctx context.Context, h host.Host) ConnectionNotifier {
 	return ConnectionNotifier{
 		h:              h,
+		ctx:            ctx,
 		DisconnectChan: make(chan peer.ID, 100),
 		quit:           make(chan struct{}),
 	}
@@ -47,11 +52,13 @@ func (c ConnectionNotifier) ListenClose(n network.Network, m ma.Multiaddr) {
 func (c ConnectionNotifier) Connected(n network.Network, cc network.Conn) {
 	// called when a connection opened
 	log.Info(fmt.Sprintf("Peer %s connected", cc.RemotePeer()))
+	stats.Record(c.ctx, metrics.Peers.M(1))
 }
 
 func (c ConnectionNotifier) Disconnected(n network.Network, cc network.Conn) {
 	// called when a connection closed
 	log.Info(fmt.Sprintf("Peer %s disconnected", cc.RemotePeer()))
+	stats.Record(c.ctx, metrics.Peers.M(-1))
 	c.DisconnectChan <- cc.RemotePeer()
 }
 
@@ -102,7 +109,7 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 		}
 
 		for _, protocol := range protocols {
-			if !hasRelay && protocol == string(wakurelay.WakuRelayID_v200) {
+			if !hasRelay && protocol == string(relay.WakuRelayID_v200) {
 				hasRelay = true
 			}
 			if !hasLightPush && protocol == string(lightpush.LightPushID_v20beta1) {

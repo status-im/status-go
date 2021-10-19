@@ -90,7 +90,7 @@ func (rz *RendezvousService) Stop() {
 
 func (rz *RendezvousService) purgeOutdated() {
 	keys := rz.cleaner.PopSince(time.Now())
-	log.Info("removed records from cleaner", "deadlines", len(rz.cleaner.deadlines), "heap", len(rz.cleaner.heap), "lth", len(keys))
+	log.Debug("removed records from cleaner", "deadlines", len(rz.cleaner.deadlines), "heap", len(rz.cleaner.heap), "lth", len(keys))
 	for _, key := range keys {
 		topic := TopicPart([]byte(key))
 		log.Debug("Removing record with", "topic", string(topic))
@@ -157,12 +157,12 @@ func (rz *RendezvousService) handleRegister(p peer.ID, m *pb.Message_Register) *
 		return newRegisterResponseError(pb.Message_E_INVALID_NAMESPACE, "namespace too long")
 	}
 
-	mpi := m.GetPeer()
+	mpi := m.GetSignedPeerRecord()
 	if mpi == nil {
-		return newRegisterResponseError(pb.Message_E_INVALID_PEER_INFO, "missing peer info")
+		return newRegisterResponseError(pb.Message_E_INVALID_PEER_INFO, "missing signed peer record")
 	}
 
-	peerRecord, err := pbToPeerRecord(mpi)
+	peerRecord, err := unmarshalSignedPeerRecord(mpi)
 	if err != nil {
 		return newRegisterResponseError(pb.Message_E_INVALID_PEER_INFO, "invalid peer record")
 	}
@@ -199,12 +199,7 @@ func (rz *RendezvousService) handleRegister(p peer.ID, m *pb.Message_Register) *
 
 	deadline := time.Now().Add(time.Duration(ttl)).Add(networkDelay)
 
-	envPayload, err := marshalEnvelope(mpi)
-	if err != nil {
-		return newRegisterResponseError(pb.Message_E_INTERNAL_ERROR, err.Error())
-	}
-
-	key, err := rz.storage.Add(ns, peerRecord.ID, envPayload, ttl, deadline)
+	key, err := rz.storage.Add(ns, peerRecord.ID, mpi, ttl, deadline)
 	if err != nil {
 		return newRegisterResponseError(pb.Message_E_INTERNAL_ERROR, err.Error())
 	}

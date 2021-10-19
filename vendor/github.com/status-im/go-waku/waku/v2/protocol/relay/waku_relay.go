@@ -2,42 +2,71 @@ package relay
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"sync"
 
 	proto "github.com/golang/protobuf/proto"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
-	"github.com/status-im/go-waku/waku/v2/protocol"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	wakurelay "github.com/status-im/go-wakurelay-pubsub"
+
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 var log = logging.Logger("wakurelay")
 
 type Topic string
 
+const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 const DefaultWakuTopic Topic = "/waku/2/default-waku/proto"
 
 type WakuRelay struct {
 	host   host.Host
-	pubsub *wakurelay.PubSub
+	pubsub *pubsub.PubSub
 
 	topics          map[Topic]bool
 	topicsMutex     sync.Mutex
-	wakuRelayTopics map[Topic]*wakurelay.Topic
-	relaySubs       map[Topic]*wakurelay.Subscription
+	wakuRelayTopics map[Topic]*pubsub.Topic
+	relaySubs       map[Topic]*pubsub.Subscription
 }
 
-func NewWakuRelay(ctx context.Context, h host.Host, opts ...wakurelay.Option) (*WakuRelay, error) {
+// Once https://github.com/status-im/nim-waku/issues/420 is fixed, implement a custom messageIdFn
+func msgIdFn(pmsg *pubsub_pb.Message) string {
+	hash := sha256.Sum256(pmsg.Data)
+	return string(hash[:])
+}
+
+func NewWakuRelay(ctx context.Context, h host.Host, opts ...pubsub.Option) (*WakuRelay, error) {
 	w := new(WakuRelay)
 	w.host = h
 	w.topics = make(map[Topic]bool)
-	w.wakuRelayTopics = make(map[Topic]*wakurelay.Topic)
-	w.relaySubs = make(map[Topic]*wakurelay.Subscription)
+	w.wakuRelayTopics = make(map[Topic]*pubsub.Topic)
+	w.relaySubs = make(map[Topic]*pubsub.Subscription)
 
-	ps, err := wakurelay.NewWakuRelaySubWithMatcherFunc(ctx, h, protocol.PrefixTextMatch, opts...)
+	// default options required by WakuRelay
+	opts = append(opts, pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign))
+	opts = append(opts, pubsub.WithNoAuthor())
+	opts = append(opts, pubsub.WithMessageIdFn(msgIdFn))
+
+	opts = append(opts, pubsub.WithGossipSubProtocols(
+		[]protocol.ID{pubsub.GossipSubID_v11, pubsub.GossipSubID_v10, pubsub.FloodSubID, WakuRelayID_v200},
+		func(feat pubsub.GossipSubFeature, proto protocol.ID) bool {
+			switch feat {
+			case pubsub.GossipSubFeatureMesh:
+				return proto == pubsub.GossipSubID_v11 || proto == pubsub.GossipSubID_v10
+			case pubsub.GossipSubFeaturePX:
+				return proto == pubsub.GossipSubID_v11
+			default:
+				return false
+			}
+		},
+	))
+
+	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +77,7 @@ func NewWakuRelay(ctx context.Context, h host.Host, opts ...wakurelay.Option) (*
 	return w, nil
 }
 
-func (w *WakuRelay) PubSub() *wakurelay.PubSub {
+func (w *WakuRelay) PubSub() *pubsub.PubSub {
 	return w.pubsub
 }
 
@@ -63,11 +92,11 @@ func (w *WakuRelay) Topics() []Topic {
 	return result
 }
 
-func (w *WakuRelay) SetPubSub(pubSub *wakurelay.PubSub) {
+func (w *WakuRelay) SetPubSub(pubSub *pubsub.PubSub) {
 	w.pubsub = pubSub
 }
 
-func (w *WakuRelay) upsertTopic(topic Topic) (*wakurelay.Topic, error) {
+func (w *WakuRelay) upsertTopic(topic Topic) (*pubsub.Topic, error) {
 	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
 
@@ -84,7 +113,7 @@ func (w *WakuRelay) upsertTopic(topic Topic) (*wakurelay.Topic, error) {
 	return pubSubTopic, nil
 }
 
-func (w *WakuRelay) Subscribe(topic Topic) (subs *wakurelay.Subscription, isNew bool, err error) {
+func (w *WakuRelay) Subscribe(topic Topic) (subs *pubsub.Subscription, isNew bool, err error) {
 
 	sub, ok := w.relaySubs[topic]
 	if !ok {
@@ -145,4 +174,8 @@ func GetTopic(topic *Topic) Topic {
 		t = *topic
 	}
 	return t
+}
+
+func (w *WakuRelay) Stop() {
+	w.host.RemoveStreamHandler(WakuRelayID_v200)
 }

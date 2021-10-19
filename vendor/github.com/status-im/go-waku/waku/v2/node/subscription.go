@@ -6,9 +6,9 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol"
 )
 
-// Subscription to a pubsub topic
+// Subscription handles the subscrition to a particular pubsub topic
 type Subscription struct {
-	// Channel for receiving messages
+	// C is channel used for receiving envelopes
 	C chan *protocol.Envelope
 
 	closed bool
@@ -16,14 +16,17 @@ type Subscription struct {
 	quit   chan struct{}
 }
 
-// Unsubscribe from a pubsub topic. Will close the message channel
+// Unsubscribe will close a subscription from a pubsub topic. Will close the message channel
 func (subs *Subscription) Unsubscribe() {
+	subs.mutex.Lock()
+	defer subs.mutex.Unlock()
 	if !subs.closed {
 		close(subs.quit)
+		subs.closed = true
 	}
 }
 
-// Determine whether a Subscription is open or not
+// IsClosed determine whether a Subscription is still open for receiving messages
 func (subs *Subscription) IsClosed() bool {
 	subs.mutex.Lock()
 	defer subs.mutex.Unlock()

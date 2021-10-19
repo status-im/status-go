@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package rendezvous.pb;
 
-import "record/pb/envelope.proto";
-
 message Message {
   enum MessageType {
     REGISTER = 0;
@@ -24,7 +22,7 @@ message Message {
 
   message Register {
     string ns = 1;
-    record.pb.Envelope peer = 2;
+    bytes signedPeerRecord = 2;
     int64 ttl = 3; // in seconds
   }
 

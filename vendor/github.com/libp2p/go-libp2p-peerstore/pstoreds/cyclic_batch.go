@@ -1,7 +1,8 @@
 package pstoreds
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 
 	ds "github.com/ipfs/go-datastore"
 )
@@ -39,10 +40,10 @@ func (cb *cyclicBatch) cycle() (err error) {
 	}
 	// commit and renew the batch.
 	if err = cb.Batch.Commit(); err != nil {
-		return errors.Wrap(err, "failed while committing cyclic batch")
+		return fmt.Errorf("failed while committing cyclic batch: %w", err)
 	}
 	if cb.Batch, err = cb.ds.Batch(); err != nil {
-		return errors.Wrap(err, "failed while renewing cyclic batch")
+		return fmt.Errorf("failed while renewing cyclic batch: %w", err)
 	}
 	return nil
 }

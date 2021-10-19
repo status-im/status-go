@@ -25,7 +25,7 @@ type expiringAddr struct {
 }
 
 func (e *expiringAddr) ExpiredBy(t time.Time) bool {
-	return t.After(e.Expires)
+	return !t.Before(e.Expires)
 }
 
 type peerRecordState struct {
@@ -68,7 +68,7 @@ func NewAddrBook() *memoryAddrBook {
 
 	ab := &memoryAddrBook{
 		segments: func() (ret addrSegments) {
-			for i, _ := range ret {
+			for i := range ret {
 				ret[i] = &addrSegment{
 					addrs:             make(map[peer.ID]map[string]*expiringAddr),
 					signedPeerRecords: make(map[peer.ID]*peerRecordState)}
@@ -136,7 +136,7 @@ func (mab *memoryAddrBook) PeersWithAddrs() peer.IDSlice {
 	for _, s := range mab.segments {
 		s.RLock()
 		for pid, amap := range s.addrs {
-			if amap != nil && len(amap) > 0 {
+			if len(amap) > 0 {
 				pidSet.Add(pid)
 			}
 		}
@@ -196,7 +196,7 @@ func (mab *memoryAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, tt
 
 func (mab *memoryAddrBook) addAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
 	if err := p.Validate(); err != nil {
-		log.Warningf("tried to set addrs for invalid peer ID %s: %s", p, err)
+		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
 		return
 	}
 
@@ -223,7 +223,7 @@ func (mab *memoryAddrBook) addAddrsUnlocked(s *addrSegment, p peer.ID, addrs []m
 	addrSet := make(map[string]struct{}, len(addrs))
 	for _, addr := range addrs {
 		if addr == nil {
-			log.Warnf("was passed nil multiaddr for %s", p)
+			log.Warnw("was passed nil multiaddr", "peer", p)
 			continue
 		}
 		k := string(addr.Bytes())
@@ -253,7 +253,7 @@ func (mab *memoryAddrBook) addAddrsUnlocked(s *addrSegment, p peer.ID, addrs []m
 // SetAddr calls mgr.SetAddrs(p, addr, ttl)
 func (mab *memoryAddrBook) SetAddr(p peer.ID, addr ma.Multiaddr, ttl time.Duration) {
 	if err := p.Validate(); err != nil {
-		log.Warningf("tried to set addrs for invalid peer ID %s: %s", p, err)
+		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
 		return
 	}
 
@@ -264,7 +264,7 @@ func (mab *memoryAddrBook) SetAddr(p peer.ID, addr ma.Multiaddr, ttl time.Durati
 // This is used when we receive the best estimate of the validity of an address.
 func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
 	if err := p.Validate(); err != nil {
-		log.Warningf("tried to set addrs for invalid peer ID %s: %s", p, err)
+		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
 		return
 	}
 
@@ -281,7 +281,7 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 	exp := time.Now().Add(ttl)
 	for _, addr := range addrs {
 		if addr == nil {
-			log.Warnf("was passed nil multiaddr for %s", p)
+			log.Warnw("was passed nil multiaddr", "peer", p)
 			continue
 		}
 		aBytes := addr.Bytes()
@@ -295,18 +295,13 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 			delete(amap, key)
 		}
 	}
-
-	// if we've expired all the signed addresses for a peer, remove their signed routing state record
-	if len(amap) == 0 {
-		delete(s.signedPeerRecords, p)
-	}
 }
 
 // UpdateAddrs updates the addresses associated with the given peer that have
 // the given oldTTL to have the given newTTL.
 func (mab *memoryAddrBook) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL time.Duration) {
 	if err := p.Validate(); err != nil {
-		log.Warningf("tried to set addrs for invalid peer ID %s: %s", p, err)
+		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
 		return
 	}
 
@@ -315,19 +310,20 @@ func (mab *memoryAddrBook) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL t
 	defer s.Unlock()
 	exp := time.Now().Add(newTTL)
 	amap, found := s.addrs[p]
-	if found {
-		for k, a := range amap {
-			if oldTTL == a.TTL {
+	if !found {
+		return
+	}
+
+	for k, a := range amap {
+		if oldTTL == a.TTL {
+			if newTTL == 0 {
+				delete(amap, k)
+			} else {
 				a.TTL = newTTL
 				a.Expires = exp
 				amap[k] = a
 			}
 		}
-	}
-
-	// if we've expired all the signed addresses for a peer, remove their signed routing state record
-	if len(amap) == 0 {
-		delete(s.signedPeerRecords, p)
 	}
 }
 
@@ -406,7 +402,7 @@ func (mab *memoryAddrBook) ClearAddrs(p peer.ID) {
 // given peer ID will be published.
 func (mab *memoryAddrBook) AddrStream(ctx context.Context, p peer.ID) <-chan ma.Multiaddr {
 	if err := p.Validate(); err != nil {
-		log.Warningf("tried to get addrs for invalid peer ID %s: %s", p, err)
+		log.Warnw("tried to set addrs for invalid peer ID", "peer", p, "error", err)
 		ch := make(chan ma.Multiaddr)
 		close(ch)
 		return ch
@@ -426,10 +422,8 @@ func (mab *memoryAddrBook) AddrStream(ctx context.Context, p peer.ID) <-chan ma.
 }
 
 type addrSub struct {
-	pubch  chan ma.Multiaddr
-	lk     sync.Mutex
-	buffer []ma.Multiaddr
-	ctx    context.Context
+	pubch chan ma.Multiaddr
+	ctx   context.Context
 }
 
 func (s *addrSub) pubAddr(a ma.Multiaddr) {
@@ -497,11 +491,7 @@ func (mgr *AddrSubManager) AddrStream(ctx context.Context, p peer.ID, initial []
 	out := make(chan ma.Multiaddr)
 
 	mgr.mu.Lock()
-	if _, ok := mgr.subs[p]; ok {
-		mgr.subs[p] = append(mgr.subs[p], sub)
-	} else {
-		mgr.subs[p] = []*addrSub{sub}
-	}
+	mgr.subs[p] = append(mgr.subs[p], sub)
 	mgr.mu.Unlock()
 
 	sort.Sort(addr.AddrList(initial))
