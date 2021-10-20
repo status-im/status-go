@@ -68,6 +68,11 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 							chatPreview.ParsedText = chat.LastMessage.ParsedText
 						}
 					}
+				} else if chat.LastMessage.ContentType == protobuf.ChatMessage_EMOJI ||
+					chat.LastMessage.ContentType == protobuf.ChatMessage_TRANSACTION_COMMAND {
+
+					chatPreview.Text = chat.LastMessage.Text
+					chatPreview.ParsedText = chat.LastMessage.ParsedText
 				}
 			}
 
