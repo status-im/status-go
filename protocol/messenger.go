@@ -683,7 +683,7 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 
 // handleStandaloneChatIdentity sends a standalone ChatIdentity message to a public or private channel if the publish criteria is met
 func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
-	if chat.ChatType != ChatTypePublic || chat.ChatType != ChatTypeOneToOne {
+	if chat.ChatType != ChatTypePublic && chat.ChatType != ChatTypeOneToOne {
 		return nil
 	}
 	shouldPublishChatIdentity, err := m.shouldPublishChatIdentity(chat.ID)

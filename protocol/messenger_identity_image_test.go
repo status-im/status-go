@@ -218,6 +218,51 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 	s.Require().True(ci.Images["large"].Encrypted)
 }
 
+func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided() {
+	s.setupTest()
+	err := s.bob.settings.SaveSetting("profile-pictures-visibility", accounts.ProfilePicturesShowToEveryone)
+	s.Require().NoError(err)
+
+	err = s.alice.settings.SaveSetting("profile-pictures-visibility", accounts.ProfilePicturesShowToEveryone)
+	s.Require().NoError(err)
+
+	bChat := CreateOneToOneChat(s.generateKeyUID(&s.aliceKey.PublicKey), &s.aliceKey.PublicKey, s.alice.transport)
+	err = s.bob.SaveChat(bChat)
+	s.Require().NoError(err)
+
+	_, err = s.bob.Join(bChat)
+	s.Require().NoError(err)
+
+	// Alice sends a message to the public chat
+	message := buildTestMessage(*bChat)
+	response, err := s.bob.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 2 * time.Second
+	}
+
+	err = tt.RetryWithBackOff(func() error {
+
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		s.Require().NotNil(response)
+
+		contacts := response.Contacts
+		s.logger.Debug("RetryWithBackOff contact data", zap.Any("contacts", contacts))
+
+		if len(contacts) > 0 && len(contacts[0].Images) > 0 {
+			s.logger.Debug("", zap.Any("contacts", contacts))
+			return nil
+		}
+
+		return errors.New("no new contacts with images received")
+	}, options)
+}
+
 func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePicture() {
 	profilePicShowSettings := map[string]accounts.ProfilePicturesShowToType{
 		"ShowToContactsOnly": accounts.ProfilePicturesShowToContactsOnly,
