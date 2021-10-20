@@ -681,9 +681,9 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 	return nil
 }
 
-// handleStandaloneChatIdentity sends a standalone ChatIdentity message to a public channel if the publish criteria is met
+// handleStandaloneChatIdentity sends a standalone ChatIdentity message to a public or private channel if the publish criteria is met
 func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
-	if chat.ChatType != ChatTypePublic {
+	if chat.ChatType != ChatTypePublic || chat.ChatType != ChatTypeOneToOne {
 		return nil
 	}
 	shouldPublishChatIdentity, err := m.shouldPublishChatIdentity(chat.ID)
@@ -711,9 +711,21 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
-	if err != nil {
-		return err
+	if chat.ChatType == ChatTypePublic {
+		_, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+		if err != nil {
+			return err
+		}
+	} else {
+		pk, err := chat.PublicKey()
+		if err != nil {
+			return err
+		}
+		_, err = m.sender.SendPrivate(ctx, pk, &rawMessage)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
