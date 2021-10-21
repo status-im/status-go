@@ -1272,7 +1272,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0 WHERE id = ?`, chatID)
+	_, err = tx.Exec(`UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0, highlight = 0 WHERE id = ?`, chatID)
 	return err
 }
 
@@ -1304,7 +1304,7 @@ func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
 		return err
 	}
 
-	q = "UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0 WHERE id IN (%s)"
+	q = "UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0, highlight = 0 WHERE id IN (%s)"
 	q = fmt.Sprintf(q, inVector)
 	_, err = tx.Exec(q, idsArgs...)
 	return err
@@ -1364,7 +1364,8 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned)
+		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+                   highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 	return countWithMentions + countNoMentions, countWithMentions, err
 }
@@ -1742,6 +1743,7 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	chat.LastMessage = nil
 	chat.UnviewedMessagesCount = 0
 	chat.UnviewedMentionsCount = 0
+	chat.Highlight = true
 
 	err := db.deleteMessagesByChatID(chat.ID, tx)
 	if err != nil {
