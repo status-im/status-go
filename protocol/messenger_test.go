@@ -377,6 +377,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2
 	chat.UnviewedMentionsCount = 3
+	chat.Highlight = true
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 	inputMessage1 := buildTestMessage(*chat)
@@ -409,6 +410,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 		if c.ID == chat.ID {
 			s.Require().Equal(uint(1), c.UnviewedMessagesCount)
 			s.Require().Equal(uint(1), c.UnviewedMentionsCount)
+			s.Require().Equal(false, c.Highlight)
 		}
 	}
 }
@@ -416,6 +418,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 func (s *MessengerSuite) TestMarkAllRead() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2
+	chat.Highlight = true
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 	inputMessage1 := buildTestMessage(*chat)
@@ -436,6 +439,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	for idx := range chats {
 		if chats[idx].ID == chat.ID {
 			s.Require().Equal(uint(0), chats[idx].UnviewedMessagesCount)
+			s.Require().Equal(false, chats[idx].Highlight)
 		}
 	}
 }
@@ -1125,6 +1129,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
+		Highlight:             false,
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -1145,6 +1150,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
+		Highlight:             false,
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -1168,6 +1174,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
+		Highlight:             false,
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -1211,6 +1218,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
+		Highlight:             false,
 	}
 	contact := Contact{
 		ID: testPK,
@@ -1305,6 +1313,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
+		Highlight:             false,
 	}
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
@@ -1339,6 +1348,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
+		Highlight:             false,
 	}
 
 	chat2 := &Chat{
@@ -1351,6 +1361,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
+		Highlight:             false,
 	}
 
 	chat3 := &Chat{
@@ -1363,6 +1374,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
+		Highlight:             false,
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat1))

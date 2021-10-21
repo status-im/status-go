@@ -813,6 +813,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	}
 
+	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+		chat.Highlight = true
+	}
+
 	err = m.checkForEdits(receivedMessage)
 	if err != nil {
 		return err

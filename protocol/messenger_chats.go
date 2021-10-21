@@ -50,6 +50,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				Joined:                chat.Joined,
 				SyncedTo:              chat.SyncedTo,
 				SyncedFrom:            chat.SyncedFrom,
+				Highlight:             chat.Highlight,
 			}
 			if chat.LastMessage != nil {
 				chatPreview.ContentType = chat.LastMessage.ContentType
@@ -73,6 +74,9 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 
 					chatPreview.Text = chat.LastMessage.Text
 					chatPreview.ParsedText = chat.LastMessage.ParsedText
+				}
+				if chat.LastMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+					chatPreview.ContentCommunityID = chat.LastMessage.CommunityID
 				}
 			}
 

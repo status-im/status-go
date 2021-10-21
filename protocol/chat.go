@@ -101,6 +101,9 @@ type Chat struct {
 
 	// SyncedFrom is the time from when it was synced with a mailserver
 	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
+
+	// Highlight is used for highlight chats
+	Highlight bool `json:"highlight,omitempty"`
 }
 
 type ChatPreview struct {
@@ -162,6 +165,12 @@ type ChatPreview struct {
 	Text string `json:"text,omitempty"`
 
 	ContentType protobuf.ChatMessage_ContentType `json:"contentType,omitempty"`
+
+	// Highlight is used for highlight chats
+	Highlight bool `json:"highlight,omitempty"`
+
+	// Used for display invited community's name in the last message
+	ContentCommunityID string `json:"contentCommunityId,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
@@ -363,6 +372,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 		Active:    true,
 		Joined:    int64(timesource.GetCurrentTime()),
 		ChatType:  ChatTypeOneToOne,
+		Highlight: true,
 	}
 }
 
@@ -458,6 +468,7 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 		SyncedTo:   synced,
 		SyncedFrom: synced,
 		ChatType:   ChatTypePrivateGroupChat,
+		Highlight:  true,
 	}
 }
 
