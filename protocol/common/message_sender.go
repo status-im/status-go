@@ -59,10 +59,13 @@ type MessageEvent struct {
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
+	database    *sql.DB
 	protocol    *encryption.Protocol
 	transport   *transport.Transport
 	logger      *zap.Logger
 	persistence *RawMessagesPersistence
+
+	datasyncEnabled bool
 
 	// ephemeralKeys is a map that contains the ephemeral keys of the client, used
 	// to decrypt messages
@@ -101,14 +104,16 @@ func NewMessageSender(
 	ds := datasync.New(dataSyncNode, dataSyncTransport, features.Datasync, logger)
 
 	p := &MessageSender{
-		identity:      identity,
-		datasync:      ds,
-		protocol:      enc,
-		persistence:   NewRawMessagesPersistence(database),
-		transport:     transport,
-		logger:        logger,
-		ephemeralKeys: make(map[string]*ecdsa.PrivateKey),
-		featureFlags:  features,
+		identity:        identity,
+		datasyncEnabled: features.Datasync,
+		datasync:        ds,
+		protocol:        enc,
+		database:        database,
+		persistence:     NewRawMessagesPersistence(database),
+		transport:       transport,
+		logger:          logger,
+		ephemeralKeys:   make(map[string]*ecdsa.PrivateKey),
+		featureFlags:    features,
 	}
 
 	// Initializing DataSync is required to encrypt and send messages.
@@ -837,4 +842,31 @@ func calculatePoW(payload []byte) float64 {
 		return whisperLargeSizePoW
 	}
 	return whisperDefaultPoW
+}
+
+func (s *MessageSender) StopDatasync() {
+	s.datasync.Stop()
+}
+
+func (s *MessageSender) StartDatasync() {
+	dataSyncTransport := datasync.NewNodeTransport()
+	dataSyncNode, err := datasyncnode.NewPersistentNode(
+		s.database,
+		dataSyncTransport,
+		datasyncpeer.PublicKeyToPeerID(s.identity.PublicKey),
+		datasyncnode.BATCH,
+		datasync.CalculateSendTime,
+		s.logger,
+	)
+	if err != nil {
+		return
+	}
+	ds := datasync.New(dataSyncNode, dataSyncTransport, true, s.logger)
+
+	if s.datasyncEnabled {
+		ds.Init(s.sendDataSync, s.transport.MaxMessageSize()/4*3, s.logger)
+		ds.Start(datasync.DatasyncTicker)
+	}
+
+	s.datasync = ds
 }

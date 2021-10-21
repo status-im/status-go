@@ -547,5 +547,13 @@ func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
 }
 
 func (m *Messenger) ConnectionChanged(state connection.State) {
+	if !m.connectionState.Offline && state.Offline {
+		m.sender.StopDatasync()
+	}
+
+	if m.connectionState.Offline && !state.Offline {
+		m.sender.StartDatasync()
+	}
+
 	m.connectionState = state
 }
