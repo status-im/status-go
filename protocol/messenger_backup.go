@@ -68,6 +68,7 @@ func (m *Messenger) startBackupLoop() {
 					m.logger.Error("failed to backup data", zap.Error(err))
 				}
 			case <-m.quit:
+				ticker.Stop()
 				return
 			}
 		}
@@ -135,7 +136,6 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 	if contact.IsSyncing {
 		return nil
 	}
-	clock, _ := m.getLastClockWithRelatedChat()
 
 	var ensName string
 	if contact.ENSVerified {
@@ -149,13 +149,15 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 	}
 
 	return &protobuf.SyncInstallationContactV2{
-		Clock:         clock,
-		Id:            contact.ID,
-		EnsName:       ensName,
-		LocalNickname: contact.LocalNickname,
-		Added:         contact.Added,
-		Blocked:       contact.Blocked,
-		Muted:         muted,
-		Removed:       contact.Removed,
+		LastUpdatedLocally: contact.LastUpdatedLocally,
+		LastUpdated:        contact.LastUpdated,
+		Id:                 contact.ID,
+		EnsName:            ensName,
+		LocalNickname:      contact.LocalNickname,
+		Added:              contact.Added,
+		Blocked:            contact.Blocked,
+		Muted:              muted,
+		HasAddedUs:         contact.HasAddedUs,
+		Removed:            contact.Removed,
 	}
 }

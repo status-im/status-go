@@ -2459,14 +2459,15 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	}
 
 	syncMessage := &protobuf.SyncInstallationContactV2{
-		Clock:         clock,
-		Id:            contact.ID,
-		EnsName:       ensName,
-		LocalNickname: contact.LocalNickname,
-		Added:         contact.Added,
-		Blocked:       contact.Blocked,
-		Muted:         muted,
-		Removed:       contact.Removed,
+		LastUpdatedLocally: contact.LastUpdatedLocally,
+		LastUpdated:        contact.LastUpdated,
+		Id:                 contact.ID,
+		EnsName:            ensName,
+		LocalNickname:      contact.LocalNickname,
+		Added:              contact.Added,
+		Blocked:            contact.Blocked,
+		Muted:              muted,
+		Removed:            contact.Removed,
 	}
 
 	encodedMessage, err := proto.Marshal(syncMessage)

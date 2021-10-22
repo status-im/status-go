@@ -300,7 +300,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		Added: true,
 	}
 
-	err = bob.SaveContact(aliceContact)
+	_, err = bob.AddContact(context.Background(), aliceContact.ID)
 	s.Require().NoError(err)
 
 	// Enable from contacts only
@@ -446,7 +446,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		Added: true,
 	}
 
-	err = bob.SaveContact(aliceContact)
+	_, err = bob.AddContact(context.Background(), aliceContact.ID)
 	s.Require().NoError(err)
 
 	// Add frank has a contact
@@ -456,7 +456,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		Added: true,
 	}
 
-	err = bob.SaveContact(frankContact)
+	_, err = bob.AddContact(context.Background(), frankContact.ID)
 	s.Require().NoError(err)
 
 	// Enable from contacts only
@@ -542,7 +542,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		ID:   types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
 		Name: "Some Contact",
 	}
-	err = bob.SaveContact(frankContact)
+	_, err = bob.RemoveContact(context.Background(), frankContact.ID)
 	s.Require().NoError(err)
 
 	// Re-registration should be triggered, pull from server and bob to check we are correctly registered

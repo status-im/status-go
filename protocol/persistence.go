@@ -467,8 +467,10 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.alias,
 			c.identicon,
 			c.last_updated,
+			c.last_updated_locally,
 			c.added,
 			c.blocked,
+			c.removed,
 			c.has_added_us,
 			c.local_nickname,
 			i.image_type,
@@ -485,15 +487,17 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	for rows.Next() {
 
 		var (
-			contact      Contact
-			nickname     sql.NullString
-			imageType    sql.NullString
-			ensName      sql.NullString
-			ensVerified  sql.NullBool
-			added        sql.NullBool
-			blocked      sql.NullBool
-			hasAddedUs   sql.NullBool
-			imagePayload []byte
+			contact            Contact
+			nickname           sql.NullString
+			imageType          sql.NullString
+			ensName            sql.NullString
+			ensVerified        sql.NullBool
+			added              sql.NullBool
+			blocked            sql.NullBool
+			removed            sql.NullBool
+			hasAddedUs         sql.NullBool
+			lastUpdatedLocally sql.NullInt64
+			imagePayload       []byte
 		)
 
 		contact.Images = make(map[string]images.IdentityImage)
@@ -506,8 +510,10 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.Alias,
 			&contact.Identicon,
 			&contact.LastUpdated,
+			&lastUpdatedLocally,
 			&added,
 			&blocked,
+			&removed,
 			&hasAddedUs,
 			&nickname,
 			&imageType,
@@ -535,6 +541,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if blocked.Valid {
 			contact.Blocked = blocked.Bool
+		}
+
+		if removed.Valid {
+			contact.Removed = removed.Bool
+		}
+
+		if lastUpdatedLocally.Valid {
+			contact.LastUpdatedLocally = uint64(lastUpdatedLocally.Int64)
 		}
 
 		if hasAddedUs.Valid {
@@ -678,14 +692,16 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			alias,
 			identicon,
 			last_updated,
+			last_updated_locally,
 			local_nickname,
 			added,
 			blocked,
+			removed,
 			has_added_us,
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -698,9 +714,11 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.Alias,
 		contact.Identicon,
 		contact.LastUpdated,
+		contact.LastUpdatedLocally,
 		contact.LocalNickname,
 		contact.Added,
 		contact.Blocked,
+		contact.Removed,
 		contact.HasAddedUs,
 		//TODO we need to drop these columns
 		"",

@@ -764,3 +764,15 @@ func (db *Database) SetLastBackup(time uint64) error {
 	_, err := db.db.Exec("UPDATE settings SET last_backup = ?", time)
 	return err
 }
+
+func (db *Database) ENSName() (string, error) {
+	var result sql.NullString
+	err := db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if result.Valid {
+		return result.String, nil
+	}
+	return "", err
+}

@@ -46,6 +46,7 @@
 // 1632303896_modify_contacts_table.up.sql (1.574kB)
 // 1633349838_add_emoji_column_in_chats.up.sql (52B)
 // 1634831235_add_highlight_column_in_chats.up.sql (62B)
+// 1634896007_add_last_updated_locally_and_removed.up.sql (131B)
 // 1635840039_add_clock_read_at_column_in_chats.up.sql (245B)
 // README.md (554B)
 // doc.go (850B)
@@ -1037,6 +1038,26 @@ func _1634831235_add_highlight_column_in_chatsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1634896007_add_last_updated_locally_and_removedUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x4a\xcd\xcd\x2f\x4b\x4d\x51\x70\xf2\xf7\xf7\x71\x75\xf4\x53\x70\x71\x75\x73\x0c\xf5\x09\x51\x70\x73\xf4\x09\x76\xb5\xe6\x22\xa4\x3d\x27\xb1\xb8\x24\xbe\xb4\x20\x25\xb1\x24\x35\x25\x3e\x27\x3f\x39\x31\x27\xa7\x52\xc1\xd3\x2f\x04\x6e\x8e\x81\x35\x17\x20\x00\x00\xff\xff\xab\xe8\x7d\xf0\x83\x00\x00\x00")
+
+func _1634896007_add_last_updated_locally_and_removedUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1634896007_add_last_updated_locally_and_removedUpSql,
+		"1634896007_add_last_updated_locally_and_removed.up.sql",
+	)
+}
+
+func _1634896007_add_last_updated_locally_and_removedUpSql() (*asset, error) {
+	bytes, err := _1634896007_add_last_updated_locally_and_removedUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1634896007_add_last_updated_locally_and_removed.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1635867803, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0xa8, 0x34, 0xe2, 0xc0, 0x62, 0xc8, 0xd6, 0x5a, 0x87, 0xe3, 0x70, 0xe1, 0xc4, 0x16, 0x9c, 0x60, 0x2e, 0x98, 0xf0, 0x91, 0x84, 0xbe, 0xe0, 0xdf, 0x3e, 0x4d, 0x24, 0xc4, 0x6c, 0x40, 0x17}}
+	return a, nil
+}
+
 var __1635840039_add_clock_read_at_column_in_chatsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xcc\xc1\x6a\x83\x30\x18\x07\xf0\xbb\x4f\xf1\x3f\x6e\xe0\x61\x77\xd9\x21\x33\x19\x08\x59\x1c\x2e\xc2\x6e\x1f\x21\xf9\x68\xa5\x51\xc1\x68\xe9\xe3\x97\x1c\x2a\xf6\xd2\x07\xf8\xfd\x84\xb6\xaa\x83\x15\x5f\x5a\xc1\x9f\xdd\x9a\x20\xa4\x44\xdd\xea\xfe\xc7\x60\x61\x17\x68\xe4\x94\xdc\x89\x13\xb9\x95\x7c\x9c\xfd\x85\xae\x2e\x6e\x8c\xc6\x58\x48\xf5\x2d\x7a\x6d\xf1\x51\x15\xfd\xaf\x14\xf6\x71\xfc\x29\xfb\x1a\x7f\x66\x52\x77\x2a\x93\xc6\x48\xf5\x8f\x38\x7b\x17\x29\x73\x1a\x02\x25\xe6\x89\x46\x9e\xd6\x61\x9e\x38\x1c\x29\x0d\xe1\x86\xd6\x60\x4b\xbc\xec\xfd\xdb\x93\x2e\x91\x79\x89\xdd\x97\x38\x04\xef\x55\x71\x0f\x00\x00\xff\xff\xab\x82\x7c\xe1\xf5\x00\x00\x00")
 
 func _1635840039_add_clock_read_at_column_in_chatsUpSqlBytes() ([]byte, error) {
@@ -1280,6 +1301,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1634831235_add_highlight_column_in_chats.up.sql": _1634831235_add_highlight_column_in_chatsUpSql,
 
+	"1634896007_add_last_updated_locally_and_removed.up.sql": _1634896007_add_last_updated_locally_and_removedUpSql,
+
 	"1635840039_add_clock_read_at_column_in_chats.up.sql": _1635840039_add_clock_read_at_column_in_chatsUpSql,
 
 	"README.md": readmeMd,
@@ -1374,6 +1397,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1632303896_modify_contacts_table.up.sql":                                 &bintree{_1632303896_modify_contacts_tableUpSql, map[string]*bintree{}},
 	"1633349838_add_emoji_column_in_chats.up.sql":                             &bintree{_1633349838_add_emoji_column_in_chatsUpSql, map[string]*bintree{}},
 	"1634831235_add_highlight_column_in_chats.up.sql":                         &bintree{_1634831235_add_highlight_column_in_chatsUpSql, map[string]*bintree{}},
+	"1634896007_add_last_updated_locally_and_removed.up.sql":                  &bintree{_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
 	"1635840039_add_clock_read_at_column_in_chats.up.sql":                     &bintree{_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},

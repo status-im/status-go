@@ -73,6 +73,9 @@ type Contact struct {
 	// updates should be discarded if last updated is less than the one stored
 	LastUpdated uint64 `json:"lastUpdated"`
 
+	// LastUpdatedLocally is the last time we updated the contact locally
+	LastUpdatedLocally uint64 `json:"lastUpdatedLocally"`
+
 	LocalNickname string `json:"localNickname,omitempty"`
 
 	Images map[string]images.IdentityImage `json:"images"`

@@ -28,7 +28,7 @@ message SyncInstallationContact {
 }
 
 message SyncInstallationContactV2 {
-  uint64 clock = 1;
+  uint64 last_updated_locally = 1;
   string id = 2;
   string profile_image = 3;
   string ens_name = 4;
@@ -39,6 +39,7 @@ message SyncInstallationContactV2 {
   bool blocked = 10;
   bool muted = 11;
   bool removed = 12;
+  bool has_added_us = 13;
 }
 
 message SyncInstallationAccount {
