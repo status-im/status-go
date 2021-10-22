@@ -39,8 +39,6 @@ const (
 	testContract        = "0x314159265dd8dbb310642f98f50c066173c1259b"
 	testValue           = "2000"
 	testTransactionHash = "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
-	testIdenticon       = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
-	testAlias           = "Concrete Lavender Xiphias"
 	newName             = "new-name"
 )
 
@@ -256,44 +254,10 @@ func (s *MessengerSuite) TestInit() {
 			Prep: func() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
-				contact := Contact{
-					ID:    types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name:  "Some Contact",
-					Added: true,
-				}
-				err = s.m.SaveContact(&contact)
+				_, err = s.m.AddContact(context.Background(), types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)))
 				s.Require().NoError(err)
 			},
-			AddedFilters: 1,
-		},
-		{
-			Name: "added and blocked contact",
-			Prep: func() {
-				key, err := crypto.GenerateKey()
-				s.Require().NoError(err)
-				contact := Contact{
-					ID:      types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name:    "Some Contact",
-					Blocked: true,
-				}
-				err = s.m.SaveContact(&contact)
-				s.Require().NoError(err)
-			},
-			AddedFilters: 0,
-		},
-		{
-			Name: "added by them contact",
-			Prep: func() {
-				key, err := crypto.GenerateKey()
-				s.Require().NoError(err)
-				contact := Contact{
-					ID:   types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name: "Some Contact",
-				}
-				err = s.m.SaveContact(&contact)
-				s.Require().NoError(err)
-			},
-			AddedFilters: 0,
+			AddedFilters: 2,
 		},
 	}
 
@@ -747,7 +711,8 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 		Blocked:     true,
 	}
 
-	s.Require().NoError(s.m.SaveContact(&blockedContact))
+	_, err = s.m.BlockContact(&blockedContact)
+	s.Require().NoError(err)
 
 	inputMessage := buildTestMessage(*chat)
 
@@ -1221,9 +1186,6 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		LastMessage:           &common.Message{},
 		Highlight:             false,
 	}
-	contact := Contact{
-		ID: testPK,
-	}
 
 	publicKeyBytes, err := hex.DecodeString(testPK[2:])
 	s.Require().NoError(err)
@@ -1232,7 +1194,6 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	s.Require().NoError(err)
 
 	s.Require().NoError(s.m.SaveChat(chat))
-	s.Require().NoError(s.m.SaveContact(&contact))
 	savedChats := s.m.Chats()
 	s.Require().Equal(3, len(savedChats))
 
@@ -1382,7 +1343,8 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(s.m.SaveChat(chat2))
 	s.Require().NoError(s.m.SaveChat(chat3))
 
-	s.Require().NoError(s.m.SaveContact(&contact))
+	_, err := s.m.AddContact(context.Background(), contact.ID)
+	s.Require().NoError(err)
 
 	contact.Name = "blocked"
 
@@ -1464,7 +1426,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		},
 	}
 
-	err := s.m.SaveMessages(messages)
+	err = s.m.SaveMessages(messages)
 	s.Require().NoError(err)
 
 	response, err := s.m.BlockContact(&contact)
@@ -1511,56 +1473,13 @@ func (s *MessengerSuite) TestBlockContact() {
 }
 
 func (s *MessengerSuite) TestContactPersistence() {
-	contact := Contact{
-		ID: testPK,
-
-		Name:        "contact-name",
-		LastUpdated: 20,
-		Added:       true,
-	}
-
-	s.Require().NoError(s.m.SaveContact(&contact))
+	_, err := s.m.AddContact(context.Background(), testPK)
+	s.Require().NoError(err)
 	savedContacts := s.m.Contacts()
+
 	s.Require().Equal(1, len(savedContacts))
 
-	actualContact := savedContacts[0]
-	expectedContact := &contact
-	expectedContact.Alias = testAlias
-	expectedContact.Identicon = testIdenticon
-	s.Require().Equal(expectedContact, actualContact)
-}
-
-func (s *MessengerSuite) TestContactPersistenceUpdate() {
-	contactID := testPK
-
-	contact := Contact{
-		ID:          contactID,
-		Name:        "contact-name",
-		LastUpdated: 20,
-		Added:       true,
-	}
-
-	s.Require().NoError(s.m.SaveContact(&contact))
-	savedContacts := s.m.Contacts()
-	s.Require().Equal(1, len(savedContacts))
-
-	actualContact := savedContacts[0]
-	expectedContact := &contact
-
-	expectedContact.Alias = testAlias
-	expectedContact.Identicon = testIdenticon
-
-	s.Require().Equal(expectedContact, actualContact)
-
-	contact.Name = "updated-name-2"
-	s.Require().NoError(s.m.SaveContact(&contact))
-	updatedContact := s.m.Contacts()
-	s.Require().Equal(1, len(updatedContact))
-
-	actualUpdatedContact := updatedContact[0]
-	expectedUpdatedContact := &contact
-
-	s.Require().Equal(expectedUpdatedContact, actualUpdatedContact)
+	s.Require().True(savedContacts[0].Added)
 }
 
 func (s *MessengerSuite) TestSharedSecretHandler() {

@@ -312,7 +312,11 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		}
 	}
 
-	if contact.LastUpdated < message.Clock {
+	if contact.LastUpdated < message.LastUpdated {
+		contact.HasAddedUs = message.HasAddedUs
+	}
+
+	if contact.LastUpdatedLocally < message.LastUpdatedLocally {
 		contact.IsSyncing = true
 		defer func() {
 			contact.IsSyncing = false
@@ -334,7 +338,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 			}
 			contact.ENSVerified = true
 		}
-		contact.LastUpdated = message.Clock
+		contact.LastUpdatedLocally = message.LastUpdatedLocally
 		contact.LocalNickname = message.LocalNickname
 
 		if message.Blocked != contact.Blocked {

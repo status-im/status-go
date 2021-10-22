@@ -185,7 +185,7 @@ func main() {
 			return
 		}
 
-		err = wakuext.SaveContact(context.Background(), contact)
+		_, err = wakuext.AddContact(context.Background(), contact.ID)
 		if err != nil {
 			return
 		}

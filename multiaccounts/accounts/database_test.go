@@ -28,6 +28,7 @@ var (
 		DappsAddress:              types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:                    "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+		BackupEnabled:             true,
 		LatestDerivedPath:         0,
 		Name:                      "Jittery Cornflowerblue Kingbird",
 		Networks:                  &networks,

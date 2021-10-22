@@ -186,3 +186,86 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	s.Require().NoError(err)
 	s.Require().Len(bob2.AddedContacts(), BackupContactsPerBatch*2)
 }
+
+func (s *MessengerBackupSuite) TestBackupRemovedContact() {
+	bob1 := s.m
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Create 2 contacts on bob 1
+
+	contact1Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
+
+	_, err = bob1.AddContact(context.Background(), contactID1)
+	s.Require().NoError(err)
+
+	contact2Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID2 := types.EncodeHex(crypto.FromECDSAPub(&contact2Key.PublicKey))
+
+	_, err = bob1.AddContact(context.Background(), contactID2)
+	s.Require().NoError(err)
+
+	s.Require().Len(bob1.Contacts(), 2)
+
+	actualContacts := bob1.Contacts()
+	if actualContacts[0].ID == contactID1 {
+		s.Require().Equal(actualContacts[0].ID, contactID1)
+		s.Require().Equal(actualContacts[1].ID, contactID2)
+	} else {
+		s.Require().Equal(actualContacts[0].ID, contactID2)
+		s.Require().Equal(actualContacts[1].ID, contactID1)
+	}
+
+	// Bob 2 add one of the same contacts
+
+	_, err = bob2.AddContact(context.Background(), contactID2)
+	s.Require().NoError(err)
+
+	// Bob 1 now removes one of the contact that was also on bob 2
+
+	_, err = bob1.RemoveContact(context.Background(), contactID2)
+	s.Require().NoError(err)
+
+	// Backup
+
+	clock, err := bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Safety check
+	s.Require().Len(bob2.Contacts(), 1)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			_, err := s.m.RetrieveAll()
+			if err != nil {
+				s.logger.Info("Failed")
+				return false
+			}
+
+			if len(bob2.Contacts()) != 1 && bob2.Contacts()[0].ID != contactID1 {
+				return false
+			}
+
+			return true
+
+		},
+		"contacts not backed up",
+	)
+	// Bob 2 should remove the contact
+	s.Require().NoError(err)
+	s.Require().Len(bob2.AddedContacts(), 1)
+	s.Require().Equal(contactID1, bob2.AddedContacts()[0].ID)
+
+	lastBackup, err := bob1.lastBackup()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(lastBackup)
+	s.Require().Equal(clock, lastBackup)
+}

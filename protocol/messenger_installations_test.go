@@ -103,8 +103,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	contact.Added = true
-	err = s.m.SaveContact(contact)
+	_, err = s.m.AddContact(context.Background(), contact.ID)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -145,9 +144,10 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	contact.Added = true
 	contact.LocalNickname = "Test Nickname"
-	err = s.m.SaveContact(contact)
+	_, err = s.m.AddContact(context.Background(), contact.ID)
+	s.Require().NoError(err)
+	_, err = s.m.SetLocalNickname(contact.ID, contact.LocalNickname)
 	s.Require().NoError(err)
 
 	// add chat
@@ -215,7 +215,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 			actualContact = response.Contacts[0]
 		}
 
-		if len(allChats) >= 3 && actualContact != nil {
+		if len(allChats) >= 2 && actualContact != nil {
 			return nil
 		}
 

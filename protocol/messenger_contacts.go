@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 
@@ -10,10 +11,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 )
-
-func (m *Messenger) SaveContact(contact *Contact) error {
-	return m.saveContact(contact)
-}
 
 func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
 	contact, ok := m.allContacts.Load(pubKey)
@@ -28,6 +25,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	if !contact.Added {
 		contact.Added = true
 	}
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	// We sync the contact with the other devices
 	err := m.syncContact(context.Background(), contact)
@@ -63,21 +61,45 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
+	// Fetch contact code
+	publicKey, err := contact.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	filter, err := m.transport.JoinPrivate(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	m.scheduleSyncFilter(filter)
+
 	// Finally we send a contact update so they are notified we added them
-	// TODO: ens and picture are both blank for now
-	response, err := m.sendContactUpdate(context.Background(), pubKey, "", "")
+	ensName, err := m.settings.ENSName()
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := m.sendContactUpdate(context.Background(), pubKey, ensName, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Send profile picture with contact request
+	chat, ok := m.allChats.Load(contact.ID)
+	if !ok {
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+		chat.Active = false
+		if err := m.saveChat(chat); err != nil {
+			return nil, err
+		}
+	}
+
+	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
 	}
 
 	response.AddChat(profileChat)
 
-	publicKey, err := contact.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Add filters to response
 	_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
 	if err != nil {
 		return nil, err
@@ -106,6 +128,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 	}
 
 	contact.Remove()
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	err := m.persistence.SaveContact(contact, nil)
 	if err != nil {
@@ -181,8 +204,32 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return contact
 }
 
+func (m *Messenger) SetLocalNickname(pubKey string, nickname string) (*MessengerResponse, error) {
+
+	contact, ok := m.allContacts.Load(pubKey)
+	if !ok {
+		return nil, errors.New("not existing contact")
+	}
+
+	clock := m.getTimesource().GetCurrentTime()
+	contact.LocalNickname = nickname
+	contact.LastUpdatedLocally = clock
+
+	response := &MessengerResponse{}
+	response.Contacts = []*Contact{contact}
+
+	err := m.syncContact(context.Background(), contact)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 	contact.Block()
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+
 	chats, err := m.persistence.BlockContact(contact)
 	if err != nil {
 		return nil, err
@@ -206,61 +253,6 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 	}
 
 	return chats, nil
-}
-
-func (m *Messenger) saveContact(contact *Contact) error {
-	name, identicon, err := generateAliasAndIdenticon(contact.ID)
-	if err != nil {
-		return err
-	}
-
-	contact.Identicon = identicon
-	contact.Alias = name
-
-	if m.shouldSyncContact(contact) {
-		if m.isNewContact(contact) {
-			publicKey, err := contact.PublicKey()
-			if err != nil {
-				return err
-			}
-			filter, err := m.transport.JoinPrivate(publicKey)
-			if err != nil {
-				return err
-			}
-			m.scheduleSyncFilter(filter)
-		}
-		err := m.syncContact(context.Background(), contact)
-		if err != nil {
-			return err
-		}
-	}
-
-	// We check if it should re-register with the push notification server
-	shouldReregisterForPushNotifications := (m.isNewContact(contact) || m.removedContact(contact))
-
-	err = m.persistence.SaveContact(contact, nil)
-	if err != nil {
-		return err
-	}
-
-	m.allContacts.Store(contact.ID, contact)
-
-	// Reregister only when data has changed
-	if shouldReregisterForPushNotifications {
-		err := m.resetLastPublishedTimeForChatIdentity()
-		if err != nil {
-			return err
-		}
-		// Publish contact code
-		err = m.publishContactCode()
-		if err != nil {
-			return err
-		}
-
-		return m.reregisterForPushNotifications()
-	}
-
-	return nil
 }
 
 // Send contact updates to all contacts added by us
@@ -298,12 +290,8 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(chatID)
-		if err != nil {
-			return nil, err
-		}
+	if !ok || !contact.Added {
+		return nil, nil
 	}
 
 	chat, ok := m.allChats.Load(chatID)
@@ -348,29 +336,5 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 	if err != nil {
 		return nil, err
 	}
-	return &response, m.saveContact(contact)
-}
-
-func (m *Messenger) isNewContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts.Load(contact.ID)
-	return contact.Added && (!ok || !previousContact.Added)
-}
-
-func (m *Messenger) shouldSyncContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts.Load(contact.ID)
-	if !ok {
-		return contact.Added
-	}
-
-	return contact.LocalNickname != previousContact.LocalNickname ||
-		contact.Added != previousContact.Added ||
-		previousContact.Blocked != contact.Blocked
-}
-
-func (m *Messenger) removedContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts.Load(contact.ID)
-	if !ok {
-		return false
-	}
-	return previousContact.Added && !contact.Added
+	return &response, nil
 }
