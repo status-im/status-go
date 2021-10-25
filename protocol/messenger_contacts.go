@@ -3,16 +3,23 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
+func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey := request.ID.String()
+
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
@@ -22,13 +29,17 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		}
 	}
 
+	if len(request.Nickname) != 0 {
+		contact.LocalNickname = request.Nickname
+	}
+
 	if !contact.Added {
 		contact.Added = true
 	}
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	// We sync the contact with the other devices
-	err := m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact)
 	if err != nil {
 		return nil, err
 	}
@@ -204,21 +215,37 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return contact
 }
 
-func (m *Messenger) SetContactLocalNickname(pubKey string, nickname string) (*MessengerResponse, error) {
+func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNickname) (*MessengerResponse, error) {
+
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	pubKey := request.ID.String()
+	nickname := request.Nickname
 
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
-		return nil, errors.New("not existing contact")
+		var err error
+		contact, err = buildContactFromPkString(pubKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	clock := m.getTimesource().GetCurrentTime()
 	contact.LocalNickname = nickname
 	contact.LastUpdatedLocally = clock
 
+	err := m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.Contacts = []*Contact{contact}
 
-	err := m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact)
 	if err != nil {
 		return nil, err
 	}
