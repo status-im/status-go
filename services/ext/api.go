@@ -298,6 +298,10 @@ func (api *PublicAPI) BlockContact(parent context.Context, contact *protocol.Con
 	return api.service.messenger.BlockContact(contact)
 }
 
+func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) error {
+	return api.service.messenger.UnblockContact(contactID)
+}
+
 func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
 	return api.service.messenger.Contacts()
 }
@@ -590,6 +594,10 @@ func (api *PublicAPI) AddContact(ctx context.Context, pubKey string) (*protocol.
 
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveContact(ctx, pubKey)
+}
+
+func (api *PublicAPI) SetContactLocalNickname(ctx context.Context, pubKey, nickname string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetContactLocalNickname(pubKey, nickname)
 }
 
 func (api *PublicAPI) ClearHistory(request *requests.ClearHistory) (*protocol.MessengerResponse, error) {

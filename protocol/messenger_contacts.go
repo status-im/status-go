@@ -204,7 +204,7 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return contact
 }
 
-func (m *Messenger) SetLocalNickname(pubKey string, nickname string) (*MessengerResponse, error) {
+func (m *Messenger) SetContactLocalNickname(pubKey string, nickname string) (*MessengerResponse, error) {
 
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
@@ -253,6 +253,31 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 	}
 
 	return chats, nil
+}
+
+func (m *Messenger) UnblockContact(contactID string) error {
+	contact, ok := m.allContacts.Load(contactID)
+	if !ok || !contact.Added {
+		return nil
+	}
+
+	contact.Unblock()
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+
+	m.allContacts.Store(contact.ID, contact)
+
+	err := m.syncContact(context.Background(), contact)
+	if err != nil {
+		return err
+	}
+
+	// re-register for push notifications
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Send contact updates to all contacts added by us
