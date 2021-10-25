@@ -588,16 +588,16 @@ func (api *PublicAPI) MarkAllReadInCommunity(communityID string) ([]string, erro
 	return api.service.messenger.MarkAllReadInCommunity(communityID)
 }
 
-func (api *PublicAPI) AddContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AddContact(ctx, pubKey)
+func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddContact) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddContact(ctx, request)
 }
 
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveContact(ctx, pubKey)
 }
 
-func (api *PublicAPI) SetContactLocalNickname(ctx context.Context, pubKey, nickname string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetContactLocalNickname(pubKey, nickname)
+func (api *PublicAPI) SetContactLocalNickname(ctx context.Context, request *requests.SetContactLocalNickname) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetContactLocalNickname(request)
 }
 
 func (api *PublicAPI) ClearHistory(request *requests.ClearHistory) (*protocol.MessengerResponse, error) {
