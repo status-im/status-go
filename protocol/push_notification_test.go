@@ -300,7 +300,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		Added: true,
 	}
 
-	_, err = bob.AddContact(context.Background(), aliceContact.ID)
+	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(aliceContact.ID)})
 	s.Require().NoError(err)
 
 	// Enable from contacts only
@@ -446,7 +446,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		Added: true,
 	}
 
-	_, err = bob.AddContact(context.Background(), aliceContact.ID)
+	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(aliceContact.ID)})
 	s.Require().NoError(err)
 
 	// Add frank has a contact
@@ -456,7 +456,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		Added: true,
 	}
 
-	_, err = bob.AddContact(context.Background(), frankContact.ID)
+	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(frankContact.ID)})
 	s.Require().NoError(err)
 
 	// Enable from contacts only

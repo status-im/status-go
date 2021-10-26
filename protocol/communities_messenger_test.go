@@ -1036,7 +1036,8 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.alice.identity.PublicKey)
-	_, err = s.alice.AddContact(context.Background(), bobPk)
+	request := &requests.AddContact{ID: types.Hex2Bytes(bobPk)}
+	_, err = s.alice.AddContact(context.Background(), request)
 	s.Require().NoError(err)
 
 	// Pull message and make sure org is received

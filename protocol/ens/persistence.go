@@ -103,3 +103,17 @@ func (p *Persistence) AddRecord(record VerificationRecord) (response *Verificati
 	_, err = tx.Exec(`INSERT INTO ens_verification_records(public_key, name, clock) VALUES (?,?,?)`, record.PublicKey, record.Name, record.Clock)
 	return
 }
+
+func (p *Persistence) GetVerifiedRecord(publicKey string) (*VerificationRecord, error) {
+	record := &VerificationRecord{}
+	err := p.db.QueryRow(`SELECT name, clock FROM ens_verification_records WHERE verified AND public_key =  ?`, publicKey).Scan(&record.Name, &record.Clock)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		return record, nil
+	}
+
+	return nil, err
+
+}

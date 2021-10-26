@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
@@ -254,7 +255,7 @@ func (s *MessengerSuite) TestInit() {
 			Prep: func() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
-				_, err = s.m.AddContact(context.Background(), types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)))
+				_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)))})
 				s.Require().NoError(err)
 			},
 			AddedFilters: 2,
@@ -1343,7 +1344,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(s.m.SaveChat(chat2))
 	s.Require().NoError(s.m.SaveChat(chat3))
 
-	_, err := s.m.AddContact(context.Background(), contact.ID)
+	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
 
 	contact.Name = "blocked"
@@ -1473,7 +1474,7 @@ func (s *MessengerSuite) TestBlockContact() {
 }
 
 func (s *MessengerSuite) TestContactPersistence() {
-	_, err := s.m.AddContact(context.Background(), testPK)
+	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(testPK)})
 	s.Require().NoError(err)
 	savedContacts := s.m.Contacts()
 

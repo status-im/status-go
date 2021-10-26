@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -103,7 +104,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	_, err = s.m.AddContact(context.Background(), contact.ID)
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -145,9 +146,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
 	contact.LocalNickname = "Test Nickname"
-	_, err = s.m.AddContact(context.Background(), contact.ID)
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
-	_, err = s.m.SetContactLocalNickname(contact.ID, contact.LocalNickname)
+	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: []byte(contact.ID), Nickname: contact.LocalNickname})
 	s.Require().NoError(err)
 
 	// add chat
