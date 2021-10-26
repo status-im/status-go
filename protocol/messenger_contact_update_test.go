@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -72,7 +73,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
-	response, err := theirMessenger.AddContact(context.Background(), contactID)
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -134,9 +135,47 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
-	response, err := theirMessenger.AddContact(context.Background(), contactID)
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
+
+	s.Require().Len(response.Contacts, 1)
+	contact := response.Contacts[0]
+
+	// It adds the profile chat and the one to one chat
+	s.Require().Len(response.Chats(), 2)
+
+	// It should add the contact
+	s.Require().True(contact.Added)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 },
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+
+	receivedContact := response.Contacts[0]
+	s.Require().NotEmpty(receivedContact.LastUpdated)
+}
+
+func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	ensName := "blah.stateofus.eth"
+
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))
+
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Contacts, 1)
+	s.Require().Equal(ensName, response.Contacts[0].Name)
+	s.Require().True(response.Contacts[0].ENSVerified)
 
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]

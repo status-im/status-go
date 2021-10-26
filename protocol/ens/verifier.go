@@ -75,6 +75,10 @@ func (v *Verifier) ENSVerified(pk, ensName string, clock uint64) error {
 	return nil
 }
 
+func (v *Verifier) GetVerifiedRecord(pk string) (*VerificationRecord, error) {
+	return v.persistence.GetVerifiedRecord(pk)
+}
+
 func (v *Verifier) Add(pk, ensName string, clock uint64) (*VerificationRecord, error) {
 	record := VerificationRecord{PublicKey: pk, Name: ensName, Clock: clock}
 	return v.persistence.AddRecord(record)

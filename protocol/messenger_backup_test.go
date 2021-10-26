@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -71,14 +72,14 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	s.Require().NoError(err)
 	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
 
-	_, err = bob1.AddContact(context.Background(), contactID1)
+	_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID1)})
 	s.Require().NoError(err)
 
 	contact2Key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	contactID2 := types.EncodeHex(crypto.FromECDSAPub(&contact2Key.PublicKey))
 
-	_, err = bob1.AddContact(context.Background(), contactID2)
+	_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID2)})
 	s.Require().NoError(err)
 
 	s.Require().Len(bob1.Contacts(), 2)
@@ -152,7 +153,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 		s.Require().NoError(err)
 		contactID := types.EncodeHex(crypto.FromECDSAPub(&contactKey.PublicKey))
 
-		_, err = bob1.AddContact(context.Background(), contactID)
+		_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
 		s.Require().NoError(err)
 
 	}
@@ -201,14 +202,14 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	s.Require().NoError(err)
 	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
 
-	_, err = bob1.AddContact(context.Background(), contactID1)
+	_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID1)})
 	s.Require().NoError(err)
 
 	contact2Key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	contactID2 := types.EncodeHex(crypto.FromECDSAPub(&contact2Key.PublicKey))
 
-	_, err = bob1.AddContact(context.Background(), contactID2)
+	_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID2)})
 	s.Require().NoError(err)
 
 	s.Require().Len(bob1.Contacts(), 2)
@@ -224,7 +225,7 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 
 	// Bob 2 add one of the same contacts
 
-	_, err = bob2.AddContact(context.Background(), contactID2)
+	_, err = bob2.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID2)})
 	s.Require().NoError(err)
 
 	// Bob 1 now removes one of the contact that was also on bob 2

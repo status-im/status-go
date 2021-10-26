@@ -29,6 +29,10 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		}
 	}
 
+	if err := m.addENSNameToContact(contact); err != nil {
+		return nil, err
+	}
+
 	if len(request.Nickname) != 0 {
 		contact.LocalNickname = request.Nickname
 	}
@@ -233,6 +237,10 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 		}
 	}
 
+	if err := m.addENSNameToContact(contact); err != nil {
+		return nil, err
+	}
+
 	clock := m.getTimesource().GetCurrentTime()
 	contact.LocalNickname = nickname
 	contact.LastUpdatedLocally = clock
@@ -389,4 +397,21 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		return nil, err
 	}
 	return &response, nil
+}
+
+func (m *Messenger) addENSNameToContact(contact *Contact) error {
+
+	// Check if there's already a verified record
+	ensRecord, err := m.ensVerifier.GetVerifiedRecord(contact.ID)
+	if err != nil {
+		return err
+	}
+	if ensRecord == nil {
+		return nil
+	}
+
+	contact.Name = ensRecord.Name
+	contact.ENSVerified = true
+
+	return nil
 }

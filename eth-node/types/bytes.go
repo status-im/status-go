@@ -32,6 +32,10 @@ func Bytes2Hex(d []byte) string {
 
 // Hex2Bytes returns the bytes represented by the hexadecimal string str.
 func Hex2Bytes(str string) []byte {
+	if has0xPrefix(str) {
+		str = str[2:]
+	}
+
 	h, _ := hex.DecodeString(str)
 	return h
 }
