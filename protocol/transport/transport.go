@@ -331,6 +331,10 @@ func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *
 	return t.api.Post(ctx, *newMessage)
 }
 
+func (t *Transport) PersonalTopicFilter() *Filter {
+	return t.filters.PersonalTopicFilter()
+}
+
 func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 	return t.filters.LoadEphemeral(&key.PublicKey, key, true)
 }

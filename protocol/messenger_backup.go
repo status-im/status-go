@@ -54,6 +54,7 @@ func (m *Messenger) startBackupLoop() {
 				lastBackup, err := m.lastBackup()
 				if err != nil {
 					m.logger.Error("failed to fetch last backup time")
+					continue
 				}
 
 				now := time.Now().Unix()
@@ -63,7 +64,9 @@ func (m *Messenger) startBackupLoop() {
 				}
 				m.logger.Debug("backing up data")
 
-				_, err = m.BackupData(context.Background())
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				_, err = m.BackupData(ctx)
 				if err != nil {
 					m.logger.Error("failed to backup data", zap.Error(err))
 				}

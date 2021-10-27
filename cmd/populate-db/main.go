@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
 )
 
@@ -165,7 +166,7 @@ func main() {
 		}
 
 		keyString := common.PubkeyToHex(&key.PublicKey)
-		_, err = wakuext.AddContact(context.Background(), keyString)
+		_, err = wakuext.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(keyString)})
 		if err != nil {
 			logger.Error("failed Add contact", "err", err)
 			return
@@ -185,7 +186,7 @@ func main() {
 			return
 		}
 
-		_, err = wakuext.AddContact(context.Background(), contact.ID)
+		_, err = wakuext.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 		if err != nil {
 			return
 		}

@@ -1053,7 +1053,7 @@ func _1634896007_add_last_updated_locally_and_removedUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1634896007_add_last_updated_locally_and_removed.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1635867803, 0)}
+	info := bindataFileInfo{name: "1634896007_add_last_updated_locally_and_removed.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1636971774, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0xa8, 0x34, 0xe2, 0xc0, 0x62, 0xc8, 0xd6, 0x5a, 0x87, 0xe3, 0x70, 0xe1, 0xc4, 0x16, 0x9c, 0x60, 0x2e, 0x98, 0xf0, 0x91, 0x84, 0xbe, 0xe0, 0xdf, 0x3e, 0x4d, 0x24, 0xc4, 0x6c, 0x40, 0x17}}
 	return a, nil
 }

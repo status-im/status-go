@@ -2365,7 +2365,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	//make sure it was resent and SendCount incremented
 	rawMessage, err = s.m.persistence.RawMessageByID(emojiID)
 	s.NoError(err)
-	s.Equal(2, rawMessage.SendCount)
+	s.True(rawMessage.SendCount >= 2)
 }
 
 type testTimeSource struct{}

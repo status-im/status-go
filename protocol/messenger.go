@@ -3418,6 +3418,10 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		return nil, "", err
 	}
 
+	if chat == nil {
+		return nil, "", ErrChatNotFound
+	}
+
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
