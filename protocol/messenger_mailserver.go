@@ -21,6 +21,7 @@ import (
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 var mailserverRequestTimeout = 45 * time.Second
+var oneMonthInSeconds uint32 = 31 * 24 * 60 * 6
 
 func (m *Messenger) shouldSync() (bool, error) {
 	if m.mailserver == nil || !m.online() {
@@ -83,6 +84,7 @@ func (m *Messenger) scheduleSyncFilter(filter *transport.Filter) {
 	}
 
 }
+
 func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
@@ -170,6 +172,23 @@ func (m *Messenger) syncChat(chatID string) (*MessengerResponse, error) {
 	return m.syncFilters(filters)
 }
 
+func (m *Messenger) syncBackup() error {
+
+	filter := m.transport.PersonalTopicFilter()
+	if filter == nil {
+		return errors.New("personal topic filter not loaded")
+	}
+
+	to := m.calculateMailserverTo()
+	from := uint32(m.getTimesource().GetCurrentTime()/1000) - oneMonthInSeconds
+	batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.Topic}}
+	err := m.processMailserverBatch(batch)
+	if err != nil {
+		return err
+	}
+	return m.settings.SetBackupFetched(true)
+}
+
 func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
 	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
 	if err != nil {
@@ -199,6 +218,20 @@ func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
 
 	if !shouldSync {
 		return nil, nil
+	}
+
+	backupFetched, err := m.settings.BackupFetched()
+	if err != nil {
+		return nil, err
+	}
+
+	if !backupFetched {
+		m.logger.Info("fetching backup")
+		err := m.syncBackup()
+		if err != nil {
+			return nil, err
+		}
+		m.logger.Info("backup fetched")
 	}
 
 	return m.syncFilters(m.transport.Filters())

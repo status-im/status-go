@@ -765,6 +765,20 @@ func (db *Database) SetLastBackup(time uint64) error {
 	return err
 }
 
+func (db *Database) SetBackupFetched(fetched bool) error {
+	_, err := db.db.Exec("UPDATE settings SET backup_fetched = ?", fetched)
+	return err
+}
+
+func (db *Database) BackupFetched() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT backup_fetched FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return true, nil
+	}
+	return result, err
+}
+
 func (db *Database) ENSName() (string, error) {
 	var result sql.NullString
 	err := db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)

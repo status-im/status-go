@@ -473,6 +473,12 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 	return []*Filter{personalDiscoveryChat}, nil
 }
 
+func (f *FiltersManager) PersonalTopicFilter() *Filter {
+	personalDiscoveryTopic := PersonalDiscoveryTopic(&f.privateKey.PublicKey)
+
+	return f.filters[personalDiscoveryTopic]
+}
+
 // LoadPublic adds a filter for a public chat.
 func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 	f.mutex.Lock()

@@ -148,7 +148,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	contact.LocalNickname = "Test Nickname"
 	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
-	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: []byte(contact.ID), Nickname: contact.LocalNickname})
+	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: types.Hex2Bytes(contact.ID), Nickname: contact.LocalNickname})
 	s.Require().NoError(err)
 
 	// add chat

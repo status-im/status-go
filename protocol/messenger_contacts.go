@@ -292,7 +292,7 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 
 func (m *Messenger) UnblockContact(contactID string) error {
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added {
+	if !ok || !contact.Blocked {
 		return nil
 	}
 
