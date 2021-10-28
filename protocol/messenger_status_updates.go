@@ -17,7 +17,7 @@ import (
 func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
 
 	status := &UserStatus{
-		StatusType: int(protobuf.StatusUpdate_ONLINE),
+		StatusType: int(protobuf.StatusUpdate_AUTOMATIC),
 		Clock:      0,
 		CustomText: "",
 	}
@@ -199,7 +199,10 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 		return fmt.Errorf("custom text shouldn't be longer than %d", maxStatusMessageText)
 	}
 
-	if newStatus != int(protobuf.StatusUpdate_ONLINE) && newStatus != int(protobuf.StatusUpdate_DO_NOT_DISTURB) {
+	if newStatus != int(protobuf.StatusUpdate_AUTOMATIC) &&
+		newStatus != int(protobuf.StatusUpdate_DO_NOT_DISTURB) &&
+		newStatus != int(protobuf.StatusUpdate_ALWAYS_ONLINE) &&
+		newStatus != int(protobuf.StatusUpdate_INACTIVE) {
 		return fmt.Errorf("unknown status type")
 	}
 

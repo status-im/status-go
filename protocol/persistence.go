@@ -19,6 +19,7 @@ import (
 var (
 	// ErrMsgAlreadyExist returned if msg already exist.
 	ErrMsgAlreadyExist = errors.New("message with given ID already exist")
+	HoursInTwoWeeks    = 336
 )
 
 // sqlitePersistence wrapper around sql db with operations common for a client.
@@ -883,9 +884,9 @@ func (db sqlitePersistence) InsertStatusUpdate(userStatus UserStatus) error {
 
 func (db sqlitePersistence) CleanOlderStatusUpdates() error {
 	now := time.Now()
-	oneHourAgo := now.Add(time.Duration(-1) * time.Hour)
+	twoWeeksAgo := now.Add(time.Duration(-1*HoursInTwoWeeks) * time.Hour)
 	_, err := db.db.Exec(`DELETE FROM status_updates WHERE clock < ?`,
-		uint64(oneHourAgo.Unix()),
+		uint64(twoWeeksAgo.Unix()),
 	)
 
 	return err
