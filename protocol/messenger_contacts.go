@@ -20,10 +20,20 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 
 	pubKey := request.ID.String()
 
+	ensName := request.ENSName
+
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
 		contact, err = buildContactFromPkString(pubKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if ensName != "" {
+		clock := m.getTimesource().GetCurrentTime()
+		err := m.ensVerifier.ENSVerified(pubKey, ensName, clock)
 		if err != nil {
 			return nil, err
 		}
@@ -87,12 +97,12 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	}
 	m.scheduleSyncFilter(filter)
 
-	// Finally we send a contact update so they are notified we added them
-	ensName, err := m.settings.ENSName()
+	ensName, err = m.settings.ENSName()
 	if err != nil {
 		return nil, err
 	}
 
+	// Finally we send a contact update so they are notified we added them
 	response, err := m.sendContactUpdate(context.Background(), pubKey, ensName, "")
 	if err != nil {
 		return nil, err

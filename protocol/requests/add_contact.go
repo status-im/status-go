@@ -11,6 +11,7 @@ var ErrAddContactInvalidID = errors.New("add-contact: invalid id")
 type AddContact struct {
 	ID       types.HexBytes `json:"id"`
 	Nickname string         `json:"nickname"`
+	ENSName  string         `json:"ensName"`
 }
 
 func (a *AddContact) Validate() error {
