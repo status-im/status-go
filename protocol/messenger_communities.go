@@ -305,7 +305,17 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 }
 
 func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
-	return m.communitiesManager.SetMuted(communityID, muted)
+	err := m.communitiesManager.SetMuted(communityID, muted)
+	if err != nil {
+		return err
+	}
+
+	c, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+
+	return m.syncCommunity(context.Background(), c)
 }
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
