@@ -2237,6 +2237,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 
 	response.AddChat(chat)
+	m.logger.Debug("sent message", zap.String("id", message.ID))
 	return &response, m.saveChat(chat)
 }
 
@@ -2677,6 +2678,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for _, messages := range chatWithMessages {
 		var processedMessages []string
 		for _, shhMessage := range messages {
+			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 			statusMessages, acks, err := m.sender.HandleMessages(shhMessage, true)
@@ -2689,6 +2691,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
 			for _, msg := range statusMessages {
+				logger := logger.With(zap.String("message-id", msg.ID.String()))
+				logger.Debug("processing message")
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.Installations)

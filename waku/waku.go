@@ -1053,6 +1053,7 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(envelope *common.Envelope) error {
+	w.logger.Debug("send: sending envelope", zap.String("hash", envelope.Hash().String()))
 	ok, err := w.add(envelope, false)
 	if err == nil && !ok {
 		return fmt.Errorf("failed to add envelope")
@@ -1326,12 +1327,15 @@ func (w *Waku) addEnvelope(envelope *common.Envelope) {
 func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool) (bool, error) {
 	now := uint32(w.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
+	logger := w.logger.With(zap.String("hash", envelope.Hash().String()), zap.String("site", "addAndBridge"), zap.String("topic", envelope.Topic.String()), zap.Bool("isP2P", isP2P))
+
+	logger.Debug("addAndBridge: processing envelope")
 
 	common.EnvelopesReceivedCounter.Inc()
 	if sent > now {
 		if sent-common.DefaultSyncAllowance > now {
 			common.EnvelopesCacheFailedCounter.WithLabelValues("in_future").Inc()
-			w.logger.Warn("envelope created in the future", zap.ByteString("hash", envelope.Hash().Bytes()))
+			logger.Warn("envelope created in the future")
 			return false, common.TimeSyncError(errors.New("envelope from future"))
 		}
 		// recalculate PoW, adjusted for the time difference, plus one second for latency
@@ -1341,17 +1345,17 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 	if envelope.Expiry < now {
 		if envelope.Expiry+common.DefaultSyncAllowance*2 < now {
 			common.EnvelopesCacheFailedCounter.WithLabelValues("very_old").Inc()
-			w.logger.Warn("very old envelope", zap.ByteString("hash", envelope.Hash().Bytes()))
+			logger.Warn("very old envelope")
 			return false, common.TimeSyncError(errors.New("very old envelope"))
 		}
-		w.logger.Debug("expired envelope dropped", zap.ByteString("hash", envelope.Hash().Bytes()))
+		logger.Debug("expired envelope dropped")
 		common.EnvelopesCacheFailedCounter.WithLabelValues("expired").Inc()
 		return false, nil // drop envelope without error
 	}
 
 	if uint32(envelope.Size()) > w.MaxMessageSize() {
 		common.EnvelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
-		return false, fmt.Errorf("huge messages are not allowed [%x][%d][%d]", envelope.Hash(), envelope.Size(), w.MaxMessageSize())
+		return false, fmt.Errorf("huge messages are not allowed [%s][%d][%d]", envelope.Hash().String(), envelope.Size(), w.MaxMessageSize())
 	}
 
 	if envelope.PoW() < w.MinPow() {
@@ -1360,7 +1364,7 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 		// for a short period of peer synchronization.
 		if envelope.PoW() < w.MinPowTolerance() {
 			common.EnvelopesCacheFailedCounter.WithLabelValues("low_pow").Inc()
-			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%v]", envelope.PoW(), envelope.Hash().Hex())
+			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%s]", envelope.PoW(), envelope.Hash().String())
 		}
 	}
 
@@ -1370,6 +1374,7 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 	}
 
 	if !match {
+		logger.Debug("addAndBridge: no matches for envelope")
 		return false, nil
 	}
 
@@ -1379,10 +1384,12 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 	_, alreadyCached := w.envelopes[hash]
 	w.poolMu.Unlock()
 	if !alreadyCached {
+		logger.Debug("addAndBridge: adding envelope")
 		w.addEnvelope(envelope)
 	}
 
 	if alreadyCached {
+		logger.Debug("addAndBridge: already cached")
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
@@ -1400,7 +1407,7 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 		// In particular, if a node is a lightweight node,
 		// it should not bridge any envelopes.
 		if !isP2P && !bridged && w.bridge != nil {
-			w.logger.Debug("bridging envelope from Waku", zap.ByteString("hash", envelope.Hash().Bytes()))
+			logger.Debug("bridging envelope from Waku")
 			_, in := w.bridge.Pipe()
 			in <- envelope
 			common.BridgeSent.Inc()
@@ -1483,12 +1490,14 @@ func (w *Waku) update() {
 func (w *Waku) expire() {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
+	logger := w.logger.With(zap.String("site", "expire"))
 
 	now := uint32(w.timeSource().Unix())
 	for expiry, hashSet := range w.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
+				logger.Debug("expiring envelope", zap.String("hash", v.(gethcommon.Hash).String()))
 				delete(w.envelopes, v.(gethcommon.Hash))
 				common.EnvelopesCachedCounter.WithLabelValues("clear").Inc()
 				w.envelopeFeed.Send(common.EnvelopeEvent{

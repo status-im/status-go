@@ -551,7 +551,7 @@ func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey
 // HandlePushNotificationResponse should set the request as processed
 func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
 	messageID := response.MessageId
-	c.config.Logger.Debug("received response for", zap.Binary("message-id", messageID))
+	c.config.Logger.Debug("received response for", zap.String("messageID", types.EncodeHex(messageID)))
 	for _, report := range response.Reports {
 		c.config.Logger.Debug("received response", zap.Any("report", report))
 		err := c.persistence.UpdateNotificationResponse(messageID, report)
@@ -985,7 +985,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 		return nil
 	}
 
-	c.config.Logger.Debug("actionable messages", zap.Any("message-ids", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
+	c.config.Logger.Debug("actionable messages", zap.Any("messageIDs", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
 	// Get message to check chatID. Again we use the first message for simplicity, but we should send one for each chatID. Messages though are very rarely batched.
 	message, err := c.getMessage(types.EncodeHex(trackedMessageIDs[0]))

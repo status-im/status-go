@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/waku/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -481,6 +483,8 @@ func toMessage(messages []*common.ReceivedMessage) []*Message {
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
 func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
+	logger := api.w.logger.With(zap.String("site", "getFilterMessages"), zap.String("filterId", id))
+	logger.Debug("retrieving filter messages")
 	api.mu.Lock()
 	f := api.w.GetFilter(id)
 	if f == nil {
@@ -493,6 +497,8 @@ func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
 	receivedMessages := f.Retrieve()
 	messages := make([]*Message, 0, len(receivedMessages))
 	for _, msg := range receivedMessages {
+
+		logger.Debug("retrieved filter message", zap.String("hash", msg.EnvelopeHash.String()), zap.Bool("isP2P", msg.P2P), zap.String("topic", msg.Topic.String()))
 		messages = append(messages, ToWakuMessage(msg))
 	}
 
