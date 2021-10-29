@@ -215,6 +215,7 @@ func (t *Transport) GetStats() types.StatsSummary {
 
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 	result := make(map[Filter][]*types.Message)
+	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
 
 	allFilters := t.filters.Filters()
 	for _, filter := range allFilters {
@@ -224,7 +225,7 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 		}
 		msgs, err := t.api.GetFilterMessages(filter.FilterID)
 		if err != nil {
-			t.logger.Warn("failed to fetch messages", zap.Error(err))
+			logger.Warn("failed to fetch messages", zap.Error(err))
 			continue
 		}
 		if len(msgs) == 0 {
@@ -239,7 +240,7 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 
 		hits, err := t.cache.Hits(ids)
 		if err != nil {
-			t.logger.Error("failed to check messages exists", zap.Error(err))
+			logger.Error("failed to check messages exists", zap.Error(err))
 			return nil, err
 		}
 
@@ -247,6 +248,10 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			// Exclude anything that is a cache hit
 			if !hits[types.EncodeHex(msgs[i].Hash)] {
 				result[*filter] = append(result[*filter], msgs[i])
+				logger.Debug("message not cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+			} else {
+				logger.Debug("message cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+
 			}
 		}
 

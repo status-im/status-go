@@ -243,6 +243,8 @@ func (s *MessageSender) sendCommunity(
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
+	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+
 	s.transport.Track(messageIDs, hash, newMessage)
 
 	return messageID, nil
@@ -297,6 +299,8 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
+		s.logger.Debug("sent private message skipEncryption", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+
 		s.transport.Track(messageIDs, hash, newMessage)
 
 	} else {
@@ -321,6 +325,8 @@ func (s *MessageSender) sendPrivate(
 			s.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
+
+		s.logger.Debug("sent private message without datasync", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 
 		s.transport.Track(messageIDs, hash, newMessage)
 	}
@@ -458,6 +464,8 @@ func (s *MessageSender) SendPublic(
 	if err != nil {
 		return nil, err
 	}
+
+	s.logger.Debug("sent public message", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 
 	sentMessage := &SentMessage{
 		Spec:       messageSpec,
@@ -640,8 +648,11 @@ func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte
 func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, marshalledDatasyncPayload []byte, payload *datasyncproto.Payload) error {
 	// Calculate the messageIDs
 	messageIDs := make([][]byte, 0, len(payload.Messages))
+	hexMessageIDs := make([]string, 0, len(payload.Messages))
 	for _, payload := range payload.Messages {
-		messageIDs = append(messageIDs, v1protocol.MessageID(&s.identity.PublicKey, payload.Body))
+		mid := v1protocol.MessageID(&s.identity.PublicKey, payload.Body)
+		messageIDs = append(messageIDs, mid)
+		hexMessageIDs = append(hexMessageIDs, mid.String())
 	}
 
 	messageSpec, err := s.protocol.BuildDirectMessage(s.identity, publicKey, marshalledDatasyncPayload)
@@ -664,6 +675,8 @@ func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.Publi
 		s.logger.Error("failed to send a datasync message", zap.Error(err))
 		return err
 	}
+
+	s.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.String("hash", types.EncodeHex(hash)))
 
 	s.transport.Track(messageIDs, hash, newMessage)
 

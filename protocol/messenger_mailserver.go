@@ -261,7 +261,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		syncedTopics = append(syncedTopics, topicData)
 	}
 
-	m.logger.Info("syncing topics", zap.Any("batches", batches))
+	m.logger.Debug("syncing topics")
 
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryRequestStarted()
@@ -270,7 +270,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 	for _, batch := range batches {
 		err := m.processMailserverBatch(batch)
 		if err != nil {
-			m.logger.Info("error syncing topics", zap.Any("error", err))
+			m.logger.Error("error syncing topics", zap.Error(err))
 			if m.config.messengerSignalsHandler != nil {
 				m.config.messengerSignalsHandler.HistoryRequestFailed(err)
 			}
@@ -278,7 +278,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 		}
 	}
 
-	m.logger.Info("topics synced")
+	m.logger.Debug("topics synced")
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
@@ -364,7 +364,12 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
-	m.logger.Info("syncing topic", zap.Any("topic", batch.Topics), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
+	var topicStrings []string
+	for _, t := range batch.Topics {
+		topicStrings = append(topicStrings, t.String())
+	}
+	logger := m.logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
+	logger.Info("syncing topic")
 	ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
 	defer cancel()
 
@@ -373,7 +378,7 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 		return err
 	}
 	for len(cursor) != 0 || storeCursor != nil {
-		m.logger.Info("retrieved cursor", zap.Any("cursor", cursor))
+		logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
 		ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
 		defer cancel()
 
@@ -382,7 +387,7 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 			return err
 		}
 	}
-	m.logger.Info("synced topic", zap.Any("topic", batch.Topics), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
+	logger.Info("synced topic")
 	return nil
 }
 
@@ -438,6 +443,8 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
 		chat.SyncedFrom = batch.From
 	}
+
+	m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
 	err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
 	if err != nil {
