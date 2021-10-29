@@ -1215,11 +1215,18 @@ func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
 		return err
 	}
 
-	if request.MutedType == Unmuted {
-		return m.communitiesManager.SetMuted(request.CommunityID, false)
+	muted := request.MutedType != Unmuted
+	err := m.communitiesManager.SetMuted(request.CommunityID, muted)
+	if err != nil {
+		return err
 	}
 
-	return m.communitiesManager.SetMuted(request.CommunityID, true)
+	c, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	return m.syncCommunity(context.Background(), c, m.dispatchMessage)
 }
 
 func (m *Messenger) MuteCommunityTill(communityID []byte, muteTill time.Time) error {
