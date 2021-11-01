@@ -217,8 +217,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	}
 
 	if cfg.LightClient {
-		opts = append(opts, node.WithLightPush())
-		opts = append(opts, node.WithWakuFilter())
+		opts = append(opts, node.WithWakuFilter(false))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
@@ -318,7 +317,7 @@ func (w *Waku) runRelayMsgLoop() {
 		return
 	}
 
-	sub, err := w.node.Subscribe(context.Background(), nil)
+	sub, err := w.node.Relay().Subscribe(context.Background(), nil)
 	if err != nil {
 		fmt.Println("Could not subscribe:", err)
 		return
@@ -714,7 +713,15 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
-	hash, err := w.node.Publish(context.Background(), msg, nil)
+	var err error
+	var hash []byte
+
+	if w.settings.LightClient {
+		hash, err = w.node.Lightpush().Publish(context.Background(), msg, nil)
+	} else {
+		hash, err = w.node.Relay().Publish(context.Background(), msg, nil)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -744,7 +751,17 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 		strTopics[i] = t.ContentTopic()
 	}
 
-	result, err := w.node.Query(context.Background(), strTopics, float64(from), float64(to), opts...)
+	query := store.Query{
+		StartTime:     float64(from),
+		EndTime:       float64(to),
+		ContentTopics: strTopics,
+		Topic:         string(relay.DefaultWakuTopic),
+	}
+
+	result, err := w.node.Store().Query(context.Background(), query, opts...)
+	if err != nil {
+		return
+	}
 
 	for _, msg := range result.Messages {
 		envelope := wakuprotocol.NewEnvelope(msg, string(relay.DefaultWakuTopic))
@@ -755,7 +772,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	}
 
 	if len(result.Messages) != 0 {
-		cursor = result.PagingInfo.Cursor
+		cursor = result.Cursor()
 	}
 
 	return

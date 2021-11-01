@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
+	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
@@ -39,10 +40,18 @@ func NewWakuLightPush(ctx context.Context, h host.Host, relay *relay.WakuRelay) 
 	wakuLP.ctx = ctx
 	wakuLP.h = h
 
+	return wakuLP
+}
+
+func (wakuLP *WakuLightPush) Start() error {
+	if wakuLP.relay == nil {
+		return errors.New("relay is required")
+	}
+
 	wakuLP.h.SetStreamHandlerMatch(LightPushID_v20beta1, protocol.PrefixTextMatch(string(LightPushID_v20beta1)), wakuLP.onRequest)
 	log.Info("Light Push protocol started")
 
-	return wakuLP
+	return nil
 }
 
 func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
@@ -56,6 +65,7 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 	err := reader.ReadMsg(requestPushRPC)
 	if err != nil {
 		log.Error("error reading request", err)
+		metrics.RecordLightpushError(wakuLP.ctx, "decodeRpcFailure")
 		return
 	}
 
@@ -68,7 +78,9 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 
 		response := new(pb.PushResponse)
 		if wakuLP.relay != nil {
-			// XXX Assumes success, should probably be extended to check for network, peers, etc
+			// TODO: Assumes success, should probably be extended to check for network, peers, etc
+			// It might make sense to use WithReadiness option here?
+
 			_, err := wakuLP.relay.Publish(wakuLP.ctx, message, &pubSubTopic)
 
 			if err != nil {
@@ -151,7 +163,7 @@ func DefaultOptions() []LightPushOption {
 	}
 }
 
-func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, opts ...LightPushOption) (*pb.PushResponse, error) {
+func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, opts ...LightPushOption) (*pb.PushResponse, error) {
 	params := new(LightPushParameters)
 	params.lp = wakuLP
 
@@ -162,6 +174,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 	}
 
 	if params.selectedPeer == "" {
+		metrics.RecordLightpushError(wakuLP.ctx, "dialError")
 		return nil, ErrNoPeersAvailable
 	}
 
@@ -172,6 +185,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
 	if err != nil {
 		log.Info("failed to connect to remote peer", err)
+		metrics.RecordLightpushError(wakuLP.ctx, "dialError")
 		return nil, err
 	}
 
@@ -179,6 +193,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 	defer func() {
 		err := connOpt.Reset()
 		if err != nil {
+			metrics.RecordLightpushError(wakuLP.ctx, "dialError")
 			log.Error("failed to reset connection", err)
 		}
 	}()
@@ -198,6 +213,7 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 	err = reader.ReadMsg(pushResponseRPC)
 	if err != nil {
 		log.Error("could not read response", err)
+		metrics.RecordLightpushError(wakuLP.ctx, "decodeRPCFailure")
 		return nil, err
 	}
 
@@ -206,4 +222,26 @@ func (wakuLP *WakuLightPush) Request(ctx context.Context, req *pb.PushRequest, o
 
 func (w *WakuLightPush) Stop() {
 	w.h.RemoveStreamHandler(LightPushID_v20beta1)
+}
+
+func (w *WakuLightPush) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic, opts ...LightPushOption) ([]byte, error) {
+	if message == nil {
+		return nil, errors.New("message can't be null")
+	}
+
+	req := new(pb.PushRequest)
+	req.Message = message
+	req.PubsubTopic = string(relay.GetTopic(topic))
+
+	response, err := w.request(ctx, req, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.IsSuccess {
+		hash, _ := message.Hash()
+		return hash, nil
+	} else {
+		return nil, errors.New(response.Info)
+	}
 }

@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
-	proto "github.com/golang/protobuf/proto"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 
@@ -20,9 +18,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
 
 	rendezvous "github.com/status-im/go-waku-rendezvous"
+	v2 "github.com/status-im/go-waku/waku/v2"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -48,10 +46,7 @@ type WakuNode struct {
 	ping       *ping.PingService
 	store      *store.WakuStore
 
-	subscriptions      map[relay.Topic][]*Subscription
-	subscriptionsMutex sync.Mutex
-
-	bcaster Broadcaster
+	bcaster v2.Broadcaster
 
 	filters filter.Filters
 
@@ -102,11 +97,10 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	}
 
 	w := new(WakuNode)
-	w.bcaster = NewBroadcaster(1024)
+	w.bcaster = v2.NewBroadcaster(1024)
 	w.host = host
 	w.cancel = cancel
 	w.ctx = ctx
-	w.subscriptions = make(map[relay.Topic][]*Subscription)
 	w.opts = params
 	w.quit = make(chan struct{})
 
@@ -124,6 +118,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 
 	w.connectionNotif = NewConnectionNotifier(ctx, host)
 	w.host.Network().Notify(w.connectionNotif)
+
 	go w.connectednessListener()
 
 	if w.opts.keepAliveInterval > time.Duration(0) {
@@ -138,6 +133,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 }
 
 func (w *WakuNode) Start() error {
+	w.store = store.NewWakuStore(w.opts.messageProvider)
 	if w.opts.enableStore {
 		w.startStore()
 	}
@@ -155,13 +151,16 @@ func (w *WakuNode) Start() error {
 		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
 	}
 
-	err := w.mountRelay(w.opts.enableRelay, w.opts.wOpts...)
+	err := w.mountRelay(w.opts.wOpts...)
 	if err != nil {
 		return err
 	}
 
+	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay)
 	if w.opts.enableLightPush {
-		w.mountLightPush()
+		if err := w.lightPush.Start(); err != nil {
+			return err
+		}
 	}
 
 	if w.opts.enableRendezvousServer {
@@ -171,15 +170,26 @@ func (w *WakuNode) Start() error {
 		}
 	}
 
+	// Subscribe store to topic
+	if w.opts.storeMsgs {
+		log.Info("Subscribing store to broadcaster")
+		w.bcaster.Register(w.store.MsgC)
+	}
+
+	if w.filter != nil {
+		log.Info("Subscribing filter to broadcaster")
+		w.bcaster.Register(w.filter.MsgC)
+	}
+
 	return nil
 }
 
 func (w *WakuNode) Stop() {
-	w.subscriptionsMutex.Lock()
-	defer w.subscriptionsMutex.Unlock()
 	defer w.cancel()
 
 	close(w.quit)
+
+	w.bcaster.Close()
 
 	defer w.connectionNotif.Close()
 	defer w.protocolEventSub.Close()
@@ -187,15 +197,6 @@ func (w *WakuNode) Stop() {
 
 	if w.rendezvous != nil {
 		w.rendezvous.Stop()
-	}
-
-	if w.relay != nil {
-		for _, topic := range w.relay.Topics() {
-			for _, sub := range w.subscriptions[topic] {
-				sub.Unsubscribe()
-			}
-		}
-		w.subscriptions = nil
 	}
 
 	if w.filter != nil {
@@ -206,13 +207,9 @@ func (w *WakuNode) Stop() {
 		w.filters = nil
 	}
 
-	if w.lightPush != nil {
-		w.lightPush.Stop()
-	}
-
-	if w.store != nil {
-		w.store.Stop()
-	}
+	w.relay.Stop()
+	w.lightPush.Stop()
+	w.store.Stop()
 
 	w.host.Close()
 }
@@ -238,16 +235,27 @@ func (w *WakuNode) Relay() *relay.WakuRelay {
 	return w.relay
 }
 
+func (w *WakuNode) Store() *store.WakuStore {
+	return w.store
+}
+
 func (w *WakuNode) Filter() *filter.WakuFilter {
 	return w.filter
 }
 
-func (w *WakuNode) mountRelay(shouldRelayMessages bool, opts ...pubsub.Option) error {
-	var err error
-	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, opts...)
+func (w *WakuNode) Lightpush() *lightpush.WakuLightPush {
+	return w.lightPush
+}
 
-	if shouldRelayMessages {
-		_, err := w.Subscribe(w.ctx, nil)
+func (w *WakuNode) mountRelay(opts ...pubsub.Option) error {
+	var err error
+	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, w.bcaster, opts...)
+	if err != nil {
+		return err
+	}
+
+	if w.opts.enableRelay {
+		_, err = w.relay.Subscribe(w.ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -265,13 +273,9 @@ func (w *WakuNode) mountFilter() error {
 		}
 	}
 
-	w.filter = filter.NewWakuFilter(w.ctx, w.host, filterHandler)
+	w.filter = filter.NewWakuFilter(w.ctx, w.host, w.opts.isFilterFullNode, filterHandler)
 
 	return nil
-}
-
-func (w *WakuNode) mountLightPush() {
-	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay)
 }
 
 func (w *WakuNode) mountRendezvous() error {
@@ -286,7 +290,6 @@ func (w *WakuNode) mountRendezvous() error {
 }
 
 func (w *WakuNode) startStore() {
-	w.store = w.opts.store
 	w.store.Start(w.ctx, w.host)
 
 	if w.opts.shouldResume {
@@ -310,7 +313,7 @@ func (w *WakuNode) startStore() {
 
 				ctxWithTimeout, ctxCancel := context.WithTimeout(w.ctx, 20*time.Second)
 				defer ctxCancel()
-				if err := w.Resume(ctxWithTimeout, nil); err != nil {
+				if _, err := w.store.Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), nil); err != nil {
 					log.Info("Retrying in 10s...")
 					time.Sleep(10 * time.Second)
 				} else {
@@ -341,129 +344,6 @@ func (w *WakuNode) AddPeer(address ma.Multiaddr, protocolID p2pproto.ID) (*peer.
 	return &info.ID, w.addPeer(info, protocolID)
 }
 
-func (w *WakuNode) Query(ctx context.Context, contentTopics []string, startTime float64, endTime float64, opts ...store.HistoryRequestOption) (*pb.HistoryResponse, error) {
-	if w.store == nil {
-		return nil, errors.New("WakuStore is not set")
-	}
-
-	query := new(pb.HistoryQuery)
-
-	for _, ct := range contentTopics {
-		query.ContentFilters = append(query.ContentFilters, &pb.ContentFilter{ContentTopic: ct})
-	}
-
-	query.StartTime = startTime
-	query.EndTime = endTime
-	query.PagingInfo = new(pb.PagingInfo)
-	result, err := w.store.Query(ctx, query, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func (w *WakuNode) Resume(ctx context.Context, peerList []peer.ID) error {
-	if w.store == nil {
-		return errors.New("WakuStore is not set")
-	}
-
-	result, err := w.store.Resume(ctx, string(relay.DefaultWakuTopic), peerList)
-	if err != nil {
-		return err
-	}
-
-	log.Info("Retrieved messages since the last online time: ", result)
-
-	return nil
-}
-
-func (node *WakuNode) Subscribe(ctx context.Context, topic *relay.Topic) (*Subscription, error) {
-	// Subscribes to a PubSub topic.
-	// NOTE The data field SHOULD be decoded as a WakuMessage.
-	if node.relay == nil {
-		return nil, errors.New("WakuRelay hasn't been set")
-	}
-
-	t := relay.GetTopic(topic)
-	sub, isNew, err := node.relay.Subscribe(t)
-
-	// Subscribe store to topic
-	if isNew && node.opts.store != nil && node.opts.storeMsgs {
-		log.Info("Subscribing store to topic ", t)
-		node.bcaster.Register(node.opts.store.MsgC)
-	}
-
-	// Subscribe filter
-	if isNew && node.filter != nil {
-		log.Info("Subscribing filter to topic ", t)
-		node.bcaster.Register(node.filter.MsgC)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Create client subscription
-	subscription := new(Subscription)
-	subscription.closed = false
-	subscription.C = make(chan *protocol.Envelope, 1024) // To avoid blocking
-	subscription.quit = make(chan struct{})
-
-	node.subscriptionsMutex.Lock()
-	defer node.subscriptionsMutex.Unlock()
-
-	node.subscriptions[t] = append(node.subscriptions[t], subscription)
-
-	node.bcaster.Register(subscription.C)
-
-	go node.subscribeToTopic(t, subscription, sub)
-
-	return subscription, nil
-}
-
-func (node *WakuNode) subscribeToTopic(t relay.Topic, subscription *Subscription, sub *pubsub.Subscription) {
-	nextMsgTicker := time.NewTicker(time.Millisecond * 10)
-	defer nextMsgTicker.Stop()
-
-	ctx, err := tag.New(node.ctx, tag.Insert(metrics.KeyType, "relay"))
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	for {
-		select {
-		case <-subscription.quit:
-			subscription.mutex.Lock()
-			node.bcaster.Unregister(subscription.C) // Remove from broadcast list
-			close(subscription.C)
-			subscription.mutex.Unlock()
-		case <-nextMsgTicker.C:
-			msg, err := sub.Next(ctx)
-			if err != nil {
-				subscription.mutex.Lock()
-				for _, subscription := range node.subscriptions[t] {
-					subscription.Unsubscribe()
-				}
-				subscription.mutex.Unlock()
-				return
-			}
-
-			stats.Record(ctx, metrics.Messages.M(1))
-
-			wakuMessage := &pb.WakuMessage{}
-			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
-				log.Error("could not decode message", err)
-				return
-			}
-
-			envelope := protocol.NewEnvelope(wakuMessage, string(t))
-
-			node.bcaster.Submit(envelope)
-		}
-	}
-}
-
 // Wrapper around WakuFilter.Subscribe
 // that adds a Filter object to node.filters
 func (node *WakuNode) SubscribeFilter(ctx context.Context, f filter.ContentFilter) (filterID string, ch chan *protocol.Envelope, err error) {
@@ -478,7 +358,7 @@ func (node *WakuNode) SubscribeFilter(ctx context.Context, f filter.ContentFilte
 	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
 	// ContentFilterChan takes MessagePush structs
 	subs, err := node.filter.Subscribe(ctx, f)
-	if subs.RequestID == "" || err != nil {
+	if err != nil || subs.RequestID == "" {
 		// Failed to subscribe
 		log.Error("remote subscription to filter failed", err)
 		return
@@ -571,52 +451,6 @@ func (node *WakuNode) UnsubscribeFilter(ctx context.Context, cf filter.ContentFi
 	return nil
 }
 
-func (node *WakuNode) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic) ([]byte, error) {
-	if node.relay == nil {
-		return nil, errors.New("WakuRelay hasn't been set")
-	}
-
-	if message == nil {
-		return nil, errors.New("message can't be null")
-	}
-
-	if node.lightPush != nil {
-		return node.LightPush(ctx, message, topic)
-	}
-
-	hash, err := node.relay.Publish(ctx, message, topic)
-	if err != nil {
-		return nil, err
-	}
-	return hash, nil
-}
-
-func (node *WakuNode) LightPush(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic, opts ...lightpush.LightPushOption) ([]byte, error) {
-	if node.lightPush == nil {
-		return nil, errors.New("WakuLightPush hasn't been set")
-	}
-
-	if message == nil {
-		return nil, errors.New("message can't be null")
-	}
-
-	req := new(pb.PushRequest)
-	req.Message = message
-	req.PubsubTopic = string(relay.GetTopic(topic))
-
-	response, err := node.lightPush.Request(ctx, req, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.IsSuccess {
-		hash, _ := message.Hash()
-		return hash, nil
-	} else {
-		return nil, errors.New(response.Info)
-	}
-}
-
 func (w *WakuNode) DialPeerWithMultiAddress(ctx context.Context, address ma.Multiaddr) error {
 	info, err := peer.AddrInfoFromP2pAddr(address)
 	if err != nil {
@@ -694,6 +528,9 @@ func (w *WakuNode) Peers() PeerStats {
 	return p
 }
 
+// startKeepAlive creates a go routine that periodically pings connected peers.
+// This is necessary because TCP connections are automatically closed due to inactivity,
+// and doing a ping will avoid this (with a small bandwidth cost)
 func (w *WakuNode) startKeepAlive(t time.Duration) {
 	log.Info("Setting up ping protocol with duration of ", t)
 
@@ -704,21 +541,14 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				for _, p := range w.host.Network().Peers() {
-					log.Debug("Pinging ", p)
-					go func(peer peer.ID) {
-						ctx, cancel := context.WithTimeout(w.ctx, 3*time.Second)
-						defer cancel()
-						pr := w.ping.Ping(ctx, peer)
-						select {
-						case res := <-pr:
-							if res.Error != nil {
-								log.Error(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
-							}
-						case <-ctx.Done():
-							log.Error(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
-						}
-					}(p)
+				// Compared to Network's peers collection,
+				// Peerstore contains all peers ever connected to,
+				// thus if a host goes down and back again,
+				// pinging a peer will trigger identification process,
+				// which is not possible when iterating
+				// through Network's peer collection, as it will be empty
+				for _, p := range w.host.Peerstore().Peers() {
+					go pingPeer(w.ctx, w.ping, p)
 				}
 			case <-w.quit:
 				ticker.Stop()
@@ -726,4 +556,20 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 			}
 		}
 	}()
+}
+
+func pingPeer(ctx context.Context, pingService *ping.PingService, peer peer.ID) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	log.Debug("Pinging ", peer)
+	pr := pingService.Ping(ctx, peer)
+	select {
+	case res := <-pr:
+		if res.Error != nil {
+			log.Error(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
+		}
+	case <-ctx.Done():
+		log.Error(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
+	}
 }

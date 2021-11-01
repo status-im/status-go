@@ -1,10 +1,15 @@
 package metrics
 
 import (
+	"context"
+
+	logging "github.com/ipfs/go-log"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 )
+
+var log = logging.Logger("metrics")
 
 var (
 	Messages            = stats.Int64("node_messages", "Number of messages received", stats.UnitDimensionless)
@@ -12,12 +17,13 @@ var (
 	Dials               = stats.Int64("dials", "Number of peer dials", stats.UnitDimensionless)
 	StoreMessages       = stats.Int64("store_messages", "Number of historical messages", stats.UnitDimensionless)
 	FilterSubscriptions = stats.Int64("filter_subscriptions", "Number of filter subscriptions", stats.UnitDimensionless)
-	Errors              = stats.Int64("errors", "Number of errors", stats.UnitDimensionless)
+	StoreErrors         = stats.Int64("errors", "Number of errors in store protocol", stats.UnitDimensionless)
+	LightpushErrors     = stats.Int64("errors", "Number of errors in lightpush protocol", stats.UnitDimensionless)
 )
 
 var (
-	KeyType, _           = tag.NewKey("type")
-	KeyStoreErrorType, _ = tag.NewKey("store_error_type")
+	KeyType, _   = tag.NewKey("type")
+	ErrorType, _ = tag.NewKey("error_type")
 )
 
 var (
@@ -44,6 +50,7 @@ var (
 		Measure:     StoreMessages,
 		Description: "The distribution of the store protocol messages",
 		Aggregation: view.LastValue(),
+		TagKeys:     []tag.Key{KeyType},
 	}
 	FilterSubscriptionsView = &view.View{
 		Name:        "gowaku_filter_subscriptions",
@@ -53,9 +60,34 @@ var (
 	}
 	StoreErrorTypesView = &view.View{
 		Name:        "gowaku_store_errors",
-		Measure:     Errors,
+		Measure:     StoreErrors,
 		Description: "The distribution of the store protocol errors",
 		Aggregation: view.Count(),
 		TagKeys:     []tag.Key{KeyType},
 	}
+	LightpushErrorTypesView = &view.View{
+		Name:        "gowaku_lightpush_errors",
+		Measure:     LightpushErrors,
+		Description: "The distribution of the lightpush protocol errors",
+		Aggregation: view.Count(),
+		TagKeys:     []tag.Key{KeyType},
+	}
 )
+
+func RecordLightpushError(ctx context.Context, tagType string) {
+	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(tag.Key(ErrorType), tagType)}, LightpushErrors.M(1)); err != nil {
+		log.Error("failed to record with tags", err)
+	}
+}
+
+func RecordMessage(ctx context.Context, tagType string, len int) {
+	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(KeyType, tagType)}, StoreMessages.M(int64(len))); err != nil {
+		log.Error("failed to record with tags", err)
+	}
+}
+
+func RecordStoreError(ctx context.Context, tagType string) {
+	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, StoreErrors.M(1)); err != nil {
+		log.Error("failed to record with tags", err)
+	}
+}

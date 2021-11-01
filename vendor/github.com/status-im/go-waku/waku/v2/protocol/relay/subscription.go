@@ -1,4 +1,4 @@
-package node
+package relay
 
 import (
 	"sync"
@@ -12,23 +12,21 @@ type Subscription struct {
 	C chan *protocol.Envelope
 
 	closed bool
-	mutex  sync.Mutex
+	once   sync.Once
 	quit   chan struct{}
 }
 
 // Unsubscribe will close a subscription from a pubsub topic. Will close the message channel
 func (subs *Subscription) Unsubscribe() {
-	subs.mutex.Lock()
-	defer subs.mutex.Unlock()
-	if !subs.closed {
-		close(subs.quit)
+	subs.once.Do(func() {
 		subs.closed = true
-	}
+		close(subs.quit)
+		close(subs.C)
+
+	})
 }
 
 // IsClosed determine whether a Subscription is still open for receiving messages
 func (subs *Subscription) IsClosed() bool {
-	subs.mutex.Lock()
-	defer subs.mutex.Unlock()
 	return subs.closed
 }
