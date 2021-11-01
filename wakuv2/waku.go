@@ -714,7 +714,28 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
-	return w.node.Publish(context.Background(), msg, nil)
+	hash, err := w.node.Publish(context.Background(), msg, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	w.poolMu.Lock()
+	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(hash)]
+	w.poolMu.Unlock()
+	if !alreadyCached {
+		envelope := wakuprotocol.NewEnvelope(msg, string(relay.GetTopic(nil)))
+		recvMessage := common.NewReceivedMessage(envelope)
+		w.addEnvelope(recvMessage)
+	}
+
+	event := common.EnvelopeEvent{
+		Event: common.EventEnvelopeSent,
+		Hash:  gethcommon.BytesToHash(hash),
+	}
+
+	w.SendEnvelopeEvent(event)
+
+	return hash, nil
 }
 
 func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {

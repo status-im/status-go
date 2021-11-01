@@ -163,7 +163,8 @@ func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
-	if m.mailServerConfirmation {
+	// Mailserver confirmations for WakuV2 are disabled
+	if m.w.Version() < 2 && m.mailServerConfirmation {
 		if !m.isMailserver(event.Peer) {
 			return
 		}
@@ -173,6 +174,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	defer m.mu.Unlock()
 
 	state, ok := m.envelopes[event.Hash]
+
 	// if we didn't send a message using extension - skip it
 	// if message was already confirmed - skip it
 	if !ok || state == EnvelopeSent {

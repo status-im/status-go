@@ -45,6 +45,6 @@ var DefaultConfig = Config{
 	MaxMessageSize:    common.DefaultMaxMessageSize,
 	Host:              "0.0.0.0",
 	Port:              60000,
-	KeepAliveInterval: 1, // second
+	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 }
