@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"encoding/binary"
+	"fmt"
 	mrand "math/rand"
 
 	"errors"
@@ -70,22 +71,38 @@ func (payload Payload) Encode(version uint32) ([]byte, error) {
 		case Symmetric:
 			encoded, err := encryptSymmetric(data, payload.Key.SymKey)
 			if err != nil {
-				return nil, errors.New("Couldn't encrypt using symmetric key")
+				return nil, fmt.Errorf("couldn't encrypt using symmetric key: %w", err)
 			} else {
 				return encoded, nil
 			}
 		case Asymmetric:
 			encoded, err := encryptAsymmetric(data, &payload.Key.PubKey)
 			if err != nil {
-				return nil, errors.New("Couldn't encrypt using asymmetric key")
+				return nil, fmt.Errorf("couldn't encrypt using asymmetric key: %w", err)
 			} else {
 				return encoded, nil
 			}
 		case None:
-			return nil, errors.New("Non supported KeyKind")
+			return nil, errors.New("non supported KeyKind")
 		}
 	}
-	return nil, errors.New("Unsupported WakuMessage version")
+	return nil, errors.New("unsupported wakumessage version")
+}
+
+func EncodeWakuMessage(message *pb.WakuMessage, keyInfo *KeyInfo) error {
+	msgPayload := message.Payload
+	payload := Payload{
+		Data: msgPayload,
+		Key:  keyInfo,
+	}
+
+	encodedBytes, err := payload.Encode(message.Version)
+	if err != nil {
+		return err
+	}
+
+	message.Payload = encodedBytes
+	return nil
 }
 
 // Decodes a WakuMessage depending on the version parameter.
@@ -98,12 +115,12 @@ func DecodePayload(message *pb.WakuMessage, keyInfo *KeyInfo) (*DecodedPayload, 
 		switch keyInfo.Kind {
 		case Symmetric:
 			if keyInfo.SymKey == nil {
-				return nil, errors.New("Symmetric key is required")
+				return nil, errors.New("symmetric key is required")
 			}
 
 			decodedData, err := decryptSymmetric(message.Payload, keyInfo.SymKey)
 			if err != nil {
-				return nil, errors.New("Couldn't decrypt using symmetric key")
+				return nil, fmt.Errorf("couldn't decrypt using symmetric key: %w", err)
 			}
 
 			decodedPayload, err := validateAndParse(decodedData)
@@ -114,12 +131,12 @@ func DecodePayload(message *pb.WakuMessage, keyInfo *KeyInfo) (*DecodedPayload, 
 			return decodedPayload, nil
 		case Asymmetric:
 			if keyInfo.PrivKey == nil {
-				return nil, errors.New("Private key is required")
+				return nil, errors.New("private key is required")
 			}
 
 			decodedData, err := decryptAsymmetric(message.Payload, keyInfo.PrivKey)
 			if err != nil {
-				return nil, errors.New("Couldn't decrypt using asymmetric key")
+				return nil, fmt.Errorf("couldn't decrypt using asymmetric key: %w", err)
 			}
 
 			decodedPayload, err := validateAndParse(decodedData)
@@ -129,10 +146,20 @@ func DecodePayload(message *pb.WakuMessage, keyInfo *KeyInfo) (*DecodedPayload, 
 
 			return decodedPayload, nil
 		case None:
-			return nil, errors.New("Non supported KeyKind")
+			return nil, errors.New("non supported KeyKind")
 		}
 	}
-	return nil, errors.New("Unsupported WakuMessage version")
+	return nil, errors.New("unsupported wakumessage version")
+}
+
+func DecodeWakuMessage(message *pb.WakuMessage, keyInfo *KeyInfo) error {
+	decodedPayload, err := DecodePayload(message, keyInfo)
+	if err != nil {
+		return err
+	}
+
+	message.Payload = decodedPayload.Data
+	return nil
 }
 
 const aesNonceLength = 12

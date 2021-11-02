@@ -17,9 +17,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
 
+	"github.com/status-im/go-waku/waku/persistence"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
@@ -51,6 +50,10 @@ func minOf(vars ...int) int {
 }
 
 func paginateWithIndex(list []IndexedWakuMessage, pinfo *pb.PagingInfo) (resMessages []IndexedWakuMessage, resPagingInfo *pb.PagingInfo) {
+	if pinfo == nil {
+		pinfo = new(pb.PagingInfo)
+	}
+
 	// takes list, and performs paging based on pinfo
 	// returns the page i.e, a sequence of IndexedWakuMessage and the new paging info to be used for the next paging request
 	cursor := pinfo.Cursor
@@ -179,17 +182,37 @@ func (w *WakuStore) FindMessages(query *pb.HistoryQuery) *pb.HistoryResponse {
 	return result
 }
 
-type StoredMessage struct {
-	ID           []byte
-	PubsubTopic  string
-	ReceiverTime float64
-	Message      *pb.WakuMessage
-}
-
 type MessageProvider interface {
-	GetAll() ([]StoredMessage, error)
+	GetAll() ([]persistence.StoredMessage, error)
 	Put(cursor *pb.Index, pubsubTopic string, message *pb.WakuMessage) error
 	Stop()
+}
+
+type Query struct {
+	Topic         string
+	ContentTopics []string
+	StartTime     float64
+	EndTime       float64
+}
+
+type Result struct {
+	Messages []*pb.WakuMessage
+
+	query  *pb.HistoryQuery
+	cursor *pb.Index
+	peerId peer.ID
+}
+
+func (r *Result) Cursor() *pb.Index {
+	return r.cursor
+}
+
+func (r *Result) PeerID() peer.ID {
+	return r.peerId
+}
+
+func (r *Result) Query() *pb.HistoryQuery {
+	return r.query
 }
 
 type IndexedWakuMessage struct {
@@ -204,18 +227,17 @@ type WakuStore struct {
 	messages []IndexedWakuMessage
 	seen     map[[32]byte]struct{}
 
+	started bool
+
 	messagesMutex sync.Mutex
 
-	storeMsgs   bool
 	msgProvider MessageProvider
 	h           host.Host
 }
 
-func NewWakuStore(shouldStoreMessages bool, p MessageProvider) *WakuStore {
+func NewWakuStore(p MessageProvider) *WakuStore {
 	wakuStore := new(WakuStore)
-	wakuStore.MsgC = make(chan *protocol.Envelope)
 	wakuStore.msgProvider = p
-	wakuStore.storeMsgs = shouldStoreMessages
 	wakuStore.seen = make(map[[32]byte]struct{})
 
 	return wakuStore
@@ -226,13 +248,14 @@ func (store *WakuStore) SetMsgProvider(p MessageProvider) {
 }
 
 func (store *WakuStore) Start(ctx context.Context, h host.Host) {
-	store.h = h
-	store.ctx = ctx
-
-	if !store.storeMsgs {
-		log.Info("Store protocol started (messages aren't stored)")
+	if store.started {
 		return
 	}
+
+	store.started = true
+	store.h = h
+	store.ctx = ctx
+	store.MsgC = make(chan *protocol.Envelope)
 
 	store.h.SetStreamHandlerMatch(StoreID_v20beta3, protocol.PrefixTextMatch(string(StoreID_v20beta3)), store.onRequest)
 
@@ -243,13 +266,20 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host) {
 		return
 	}
 
-	storedMessages, err := store.msgProvider.GetAll()
+	store.fetchDBRecords(ctx)
+
+	log.Info("Store protocol started")
+}
+
+func (store *WakuStore) fetchDBRecords(ctx context.Context) {
+	if store.msgProvider == nil {
+		return
+	}
+
+	storedMessages, err := (store.msgProvider).GetAll()
 	if err != nil {
 		log.Error("could not load DBProvider messages", err)
-		err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "store_load_failure")}, metrics.Errors.M(1))
-		if err != nil {
-			log.Error("failed to record with tags")
-		}
+		metrics.RecordStoreError(ctx, "store_load_failure")
 		return
 	}
 
@@ -261,12 +291,8 @@ func (store *WakuStore) Start(ctx context.Context, h host.Host) {
 
 		store.storeMessageWithIndex(storedMessage.PubsubTopic, idx, storedMessage.Message)
 
-		if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "stored")}, metrics.StoreMessages.M(int64(len(store.messages)))); err != nil {
-			log.Error("failed to record with tags")
-		}
+		metrics.RecordMessage(ctx, "stored", len(store.messages))
 	}
-
-	log.Info("Store protocol started")
 }
 
 func (store *WakuStore) storeMessageWithIndex(pubsubTopic string, idx *pb.Index, msg *pb.WakuMessage) {
@@ -294,6 +320,7 @@ func (store *WakuStore) storeMessage(pubSubTopic string, msg *pb.WakuMessage) {
 	store.storeMessageWithIndex(pubSubTopic, index, msg)
 
 	if store.msgProvider == nil {
+		metrics.RecordMessage(store.ctx, "stored", len(store.messages))
 		return
 	}
 
@@ -301,16 +328,11 @@ func (store *WakuStore) storeMessage(pubSubTopic string, msg *pb.WakuMessage) {
 
 	if err != nil {
 		log.Error("could not store message", err)
-		if err := stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "store_failure")}, metrics.Errors.M(1)); err != nil {
-			log.Error("failed to record with tags", err)
-		}
+		metrics.RecordStoreError(store.ctx, "store_failure")
 		return
 	}
 
-	if err := stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "stored")}, metrics.StoreMessages.M(int64(len(store.messages)))); err != nil {
-		log.Error("failed to record with tags", err)
-	}
-
+	metrics.RecordMessage(store.ctx, "stored", len(store.messages))
 }
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
@@ -330,9 +352,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
 		log.Error("error reading request", err)
-		if err := stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "decodeRPCFailure")}, metrics.Errors.M(1)); err != nil {
-			log.Error("failed to record with tags", err)
-		}
+		metrics.RecordStoreError(store.ctx, "decodeRPCFailure")
 		return
 	}
 
@@ -495,20 +515,28 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = reader.ReadMsg(historyResponseRPC)
 	if err != nil {
 		log.Error("could not read response", err)
-		if err := stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyStoreErrorType, "decodeRPCFailure")}, metrics.Errors.M(1)); err != nil {
-			log.Error("failed to record with tags")
-		}
+		metrics.RecordStoreError(store.ctx, "decodeRPCFailure")
 		return nil, err
 	}
 
-	if err := stats.RecordWithTags(store.ctx, []tag.Mutator{tag.Insert(metrics.KeyType, "retrieved")}, metrics.StoreMessages.M(int64(len(store.messages)))); err != nil {
-		log.Error("failed to record with tags", err)
-	}
+	metrics.RecordMessage(ctx, "retrieved", len(store.messages))
 
 	return historyResponseRPC.Response, nil
 }
 
-func (store *WakuStore) Query(ctx context.Context, q *pb.HistoryQuery, opts ...HistoryRequestOption) (*pb.HistoryResponse, error) {
+func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error) {
+	q := &pb.HistoryQuery{
+		PubsubTopic:    query.Topic,
+		ContentFilters: []*pb.ContentFilter{},
+		StartTime:      query.StartTime,
+		EndTime:        query.EndTime,
+		PagingInfo:     &pb.PagingInfo{},
+	}
+
+	for _, cf := range query.ContentTopics {
+		q.ContentFilters = append(q.ContentFilters, &pb.ContentFilter{ContentTopic: cf})
+	}
+
 	params := new(HistoryRequestParameters)
 	params.s = store
 
@@ -538,7 +566,55 @@ func (store *WakuStore) Query(ctx context.Context, q *pb.HistoryQuery, opts ...H
 
 	q.PagingInfo.PageSize = params.pageSize
 
-	return store.queryFrom(ctx, q, params.selectedPeer, params.requestId)
+	response, err := store.queryFrom(ctx, q, params.selectedPeer, params.requestId)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.Error == pb.HistoryResponse_INVALID_CURSOR {
+		return nil, errors.New("invalid cursor")
+	}
+
+	return &Result{
+		Messages: response.Messages,
+		cursor:   response.PagingInfo.Cursor,
+		query:    q,
+		peerId:   params.selectedPeer,
+	}, nil
+}
+
+func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
+	q := &pb.HistoryQuery{
+		PubsubTopic:    r.query.PubsubTopic,
+		ContentFilters: r.query.ContentFilters,
+		StartTime:      r.query.StartTime,
+		EndTime:        r.query.EndTime,
+		PagingInfo: &pb.PagingInfo{
+			PageSize:  r.query.PagingInfo.PageSize,
+			Direction: r.query.PagingInfo.Direction,
+			Cursor: &pb.Index{
+				Digest:       r.cursor.Digest,
+				ReceiverTime: r.cursor.ReceiverTime,
+				SenderTime:   r.cursor.SenderTime,
+			},
+		},
+	}
+
+	response, err := store.queryFrom(ctx, q, r.peerId, protocol.GenerateRequestId())
+	if err != nil {
+		return nil, err
+	}
+
+	if response.Error == pb.HistoryResponse_INVALID_CURSOR {
+		return nil, errors.New("invalid cursor")
+	}
+
+	return &Result{
+		Messages: response.Messages,
+		cursor:   response.PagingInfo.Cursor,
+		query:    q,
+		peerId:   r.peerId,
+	}, nil
 }
 
 func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) (*pb.HistoryResponse, error) {
@@ -546,9 +622,10 @@ func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, c
 	// returns the number of retrieved messages, or error if all the requests fail
 	for _, peer := range candidateList {
 		result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestId())
-		if err != nil {
+		if err == nil {
 			return result, nil
 		}
+		log.Error(fmt.Errorf("resume history with peer %s failed: %w", peer, err))
 	}
 
 	return nil, ErrFailedQuery
@@ -574,6 +651,10 @@ func (store *WakuStore) findLastSeen() float64 {
 // the resume proc returns the number of retrieved messages if no error occurs, otherwise returns the error string
 
 func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error) {
+	if !store.started {
+		return 0, errors.New("can't resume: store has not started")
+	}
+
 	currentTime := utils.GetUnixEpoch()
 	lastSeenTime := store.findLastSeen()
 
@@ -617,11 +698,21 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 		store.storeMessage(pubsubTopic, msg)
 	}
 
+	log.Info("Retrieved messages since the last online time: ", len(response.Messages))
+
 	return len(response.Messages), nil
 }
 
 // TODO: queryWithAccounting
 
 func (w *WakuStore) Stop() {
-	w.h.RemoveStreamHandler(StoreID_v20beta3)
+	w.started = false
+
+	if w.MsgC != nil {
+		close(w.MsgC)
+	}
+
+	if w.h != nil {
+		w.h.RemoveStreamHandler(StoreID_v20beta3)
+	}
 }

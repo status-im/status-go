@@ -28,14 +28,15 @@ type WakuNodeParameters struct {
 	privKey        *crypto.PrivKey
 	libP2POpts     []libp2p.Option
 
-	enableRelay  bool
-	enableFilter bool
-	wOpts        []pubsub.Option
+	enableRelay      bool
+	enableFilter     bool
+	isFilterFullNode bool
+	wOpts            []pubsub.Option
 
-	enableStore  bool
-	shouldResume bool
-	storeMsgs    bool
-	store        *store.WakuStore
+	enableStore     bool
+	shouldResume    bool
+	storeMsgs       bool
+	messageProvider store.MessageProvider
 
 	enableRendezvous       bool
 	enableRendezvousServer bool
@@ -151,9 +152,10 @@ func WithRendezvousServer(storage rendezvous.Storage) WakuNodeOption {
 
 // WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
 // accepts a list of WakuFilter gossipsub options to setup the protocol
-func WithWakuFilter(opts ...pubsub.Option) WakuNodeOption {
+func WithWakuFilter(fullNode bool) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilter = true
+		params.isFilterFullNode = fullNode
 		return nil
 	}
 }
@@ -164,7 +166,6 @@ func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableStore = true
 		params.storeMsgs = shouldStoreMessages
-		params.store = store.NewWakuStore(shouldStoreMessages, nil)
 		params.shouldResume = shouldResume
 		return nil
 	}
@@ -174,11 +175,7 @@ func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 // used to store and retrieve persisted messages
 func WithMessageProvider(s store.MessageProvider) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		if params.store != nil {
-			params.store.SetMsgProvider(s)
-		} else {
-			params.store = store.NewWakuStore(true, s)
-		}
+		params.messageProvider = s
 		return nil
 	}
 }

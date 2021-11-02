@@ -1,4 +1,4 @@
-package node
+package v2
 
 import (
 	"github.com/status-im/go-waku/waku/v2/protocol"
@@ -23,7 +23,7 @@ type Broadcaster interface {
 	// Unregister a channel so that it no longer receives broadcasts.
 	Unregister(chan<- *protocol.Envelope)
 	// Shut this broadcaster down.
-	Close() error
+	Close()
 	// Submit a new object to all subscribers
 	Submit(*protocol.Envelope)
 }
@@ -78,9 +78,8 @@ func (b *broadcaster) Unregister(newch chan<- *protocol.Envelope) {
 }
 
 // Closes the broadcaster. Used to stop receiving new subscribers
-func (b *broadcaster) Close() error {
+func (b *broadcaster) Close() {
 	close(b.reg)
-	return nil
 }
 
 // Submits an Envelope to be broadcasted among all registered subscriber channels

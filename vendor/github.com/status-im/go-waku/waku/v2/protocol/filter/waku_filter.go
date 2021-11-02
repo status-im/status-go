@@ -66,6 +66,7 @@ type (
 		ctx         context.Context
 		h           host.Host
 		subscribers []Subscriber
+		isFullNode  bool
 		pushHandler MessagePushHandler
 		MsgC        chan *protocol.Envelope
 	}
@@ -145,7 +146,7 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 
 		log.Info("filter light node, received a message push. ", len(filterRPCRequest.Push.Messages), " messages")
 		stats.Record(wf.ctx, metrics.Messages.M(int64(len(filterRPCRequest.Push.Messages))))
-	} else if filterRPCRequest.Request != nil {
+	} else if filterRPCRequest.Request != nil && wf.isFullNode {
 		// We're on a full node.
 		// This is a filter request coming from a light node.
 		if filterRPCRequest.Request.Subscribe {
@@ -197,10 +198,13 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 
 			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len(wf.subscribers))))
 		}
+	} else {
+		log.Error("can't serve request")
+		return
 	}
 }
 
-func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandler) *WakuFilter {
+func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, handler MessagePushHandler) *WakuFilter {
 	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
 	if err != nil {
 		log.Error(err)
@@ -211,15 +215,21 @@ func NewWakuFilter(ctx context.Context, host host.Host, handler MessagePushHandl
 	wf.MsgC = make(chan *protocol.Envelope)
 	wf.h = host
 	wf.pushHandler = handler
+	wf.isFullNode = isFullNode
 
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
 	go wf.FilterListener()
+
+	if wf.isFullNode {
+		log.Info("Filter protocol started")
+	} else {
+		log.Info("Filter protocol started (only client mode)")
+	}
 
 	return wf
 }
 
 func (wf *WakuFilter) FilterListener() {
-
 	// This function is invoked for each message received
 	// on the full node in context of Waku2-Filter
 	handle := func(envelope *protocol.Envelope) error { // async

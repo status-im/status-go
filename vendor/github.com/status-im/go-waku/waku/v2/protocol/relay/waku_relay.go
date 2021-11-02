@@ -4,17 +4,22 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"sync"
 
 	proto "github.com/golang/protobuf/proto"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
-
-	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	v2 "github.com/status-im/go-waku/waku/v2"
+	"github.com/status-im/go-waku/waku/v2/metrics"
+	waku_proto "github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 )
 
 var log = logging.Logger("wakurelay")
@@ -32,6 +37,11 @@ type WakuRelay struct {
 	topicsMutex     sync.Mutex
 	wakuRelayTopics map[Topic]*pubsub.Topic
 	relaySubs       map[Topic]*pubsub.Subscription
+
+	bcaster v2.Broadcaster
+
+	subscriptions      map[Topic][]*Subscription
+	subscriptionsMutex sync.Mutex
 }
 
 // Once https://github.com/status-im/nim-waku/issues/420 is fixed, implement a custom messageIdFn
@@ -40,12 +50,14 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 	return string(hash[:])
 }
 
-func NewWakuRelay(ctx context.Context, h host.Host, opts ...pubsub.Option) (*WakuRelay, error) {
+func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, opts ...pubsub.Option) (*WakuRelay, error) {
 	w := new(WakuRelay)
 	w.host = h
 	w.topics = make(map[Topic]bool)
 	w.wakuRelayTopics = make(map[Topic]*pubsub.Topic)
 	w.relaySubs = make(map[Topic]*pubsub.Subscription)
+	w.subscriptions = make(map[Topic][]*Subscription)
+	w.bcaster = bcaster
 
 	// default options required by WakuRelay
 	opts = append(opts, pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign))
@@ -113,31 +125,28 @@ func (w *WakuRelay) upsertTopic(topic Topic) (*pubsub.Topic, error) {
 	return pubSubTopic, nil
 }
 
-func (w *WakuRelay) Subscribe(topic Topic) (subs *pubsub.Subscription, isNew bool, err error) {
-
+func (w *WakuRelay) subscribe(topic Topic) (subs *pubsub.Subscription, err error) {
 	sub, ok := w.relaySubs[topic]
 	if !ok {
 		pubSubTopic, err := w.upsertTopic(topic)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		sub, err = pubSubTopic.Subscribe()
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		w.relaySubs[topic] = sub
 
 		log.Info("Subscribing to topic ", topic)
 	}
 
-	isNew = !ok // ok will be true if subscription already exists
-	return sub, isNew, nil
+	return sub, nil
 }
 
 func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic *Topic) ([]byte, error) {
 	// Publish a `WakuMessage` to a PubSub topic.
-
 	if w.pubsub == nil {
 		return nil, errors.New("PubSub hasn't been set")
 	}
@@ -158,7 +167,6 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic 
 	}
 
 	err = pubSubTopic.Publish(ctx, out)
-
 	if err != nil {
 		return nil, err
 	}
@@ -178,4 +186,96 @@ func GetTopic(topic *Topic) Topic {
 
 func (w *WakuRelay) Stop() {
 	w.host.RemoveStreamHandler(WakuRelayID_v200)
+	w.subscriptionsMutex.Lock()
+	defer w.subscriptionsMutex.Unlock()
+
+	for _, topic := range w.Topics() {
+		for _, sub := range w.subscriptions[topic] {
+			sub.Unsubscribe()
+		}
+	}
+	w.subscriptions = nil
+}
+
+func (w *WakuRelay) Subscribe(ctx context.Context, topic *Topic) (*Subscription, error) {
+	// Subscribes to a PubSub topic.
+	// NOTE The data field SHOULD be decoded as a WakuMessage.
+	t := GetTopic(topic)
+	sub, err := w.subscribe(t)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Create client subscription
+	subscription := new(Subscription)
+	subscription.closed = false
+	subscription.C = make(chan *waku_proto.Envelope, 1024) // To avoid blocking
+	subscription.quit = make(chan struct{})
+
+	w.subscriptionsMutex.Lock()
+	defer w.subscriptionsMutex.Unlock()
+
+	w.subscriptions[t] = append(w.subscriptions[t], subscription)
+
+	if w.bcaster != nil {
+		w.bcaster.Register(subscription.C)
+	}
+
+	go w.subscribeToTopic(t, subscription, sub)
+
+	return subscription, nil
+}
+
+func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <-chan *pubsub.Message {
+	msgChannel := make(chan *pubsub.Message, 1024)
+	go func(msgChannel chan *pubsub.Message) {
+		for {
+			msg, err := sub.Next(ctx)
+			if err != nil {
+				log.Error(fmt.Errorf("subscription failed: %w", err))
+				sub.Cancel()
+				close(msgChannel)
+				for _, subscription := range w.subscriptions[Topic(sub.Topic())] {
+					subscription.Unsubscribe()
+				}
+			}
+
+			msgChannel <- msg
+		}
+	}(msgChannel)
+	return msgChannel
+}
+
+func (w *WakuRelay) subscribeToTopic(t Topic, subscription *Subscription, sub *pubsub.Subscription) {
+	ctx, err := tag.New(context.Background(), tag.Insert(metrics.KeyType, "relay"))
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	subChannel := w.nextMessage(ctx, sub)
+
+	for {
+		select {
+		case <-subscription.quit:
+			if w.bcaster != nil {
+				w.bcaster.Unregister(subscription.C) // Remove from broadcast list
+			}
+			// TODO: if there are no more relay subscriptions, close the pubsub subscription
+		case msg := <-subChannel:
+			stats.Record(ctx, metrics.Messages.M(1))
+			wakuMessage := &pb.WakuMessage{}
+			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
+				log.Error("could not decode message", err)
+				return
+			}
+
+			envelope := waku_proto.NewEnvelope(wakuMessage, string(t))
+
+			if w.bcaster != nil {
+				w.bcaster.Submit(envelope)
+			}
+		}
+	}
 }
