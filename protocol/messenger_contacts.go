@@ -203,6 +203,13 @@ func (m *Messenger) saveContact(contact *Contact) error {
 		return err
 	}
 
+	// NOTE(rasom): currently images are always empty on saving contact so
+	// we keep existing ones in memory if those are available
+	existingContact, ok := m.allContacts.Load(contact.ID)
+	if ok {
+		contact.Images = existingContact.Images
+	}
+
 	contact.Identicon = identicon
 	contact.Alias = name
 
