@@ -47,6 +47,8 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/mailservers"
+
+	"github.com/status-im/status-go/telemetry"
 )
 
 //todo: kozieiev: get rid of wakutransp word
@@ -110,6 +112,7 @@ type Messenger struct {
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
 	connectionState            connection.State
+	telemetryClient            *telemetry.Client
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex sync.Mutex
@@ -160,6 +163,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 }
 
 func NewMessenger(
+	nodeName string,
 	identity *ecdsa.PrivateKey,
 	node types.Node,
 	installationID string,
@@ -299,6 +303,11 @@ func NewMessenger(
 		anonMetricsServer.Logger = logger
 	}
 
+	var telemetryClient *telemetry.Client
+	if c.telemetryServerURL != "" {
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName)
+	}
+
 	// Initialize push notification server
 	var pushNotificationServer *pushnotificationserver.Server
 	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
@@ -339,6 +348,7 @@ func NewMessenger(
 		sender:                     sender,
 		anonMetricsClient:          anonMetricsClient,
 		anonMetricsServer:          anonMetricsServer,
+		telemetryClient:            telemetryClient,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
@@ -2682,7 +2692,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
-	for _, messages := range chatWithMessages {
+	for filter, messages := range chatWithMessages {
 		var processedMessages []string
 		for _, shhMessage := range messages {
 			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))
@@ -2692,6 +2702,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
+			}
+
+			if m.telemetryClient != nil {
+				go m.telemetryClient.PushReceivedMessages(filter, shhMessage, statusMessages)
 			}
 			m.markDeliveredMessages(acks)
 

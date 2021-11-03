@@ -138,6 +138,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 	options = append(options, extraOptions...)
 
 	m, err := NewMessenger(
+		"Test",
 		privateKey,
 		&testNode{shh: shh},
 		uuid.New().String(),

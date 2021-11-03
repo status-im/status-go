@@ -102,7 +102,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -143,6 +143,7 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAcco
 	}
 
 	messenger, err := protocol.NewMessenger(
+		nodeName,
 		identity,
 		s.n,
 		s.config.InstallationID,
@@ -452,6 +453,10 @@ func buildMessengerOptions(
 			PostgresURI: config.AnonMetricsServerPostgresURI,
 		}
 		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
+	}
+
+	if settings.TelemetryServerURL != "" {
+		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL))
 	}
 
 	if settings.PushNotificationsServerEnabled {
