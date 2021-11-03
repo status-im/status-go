@@ -1584,3 +1584,133 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	aoCom := mr.Communities()[0]
 	s.Equal(aCom, aoCom)
 }
+
+// TestSyncCommunity_Muted tests that the muted state is synced between 2 Messengers
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_Muted() {
+	// Create new device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	tcs, err := alicesOtherDevice.communitiesManager.All()
+	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
+	s.Len(tcs, 1, "Must have 1 communities")
+
+	// Pair devices
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+
+	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	// Check that Alice has 2 communities
+	cs, err := s.alice.communitiesManager.All()
+	s.Require().NoError(err, "communitiesManager.All")
+	s.Len(cs, 2, "Must have 2 communities")
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		// Do we have a new synced community?
+		_, err = alicesOtherDevice.communitiesManager.GetSyncedRawCommunity(newCommunity.ID())
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Count the number of communities in their device
+	tcs, err = alicesOtherDevice.communitiesManager.All()
+	s.Require().NoError(err)
+	s.Len(tcs, 2, "There must be 2 communities")
+
+	s.logger.Debug("", zap.Any("tcs", tcs))
+
+	// Get the new community from their db
+	tnc, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err)
+
+	// Check the community on their device matched the new community on Alice's device
+	s.Equal(newCommunity.ID(), tnc.ID())
+	s.Equal(newCommunity.Name(), tnc.Name())
+	s.Equal(newCommunity.DescriptionText(), tnc.DescriptionText())
+	s.Equal(newCommunity.IDString(), tnc.IDString())
+	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
+	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
+	s.Equal(newCommunity.Verified(), tnc.Verified())
+	s.Equal(newCommunity.Muted(), tnc.Muted())
+	s.Equal(newCommunity.Joined(), tnc.Joined())
+	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
+	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
+
+	// Check that the muted state is false on both devices
+	s.Equal(false, newCommunity.Muted())
+	s.Equal(false, tnc.Muted())
+
+	// Set alice community muted to true
+	err = s.alice.SetMuted(newCommunity.ID(), true)
+	s.Require().NoError(err, "alice.communitiesManager.SetMuted to true")
+
+	// muted state before synced
+	ac, err := s.alice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err, "alice.communitiesManager.GetByID")
+	s.Equal(true, ac.Muted())
+
+	aoc, err := alicesOtherDevice.communitiesManager.GetByID(tnc.ID())
+	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.GetByID")
+	s.Equal(false, aoc.Muted())
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		_, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		c, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+		if c == nil {
+			return fmt.Errorf("no community found")
+		}
+		if !c.Muted() {
+			return fmt.Errorf("community found but not muted")
+		}
+		if err != nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Get the community from their db
+	tnc, err = alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err)
+
+	// community should have its muted state updated
+	s.Equal(true, tnc.Muted())
+}

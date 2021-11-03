@@ -1209,6 +1209,13 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		}
 	}
 
+	// Update the muted state of the community
+	err = m.communitiesManager.SetMuted(syncCommunity.Id, syncCommunity.Muted)
+	if err != nil {
+		logger.Debug("m.communitiesManager.SetMuted", zap.Error(err))
+		return err
+	}
+
 	// update the clock value
 	err = m.communitiesManager.SetSyncClock(syncCommunity.Id, syncCommunity.Clock)
 	if err != nil {
