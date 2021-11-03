@@ -1116,7 +1116,7 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		st := b.statusNode.WakuExtService()
 
 		if st != nil {
-			if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
+			if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 				return err
 			}
 			// Set initial connection state
@@ -1141,7 +1141,7 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		}
 		st := b.statusNode.WakuV2ExtService()
 
-		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
 	}

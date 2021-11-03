@@ -66,6 +66,8 @@ type config struct {
 	logger *zap.Logger
 
 	messengerSignalsHandler MessengerSignalsHandler
+
+	telemetryServerURL string
 }
 
 type Option func(*config) error
@@ -166,6 +168,13 @@ func WithAnonMetricsClientConfig(anonMetricsClientConfig *anonmetrics.ClientConf
 func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConfig) Option {
 	return func(c *config) error {
 		c.anonMetricsServerConfig = anonMetricsServerConfig
+		return nil
+	}
+}
+
+func WithTelemetry(serverURL string) Option {
+	return func(c *config) error {
+		c.telemetryServerURL = serverURL
 		return nil
 	}
 }

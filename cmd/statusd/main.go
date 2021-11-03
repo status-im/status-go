@@ -211,7 +211,13 @@ func main() {
 			protocol.WithDatabase(db),
 		}
 
-		messenger, err := protocol.NewMessenger(identity, gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()), installationID.String(), options...)
+		messenger, err := protocol.NewMessenger(
+			config.Name,
+			identity,
+			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+			installationID.String(),
+			options...,
+		)
 		if err != nil {
 			logger.Error("failed to create messenger", "error", err)
 			return
