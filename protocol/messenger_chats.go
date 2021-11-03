@@ -406,7 +406,7 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	if err != nil {
 		return err
 	}
-	// TODO(samyoul) remove storing of an updated reference pointer?
+	// We store the chat has it might not have been in the store in the first place
 	m.allChats.Store(chat.ID, chat)
 
 	return nil
