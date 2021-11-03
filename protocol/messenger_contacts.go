@@ -85,6 +85,9 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	if err != nil {
 		return nil, err
 	}
+	if err := m.saveChat(profileChat); err != nil {
+		return nil, err
+	}
 
 	// Fetch contact code
 	publicKey, err := contact.PublicKey()
@@ -285,6 +288,7 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 		m.allChats.Store(chat.ID, chat)
 	}
 	m.allChats.Delete(contact.ID)
+	m.allChats.Delete(buildProfileChatID(contact.ID))
 
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {
