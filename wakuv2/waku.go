@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +57,7 @@ import (
 	libp2pproto "github.com/libp2p/go-libp2p-core/protocol"
 
 	rendezvous "github.com/status-im/go-waku-rendezvous"
+	"github.com/status-im/go-waku/waku/v2/discovery"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -260,48 +262,75 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	return waku, nil
 }
 
-func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID) {
+func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, fnForEachPeer func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
 	for _, addrString := range addresses {
 		if addrString == "" {
 			continue
 		}
 
-		addr, err := multiaddr.NewMultiaddr(addrString)
-		if err != nil {
-			log.Warn("invalid peer multiaddress", addrString, err)
-			continue
+		if strings.HasPrefix(addrString, "enrtree://") {
+			// Use DNS Discovery
+			go w.dnsDiscover(addrString, protocol, fnForEachPeer)
+		} else {
+			// It's a normal multiaddress
+			w.addPeerFromString(addrString, protocol, fnForEachPeer)
 		}
-
-		peerID, err := w.node.AddPeer(addr, protocol)
-		if err != nil {
-			log.Warn("could not add peer", addr, err)
-			continue
-		}
-
-		log.Info("peer added successfully", peerID)
 	}
+}
+
+func (w *Waku) dnsDiscover(addrString string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	multiaddresses, err := discovery.RetrieveNodes(ctx, addrString)
+	if err != nil {
+		log.Warn("dns discovery error ", err)
+		return
+	}
+	for _, m := range multiaddresses {
+		apply(m, protocol)
+	}
+}
+
+func (w *Waku) addPeerFromString(addrString string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+	addr, err := multiaddr.NewMultiaddr(addrString)
+	if err != nil {
+		log.Warn("invalid peer multiaddress", addrString, err)
+		return
+	}
+
+	apply(addr, protocol)
 }
 
 func (w *Waku) addWakuV2Peers(cfg *Config) {
 	if !cfg.LightClient {
-		for _, relaynode := range cfg.RelayNodes {
-			go func(node string) {
+		addRelayPeer := func(m multiaddr.Multiaddr, protocol libp2pproto.ID) {
+			go func(node multiaddr.Multiaddr) {
 				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 				defer cancel()
-				err := w.node.DialPeer(ctx, node)
+				err := w.node.DialPeerWithMultiAddress(ctx, node)
 				if err != nil {
 					log.Warn("could not dial peer", err)
 				} else {
 					log.Info("relay peer dialed successfully", node)
 				}
-			}(relaynode)
+			}(m)
 		}
+		w.addPeers(cfg.RelayNodes, relay.WakuRelayID_v200, addRelayPeer)
 	}
 
-	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta3)
-	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1)
-	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1)
-	w.addPeers(cfg.WakuRendezvousNodes, rendezvous.RendezvousID_v001)
+	addToStore := func(m multiaddr.Multiaddr, protocol libp2pproto.ID) {
+		peerID, err := w.node.AddPeer(m, protocol)
+		if err != nil {
+			log.Warn("could not add peer", m, err)
+			return
+		}
+		log.Info("peer added successfully", peerID)
+	}
+
+	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta3, addToStore)
+	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1, addToStore)
+	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1, addToStore)
+	w.addPeers(cfg.WakuRendezvousNodes, rendezvous.RendezvousID_v001, addToStore)
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -758,7 +787,10 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 		Topic:         string(relay.DefaultWakuTopic),
 	}
 
-	result, err := w.node.Store().Query(context.Background(), query, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	result, err := w.node.Store().Query(ctx, query, opts...)
 	if err != nil {
 		return
 	}
