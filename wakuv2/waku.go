@@ -96,6 +96,9 @@ type ConnStatus struct {
 type Waku struct {
 	node *node.WakuNode // reference to a libp2p waku node
 
+	dnsAddressCache     map[string][]multiaddr.Multiaddr // Map to store the multiaddresses returned by dns discovery
+	dnsAddressCacheLock *sync.RWMutex                    // lock to handle access to the map
+
 	filters          *common.Filters         // Message filters installed with Subscribe function
 	filterMsgChannel chan *protocol.Envelope // Channel for wakuv2 filter messages
 
@@ -135,14 +138,16 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	}
 
 	waku := &Waku{
-		privateKeys: make(map[string]*ecdsa.PrivateKey),
-		symKeys:     make(map[string][]byte),
-		envelopes:   make(map[gethcommon.Hash]*common.ReceivedMessage),
-		expirations: make(map[uint32]mapset.Set),
-		msgQueue:    make(chan *common.ReceivedMessage, messageQueueLimit),
-		quit:        make(chan struct{}),
-		timeSource:  time.Now,
-		logger:      logger,
+		privateKeys:         make(map[string]*ecdsa.PrivateKey),
+		symKeys:             make(map[string][]byte),
+		envelopes:           make(map[gethcommon.Hash]*common.ReceivedMessage),
+		expirations:         make(map[uint32]mapset.Set),
+		msgQueue:            make(chan *common.ReceivedMessage, messageQueueLimit),
+		quit:                make(chan struct{}),
+		dnsAddressCache:     make(map[string][]multiaddr.Multiaddr),
+		dnsAddressCacheLock: &sync.RWMutex{},
+		timeSource:          time.Now,
+		logger:              logger,
 	}
 
 	waku.settings = settings{
@@ -278,14 +283,25 @@ func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, fnForEachPe
 	}
 }
 
-func (w *Waku) dnsDiscover(addrString string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	multiaddresses, err := discovery.RetrieveNodes(ctx, addrString)
-	if err != nil {
-		log.Warn("dns discovery error ", err)
-		return
+
+	w.dnsAddressCacheLock.RLock()
+	multiaddresses, ok := w.dnsAddressCache[enrtreeAddress]
+	w.dnsAddressCacheLock.RUnlock()
+
+	if !ok {
+		w.dnsAddressCacheLock.Lock()
+		var err error
+		multiaddresses, err = discovery.RetrieveNodes(ctx, enrtreeAddress)
+		w.dnsAddressCacheLock.Unlock()
+		if err != nil {
+			log.Warn("dns discovery error ", err)
+			return
+		}
 	}
+
 	for _, m := range multiaddresses {
 		apply(m, protocol)
 	}
