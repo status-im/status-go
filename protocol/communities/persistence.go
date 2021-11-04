@@ -19,6 +19,8 @@ type Persistence struct {
 	logger *zap.Logger
 }
 
+var ErrOldRequestToJoin = errors.New("old request to join")
+
 const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
@@ -260,7 +262,7 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 
 	// This is already processed
 	if clock >= request.Clock {
-		return errors.New("old request to join")
+		return ErrOldRequestToJoin
 	}
 
 	_, err = tx.Exec(`INSERT INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) VALUES (?, ?, ?, ?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.ENSName, request.ChatID, request.CommunityID, request.State)
