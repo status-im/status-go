@@ -1008,6 +1008,56 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	return result, nil
 }
 
+// EmojiReactionsByChatIDMessageID returns the emoji reactions for the queried message.
+func (db sqlitePersistence) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*EmojiReaction, error) {
+
+	args := []interface{}{chatID, messageID}
+	query := `SELECT
+			    e.clock_value,
+			    e.source,
+			    e.emoji_id,
+			    e.message_id,
+			    e.chat_id,
+			    e.local_chat_id,
+			    e.retracted
+			FROM
+				emoji_reactions e
+			WHERE NOT(e.retracted)
+			AND
+			e.local_chat_id = ?
+			AND
+			e.message_id = ?
+			LIMIT 1000`
+
+	rows, err := db.db.Query(
+		query,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*EmojiReaction
+	for rows.Next() {
+		var emojiReaction EmojiReaction
+		err := rows.Scan(&emojiReaction.Clock,
+			&emojiReaction.From,
+			&emojiReaction.Type,
+			&emojiReaction.MessageId,
+			&emojiReaction.ChatId,
+			&emojiReaction.LocalChatID,
+			&emojiReaction.Retracted)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, &emojiReaction)
+	}
+
+	return result, nil
+}
+
 // EmojiReactionsByChatIDs returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor string, limit int) ([]*EmojiReaction, error) {
