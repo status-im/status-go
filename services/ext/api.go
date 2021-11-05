@@ -505,6 +505,10 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
+func (api *PublicAPI) MessageByMessageID(messageID string) (*common.Message, error) {
+	return api.service.messenger.MessageByID(messageID)
+}
+
 func (api *PublicAPI) AllMessagesFromChatWhichMatchTerm(chatID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
 	messages, err := api.service.messenger.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
 	if err != nil {
@@ -831,6 +835,10 @@ func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReac
 
 func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
 	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatIDMessageID(chatID, messageID)
 }
 
 // Urls

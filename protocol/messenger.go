@@ -4617,6 +4617,15 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
 }
 
+func (m *Messenger) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*EmojiReaction, error) {
+	_, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.persistence.EmojiReactionsByChatIDMessageID(chatID, messageID)
+}
+
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
 	emojiR, err := m.persistence.EmojiReactionByID(emojiReactionID)
 	if err != nil {
