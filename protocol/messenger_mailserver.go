@@ -21,7 +21,7 @@ import (
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 var mailserverRequestTimeout = 45 * time.Second
-var oneMonthInSeconds uint32 = 31 * 24 * 60 * 6
+var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 
 func (m *Messenger) shouldSync() (bool, error) {
 	if m.mailserver == nil || !m.online() {

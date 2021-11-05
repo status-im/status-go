@@ -3270,6 +3270,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	// Hydrate chat alias and identicon
 	for id := range messageState.Response.chats {
 		chat, _ := messageState.AllChats.Load(id)
+		if chat == nil {
+			continue
+		}
 		if chat.OneToOne() {
 			contact, ok := m.allContacts.Load(chat.ID)
 			if ok {

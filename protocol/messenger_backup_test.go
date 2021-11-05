@@ -145,7 +145,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	_, err = bob2.Start()
 	s.Require().NoError(err)
 
-	// Create 2 contacts
+	// Create contacts
 
 	for i := 0; i < BackupContactsPerBatch*2; i++ {
 
@@ -269,4 +269,118 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)
 	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupLocalNickname() {
+	bob1 := s.m
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	nickname := "don van vliet"
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Set contact nickname
+
+	contact1Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
+
+	_, err = bob1.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: types.Hex2Bytes(contactID1), Nickname: nickname})
+	s.Require().NoError(err)
+
+	// Backup
+
+	clock, err := bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Safety check
+	s.Require().Len(bob2.Contacts(), 0)
+
+	var actualContact *Contact
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			_, err := s.m.RetrieveAll()
+			if err != nil {
+				s.logger.Info("Failed")
+				return false
+			}
+
+			for _, c := range bob2.Contacts() {
+				if c.ID == contactID1 {
+					actualContact = c
+					return true
+				}
+			}
+			return false
+
+		},
+		"contacts not backed up",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Equal(actualContact.LocalNickname, nickname)
+	lastBackup, err := bob1.lastBackup()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(lastBackup)
+	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
+	bob1 := s.m
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Create contact
+	contact1Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
+
+	_, err = bob1.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID1)})
+	s.Require().NoError(err)
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Safety check
+	s.Require().Len(bob2.Contacts(), 0)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return len(bob2.Contacts()) >= 1
+		},
+		"contacts not backed up",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(bob2.AddedContacts(), 1)
+
+	actualContacts := bob2.AddedContacts()
+	s.Require().Equal(actualContacts[0].ID, contactID1)
+
+	_, err = bob1.BlockContact(contactID1)
+	s.Require().NoError(err)
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return len(bob2.BlockedContacts()) == 1
+
+		},
+		"blocked contact not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(bob2.BlockedContacts(), 1)
 }

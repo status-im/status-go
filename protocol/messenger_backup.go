@@ -108,10 +108,11 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		}
 
 		_, err = m.dispatchMessage(ctx, common.RawMessage{
-			LocalChatID:    chat.ID,
-			Payload:        encodedMessage,
-			SkipEncryption: true,
-			MessageType:    protobuf.ApplicationMetadataMessage_BACKUP,
+			LocalChatID:         chat.ID,
+			Payload:             encodedMessage,
+			SkipEncryption:      true,
+			SendOnPersonalTopic: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
 		})
 		if err != nil {
 			return 0, err

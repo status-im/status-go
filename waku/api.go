@@ -484,7 +484,6 @@ func toMessage(messages []*common.ReceivedMessage) []*Message {
 // are received between the last poll and now.
 func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
 	logger := api.w.logger.With(zap.String("site", "getFilterMessages"), zap.String("filterId", id))
-	logger.Debug("retrieving filter messages")
 	api.mu.Lock()
 	f := api.w.GetFilter(id)
 	if f == nil {
