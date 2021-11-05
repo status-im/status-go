@@ -226,6 +226,17 @@ func (m *Messenger) AddedContacts() []*Contact {
 	return contacts
 }
 
+func (m *Messenger) BlockedContacts() []*Contact {
+	var contacts []*Contact
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+		if contact.Blocked {
+			contacts = append(contacts, contact)
+		}
+		return true
+	})
+	return contacts
+}
+
 // GetContactByID assumes pubKey includes 0x prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	contact, _ := m.allContacts.Load(pubKey)
@@ -263,6 +274,8 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 		return nil, err
 	}
 
+	m.allContacts.Store(contact.ID, contact)
+
 	response := &MessengerResponse{}
 	response.Contacts = []*Contact{contact}
 
@@ -274,7 +287,16 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
+func (m *Messenger) BlockContact(contactID string) ([]*Chat, error) {
+	contact, ok := m.allContacts.Load(contactID)
+	if !ok {
+		var err error
+		contact, err = buildContactFromPkString(contactID)
+		if err != nil {
+			return nil, err
+		}
+
+	}
 	contact.Block()
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 

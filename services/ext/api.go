@@ -293,9 +293,9 @@ func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.UnmuteChat(chatID)
 }
 
-func (api *PublicAPI) BlockContact(parent context.Context, contact *protocol.Contact) ([]*protocol.Chat, error) {
-	api.log.Info("blocking contact", "contact", contact.ID)
-	return api.service.messenger.BlockContact(contact)
+func (api *PublicAPI) BlockContact(parent context.Context, contactID string) ([]*protocol.Chat, error) {
+	api.log.Info("blocking contact", "contact", contactID)
+	return api.service.messenger.BlockContact(contactID)
 }
 
 func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) error {

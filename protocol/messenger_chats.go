@@ -257,6 +257,32 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		return nil, err
 	}
 
+	response := &MessengerResponse{}
+
+	ensName := request.ENSName
+	if ensName != "" {
+		clock := m.getTimesource().GetCurrentTime()
+		err := m.ensVerifier.ENSVerified(chatID, ensName, clock)
+		if err != nil {
+			return nil, err
+		}
+		contact, ok := m.allContacts.Load(chatID)
+		if !ok {
+			var err error
+			contact, err = buildContactFromPkString(chatID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		contact.Name = ensName
+		contact.ENSVerified = true
+		err = m.persistence.SaveContact(contact, nil)
+		if err != nil {
+			return nil, err
+		}
+		response.Contacts = []*Contact{contact}
+	}
+
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = CreateOneToOneChat(chatID, pk, m.getTimesource())
@@ -271,7 +297,6 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 	// TODO(Samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chatID, chat)
 
-	response := &MessengerResponse{}
 	response.AddChat(chat)
 
 	willSync, err := m.scheduleSyncFilters(filters)
@@ -291,7 +316,6 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		return nil, err
 	}
 	return response, nil
-
 }
 
 func (m *Messenger) DeleteChat(chatID string) error {

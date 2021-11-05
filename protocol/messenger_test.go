@@ -712,7 +712,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 		Blocked:     true,
 	}
 
-	_, err = s.m.BlockContact(&blockedContact)
+	_, err = s.m.BlockContact(blockedContact.ID)
 	s.Require().NoError(err)
 
 	inputMessage := buildTestMessage(*chat)
@@ -1347,8 +1347,6 @@ func (s *MessengerSuite) TestBlockContact() {
 	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
 
-	contact.Name = "blocked"
-
 	messages := []*common.Message{
 		{
 			ID:          "test-1",
@@ -1430,7 +1428,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	err = s.m.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	response, err := s.m.BlockContact(&contact)
+	response, err := s.m.BlockContact(contact.ID)
 	s.Require().NoError(err)
 
 	var actualChat2, actualChat3 *Chat
@@ -1456,7 +1454,6 @@ func (s *MessengerSuite) TestBlockContact() {
 	// The contact is updated
 	savedContacts := s.m.Contacts()
 	s.Require().Equal(1, len(savedContacts))
-	s.Require().Equal("blocked", savedContacts[0].Name)
 
 	// The chat is deleted
 	actualChats := s.m.Chats()

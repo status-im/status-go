@@ -290,7 +290,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	if !ok && (message.Added || message.Muted) && !removedOrBlcoked {
 		pubKey, err := common.HexToPubkey(message.Id)
 		if err != nil {
-			return nil
+			return err
 		}
 
 		chat = OneToOneFromPublicKey(pubKey, state.Timesource)
@@ -329,7 +329,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 			contact.Name = message.EnsName
 			publicKey, err := contact.PublicKey()
 			if err != nil {
-				return nil
+				return err
 			}
 
 			err = m.ENSVerified(common.PubkeyToHex(publicKey), message.EnsName)
@@ -343,7 +343,8 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 		if message.Blocked != contact.Blocked {
 			if message.Blocked {
-				chats, err := m.BlockContact(contact)
+				state.AllContacts.Store(contact.ID, contact)
+				chats, err := m.BlockContact(contact.ID)
 				if err != nil {
 					return err
 				}
@@ -380,7 +381,6 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	}
 
 	if chat != nil {
-		// TODO(samyoul) remove storing of an updated reference pointer?
 		state.AllChats.Store(chat.ID, chat)
 	}
 
