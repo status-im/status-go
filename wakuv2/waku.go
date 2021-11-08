@@ -209,13 +209,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	}
 
 	opts := []node.WakuNodeOption{
-		node.WithLibP2POptions(
-			libp2pOpts...,
-		),
+		node.WithLibP2POptions(libp2pOpts...),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]*net.TCPAddr{hostAddr}),
-		node.WithWakuStore(false, false), // Mounts the store protocol (without storing the messages)
-		node.WithConnStatusChan(connStatusChan),
+		node.WithConnectionStatusChannel(connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 	}
 
@@ -403,15 +400,19 @@ func (w *Waku) subscribeWakuFilterTopic(topics [][]byte) {
 	}
 
 	var err error
-	filter := filter.ContentFilter{
+	contentFilter := filter.ContentFilter{
 		Topic:         string(pubsubTopic),
 		ContentTopics: contentTopics,
 	}
-	_, w.filterMsgChannel, err = w.node.SubscribeFilter(context.Background(), filter)
+
+	var wakuFilter filter.Filter
+	_, wakuFilter, err = w.node.Filter().Subscribe(context.Background(), contentFilter)
 	if err != nil {
 		w.logger.Warn("could not add wakuv2 filter for topics", zap.Any("topics", topics))
 		return
 	}
+
+	w.filterMsgChannel = wakuFilter.Chan
 }
 
 // MaxMessageSize returns the maximum accepted message size.
@@ -731,7 +732,8 @@ func (w *Waku) Unsubscribe(id string) error {
 		for _, topic := range f.Topics {
 			contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
 		}
-		if err := w.node.UnsubscribeFilter(context.Background(), contentFilter); err != nil {
+
+		if err := w.node.Filter().UnsubscribeFilter(context.Background(), contentFilter); err != nil {
 			return fmt.Errorf("failed to unsubscribe: %w", err)
 		}
 	}

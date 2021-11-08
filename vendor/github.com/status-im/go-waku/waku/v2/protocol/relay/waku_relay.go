@@ -33,13 +33,15 @@ type WakuRelay struct {
 	host   host.Host
 	pubsub *pubsub.PubSub
 
-	topics          map[Topic]bool
+	bcaster v2.Broadcaster
+
+	// TODO: convert to concurrent maps
+	topics          map[Topic]struct{}
 	topicsMutex     sync.Mutex
 	wakuRelayTopics map[Topic]*pubsub.Topic
 	relaySubs       map[Topic]*pubsub.Subscription
 
-	bcaster v2.Broadcaster
-
+	// TODO: convert to concurrent maps
 	subscriptions      map[Topic][]*Subscription
 	subscriptionsMutex sync.Mutex
 }
@@ -53,7 +55,7 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, opts ...pubsub.Option) (*WakuRelay, error) {
 	w := new(WakuRelay)
 	w.host = h
-	w.topics = make(map[Topic]bool)
+	w.topics = make(map[Topic]struct{})
 	w.wakuRelayTopics = make(map[Topic]*pubsub.Topic)
 	w.relaySubs = make(map[Topic]*pubsub.Subscription)
 	w.subscriptions = make(map[Topic][]*Subscription)
@@ -112,7 +114,7 @@ func (w *WakuRelay) upsertTopic(topic Topic) (*pubsub.Topic, error) {
 	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
 
-	w.topics[topic] = true
+	w.topics[topic] = struct{}{}
 	pubSubTopic, ok := w.wakuRelayTopics[topic]
 	if !ok { // Joins topic if node hasn't joined yet
 		newTopic, err := w.pubsub.Join(string(topic))

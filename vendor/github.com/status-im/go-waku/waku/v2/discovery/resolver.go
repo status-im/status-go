@@ -5,6 +5,8 @@ import (
 	"net"
 )
 
+// GetResolver returns a *net.Resolver object using a custom nameserver, or
+// the default system resolver if no nameserver is specified
 func GetResolver(ctx context.Context, nameserver string) *net.Resolver {
 	if nameserver == "" {
 		return net.DefaultResolver

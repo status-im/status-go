@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -22,10 +21,8 @@ import (
 	rendezvous "github.com/status-im/go-waku-rendezvous"
 	v2 "github.com/status-im/go-waku/waku/v2"
 	"github.com/status-im/go-waku/waku/v2/metrics"
-	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	"github.com/status-im/go-waku/waku/v2/utils"
@@ -47,8 +44,6 @@ type WakuNode struct {
 	store      *store.WakuStore
 
 	bcaster v2.Broadcaster
-
-	filters filter.Filters
 
 	connectionNotif        ConnectionNotifier
 	protocolEventSub       event.Subscription
@@ -112,8 +107,8 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		return nil, err
 	}
 
-	if params.connStatusChan != nil {
-		w.connStatusChan = params.connStatusChan
+	if params.connStatusC != nil {
+		w.connStatusChan = params.connStatusC
 	}
 
 	w.connectionNotif = NewConnectionNotifier(ctx, host)
@@ -133,17 +128,13 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 }
 
 func (w *WakuNode) Start() error {
-	w.store = store.NewWakuStore(w.opts.messageProvider)
+	w.store = store.NewWakuStore(w.opts.messageProvider, w.opts.maxMessages, w.opts.maxDuration)
 	if w.opts.enableStore {
 		w.startStore()
 	}
 
 	if w.opts.enableFilter {
-		w.filters = make(filter.Filters)
-		err := w.mountFilter()
-		if err != nil {
-			return err
-		}
+		w.filter = filter.NewWakuFilter(w.ctx, w.host, w.opts.isFilterFullNode)
 	}
 
 	if w.opts.enableRendezvous {
@@ -201,10 +192,6 @@ func (w *WakuNode) Stop() {
 
 	if w.filter != nil {
 		w.filter.Stop()
-		for _, filter := range w.filters {
-			close(filter.Chan)
-		}
-		w.filters = nil
 	}
 
 	w.relay.Stop()
@@ -264,18 +251,6 @@ func (w *WakuNode) mountRelay(opts ...pubsub.Option) error {
 	// TODO: rlnRelay
 
 	return err
-}
-
-func (w *WakuNode) mountFilter() error {
-	filterHandler := func(requestId string, msg pb.MessagePush) {
-		for _, message := range msg.Messages {
-			w.filters.Notify(message, requestId) // Trigger filter handlers on a light node
-		}
-	}
-
-	w.filter = filter.NewWakuFilter(w.ctx, w.host, w.opts.isFilterFullNode, filterHandler)
-
-	return nil
 }
 
 func (w *WakuNode) mountRendezvous() error {
@@ -342,113 +317,6 @@ func (w *WakuNode) AddPeer(address ma.Multiaddr, protocolID p2pproto.ID) (*peer.
 	}
 
 	return &info.ID, w.addPeer(info, protocolID)
-}
-
-// Wrapper around WakuFilter.Subscribe
-// that adds a Filter object to node.filters
-func (node *WakuNode) SubscribeFilter(ctx context.Context, f filter.ContentFilter) (filterID string, ch chan *protocol.Envelope, err error) {
-	if node.filter == nil {
-		err = errors.New("WakuFilter is not set")
-		return
-	}
-
-	// TODO: should be possible to pass the peerID as option or autoselect peer.
-	// TODO: check if there's an existing pubsub topic that uses the same peer. If so, reuse filter, and return same channel and filterID
-
-	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
-	// ContentFilterChan takes MessagePush structs
-	subs, err := node.filter.Subscribe(ctx, f)
-	if err != nil || subs.RequestID == "" {
-		// Failed to subscribe
-		log.Error("remote subscription to filter failed", err)
-		return
-	}
-
-	ch = make(chan *protocol.Envelope, 1024) // To avoid blocking
-
-	// Register handler for filter, whether remote subscription succeeded or not
-	node.filters[subs.RequestID] = filter.Filter{
-		PeerID:         subs.Peer,
-		Topic:          f.Topic,
-		ContentFilters: f.ContentTopics,
-		Chan:           ch,
-	}
-
-	return subs.RequestID, ch, nil
-}
-
-// UnsubscribeFilterByID removes a subscription to a filter node completely
-// using the filterID returned when the subscription was created
-func (node *WakuNode) UnsubscribeFilterByID(ctx context.Context, filterID string) error {
-
-	var f filter.Filter
-	var ok bool
-	if f, ok = node.filters[filterID]; !ok {
-		return errors.New("filter not found")
-	}
-
-	cf := filter.ContentFilter{
-		Topic:         f.Topic,
-		ContentTopics: f.ContentFilters,
-	}
-
-	err := node.filter.Unsubscribe(ctx, cf, f.PeerID)
-	if err != nil {
-		return err
-	}
-
-	close(f.Chan)
-	delete(node.filters, filterID)
-
-	return nil
-}
-
-// Unsubscribe filter removes content topics from a filter subscription. If all
-// the contentTopics are removed the subscription is dropped completely
-func (node *WakuNode) UnsubscribeFilter(ctx context.Context, cf filter.ContentFilter) error {
-	// Remove local filter
-	var idsToRemove []string
-	for id, f := range node.filters {
-		if f.Topic != cf.Topic {
-			continue
-		}
-
-		// Send message to full node in order to unsubscribe
-		err := node.filter.Unsubscribe(ctx, cf, f.PeerID)
-		if err != nil {
-			return err
-		}
-
-		// Iterate filter entries to remove matching content topics
-		// make sure we delete the content filter
-		// if no more topics are left
-		for _, cfToDelete := range cf.ContentTopics {
-			for i, cf := range f.ContentFilters {
-				if cf == cfToDelete {
-					l := len(f.ContentFilters) - 1
-					f.ContentFilters[l], f.ContentFilters[i] = f.ContentFilters[i], f.ContentFilters[l]
-					f.ContentFilters = f.ContentFilters[:l]
-					break
-				}
-
-			}
-			if len(f.ContentFilters) == 0 {
-				idsToRemove = append(idsToRemove, id)
-			}
-		}
-	}
-
-	for _, rId := range idsToRemove {
-		for id := range node.filters {
-			if id == rId {
-				close(node.filters[id].Chan)
-				delete(node.filters, id)
-				break
-			}
-		}
-	}
-
-	return nil
 }
 
 func (w *WakuNode) DialPeerWithMultiAddress(ctx context.Context, address ma.Multiaddr) error {
