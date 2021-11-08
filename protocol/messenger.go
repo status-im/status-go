@@ -2515,10 +2515,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
+	m.logger.Debug("retrieving messages")
 	chatWithMessages, err := m.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
+	m.logger.Debug("retrieved messages", zap.Int("count", len(chatWithMessages)))
 
 	return m.handleRetrievedMessages(chatWithMessages)
 }
@@ -2702,18 +2704,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				logger.Debug("processing message")
 				publicKey := msg.SigPubKey()
 
+				logger.Debug("handling installations")
 				m.handleInstallations(msg.Installations)
+				logger.Debug("handled installations")
 				err := m.handleSharedSecrets(msg.SharedSecrets)
 				if err != nil {
 					// log and continue, non-critical error
 					logger.Warn("failed to handle shared secrets")
 				}
+				logger.Debug("handled shared secrets")
 
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
 				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
 					continue
 				}
+				logger.Debug("loaded contact")
 
 				// Don't process duplicates
 				messageID := types.EncodeHex(msg.ID)
@@ -2725,6 +2731,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					logger.Debug("messageExists", zap.String("messageID", messageID))
 					continue
 				}
+				logger.Debug("message exists")
 
 				var contact *Contact
 				if c, ok := messageState.AllContacts.Load(senderID); ok {
@@ -2739,6 +2746,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					contact = c
 					messageState.AllContacts.Store(senderID, contact)
 				}
+
+				logger.Debug("build contact")
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
 					WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
@@ -2748,7 +2757,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				if msg.ParsedMessage != nil {
 
-					logger.Debug("Handling parsed message")
+					logger.Debug("handling parsed message")
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
@@ -2763,7 +2772,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.ChatMessage:
-						logger.Debug("Handling ChatMessage")
+						logger.Debug("handling ChatMessage")
 						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
 						err = m.HandleChatMessage(messageState)
 						if err != nil {
@@ -2771,6 +2780,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+						logger.Debug("handled ChatMessage")
 
 					case protobuf.EditMessage:
 						logger.Debug("Handling EditMessage")
@@ -3179,8 +3189,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				} else {
 					logger.Debug("parsed message is nil")
 				}
+
+				logger.Debug("handled statusMessage")
 			}
 
+			logger.Debug("handling community changes")
 			// Process any community changes
 			for _, changes := range messageState.Response.CommunityChanges {
 				if changes.ShouldMemberJoin {
@@ -3224,8 +3237,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				logger.Warn("failed to confirm processed messages", zap.Error(err))
 			}
 		}
+		logger.Debug("confirming processed messages")
 	}
 
+	logger.Debug("saving contacts")
 	var contactsToSave []*Contact
 	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
 		contact, ok := messageState.AllContacts.Load(id)
@@ -3236,6 +3251,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return true
 	})
 
+	logger.Debug("saving chats")
 	// Hydrate chat alias and identicon
 	for id := range messageState.Response.chats {
 		chat, _ := messageState.AllChats.Load(id)
@@ -3250,6 +3266,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.AddChat(chat)
 	}
 
+	logger.Debug("saving installations")
 	var err error
 	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool) {
 		installation, _ := messageState.AllInstallations.Load(id)
@@ -3267,12 +3284,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return nil, err
 	}
 
+	logger.Debug("saving chats 2")
 	if len(messageState.Response.chats) > 0 {
 		err = m.saveChats(messageState.Response.Chats())
 		if err != nil {
 			return nil, err
 		}
 	}
+	logger.Debug("saving pinned ")
 
 	if len(messageState.Response.pinMessages) > 0 {
 		err = m.SavePinMessages(messageState.Response.PinMessages())
@@ -3281,6 +3300,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
+	logger.Debug("saving messages ")
 	messagesToSave := messageState.Response.Messages()
 	if len(messageState.Response.messages) > 0 {
 		err = m.SaveMessages(messagesToSave)
@@ -3289,14 +3309,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
+	logger.Debug("saving emoji ")
 	for _, emojiReaction := range messageState.EmojiReactions {
 		messageState.Response.EmojiReactions = append(messageState.Response.EmojiReactions, emojiReaction)
 	}
 
+	logger.Debug("saving invitations ")
 	for _, groupChatInvitation := range messageState.GroupChatInvitations {
 		messageState.Response.Invitations = append(messageState.Response.Invitations, groupChatInvitation)
 	}
 
+	logger.Debug("saving contacts ")
 	if len(contactsToSave) > 0 {
 		err = m.persistence.SaveContacts(contactsToSave)
 		if err != nil {
@@ -3311,6 +3334,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
+	logger.Debug("pulling messages")
 	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messagesToSave)
 	if err != nil {
 		return nil, err
@@ -3331,6 +3355,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return nil, err
 	}
 
+	logger.Debug("creating notifications")
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
@@ -3352,6 +3377,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	// Reset installations
 	m.modifiedInstallations = new(stringBoolMap)
 
+	logger.Debug("finished retrieve")
 	return messageState.Response, nil
 }
 

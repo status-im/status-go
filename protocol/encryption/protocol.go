@@ -254,14 +254,17 @@ func (p *Protocol) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *
 func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *Bundle) ([]*multidevice.Installation, error) {
 	logger := p.logger.With(zap.String("site", "ProcessPublicBundle"))
 
+	logger.Debug("processing public bundle")
 	if err := p.encryptor.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
 	}
+	logger.Debug("processed encryptor public bundle")
 
 	installations, enabled, err := p.recoverInstallationsFromBundle(myIdentityKey, bundle)
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("recovered installations from bundle")
 
 	// TODO(adam): why do we add installations using identity obtained from GetIdentity()
 	// instead of the output of crypto.CompressPubkey()? I tried the second option
@@ -271,10 +274,12 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 	if err != nil {
 		logger.Panic("unrecoverable error extracting identity", zap.Error(err))
 	}
+	logger.Debug("extracted identity from bundle")
 	compressedIdentity := crypto.CompressPubkey(theirIdentity)
 	if !bytes.Equal(identityFromBundle, compressedIdentity) {
 		logger.Panic("identity from bundle and compressed are not equal")
 	}
+	logger.Debug("compared identity")
 
 	return p.multidevice.AddInstallations(bundle.GetIdentity(), bundle.GetTimestamp(), installations, enabled)
 }
@@ -389,23 +394,29 @@ func (p *Protocol) HandleMessage(
 
 	// Process bundles
 	for _, bundle := range protocolMessage.GetBundles() {
+		logger.Debug("processing bundle 1")
 		// Should we stop processing if the bundle cannot be verified?
 		newInstallations, err := p.ProcessPublicBundle(myIdentityKey, bundle)
 		if err != nil {
 			return nil, err
 		}
+		logger.Debug("got new  installation")
 		response.Installations = newInstallations
 	}
+	logger.Debug("processed bundles")
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
+		logger.Debug("public message")
 		// Nothing to do, as already in cleartext
 		response.DecryptedMessage = publicMessage
 		return response, nil
 	}
 
+	logger.Debug("encrypted message")
 	// Decrypt message
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
+		logger.Debug("decrypting message")
 		message, err := p.encryptor.DecryptPayload(
 			myIdentityKey,
 			theirPublicKey,
@@ -416,6 +427,7 @@ func (p *Protocol) HandleMessage(
 		if err != nil {
 			return nil, err
 		}
+		logger.Debug("decrypted message")
 
 		bundles := protocolMessage.GetBundles()
 		version := getProtocolVersion(bundles, protocolMessage.GetInstallationId())
@@ -428,6 +440,7 @@ func (p *Protocol) HandleMessage(
 			response.SharedSecrets = []*sharedsecret.Secret{sharedSecret}
 		}
 		response.DecryptedMessage = message
+		logger.Debug("finished decrypting message")
 		return response, nil
 	}
 

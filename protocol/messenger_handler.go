@@ -776,14 +776,17 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.Seen = true
 	}
 
+	logger.Debug("preparing content")
 	err := receivedMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
+	logger.Debug("prepared content")
 	chat, err := m.matchChatEntity(receivedMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
+	logger.Debug("matched chat entity")
 
 	if chat.ReadMessagesAtClockValue > state.CurrentMessageState.WhisperTimestamp {
 		receivedMessage.Seen = true
@@ -793,6 +796,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return err
 	}
+	logger.Debug("checked allowed")
 
 	if !allowed {
 		return ErrMessageNotAllowed
@@ -821,10 +825,13 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
+	logger.Debug("set local chat id")
 
 	if c, ok := m.allChats.Load(chat.ID); ok {
 		chat = c
 	}
+
+	logger.Debug("loaded chat")
 
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
@@ -843,11 +850,13 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		chat.Highlight = true
 	}
 
+	logger.Debug("checking edits")
 	err = m.checkForEdits(receivedMessage)
 	if err != nil {
 		return err
 	}
 
+	logger.Debug("checking deletes")
 	err = m.checkForDeletes(receivedMessage)
 	if err != nil {
 		return err
@@ -870,6 +879,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			return err
 		}
 	}
+	logger.Debug("checking for notifications")
 
 	// If the chat is not active, create a notification in the center
 	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active {
@@ -881,6 +891,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 
+	logger.Debug("added chat")
 	contact := state.CurrentMessageState.Contact
 	if receivedMessage.EnsName != "" {
 		oldRecord, err := m.ensVerifier.Add(contact.ID, receivedMessage.EnsName, receivedMessage.Clock)
@@ -912,6 +923,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	receivedMessage.New = true
 	state.Response.AddMessage(receivedMessage)
 
+	logger.Debug("finished processing")
 	return nil
 }
 
