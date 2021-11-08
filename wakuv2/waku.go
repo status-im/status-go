@@ -264,7 +264,9 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	return waku, nil
 }
 
-func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, fnForEachPeer func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+type fnApplyToEachPeer func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)
+
+func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
 	for _, addrString := range addresses {
 		if addrString == "" {
 			continue
@@ -272,15 +274,15 @@ func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, fnForEachPe
 
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
-			go w.dnsDiscover(addrString, protocol, fnForEachPeer)
+			go w.dnsDiscover(addrString, protocol, apply)
 		} else {
 			// It's a normal multiaddress
-			w.addPeerFromString(addrString, protocol, fnForEachPeer)
+			w.addPeerFromString(addrString, protocol, apply)
 		}
 	}
 }
 
-func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -292,6 +294,7 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 		w.dnsAddressCacheLock.Lock()
 		var err error
 		multiaddresses, err = discovery.RetrieveNodes(ctx, enrtreeAddress)
+		w.dnsAddressCache[enrtreeAddress] = multiaddresses
 		w.dnsAddressCacheLock.Unlock()
 		if err != nil {
 			log.Warn("dns discovery error ", err)
@@ -304,7 +307,7 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 	}
 }
 
-func (w *Waku) addPeerFromString(addrString string, protocol libp2pproto.ID, apply func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)) {
+func (w *Waku) addPeerFromString(addrString string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
 	addr, err := multiaddr.NewMultiaddr(addrString)
 	if err != nil {
 		log.Warn("invalid peer multiaddress", addrString, err)
