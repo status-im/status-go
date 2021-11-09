@@ -236,9 +236,10 @@ type WakuStore struct {
 }
 
 // NewWakuStore creates a WakuStore using an specific MessageProvider for storing the messages
-func NewWakuStore(p MessageProvider, maxNumberOfMessages int, maxRetentionDuration time.Duration) *WakuStore {
+func NewWakuStore(host host.Host, p MessageProvider, maxNumberOfMessages int, maxRetentionDuration time.Duration) *WakuStore {
 	wakuStore := new(WakuStore)
 	wakuStore.msgProvider = p
+	wakuStore.h = host
 	wakuStore.messageQueue = NewMessageQueue(maxNumberOfMessages, maxRetentionDuration)
 	return wakuStore
 }
@@ -249,13 +250,12 @@ func (store *WakuStore) SetMessageProvider(p MessageProvider) {
 }
 
 // Start initializes the WakuStore by enabling the protocol and fetching records from a message provider
-func (store *WakuStore) Start(ctx context.Context, h host.Host) {
+func (store *WakuStore) Start(ctx context.Context) {
 	if store.started {
 		return
 	}
 
 	store.started = true
-	store.h = h
 	store.ctx = ctx
 	store.MsgC = make(chan *protocol.Envelope, 1024)
 

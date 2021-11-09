@@ -128,7 +128,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 }
 
 func (w *WakuNode) Start() error {
-	w.store = store.NewWakuStore(w.opts.messageProvider, w.opts.maxMessages, w.opts.maxDuration)
+	w.store = store.NewWakuStore(w.host, w.opts.messageProvider, w.opts.maxMessages, w.opts.maxDuration)
 	if w.opts.enableStore {
 		w.startStore()
 	}
@@ -265,7 +265,7 @@ func (w *WakuNode) mountRendezvous() error {
 }
 
 func (w *WakuNode) startStore() {
-	w.store.Start(w.ctx, w.host)
+	w.store.Start(w.ctx)
 
 	if w.opts.shouldResume {
 		// TODO: extract this to a function and run it when you go offline

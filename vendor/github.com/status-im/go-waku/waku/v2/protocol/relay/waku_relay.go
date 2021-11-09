@@ -229,9 +229,38 @@ func (w *WakuRelay) Subscribe(ctx context.Context, topic *Topic) (*Subscription,
 	return subscription, nil
 }
 
+func (w *WakuRelay) Unsubscribe(ctx context.Context, topic Topic) error {
+	if _, ok := w.topics[topic]; !ok {
+		return fmt.Errorf("topics %s is not subscribed", (string)(topic))
+	}
+	log.Info("Unsubscribing from topic ", topic)
+	delete(w.topics, topic)
+
+	for _, sub := range w.subscriptions[topic] {
+		sub.Unsubscribe()
+	}
+
+	w.relaySubs[topic].Cancel()
+	delete(w.relaySubs, topic)
+
+	err := w.wakuRelayTopics[topic].Close()
+	if err != nil {
+		return err
+	}
+	delete(w.wakuRelayTopics, topic)
+
+	return nil
+}
+
 func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <-chan *pubsub.Message {
 	msgChannel := make(chan *pubsub.Message, 1024)
 	go func(msgChannel chan *pubsub.Message) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Debug("recovered msgChannel")
+			}
+		}()
+
 		for {
 			msg, err := sub.Next(ctx)
 			if err != nil {
@@ -266,6 +295,9 @@ func (w *WakuRelay) subscribeToTopic(t Topic, subscription *Subscription, sub *p
 			}
 			// TODO: if there are no more relay subscriptions, close the pubsub subscription
 		case msg := <-subChannel:
+			if msg == nil {
+				return
+			}
 			stats.Record(ctx, metrics.Messages.M(1))
 			wakuMessage := &pb.WakuMessage{}
 			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {

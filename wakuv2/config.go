@@ -31,6 +31,7 @@ type Config struct {
 	PersistPeers           bool     `toml:",omitempty"`
 	PeerExchange           bool     `toml:",omitempty"`
 	KeepAliveInterval      int      `toml:",omitempty"`
+	MinPeersForRelay       int      `toml:",omitempty"`
 	LightClient            bool     `toml:",omitempty"`
 	RelayNodes             []string `toml:",omitempty"`
 	StoreNodes             []string `toml:",omitempty"`
@@ -47,4 +48,5 @@ var DefaultConfig = Config{
 	Port:              60000,
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
+	MinPeersForRelay:  2, // TODO: determine correct value with Vac team
 }
