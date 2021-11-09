@@ -26,9 +26,10 @@ type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
 	CommunityInfoFound(community *communities.Community)
 	MessengerResponse(response *MessengerResponse)
-	HistoryRequestStarted()
-	HistoryRequestCompleted()
-	HistoryRequestFailed(err error)
+	HistoryRequestStarted(requestID string, numBatches int)
+	HistoryRequestBatchProcessed(requestID string, batchIndex int, batchNum int)
+	HistoryRequestCompleted(requestID string)
+	HistoryRequestFailed(requestID string, err error)
 }
 
 type config struct {
