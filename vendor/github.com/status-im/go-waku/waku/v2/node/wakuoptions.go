@@ -37,6 +37,8 @@ type WakuNodeParameters struct {
 	shouldResume    bool
 	storeMsgs       bool
 	messageProvider store.MessageProvider
+	maxMessages     int
+	maxDuration     time.Duration
 
 	enableRendezvous       bool
 	enableRendezvousServer bool
@@ -47,15 +49,17 @@ type WakuNodeParameters struct {
 
 	enableLightPush bool
 
-	connStatusChan chan ConnStatus
+	connStatusC chan ConnStatus
 }
 
 type WakuNodeOption func(*WakuNodeParameters) error
 
+// MultiAddresses return the list of multiaddresses configured in the node
 func (w WakuNodeParameters) MultiAddresses() []ma.Multiaddr {
 	return w.multiAddr
 }
 
+// Identity returns a libp2p option containing the identity used by the node
 func (w WakuNodeParameters) Identity() config.Option {
 	return libp2p.Identity(*w.privKey)
 }
@@ -134,6 +138,8 @@ func WithWakuRelay(opts ...pubsub.Option) WakuNodeOption {
 	}
 }
 
+// WithRendezvous is a WakuOption used to enable go-waku-rendezvous discovery.
+// It accepts an optional list of DiscoveryOpt options
 func WithRendezvous(discoverOpts ...pubsub.DiscoverOpt) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRendezvous = true
@@ -142,6 +148,8 @@ func WithRendezvous(discoverOpts ...pubsub.DiscoverOpt) WakuNodeOption {
 	}
 }
 
+// WithRendezvousServer is a WakuOption used to set the node as a rendezvous
+// point, using an specific storage for the peer information
 func WithRendezvousServer(storage rendezvous.Storage) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRendezvousServer = true
@@ -171,6 +179,19 @@ func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 	}
 }
 
+// WithWakuStoreAndRetentionPolicy enables the Waku V2 Store protocol, storing them in an optional message provider
+// applying an specific retention policy
+func WithWakuStoreAndRetentionPolicy(shouldResume bool, maxDuration time.Duration, maxMessages int) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableStore = true
+		params.storeMsgs = true
+		params.shouldResume = shouldResume
+		params.maxDuration = maxDuration
+		params.maxMessages = maxMessages
+		return nil
+	}
+}
+
 // WithMessageProvider is a WakuNodeOption that sets the MessageProvider
 // used to store and retrieve persisted messages
 func WithMessageProvider(s store.MessageProvider) WakuNodeOption {
@@ -188,6 +209,8 @@ func WithLightPush() WakuNodeOption {
 	}
 }
 
+// WithKeepAlive is a WakuNodeOption used to set the interval of time when
+// each peer will be ping to keep the TCP connection alive
 func WithKeepAlive(t time.Duration) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.keepAliveInterval = t
@@ -195,9 +218,12 @@ func WithKeepAlive(t time.Duration) WakuNodeOption {
 	}
 }
 
-func WithConnStatusChan(connStatusChan chan ConnStatus) WakuNodeOption {
+// WithConnectionStatusChannel is a WakuNodeOption used to set a channel where the
+// connection status changes will be pushed to. It's useful to identify when peer
+// connections and disconnections occur
+func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.connStatusChan = connStatusChan
+		params.connStatusC = connStatus
 		return nil
 	}
 }

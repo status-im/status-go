@@ -9,14 +9,12 @@ import (
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
-	utils "github.com/status-im/go-waku/waku/v2/utils"
 )
 
 var log = logging.Logger("waku_lightpush")
@@ -44,14 +42,18 @@ func NewWakuLightPush(ctx context.Context, h host.Host, relay *relay.WakuRelay) 
 }
 
 func (wakuLP *WakuLightPush) Start() error {
-	if wakuLP.relay == nil {
-		return errors.New("relay is required")
+	if wakuLP.IsClientOnly() {
+		return errors.New("relay is required, without it, it is only a client and cannot be started")
 	}
 
 	wakuLP.h.SetStreamHandlerMatch(LightPushID_v20beta1, protocol.PrefixTextMatch(string(LightPushID_v20beta1)), wakuLP.onRequest)
 	log.Info("Light Push protocol started")
 
 	return nil
+}
+
+func (wakuLp *WakuLightPush) IsClientOnly() bool {
+	return wakuLp.relay == nil
 }
 
 func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
@@ -73,11 +75,11 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 
 	if requestPushRPC.Query != nil {
 		log.Info("lightpush push request")
-		pubSubTopic := relay.Topic(requestPushRPC.Query.PubsubTopic)
-		message := requestPushRPC.Query.Message
-
 		response := new(pb.PushResponse)
-		if wakuLP.relay != nil {
+		if !wakuLP.IsClientOnly() {
+			pubSubTopic := relay.Topic(requestPushRPC.Query.PubsubTopic)
+			message := requestPushRPC.Query.Message
+
 			// TODO: Assumes success, should probably be extended to check for network, peers, etc
 			// It might make sense to use WithReadiness option here?
 
@@ -118,56 +120,10 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 	}
 }
 
-type LightPushParameters struct {
-	selectedPeer peer.ID
-	requestId    []byte
-
-	lp *WakuLightPush
-}
-
-type LightPushOption func(*LightPushParameters)
-
-func WithPeer(p peer.ID) LightPushOption {
-	return func(params *LightPushParameters) {
-		params.selectedPeer = p
-	}
-}
-
-func WithAutomaticPeerSelection() LightPushOption {
-	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeer(params.lp.h, string(LightPushID_v20beta1))
-		if err == nil {
-			params.selectedPeer = *p
-		} else {
-			log.Info("Error selecting peer: ", err)
-		}
-	}
-}
-
-func WithRequestId(requestId []byte) LightPushOption {
-	return func(params *LightPushParameters) {
-		params.requestId = requestId
-	}
-}
-
-func WithAutomaticRequestId() LightPushOption {
-	return func(params *LightPushParameters) {
-		params.requestId = protocol.GenerateRequestId()
-	}
-}
-
-func DefaultOptions() []LightPushOption {
-	return []LightPushOption{
-		WithAutomaticRequestId(),
-		WithAutomaticPeerSelection(),
-	}
-}
-
 func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, opts ...LightPushOption) (*pb.PushResponse, error) {
 	params := new(LightPushParameters)
-	params.lp = wakuLP
 
-	optList := DefaultOptions()
+	optList := DefaultOptions(wakuLP.h)
 	optList = append(optList, opts...)
 	for _, opt := range optList {
 		opt(params)
@@ -220,11 +176,11 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	return pushResponseRPC.Response, nil
 }
 
-func (w *WakuLightPush) Stop() {
-	w.h.RemoveStreamHandler(LightPushID_v20beta1)
+func (wakuLP *WakuLightPush) Stop() {
+	wakuLP.h.RemoveStreamHandler(LightPushID_v20beta1)
 }
 
-func (w *WakuLightPush) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic, opts ...LightPushOption) ([]byte, error) {
+func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *pb.WakuMessage, topic *relay.Topic, opts ...LightPushOption) ([]byte, error) {
 	if message == nil {
 		return nil, errors.New("message can't be null")
 	}
@@ -233,7 +189,7 @@ func (w *WakuLightPush) Publish(ctx context.Context, message *pb.WakuMessage, to
 	req.Message = message
 	req.PubsubTopic = string(relay.GetTopic(topic))
 
-	response, err := w.request(ctx, req, opts...)
+	response, err := wakuLP.request(ctx, req, opts...)
 	if err != nil {
 		return nil, err
 	}

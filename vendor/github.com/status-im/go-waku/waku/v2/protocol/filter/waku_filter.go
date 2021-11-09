@@ -46,29 +46,19 @@ type (
 		ContentTopics []string
 	}
 
-	// @TODO MAYBE MORE INFO?
-	Filters map[string]Filter
-
-	Subscriber struct {
-		peer      peer.ID
-		requestId string
-		filter    pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
-	}
-
 	FilterSubscription struct {
 		RequestID string
 		Peer      peer.ID
 	}
 
-	MessagePushHandler func(requestId string, msg pb.MessagePush)
-
 	WakuFilter struct {
-		ctx         context.Context
-		h           host.Host
-		subscribers []Subscriber
-		isFullNode  bool
-		pushHandler MessagePushHandler
-		MsgC        chan *protocol.Envelope
+		ctx        context.Context
+		h          host.Host
+		isFullNode bool
+		MsgC       chan *protocol.Envelope
+
+		filters     *FilterMap
+		subscribers *Subscribers
 	}
 )
 
@@ -101,29 +91,6 @@ func DefaultOptions() []FilterSubscribeOption {
 	}
 }
 
-func (filters *Filters) Notify(msg *pb.WakuMessage, requestId string) {
-	for key, filter := range *filters {
-		envelope := protocol.NewEnvelope(msg, filter.Topic)
-
-		// We do this because the key for the filter is set to the requestId received from the filter protocol.
-		// This means we do not need to check the content filter explicitly as all MessagePushs already contain
-		// the requestId of the coresponding filter.
-		if requestId != "" && requestId == key {
-			filter.Chan <- envelope
-			continue
-		}
-
-		// TODO: In case of no topics we should either trigger here for all messages,
-		// or we should not allow such filter to exist in the first place.
-		for _, contentTopic := range filter.ContentFilters {
-			if msg.ContentTopic == contentTopic {
-				filter.Chan <- envelope
-				break
-			}
-		}
-	}
-}
-
 func (wf *WakuFilter) onRequest(s network.Stream) {
 	defer s.Close()
 
@@ -142,7 +109,9 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 	if filterRPCRequest.Push != nil && len(filterRPCRequest.Push.Messages) > 0 {
 		// We're on a light node.
 		// This is a message push coming from a full node.
-		wf.pushHandler(filterRPCRequest.RequestId, *filterRPCRequest.Push)
+		for _, message := range filterRPCRequest.Push.Messages {
+			wf.filters.Notify(message, filterRPCRequest.RequestId) // Trigger filter handlers on a light node
+		}
 
 		log.Info("filter light node, received a message push. ", len(filterRPCRequest.Push.Messages), " messages")
 		stats.Record(wf.ctx, metrics.Messages.M(int64(len(filterRPCRequest.Push.Messages))))
@@ -151,52 +120,16 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 		// This is a filter request coming from a light node.
 		if filterRPCRequest.Request.Subscribe {
 			subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
-			wf.subscribers = append(wf.subscribers, subscriber)
-			log.Info("filter full node, add a filter subscriber: ", subscriber.peer)
+			len := wf.subscribers.Append(subscriber)
 
-			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len(wf.subscribers))))
+			log.Info("filter full node, add a filter subscriber: ", subscriber.peer)
+			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len)))
 		} else {
 			peerId := s.Conn().RemotePeer()
+			wf.subscribers.RemoveContentFilters(peerId, filterRPCRequest.Request.ContentFilters)
+
 			log.Info("filter full node, remove a filter subscriber: ", peerId.Pretty())
-			contentFilters := filterRPCRequest.Request.ContentFilters
-			var peerIdsToRemove []peer.ID
-			for _, subscriber := range wf.subscribers {
-				if subscriber.peer != peerId {
-					continue
-				}
-
-				// make sure we delete the content filter
-				// if no more topics are left
-				for i, contentFilter := range contentFilters {
-					subCfs := subscriber.filter.ContentFilters
-					for _, cf := range subCfs {
-						if cf.ContentTopic == contentFilter.ContentTopic {
-							l := len(subCfs) - 1
-							subCfs[l], subCfs[i] = subCfs[i], subCfs[l]
-							subscriber.filter.ContentFilters = subCfs[:l]
-						}
-					}
-				}
-
-				if len(subscriber.filter.ContentFilters) == 0 {
-					peerIdsToRemove = append(peerIdsToRemove, subscriber.peer)
-				}
-			}
-
-			// make sure we delete the subscriber
-			// if no more content filters left
-			for _, peerId := range peerIdsToRemove {
-				for i, s := range wf.subscribers {
-					if s.peer == peerId {
-						l := len(wf.subscribers) - 1
-						wf.subscribers[l], wf.subscribers[i] = wf.subscribers[i], wf.subscribers[l]
-						wf.subscribers = wf.subscribers[:l]
-						break
-					}
-				}
-			}
-
-			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len(wf.subscribers))))
+			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(wf.subscribers.Length())))
 		}
 	} else {
 		log.Error("can't serve request")
@@ -204,7 +137,7 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 	}
 }
 
-func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, handler MessagePushHandler) *WakuFilter {
+func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool) *WakuFilter {
 	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
 	if err != nil {
 		log.Error(err)
@@ -214,8 +147,9 @@ func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, handler
 	wf.ctx = ctx
 	wf.MsgC = make(chan *protocol.Envelope)
 	wf.h = host
-	wf.pushHandler = handler
 	wf.isFullNode = isFullNode
+	wf.filters = NewFilterMap()
+	wf.subscribers = NewSubscribers()
 
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
 	go wf.FilterListener()
@@ -229,6 +163,29 @@ func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, handler
 	return wf
 }
 
+func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) error {
+	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*pb.WakuMessage{msg}}}
+
+	conn, err := wf.h.NewStream(wf.ctx, peer.ID(subscriber.peer), FilterID_v20beta1)
+	// TODO: keep track of errors to automatically unsubscribe a peer?
+	if err != nil {
+		// @TODO more sophisticated error handling here
+		log.Error("failed to open peer stream")
+		//waku_filter_errors.inc(labelValues = [dialFailure])
+		return err
+	}
+
+	defer conn.Close()
+	writer := protoio.NewDelimitedWriter(conn)
+	err = writer.WriteMsg(pushRPC)
+	if err != nil {
+		log.Error("failed to push messages to remote peer")
+		return nil
+	}
+
+	return nil
+}
+
 func (wf *WakuFilter) FilterListener() {
 	// This function is invoked for each message received
 	// on the full node in context of Waku2-Filter
@@ -237,7 +194,7 @@ func (wf *WakuFilter) FilterListener() {
 		topic := envelope.PubsubTopic()
 		// Each subscriber is a light node that earlier on invoked
 		// a FilterRequest on this node
-		for _, subscriber := range wf.subscribers {
+		for subscriber := range wf.subscribers.Items() {
 			if subscriber.filter.Topic != "" && subscriber.filter.Topic != topic {
 				log.Info("Subscriber's filter pubsubTopic does not match message topic", subscriber.filter.Topic, topic)
 				continue
@@ -246,26 +203,10 @@ func (wf *WakuFilter) FilterListener() {
 			for _, filter := range subscriber.filter.ContentFilters {
 				if msg.ContentTopic == filter.ContentTopic {
 					log.Info("found matching contentTopic ", filter, msg)
-					msgArr := []*pb.WakuMessage{msg}
 					// Do a message push to light node
-					pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: msgArr}}
-					log.Info("pushing a message to light node: ", pushRPC)
-
-					conn, err := wf.h.NewStream(wf.ctx, peer.ID(subscriber.peer), FilterID_v20beta1)
-					// TODO: keep track of errors to automatically unsubscribe a peer?
-					if err != nil {
-						// @TODO more sophisticated error handling here
-						log.Error("failed to open peer stream")
-						//waku_filter_errors.inc(labelValues = [dialFailure])
+					log.Info("pushing messages to light node: ", subscriber.peer)
+					if err := wf.pushMessage(subscriber, msg); err != nil {
 						return err
-					}
-
-					defer conn.Close()
-					writer := protoio.NewDelimitedWriter(conn)
-					err = writer.WriteMsg(pushRPC)
-					if err != nil {
-						log.Error("failed to push messages to remote peer")
-						return nil
 					}
 
 				}
@@ -286,7 +227,7 @@ func (wf *WakuFilter) FilterListener() {
 // Having a FilterRequest struct,
 // select a peer with filter support, dial it,
 // and submit FilterRequest wrapped in FilterRPC
-func (wf *WakuFilter) Subscribe(ctx context.Context, filter ContentFilter, opts ...FilterSubscribeOption) (subscription *FilterSubscription, err error) {
+func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFilter, opts ...FilterSubscribeOption) (subscription *FilterSubscription, err error) {
 	params := new(FilterSubscribeParameters)
 	params.host = wf.h
 
@@ -338,7 +279,7 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, filter ContentFilter, opts 
 	return
 }
 
-func (wf *WakuFilter) Unsubscribe(ctx context.Context, filter ContentFilter, peer peer.ID) error {
+func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilter, peer peer.ID) error {
 	conn, err := wf.h.NewStream(ctx, peer, FilterID_v20beta1)
 
 	if err != nil {
@@ -351,13 +292,13 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, filter ContentFilter, pee
 	id := protocol.GenerateRequestId()
 
 	var contentFilters []*pb.FilterRequest_ContentFilter
-	for _, ct := range filter.ContentTopics {
+	for _, ct := range contentFilter.ContentTopics {
 		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
 	}
 
 	request := pb.FilterRequest{
 		Subscribe:      false,
-		Topic:          filter.Topic,
+		Topic:          contentFilter.Topic,
 		ContentFilters: contentFilters,
 	}
 
@@ -373,4 +314,103 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, filter ContentFilter, pee
 
 func (wf *WakuFilter) Stop() {
 	wf.h.RemoveStreamHandler(FilterID_v20beta1)
+	wf.filters.RemoveAll()
+}
+
+func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...FilterSubscribeOption) (filterID string, theFilter Filter, err error) {
+	// TODO: check if there's an existing pubsub topic that uses the same peer. If so, reuse filter, and return same channel and filterID
+
+	// Registers for messages that match a specific filter. Triggers the handler whenever a message is received.
+	// ContentFilterChan takes MessagePush structs
+	remoteSubs, err := wf.requestSubscription(ctx, f, opts...)
+	if err != nil || remoteSubs.RequestID == "" {
+		// Failed to subscribe
+		log.Error("remote subscription to filter failed", err)
+		return
+	}
+
+	// Register handler for filter, whether remote subscription succeeded or not
+
+	filterID = remoteSubs.RequestID
+	theFilter = Filter{
+		PeerID:         remoteSubs.Peer,
+		Topic:          f.Topic,
+		ContentFilters: f.ContentTopics,
+		Chan:           make(chan *protocol.Envelope, 1024), // To avoid blocking
+	}
+
+	wf.filters.Set(filterID, theFilter)
+
+	return
+}
+
+// UnsubscribeFilterByID removes a subscription to a filter node completely
+// using the filterID returned when the subscription was created
+func (wf *WakuFilter) UnsubscribeFilterByID(ctx context.Context, filterID string) error {
+
+	var f Filter
+	var ok bool
+
+	if f, ok = wf.filters.Get(filterID); !ok {
+		return errors.New("filter not found")
+	}
+
+	cf := ContentFilter{
+		Topic:         f.Topic,
+		ContentTopics: f.ContentFilters,
+	}
+
+	err := wf.Unsubscribe(ctx, cf, f.PeerID)
+	if err != nil {
+		return err
+	}
+
+	wf.filters.Delete(filterID)
+
+	return nil
+}
+
+// Unsubscribe filter removes content topics from a filter subscription. If all
+// the contentTopics are removed the subscription is dropped completely
+func (wf *WakuFilter) UnsubscribeFilter(ctx context.Context, cf ContentFilter) error {
+	// Remove local filter
+	var idsToRemove []string
+	for filterMapItem := range wf.filters.Items() {
+		f := filterMapItem.Value
+		id := filterMapItem.Key
+
+		if f.Topic != cf.Topic {
+			continue
+		}
+
+		// Send message to full node in order to unsubscribe
+		err := wf.Unsubscribe(ctx, cf, f.PeerID)
+		if err != nil {
+			return err
+		}
+
+		// Iterate filter entries to remove matching content topics
+		// make sure we delete the content filter
+		// if no more topics are left
+		for _, cfToDelete := range cf.ContentTopics {
+			for i, cf := range f.ContentFilters {
+				if cf == cfToDelete {
+					l := len(f.ContentFilters) - 1
+					f.ContentFilters[l], f.ContentFilters[i] = f.ContentFilters[i], f.ContentFilters[l]
+					f.ContentFilters = f.ContentFilters[:l]
+					break
+				}
+
+			}
+			if len(f.ContentFilters) == 0 {
+				idsToRemove = append(idsToRemove, id)
+			}
+		}
+	}
+
+	for _, rId := range idsToRemove {
+		wf.filters.Delete(rId)
+	}
+
+	return nil
 }

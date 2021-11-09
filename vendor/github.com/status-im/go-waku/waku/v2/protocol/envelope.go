@@ -2,6 +2,9 @@ package protocol
 
 import "github.com/status-im/go-waku/waku/v2/protocol/pb"
 
+// Envelope contains information about the pubsub topic of a WakuMessage
+// and a hash used to identify a message based on the bytes of a WakuMessage
+// protobuffer
 type Envelope struct {
 	msg         *pb.WakuMessage
 	pubsubTopic string
