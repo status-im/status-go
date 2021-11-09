@@ -80,6 +80,7 @@ const requestTimeout = 5 * time.Second
 
 type settings struct {
 	LightClient            bool            // Indicates if the node is a light client
+	MinPeersForRelay       int             // Indicates the minimum number of peers required for using Relay Protocol instead of Lightpush
 	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
 	EnableConfirmations    bool            // Enable sending message confirmations
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
@@ -154,6 +155,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 		MaxMsgSize:             cfg.MaxMessageSize,
 		SoftBlacklistedPeerIDs: make(map[string]bool),
 		LightClient:            cfg.LightClient,
+		MinPeersForRelay:       cfg.MinPeersForRelay,
 	}
 
 	waku.filters = common.NewFilters()
@@ -760,15 +762,23 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
+func (w *Waku) notEnoughPeers() bool {
+	topic := string(relay.GetTopic(nil))
+	numPeers := len(w.node.Relay().PubSub().ListPeers(topic))
+	return numPeers <= w.settings.MinPeersForRelay
+}
+
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	var err error
 	var hash []byte
 
-	if w.settings.LightClient {
+	if w.settings.LightClient || w.notEnoughPeers() {
+		log.Debug("publishing message via lightpush")
 		hash, err = w.node.Lightpush().Publish(context.Background(), msg, nil)
 	} else {
+		log.Debug("publishing message via relay")
 		hash, err = w.node.Relay().Publish(context.Background(), msg, nil)
 	}
 
