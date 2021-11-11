@@ -950,7 +950,7 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		}
 
 		err = m.communitiesManager.SaveRequestToJoin(req)
-		if err != nil {
+		if err != nil && err != communities.ErrOldRequestToJoin {
 			logger.Debug("m.communitiesManager.SaveRequestToJoin error", zap.Error(err))
 			return err
 		}
