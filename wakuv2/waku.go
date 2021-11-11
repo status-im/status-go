@@ -828,6 +828,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 
 	for _, msg := range result.Messages {
 		envelope := wakuprotocol.NewEnvelope(msg, string(relay.DefaultWakuTopic))
+		w.logger.Debug("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
 		_, err = w.OnNewEnvelopes(envelope)
 		if err != nil {
 			return nil, err

@@ -3,13 +3,14 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"log"
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -155,6 +156,8 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 	m.ApplicationMetadataLayerSigPubKey = recoveredKey
 	// Calculate ID using the wrapped record
 	m.ID = MessageID(recoveredKey, m.DecryptedPayload)
+	log.Debug("calculated ID for envelope", "envelopeHash", hexutil.Encode(m.Hash), "messageId", hexutil.Encode(m.ID))
+
 	m.UnwrappedPayload = message.Payload
 	m.Type = message.Type
 	return nil
@@ -197,7 +200,7 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncInstallation))
 
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
-		log.Printf("Sync installation contact")
+		log.Debug("Sync installation contact")
 		return m.unmarshalProtobufData(new(protobuf.SyncInstallationContactV2))
 
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
@@ -268,7 +271,7 @@ func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
 	err := proto.Unmarshal(m.UnwrappedPayload, ptr)
 	if err != nil {
 		m.ParsedMessage = nil
-		log.Printf("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
+		log.Error("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
 	} else {
 		rv = reflect.ValueOf(ptr)
 		elem := rv.Elem()
