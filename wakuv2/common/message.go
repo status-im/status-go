@@ -149,8 +149,7 @@ func NewReceivedMessage(env *protocol.Envelope) *ReceivedMessage {
 // Hash returns the SHA3 hash of the envelope, calculating it if not yet done.
 func (msg *ReceivedMessage) Hash() common.Hash {
 	if (msg.hash == common.Hash{}) {
-		envelopeHash := msg.Envelope.Hash()
-		msg.hash = crypto.Keccak256Hash(envelopeHash[:])
+		msg.hash = common.BytesToHash(msg.Envelope.Hash())
 	}
 	return msg.hash
 }
