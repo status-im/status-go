@@ -122,6 +122,7 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 
 func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, opts ...LightPushOption) (*pb.PushResponse, error) {
 	params := new(LightPushParameters)
+	params.host = wakuLP.h
 
 	optList := DefaultOptions(wakuLP.h)
 	optList = append(optList, opts...)

@@ -40,7 +40,6 @@ type WakuNode struct {
 	filter     *filter.WakuFilter
 	lightPush  *lightpush.WakuLightPush
 	rendezvous *rendezvous.RendezvousService
-	ping       *ping.PingService
 	store      *store.WakuStore
 
 	bcaster v2.Broadcaster
@@ -402,7 +401,6 @@ func (w *WakuNode) Peers() PeerStats {
 func (w *WakuNode) startKeepAlive(t time.Duration) {
 	log.Info("Setting up ping protocol with duration of ", t)
 
-	w.ping = ping.NewPingService(w.host)
 	ticker := time.NewTicker(t)
 
 	go func() {
@@ -416,7 +414,9 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 				// which is not possible when iterating
 				// through Network's peer collection, as it will be empty
 				for _, p := range w.host.Peerstore().Peers() {
-					go pingPeer(w.ctx, w.ping, p)
+					if p != w.host.ID() {
+						go pingPeer(w.ctx, w.host, p)
+					}
 				}
 			case <-w.quit:
 				ticker.Stop()
@@ -426,12 +426,12 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 	}()
 }
 
-func pingPeer(ctx context.Context, pingService *ping.PingService, peer peer.ID) {
+func pingPeer(ctx context.Context, host host.Host, peer peer.ID) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	log.Debug("Pinging ", peer)
-	pr := pingService.Ping(ctx, peer)
+	pr := ping.Ping(ctx, host, peer)
 	select {
 	case res := <-pr:
 		if res.Error != nil {

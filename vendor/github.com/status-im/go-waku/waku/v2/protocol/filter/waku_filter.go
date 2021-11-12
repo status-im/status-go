@@ -85,6 +85,17 @@ func WithAutomaticPeerSelection() FilterSubscribeOption {
 	}
 }
 
+func WithFastestPeerSelection(ctx context.Context) FilterSubscribeOption {
+	return func(params *FilterSubscribeParameters) {
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(FilterID_v20beta1))
+		if err == nil {
+			params.selectedPeer = *p
+		} else {
+			log.Info("Error selecting peer: ", err)
+		}
+	}
+}
+
 func DefaultOptions() []FilterSubscribeOption {
 	return []FilterSubscribeOption{
 		WithAutomaticPeerSelection(),

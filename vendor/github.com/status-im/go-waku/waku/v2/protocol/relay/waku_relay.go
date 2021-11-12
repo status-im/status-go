@@ -27,7 +27,8 @@ var log = logging.Logger("wakurelay")
 type Topic string
 
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
-const DefaultWakuTopic Topic = "/waku/2/default-waku/proto"
+
+var DefaultWakuTopic Topic = Topic(waku_proto.DefaultPubsubTopic().String())
 
 type WakuRelay struct {
 	host   host.Host
