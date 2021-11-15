@@ -1,15 +1,22 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"math/rand"
+	"sync"
+	"time"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
 var log = logging.Logger("utils")
+
+var ErrNoPeersAvailable = errors.New("no suitable peers found")
+var PingServiceNotAvailable = errors.New("ping service not available")
 
 // SelectPeer is used to return a random peer that supports a given protocol.
 func SelectPeer(host host.Host, protocolId string) (*peer.ID, error) {
@@ -37,5 +44,71 @@ func SelectPeer(host host.Host, protocolId string) (*peer.ID, error) {
 		return &peers[rand.Intn(len(peers))], nil // nolint: gosec
 	}
 
-	return nil, errors.New("no suitable peers found")
+	return nil, ErrNoPeersAvailable
+}
+
+type pingResult struct {
+	p   peer.ID
+	rtt time.Duration
+}
+
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string) (*peer.ID, error) {
+	var peers peer.IDSlice
+	for _, peer := range host.Peerstore().Peers() {
+		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
+		if err != nil {
+			log.Error("error obtaining the protocols supported by peers", err)
+			return nil, err
+		}
+
+		if len(protocols) > 0 {
+			peers = append(peers, peer)
+		}
+	}
+
+	wg := sync.WaitGroup{}
+	waitCh := make(chan struct{})
+	pingCh := make(chan pingResult, 1000)
+
+	go func() {
+		for _, p := range peers {
+			wg.Add(1)
+			go func(p peer.ID) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+				defer cancel()
+				result := <-ping.Ping(ctx, host, p)
+				if result.Error == nil {
+					pingCh <- pingResult{
+						p:   p,
+						rtt: result.RTT,
+					}
+				}
+			}(p)
+		}
+		wg.Wait()
+		close(waitCh)
+		close(pingCh)
+	}()
+
+	select {
+	case <-waitCh:
+		var min *pingResult
+		for p := range pingCh {
+			if min == nil {
+				min = &p
+			} else {
+				if p.rtt < min.rtt {
+					min = &p
+				}
+			}
+		}
+		if min == nil {
+			return nil, ErrNoPeersAvailable
+		} else {
+			return &min.p, nil
+		}
+	case <-ctx.Done():
+		return nil, ErrNoPeersAvailable
+	}
 }

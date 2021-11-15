@@ -1,6 +1,8 @@
 package lightpush
 
 import (
+	"context"
+
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/status-im/go-waku/waku/v2/protocol"
@@ -8,6 +10,7 @@ import (
 )
 
 type LightPushParameters struct {
+	host         host.Host
 	selectedPeer peer.ID
 	requestId    []byte
 }
@@ -23,6 +26,17 @@ func WithPeer(p peer.ID) LightPushOption {
 func WithAutomaticPeerSelection(host host.Host) LightPushOption {
 	return func(params *LightPushParameters) {
 		p, err := utils.SelectPeer(host, string(LightPushID_v20beta1))
+		if err == nil {
+			params.selectedPeer = *p
+		} else {
+			log.Info("Error selecting peer: ", err)
+		}
+	}
+}
+
+func WithFastestPeerSelection(ctx context.Context) LightPushOption {
+	return func(params *LightPushParameters) {
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1))
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
