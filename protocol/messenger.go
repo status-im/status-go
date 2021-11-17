@@ -64,8 +64,8 @@ const (
 	privateChat chatContext = "private-chat"
 )
 
-const emojiResendMinDelay = 30
-const emojiResendMaxCount = 3
+const messageResendMinDelay = 30
+const messageResendMaxCount = 3
 
 var communityAdvertiseIntervalSecond int64 = 60 * 60
 
@@ -140,9 +140,16 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) 
 		err := interceptor.Messenger.processSentMessages(ids)
 		if err != nil {
 			interceptor.Messenger.logger.Info("Messenger failed to process sent messages", zap.Error(err))
+		} else {
+			interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
 		}
+	} else {
+		// NOTE(rasom): In case if interceptor.Messenger is not nil and
+		// some error occurred on processing sent message we don't want
+		// to send envelop.sent signal to the client, thus `else` cause
+		// is necessary.
+		interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
 	}
-	interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
 }
 
 // EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
@@ -404,6 +411,10 @@ func NewMessenger(
 }
 
 func (m *Messenger) processSentMessages(ids []string) error {
+	if m.connectionState.Offline {
+		return errors.New("Can't mark message as sent while offline")
+	}
+
 	for _, id := range ids {
 		rawMessage, err := m.persistence.RawMessageByID(id)
 		if err != nil {
@@ -416,32 +427,42 @@ func (m *Messenger) processSentMessages(ids []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "Can't save raw message marked as sent")
 		}
+
+		err = m.UpdateMessageOutgoingStatus(id, "sent")
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func shouldResendEmojiReaction(message *common.RawMessage, t common.TimeSource) (bool, error) {
-	if message.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION {
-		return false, errors.New("Should resend only emoji reactions")
+func shouldResendMessage(message *common.RawMessage, t common.TimeSource) (bool, error) {
+	if !(message.MessageType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION ||
+		message.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE) {
+		return false, errors.Errorf("Should resend only specific types of messages, can't resend %v", message.MessageType)
 	}
 
 	if message.Sent {
 		return false, errors.New("Should resend only non-sent messages")
 	}
 
-	if message.SendCount > emojiResendMaxCount {
+	if message.SendCount > messageResendMaxCount {
 		return false, nil
 	}
 
 	//exponential backoff depends on how many attempts to send message already made
-	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * emojiResendMinDelay * uint64(time.Second)
+	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * messageResendMinDelay * uint64(time.Second.Milliseconds())
 	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
 	return backoffElapsed, nil
 }
 
-func (m *Messenger) resendExpiredEmojiReactions() error {
-	ids, err := m.persistence.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+func (m *Messenger) resendExpiredMessages() error {
+	if m.connectionState.Offline {
+		return errors.New("offline")
+	}
+
+	ids, err := m.persistence.ExpiredMessagesIDs(messageResendMaxCount)
 	if err != nil {
 		return errors.Wrapf(err, "Can't get expired reactions from db")
 	}
@@ -452,7 +473,21 @@ func (m *Messenger) resendExpiredEmojiReactions() error {
 			return errors.Wrapf(err, "Can't get raw message with id %v", id)
 		}
 
-		if ok, err := shouldResendEmojiReaction(rawMessage, m.getTimesource()); ok {
+		chat, ok := m.allChats.Load(rawMessage.LocalChatID)
+		if !ok {
+			return ErrChatNotFound
+		}
+
+		if !(chat.Public() || chat.CommunityChat()) {
+			return errors.New("Only public chats and community chats messages are resent")
+		}
+
+		ok, err = shouldResendMessage(rawMessage, m.getTimesource())
+		if err != nil {
+			return err
+		}
+
+		if ok {
 			err = m.persistence.SaveRawMessage(rawMessage)
 			if err != nil {
 				return errors.Wrapf(err, "Can't save raw message marked as non-expired")
@@ -462,8 +497,6 @@ func (m *Messenger) resendExpiredEmojiReactions() error {
 			if err != nil {
 				return errors.Wrapf(err, "Can't resend expired message with id %v", rawMessage.ID)
 			}
-		} else {
-			return err
 		}
 	}
 	return nil
@@ -524,7 +557,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
-	m.watchExpiredEmojis()
+	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
 	m.startBackupLoop()
@@ -998,15 +1031,15 @@ func (m *Messenger) watchConnectionChange() {
 	}()
 }
 
-// watchExpiredEmojis regularly checks for expired emojis and invoke their resending
-func (m *Messenger) watchExpiredEmojis() {
-	m.logger.Debug("watching expired emojis")
+// watchExpiredMessages regularly checks for expired emojis and invoke their resending
+func (m *Messenger) watchExpiredMessages() {
+	m.logger.Debug("watching expired messages")
 	go func() {
 		for {
 			select {
 			case <-time.After(time.Second):
 				if m.online() {
-					err := m.resendExpiredEmojiReactions()
+					err := m.resendExpiredMessages()
 					if err != nil {
 						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
 					}

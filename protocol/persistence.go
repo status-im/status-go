@@ -643,7 +643,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 	return
 }
 
-func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string, error) {
+func (db sqlitePersistence) ExpiredMessagesIDs(maxSendCount int) ([]string, error) {
 	ids := []string{}
 
 	rows, err := db.db.Query(`
@@ -652,8 +652,11 @@ func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string
 			FROM
 				raw_messages
 			WHERE
-			message_type = ? AND sent = ? AND send_count <= ?`,
-		protobuf.ApplicationMetadataMessage_EMOJI_REACTION, false, maxSendCount)
+			message_type IN (?, ?) AND sent = ? AND send_count <= ?`,
+		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		false,
+		maxSendCount)
 	if err != nil {
 		return ids, err
 	}

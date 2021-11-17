@@ -2242,7 +2242,7 @@ func (s *MessengerSuite) TestLastSentField() {
 
 func (s *MessengerSuite) TestShouldResendEmoji() {
 	// shouldn't try to resend non-emoji messages.
-	ok, err := shouldResendEmojiReaction(&common.RawMessage{
+	ok, err := shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
 		Sent:        false,
 		SendCount:   2,
@@ -2251,7 +2251,7 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 	s.False(ok)
 
 	// shouldn't try to resend already sent message
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        true,
 		SendCount:   1,
@@ -2260,50 +2260,50 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 	s.False(ok)
 
 	// messages that already sent to many times shouldn't be resend
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        false,
-		SendCount:   emojiResendMaxCount + 1,
+		SendCount:   messageResendMaxCount + 1,
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.False(ok)
 
 	// message sent one time CAN'T be resend in 15 seconds (only after 30)
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        false,
 		SendCount:   1,
-		LastSent:    s.m.getTimesource().GetCurrentTime() - 15*uint64(time.Second),
+		LastSent:    s.m.getTimesource().GetCurrentTime() - 15*uint64(time.Second.Milliseconds()),
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.False(ok)
 
 	// message sent one time CAN be resend in 35 seconds
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        false,
 		SendCount:   1,
-		LastSent:    s.m.getTimesource().GetCurrentTime() - 35*uint64(time.Second),
+		LastSent:    s.m.getTimesource().GetCurrentTime() - 35*uint64(time.Second.Milliseconds()),
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.True(ok)
 
 	// message sent three times CAN'T be resend in 100 seconds (only after 120)
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        false,
 		SendCount:   3,
-		LastSent:    s.m.getTimesource().GetCurrentTime() - 100*uint64(time.Second),
+		LastSent:    s.m.getTimesource().GetCurrentTime() - 100*uint64(time.Second.Milliseconds()),
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.False(ok)
 
 	// message sent tow times CAN be resend in 65 seconds
-	ok, err = shouldResendEmojiReaction(&common.RawMessage{
+	ok, err = shouldResendMessage(&common.RawMessage{
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		Sent:        false,
 		SendCount:   3,
-		LastSent:    s.m.getTimesource().GetCurrentTime() - 125*uint64(time.Second),
+		LastSent:    s.m.getTimesource().GetCurrentTime() - 125*uint64(time.Second.Milliseconds()),
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.True(ok)
@@ -2359,7 +2359,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	s.Equal(1, rawMessage.SendCount)
 
 	//imitate that more than 30 seconds passed since message was sent
-	rawMessage.LastSent = rawMessage.LastSent - 35*uint64(time.Second)
+	rawMessage.LastSent = rawMessage.LastSent - 35*uint64(time.Second.Milliseconds())
 	err = s.m.persistence.SaveRawMessage(rawMessage)
 	s.NoError(err)
 	time.Sleep(2 * time.Second)
