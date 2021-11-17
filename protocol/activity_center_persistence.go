@@ -85,7 +85,8 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		_ = tx.Rollback()
 	}()
 
-	if notification.Type == ActivityCenterNotificationTypeNewOneToOne {
+	if notification.Type == ActivityCenterNotificationTypeNewOneToOne ||
+		notification.Type == ActivityCenterNotificationTypeNewPrivateGroupChat {
 		// Delete other notifications so it pop us again if not currently dismissed
 		_, err = tx.Exec(`DELETE FROM activity_center_notifications WHERE id = ? AND (dismissed OR accepted)`, notification.ID)
 		if err != nil {
