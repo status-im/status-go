@@ -261,14 +261,6 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			PersistPeers:           nodeConfig.WakuV2Config.PersistPeers,
 		}
 
-		if cfg.Host == "" {
-			cfg.Host = wakuv2.DefaultConfig.Host
-		}
-
-		if cfg.DiscoveryLimit == 0 {
-			cfg.DiscoveryLimit = wakuv2.DefaultConfig.DiscoveryLimit
-		}
-
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
 			cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
 		}
