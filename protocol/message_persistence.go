@@ -1328,7 +1328,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	mentionedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND not(seen) != 1 AND clock_value <= ? AND mentioned`, chatID, clock)
+	mentionedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND not(seen) AND clock_value <= ? AND mentioned`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
