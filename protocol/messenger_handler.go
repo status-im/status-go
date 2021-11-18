@@ -65,6 +65,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 	showPushNotification := isActive && messageState.CurrentMessageState.Contact.ID != ourKey
 
+	// wasUserAdded indicates whether the user has been added to the group with this update
+	wasUserAdded := false
 	if chat == nil || waitingForApproval {
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
@@ -104,6 +106,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if !group.IsMember(ourKey) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
+		// A new chat always adds us
+		wasUserAdded = true
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
 		// unless is coming from us or a contact or were waiting for approval
@@ -131,17 +135,19 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return errors.Wrap(err, "failed to create a group with new membership updates")
 		}
 		chat.updateChatFromGroupMembershipChanges(group)
+
+		wasUserAdded = !existingGroup.IsMember(ourKey) &&
+			updateGroup.IsMember(ourKey)
+
 		// Reactivate deleted group chat on re-invite from contact
-		chat.Active = chat.Active || (isActive && group.IsMember(ourKey))
+		chat.Active = chat.Active || (isActive && wasUserAdded)
 
 		// Show push notifications when our key is added to members list and chat is Active
-		showPushNotification = showPushNotification &&
-			!existingGroup.IsMember(ourKey) &&
-			updateGroup.IsMember(ourKey)
+		showPushNotification = showPushNotification && wasUserAdded
 	}
 
 	// Only create a message notification when the user is added, not when removed
-	if !chat.Active && group.IsMember(ourKey) {
+	if !chat.Active && wasUserAdded {
 		chat.Highlight = true
 		m.createMessageNotification(chat, messageState)
 	}
