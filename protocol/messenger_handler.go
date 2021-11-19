@@ -62,7 +62,11 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
 	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
 	ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
+	isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
+	showPushNotification := isActive && messageState.CurrentMessageState.Contact.ID != ourKey
 
+	// wasUserAdded indicates whether the user has been added to the group with this update
+	wasUserAdded := false
 	if chat == nil || waitingForApproval {
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
@@ -102,10 +106,11 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if !group.IsMember(ourKey) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
+		// A new chat always adds us
+		wasUserAdded = true
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
 		// unless is coming from us or a contact or were waiting for approval
-		isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 		newChat.Active = isActive
 		chat = &newChat
 
@@ -115,14 +120,6 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return errors.Wrap(err, "failed to get group creator")
 		}
 
-		profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
-		if err != nil {
-			return errors.Wrap(err, "failed to get profilePicturesVisibility setting")
-		}
-
-		if chat.Active && messageState.CurrentMessageState.Contact.ID != ourKey {
-			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility))
-		}
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
 		if err != nil {
@@ -138,10 +135,32 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return errors.Wrap(err, "failed to create a group with new membership updates")
 		}
 		chat.updateChatFromGroupMembershipChanges(group)
+
+		wasUserAdded = !existingGroup.IsMember(ourKey) &&
+			updateGroup.IsMember(ourKey)
+
+		// Reactivate deleted group chat on re-invite from contact
+		chat.Active = chat.Active || (isActive && wasUserAdded)
+
+		// Show push notifications when our key is added to members list and chat is Active
+		showPushNotification = showPushNotification && wasUserAdded
 	}
 
-	if !chat.Active {
+	// Only create a message notification when the user is added, not when removed
+	if !chat.Active && wasUserAdded {
+		chat.Highlight = true
 		m.createMessageNotification(chat, messageState)
+	}
+
+	profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
+	if err != nil {
+		return errors.Wrap(err, "failed to get profilePicturesVisibility setting")
+	}
+
+	if showPushNotification {
+		// chat is highlighted for new group invites or group re-invites
+		chat.Highlight = true
+		messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility))
 	}
 
 	systemMessages := buildSystemMessages(message.Events, translations)

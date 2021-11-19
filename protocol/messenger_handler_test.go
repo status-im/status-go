@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"testing"
 
@@ -176,4 +177,23 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Notifications(), 1)
 	s.Require().Equal(state.Response.Notifications()[0].Category, localnotifications.CategoryGroupInvite)
+	s.Require().Len(state.Response.Chats(), 1)
+
+	chat := state.Response.Chats()[0]
+
+	// Decline event, setting chat inactive
+	response, err := s.m.LeaveGroupChat(context.Background(), chat.ID, true)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats(), 1)
+
+	chat = response.Chats()[0]
+
+	// If the same response is handled, it should not show another notification & the chat should remain inactive
+	state.Response = &MessengerResponse{}
+	err = s.m.HandleMembershipUpdate(state, chat, *rawMembershipUpdateMessage2, defaultSystemMessagesTranslations)
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Notifications(), 0)
+	s.Require().Len(state.Response.Chats(), 1)
+	s.Require().False(state.Response.Chats()[0].Active)
 }
