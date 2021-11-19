@@ -50,7 +50,7 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 		Hash:  testHash,
 	})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
