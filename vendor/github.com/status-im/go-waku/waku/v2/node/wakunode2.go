@@ -3,6 +3,8 @@ package node
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	logging "github.com/ipfs/go-log"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	p2pproto "github.com/libp2p/go-libp2p-core/protocol"
@@ -20,6 +23,7 @@ import (
 
 	rendezvous "github.com/status-im/go-waku-rendezvous"
 	v2 "github.com/status-im/go-waku/waku/v2"
+	"github.com/status-im/go-waku/waku/v2/discv5"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
@@ -32,6 +36,13 @@ var log = logging.Logger("wakunode")
 
 type Message []byte
 
+type Peer struct {
+	ID        peer.ID
+	Protocols []string
+	Addrs     []ma.Multiaddr
+	Connected bool
+}
+
 type WakuNode struct {
 	host host.Host
 	opts *WakuNodeParameters
@@ -42,11 +53,16 @@ type WakuNode struct {
 	rendezvous *rendezvous.RendezvousService
 	store      *store.WakuStore
 
+	addrChan chan ma.Multiaddr
+
+	discoveryV5 *discv5.DiscoveryV5
+
 	bcaster v2.Broadcaster
 
 	connectionNotif        ConnectionNotifier
 	protocolEventSub       event.Subscription
 	identificationEventSub event.Subscription
+	addressChangesSub      event.Subscription
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -64,6 +80,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 
 	params.libP2POpts = DefaultLibP2POptions
 
+	opts = append(DefaultWakuNodeOptions, opts...)
 	for _, opt := range opts {
 		err := opt(params)
 		if err != nil {
@@ -72,6 +89,14 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
+	// Setting default host address if none was provided
+	if params.hostAddr == nil {
+		err := WithHostAddress(&net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: 0})(params)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+	}
 	if len(params.multiAddr) > 0 {
 		params.libP2POpts = append(params.libP2POpts, libp2p.ListenAddrs(params.multiAddr...))
 	}
@@ -97,12 +122,17 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.ctx = ctx
 	w.opts = params
 	w.quit = make(chan struct{})
+	w.addrChan = make(chan ma.Multiaddr, 1024)
 
 	if w.protocolEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerProtocolsUpdated)); err != nil {
 		return nil, err
 	}
 
 	if w.identificationEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerIdentificationCompleted)); err != nil {
+		return nil, err
+	}
+
+	if w.addressChangesSub, err = host.EventBus().Subscribe(new(event.EvtLocalAddressesUpdated)); err != nil {
 		return nil, err
 	}
 
@@ -119,11 +149,81 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		w.startKeepAlive(w.opts.keepAliveInterval)
 	}
 
-	for _, addr := range w.ListenAddresses() {
-		log.Info("Listening on ", addr)
-	}
+	go w.checkForAddressChanges()
+	go w.onAddrChange()
 
 	return w, nil
+}
+
+func (w *WakuNode) onAddrChange() {
+	for m := range w.addrChan {
+		ipStr, err := m.ValueForProtocol(ma.P_IP4)
+		if err != nil {
+			log.Error(fmt.Sprintf("could not extract ip from ma %s: %s", m, err.Error()))
+			continue
+		}
+		ip := net.ParseIP(ipStr)
+		if !ip.IsLoopback() && !ip.IsUnspecified() {
+			if w.opts.enableDiscV5 {
+				err := w.discoveryV5.UpdateAddr(ip)
+				if err != nil {
+					log.Error(fmt.Sprintf("could not update DiscV5 address with IP %s: %s", ip, err.Error()))
+					continue
+				}
+			}
+		}
+	}
+}
+
+func (w *WakuNode) logAddress(addr ma.Multiaddr) {
+	log.Info("Listening on ", addr)
+
+	// TODO: make this optional depending on DNS Disc being enabled
+	if w.opts.privKey != nil {
+		enr, ip, err := utils.GetENRandIP(addr, w.opts.privKey)
+		if err != nil {
+			log.Error("could not obtain ENR record from multiaddress", err)
+		} else {
+			log.Info(fmt.Sprintf("ENR for IP %s:  %s", ip, enr))
+		}
+	}
+}
+
+func (w *WakuNode) checkForAddressChanges() {
+	addrs := w.ListenAddresses()
+	first := make(chan struct{}, 1)
+	first <- struct{}{}
+	for {
+		select {
+		case <-w.quit:
+			return
+		case <-first:
+			for _, addr := range addrs {
+				w.logAddress(addr)
+			}
+		case <-w.addressChangesSub.Out():
+			newAddrs := w.ListenAddresses()
+			print := false
+			if len(addrs) != len(newAddrs) {
+				print = true
+			} else {
+				for i := range newAddrs {
+					if addrs[i].String() != newAddrs[i].String() {
+						print = true
+						break
+					}
+				}
+			}
+			if print {
+				addrs = newAddrs
+				log.Warn("Change in host multiaddresses")
+				for _, addr := range newAddrs {
+					w.addrChan <- addr
+					w.logAddress(addr)
+				}
+			}
+		}
+	}
 }
 
 func (w *WakuNode) Start() error {
@@ -139,6 +239,17 @@ func (w *WakuNode) Start() error {
 	if w.opts.enableRendezvous {
 		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
 		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
+	}
+
+	if w.opts.enableDiscV5 {
+		err := w.mountDiscV5()
+		if err != nil {
+			return err
+		}
+	}
+
+	if w.opts.enableDiscV5 {
+		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(w.discoveryV5, w.opts.discV5Opts...))
 	}
 
 	err := w.mountRelay(w.opts.wOpts...)
@@ -178,12 +289,14 @@ func (w *WakuNode) Stop() {
 	defer w.cancel()
 
 	close(w.quit)
+	close(w.addrChan)
 
 	w.bcaster.Close()
 
 	defer w.connectionNotif.Close()
 	defer w.protocolEventSub.Close()
 	defer w.identificationEventSub.Close()
+	defer w.addressChangesSub.Close()
 
 	if w.rendezvous != nil {
 		w.rendezvous.Stop()
@@ -233,6 +346,14 @@ func (w *WakuNode) Lightpush() *lightpush.WakuLightPush {
 	return w.lightPush
 }
 
+func (w *WakuNode) DiscV5() *discv5.DiscoveryV5 {
+	return w.discoveryV5
+}
+
+func (w *WakuNode) Broadcaster() v2.Broadcaster {
+	return w.bcaster
+}
+
 func (w *WakuNode) mountRelay(opts ...pubsub.Option) error {
 	var err error
 	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, w.bcaster, opts...)
@@ -241,7 +362,7 @@ func (w *WakuNode) mountRelay(opts ...pubsub.Option) error {
 	}
 
 	if w.opts.enableRelay {
-		_, err = w.relay.Subscribe(w.ctx, nil)
+		_, err = w.relay.Subscribe(w.ctx)
 		if err != nil {
 			return err
 		}
@@ -250,6 +371,41 @@ func (w *WakuNode) mountRelay(opts ...pubsub.Option) error {
 	// TODO: rlnRelay
 
 	return err
+}
+
+func (w *WakuNode) mountDiscV5() error {
+	wakuFlag := discv5.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilter, w.opts.enableStore, w.opts.enableRelay)
+
+	discV5Options := []discv5.DiscoveryV5Option{
+		discv5.WithBootnodes(w.opts.discV5bootnodes),
+		discv5.WithUDPPort(w.opts.udpPort),
+		discv5.WithAutoUpdate(w.opts.discV5autoUpdate),
+	}
+
+	addr := w.ListenAddresses()[0]
+
+	ipStr, err := addr.ValueForProtocol(ma.P_IP4)
+	if err != nil {
+		return err
+	}
+
+	portStr, err := addr.ValueForProtocol(ma.P_TCP)
+	if err != nil {
+		return err
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return err
+	}
+
+	discoveryV5, err := discv5.NewDiscoveryV5(w.Host(), net.ParseIP(ipStr), port, w.opts.privKey, wakuFlag, discV5Options...)
+	if err != nil {
+		return err
+	}
+
+	w.discoveryV5 = discoveryV5
+	return nil
 }
 
 func (w *WakuNode) mountRendezvous() error {
@@ -270,14 +426,16 @@ func (w *WakuNode) startStore() {
 		// TODO: extract this to a function and run it when you go offline
 		// TODO: determine if a store is listening to a topic
 		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+
 			for {
-				t := time.NewTicker(time.Second)
 			peerVerif:
 				for {
 					select {
 					case <-w.quit:
 						return
-					case <-t.C:
+					case <-ticker.C:
 						_, err := utils.SelectPeer(w.host, string(store.StoreID_v20beta3))
 						if err == nil {
 							break peerVerif
@@ -383,7 +541,7 @@ func (w *WakuNode) PeerCount() int {
 	return len(w.host.Network().Peers())
 }
 
-func (w *WakuNode) Peers() PeerStats {
+func (w *WakuNode) PeerStats() PeerStats {
 	p := make(PeerStats)
 	for _, peerID := range w.host.Network().Peers() {
 		protocols, err := w.host.Peerstore().GetProtocols(peerID)
@@ -395,6 +553,26 @@ func (w *WakuNode) Peers() PeerStats {
 	return p
 }
 
+func (w *WakuNode) Peers() ([]*Peer, error) {
+	var peers []*Peer
+	for _, peerId := range w.host.Peerstore().Peers() {
+		connected := w.host.Network().Connectedness(peerId) == network.Connected
+		protocols, err := w.host.Peerstore().GetProtocols(peerId)
+		if err != nil {
+			return nil, err
+		}
+
+		addrs := w.host.Peerstore().Addrs(peerId)
+		peers = append(peers, &Peer{
+			ID:        peerId,
+			Protocols: protocols,
+			Connected: connected,
+			Addrs:     addrs,
+		})
+	}
+	return peers, nil
+}
+
 // startKeepAlive creates a go routine that periodically pings connected peers.
 // This is necessary because TCP connections are automatically closed due to inactivity,
 // and doing a ping will avoid this (with a small bandwidth cost)
@@ -402,6 +580,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 	log.Info("Setting up ping protocol with duration of ", t)
 
 	ticker := time.NewTicker(t)
+	defer ticker.Stop()
 
 	go func() {
 		for {
@@ -419,7 +598,6 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 					}
 				}
 			case <-w.quit:
-				ticker.Stop()
 				return
 			}
 		}
@@ -435,9 +613,9 @@ func pingPeer(ctx context.Context, host host.Host, peer peer.ID) {
 	select {
 	case res := <-pr:
 		if res.Error != nil {
-			log.Error(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
+			log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
 		}
 	case <-ctx.Done():
-		log.Error(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
+		log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
 	}
 }

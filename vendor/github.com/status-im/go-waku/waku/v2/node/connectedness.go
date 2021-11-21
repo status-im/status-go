@@ -77,7 +77,7 @@ func (c ConnectionNotifier) Close() {
 func (w *WakuNode) sendConnStatus() {
 	isOnline, hasHistory := w.Status()
 	if w.connStatusChan != nil {
-		connStatus := ConnStatus{IsOnline: isOnline, HasHistory: hasHistory, Peers: w.Peers()}
+		connStatus := ConnStatus{IsOnline: isOnline, HasHistory: hasHistory, Peers: w.PeerStats()}
 		w.connStatusChan <- connStatus
 	}
 

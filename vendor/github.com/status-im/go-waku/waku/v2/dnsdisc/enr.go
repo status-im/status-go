@@ -1,12 +1,10 @@
-package discovery
+package dnsdisc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/p2p/dnsdisc"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/status-im/go-waku/waku/v2/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -44,7 +42,7 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 	}
 
 	for _, node := range tree.Nodes() {
-		m, err := EnodeToMultiAddr(node)
+		m, err := utils.EnodeToMultiAddr(node)
 		if err != nil {
 			return nil, err
 		}
@@ -53,13 +51,4 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 	}
 
 	return multiAddrs, nil
-}
-
-func EnodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
-	peerID, err := peer.IDFromPublicKey(&ECDSAPublicKey{node.Pubkey()})
-	if err != nil {
-		return nil, err
-	}
-
-	return ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
 }

@@ -24,11 +24,9 @@ import (
 
 var log = logging.Logger("wakurelay")
 
-type Topic string
-
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 
-var DefaultWakuTopic Topic = Topic(waku_proto.DefaultPubsubTopic().String())
+var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
 type WakuRelay struct {
 	host   host.Host
@@ -37,13 +35,12 @@ type WakuRelay struct {
 	bcaster v2.Broadcaster
 
 	// TODO: convert to concurrent maps
-	topics          map[Topic]struct{}
 	topicsMutex     sync.Mutex
-	wakuRelayTopics map[Topic]*pubsub.Topic
-	relaySubs       map[Topic]*pubsub.Subscription
+	wakuRelayTopics map[string]*pubsub.Topic
+	relaySubs       map[string]*pubsub.Subscription
 
 	// TODO: convert to concurrent maps
-	subscriptions      map[Topic][]*Subscription
+	subscriptions      map[string][]*Subscription
 	subscriptionsMutex sync.Mutex
 }
 
@@ -56,10 +53,9 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, opts ...pubsub.Option) (*WakuRelay, error) {
 	w := new(WakuRelay)
 	w.host = h
-	w.topics = make(map[Topic]struct{})
-	w.wakuRelayTopics = make(map[Topic]*pubsub.Topic)
-	w.relaySubs = make(map[Topic]*pubsub.Subscription)
-	w.subscriptions = make(map[Topic][]*Subscription)
+	w.wakuRelayTopics = make(map[string]*pubsub.Topic)
+	w.relaySubs = make(map[string]*pubsub.Subscription)
+	w.subscriptions = make(map[string][]*Subscription)
 	w.bcaster = bcaster
 
 	// default options required by WakuRelay
@@ -96,12 +92,12 @@ func (w *WakuRelay) PubSub() *pubsub.PubSub {
 	return w.pubsub
 }
 
-func (w *WakuRelay) Topics() []Topic {
+func (w *WakuRelay) Topics() []string {
 	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
 
-	var result []Topic
-	for topic := range w.topics {
+	var result []string
+	for topic := range w.relaySubs {
 		result = append(result, topic)
 	}
 	return result
@@ -111,11 +107,10 @@ func (w *WakuRelay) SetPubSub(pubSub *pubsub.PubSub) {
 	w.pubsub = pubSub
 }
 
-func (w *WakuRelay) upsertTopic(topic Topic) (*pubsub.Topic, error) {
+func (w *WakuRelay) upsertTopic(topic string) (*pubsub.Topic, error) {
 	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
 
-	w.topics[topic] = struct{}{}
 	pubSubTopic, ok := w.wakuRelayTopics[topic]
 	if !ok { // Joins topic if node hasn't joined yet
 		newTopic, err := w.pubsub.Join(string(topic))
@@ -128,7 +123,7 @@ func (w *WakuRelay) upsertTopic(topic Topic) (*pubsub.Topic, error) {
 	return pubSubTopic, nil
 }
 
-func (w *WakuRelay) subscribe(topic Topic) (subs *pubsub.Subscription, err error) {
+func (w *WakuRelay) subscribe(topic string) (subs *pubsub.Subscription, err error) {
 	sub, ok := w.relaySubs[topic]
 	if !ok {
 		pubSubTopic, err := w.upsertTopic(topic)
@@ -148,7 +143,7 @@ func (w *WakuRelay) subscribe(topic Topic) (subs *pubsub.Subscription, err error
 	return sub, nil
 }
 
-func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic *Topic) ([]byte, error) {
+func (w *WakuRelay) PublishToTopic(ctx context.Context, message *pb.WakuMessage, topic string) ([]byte, error) {
 	// Publish a `WakuMessage` to a PubSub topic.
 	if w.pubsub == nil {
 		return nil, errors.New("PubSub hasn't been set")
@@ -158,7 +153,7 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic 
 		return nil, errors.New("message can't be null")
 	}
 
-	pubSubTopic, err := w.upsertTopic(GetTopic(topic))
+	pubSubTopic, err := w.upsertTopic(topic)
 
 	if err != nil {
 		return nil, err
@@ -179,12 +174,8 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, topic 
 	return hash, nil
 }
 
-func GetTopic(topic *Topic) Topic {
-	var t Topic = DefaultWakuTopic
-	if topic != nil {
-		t = *topic
-	}
-	return t
+func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage) ([]byte, error) {
+	return w.PublishToTopic(ctx, message, DefaultWakuTopic)
 }
 
 func (w *WakuRelay) Stop() {
@@ -200,11 +191,10 @@ func (w *WakuRelay) Stop() {
 	w.subscriptions = nil
 }
 
-func (w *WakuRelay) Subscribe(ctx context.Context, topic *Topic) (*Subscription, error) {
+func (w *WakuRelay) SubscribeToTopic(ctx context.Context, topic string) (*Subscription, error) {
 	// Subscribes to a PubSub topic.
 	// NOTE The data field SHOULD be decoded as a WakuMessage.
-	t := GetTopic(topic)
-	sub, err := w.subscribe(t)
+	sub, err := w.subscribe(topic)
 
 	if err != nil {
 		return nil, err
@@ -219,23 +209,26 @@ func (w *WakuRelay) Subscribe(ctx context.Context, topic *Topic) (*Subscription,
 	w.subscriptionsMutex.Lock()
 	defer w.subscriptionsMutex.Unlock()
 
-	w.subscriptions[t] = append(w.subscriptions[t], subscription)
+	w.subscriptions[topic] = append(w.subscriptions[topic], subscription)
 
 	if w.bcaster != nil {
 		w.bcaster.Register(subscription.C)
 	}
 
-	go w.subscribeToTopic(t, subscription, sub)
+	go w.subscribeToTopic(topic, subscription, sub)
 
 	return subscription, nil
 }
 
-func (w *WakuRelay) Unsubscribe(ctx context.Context, topic Topic) error {
-	if _, ok := w.topics[topic]; !ok {
+func (w *WakuRelay) Subscribe(ctx context.Context) (*Subscription, error) {
+	return w.SubscribeToTopic(ctx, DefaultWakuTopic)
+}
+
+func (w *WakuRelay) Unsubscribe(ctx context.Context, topic string) error {
+	if _, ok := w.relaySubs[topic]; !ok {
 		return fmt.Errorf("topics %s is not subscribed", (string)(topic))
 	}
 	log.Info("Unsubscribing from topic ", topic)
-	delete(w.topics, topic)
 
 	for _, sub := range w.subscriptions[topic] {
 		sub.Unsubscribe()
@@ -268,7 +261,7 @@ func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <
 				log.Error(fmt.Errorf("subscription failed: %w", err))
 				sub.Cancel()
 				close(msgChannel)
-				for _, subscription := range w.subscriptions[Topic(sub.Topic())] {
+				for _, subscription := range w.subscriptions[sub.Topic()] {
 					subscription.Unsubscribe()
 				}
 			}
@@ -279,7 +272,7 @@ func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <
 	return msgChannel
 }
 
-func (w *WakuRelay) subscribeToTopic(t Topic, subscription *Subscription, sub *pubsub.Subscription) {
+func (w *WakuRelay) subscribeToTopic(t string, subscription *Subscription, sub *pubsub.Subscription) {
 	ctx, err := tag.New(context.Background(), tag.Insert(metrics.KeyType, "relay"))
 	if err != nil {
 		log.Error(err)

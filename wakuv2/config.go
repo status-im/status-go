@@ -39,7 +39,11 @@ type Config struct {
 	LightpushNodes         []string `toml:",omitempty"`
 	Rendezvous             bool     `toml:",omitempty"`
 	WakuRendezvousNodes    []string `toml:",omitempty"`
+	DiscV5BootstrapNodes   []string `toml:",omitempty"`
+	EnableDiscV5           bool     `toml:",omitempty"`
 	DiscoveryLimit         int      `toml:",omitempty"`
+	AutoUpdate             bool     `toml:",omitempty"`
+	UDPPort                int      `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
@@ -49,4 +53,38 @@ var DefaultConfig = Config{
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 	MinPeersForRelay:  2, // TODO: determine correct value with Vac team
+	UDPPort:           9000,
+	AutoUpdate:        true,
+}
+
+func setDefaults(cfg *Config) *Config {
+	if cfg == nil {
+		cfg = new(Config)
+	}
+
+	if cfg.MaxMessageSize == 0 {
+		cfg.MaxMessageSize = DefaultConfig.MaxMessageSize
+	}
+
+	if cfg.Host == "" {
+		cfg.Host = DefaultConfig.Host
+	}
+
+	if cfg.Port == 0 {
+		cfg.Port = DefaultConfig.Port
+	}
+
+	if cfg.KeepAliveInterval == 0 {
+		cfg.KeepAliveInterval = DefaultConfig.KeepAliveInterval
+	}
+
+	if cfg.DiscoveryLimit == 0 {
+		cfg.DiscoveryLimit = DefaultConfig.DiscoveryLimit
+	}
+
+	if cfg.MinPeersForRelay == 0 {
+		cfg.MinPeersForRelay = DefaultConfig.MinPeersForRelay
+	}
+
+	return cfg
 }

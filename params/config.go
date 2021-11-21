@@ -238,6 +238,15 @@ type WakuV2Config struct {
 
 	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
 	PeerExchange bool
+
+	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
+	EnableDiscV5 bool
+
+	// UDPPort number to start discovery v5
+	UDPPort int
+
+	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
+	AutoUpdate bool
 }
 
 // ----------
@@ -301,6 +310,9 @@ type ClusterConfig struct {
 
 	// WakuRendezvousNodes is a list of go-waku rendezvous nodes to be used for ambient discovery
 	WakuRendezvousNodes []string
+
+	// DiscV5Nodes is a list of enr to be used for ambient discovery
+	DiscV5BootstrapNodes []string
 }
 
 // String dumps config object as nicely indented JSON
