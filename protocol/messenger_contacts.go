@@ -12,6 +12,38 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+// NOTE: This sets HasAddedUs to false, so next time we receive a contact request it will be reset to true
+func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey := request.ID.String()
+	contact, ok := m.allContacts.Load(pubKey)
+	if !ok {
+		var err error
+		contact, err = buildContactFromPkString(pubKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	contact.HasAddedUs = false
+
+	err = m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	m.allContacts.Store(contact.ID, contact)
+
+	response := &MessengerResponse{}
+	response.Contacts = []*Contact{contact}
+
+	return response, nil
+}
+
 func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
