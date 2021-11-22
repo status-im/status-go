@@ -31,10 +31,8 @@ type Config struct {
 	KeepAliveInterval    int      `toml:",omitempty"`
 	MinPeersForRelay     int      `toml:",omitempty"`
 	LightClient          bool     `toml:",omitempty"`
-	RelayNodes           []string `toml:",omitempty"`
-	StoreNodes           []string `toml:",omitempty"`
-	FilterNodes          []string `toml:",omitempty"`
-	LightpushNodes       []string `toml:",omitempty"`
+	WakuNodes            []string `toml:",omitempty"`
+	Rendezvous           bool     `toml:",omitempty"`
 	DiscV5BootstrapNodes []string `toml:",omitempty"`
 	EnableDiscV5         bool     `toml:",omitempty"`
 	DiscoveryLimit       int      `toml:",omitempty"`
