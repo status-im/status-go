@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
 
 	"go.uber.org/zap"
@@ -51,13 +52,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
-
 	"github.com/status-im/go-waku/waku/v2/dnsdisc"
 	"github.com/status-im/go-waku/waku/v2/protocol"
-	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
-	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -84,8 +81,9 @@ type settings struct {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	node  *node.WakuNode // reference to a libp2p waku node
-	appDB *sql.DB
+	node            *node.WakuNode // reference to a libp2p waku node
+	identifyService identify.IDService
+	appDB           *sql.DB
 
 	dnsAddressCache     map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
@@ -106,6 +104,7 @@ type Waku struct {
 	sendQueue chan *pb.WakuMessage
 	msgQueue  chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 	quit      chan struct{}                // Channel used for graceful exit
+	wg        sync.WaitGroup
 
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
@@ -143,6 +142,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		sendQueue:               make(chan *pb.WakuMessage, 1000),
 		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
 		quit:                    make(chan struct{}),
+		wg:                      sync.WaitGroup{},
 		dnsAddressCache:         make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:     &sync.RWMutex{},
 		storeMsgIDs:             make(map[gethcommon.Hash]bool),
@@ -201,7 +201,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 	}
 
 	if cfg.EnableDiscV5 {
-		bootnodes, err := waku.getDiscV5BootstrapNodes(cfg.DiscV5BootstrapNodes)
+		bootnodes, err := waku.getDiscV5BootstrapNodes(ctx, cfg.DiscV5BootstrapNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -236,10 +236,19 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		return nil, fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 
-	waku.addWakuV2Peers(cfg)
+	idService, err := identify.NewIDService(waku.node.Host())
+	if err != nil {
+		return nil, err
+	}
+
+	waku.identifyService = idService
 
 	if err = waku.node.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start go-waku node: %v", err)
+	}
+
+	if err = waku.addWakuV2Peers(ctx, cfg); err != nil {
+		return nil, fmt.Errorf("failed to add wakuv2 peers: %v", err)
 	}
 
 	if cfg.EnableDiscV5 {
@@ -248,8 +257,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 			return nil, err
 		}
 	}
+	waku.wg.Add(3)
 
 	go func() {
+		defer waku.wg.Done()
 		for {
 			select {
 			case <-waku.quit:
@@ -286,32 +297,15 @@ func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
 	return subscription
 }
 
-type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, protocol libp2pproto.ID)
-
-func (w *Waku) addPeers(addresses []string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
-	for _, addrString := range addresses {
-		if addrString == "" {
-			continue
-		}
-
-		if strings.HasPrefix(addrString, "enrtree://") {
-			// Use DNS Discovery
-			go w.dnsDiscover(addrString, protocol, apply)
-		} else {
-			// It's a normal multiaddress
-			w.addPeerFromString(addrString, protocol, apply)
-		}
-	}
-}
-
-func (w *Waku) getDiscV5BootstrapNodes(addresses []string) ([]*enode.Node, error) {
+func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
 	var result []*enode.Node
 
-	retrieveENR := func(d dnsdisc.DiscoveredNode, protocol libp2pproto.ID) {
+	retrieveENR := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		mu.Lock()
 		defer mu.Unlock()
+		defer wg.Done()
 		if d.ENR != nil {
 			result = append(result, d.ENR)
 		}
@@ -327,7 +321,7 @@ func (w *Waku) getDiscV5BootstrapNodes(addresses []string) ([]*enode.Node, error
 			wg.Add(1)
 			go func(addr string) {
 				defer wg.Done()
-				w.dnsDiscover(addr, libp2pproto.ID(""), retrieveENR)
+				w.dnsDiscover(ctx, addr, retrieveENR)
 			}(addrString)
 		} else {
 			// It's a normal enr
@@ -342,8 +336,10 @@ func (w *Waku) getDiscV5BootstrapNodes(addresses []string) ([]*enode.Node, error
 	return result, nil
 }
 
-func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
+
+func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
 	w.dnsAddressCacheLock.Lock()
@@ -361,57 +357,95 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 		discNodes = w.dnsAddressCache[enrtreeAddress]
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(len(discNodes))
 	for _, d := range discNodes {
-		apply(d, protocol)
+		apply(d, wg)
 	}
+	wg.Wait()
 }
 
-func (w *Waku) addPeerFromString(addrString string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
-	addr, err := multiaddr.NewMultiaddr(addrString)
+func (w *Waku) addWakuV2Peers(ctx context.Context, cfg *Config) error {
+	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
+		if len(d.Addresses) != 0 {
+			go func(ma multiaddr.Multiaddr) {
+				w.identifyAndConnect(ctx, w.settings.LightClient, ma)
+				wg.Done()
+			}(d.Addresses[0])
+		}
+	}
+
+	identifyWg := &sync.WaitGroup{}
+	identifyWg.Add(len(cfg.WakuNodes))
+	for _, addrString := range cfg.WakuNodes {
+		if strings.HasPrefix(addrString, "enrtree://") {
+			// Use DNS Discovery
+			go func() {
+				w.dnsDiscover(ctx, addrString, fnApply)
+				identifyWg.Done()
+			}()
+		} else {
+			// It is a normal multiaddress
+			addr, err := multiaddr.NewMultiaddr(addrString)
+			if err != nil {
+				w.logger.Warn("invalid peer multiaddress", zap.String("ma", addrString), zap.Error(err))
+				continue
+			}
+
+			go func(ma multiaddr.Multiaddr) {
+				w.identifyAndConnect(ctx, cfg.LightClient, ma)
+				identifyWg.Done()
+			}(addr)
+		}
+	}
+
+	identifyWg.Wait()
+	return nil
+}
+
+func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, ma multiaddr.Multiaddr) {
+	peerInfo, err := peer.AddrInfoFromP2pAddr(ma)
 	if err != nil {
-		w.logger.Warn("invalid peer multiaddress", zap.String("addr", addrString), zap.Error(err))
+		w.logger.Warn("invalid peer multiaddress", zap.String("addr", ma.String()), zap.Error(err))
 		return
 	}
 
-	d := dnsdisc.DiscoveredNode{
-		Addresses: []multiaddr.Multiaddr{addr},
-	}
-	apply(d, protocol)
-}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
 
-func (w *Waku) addWakuV2Peers(cfg *Config) {
-	if !cfg.LightClient {
-		addRelayPeer := func(d dnsdisc.DiscoveredNode, protocol libp2pproto.ID) {
-			for _, m := range d.Addresses {
-				go func(node multiaddr.Multiaddr) {
-					ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-					defer cancel()
-					err := w.node.DialPeerWithMultiAddress(ctx, node)
-					if err != nil {
-						w.logger.Warn("could not dial peer", zap.Error(err))
-					} else {
-						w.logger.Info("relay peer dialed successfully", zap.String("multiaddr", node.String()))
-					}
-				}(m)
-			}
+	err = w.node.Host().Connect(ctx, *peerInfo)
+	if err != nil {
+		w.logger.Error("could not extract peerinfo", zap.String("ma", ma.String()), zap.Error(err))
+		return
+	}
+
+	conns := w.node.Host().Network().ConnsToPeer(peerInfo.ID)
+	if len(conns) == 0 {
+		return // No connection
+	}
+
+	w.identifyService.IdentifyConn(conns[0])
+
+	if isLightClient {
+		err = w.node.Host().Network().ClosePeer(peerInfo.ID)
+		if err != nil {
+			w.logger.Error("could not close connections to peer", zap.Any("peer", peerInfo.ID), zap.Error(err))
 		}
-		w.addPeers(cfg.RelayNodes, relay.WakuRelayID_v200, addRelayPeer)
+		return
 	}
 
-	addToPeerStore := func(d dnsdisc.DiscoveredNode, protocol libp2pproto.ID) {
-		for _, m := range d.Addresses {
-			peerID, err := w.node.AddPeer(m, string(protocol))
-			if err != nil {
-				w.logger.Warn("could not add peer", zap.String("multiaddr", m.String()), zap.Error(err))
-				return
-			}
-			w.logger.Info("peer added successfully", zap.String("peerId", peerID.String()))
+	supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, string(relay.WakuRelayID_v200))
+	if err != nil {
+		w.logger.Error("could not obtain protocols", zap.Any("peer", peerInfo.ID), zap.Error(err))
+		return
+	}
+
+	if len(supportedProtocols) == 0 {
+		err = w.node.Host().Network().ClosePeer(peerInfo.ID)
+		if err != nil {
+			w.logger.Error("could not close connections to peer", zap.Any("peer", peerInfo.ID), zap.Error(err))
 		}
 	}
-
-	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta4, addToPeerStore)
-	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1, addToPeerStore)
-	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1, addToPeerStore)
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -423,6 +457,8 @@ func (w *Waku) GetStats() types.StatsSummary {
 }
 
 func (w *Waku) runRelayMsgLoop() {
+	defer w.wg.Done()
+
 	if w.settings.LightClient {
 		return
 	}
@@ -445,6 +481,8 @@ func (w *Waku) runRelayMsgLoop() {
 }
 
 func (w *Waku) runFilterMsgLoop() {
+	defer w.wg.Done()
+
 	if !w.settings.LightClient {
 		return
 	}
@@ -882,7 +920,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(hash)]
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		envelope := wakuprotocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
+		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
@@ -913,7 +951,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	}
 
 	for _, msg := range result.Messages {
-		envelope := wakuprotocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
+		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
 		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
@@ -944,13 +982,15 @@ func (w *Waku) Start() error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
+	w.identifyService.Close()
 	w.node.Stop()
 	close(w.quit)
 	close(w.filterMsgChannel)
+	w.wg.Wait()
 	return nil
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
+func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	envelopeErrors := make([]common.EnvelopeError, 0)
 

@@ -258,20 +258,8 @@ type ClusterConfig struct {
 	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
 
-	// RelayNodes is a list of wakuv2 relay nodes (libp2p)
-	RelayNodes []string
-
-	// StoreNodes is a list of wakuv2 store nodes (libp2p)
-	StoreNodes []string
-
-	// FilterNodes is a list of wakuv2 filter nodes (libp2p)
-	FilterNodes []string
-
-	// LightpushNodes is a list of wakuv2 lightpush nodes (libp2p)
-	LightpushNodes []string
-
-	// WakuRendezvousNodes is a list of go-waku rendezvous nodes to be used for ambient discovery
-	WakuRendezvousNodes []string
+	// WakuNodes is a list of waku2 multiaddresses
+	WakuNodes []string
 
 	// DiscV5Nodes is a list of enr to be used for ambient discovery
 	DiscV5BootstrapNodes []string
