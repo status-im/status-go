@@ -592,6 +592,10 @@ func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddConta
 	return api.service.messenger.AddContact(ctx, request)
 }
 
+func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RejectContactRequest(ctx, request)
+}
+
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveContact(ctx, pubKey)
 }
