@@ -1017,11 +1017,20 @@ func (w *Waku) Peers() map[string][]string {
 }
 
 func (w *Waku) StartDiscV5() error {
+	if w.node.DiscV5() == nil {
+		return errors.New("discv5 is not setup")
+	}
+
 	return w.node.DiscV5().Start()
 }
 
-func (w *Waku) StopDiscV5() {
+func (w *Waku) StopDiscV5() error {
+	if w.node.DiscV5() == nil {
+		return errors.New("discv5 is not setup")
+	}
+
 	w.node.DiscV5().Stop()
+	return nil
 }
 
 func (w *Waku) AddStorePeer(address string) (string, error) {

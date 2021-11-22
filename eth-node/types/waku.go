@@ -20,7 +20,7 @@ type Waku interface {
 
 	StartDiscV5() error
 
-	StopDiscV5()
+	StopDiscV5() error
 
 	AddStorePeer(address string) (string, error)
 

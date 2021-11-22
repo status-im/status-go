@@ -226,8 +226,8 @@ func (w *gethWakuV2Wrapper) StartDiscV5() error {
 	return w.waku.StartDiscV5()
 }
 
-func (w *gethWakuV2Wrapper) StopDiscV5() {
-	w.waku.StopDiscV5()
+func (w *gethWakuV2Wrapper) StopDiscV5() error {
+	return w.waku.StopDiscV5()
 }
 
 func (w *gethWakuV2Wrapper) AddStorePeer(address string) (string, error) {
