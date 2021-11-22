@@ -18,6 +18,10 @@ type Waku interface {
 
 	Peers() map[string][]string
 
+	StartDiscV5() error
+
+	StopDiscV5() error
+
 	AddStorePeer(address string) (string, error)
 
 	AddRelayPeer(address string) (string, error)

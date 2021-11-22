@@ -43,6 +43,16 @@ func (w *gethWakuWrapper) PeerCount() int {
 	return -1
 }
 
+// Added for compatibility with waku V2
+func (w *gethWakuWrapper) StartDiscV5() error {
+	return errors.New("not available in WakuV1")
+}
+
+// Added for compatibility with waku V2
+func (w *gethWakuWrapper) StopDiscV5() error {
+	return errors.New("not available in WakuV1")
+}
+
 // PeerCount function only added for compatibility with waku V2
 func (w *gethWakuWrapper) AddStorePeer(address string) (string, error) {
 	return "", errors.New("not available in WakuV1")

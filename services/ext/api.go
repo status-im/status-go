@@ -921,6 +921,14 @@ func (api *PublicAPI) BloomFilter() string {
 	return hexutil.Encode(api.service.messenger.BloomFilter())
 }
 
+func (api *PublicAPI) StartDiscV5() error {
+	return api.service.messenger.StartDiscV5()
+}
+
+func (api *PublicAPI) StopDiscV5() error {
+	return api.service.messenger.StopDiscV5()
+}
+
 func (api *PublicAPI) AddStorePeer(address string) (string, error) {
 	return api.service.messenger.AddStorePeer(address)
 }

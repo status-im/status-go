@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	"github.com/status-im/go-waku/waku/v2/utils"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 )
@@ -27,13 +26,6 @@ var (
 )
 
 type (
-	FilterSubscribeParameters struct {
-		host         host.Host
-		selectedPeer peer.ID
-	}
-
-	FilterSubscribeOption func(*FilterSubscribeParameters)
-
 	Filter struct {
 		PeerID         peer.ID
 		Topic          string
@@ -65,41 +57,32 @@ type (
 // NOTE This is just a start, the design of this protocol isn't done yet. It
 // should be direct payload exchange (a la req-resp), not be coupled with the
 // relay protocol.
-
 const FilterID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter/2.0.0-beta1")
 
-func WithPeer(p peer.ID) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) {
-		params.selectedPeer = p
+func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool) *WakuFilter {
+	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
+	if err != nil {
+		log.Error(err)
 	}
-}
 
-func WithAutomaticPeerSelection() FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) {
-		p, err := utils.SelectPeer(params.host, string(FilterID_v20beta1))
-		if err == nil {
-			params.selectedPeer = *p
-		} else {
-			log.Info("Error selecting peer: ", err)
-		}
-	}
-}
+	wf := new(WakuFilter)
+	wf.ctx = ctx
+	wf.MsgC = make(chan *protocol.Envelope)
+	wf.h = host
+	wf.isFullNode = isFullNode
+	wf.filters = NewFilterMap()
+	wf.subscribers = NewSubscribers()
 
-func WithFastestPeerSelection(ctx context.Context) FilterSubscribeOption {
-	return func(params *FilterSubscribeParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(FilterID_v20beta1))
-		if err == nil {
-			params.selectedPeer = *p
-		} else {
-			log.Info("Error selecting peer: ", err)
-		}
-	}
-}
+	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
+	go wf.FilterListener()
 
-func DefaultOptions() []FilterSubscribeOption {
-	return []FilterSubscribeOption{
-		WithAutomaticPeerSelection(),
+	if wf.isFullNode {
+		log.Info("Filter protocol started")
+	} else {
+		log.Info("Filter protocol started (only client mode)")
 	}
+
+	return wf
 }
 
 func (wf *WakuFilter) onRequest(s network.Stream) {
@@ -146,32 +129,6 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 		log.Error("can't serve request")
 		return
 	}
-}
-
-func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool) *WakuFilter {
-	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
-	if err != nil {
-		log.Error(err)
-	}
-
-	wf := new(WakuFilter)
-	wf.ctx = ctx
-	wf.MsgC = make(chan *protocol.Envelope)
-	wf.h = host
-	wf.isFullNode = isFullNode
-	wf.filters = NewFilterMap()
-	wf.subscribers = NewSubscribers()
-
-	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
-	go wf.FilterListener()
-
-	if wf.isFullNode {
-		log.Info("Filter protocol started")
-	} else {
-		log.Info("Filter protocol started (only client mode)")
-	}
-
-	return wf
 }
 
 func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) error {

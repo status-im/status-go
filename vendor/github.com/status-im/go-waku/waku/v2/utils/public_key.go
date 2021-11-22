@@ -1,4 +1,4 @@
-package discovery
+package utils
 
 import (
 	"crypto/ecdsa"

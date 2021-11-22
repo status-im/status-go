@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -23,9 +24,11 @@ import (
 const clientId string = "Go Waku v2 node"
 
 type WakuNodeParameters struct {
+	hostAddr       *net.TCPAddr
+	advertiseAddr  *net.IP
 	multiAddr      []ma.Multiaddr
 	addressFactory basichost.AddrsFactory
-	privKey        *crypto.PrivKey
+	privKey        *ecdsa.PrivateKey
 	libP2POpts     []libp2p.Option
 
 	enableRelay      bool
@@ -45,6 +48,12 @@ type WakuNodeParameters struct {
 	rendevousStorage       rendezvous.Storage
 	rendezvousOpts         []pubsub.DiscoverOpt
 
+	enableDiscV5     bool
+	udpPort          int
+	discV5bootnodes  []*enode.Node
+	discV5Opts       []pubsub.DiscoverOpt
+	discV5autoUpdate bool
+
 	keepAliveInterval time.Duration
 
 	enableLightPush bool
@@ -54,6 +63,11 @@ type WakuNodeParameters struct {
 
 type WakuNodeOption func(*WakuNodeParameters) error
 
+// Default options used in the libp2p node
+var DefaultWakuNodeOptions = []WakuNodeOption{
+	WithWakuRelay(),
+}
+
 // MultiAddresses return the list of multiaddresses configured in the node
 func (w WakuNodeParameters) MultiAddresses() []ma.Multiaddr {
 	return w.multiAddr
@@ -61,39 +75,43 @@ func (w WakuNodeParameters) MultiAddresses() []ma.Multiaddr {
 
 // Identity returns a libp2p option containing the identity used by the node
 func (w WakuNodeParameters) Identity() config.Option {
-	return libp2p.Identity(*w.privKey)
+	return libp2p.Identity(*w.GetPrivKey())
 }
 
-// WithHostAddress is a WakuNodeOption that configures libp2p to listen on a list of net endpoint addresses
-func WithHostAddress(hostAddr []*net.TCPAddr) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		var multiAddresses []ma.Multiaddr
-		for _, addr := range hostAddr {
-			hostAddrMA, err := manet.FromNetAddr(addr)
-			if err != nil {
-				return err
-			}
-			multiAddresses = append(multiAddresses, hostAddrMA)
-		}
+func (w WakuNodeParameters) AddressFactory() basichost.AddrsFactory {
+	return w.addressFactory
+}
 
-		params.multiAddr = append(params.multiAddr, multiAddresses...)
+// WithHostAddress is a WakuNodeOption that configures libp2p to listen on a specific address
+func WithHostAddress(hostAddr *net.TCPAddr) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.hostAddr = hostAddr
+		hostAddrMA, err := manet.FromNetAddr(hostAddr)
+		if err != nil {
+			return err
+		}
+		params.multiAddr = append(params.multiAddr, hostAddrMA)
 
 		return nil
 	}
 }
 
-// WithAdvertiseAddress is a WakuNodeOption that allows overriding the addresses used in the waku node with custom values
-func WithAdvertiseAddress(addressesToAdvertise []*net.TCPAddr, enableWS bool, wsPort int) WakuNodeOption {
+// WithAdvertiseAddress is a WakuNodeOption that allows overriding the address used in the waku node with custom value
+func WithAdvertiseAddress(address *net.TCPAddr, enableWS bool, wsPort int) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
+		params.advertiseAddr = &address.IP
+
+		advertiseAddress, err := manet.FromNetAddr(address)
+		if err != nil {
+			return err
+		}
+
 		params.addressFactory = func([]ma.Multiaddr) []ma.Multiaddr {
 			var result []multiaddr.Multiaddr
-			for _, adv := range addressesToAdvertise {
-				addr, _ := manet.FromNetAddr(adv)
-				result = append(result, addr)
-				if enableWS {
-					wsMa, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", adv.IP.String(), wsPort))
-					result = append(result, wsMa)
-				}
+			result = append(result, advertiseAddress)
+			if enableWS {
+				wsMa, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address, wsPort))
+				result = append(result, wsMa)
 			}
 			return result
 		}
@@ -112,10 +130,14 @@ func WithMultiaddress(addresses []ma.Multiaddr) WakuNodeOption {
 // WithPrivateKey is used to set an ECDSA private key in a libp2p node
 func WithPrivateKey(privKey *ecdsa.PrivateKey) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		privk := crypto.PrivKey((*crypto.Secp256k1PrivateKey)(privKey))
-		params.privKey = &privk
+		params.privKey = privKey
 		return nil
 	}
+}
+
+func (w *WakuNodeParameters) GetPrivKey() *crypto.PrivKey {
+	privKey := crypto.PrivKey((*crypto.Secp256k1PrivateKey)(w.privKey))
+	return &privKey
 }
 
 // WithLibP2POptions is a WakuNodeOption used to configure the libp2p node.
@@ -134,6 +156,18 @@ func WithWakuRelay(opts ...pubsub.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRelay = true
 		params.wOpts = opts
+		return nil
+	}
+}
+
+// WithDiscoveryV5 is a WakuOption used to enable DiscV5 peer discovery
+func WithDiscoveryV5(udpPort int, bootnodes []*enode.Node, autoUpdate bool, discoverOpts ...pubsub.DiscoverOpt) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableDiscV5 = true
+		params.udpPort = udpPort
+		params.discV5bootnodes = bootnodes
+		params.discV5Opts = discoverOpts
+		params.discV5autoUpdate = autoUpdate
 		return nil
 	}
 }
@@ -232,7 +266,6 @@ func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
 var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.DefaultTransports,
 	libp2p.UserAgent(clientId),
-	libp2p.NATPortMap(),       // Attempt to open ports using uPNP for NATed hosts.
 	libp2p.EnableNATService(), // TODO: is this needed?)
 	libp2p.ConnectionManager(connmgr.NewConnManager(200, 300, 0)),
 }

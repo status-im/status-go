@@ -74,12 +74,15 @@ func (self *MessageQueue) cleanOlderRecords() {
 
 func (self *MessageQueue) checkForOlderRecords(d time.Duration) {
 	ticker := time.NewTicker(d)
+	defer ticker.Stop()
 
-	select {
-	case <-self.quit:
-		return
-	case <-ticker.C:
-		self.cleanOlderRecords()
+	for {
+		select {
+		case <-self.quit:
+			return
+		case <-ticker.C:
+			self.cleanOlderRecords()
+		}
 	}
 }
 

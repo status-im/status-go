@@ -603,6 +603,14 @@ func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }
 
+func (t *Transport) StartDiscV5() error {
+	return t.waku.StartDiscV5()
+}
+
+func (t *Transport) StopDiscV5() error {
+	return t.waku.StopDiscV5()
+}
+
 func (t *Transport) AddStorePeer(address string) (string, error) {
 	return t.waku.AddStorePeer(address)
 }
