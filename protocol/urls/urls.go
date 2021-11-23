@@ -33,15 +33,6 @@ type GiphyOembedData struct {
 	Width        int    `json:"width"`
 }
 
-type TenorOembedData struct {
-	ProviderName string `json:"provider_name"`
-	ThumbnailURL string `json:"thumbnail_url"`
-	AuthorName   string `json:"author_name"`
-	Title        string `json:"title"`
-	Height       int    `json:"height"`
-	Width        int    `json:"width"`
-}
-
 type LinkPreviewData struct {
 	Site         string `json:"site" meta:"og:site_name"`
 	Title        string `json:"title" meta:"og:title"`
@@ -60,7 +51,6 @@ type Site struct {
 const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
 const TwitterOembedLink = "https://publish.twitter.com/oembed?url=%s"
 const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
-const TenorOembedLink = "https://tenor.com/oembed?url=%s"
 
 var httpClient = http.Client{
 	Timeout: 30 * time.Second,
@@ -87,11 +77,6 @@ func LinkPreviewWhitelist() []Site {
 			Title:     "Twitter",
 			Address:   "twitter.com",
 			ImageSite: false,
-		},
-		Site{
-			Title:     "Tenor GIFs",
-			Address:   "tenor.com",
-			ImageSite: true,
 		},
 		Site{
 			Title:     "GIPHY GIFs shortener",
@@ -279,41 +264,6 @@ func GetGiphyShortURLPreviewData(shortURL string) (data LinkPreviewData, err err
 	return GetGiphyPreviewData(longURL)
 }
 
-func GetTenorOembed(url string) (data TenorOembedData, err error) {
-	oembedLink := fmt.Sprintf(TenorOembedLink, url)
-
-	jsonBytes, err := GetURLContent(oembedLink)
-
-	if err != nil {
-		return data, fmt.Errorf("can't get bytes from Tenor oembed response at %s", oembedLink)
-	}
-
-	err = json.Unmarshal(jsonBytes, &data)
-	if err != nil {
-		return data, fmt.Errorf("can't unmarshall json %w", err)
-	}
-
-	return data, nil
-}
-
-func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
-	oembedData, err := GetTenorOembed(link)
-	if err != nil {
-		return previewData, err
-	}
-
-	previewData.Title = oembedData.Title
-	if len(previewData.Title) == 0 {
-		previewData.Title = oembedData.AuthorName
-	}
-	previewData.Site = oembedData.ProviderName
-	previewData.ThumbnailURL = oembedData.ThumbnailURL
-	previewData.Height = oembedData.Height
-	previewData.Width = oembedData.Width
-
-	return previewData, nil
-}
-
 func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	url, err := url.Parse(link)
 	if err != nil {
@@ -331,8 +281,6 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetGiphyPreviewData(link)
 	case "gph.is":
 		return GetGiphyShortURLPreviewData(link)
-	case "tenor.com":
-		return GetTenorPreviewData(link)
 	case "twitter.com":
 		return GetTwitterPreviewData(link)
 	default:

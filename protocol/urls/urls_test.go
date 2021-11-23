@@ -97,28 +97,6 @@ func TestGetGiphyShortURLPreviewData(t *testing.T) {
 	require.Equal(t, bostonDynamicsEthGifData.Title, previewData.Title)
 }
 
-func TestGetTenorPreviewData(t *testing.T) {
-	validTenorLink := "https://tenor.com/view/robot-lol-slip-banana-peels-gif-5665377"
-	previewData, err := GetTenorPreviewData(validTenorLink)
-
-	gifData := LinkPreviewData{
-		Site:         "Tenor",
-		Title:        "robot",
-		ThumbnailURL: "https://media.tenor.com/images/fba19655163e2796d19eeeb3ae7318a0/raw",
-		Height:       400,
-		Width:        600,
-	}
-	require.NoError(t, err)
-	require.Equal(t, gifData.Site, previewData.Site)
-	require.Equal(t, gifData.Title, previewData.Title)
-	require.Equal(t, gifData.Height, previewData.Height)
-	require.Equal(t, gifData.Width, previewData.Width)
-
-	invalidTenorLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
-	_, err = GetTenorPreviewData(invalidTenorLink)
-	require.Error(t, err)
-}
-
 func TestStatusLinkPreviewData(t *testing.T) {
 
 	statusSecurityAudit := LinkPreviewData{
