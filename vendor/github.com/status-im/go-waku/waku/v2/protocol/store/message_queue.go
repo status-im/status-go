@@ -16,6 +16,7 @@ type MessageQueue struct {
 	maxDuration time.Duration
 
 	quit chan struct{}
+	wg   *sync.WaitGroup
 }
 
 func (self *MessageQueue) Push(msg IndexedWakuMessage) {
@@ -73,6 +74,8 @@ func (self *MessageQueue) cleanOlderRecords() {
 }
 
 func (self *MessageQueue) checkForOlderRecords(d time.Duration) {
+	defer self.wg.Done()
+
 	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 
@@ -98,9 +101,11 @@ func NewMessageQueue(maxMessages int, maxDuration time.Duration) *MessageQueue {
 		maxDuration: maxDuration,
 		seen:        make(map[[32]byte]struct{}),
 		quit:        make(chan struct{}),
+		wg:          &sync.WaitGroup{},
 	}
 
 	if maxDuration != 0 {
+		result.wg.Add(1)
 		go result.checkForOlderRecords(10 * time.Second) // is 10s okay?
 	}
 
@@ -109,4 +114,5 @@ func NewMessageQueue(maxMessages int, maxDuration time.Duration) *MessageQueue {
 
 func (self *MessageQueue) Stop() {
 	close(self.quit)
+	self.wg.Wait()
 }

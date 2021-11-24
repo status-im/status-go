@@ -22,21 +22,21 @@ func NewSubscribers() *Subscribers {
 	return &Subscribers{}
 }
 
-func (self *Subscribers) Append(s Subscriber) int {
-	self.Lock()
-	defer self.Unlock()
+func (sub *Subscribers) Append(s Subscriber) int {
+	sub.Lock()
+	defer sub.Unlock()
 
-	self.subscribers = append(self.subscribers, s)
-	return len(self.subscribers)
+	sub.subscribers = append(sub.subscribers, s)
+	return len(sub.subscribers)
 }
 
-func (self *Subscribers) Items() <-chan Subscriber {
+func (sub *Subscribers) Items() <-chan Subscriber {
 	c := make(chan Subscriber)
 
 	f := func() {
-		self.RLock()
-		defer self.RUnlock()
-		for _, value := range self.subscribers {
+		sub.RLock()
+		defer sub.RUnlock()
+		for _, value := range sub.subscribers {
 			c <- value
 		}
 		close(c)
@@ -46,17 +46,17 @@ func (self *Subscribers) Items() <-chan Subscriber {
 	return c
 }
 
-func (self *Subscribers) Length() int {
-	self.RLock()
-	defer self.RUnlock()
+func (sub *Subscribers) Length() int {
+	sub.RLock()
+	defer sub.RUnlock()
 
-	return len(self.subscribers)
+	return len(sub.subscribers)
 }
 
-func (self *Subscribers) RemoveContentFilters(peerID peer.ID, contentFilters []*pb.FilterRequest_ContentFilter) {
+func (sub *Subscribers) RemoveContentFilters(peerID peer.ID, contentFilters []*pb.FilterRequest_ContentFilter) {
 	var peerIdsToRemove []peer.ID
 
-	for _, subscriber := range self.subscribers {
+	for _, subscriber := range sub.subscribers {
 		if subscriber.peer != peerID {
 			continue
 		}
@@ -82,11 +82,11 @@ func (self *Subscribers) RemoveContentFilters(peerID peer.ID, contentFilters []*
 	// make sure we delete the subscriber
 	// if no more content filters left
 	for _, peerId := range peerIdsToRemove {
-		for i, s := range self.subscribers {
+		for i, s := range sub.subscribers {
 			if s.peer == peerId {
-				l := len(self.subscribers) - 1
-				self.subscribers[l], self.subscribers[i] = self.subscribers[i], self.subscribers[l]
-				self.subscribers = self.subscribers[:l]
+				l := len(sub.subscribers) - 1
+				sub.subscribers[l], sub.subscribers[i] = sub.subscribers[i], sub.subscribers[l]
+				sub.subscribers = sub.subscribers[:l]
 				break
 			}
 		}

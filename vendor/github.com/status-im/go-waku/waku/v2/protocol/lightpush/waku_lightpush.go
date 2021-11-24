@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -62,7 +63,7 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 	requestPushRPC := &pb.PushRPC{}
 
 	writer := protoio.NewDelimitedWriter(s)
-	reader := protoio.NewDelimitedReader(s, 64*1024)
+	reader := protoio.NewDelimitedReader(s, math.MaxInt32)
 
 	err := reader.ReadMsg(requestPushRPC)
 	if err != nil {
@@ -158,7 +159,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestId), Query: req}
 
 	writer := protoio.NewDelimitedWriter(connOpt)
-	reader := protoio.NewDelimitedReader(connOpt, 64*1024)
+	reader := protoio.NewDelimitedReader(connOpt, math.MaxInt32)
 
 	err = writer.WriteMsg(pushRequestRPC)
 	if err != nil {

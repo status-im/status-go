@@ -84,6 +84,8 @@ func (w *WakuNode) sendConnStatus() {
 }
 
 func (w *WakuNode) connectednessListener() {
+	defer w.wg.Done()
+
 	for {
 		select {
 		case <-w.quit:

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
 	logging "github.com/ipfs/go-log"
@@ -227,6 +228,7 @@ type IndexedWakuMessage struct {
 type WakuStore struct {
 	ctx  context.Context
 	MsgC chan *protocol.Envelope
+	wg   *sync.WaitGroup
 
 	started bool
 
@@ -240,6 +242,7 @@ func NewWakuStore(host host.Host, p MessageProvider, maxNumberOfMessages int, ma
 	wakuStore := new(WakuStore)
 	wakuStore.msgProvider = p
 	wakuStore.h = host
+	wakuStore.wg = &sync.WaitGroup{}
 	wakuStore.messageQueue = NewMessageQueue(maxNumberOfMessages, maxRetentionDuration)
 	return wakuStore
 }
@@ -261,6 +264,7 @@ func (store *WakuStore) Start(ctx context.Context) {
 
 	store.h.SetStreamHandlerMatch(StoreID_v20beta3, protocol.PrefixTextMatch(string(StoreID_v20beta3)), store.onRequest)
 
+	store.wg.Add(1)
 	go store.storeIncomingMessages(ctx)
 
 	if store.msgProvider == nil {
@@ -327,6 +331,7 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) {
 }
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
+	defer store.wg.Done()
 	for envelope := range store.MsgC {
 		store.storeMessage(envelope)
 	}
@@ -338,7 +343,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	historyRPCRequest := &pb.HistoryRPC{}
 
 	writer := protoio.NewDelimitedWriter(s)
-	reader := protoio.NewDelimitedReader(s, 64*1024)
+	reader := protoio.NewDelimitedReader(s, math.MaxInt32)
 
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
@@ -505,7 +510,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(requestId)}
 
 	writer := protoio.NewDelimitedWriter(connOpt)
-	reader := protoio.NewDelimitedReader(connOpt, 64*1024)
+	reader := protoio.NewDelimitedReader(connOpt, math.MaxInt32)
 
 	err = writer.WriteMsg(historyRequest)
 	if err != nil {
@@ -721,4 +726,6 @@ func (store *WakuStore) Stop() {
 	if store.h != nil {
 		store.h.RemoveStreamHandler(StoreID_v20beta3)
 	}
+
+	store.wg.Wait()
 }
