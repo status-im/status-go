@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -167,6 +168,35 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 		rst = append(rst, address)
 	}
 	return rst
+}
+
+func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Client, address common.Address, hash common.Hash) error {
+	chainClient, err := chain.NewClient(rpcClient, rpcClient.UpstreamChainID)
+	if err != nil {
+		return err
+	}
+
+	signer := types.NewLondonSigner(chainClient.ToBigInt())
+
+	transfer, err := getTransferByHash(ctx, chainClient, signer, address, hash)
+	if err != nil {
+		return err
+	}
+
+	transfers := []Transfer{*transfer}
+
+	err = c.db.InsertBlock(rpcClient.UpstreamChainID, address, transfer.BlockNumber, transfer.BlockHash)
+	if err != nil {
+		return err
+	}
+
+	blocks := []*big.Int{transfer.BlockNumber}
+	err = c.db.SaveTranfers(rpcClient.UpstreamChainID, address, transfers, blocks)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]View, error) {

@@ -39,8 +39,14 @@ func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []ui
 
 // GetTransfersByAddress returns transfers for a single address
 func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
-	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address")
+	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address)
 	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, toBlock, limit, fetchMore)
+}
+
+// LoadTransferByHash loads transfer to the database
+func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, hash common.Hash) error {
+	log.Debug("[WalletAPI:: LoadTransferByHash] get transfer by hash", "address", address, "hash", hash)
+	return api.s.transferController.LoadTransferByHash(ctx, api.s.rpcClient, address, hash)
 }
 
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {

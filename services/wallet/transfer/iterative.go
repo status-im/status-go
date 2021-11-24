@@ -12,14 +12,14 @@ import (
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
 	db *Database, client HeaderReader, address common.Address,
-	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int) (*IterativeDownloader, error) {
+	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int, isBatchSizeAdjustable bool) (*IterativeDownloader, error) {
 
 	if to == nil || from == nil {
 		return nil, errors.New("to or from cannot be nil")
 	}
 
 	adjustedSize := big.NewInt(0).Div(big.NewInt(0).Sub(to, from), big.NewInt(10))
-	if adjustedSize.Cmp(size) == 1 {
+	if isBatchSizeAdjustable && adjustedSize.Cmp(size) == 1 {
 		size = adjustedSize
 	}
 	log.Info("iterative downloader", "address", address, "from", from, "to", to, "size", size)

@@ -14,7 +14,16 @@ import (
 	"github.com/status-im/status-go/services/wallet/chain"
 )
 
-var numberOfBlocksCheckedPerIteration = 40
+var (
+	// This will work only for binance testnet as mainnet doesn't support
+	// archival request.
+	binanceChainMaxInitialRange       = big.NewInt(500000)
+	binanceChainErc20BatchSize        = big.NewInt(5000)
+	erc20BatchSize                    = big.NewInt(100000)
+	binancChainID                     = uint64(56)
+	binanceTestChainID                = uint64(97)
+	numberOfBlocksCheckedPerIteration = 40
+)
 
 type ethHistoricalCommand struct {
 	db           *Database
@@ -87,12 +96,20 @@ func (c *erc20HistoricalCommand) Command() async.Command {
 	}.Run
 }
 
+func getErc20BatchSize(chainID uint64) *big.Int {
+	if isBinanceChain(chainID) {
+		return binanceChainErc20BatchSize
+	}
+
+	return erc20BatchSize
+}
+
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	start := time.Now()
 	if c.iterator == nil {
 		c.iterator, err = SetupIterativeDownloader(
 			c.db, c.chainClient, c.address,
-			c.erc20, erc20BatchSize, c.to, c.from)
+			c.erc20, getErc20BatchSize(c.chainClient.ChainID), c.to, c.from, !isBinanceChain(c.chainClient.ChainID))
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
@@ -585,8 +602,21 @@ func loadTransfers(ctx context.Context, accounts []common.Address, block *Block,
 	}
 }
 
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *chain.Client) (*big.Int, error) {
+func isBinanceChain(chainID uint64) bool {
+	return chainID == binancChainID || chainID == binanceTestChainID
+}
+
+func getLowestFrom(chainID uint64, to *big.Int) *big.Int {
 	from := big.NewInt(0)
+	if isBinanceChain(chainID) && big.NewInt(0).Sub(to, from).Cmp(binanceChainMaxInitialRange) == 1 {
+		from = big.NewInt(0).Sub(to, binanceChainMaxInitialRange)
+	}
+
+	return from
+}
+
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *chain.Client) (*big.Int, error) {
+	from := getLowestFrom(client.ChainID, initialTo)
 	to := initialTo
 	goal := uint64(20)
 
@@ -602,7 +632,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	}
 
 	if firstNonce <= goal {
-		return zero, nil
+		return from, nil
 	}
 
 	nonceDiff := firstNonce

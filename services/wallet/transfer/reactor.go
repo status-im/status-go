@@ -13,10 +13,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/chain"
 )
 
-var (
-	erc20BatchSize    = big.NewInt(100000)
-	errAlreadyRunning = errors.New("already running")
-)
+var errAlreadyRunning = errors.New("already running")
 
 // HeaderReader interface for reading headers using block number or hash.
 type HeaderReader interface {

@@ -90,6 +90,44 @@ func (d *ETHDownloader) GetTransfersByNumber(ctx context.Context, number *big.In
 	return rst, err
 }
 
+func getTransferByHash(ctx context.Context, client *chain.Client, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
+	transaction, _, err := client.TransactionByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	receipt, err := client.TransactionReceipt(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	transactionLog := getTokenLog(receipt.Logs)
+
+	transferType := ethTransfer
+	if transactionLog != nil {
+		transferType = erc20Transfer
+	}
+
+	from, err := types.Sender(signer, transaction)
+
+	if err != nil {
+		return nil, err
+	}
+
+	transfer := &Transfer{Type: transferType,
+		ID:          hash,
+		Address:     address,
+		BlockNumber: receipt.BlockNumber,
+		BlockHash:   receipt.BlockHash,
+		Timestamp:   uint64(time.Now().Unix()),
+		Transaction: transaction,
+		From:        from,
+		Receipt:     receipt,
+		Log:         transactionLog}
+
+	return transfer, nil
+}
+
 func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
 	for _, address := range accounts {
 		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chainClient.ChainID, address, blk.Hash())

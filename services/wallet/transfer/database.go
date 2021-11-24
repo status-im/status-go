@@ -351,6 +351,31 @@ func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
 	return nil
 }
 
+func (db *Database) InsertBlock(chainID uint64, account common.Address, blockNumber *big.Int, blockHash common.Hash) error {
+	var (
+		tx *sql.Tx
+	)
+	tx, err := db.client.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	insert, err := tx.Prepare("INSERT OR IGNORE INTO blocks(network_id, address, blk_number, blk_hash, loaded) VALUES (?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+
+	_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(blockNumber), blockHash, true)
+	return err
+}
+
 func insertBlocksWithTransactions(chainID uint64, creator statementCreator, account common.Address, headers []*DBHeader) error {
 	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(network_id, address, blk_number, blk_hash, loaded) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
@@ -363,7 +388,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 		return err
 	}
 
-	insertTx, err := creator.Prepare(`INSERT OR IGNORE 
+	insertTx, err := creator.Prepare(`INSERT OR IGNORE
 	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`)
 	if err != nil {
