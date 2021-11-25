@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -33,6 +34,10 @@ type DiscoveryV5 struct {
 	udpAddr   *net.UDPAddr
 	listener  *discover.UDPv5
 	localnode *enode.LocalNode
+	NAT       nat.Interface
+	quit      chan struct{}
+
+	wg *sync.WaitGroup
 
 	peerCache peerCache
 }
@@ -130,9 +135,16 @@ func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.Priv
 		return nil, err
 	}
 
+	var NAT nat.Interface = nil
+	if params.advertiseAddr == nil {
+		NAT = nat.Any()
+	}
+
 	return &DiscoveryV5{
 		host:   host,
 		params: params,
+		NAT:    NAT,
+		wg:     &sync.WaitGroup{},
 		peerCache: peerCache{
 			rng:  rand.New(rand.NewSource(rand.Int63())),
 			recs: make(map[peer.ID]peerRecord),
@@ -175,6 +187,7 @@ func newLocalnode(priv *ecdsa.PrivateKey, ipAddr net.IP, udpPort int, tcpPort in
 	if advertiseAddr != nil {
 		localnode.SetStaticIP(*advertiseAddr)
 	}
+
 	return localnode, nil
 }
 
@@ -184,12 +197,28 @@ func (d *DiscoveryV5) listen() error {
 		return err
 	}
 
+	d.udpAddr = conn.LocalAddr().(*net.UDPAddr)
+
+	if d.NAT != nil && !d.udpAddr.IP.IsLoopback() {
+		d.wg.Add(1)
+		go func() {
+			defer d.wg.Done()
+			nat.Map(d.NAT, d.quit, "udp", d.udpAddr.Port, d.udpAddr.Port, "go-waku discv5 discovery")
+		}()
+
+	}
+
+	d.localnode.SetFallbackUDP(d.udpAddr.Port)
+
 	listener, err := discover.ListenV5(conn, d.localnode, d.config)
 	if err != nil {
 		return err
 	}
 
 	d.listener = listener
+
+	log.Info(fmt.Sprintf("Started Discovery V5 at %s:%d, advertising IP: %s:%d", d.udpAddr.IP, d.udpAddr.Port, d.localnode.Node().IP(), d.params.tcpPort))
+	log.Info("Discovery V5 ", d.localnode.Node())
 
 	return nil
 }
@@ -198,13 +227,14 @@ func (d *DiscoveryV5) Start() error {
 	d.Lock()
 	defer d.Unlock()
 
+	d.wg.Wait() // Waiting for other go routines to stop
+
+	d.quit = make(chan struct{}, 1)
+
 	err := d.listen()
 	if err != nil {
 		return err
 	}
-
-	log.Info(fmt.Sprintf("Started Discovery V5 at %s:%d, advertising IP: %s:%d", d.udpAddr.IP, d.udpAddr.Port, d.localnode.Node().IP(), d.params.tcpPort))
-	log.Info("Discovery V5 ", d.localnode.Node())
 
 	return nil
 }
@@ -213,9 +243,14 @@ func (d *DiscoveryV5) Stop() {
 	d.Lock()
 	defer d.Unlock()
 
+	close(d.quit)
+
 	d.listener.Close()
 	d.listener = nil
+
 	log.Info("Stopped Discovery V5")
+
+	d.wg.Wait()
 }
 
 // IsPrivate reports whether ip is a private address, according to
@@ -328,6 +363,8 @@ func (c *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discover
 }
 
 func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limit int, doneCh chan struct{}) {
+	defer d.wg.Done()
+
 	for {
 		if len(d.peerCache.recs) >= limit {
 			break
@@ -409,6 +446,8 @@ func (d *DiscoveryV5) FindPeers(ctx context.Context, topic string, opts ...disco
 		defer iterator.Close()
 
 		doneCh := make(chan struct{})
+
+		d.wg.Add(1)
 		go d.iterate(ctx, iterator, limit, doneCh)
 
 		select {

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"sync"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -48,6 +50,7 @@ type (
 		h          host.Host
 		isFullNode bool
 		MsgC       chan *protocol.Envelope
+		wg         *sync.WaitGroup
 
 		filters     *FilterMap
 		subscribers *Subscribers
@@ -67,13 +70,16 @@ func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool) *WakuFi
 
 	wf := new(WakuFilter)
 	wf.ctx = ctx
-	wf.MsgC = make(chan *protocol.Envelope)
+	wf.wg = &sync.WaitGroup{}
+	wf.MsgC = make(chan *protocol.Envelope, 1024)
 	wf.h = host
 	wf.isFullNode = isFullNode
 	wf.filters = NewFilterMap()
 	wf.subscribers = NewSubscribers()
 
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
+
+	wf.wg.Add(1)
 	go wf.FilterListener()
 
 	if wf.isFullNode {
@@ -90,7 +96,7 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 
 	filterRPCRequest := &pb.FilterRPC{}
 
-	reader := protoio.NewDelimitedReader(s, 64*1024)
+	reader := protoio.NewDelimitedReader(s, math.MaxInt32)
 
 	err := reader.ReadMsg(filterRPCRequest)
 	if err != nil {
@@ -155,6 +161,8 @@ func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) er
 }
 
 func (wf *WakuFilter) FilterListener() {
+	defer wf.wg.Done()
+
 	// This function is invoked for each message received
 	// on the full node in context of Waku2-Filter
 	handle := func(envelope *protocol.Envelope) error { // async
@@ -189,7 +197,6 @@ func (wf *WakuFilter) FilterListener() {
 			log.Error("failed to handle message", err)
 		}
 	}
-
 }
 
 // Having a FilterRequest struct,
@@ -281,8 +288,11 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilt
 }
 
 func (wf *WakuFilter) Stop() {
+	close(wf.MsgC)
+
 	wf.h.RemoveStreamHandler(FilterID_v20beta1)
 	wf.filters.RemoveAll()
+	wf.wg.Wait()
 }
 
 func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...FilterSubscribeOption) (filterID string, theFilter Filter, err error) {

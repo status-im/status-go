@@ -79,9 +79,10 @@ func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId str
 	waitCh := make(chan struct{})
 	pingCh := make(chan pingResult, 1000)
 
+	wg.Add(len(peers))
+
 	go func() {
 		for _, p := range peers {
-			wg.Add(1)
 			go func(p peer.ID) {
 				defer wg.Done()
 				ctx, cancel := context.WithTimeout(ctx, 3*time.Second)

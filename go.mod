@@ -49,7 +49,7 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20211121140431-79bb101787c5
+	github.com/status-im/go-waku v0.0.0-20211125141833-23cbb24a94d6
 	github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432
 	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2

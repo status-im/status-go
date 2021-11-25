@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	logging "github.com/ipfs/go-log"
@@ -33,6 +34,8 @@ import (
 )
 
 var log = logging.Logger("wakunode")
+
+const maxAllowedPingFailures = 2
 
 type Message []byte
 
@@ -64,9 +67,13 @@ type WakuNode struct {
 	identificationEventSub event.Subscription
 	addressChangesSub      event.Subscription
 
+	keepAliveMutex sync.Mutex
+	keepAliveFails map[peer.ID]int
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	quit   chan struct{}
+	wg     *sync.WaitGroup
 
 	// Channel passed to WakuNode constructor
 	// receiving connection status notifications
@@ -122,7 +129,9 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.ctx = ctx
 	w.opts = params
 	w.quit = make(chan struct{})
+	w.wg = &sync.WaitGroup{}
 	w.addrChan = make(chan ma.Multiaddr, 1024)
+	w.keepAliveFails = make(map[peer.ID]int)
 
 	if w.protocolEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerProtocolsUpdated)); err != nil {
 		return nil, err
@@ -143,14 +152,15 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.connectionNotif = NewConnectionNotifier(ctx, host)
 	w.host.Network().Notify(w.connectionNotif)
 
+	w.wg.Add(2)
 	go w.connectednessListener()
-
-	if w.opts.keepAliveInterval > time.Duration(0) {
-		w.startKeepAlive(w.opts.keepAliveInterval)
-	}
-
 	go w.checkForAddressChanges()
 	go w.onAddrChange()
+
+	if w.opts.keepAliveInterval > time.Duration(0) {
+		w.wg.Add(1)
+		w.startKeepAlive(w.opts.keepAliveInterval)
+	}
 
 	return w, nil
 }
@@ -190,6 +200,8 @@ func (w *WakuNode) logAddress(addr ma.Multiaddr) {
 }
 
 func (w *WakuNode) checkForAddressChanges() {
+	defer w.wg.Done()
+
 	addrs := w.ListenAddresses()
 	first := make(chan struct{}, 1)
 	first <- struct{}{}
@@ -311,6 +323,8 @@ func (w *WakuNode) Stop() {
 	w.store.Stop()
 
 	w.host.Close()
+
+	w.wg.Wait()
 }
 
 func (w *WakuNode) Host() host.Host {
@@ -425,7 +439,10 @@ func (w *WakuNode) startStore() {
 	if w.opts.shouldResume {
 		// TODO: extract this to a function and run it when you go offline
 		// TODO: determine if a store is listening to a topic
+		w.wg.Add(1)
 		go func() {
+			defer w.wg.Done()
+
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 
@@ -577,12 +594,11 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 // This is necessary because TCP connections are automatically closed due to inactivity,
 // and doing a ping will avoid this (with a small bandwidth cost)
 func (w *WakuNode) startKeepAlive(t time.Duration) {
-	log.Info("Setting up ping protocol with duration of ", t)
-
-	ticker := time.NewTicker(t)
-	defer ticker.Stop()
-
 	go func() {
+		defer w.wg.Done()
+		log.Info("Setting up ping protocol with duration of ", t)
+		ticker := time.NewTicker(t)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
@@ -594,7 +610,8 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 				// through Network's peer collection, as it will be empty
 				for _, p := range w.host.Peerstore().Peers() {
 					if p != w.host.ID() {
-						go pingPeer(w.ctx, w.host, p)
+						w.wg.Add(1)
+						go w.pingPeer(p)
 					}
 				}
 			case <-w.quit:
@@ -604,18 +621,34 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 	}()
 }
 
-func pingPeer(ctx context.Context, host host.Host, peer peer.ID) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+func (w *WakuNode) pingPeer(peer peer.ID) {
+	w.keepAliveMutex.Lock()
+	defer w.keepAliveMutex.Unlock()
+	defer w.wg.Done()
+
+	ctx, cancel := context.WithTimeout(w.ctx, 3*time.Second)
 	defer cancel()
 
 	log.Debug("Pinging ", peer)
-	pr := ping.Ping(ctx, host, peer)
+	pr := ping.Ping(ctx, w.host, peer)
 	select {
 	case res := <-pr:
 		if res.Error != nil {
+			w.keepAliveFails[peer]++
 			log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
+		} else {
+			w.keepAliveFails[peer] = 0
 		}
 	case <-ctx.Done():
+		w.keepAliveFails[peer]++
 		log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
+	}
+
+	if w.keepAliveFails[peer] > maxAllowedPingFailures && w.host.Network().Connectedness(peer) == network.Connected {
+		log.Info("Disconnecting peer ", peer)
+		if err := w.host.Network().ClosePeer(peer); err != nil {
+			log.Debug(fmt.Sprintf("Could not close conn to peer %s: %s", peer, err))
+		}
+		w.keepAliveFails[peer] = 0
 	}
 }
