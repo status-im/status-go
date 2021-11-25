@@ -86,6 +86,9 @@ type Chat struct {
 	// Public key of administrator who created invitation link
 	InvitationAdmin string `json:"invitationAdmin,omitempty"`
 
+	// Public key of administrator who sent us group invitation
+	ReceivedInvitationAdmin string `json:"receivedInvitationAdmin,omitempty"`
+
 	// Public key of user profile
 	Profile string `json:"profile,omitempty"`
 

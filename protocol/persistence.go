@@ -131,8 +131,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value, received_invitation_admin)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -163,6 +163,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Description,
 		chat.Highlight,
 		chat.ReadMessagesAtClockValue,
+		chat.ReceivedInvitationAdmin,
 	)
 
 	if err != nil {
@@ -257,7 +258,8 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.synced_to,
 		    chats.description,
 			contacts.alias,
-                        chats.highlight
+                        chats.highlight,
+                        chats.received_invitation_admin
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
 	`)
@@ -304,6 +306,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Description,
 			&alias,
 			&chat.Highlight,
+			&chat.ReceivedInvitationAdmin,
 		)
 
 		if err != nil {
@@ -389,7 +392,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			community_id,
             joined,
 		    description,
-                    highlight
+                    highlight,
+                    received_invitation_admin
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -414,6 +418,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Joined,
 		&chat.Description,
 		&chat.Highlight,
+		&chat.ReceivedInvitationAdmin,
 	)
 	switch err {
 	case sql.ErrNoRows:
