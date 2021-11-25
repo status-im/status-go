@@ -727,6 +727,11 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	}
 
 	response := &MessengerResponse{}
+	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
 	response.AddCommunity(community)
 	return response, nil
 }

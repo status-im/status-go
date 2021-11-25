@@ -34,7 +34,7 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, chatID)
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, chatID, "", ActivityCenterNotificationNoType)
 
 	if err != nil {
 		return err
@@ -190,11 +190,15 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	return latestCursor, notifications, nil
 
 }
-func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, limit int, ids []types.HexBytes, chatID string) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, limit int, ids []types.HexBytes, chatID string, author string, activityCenterType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
+
 	cursorWhere := ""
 	inQueryWhere := ""
 	inChatWhere := ""
+	fromAuthorWhere := ""
+	ofTypeWhere := ""
+
 	if cursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 		args = append(args, cursor)
@@ -213,6 +217,16 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
 	if chatID != "" {
 		inChatWhere = "AND a.chat_id = ?" //nolint: goconst
 		args = append(args, chatID)
+	}
+
+	if author != "" {
+		fromAuthorWhere = " AND author = ?"
+		args = append(args, author)
+	}
+
+	if activityCenterType != ActivityCenterNotificationNoType {
+		ofTypeWhere = " AND notification_type = ?"
+		args = append(args, activityCenterType)
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
@@ -239,7 +253,10 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   %s
   %s
   %s
-  ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere)
+  %s
+  %s
+  ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere)
+
 	if limit != 0 {
 		args = append(args, limit)
 		query += ` LIMIT ?`
@@ -270,7 +287,7 @@ func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit
 		_ = tx.Rollback()
 	}()
 
-	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, currCursor, incrementedLimit, nil, "")
+	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, currCursor, incrementedLimit, nil, "", "", ActivityCenterNotificationNoType)
 	if err != nil {
 		return "", nil, err
 	}
@@ -320,7 +337,7 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityC
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "")
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "", "", ActivityCenterNotificationNoType)
 
 	_, err = tx.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed`)
 	if err != nil {
@@ -347,7 +364,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, ids, "")
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, ids, "", "", ActivityCenterNotificationNoType)
 
 	if err != nil {
 		return nil, err
@@ -362,6 +379,38 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	query := "UPDATE activity_center_notifications SET accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
+}
+
+func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "", userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed AND author = ? AND notification_type = ?`, userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
 }
 
 func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead() error {

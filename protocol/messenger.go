@@ -1894,6 +1894,42 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 	return m.leaveGroupChat(ctx, &response, chatID, remove, true)
 }
 
+// Decline all pending group invites from a user
+func (m *Messenger) DeclineAllPendingGroupInvitesFromUser(response *MessengerResponse, userPublicKey string) (*MessengerResponse, error) {
+
+	// Decline group invites from active chats
+	chats, err := m.persistence.Chats()
+	var ctx context.Context
+	if err != nil {
+		return nil, err
+	}
+
+	for _, chat := range chats {
+		if chat.ChatType == ChatTypePrivateGroupChat &&
+			chat.ReceivedInvitationAdmin == userPublicKey &&
+			chat.Joined == 0 && chat.Active {
+			response, err = m.leaveGroupChat(ctx, response, chat.ID, true, true)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Decline group invites from activity center notifications
+	notifications, err := m.persistence.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, notification := range notifications {
+		response, err = m.leaveGroupChat(ctx, response, notification.ChatID, true, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return response, nil
+}
+
 func (m *Messenger) reregisterForPushNotifications() error {
 	m.logger.Info("contact state changed, re-registering for push notification")
 	if m.pushNotificationClient == nil {

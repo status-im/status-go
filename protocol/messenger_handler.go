@@ -49,7 +49,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		return err
 	}
 
-	allowed, err := m.isMessageAllowedFrom(messageState.CurrentMessageState.Contact.ID, chat)
+	senderID := messageState.CurrentMessageState.Contact.ID
+	allowed, err := m.isMessageAllowedFrom(senderID, chat)
 	if err != nil {
 		return err
 	}
@@ -112,6 +113,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		// We set group chat inactive and create a notification instead
 		// unless is coming from us or a contact or were waiting for approval
 		newChat.Active = isActive
+		newChat.ReceivedInvitationAdmin = senderID
 		chat = &newChat
 
 		chat.updateChatFromGroupMembershipChanges(group)
