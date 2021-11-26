@@ -430,6 +430,8 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 			return err
 		}
 	}
+	logger.Info("waiting until message processed")
+	m.waitUntilP2PMessagesProcessed()
 	logger.Info("synced topic")
 	return nil
 }
@@ -570,6 +572,21 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 	}
 
 	return m.persistence.DeleteMessages(messageIDs)
+}
+
+func (m *Messenger) waitUntilP2PMessagesProcessed() {
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+
+	for {
+		select {
+		case <-ticker.C:
+			if !m.transport.ProcessingP2PMessages() {
+				ticker.Stop()
+				return
+			}
+		}
+	}
 }
 
 func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {

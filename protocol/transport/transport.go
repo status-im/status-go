@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -219,15 +220,19 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 
 	allFilters := t.filters.Filters()
 	for _, filter := range allFilters {
-		// Don't pull from filters we don't listen to
-		if !filter.Listen {
-			continue
-		}
 		msgs, err := t.api.GetFilterMessages(filter.FilterID)
 		if err != nil {
 			logger.Warn("failed to fetch messages", zap.Error(err))
 			continue
 		}
+		// Don't pull from filters we don't listen to
+		if !filter.Listen {
+			for _, msg := range msgs {
+				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msg.Hash))
+			}
+			continue
+		}
+
 		if len(msgs) == 0 {
 			continue
 		}
@@ -629,4 +634,12 @@ func (t *Transport) DialPeerByID(peerID string) error {
 
 func (t *Transport) DropPeer(peerID string) error {
 	return t.waku.DropPeer(peerID)
+}
+
+func (t *Transport) ProcessingP2PMessages() bool {
+	return t.waku.ProcessingP2PMessages()
+}
+
+func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
+	t.waku.MarkP2PMessageAsProcessed(hash)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -233,6 +234,14 @@ func (w *gethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesReq
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWakuWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
 	return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*wakucommon.Envelope), timeout)
+}
+
+func (w *gethWakuWrapper) ProcessingP2PMessages() bool {
+	return w.waku.ProcessingP2PMessages()
+}
+
+func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
+	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
 func (w *gethWakuWrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {

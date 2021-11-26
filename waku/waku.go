@@ -91,9 +91,12 @@ type Waku struct {
 	peers  map[common.Peer]struct{} // Set of currently active peers
 	peerMu sync.RWMutex             // Mutex to sync the active peer set
 
-	msgQueue    chan *common.Envelope // Message queue for normal waku messages
-	p2pMsgQueue chan interface{}      // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
-	quit        chan struct{}         // Channel used for graceful exit
+	msgQueue    chan *common.Envelope    // Message queue for normal waku messages
+	p2pMsgQueue chan interface{}         // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
+	p2pMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
+	p2pMsgIDsMu sync.RWMutex
+
+	quit chan struct{} // Channel used for graceful exit
 
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
@@ -133,6 +136,7 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 		peers:       make(map[common.Peer]struct{}),
 		msgQueue:    make(chan *common.Envelope, messageQueueLimit),
 		p2pMsgQueue: make(chan interface{}, messageQueueLimit),
+		p2pMsgIDs:   make(map[gethcommon.Hash]bool),
 		quit:        make(chan struct{}),
 		timeSource:  time.Now,
 		logger:      logger,
@@ -1454,7 +1458,14 @@ func (w *Waku) processP2P() {
 		case e := <-w.p2pMsgQueue:
 			switch evn := e.(type) {
 			case *common.Envelope:
-				w.filters.NotifyWatchers(evn, true)
+				matched := w.filters.NotifyWatchers(evn, true)
+				// If matched we add it to the in-flight messages map
+				if matched {
+					w.p2pMsgIDsMu.Lock()
+					w.p2pMsgIDs[evn.Hash()] = true
+					w.p2pMsgIDsMu.Unlock()
+				}
+
 				w.envelopeFeed.Send(common.EnvelopeEvent{
 					Topic: evn.Topic,
 					Hash:  evn.Hash(),
@@ -1543,6 +1554,18 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 
 	_, exist := w.envelopes[hash]
 	return exist
+}
+
+func (w *Waku) ProcessingP2PMessages() bool {
+	w.p2pMsgIDsMu.Lock()
+	defer w.p2pMsgIDsMu.Unlock()
+	return len(w.p2pMsgIDs) != 0
+}
+
+func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
+	w.p2pMsgIDsMu.Lock()
+	defer w.p2pMsgIDsMu.Unlock()
+	delete(w.p2pMsgIDs, hash)
 }
 
 // validatePrivateKey checks the format of the given private key.
