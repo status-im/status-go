@@ -419,12 +419,13 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 	if err != nil {
 		return err
 	}
+
 	for len(cursor) != 0 || storeCursor != nil {
 		logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
 		ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
 		defer cancel()
 
-		cursor, storeCursor, err = m.transport.SendMessagesRequest(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, true)
+		cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
 		if err != nil {
 			return err
 		}
