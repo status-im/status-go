@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
 	wakucommon "github.com/status-im/status-go/wakuv2/common"
@@ -252,6 +253,15 @@ func (w *gethWakuV2Wrapper) DialPeerByID(peerID string) error {
 
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
 	return w.waku.DropPeer(peerID)
+}
+
+func (w *gethWakuV2Wrapper) ProcessingP2PMessages() bool {
+	// NOTE: not implemented for waku 2
+	return false
+}
+
+func (w *gethWakuV2Wrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
+	// NOTE: not implemented for waku 2
 }
 
 type wakuV2FilterWrapper struct {

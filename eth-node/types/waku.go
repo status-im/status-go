@@ -3,6 +3,8 @@ package types
 import (
 	"crypto/ecdsa"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -79,4 +81,10 @@ type Waku interface {
 
 	// RequestStoreMessages uses the WAKU2-STORE protocol to request historic messages
 	RequestStoreMessages(peerID []byte, request MessagesRequest) (*StoreRequestCursor, error)
+
+	// ProcessingP2PMessages indicates whether there are in-flight p2p messages
+	ProcessingP2PMessages() bool
+
+	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
+	MarkP2PMessageAsProcessed(common.Hash)
 }
