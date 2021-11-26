@@ -160,11 +160,13 @@ func (fs *Filters) Get(id string) *Filter {
 
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
-func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
+func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) bool {
 	var msg *ReceivedMessage
 
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
+
+	var matched bool
 
 	candidates := fs.GetWatchersByTopic(env.Topic)
 	for _, watcher := range candidates {
@@ -194,8 +196,10 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
 				watcher.Trigger(msg)
 			}
+			matched = true
 		}
 	}
+	return matched
 }
 
 func (f *Filter) expectsAsymmetricEncryption() bool {
@@ -219,6 +223,7 @@ func (f *Filter) Trigger(msg *ReceivedMessage) {
 // to a filter.
 func (f *Filter) Retrieve() []*ReceivedMessage {
 	msgs, err := f.Messages.Pop()
+
 	if err != nil {
 		log.Error("failed to retrieve messages from filter store", "error", err)
 		return nil

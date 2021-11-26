@@ -21,6 +21,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
@@ -3287,6 +3288,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			messageState.Response.CommunityChanges = nil
 
 			if allMessagesProcessed {
+				m.transport.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 				processedMessages = append(processedMessages, types.EncodeHex(shhMessage.Hash))
 			}
 		}
