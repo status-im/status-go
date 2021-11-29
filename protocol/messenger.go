@@ -527,6 +527,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
 	m.startBackupLoop()
+	err = m.startAutoMessageLoop()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
@@ -541,6 +545,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		response.Mailservers = mailservers
 
 	}
+
 	return response, nil
 }
 
