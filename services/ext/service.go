@@ -190,12 +190,11 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 	for {
 		select {
 		case <-ticker.C:
-			response, err := s.messenger.RetrieveAll()
+			err := s.messenger.RetrieveBatched(publishMessengerResponse, 5)
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-			publishMessengerResponse(response)
 		case <-cancel:
 			return
 		}

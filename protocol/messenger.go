@@ -2572,6 +2572,35 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	return m.handleRetrievedMessages(chatWithMessages)
 }
 
+// RetrieveBatched retrieves messages from all filters, process them and calls callback once a specific batch count has been processed
+func (m *Messenger) RetrieveBatched(callback func(*MessengerResponse), batchCount int) error {
+	chatWithMessages, err := m.transport.RetrieveRawAll()
+	if err != nil {
+		return err
+	}
+
+	batch := make(map[transport.Filter][]*types.Message)
+	currentBatchCount := 0
+	for filter, messages := range chatWithMessages {
+
+		for _, message := range messages {
+			if currentBatchCount == batchCount {
+				response, err := m.handleRetrievedMessages(batch)
+				if err != nil {
+					return err
+				}
+				callback(response)
+				batch = make(map[transport.Filter][]*types.Message)
+				currentBatchCount = 0
+			} else {
+				batch[filter] = append(batch[filter], message)
+				currentBatchCount++
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) GetStats() types.StatsSummary {
 	return m.transport.GetStats()
 }
