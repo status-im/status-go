@@ -2994,6 +2994,54 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.SyncActivityCenterRead:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterRead)
+						logger.Debug("Handling SyncActivityCenterRead", zap.Any("message", a))
+
+						err = m.handleActivityCenterRead(messageState, a)
+						if err != nil {
+							logger.Warn("failed to handle SyncActivityCenterRead", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncActivityCenterAccepted:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterAccepted)
+						logger.Debug("Handling SyncActivityCenterAccepted", zap.Any("message", a))
+
+						err = m.handleActivityCenterAccepted(messageState, a)
+						if err != nil {
+							logger.Warn("failed to handle SyncActivityCenterAccepted", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncActivityCenterDismissed:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterDismissed)
+						logger.Debug("Handling SyncActivityCenterDismissed", zap.Any("message", a))
+
+						err = m.handleActivityCenterDismissed(messageState, a)
+						if err != nil {
+							logger.Warn("failed to handle SyncActivityCenterDismissed", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.RequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))

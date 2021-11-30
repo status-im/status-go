@@ -90,3 +90,18 @@ message SyncChatMessagesRead {
   uint64 clock = 1;
   string id = 2;
 }
+
+message SyncActivityCenterRead {
+  uint64 clock = 1;
+  repeated bytes ids = 2;
+}
+
+message SyncActivityCenterAccepted {
+  uint64 clock = 1;
+  repeated bytes ids = 2;
+}
+
+message SyncActivityCenterDismissed {
+  uint64 clock = 1;
+  repeated bytes ids = 2;
+}

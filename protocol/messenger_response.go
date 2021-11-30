@@ -183,6 +183,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddMessages(response.Messages())
 	r.AddCommunities(response.Communities())
 	r.AddPinMessages(response.PinMessages())
+	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
 
 	return nil
 }

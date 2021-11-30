@@ -257,6 +257,12 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncChatMessagesRead))
 	case protobuf.ApplicationMetadataMessage_BACKUP:
 		return m.unmarshalProtobufData(new(protobuf.Backup))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ:
+		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterRead))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED:
+		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterAccepted))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED:
+		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterDismissed))
 	}
 	return nil
 }
