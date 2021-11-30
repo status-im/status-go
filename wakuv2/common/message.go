@@ -14,6 +14,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// MessageType represents where this message comes from
+type MessageType int
+
+const (
+	RelayedMessageType MessageType = iota
+	StoreMessageType
+)
+
 // MessageParams specifies the exact way a message should be wrapped
 // into an Envelope.
 type MessageParams struct {
@@ -29,6 +37,8 @@ type MessageParams struct {
 // WakuV2 protocol and successfully decrypted.
 type ReceivedMessage struct {
 	Envelope *protocol.Envelope // Wrapped Waku Message
+
+	MsgType MessageType
 
 	Data      []byte
 	Padding   []byte
@@ -140,9 +150,10 @@ type MemoryMessageStore struct {
 	messages map[common.Hash]*ReceivedMessage
 }
 
-func NewReceivedMessage(env *protocol.Envelope) *ReceivedMessage {
+func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
 	return &ReceivedMessage{
 		Envelope: env,
+		MsgType:  msgType,
 	}
 }
 

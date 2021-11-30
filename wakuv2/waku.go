@@ -123,6 +123,9 @@ type Waku struct {
 
 	envelopeFeed event.Feed
 
+	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
+	storeMsgIDsMu sync.RWMutex
+
 	timeSource func() time.Time // source of time for waku
 
 	logger *zap.Logger
@@ -148,6 +151,8 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 		quit:                make(chan struct{}),
 		dnsAddressCache:     make(map[string][]multiaddr.Multiaddr),
 		dnsAddressCacheLock: &sync.RWMutex{},
+		storeMsgIDs:         make(map[gethcommon.Hash]bool),
+		storeMsgIDsMu:       sync.RWMutex{},
 		timeSource:          time.Now,
 		logger:              logger,
 	}
@@ -384,7 +389,7 @@ func (w *Waku) runRelayMsgLoop() {
 	}
 
 	for env := range sub.C {
-		envelopeErrors, err := w.OnNewEnvelopes(env)
+		envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
 		// TODO: should these be handled?
 		_ = envelopeErrors
 		_ = err
@@ -401,7 +406,7 @@ func (w *Waku) runFilterMsgLoop() {
 		case <-w.quit:
 			return
 		case env := <-w.filterMsgChannel:
-			envelopeErrors, err := w.OnNewEnvelopes(env)
+			envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
 			// TODO: should these be handled?
 			_ = envelopeErrors
 			_ = err
@@ -835,7 +840,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	w.poolMu.Unlock()
 	if !alreadyCached {
 		envelope := wakuprotocol.NewEnvelope(msg, relay.DefaultWakuTopic)
-		recvMessage := common.NewReceivedMessage(envelope)
+		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
 	}
@@ -867,7 +872,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	for _, msg := range result.Messages {
 		envelope := wakuprotocol.NewEnvelope(msg, relay.DefaultWakuTopic)
 		w.logger.Debug("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
-		_, err = w.OnNewEnvelopes(envelope)
+		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
 			return nil, err
 		}
@@ -902,8 +907,8 @@ func (w *Waku) Stop() error {
 	return nil
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope) ([]common.EnvelopeError, error) {
-	recvMessage := common.NewReceivedMessage(envelope)
+func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
+	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	envelopeErrors := make([]common.EnvelopeError, 0)
 
 	w.logger.Debug("received new envelope")
@@ -969,7 +974,23 @@ func (w *Waku) processQueue() {
 		case <-w.quit:
 			return
 		case e := <-w.msgQueue:
-			w.filters.NotifyWatchers(e)
+			if e.MsgType == common.StoreMessageType {
+				// We need to insert it first, and then remove it if not matched,
+				// as messages are processed asynchronously
+				w.storeMsgIDsMu.Lock()
+				w.storeMsgIDs[e.Hash()] = true
+				w.storeMsgIDsMu.Unlock()
+			}
+
+			matched := w.filters.NotifyWatchers(e)
+
+			// If not matched we remove it
+			if !matched {
+				w.storeMsgIDsMu.Lock()
+				delete(w.storeMsgIDs, e.Hash())
+				w.storeMsgIDsMu.Unlock()
+			}
+
 			w.envelopeFeed.Send(common.EnvelopeEvent{
 				Topic: e.Topic,
 				Hash:  e.Hash(),
@@ -1073,6 +1094,18 @@ func (w *Waku) DialPeerByID(peerID string) error {
 
 func (w *Waku) DropPeer(peerID string) error {
 	return w.node.ClosePeerById(peer.ID(peerID))
+}
+
+func (w *Waku) ProcessingP2PMessages() bool {
+	w.storeMsgIDsMu.Lock()
+	defer w.storeMsgIDsMu.Unlock()
+	return len(w.storeMsgIDs) != 0
+}
+
+func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
+	w.storeMsgIDsMu.Lock()
+	defer w.storeMsgIDsMu.Unlock()
+	delete(w.storeMsgIDs, hash)
 }
 
 // validatePrivateKey checks the format of the given private key.

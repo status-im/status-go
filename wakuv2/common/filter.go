@@ -159,7 +159,7 @@ func (fs *Filters) Get(id string) *Filter {
 
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
-func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
+func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	var decodedMsg *ReceivedMessage
 
 	fs.mutex.RLock()
@@ -168,28 +168,31 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
 	topic, err := ExtractTopicFromContentTopic(recvMessage.Envelope.Message().ContentTopic)
 	if err != nil {
 		log.Trace(err.Error(), "topic", recvMessage.Envelope.Message().ContentTopic)
-		return
+		return false
 	}
+
+	var matched bool
 
 	candidates := fs.GetWatchersByTopic(*topic)
 	for _, watcher := range candidates {
-		match := true
+		matched = true
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
 				log.Trace("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
 		} else {
-			match = watcher.MatchMessage(decodedMsg)
+			matched = watcher.MatchMessage(decodedMsg)
 		}
 
-		if match && decodedMsg != nil {
+		if matched && decodedMsg != nil {
 			log.Trace("processing message: decrypted", "hash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}
 		}
 	}
+	return matched
 }
 
 func (f *Filter) expectsAsymmetricEncryption() bool {
