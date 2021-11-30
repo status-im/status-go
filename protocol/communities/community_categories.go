@@ -325,7 +325,11 @@ func (o *Community) insertAndSort(changes *CommunityChanges, categoryID string, 
 
 	for k, v := range o.config.CommunityDescription.Chats {
 		if k != chatID && newPosition == int(v.Position) && v.CategoryId == categoryID {
-			v.Position++
+			if decrease {
+				v.Position++
+			} else {
+				v.Position--
+			}
 		}
 	}
 
