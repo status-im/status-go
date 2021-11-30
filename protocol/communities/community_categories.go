@@ -254,7 +254,7 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	changes := o.emptyCommunityChanges()
 
 	o.SortCategoryChats(changes, oldCategoryID)
-	o.insertAndSort(changes, categoryID, chatID, chat, newPosition)
+	o.insertAndSort(changes, oldCategoryID, categoryID, chatID, chat, newPosition)
 
 	o.increaseClock()
 
@@ -295,7 +295,7 @@ func (o *Community) SortCategoryChats(changes *CommunityChanges, categoryID stri
 	}
 }
 
-func (o *Community) insertAndSort(changes *CommunityChanges, categoryID string, chatID string, chat *protobuf.CommunityChat, newPosition int) {
+func (o *Community) insertAndSort(changes *CommunityChanges, oldCategoryID string, categoryID string, chatID string, chat *protobuf.CommunityChat, newPosition int) {
 	// We sort the chats here because maps are not guaranteed to keep order
 	var catChats []string
 	sortedChats := make(sortSlice, 0, len(o.config.CommunityDescription.Chats))
@@ -325,10 +325,14 @@ func (o *Community) insertAndSort(changes *CommunityChanges, categoryID string, 
 
 	for k, v := range o.config.CommunityDescription.Chats {
 		if k != chatID && newPosition == int(v.Position) && v.CategoryId == categoryID {
-			if decrease {
-				v.Position++
+			if oldCategoryID == categoryID {
+				if decrease {
+					v.Position++
+				} else {
+					v.Position--
+				}
 			} else {
-				v.Position--
+				v.Position++
 			}
 		}
 	}
