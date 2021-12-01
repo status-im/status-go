@@ -1126,14 +1126,16 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		m.allChats.Store(chat.ID, chat)
+                if (!chat.Timeline() && chat.ChatType != ChatTypeProfile) {
+                        m.allChats.Store(chat.ID, chat)
+                }
 
-		if !chat.Active || chat.Timeline() {
-			continue
-		}
+                if !chat.Active || chat.Timeline() {
+                        continue
+                }
 
-		switch chat.ChatType {
-		case ChatTypePublic, ChatTypeProfile:
+                switch chat.ChatType {
+                case ChatTypePublic, ChatTypeProfile:
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeCommunityChat:
 			publicChatIDs = append(publicChatIDs, chat.ID)
