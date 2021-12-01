@@ -256,12 +256,11 @@ func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
 }
 
 func (w *gethWakuV2Wrapper) ProcessingP2PMessages() bool {
-	// NOTE: not implemented for waku 2
-	return false
+	return w.waku.ProcessingP2PMessages()
 }
 
 func (w *gethWakuV2Wrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
-	// NOTE: not implemented for waku 2
+	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
 type wakuV2FilterWrapper struct {
