@@ -672,6 +672,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
+	b.log.Info("status-go version details", "version", params.Version, "commit", params.GitCommit)
 	b.log.Debug("starting node with config", "config", config)
 	// Update config with some defaults.
 	if err := config.UpdateWithDefaults(); err != nil {
