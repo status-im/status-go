@@ -477,12 +477,14 @@ func (p *Protocol) HandleMessage(
 		if dmProtocol == nil {
 			dmProtocol = encryptedMessage[noInstallationID]
 		}
-		hrHeader := dmProtocol.HRHeader
-		if hrHeader != nil && hrHeader.SeqNo == 0 {
-			// Payload contains hash ratchet key
-			err = p.encryptor.persistence.SaveHashRatchetKey(hrHeader.GroupId, hrHeader.KeyId, message)
-			if err != nil {
-				return nil, err
+		if dmProtocol != nil {
+			hrHeader := dmProtocol.HRHeader
+			if hrHeader != nil && hrHeader.SeqNo == 0 {
+				// Payload contains hash ratchet key
+				err = p.encryptor.persistence.SaveHashRatchetKey(hrHeader.GroupId, hrHeader.KeyId, message)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
