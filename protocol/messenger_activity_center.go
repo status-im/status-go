@@ -1,26 +1,91 @@
 package protocol
 
 import (
+	"context"
+
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 func (m *Messenger) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return m.persistence.UnreadActivityCenterNotificationsCount()
 }
 
-func (m *Messenger) MarkAllActivityCenterNotificationsRead() error {
+func toHexBytes(b [][]byte) []types.HexBytes {
+	hb := make([]types.HexBytes, len(b))
+
+	for i, v := range b {
+		hb[i] = types.HexBytes(v)
+	}
+
+	return hb
+}
+
+func fromHexBytes(hb []types.HexBytes) [][]byte {
+	b := make([][]byte, len(hb))
+
+	for i, v := range hb {
+		b[i] = v
+	}
+
+	return b
+}
+
+func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
+	if m.hasPairedDevices() {
+		ids, err := m.persistence.GetNotReadActivityCenterNotificationIds()
+		if err != nil {
+			return err
+		}
+
+		_, err = m.MarkActivityCenterNotificationsRead(ctx, toHexBytes(ids), true)
+		return err
+	}
+
 	return m.persistence.MarkAllActivityCenterNotificationsRead()
 }
 
-func (m *Messenger) MarkActivityCenterNotificationsRead(ids []types.HexBytes) error {
-	return m.persistence.MarkActivityCenterNotificationsRead(ids)
+func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
+	err := m.persistence.MarkActivityCenterNotificationsRead(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	if !sync {
+		notifications, err := m.persistence.GetActivityCenterNotificationsByID(ids)
+		if err != nil {
+			return nil, err
+		}
+		return m.processActivityCenterNotifications(notifications, true)
+	}
+
+	syncMessage := &protobuf.SyncActivityCenterRead{
+		Clock: m.getTimesource().GetCurrentTime(),
+		Ids:   fromHexBytes(ids),
+	}
+
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.sendToPairedDevices(ctx, common.RawMessage{
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ,
+		ResendAutomatically: true,
+	})
+
+	return nil, err
 }
 
 func (m *Messenger) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
 	return m.persistence.MarkActivityCenterNotificationsUnread(ids)
 }
 
-func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*ActivityCenterNotification) (*MessengerResponse, error) {
+func (m *Messenger) processActivityCenterNotifications(notifications []*ActivityCenterNotification, addNotifications bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 	var chats []*Chat
 	for _, notification := range notifications {
@@ -36,6 +101,10 @@ func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*
 			chats = append(chats, chat)
 			response.AddChat(chat)
 		}
+
+		if addNotifications {
+			response.AddActivityCenterNotification(notification)
+		}
 	}
 	if len(chats) != 0 {
 		err := m.saveChats(chats)
@@ -46,28 +115,103 @@ func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*
 	return response, nil
 }
 
-func (m *Messenger) AcceptAllActivityCenterNotifications() (*MessengerResponse, error) {
+func (m *Messenger) processAcceptedActivityCenterNotifications(ctx context.Context, notifications []*ActivityCenterNotification, sync bool) (*MessengerResponse, error) {
+	ids := make([][]byte, len(notifications))
+
+	for i := range notifications {
+		ids[i] = notifications[i].ID
+		notifications[i].Accepted = true
+	}
+
+	if sync {
+		syncMessage := &protobuf.SyncActivityCenterAccepted{
+			Clock: m.getTimesource().GetCurrentTime(),
+			Ids:   ids,
+		}
+
+		encodedMessage, err := proto.Marshal(syncMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		err = m.sendToPairedDevices(ctx, common.RawMessage{
+			Payload:             encodedMessage,
+			MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED,
+			ResendAutomatically: true,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return m.processActivityCenterNotifications(notifications, !sync)
+}
+
+func (m *Messenger) AcceptAllActivityCenterNotifications(ctx context.Context) (*MessengerResponse, error) {
 	notifications, err := m.persistence.AcceptAllActivityCenterNotifications()
 	if err != nil {
 		return nil, err
 	}
-	return m.processAcceptedActivityCenterNotifications(notifications)
+
+	return m.processAcceptedActivityCenterNotifications(ctx, notifications, true)
 }
 
-func (m *Messenger) AcceptActivityCenterNotifications(ids []types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
 	notifications, err := m.persistence.AcceptActivityCenterNotifications(ids)
 	if err != nil {
 		return nil, err
 	}
-	return m.processAcceptedActivityCenterNotifications(notifications)
+
+	return m.processAcceptedActivityCenterNotifications(ctx, notifications, sync)
 }
 
-func (m *Messenger) DismissAllActivityCenterNotifications() error {
+func (m *Messenger) DismissAllActivityCenterNotifications(ctx context.Context) error {
+	if m.hasPairedDevices() {
+		ids, err := m.persistence.GetToProcessActivityCenterNotificationIds()
+		if err != nil {
+			return err
+		}
+
+		_, err = m.DismissActivityCenterNotifications(ctx, toHexBytes(ids), true)
+		return err
+	}
+
 	return m.persistence.DismissAllActivityCenterNotifications()
 }
 
-func (m *Messenger) DismissActivityCenterNotifications(ids []types.HexBytes) error {
-	return m.persistence.DismissActivityCenterNotifications(ids)
+func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
+	err := m.persistence.DismissActivityCenterNotifications(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	if !sync {
+		notifications, err := m.persistence.GetActivityCenterNotificationsByID(ids)
+		if err != nil {
+			return nil, err
+		}
+
+		return m.processActivityCenterNotifications(notifications, true)
+	}
+
+	syncMessage := &protobuf.SyncActivityCenterDismissed{
+		Clock: m.getTimesource().GetCurrentTime(),
+		Ids:   fromHexBytes(ids),
+	}
+
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.sendToPairedDevices(ctx, common.RawMessage{
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED,
+		ResendAutomatically: true,
+	})
+
+	return nil, err
 }
 
 func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*ActivityCenterPaginationResponse, error) {
@@ -80,4 +224,37 @@ func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*A
 		Cursor:        cursor,
 		Notifications: notifications,
 	}, nil
+}
+
+func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
+	m.logger.Info("HANDLING SYNC ACTIVITY CENTER READ")
+	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
+
+	if err != nil {
+		return err
+	}
+
+	return state.Response.Merge(resp)
+}
+
+func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, message protobuf.SyncActivityCenterAccepted) error {
+	m.logger.Info("HANDLING SYNC ACTIVITY CENTER ACCEPTED")
+	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
+
+	if err != nil {
+		return err
+	}
+
+	return state.Response.Merge(resp)
+}
+
+func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, message protobuf.SyncActivityCenterDismissed) error {
+	m.logger.Info("HANDLING SYNC ACTIVITY CENTER DISMISS")
+	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
+
+	if err != nil {
+		return err
+	}
+
+	return state.Response.Merge(resp)
 }

@@ -269,6 +269,66 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
 	return db.unmarshalActivityCenterNotificationRows(rows)
 }
 
+func (db sqlitePersistence) runActivityCenterIDQuery(query string) ([][]byte, error) {
+	rows, err := db.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids [][]byte
+
+	for rows.Next() {
+		var id []byte
+		err = rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+func (db sqlitePersistence) GetNotReadActivityCenterNotificationIds() ([][]byte, error) {
+	return db.runActivityCenterIDQuery("SELECT a.id FROM activity_center_notifications a WHERE NOT a.read")
+}
+
+func (db sqlitePersistence) GetToProcessActivityCenterNotificationIds() ([][]byte, error) {
+	return db.runActivityCenterIDQuery("SELECT a.id FROM activity_center_notifications a WHERE NOT a.dismissed AND NOT a.accepted")
+}
+
+func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
+	idsArgs := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		idsArgs = append(idsArgs, id)
+	}
+
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+	rows, err := db.db.Query("SELECT a.id, a.read, a.accepted, a.dismissed FROM activity_center_notifications a WHERE a.id IN ("+inVector+")", idsArgs...) // nolint: gosec
+
+	if err != nil {
+		return nil, err
+	}
+
+	var notifications []*ActivityCenterNotification
+	for rows.Next() {
+		notification := &ActivityCenterNotification{}
+		err := rows.Scan(
+			&notification.ID,
+			&notification.Read,
+			&notification.Accepted,
+			&notification.Dismissed)
+
+		if err != nil {
+			return nil, err
+		}
+
+		notifications = append(notifications, notification)
+	}
+
+	return notifications, nil
+}
+
 func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
