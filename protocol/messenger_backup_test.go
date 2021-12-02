@@ -355,7 +355,7 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			return len(bob2.Contacts()) >= 1
+			return len(bob2.AddedContacts()) >= 1
 		},
 		"contacts not backed up",
 	)
