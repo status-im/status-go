@@ -55,7 +55,7 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 		}
 
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		query := "UPDATE activity_center_notifications SET dismissed = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+		query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 		_, err = tx.Exec(query, idsArgs...)
 		return err
 	}
@@ -297,6 +297,15 @@ func (db sqlitePersistence) GetToProcessActivityCenterNotificationIds() ([][]byt
 	return db.runActivityCenterIDQuery("SELECT a.id FROM activity_center_notifications a WHERE NOT a.dismissed AND NOT a.accepted")
 }
 
+func (db sqlitePersistence) HasPendingNotificationsForChat(chatID string) (bool, error) {
+	rows, err := db.db.Query("SELECT 1 FROM activity_center_notifications a WHERE a.chat_id = ? NOT a.dismissed AND NOT a.accepted", chatID)
+	if err != nil {
+		return false, err
+	}
+
+	return rows.Next(), nil
+}
+
 func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
 	idsArgs := make([]interface{}, 0, len(ids))
 	for _, id := range ids {
@@ -362,12 +371,12 @@ func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotifications() error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET dismissed = 1 WHERE NOT dismissed AND NOT accepted`)
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE NOT dismissed AND NOT accepted`)
 	return err
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPublicKey string) error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET dismissed = 1 WHERE NOT dismissed AND NOT accepted AND author = ?`, userPublicKey)
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE NOT dismissed AND NOT accepted AND author = ?`, userPublicKey)
 	return err
 }
 
@@ -379,7 +388,7 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET dismissed = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err := db.db.Exec(query, idsArgs...)
 	return err
 
@@ -404,7 +413,7 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityC
 
 	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "", "", ActivityCenterNotificationNoType)
 
-	_, err = tx.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed`)
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE NOT accepted AND NOT dismissed`)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +450,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
 }
@@ -469,7 +478,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 		return nil, err
 	}
 
-	_, err = tx.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed AND author = ? AND notification_type = ?`, userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE NOT accepted AND NOT dismissed AND author = ? AND notification_type = ?`, userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
 
 	if err != nil {
 		return nil, err

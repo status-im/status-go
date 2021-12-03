@@ -1894,14 +1894,19 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 		if err != nil {
 			return nil, err
 		}
-		_, err = m.dispatchMessage(ctx, common.RawMessage{
-			LocalChatID: chat.ID,
-			Payload:     encodedMessage,
-			MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-			Recipients:  recipients,
-		})
-		if err != nil {
-			return nil, err
+
+		// shouldBeSynced is false if we got here because a synced client has already
+		// sent the leave group message. In that case we don't need to send it again.
+		if shouldBeSynced {
+			_, err = m.dispatchMessage(ctx, common.RawMessage{
+				LocalChatID: chat.ID,
+				Payload:     encodedMessage,
+				MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+				Recipients:  recipients,
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		chat.updateChatFromGroupMembershipChanges(group)
@@ -2346,9 +2351,16 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 
 		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active {
-			err := m.syncChatRemoving(ctx, chatID)
+			pending, err := m.persistence.HasPendingNotificationsForChat(chat.ID)
 			if err != nil {
 				return false
+			}
+
+			if !pending {
+				err = m.syncChatRemoving(ctx, chatID)
+				if err != nil {
+					return false
+				}
 			}
 		}
 
