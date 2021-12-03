@@ -181,7 +181,12 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
-	m.sendCurrentUserStatus(ctx)
+	go func() {
+		// Ensure that we are connected before sending a message
+		time.Sleep(5 * time.Second)
+		m.sendCurrentUserStatus(ctx)
+	}()
+
 	go func() {
 		for {
 			select {
