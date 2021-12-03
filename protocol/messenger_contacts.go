@@ -367,9 +367,14 @@ func (m *Messenger) UnblockContact(contactID string) error {
 	contact.Unblock()
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
+	err := m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return err
+	}
+
 	m.allContacts.Store(contact.ID, contact)
 
-	err := m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact)
 	if err != nil {
 		return err
 	}
