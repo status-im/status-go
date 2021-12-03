@@ -428,7 +428,7 @@ func (api *NimbusPublicAPI) SaveContact(parent context.Context, contact *protoco
 	return api.service.messenger.SaveContact(contact)
 }
 
-func (api *NimbusPublicAPI) BlockContact(parent context.Context, contact *protocol.Contact) ([]*protocol.Chat, error) {
+func (api *NimbusPublicAPI) BlockContact(parent context.Context, contact *protocol.Contact) (*protocol.MessengerResponse, error) {
 	api.log.Info("blocking contact", "contact", contact.ID)
 	return api.service.messenger.BlockContact(contact)
 }

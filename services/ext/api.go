@@ -293,7 +293,7 @@ func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.UnmuteChat(chatID)
 }
 
-func (api *PublicAPI) BlockContact(parent context.Context, contactID string) ([]*protocol.Chat, error) {
+func (api *PublicAPI) BlockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	api.log.Info("blocking contact", "contact", contactID)
 	return api.service.messenger.BlockContact(contactID)
 }

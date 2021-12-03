@@ -365,11 +365,14 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		if message.Blocked != contact.Blocked {
 			if message.Blocked {
 				state.AllContacts.Store(contact.ID, contact)
-				chats, err := m.BlockContact(contact.ID)
+				response, err := m.BlockContact(contact.ID)
 				if err != nil {
 					return err
 				}
-				state.Response.AddChats(chats)
+				err = state.Response.Merge(response)
+				if err != nil {
+					return err
+				}
 			} else {
 				contact.Unblock()
 			}

@@ -366,6 +366,11 @@ func (db sqlitePersistence) DismissAllActivityCenterNotifications() error {
 	return err
 }
 
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPublicKey string) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET dismissed = 1 WHERE NOT dismissed AND NOT accepted AND author = ?`, userPublicKey)
+	return err
+}
+
 func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBytes) error {
 
 	idsArgs := make([]interface{}, 0, len(ids))
