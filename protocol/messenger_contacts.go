@@ -319,7 +319,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) BlockContact(contactID string) ([]*Chat, error) {
+func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok {
 		var err error
@@ -356,6 +356,28 @@ func (m *Messenger) BlockContact(contactID string) ([]*Chat, error) {
 	}
 
 	return chats, nil
+}
+
+func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	chats, err := m.blockContact(contactID)
+	if err != nil {
+		return nil, err
+	}
+	response.AddChats(chats)
+
+	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) UnblockContact(contactID string) error {

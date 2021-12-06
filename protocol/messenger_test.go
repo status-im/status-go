@@ -1433,14 +1433,15 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(err)
 
 	response, err := s.m.BlockContact(contact.ID)
+	chats := response.Chats()
 	s.Require().NoError(err)
 
 	var actualChat2, actualChat3 *Chat
-	for idx := range response {
-		if response[idx].ID == chat2.ID {
-			actualChat2 = response[idx]
-		} else if response[idx].ID == chat3.ID {
-			actualChat3 = response[idx]
+	for idx := range chats {
+		if chats[idx].ID == chat2.ID {
+			actualChat2 = chats[idx]
+		} else if chats[idx].ID == chat3.ID {
+			actualChat3 = chats[idx]
 		}
 	}
 	// The new unviewed count is updated
