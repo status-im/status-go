@@ -3347,50 +3347,265 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+<<<<<<< HEAD
 					case protobuf.SyncActivityCenterRead:
+=======
+					case protobuf.SyncSettings:
+>>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
+<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterRead)
 						logger.Debug("Handling SyncActivityCenterRead", zap.Any("message", a))
 
 						err = m.handleActivityCenterRead(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterRead", zap.Error(err))
+=======
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettings)
+						logger.Debug("Handling SyncSettings", zap.Any("message", settings))
+
+						err = m.handleSyncSettings(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettings", zap.Error(err))
+>>>>>>> Sync Settings
 							allMessagesProcessed = false
 							continue
 						}
 
+<<<<<<< HEAD
 					case protobuf.SyncActivityCenterAccepted:
+=======
+					case protobuf.SyncSettingCurrency:
+>>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
+<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterAccepted)
 						logger.Debug("Handling SyncActivityCenterAccepted", zap.Any("message", a))
 
 						err = m.handleActivityCenterAccepted(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterAccepted", zap.Error(err))
+=======
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingCurrency)
+						logger.Debug("Handling SyncSettingCurrency", zap.Any("message", settings))
+
+						err = m.handleSyncSettingCurrency(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingCurrency", zap.Error(err))
+>>>>>>> Sync Settings
 							allMessagesProcessed = false
 							continue
 						}
 
+<<<<<<< HEAD
 					case protobuf.SyncActivityCenterDismissed:
+=======
+					case protobuf.SyncSettingGifFavorites:
+>>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
+<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterDismissed)
 						logger.Debug("Handling SyncActivityCenterDismissed", zap.Any("message", a))
 
 						err = m.handleActivityCenterDismissed(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterDismissed", zap.Error(err))
+=======
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifFavorites)
+						logger.Debug("Handling SyncSettingGifFavorites", zap.Any("message", settings))
+
+						err = m.handleSyncSettingGifFavorites(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingGifFavorites", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingGifRecents:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifRecents)
+						logger.Debug("Handling SyncSettingGifRecents", zap.Any("message", settings))
+
+						err = m.handleSyncSettingGifRecents(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingGifRecents", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingMessagesFromContactsOnly:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingMessagesFromContactsOnly)
+						logger.Debug("Handling SyncSettingMessagesFromContactsOnly", zap.Any("message", settings))
+
+						err = m.handleSyncSettingMessagesFromContactsOnly(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingMessagesFromContactsOnly", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingPreferredName:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreferredName)
+						logger.Debug("Handling SyncSettingPreferredName", zap.Any("message", settings))
+
+						err = m.handleSyncSettingPreferredName(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingPreferredName", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingPreviewPrivacy:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreviewPrivacy)
+						logger.Debug("Handling SyncSettingPreviewPrivacy", zap.Any("message", settings))
+
+						err = m.handleSyncSettingPreviewPrivacy(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingPreviewPrivacy", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingProfilePicturesShowTo:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesShowTo)
+						logger.Debug("Handling SyncSettingProfilePicturesShowTo", zap.Any("message", settings))
+
+						err = m.handleSyncSettingProfilePicturesShowTo(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingProfilePicturesShowTo", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingProfilePicturesVisibility:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesVisibility)
+						logger.Debug("Handling SyncSettingProfilePicturesVisibility", zap.Any("message", settings))
+
+						err = m.handleSyncSettingProfilePicturesVisibility(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingProfilePicturesVisibility", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingSendStatusUpdates:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingSendStatusUpdates)
+						logger.Debug("Handling SyncSettingSendStatusUpdates", zap.Any("message", settings))
+
+						err = m.handleSyncSettingSendStatusUpdates(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingSendStatusUpdates", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingStickerPacksInstalled:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksInstalled)
+						logger.Debug("Handling SyncSettingStickerPacksInstalled", zap.Any("message", settings))
+
+						err = m.handleSyncSettingStickerPacksInstalled(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingStickerPacksInstalled", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingStickerPacksPending:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksPending)
+						logger.Debug("Handling SyncSettingStickerPacksPending", zap.Any("message", settings))
+
+						err = m.handleSyncSettingStickerPacksPending(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingStickerPacksPending", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingStickersRecentStickers:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickersRecentStickers)
+						logger.Debug("Handling SyncSettingStickersRecentStickers", zap.Any("message", settings))
+
+						err = m.handleSyncSettingStickersRecentStickers(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingStickersRecentStickers", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingTelemetryServerURL:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingTelemetryServerURL)
+						logger.Debug("Handling SyncSettingTelemetryServerURL", zap.Any("message", settings))
+
+						err = m.handleSyncSettingTelemetryServerURL(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingTelemetryServerURL", zap.Error(err))
+>>>>>>> Sync Settings
 							allMessagesProcessed = false
 							continue
 						}

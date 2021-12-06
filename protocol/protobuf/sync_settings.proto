@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message SyncSettings {
+  SyncSettingCurrency                  currency = 1;
+  SyncSettingGifRecents                gif_recents = 2;
+  SyncSettingGifFavorites              gif_favorites = 3;
+  SyncSettingMessagesFromContactsOnly  messages_from_contacts_only = 4;
+  SyncSettingPreferredName             preferred_name = 5;
+  SyncSettingPreviewPrivacy            previewPrivacy = 6;
+  SyncSettingProfilePicturesShowTo     profile_pictures_show_to = 7;
+  SyncSettingProfilePicturesVisibility profile_pictures_visibility = 8;
+  SyncSettingSendStatusUpdates         send_status_updates = 9;
+  SyncSettingStickerPacksInstalled     sticker_packs_installed = 10;
+  SyncSettingStickerPacksPending       sticker_packs_pending = 11;
+  SyncSettingStickersRecentStickers    stickers_recent_stickers = 12;
+  SyncSettingTelemetryServerURL        telemetry_server_URL = 13;
+}
+
+message SyncSettingCurrency {
+  uint64 clock = 1;
+  string value = 2;
+}
+
+message SyncSettingGifRecents {
+  uint64 clock = 1;
+  bytes value = 2;
+}
+
+message SyncSettingGifFavorites {
+  uint64 clock = 1;
+  bytes value = 2;
+}
+
+message SyncSettingMessagesFromContactsOnly {
+  uint64 clock = 1;
+  bool value = 2;
+}
+
+message SyncSettingPreferredName {
+  uint64 clock = 1;
+  string value = 2;
+}
+
+message SyncSettingPreviewPrivacy {
+  uint64 clock = 1;
+  bool value = 2;
+}
+
+message SyncSettingProfilePicturesShowTo {
+  uint64 clock = 1;
+  int64 value = 2;
+}
+
+message SyncSettingProfilePicturesVisibility {
+  uint64 clock = 1;
+  int64 value = 2;
+}
+
+message SyncSettingSendStatusUpdates {
+  uint64 clock = 1;
+  bool value = 2;
+}
+
+message SyncSettingStickerPacksInstalled {
+  uint64 clock = 1;
+  bytes value = 2;
+}
+
+message SyncSettingStickerPacksPending {
+  uint64 clock = 1;
+  bytes value = 2;
+}
+
+message SyncSettingStickersRecentStickers {
+  uint64 clock = 1;
+  bytes value = 2;
+}
+
+message SyncSettingTelemetryServerURL {
+  uint64 clock = 1;
+  string value = 2;
+}
+
+/* TODOs
+LastBackup uint64
+BackupEnabled bool
+ */

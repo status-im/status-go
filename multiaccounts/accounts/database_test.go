@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -240,4 +241,31 @@ func TestAddressDoesntExist(t *testing.T) {
 	exists, err := db.AddressExists(types.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+func TestDatabase_SetSettingLastSynced(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	tm := time.Unix(0,0)
+
+	ct, err := db.GetSettingLastSynced(Currency.DBColumnName)
+	require.NoError(t, err)
+	require.True(t, tm.Equal(ct))
+
+	tm = tm.Add(123 * time.Minute)
+	err = db.SetSettingLastSynced(Currency.DBColumnName, tm)
+	require.NoError(t, err)
+
+	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	require.NoError(t, err)
+	require.True(t, tm.Equal(ct))
+
+	now := time.Now()
+	err = db.SetSettingLastSynced(Currency.DBColumnName, now)
+	require.NoError(t, err)
+
+	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	require.NoError(t, err)
+	require.True(t, now.Equal(ct))
 }
