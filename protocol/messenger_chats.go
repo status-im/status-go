@@ -356,9 +356,28 @@ func (m *Messenger) deactivateChat(chatID string, shouldBeSynced bool) (*Messeng
 		return nil, ErrChatNotFound
 	}
 
+	// Reset mailserver last request to allow re-fetching messages if joining a chat again
+	filters, err := m.filtersForChat(chatID)
+	if err != nil && err != ErrNoFiltersForChat {
+		return nil, err
+	}
+
+	if m.mailserversDatabase != nil {
+		for _, filter := range filters {
+			if !filter.Listen || filter.Ephemeral {
+				continue
+			}
+
+			err := m.mailserversDatabase.ResetLastRequest(filter.Topic.String())
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	err := m.persistence.DeactivateChat(chat, clock)
+	err = m.persistence.DeactivateChat(chat, clock)
 
 	if err != nil {
 		return nil, err

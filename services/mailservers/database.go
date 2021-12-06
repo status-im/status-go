@@ -297,6 +297,11 @@ func (d *Database) Topics() ([]MailserverTopic, error) {
 	return result, nil
 }
 
+func (d *Database) ResetLastRequest(topic string) error {
+	_, err := d.db.Exec("UPDATE mailserver_topics SET last_request = 0 WHERE topic = ?", topic)
+	return err
+}
+
 func (d *Database) DeleteTopic(topic string) error {
 	_, err := d.db.Exec(`DELETE FROM mailserver_topics WHERE topic = ?`, topic)
 	return err

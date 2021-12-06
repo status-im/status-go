@@ -23,6 +23,8 @@ var tolerance uint32 = 60
 var mailserverRequestTimeout = 45 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 
+var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
+
 func (m *Messenger) shouldSync() (bool, error) {
 	if m.mailserver == nil || !m.online() {
 		return false, nil
@@ -140,7 +142,7 @@ func (m *Messenger) filtersForChat(chatID string) ([]*transport.Filter, error) {
 	} else {
 		filter := m.transport.FilterByChatID(chatID)
 		if filter == nil {
-			return nil, errors.New("no filter registered for given chat")
+			return nil, ErrNoFiltersForChat
 		}
 		filters = []*transport.Filter{filter}
 	}
@@ -277,6 +279,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 				LastRequest: int(lastRequest),
 			}
 		}
+
 		batch, ok := batches[topicData.LastRequest]
 		if !ok {
 			from, err := m.capToDefaultSyncPeriod(uint32(topicData.LastRequest))
