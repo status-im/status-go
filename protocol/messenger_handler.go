@@ -1209,6 +1209,8 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 
 			chat = CreateOneToOneChat(chatID[:8], pubKey, m.getTimesource())
 		}
+		// if we are the sender, the chat must be active
+		chat.Active = true
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
 		// It's an incoming private chatEntity. ChatID is calculated from the signature.

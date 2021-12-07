@@ -121,6 +121,7 @@ func (m *Messenger) processAcceptedActivityCenterNotifications(ctx context.Conte
 	for i := range notifications {
 		ids[i] = notifications[i].ID
 		notifications[i].Accepted = true
+		notifications[i].Read = true
 	}
 
 	if sync {
