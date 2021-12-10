@@ -298,7 +298,7 @@ func (db sqlitePersistence) GetToProcessActivityCenterNotificationIds() ([][]byt
 }
 
 func (db sqlitePersistence) HasPendingNotificationsForChat(chatID string) (bool, error) {
-	rows, err := db.db.Query("SELECT 1 FROM activity_center_notifications a WHERE a.chat_id = ? NOT a.dismissed AND NOT a.accepted", chatID)
+	rows, err := db.db.Query("SELECT 1 FROM activity_center_notifications a WHERE a.chat_id = ? AND NOT a.dismissed AND NOT a.accepted", chatID)
 	if err != nil {
 		return false, err
 	}
