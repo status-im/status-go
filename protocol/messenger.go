@@ -2338,6 +2338,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+		m.logger.Info("ERROR SENDING CONTACT UPDATE", zap.Error(err))
 		return err
 	}
 
@@ -2346,6 +2347,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		if isPublicChat && chat.Active {
 			err = m.syncPublicChat(ctx, chat)
 			if err != nil {
+				m.logger.Info("ERROR SYNCING PUBLIC CHAT", zap.Error(err))
 				return false
 			}
 		}
@@ -2353,12 +2355,14 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active {
 			pending, err := m.persistence.HasPendingNotificationsForChat(chat.ID)
 			if err != nil {
+				m.logger.Info("ERROR SYNCING PUBLIC CHAT 2", zap.Error(err))
 				return false
 			}
 
 			if !pending {
 				err = m.syncChatRemoving(ctx, chatID)
 				if err != nil {
+					m.logger.Info("ERROR SYNCING PUBLIC CHAT 3", zap.Error(err))
 					return false
 				}
 			}
@@ -2367,6 +2371,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat() || chat.CommunityChat()) && chat.Active {
 			err := m.syncChatMessagesRead(ctx, chatID, chat.ReadMessagesAtClockValue)
 			if err != nil {
+				m.logger.Info("ERROR SYNCING MESSAGE READ", zap.Error(err))
 				return false
 			}
 		}
@@ -2374,6 +2379,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return true
 	})
 	if err != nil {
+		m.logger.Info("ERROR SYNCING  ha", zap.Error(err))
 		return err
 	}
 
@@ -2381,6 +2387,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		if contact.ID != myID &&
 			(contact.LocalNickname != "" || contact.Added || contact.Blocked) {
 			if err = m.syncContact(ctx, contact); err != nil {
+				m.logger.Info("ERROR SYNCING  CONTACT", zap.Error(err))
 				return false
 			}
 		}
@@ -2389,10 +2396,12 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 
 	cs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
 	if err != nil {
+		m.logger.Info("ERROR FETCHING", zap.Error(err))
 		return err
 	}
 	for _, c := range cs {
 		if err = m.syncCommunity(ctx, c); err != nil {
+			m.logger.Info("ERROR SYNCING  COMMUNITY", zap.Error(err))
 			return err
 		}
 	}
