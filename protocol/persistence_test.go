@@ -1303,3 +1303,13 @@ func TestSaveCommunityChat(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, chat, retrievedChat)
 }
+
+func TestHasPendingNotificationsForChatSanityCheck(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+
+	result, err := p.HasPendingNotificationsForChat("test-chat-id")
+	require.NoError(t, err)
+	require.False(t, result)
+}
