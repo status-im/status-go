@@ -415,19 +415,23 @@ func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState
 	chatID := message.Id
 	existingChat, ok := state.AllChats.Load(chatID)
 	if ok && (existingChat.Active || uint32(message.GetClock()/1000) < existingChat.SyncedTo) {
+		m.logger.Info("We have chat already", zap.Bool("activ", existingChat.Active), zap.Uint64("clock", message.GetClock()), zap.Uint64("synced-to", uint64(existingChat.SyncedTo)))
 		return nil
 	}
 
 	chat := existingChat
 	if !ok {
+		m.logger.Info("Creating new chat")
 		chat = CreatePublicChat(chatID, state.Timesource)
 	} else {
+		m.logger.Info("Setting joined")
 		existingChat.Joined = int64(state.Timesource.GetCurrentTime())
 	}
 
 	state.AllChats.Store(chat.ID, chat)
 
 	state.Response.AddChat(chat)
+	m.logger.Info("added chat to response")
 	return chat
 }
 
