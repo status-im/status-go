@@ -719,11 +719,16 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 	if err != nil {
 		return err
 	}
+
+	var hash []byte
 	if img == nil {
-		return errors.New("could not find image")
+		// Account has no images, so we use the identicon hash
+		hash = crypto.Keccak256([]byte(m.account.Identicon))
+	} else {
+		hash = img.Hash()
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, img.Hash())
+	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, hash)
 	if err != nil {
 		return err
 	}
@@ -800,14 +805,18 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, nil
 	}
 
-	// Check we have at least one image
 	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 	if err != nil {
 		return false, err
 	}
 
+	var imgHash []byte
 	if img == nil {
-		return false, nil
+		// No images, use identicon
+		imgHash = crypto.Keccak256([]byte(m.account.Identicon))
+	} else {
+		// We have at least 1 image
+		imgHash = img.Hash()
 	}
 
 	lp, hash, err := m.persistence.GetWhenChatIdentityLastPublished(chatID)
@@ -815,7 +824,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	if !bytes.Equal(hash, img.Hash()) {
+	if !bytes.Equal(hash, imgHash) {
 		return true, nil
 	}
 

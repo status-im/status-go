@@ -1468,12 +1468,17 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		return err
 	}
 	if newImages {
-		for imageType, image := range ci.Images {
-			if contact.Images == nil {
-				contact.Images = make(map[string]images.IdentityImage)
-			}
-			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
+		if len(ci.Images) != 0 {
+			for imageType, image := range ci.Images {
+				if contact.Images == nil {
+					contact.Images = make(map[string]images.IdentityImage)
+				}
+				contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
 
+			}
+		} else {
+			// Images were removed
+			contact.Images = make(map[string]images.IdentityImage) // Clearing image map
 		}
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)

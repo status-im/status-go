@@ -240,5 +240,10 @@ func (db *Database) publishOnIdentityImageSubscriptions() {
 
 func (db *Database) DeleteIdentityImage(keyUID string) error {
 	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	db.publishOnIdentityImageSubscriptions()
+	return nil
 }

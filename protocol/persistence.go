@@ -601,43 +601,66 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		_ = tx.Rollback()
 	}()
 
-	for imageType, image := range chatIdentity.Images {
+	if len(chatIdentity.Images) == 0 {
 		var exists bool
-		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ? AND image_type = ? AND clock_value >= ?)`, contactID, imageType, chatIdentity.Clock).Scan(&exists)
+		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ?)`, contactID).Scan(&exists)
 		if err != nil {
 			return false, err
 		}
 
 		if exists {
-			continue
+			updated = true
 		}
 
-		stmt, err := tx.Prepare(`INSERT INTO chat_identity_contacts (contact_id, image_type, clock_value, payload) VALUES (?, ?, ?, ?)`)
+		stmt, err := tx.Prepare(`DELETE FROM chat_identity_contacts WHERE contact_id = ?`)
 		if err != nil {
 			return false, err
 		}
 		defer stmt.Close()
-		if image.Payload == nil {
-			continue
-		}
 
-		// TODO implement something that doesn't reject all images if a single image fails validation
-		// Validate image URI to make sure it's serializable
-		_, err = images.GetPayloadDataURI(image.Payload)
+		_, err = stmt.Exec(contactID)
 		if err != nil {
 			return false, err
 		}
+	} else {
+		for imageType, image := range chatIdentity.Images {
+			var exists bool
+			err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ? AND image_type = ? AND clock_value >= ?)`, contactID, imageType, chatIdentity.Clock).Scan(&exists)
+			if err != nil {
+				return false, err
+			}
 
-		_, err = stmt.Exec(
-			contactID,
-			imageType,
-			chatIdentity.Clock,
-			image.Payload,
-		)
-		if err != nil {
-			return false, err
+			if exists {
+				continue
+			}
+
+			stmt, err := tx.Prepare(`INSERT INTO chat_identity_contacts (contact_id, image_type, clock_value, payload) VALUES (?, ?, ?, ?)`)
+			if err != nil {
+				return false, err
+			}
+			defer stmt.Close()
+			if image.Payload == nil {
+				continue
+			}
+
+			// TODO implement something that doesn't reject all images if a single image fails validation
+			// Validate image URI to make sure it's serializable
+			_, err = images.GetPayloadDataURI(image.Payload)
+			if err != nil {
+				return false, err
+			}
+
+			_, err = stmt.Exec(
+				contactID,
+				imageType,
+				chatIdentity.Clock,
+				image.Payload,
+			)
+			if err != nil {
+				return false, err
+			}
+			updated = true
 		}
-		updated = true
 	}
 
 	return
