@@ -882,12 +882,13 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 			return err
 		}
 
-		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
+		if img != nil {
+			m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
 
-		ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
-		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
-		ci.Images = ciis
-
+			ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
+			m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
+			ci.Images = ciis
+		}
 	case privateChat:
 		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
 
