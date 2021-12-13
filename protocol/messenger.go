@@ -787,11 +787,17 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	if err != nil {
 		return err
 	}
+
+	var imgHash []byte
 	if img == nil {
-		return errors.New("could not find image")
+		// No images, use identicon
+		imgHash = crypto.Keccak256([]byte(m.account.Identicon))
+	} else {
+		// We have at least 1 image
+		imgHash = img.Hash()
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, img.Hash())
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, imgHash)
 	if err != nil {
 		return err
 	}
