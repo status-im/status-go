@@ -37,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/provider"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
@@ -45,7 +44,9 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/wakuv2"
 )
@@ -82,6 +83,7 @@ type StatusNode struct {
 
 	gethAccountManager *account.GethManager
 	accountsManager    *accounts.Manager
+	transactor         *transactions.Transactor
 
 	// services
 	services      []common.StatusService
@@ -96,7 +98,7 @@ type StatusNode struct {
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
 	mailserversSrvc        *mailservers.Service
-	providerSrvc           *provider.Service
+	providerSrvc           *web3provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	peerSrvc               *peer.Service
@@ -110,9 +112,10 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New() *StatusNode {
+func New(transactor *transactions.Transactor) *StatusNode {
 	return &StatusNode{
 		gethAccountManager: account.NewGethManager(),
+		transactor:         transactor,
 		log:                log.New("package", "status-go/node.StatusNode"),
 		publicMethods:      make(map[string]bool),
 	}

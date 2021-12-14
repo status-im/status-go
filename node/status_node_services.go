@@ -30,7 +30,6 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/provider"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
@@ -38,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -68,7 +68,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
-	services = appendIf(config.ProviderConfig.Enabled, services, b.providerService())
+	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
 
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -369,10 +369,9 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 	return b.mailserversSrvc
 }
 
-func (b *StatusNode) providerService() *provider.Service {
+func (b *StatusNode) providerService() *web3provider.Service {
 	if b.providerSrvc == nil {
-
-		b.providerSrvc = provider.NewService()
+		b.providerSrvc = web3provider.NewService(b.appDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
 	}
 	return b.providerSrvc
 }

@@ -509,9 +509,9 @@ type NodeConfig struct {
 	// (persistent storage of user's mailserver records).
 	MailserversConfig MailserversConfig
 
-	// ProviderConfig extra configuration for provider.Service
+	// Web3ProviderConfig extra configuration for provider.Service
 	// (desktop provider API)
-	ProviderConfig ProviderConfig
+	Web3ProviderConfig Web3ProviderConfig
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
@@ -557,7 +557,7 @@ type MailserversConfig struct {
 }
 
 // ProviderConfig extra configuration for provider.Service
-type ProviderConfig struct {
+type Web3ProviderConfig struct {
 	Enabled bool
 }
 

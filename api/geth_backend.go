@@ -82,10 +82,10 @@ func NewGethStatusBackend() *GethStatusBackend {
 }
 
 func (b *GethStatusBackend) initialize() {
-	statusNode := node.New()
 	accountManager := account.NewGethManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
+	statusNode := node.New(transactor)
 
 	b.statusNode = statusNode
 	b.accountManager = accountManager
