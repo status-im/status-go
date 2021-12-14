@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/provider"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
@@ -67,6 +68,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
+	services = appendIf(config.ProviderConfig.Enabled, services, b.providerService())
+
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
 		if err != nil {
@@ -364,6 +367,14 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
 	}
 	return b.mailserversSrvc
+}
+
+func (b *StatusNode) providerService() *provider.Service {
+	if b.providerSrvc == nil {
+
+		b.providerSrvc = provider.NewService()
+	}
+	return b.providerSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {

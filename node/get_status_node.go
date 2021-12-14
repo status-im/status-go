@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/provider"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
@@ -95,6 +96,7 @@ type StatusNode struct {
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
 	mailserversSrvc        *mailservers.Service
+	providerSrvc           *provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	peerSrvc               *peer.Service
@@ -401,6 +403,7 @@ func (n *StatusNode) stop() error {
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
 	n.mailserversSrvc = nil
+	n.providerSrvc = nil
 	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
 	n.peerSrvc = nil
