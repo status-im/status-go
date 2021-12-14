@@ -22,6 +22,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.12
+	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ds-sql v0.2.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -38,6 +39,7 @@ require (
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/multiformats/go-multiaddr v0.4.0
 	github.com/multiformats/go-multibase v0.0.3
+	github.com/multiformats/go-multihash v0.0.15
 	github.com/multiformats/go-varint v0.0.6
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/nfnt/resize v0.0.0-00010101000000-000000000000
@@ -62,6 +64,7 @@ require (
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.5.0
+	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e

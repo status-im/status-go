@@ -24,6 +24,7 @@ import (
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
@@ -65,6 +66,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
+	services = appendIf(config.ENSConfig.Enabled, services, b.ensService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	if config.WakuConfig.Enabled {
@@ -349,6 +351,13 @@ func (b *StatusNode) browsersService() *browsers.Service {
 		b.browsersSrvc = browsers.NewService(browsers.NewDB(b.appDB))
 	}
 	return b.browsersSrvc
+}
+
+func (b *StatusNode) ensService() *ens.Service {
+	if b.ensSrvc == nil {
+		b.ensSrvc = ens.NewService(b.rpcClient)
+	}
+	return b.ensSrvc
 }
 
 func (b *StatusNode) permissionsService() *permissions.Service {
