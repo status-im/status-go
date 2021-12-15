@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -149,13 +150,34 @@ type Settings struct {
 	GifAPIKey                      string                        `json:"gifs/api-key"`
 }
 
-func NewDB(db *sql.DB) *Database {
-	return &Database{db: db}
-}
-
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	db *sql.DB
+	syncQueue chan SettingField
+}
+
+var (
+	// TODO resolve issue where we may get a request for a new Database with a connection to
+	//  a different *sql.DB.
+	//  Perhaps find some way to compare the connection string or filename of incoming sql.DB
+
+	// dbInstance holds the singleton instance of the multiaccounts/accounts/Database
+	dbInstance *Database
+
+	// once guards the instantiation of the dbInstance to prevent any additional instantiations
+	once sync.Once
+)
+
+// NewDB ensures that a singleton instance of Database is returned
+func NewDB(db *sql.DB) *Database {
+	once.Do(func() {
+		dbInstance = &Database{
+			db: db,
+			syncQueue: make(chan SettingField, 100),
+		}
+	})
+
+	return dbInstance
 }
 
 // Get database
@@ -238,271 +260,62 @@ INSERT INTO settings (
 	return nodecfg.SaveConfigWithTx(tx, &n)
 }
 
-func (db *Database) SaveSetting(setting string, value interface{}) error {
-	var (
-		update *sql.Stmt
-		err    error
-	)
+func (db *Database) saveSetting(setting string, value interface{}) (SettingField, error) {
+	var update *sql.Stmt
+	var	err error
+	var sf SettingField
+	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
 
-	switch setting {
-	case "chaos-mode?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET chaos_mode = ? WHERE synthetic_id = 'id'")
-	case Currency.ReactFieldName:
-		update, err = db.db.Prepare("UPDATE settings SET currency = ? WHERE synthetic_id = 'id'")
-	case "custom-bootnodes":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes = ? WHERE synthetic_id = 'id'")
-	case "custom-bootnodes-enabled?":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes_enabled = ? WHERE synthetic_id = 'id'")
-	case "dapps-address":
-		str, ok := value.(string)
-		if ok {
-			value = types.HexToAddress(str)
-		} else {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET dapps_address = ? WHERE synthetic_id = 'id'")
-	case "display-name":
-		update, err = db.db.Prepare("UPDATE settings SET display_name = ? WHERE synthetic_id = 'id'")
-	case "eip1581-address":
-		str, ok := value.(string)
-		if ok {
-			value = types.HexToAddress(str)
-		} else {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET eip1581_address = ? WHERE synthetic_id = 'id'")
-	case "fleet":
-		update, err = db.db.Prepare("UPDATE settings SET fleet = ? WHERE synthetic_id = 'id'")
-	case "hide-home-tooltip?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET hide_home_tooltip = ? WHERE synthetic_id = 'id'")
-	case "messages-from-contacts-only":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET messages_from_contacts_only = ? WHERE synthetic_id = 'id'")
-	case "keycard-instance_uid":
-		update, err = db.db.Prepare("UPDATE settings SET keycard_instance_uid = ? WHERE synthetic_id = 'id'")
-	case "keycard-paired_on":
-		update, err = db.db.Prepare("UPDATE settings SET keycard_paired_on = ? WHERE synthetic_id = 'id'")
-	case "keycard-pairing":
-		update, err = db.db.Prepare("UPDATE settings SET keycard_pairing = ? WHERE synthetic_id = 'id'")
-	case "last-updated":
-		update, err = db.db.Prepare("UPDATE settings SET last_updated = ? WHERE synthetic_id = 'id'")
-	case "latest-derived-path":
-		update, err = db.db.Prepare("UPDATE settings SET latest_derived_path = ? WHERE synthetic_id = 'id'")
-	case "link-preview-request-enabled":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET link_preview_request_enabled = ? WHERE synthetic_id = 'id'")
-	case "link-previews-enabled-sites":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET link_previews_enabled_sites = ? WHERE synthetic_id = 'id'")
-	case "log-level":
-		update, err = db.db.Prepare("UPDATE settings SET log_level = ? WHERE synthetic_id = 'id'")
-	case "mnemonic":
-		update, err = db.db.Prepare("UPDATE settings SET mnemonic = ? WHERE synthetic_id = 'id'")
-	case "name":
-		update, err = db.db.Prepare("UPDATE settings SET name = ? WHERE synthetic_id = 'id'")
-	case "networks/current-network":
-		update, err = db.db.Prepare("UPDATE settings SET current_network = ? WHERE synthetic_id = 'id'")
-	case "networks/networks":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET networks = ? WHERE synthetic_id = 'id'")
-	case "node-config":
-		var jsonString []byte
-		jsonString, err = json.Marshal(value)
-		if err != nil {
-			return err
-		}
-		var nodeConfig params.NodeConfig
-		err = json.Unmarshal(jsonString, &nodeConfig)
-		if err != nil {
-			return err
-		}
-		if err = nodecfg.SaveNodeConfig(db.db, &nodeConfig); err != nil {
-			return err
-		}
-		value = nil
-		update, err = db.db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
-	case "notifications-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET notifications_enabled = ? WHERE synthetic_id = 'id'")
-	case "photo-path":
-		update, err = db.db.Prepare("UPDATE settings SET photo_path = ? WHERE synthetic_id = 'id'")
-	case "pinned-mailservers":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET pinned_mailservers = ? WHERE synthetic_id = 'id'")
-	case "preferred-name":
-		update, err = db.db.Prepare("UPDATE settings SET preferred_name = ? WHERE synthetic_id = 'id'")
-	case "preview-privacy?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET preview_privacy = ? WHERE synthetic_id = 'id'")
-	case "public-key":
-		update, err = db.db.Prepare("UPDATE settings SET public_key = ? WHERE synthetic_id = 'id'")
-	case "remember-syncing-choice?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET remember_syncing_choice = ? WHERE synthetic_id = 'id'")
-	case "remote-push-notifications-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET remote_push_notifications_enabled = ? WHERE synthetic_id = 'id'")
-	case "push-notifications-server-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET push_notifications_server_enabled = ? WHERE synthetic_id = 'id'")
-	case "push-notifications-from-contacts-only?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET push_notifications_from_contacts_only = ? WHERE synthetic_id = 'id'")
-	case "push-notifications-block-mentions?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET push_notifications_block_mentions = ? WHERE synthetic_id = 'id'")
-	case "send-push-notifications?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET send_push_notifications = ? WHERE synthetic_id = 'id'")
-	case "stickers/packs-installed":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_installed = ? WHERE synthetic_id = 'id'")
-	case "stickers/packs-pending":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_pending = ? WHERE synthetic_id = 'id'")
-	case "stickers/recent-stickers":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET stickers_recent_stickers = ? WHERE synthetic_id = 'id'")
-	case "syncing-on-mobile-network?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET syncing_on_mobile_network = ? WHERE synthetic_id = 'id'")
-	case "use-mailservers?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET use_mailservers = ? WHERE synthetic_id = 'id'")
-	case "default-sync-period":
-		update, err = db.db.Prepare("UPDATE settings SET default_sync_period = ? WHERE synthetic_id = 'id'")
-	case "usernames":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET usernames = ? WHERE synthetic_id = 'id'")
-	case "wallet-set-up-passed?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET wallet_set_up_passed = ? WHERE synthetic_id = 'id'")
-	case "wallet/visible-tokens":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
-	case "appearance":
-		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
-	case "profile-pictures-show-to":
-		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_show_to = ? WHERE synthetic_id = 'id'")
-	case "profile-pictures-visibility":
-		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_visibility = ? WHERE synthetic_id = 'id'")
-	case "waku-bloom-filter-mode":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET waku_bloom_filter_mode = ? WHERE synthetic_id = 'id'")
-	case "webview-allow-permission-requests?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET webview_allow_permission_requests = ? WHERE synthetic_id = 'id'")
-	case "anon-metrics/should-send?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET anon_metrics_should_send = ? WHERE synthetic_id = 'id'")
-	case "current-user-status":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET current_user_status = ? WHERE synthetic_id = 'id'")
-	case "send-status-updates?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET send_status_updates = ? WHERE synthetic_id = 'id'")
-	case "gifs/recent-gifs":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET gif_recents = ? WHERE synthetic_id = 'id'")
-	case "gifs/favorite-gifs":
-		value = &sqlite.JSONBlob{Data: value}
-		update, err = db.db.Prepare("UPDATE settings SET gif_favorites = ? WHERE synthetic_id = 'id'")
-	case "opensea-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET opensea_enabled = ? WHERE synthetic_id = 'id'")
-	case "telemetry-server-url":
-		update, err = db.db.Prepare("UPDATE settings SET telemetry_server_url = ? WHERE synthetic_id = 'id'")
-	case "backup-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET backup_enabled = ? WHERE synthetic_id = 'id'")
-	case "auto-message-enabled?":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
+	for _, s := range SettingFieldRegister {
+		if s.ReactFieldName == setting {
+			value, err = s.ValueHandler(value)
+			if err != nil {
+				return sf, err
+			}
 
-		update, err = db.db.Prepare("UPDATE settings SET auto_message_enabled = ? WHERE synthetic_id = 'id'")
-	case "gifs/api-key":
-		_, ok := value.(string)
-		if !ok {
-			return ErrInvalidConfig
+			// TODO this is ugly as hell need a more elegant solution
+			if NodeConfig.ReactFieldName == setting {
+				if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
+					return sf, err
+				}
+				value = nil
+			}
+
+			query = fmt.Sprintf(query, s.DBColumnName)
+			update, err = db.db.Prepare(query)
+			if err != nil {
+				return sf, err
+			}
+
+			sf = s
+			break
 		}
-		update, err = db.db.Prepare("UPDATE settings SET gif_api_key = ? WHERE synthetic_id = 'id'")
-	default:
-		return ErrInvalidConfig
 	}
+	if query == "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'" {
+		return sf, ErrInvalidConfig
+	}
+
+	_, err = update.Exec(value)
+	return sf, err
+}
+
+// SaveSetting stores data from any non-sync source
+// If the field requires syncing the field data is pushed on to the syncQueue
+func (db *Database) SaveSetting(setting string, value interface{}) error {
+	sf, err := db.saveSetting(setting, value)
 	if err != nil {
 		return err
 	}
 
-	_, err = update.Exec(value)
+	if sf.ShouldSync {
+		db.syncQueue <- sf
+	}
+	return nil
+}
+
+// SaveSyncSetting stores setting data from a sync protobuf source
+func (db *Database) SaveSyncSetting(setting string, value interface{}) error {
+	_, err := db.saveSetting(setting, value)
 	return err
 }
 
@@ -988,11 +801,11 @@ func (db *Database) GetSettingLastSynced(column string) (time.Time, error) {
 
 	err := db.db.QueryRow(query).Scan(&result)
 	if err != nil {
-		return time.Unix(0,0), err
+		return time.Unix(0, 0), err
 	}
 
 	if !result.Valid {
-		return time.Unix(0,0), nil
+		return time.Unix(0, 0), nil
 	}
 
 	return result.Time, nil

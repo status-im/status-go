@@ -79,6 +79,8 @@ func TestSaveSetting(t *testing.T) {
 
 	_, err := db.GetSettings()
 	require.NoError(t, err)
+
+	require.Equal(t, ErrInvalidConfig, db.SaveSetting("a_column_that_does_n0t_exist", "random value"))
 }
 
 func TestSaveAccounts(t *testing.T) {
