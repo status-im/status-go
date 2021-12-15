@@ -367,6 +367,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		lastMessageBytes         []byte
 		invitationAdmin          sql.NullString
 		profile                  sql.NullString
+		syncedFrom               sql.NullInt64
+		syncedTo                 sql.NullInt64
 	)
 
 	err := db.db.QueryRow(`
@@ -393,7 +395,9 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
             joined,
 		    description,
                     highlight,
-                    received_invitation_admin
+                    received_invitation_admin,
+                    synced_from,
+                    synced_to
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -419,11 +423,19 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Description,
 		&chat.Highlight,
 		&chat.ReceivedInvitationAdmin,
+		&syncedFrom,
+		&syncedTo,
 	)
 	switch err {
 	case sql.ErrNoRows:
 		return nil, nil
 	case nil:
+		if syncedFrom.Valid {
+			chat.SyncedFrom = uint32(syncedFrom.Int64)
+		}
+		if syncedTo.Valid {
+			chat.SyncedTo = uint32(syncedTo.Int64)
+		}
 		if invitationAdmin.Valid {
 			chat.InvitationAdmin = invitationAdmin.String
 		}
