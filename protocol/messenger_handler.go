@@ -421,8 +421,9 @@ func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState
 	chat := existingChat
 	if !ok {
 		chat = CreatePublicChat(chatID, state.Timesource)
+		chat.Joined = int64(message.Clock)
 	} else {
-		existingChat.Joined = int64(state.Timesource.GetCurrentTime())
+		existingChat.Joined = int64(message.Clock)
 	}
 
 	state.AllChats.Store(chat.ID, chat)
@@ -448,7 +449,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 		}
 	}
 
-	response, err := m.deactivateChat(message.Id, false)
+	response, err := m.deactivateChat(message.Id, message.Clock, false)
 	if err != nil {
 		return err
 	}

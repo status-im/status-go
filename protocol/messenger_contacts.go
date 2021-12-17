@@ -214,7 +214,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 	_, ok = m.allChats.Load(profileChatID)
 
 	if ok {
-		chatResponse, err := m.deactivateChat(profileChatID, false)
+		chatResponse, err := m.deactivateChat(profileChatID, 0, false)
 		if err != nil {
 			return err
 		}

@@ -163,7 +163,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	chat2 := CreatePublicChat(removedChatID, s.m.transport)
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
-	_, err = s.m.deactivateChat(removedChatID, true)
+	_, err = s.m.deactivateChat(removedChatID, 0, true)
 	s.Require().NoError(err)
 
 	// pair

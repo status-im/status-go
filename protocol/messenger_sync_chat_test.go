@@ -121,7 +121,7 @@ func (s *MessengerSyncChatSuite) TestRemovePubChat() {
 
 	s.Pair()
 
-	_, err = s.alice1.deactivateChat(publicChatName, true)
+	_, err = s.alice1.deactivateChat(publicChatName, 0, true)
 	s.Require().NoError(err)
 
 	var allChats []*Chat
