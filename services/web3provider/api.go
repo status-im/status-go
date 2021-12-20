@@ -24,6 +24,8 @@ const PermissionWeb3 = "web3"
 const PermissionContactCode = "contact-code"
 const PermissionUnknown = "unknown"
 
+const ethCoinbase = "eth_coinbase"
+
 var ErrorInvalidAPIRequest = errors.New("invalid API request")
 var ErrorUnknownPermission = errors.New("unknown permission")
 
@@ -210,7 +212,7 @@ func (api *API) web3AccResponse(request Web3SendAsyncReadOnlyRequest) (*Web3Send
 	}
 
 	var result interface{}
-	if request.Payload.Method == "eth_coinbase" {
+	if request.Payload.Method == ethCoinbase {
 		result = dappsAddress
 	} else {
 		result = []types.Address{dappsAddress}

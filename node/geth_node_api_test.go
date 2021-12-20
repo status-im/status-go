@@ -18,7 +18,7 @@ func TestWakuLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 			LightClient: true,
 		},
 	}
-	node := New()
+	node := New(nil)
 	require.NoError(t, node.Start(&config, &accounts.Manager{}))
 	defer func() {
 		require.NoError(t, node.Stop())
@@ -41,7 +41,7 @@ func TestWakuLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 			LightClient: false,
 		},
 	}
-	node := New()
+	node := New(nil)
 	require.NoError(t, node.Start(&config, &accounts.Manager{}))
 	defer func() {
 		require.NoError(t, node.Stop())

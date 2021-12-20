@@ -7,18 +7,20 @@ import (
 	"os"
 	"testing"
 
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
-	"github.com/stretchr/testify/require"
+
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	statusRPC "github.com/status-im/status-go/rpc"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {
@@ -36,6 +38,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	db, cancel := createDB(t)
 
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	require.NoError(t, err)
 
 	// Creating a dummy status node to simulate what it's done in get_status_node.go
 	upstreamConfig := params.UpstreamRPCConfig{
@@ -99,7 +102,7 @@ func TestRequestPermission(t *testing.T) {
 	require.False(t, response.IsAllowed)
 	require.Equal(t, ResponseAPI, response.ProviderResponse.ResponseType)
 
-	api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3, PermissionContactCode, "RandomPermission"}})
+	_ = api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3, PermissionContactCode, "RandomPermission"}})
 
 	response, err = api.ProcessAPIRequest(request)
 	require.NoError(t, err)
@@ -149,7 +152,7 @@ func TestWeb3Call(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint(4100), response.Error.(Web3SendAsyncReadOnlyError).Code)
 
-	api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3}})
+	_ = api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3}})
 
 	response, err = api.ProcessWeb3ReadOnlyRequest(request)
 	require.NoError(t, err)
@@ -170,7 +173,7 @@ func TestWeb3Signature(t *testing.T) {
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
-	api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3}})
+	_ = api.s.permissionsDB.AddPermissions(permissions.DappPermissions{Name: "www.status.im", Permissions: []string{PermissionWeb3}})
 
 	request := Web3SendAsyncReadOnlyRequest{
 		Hostname:  "www.status.im",

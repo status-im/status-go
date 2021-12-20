@@ -23,7 +23,7 @@ import (
 func TestStatusNodeStart(t *testing.T) {
 	config, err := utils.MakeTestNodeConfigWithDataDir("", "", params.StatusChainNetworkID)
 	require.NoError(t, err)
-	n := New()
+	n := New(nil)
 
 	// checks before node is started
 	require.Nil(t, n.GethNode())
@@ -74,7 +74,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 		DataDir:     dir,
 		KeyStoreDir: keyStoreDir,
 	}
-	n := New()
+	n := New(nil)
 
 	require.NoError(t, n.Start(&config, nil))
 	require.NoError(t, n.Stop())
@@ -96,7 +96,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	defer func() { require.NoError(t, peer.Close()) }()
 	peerURL := peer.Server().Self().URLv4()
 
-	n := New()
+	n := New(nil)
 
 	// checks before node is started
 	require.EqualError(t, n.AddPeer(peerURL), ErrNoRunningNode.Error())
@@ -128,7 +128,7 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 		// use custom address to test the all possibilities
 		AdvertiseAddr: "127.0.0.1",
 	}
-	n := New()
+	n := New(nil)
 	require.NoError(t, n.Start(&config, nil))
 	require.NotNil(t, n.discovery)
 	require.True(t, n.discovery.Running())
@@ -147,7 +147,7 @@ func TestStatusNodeStartDiscoveryManual(t *testing.T) {
 		// use custom address to test the all possibilities
 		AdvertiseAddr: "127.0.0.1",
 	}
-	n := New()
+	n := New(nil)
 	require.NoError(t, n.StartWithOptions(&config, StartOptions{}))
 	require.Nil(t, n.discovery)
 	// start discovery manually
@@ -162,7 +162,7 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		NoDiscovery: true,
 		ListenAddr:  "127.0.0.1:0",
 	}
-	n := New()
+	n := New(nil)
 	require.NoError(t, n.Start(&config, nil))
 	node, err := n.discoverNode()
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		AdvertiseAddr: "127.0.0.2",
 		ListenAddr:    "127.0.0.1:0",
 	}
-	n = New()
+	n = New(nil)
 	require.NoError(t, n.Start(&config, nil))
 	node, err = n.discoverNode()
 	require.NoError(t, err)

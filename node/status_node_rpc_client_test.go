@@ -17,7 +17,7 @@ func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	statusNode := New()
+	statusNode := New(nil)
 	err := statusNode.Start(config, nil)
 	if err != nil {
 		return nil, err
