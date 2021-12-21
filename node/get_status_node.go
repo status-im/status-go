@@ -32,6 +32,7 @@ import (
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/ens"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/peer"
@@ -105,6 +106,7 @@ type StatusNode struct {
 	wakuExtSrvc            *wakuext.Service
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
+	ensSrvc                *ens.Service
 }
 
 // New makes new instance of StatusNode.
@@ -411,6 +413,7 @@ func (n *StatusNode) stop() error {
 	n.wakuExtSrvc = nil
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
+	n.ensSrvc = nil
 	n.publicMethods = make(map[string]bool)
 
 	return nil
