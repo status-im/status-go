@@ -453,6 +453,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = update.Exec(value)
 	return err
 }
@@ -645,6 +646,22 @@ func (db *Database) GetProfilePicturesVisibility() (int, error) {
 		return result, nil
 	}
 	return result, err
+}
+
+func (db *Database) GetPublicKey() (rst string, err error) {
+	err = db.db.QueryRow("SELECT public_key FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
+	return
+}
+
+func (db *Database) GetDappsAddress() (rst types.Address, err error) {
+	err = db.db.QueryRow("SELECT dapps_address FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
+	return
 }
 
 func (db *Database) CanUseMailservers() (bool, error) {

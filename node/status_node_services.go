@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -69,6 +70,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.ENSConfig.Enabled, services, b.ensService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
+	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
+
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
 		if err != nil {
@@ -373,6 +376,13 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
 	}
 	return b.mailserversSrvc
+}
+
+func (b *StatusNode) providerService() *web3provider.Service {
+	if b.providerSrvc == nil {
+		b.providerSrvc = web3provider.NewService(b.appDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
+	}
+	return b.providerSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {

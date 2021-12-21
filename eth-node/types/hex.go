@@ -16,12 +16,16 @@ var (
 // The empty slice marshals as "0x".
 type HexBytes []byte
 
-// MarshalText implements encoding.TextMarshaler
-func (b HexBytes) MarshalText() ([]byte, error) {
+func (b HexBytes) Bytes() []byte {
 	result := make([]byte, len(b)*2+2)
 	copy(result, `0x`)
 	hex.Encode(result[2:], b)
-	return result, nil
+	return result
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (b HexBytes) MarshalText() ([]byte, error) {
+	return b.Bytes(), nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

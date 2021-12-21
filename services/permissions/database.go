@@ -116,7 +116,55 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 	return rst, nil
 }
 
+func (db *Database) GetPermissionsByDappName(dappName string) (rst *DappPermissions, err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	rst = &DappPermissions{
+		Name: dappName,
+	}
+
+	pRows, err := tx.Query("SELECT permission from permissions WHERE dapp_name = ?", dappName)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	defer pRows.Close()
+
+	var permission string
+	for pRows.Next() {
+		err = pRows.Scan(&permission)
+		if err != nil {
+			return
+		}
+		rst.Permissions = append(rst.Permissions, permission)
+	}
+
+	return rst, nil
+}
+
 func (db *Database) DeletePermission(name string) error {
 	_, err := db.db.Exec("DELETE FROM dapps WHERE name = ?", name)
 	return err
+}
+
+func (db *Database) DeleteDappPermission(dappName, permission string) error {
+	_, err := db.db.Exec("DELETE FROM permissions WHERE dapp_name = ? AND permission = ?", dappName, permission)
+	return err
+}
+
+func (db *Database) HasPermission(dappName string, permission string) (bool, error) {
+	var count uint64
+	err := db.db.QueryRow(`SELECT COUNT(1) FROM permissions WHERE dapp_name = ? AND permission = ?`, dappName, permission).Scan(&count)
+	return count > 0, err
 }
