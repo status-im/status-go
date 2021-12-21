@@ -480,7 +480,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	fmt.Println(nodeConfig)
 	accounts := []accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndConfig(account, "", *settings, nodeConfig, accounts)
+	err = backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
 	if err != nil {
 		logger.Error("start node", err)
 		return err

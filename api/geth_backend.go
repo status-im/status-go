@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/imdario/mergo"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -336,7 +338,7 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	return err
 }
 
-func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string) error {
+func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
@@ -344,6 +346,17 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	conf, err := b.loadNodeConfig()
 	if err != nil {
 		return err
+	}
+
+	if nodecfg != nil {
+		// Overwrite db configuration
+		if err := mergo.Merge(conf, nodecfg, mergo.WithOverride); err != nil {
+			return err
+		}
+
+		if err := b.saveNodeConfig(conf); err != nil {
+			return err
+		}
 	}
 
 	logSettings := logutils.LogSettings{
@@ -423,8 +436,8 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 	return nil
 }
 
-func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
-	err := b.startNodeWithAccount(acc, password)
+func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
+	err := b.startNodeWithAccount(acc, password, nodecfg)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
@@ -593,10 +606,10 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 	return b.StartNodeWithKey(acc, password, keyHex)
 }
 
-// StartNodeWithAccountAndConfig is used after account and config was generated.
+// StartNodeWithAccountAndInitialConfig is used after account and config was generated.
 // In current setup account name and config is generated on the client side. Once/if it will be generated on
 // status-go side this flow can be simplified.
-func (b *GethStatusBackend) StartNodeWithAccountAndConfig(
+func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	account multiaccounts.Account,
 	password string,
 	settings accounts.Settings,
@@ -615,7 +628,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndConfig(
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithAccount(account, password)
+	return b.StartNodeWithAccount(account, password, nil)
 }
 
 func (b *GethStatusBackend) saveAccountsAndSettings(settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
@@ -656,6 +669,17 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
 	return &conf, nil
+}
+
+func (b *GethStatusBackend) saveNodeConfig(nodeCfg *params.NodeConfig) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	accountDB := accounts.NewDB(b.appDB)
+	err := accountDB.SaveSetting("node-config", nodeCfg)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {

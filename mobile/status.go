@@ -195,18 +195,24 @@ func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
 	return makeJSONResponse(nil)
 }
 
-// Login loads a key file (for a given address), tries to decrypt it using the password,
-// to verify ownership if verified, purges all the previous identities from Whisper,
-// and injects verified key as shh identity.
-func Login(accountData, password string) string {
+func login(accountData, password, configJSON string) error {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
-		return makeJSONResponse(err)
+		return err
 	}
+
+	var conf params.NodeConfig
+	if configJSON != "" {
+		err = json.Unmarshal([]byte(configJSON), &conf)
+		if err != nil {
+			return err
+		}
+	}
+
 	api.RunAsync(func() error {
 		log.Debug("start a node with account", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccount(account, password)
+		err := statusBackend.StartNodeWithAccount(account, password, &conf)
 		if err != nil {
 			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
@@ -214,6 +220,30 @@ func Login(accountData, password string) string {
 		log.Debug("started a node with", "key-uid", account.KeyUID)
 		return nil
 	})
+
+	return nil
+}
+
+// Login loads a key file (for a given address), tries to decrypt it using the password,
+// to verify ownership if verified, purges all the previous identities from Whisper,
+// and injects verified key as shh identity.
+func Login(accountData, password string) string {
+	err := login(accountData, password, "")
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}
+
+// Login loads a key file (for a given address), tries to decrypt it using the password,
+// to verify ownership if verified, purges all the previous identities from Whisper,
+// and injects verified key as shh identity. It then updates the accounts node configuration
+// mergin the values received in the configJSON parameter
+func LoginWithConfig(accountData, password, configJSON string) string {
+	err := login(accountData, password, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	return makeJSONResponse(nil)
 }
 
@@ -241,7 +271,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	}
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccountAndConfig(account, password, settings, &conf, subaccs)
+		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
