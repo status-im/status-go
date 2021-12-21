@@ -80,11 +80,10 @@ const messageQueueLimit = 1024
 const requestTimeout = 5 * time.Second
 
 type settings struct {
-	LightClient            bool            // Indicates if the node is a light client
-	MinPeersForRelay       int             // Indicates the minimum number of peers required for using Relay Protocol instead of Lightpush
-	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
-	EnableConfirmations    bool            // Enable sending message confirmations
-	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
+	LightClient         bool   // Indicates if the node is a light client
+	MinPeersForRelay    int    // Indicates the minimum number of peers required for using Relay Protocol instead of Lightpush
+	MaxMsgSize          uint32 // Maximal message length allowed by the waku node
+	EnableConfirmations bool   // Enable sending message confirmations
 }
 
 type ConnStatus struct {
@@ -158,10 +157,9 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	}
 
 	waku.settings = settings{
-		MaxMsgSize:             cfg.MaxMessageSize,
-		SoftBlacklistedPeerIDs: make(map[string]bool),
-		LightClient:            cfg.LightClient,
-		MinPeersForRelay:       cfg.MinPeersForRelay,
+		MaxMsgSize:       cfg.MaxMessageSize,
+		LightClient:      cfg.LightClient,
+		MinPeersForRelay: cfg.MinPeersForRelay,
 	}
 
 	waku.filters = common.NewFilters()

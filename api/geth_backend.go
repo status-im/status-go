@@ -368,8 +368,12 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	}
 
 	if nodecfg != nil {
-		conf, err = b.mergeConfig(nodecfg)
-		if err != nil {
+		// Overwrite db configuration (only adds new values)
+		if err := mergo.Merge(conf, nodecfg); err != nil {
+			return err
+		}
+
+		if err := b.saveNodeConfig(conf); err != nil {
 			return err
 		}
 	}
@@ -660,9 +664,8 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings accounts.Settings, 
 func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var conf params.NodeConfig
 	accountDB := accounts.NewDB(b.appDB)
-	err := accountDB.GetNodeConfig(&conf)
+	conf, err := accountDB.GetNodeConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -683,14 +686,14 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	}
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
-	return &conf, nil
+	return conf, nil
 }
 
 func (b *GethStatusBackend) saveNodeConfig(nodeCfg *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accountDB := accounts.NewDB(b.appDB)
-	err := accountDB.SaveSetting("node-config", nodeCfg)
+	err := accountDB.SaveSetting("node-config", *nodeCfg)
 	if err != nil {
 		return err
 	}
