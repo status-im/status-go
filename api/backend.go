@@ -17,8 +17,8 @@ type StatusBackend interface {
 	// IsNodeRunning() bool                       // NOTE: Only used in tests
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error
-	StartNodeWithAccount(acc multiaccounts.Account, password string) error
-	StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account) error
+	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig) error
+	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account) error
 	StopNode() error
 	// RestartNode() error // NOTE: Only used in tests
 

@@ -199,7 +199,7 @@ INSERT INTO settings (
 		s.Mnemonic,
 		s.Name,
 		s.Networks,
-		&sqlite.JSONBlob{nodecfg},
+		&sqlite.JSONBlob{Data: nodecfg},
 		s.PhotoPath,
 		s.PreviewPrivacy,
 		s.PublicKey,
@@ -226,10 +226,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "currency":
 		update, err = db.db.Prepare("UPDATE settings SET currency = ? WHERE synthetic_id = 'id'")
 	case "custom-bootnodes":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes = ? WHERE synthetic_id = 'id'")
 	case "custom-bootnodes-enabled?":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes_enabled = ? WHERE synthetic_id = 'id'")
 	case "dapps-address":
 		str, ok := value.(string)
@@ -278,7 +278,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		}
 		update, err = db.db.Prepare("UPDATE settings SET link_preview_request_enabled = ? WHERE synthetic_id = 'id'")
 	case "link-previews-enabled-sites":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET link_previews_enabled_sites = ? WHERE synthetic_id = 'id'")
 	case "log-level":
 		update, err = db.db.Prepare("UPDATE settings SET log_level = ? WHERE synthetic_id = 'id'")
@@ -289,10 +289,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "networks/current-network":
 		update, err = db.db.Prepare("UPDATE settings SET current_network = ? WHERE synthetic_id = 'id'")
 	case "networks/networks":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET networks = ? WHERE synthetic_id = 'id'")
 	case "node-config":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
 	case "notifications-enabled?":
 		_, ok := value.(bool)
@@ -303,7 +303,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "photo-path":
 		update, err = db.db.Prepare("UPDATE settings SET photo_path = ? WHERE synthetic_id = 'id'")
 	case "pinned-mailservers":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET pinned_mailservers = ? WHERE synthetic_id = 'id'")
 	case "preferred-name":
 		update, err = db.db.Prepare("UPDATE settings SET preferred_name = ? WHERE synthetic_id = 'id'")
@@ -352,13 +352,13 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		}
 		update, err = db.db.Prepare("UPDATE settings SET send_push_notifications = ? WHERE synthetic_id = 'id'")
 	case "stickers/packs-installed":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_installed = ? WHERE synthetic_id = 'id'")
 	case "stickers/packs-pending":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_pending = ? WHERE synthetic_id = 'id'")
 	case "stickers/recent-stickers":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_recent_stickers = ? WHERE synthetic_id = 'id'")
 	case "syncing-on-mobile-network?":
 		_, ok := value.(bool)
@@ -375,7 +375,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "default-sync-period":
 		update, err = db.db.Prepare("UPDATE settings SET default_sync_period = ? WHERE synthetic_id = 'id'")
 	case "usernames":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET usernames = ? WHERE synthetic_id = 'id'")
 	case "wallet-set-up-passed?":
 		_, ok := value.(bool)
@@ -384,7 +384,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		}
 		update, err = db.db.Prepare("UPDATE settings SET wallet_set_up_passed = ? WHERE synthetic_id = 'id'")
 	case "wallet/visible-tokens":
-		value = &sqlite.JSONBlob{value}
+		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
 	case "appearance":
 		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
