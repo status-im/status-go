@@ -3,21 +3,9 @@ package network
 import (
 	"bytes"
 	"database/sql"
-)
 
-type Network struct {
-	ChainID                uint64 `json:"chainId"`
-	ChainName              string `json:"chainName"`
-	RPCURL                 string `json:"rpcUrl"`
-	BlockExplorerURL       string `json:"blockExplorerUrl,omitempty"`
-	IconURL                string `json:"iconUrl,omitempty"`
-	NativeCurrencyName     string `json:"nativeCurrencyName,omitempty"`
-	NativeCurrencySymbol   string `json:"nativeCurrencySymbol,omitempty"`
-	NativeCurrencyDecimals uint64 `json:"nativeCurrencyDecimals"`
-	IsTest                 bool   `json:"isTest"`
-	Layer                  uint64 `json:"layer"`
-	Enabled                bool   `json:"enabled"`
-}
+	"github.com/status-im/status-go/params"
+)
 
 const baseQuery = "SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled FROM networks"
 
@@ -57,15 +45,15 @@ func (nq *networksQuery) filterChainID(chainID uint64) *networksQuery {
 	return nq
 }
 
-func (nq *networksQuery) exec(db *sql.DB) ([]*Network, error) {
+func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 	rows, err := db.Query(nq.buf.String(), nq.args...)
 	if err != nil {
 		return nil, err
 	}
-	var res []*Network
+	var res []*params.Network
 	defer rows.Close()
 	for rows.Next() {
-		network := Network{}
+		network := params.Network{}
 		err := rows.Scan(
 			&network.ChainID, &network.ChainName, &network.RPCURL, &network.BlockExplorerURL, &network.IconURL,
 			&network.NativeCurrencyName, &network.NativeCurrencySymbol, &network.NativeCurrencyDecimals,
@@ -90,7 +78,7 @@ func NewManager(db *sql.DB) *Manager {
 	}
 }
 
-func (nm *Manager) Init(networks []Network) error {
+func (nm *Manager) Init(networks []params.Network) error {
 	if networks == nil {
 		return nil
 	}
@@ -110,7 +98,7 @@ func (nm *Manager) Init(networks []Network) error {
 	return nil
 }
 
-func (nm *Manager) Upsert(network *Network) error {
+func (nm *Manager) Upsert(network *params.Network) error {
 	_, err := nm.db.Exec(
 		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
@@ -125,7 +113,7 @@ func (nm *Manager) Delete(chainID uint64) error {
 	return err
 }
 
-func (nm *Manager) Find(chainID uint64) *Network {
+func (nm *Manager) Find(chainID uint64) *params.Network {
 	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
 	if len(networks) != 1 || err != nil {
 		return nil
@@ -133,7 +121,7 @@ func (nm *Manager) Find(chainID uint64) *Network {
 	return networks[0]
 }
 
-func (nm *Manager) Get(onlyEnabled bool) ([]*Network, error) {
+func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 	query := newNetworksQuery()
 	if onlyEnabled {
 		query.filterEnabled(true)

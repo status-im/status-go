@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc/network"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
@@ -46,7 +45,7 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []network.Network{}, db)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -85,7 +84,7 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []network.Network{}, db)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -112,7 +111,7 @@ func TestUpdateUpstreamURL(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []network.Network{}, db)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []params.Network{}, db)
 	require.NoError(t, err)
 	require.Equal(t, ts.URL, c.upstreamURL)
 

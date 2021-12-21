@@ -1,10 +1,13 @@
-package accounts
+package appdatabase
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"math/big"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -14,20 +17,31 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/sqlite"
 )
+
+func setupTestDB(t *testing.T) (*sql.DB, func()) {
+	tmpfile, err := ioutil.TempFile("", "settings-tests-")
+	require.NoError(t, err)
+	db, err := InitializeDB(tmpfile.Name(), "settings-tests")
+	require.NoError(t, err)
+	return db, func() {
+		require.NoError(t, db.Close())
+		require.NoError(t, os.Remove(tmpfile.Name()))
+	}
+}
 
 func TestGetNodeConfig(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
 	nodeConfig := randomNodeConfig()
-	require.NoError(t, db.CreateSettings(settings, *nodeConfig))
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
 
-	dbNodeConfig, err := db.GetNodeConfig()
+	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
 	require.NoError(t, err)
 	require.Equal(t, nodeConfig, dbNodeConfig)
 }
@@ -36,12 +50,12 @@ func TestSaveNodeConfig(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	require.NoError(t, db.CreateSettings(settings, *randomNodeConfig()))
+	require.NoError(t, nodecfg.SaveNodeConfig(db, randomNodeConfig()))
 
 	newNodeConfig := randomNodeConfig()
-	require.NoError(t, db.SaveNodeConfig(newNodeConfig))
+	require.NoError(t, nodecfg.SaveNodeConfig(db, newNodeConfig))
 
-	dbNodeConfig, err := db.GetNodeConfig()
+	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
 	require.NoError(t, err)
 	require.Equal(t, *newNodeConfig, *dbNodeConfig)
 }
@@ -51,22 +65,20 @@ func TestMigrateNodeConfig(t *testing.T) {
 	defer stop()
 
 	nodeConfig := randomNodeConfig()
-	require.NoError(t, db.CreateSettings(settings, *nodeConfig))
-
 	value := &sqlite.JSONBlob{Data: nodeConfig}
-	update, err := db.db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
+	update, err := db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
 	require.NoError(t, err)
 	_, err = update.Exec(value)
 	require.NoError(t, err)
 
 	// GetNodeConfig should migrate the settings to a table
-	dbNodeConfig, err := db.GetNodeConfig()
+	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
 	require.NoError(t, err)
 	require.Equal(t, nodeConfig, dbNodeConfig)
 
 	// node_config column should be empty
 	var result string
-	err = db.db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
+	err = db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
 	require.NoError(t, err)
 	require.Equal(t, "empty", result)
 }
@@ -128,11 +140,11 @@ func randomCustomNodes() map[string]string {
 	return result
 }
 
-func randomNetworkSlice() []network.Network {
+func randomNetworkSlice() []params.Network {
 	m := randomInt(7) + 1
-	var result []network.Network
+	var result []params.Network
 	for i := 0; i < m; i++ {
-		n := network.Network{
+		n := params.Network{
 			ChainID:                uint64(i),
 			ChainName:              randomString(),
 			RPCURL:                 randomString(),

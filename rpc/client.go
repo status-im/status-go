@@ -59,7 +59,7 @@ type Client struct {
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []network.Network, db *sql.DB) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []params.Network, db *sql.DB) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
