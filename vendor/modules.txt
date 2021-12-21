@@ -449,7 +449,7 @@ github.com/spacemonkeygo/spacelog
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.1
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20211125141833-23cbb24a94d6
+# github.com/status-im/go-waku v0.0.0-20211231121244-6002fc4d40ee
 github.com/status-im/go-waku/waku/persistence
 github.com/status-im/go-waku/waku/v2
 github.com/status-im/go-waku/waku/v2/discv5

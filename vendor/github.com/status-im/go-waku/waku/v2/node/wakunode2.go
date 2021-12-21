@@ -602,13 +602,14 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				// Compared to Network's peers collection,
+				// Network's peers collection,
+				// contains only currently active peers
 				// Peerstore contains all peers ever connected to,
 				// thus if a host goes down and back again,
 				// pinging a peer will trigger identification process,
 				// which is not possible when iterating
 				// through Network's peer collection, as it will be empty
-				for _, p := range w.host.Peerstore().Peers() {
+				for _, p := range w.host.Network().Peers() {
 					if p != w.host.ID() {
 						w.wg.Add(1)
 						go w.pingPeer(p)

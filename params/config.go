@@ -239,6 +239,9 @@ type WakuV2Config struct {
 	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
 	PeerExchange bool
 
+	// Rendezvous enables rendezvous capability
+	Rendezvous bool
+
 	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
 	EnableDiscV5 bool
 

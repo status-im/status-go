@@ -13,6 +13,7 @@ fleets=(
 wakufleets=(
     'wakuv2.test'
     'wakuv2.prod'
+    'go-waku.test'
 )
 
 for fleet in ${fleets[@]}; do 
@@ -41,7 +42,7 @@ done
 for fleet in ${wakufleets[@]}; do 
     echo "Processing $fleet fleet..."
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")
-    waku=$(echo $fleetJSON | jq ".waku | map(.)" -r)
+    waku=$(echo $fleetJSON | jq "if .waku then .waku else .libp2p end | map(.)" -r)
 
     git checkout $DIR/fleet-$fleet.json \
         && jq \
