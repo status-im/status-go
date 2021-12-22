@@ -338,6 +338,25 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	return err
 }
 
+func (b *GethStatusBackend) mergeConfig(nodecfg *params.NodeConfig) (*params.NodeConfig, error) {
+	var conf params.NodeConfig
+	accountDB := accounts.NewDB(b.appDB)
+	if err := accountDB.GetNodeConfig(&conf); err != nil {
+		return nil, err
+	}
+
+	// Overwrite db configuration
+	if err := mergo.Merge(&conf, nodecfg, mergo.WithOverride); err != nil {
+		return nil, err
+	}
+
+	if err := b.saveNodeConfig(&conf); err != nil {
+		return nil, err
+	}
+
+	return b.loadNodeConfig()
+}
+
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
@@ -349,12 +368,8 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	}
 
 	if nodecfg != nil {
-		// Overwrite db configuration
-		if err := mergo.Merge(conf, nodecfg, mergo.WithOverride); err != nil {
-			return err
-		}
-
-		if err := b.saveNodeConfig(conf); err != nil {
+		conf, err = b.mergeConfig(nodecfg)
+		if err != nil {
 			return err
 		}
 	}
