@@ -92,8 +92,8 @@ func TestPublicKeyOf(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		[32]byte{226, 93, 166, 153, 78, 162, 220, 74, 199, 7, 39, 224, 126, 202, 21, 58, 233, 43, 247, 96, 157, 183, 190, 251, 126, 189, 206, 170, 211, 72, 244, 252},
-		pubKey.X,
+		"0xe25da6994ea2dc4ac70727e07eca153ae92bf7609db7befb7ebdceaad348f4fc55bbe90abf9501176301db5aa103fc0eb3bc3750272a26c424a10887db2a7ea8",
+		pubKey,
 	)
 }
 
@@ -110,9 +110,9 @@ func TestExpireAt(t *testing.T) {
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
-	r, err := api.ExpireAt(context.Background(), 1, "rramos.eth")
+	r, err := api.ExpireAt(context.Background(), 1, "rramos")
 	require.NoError(t, err)
-	require.Equal(t, "0", r.String())
+	require.Equal(t, "5db32cb7", r)
 }
 
 func TestPrice(t *testing.T) {
@@ -121,7 +121,7 @@ func TestPrice(t *testing.T) {
 
 	r, err := api.Price(context.Background(), 1)
 	require.NoError(t, err)
-	require.Equal(t, "10000000000000000000", r.String())
+	require.Equal(t, "8ac7230489e80000", r)
 }
 
 func TestResourceURL(t *testing.T) {

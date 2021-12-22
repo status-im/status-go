@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/rpc"
 )
 
@@ -30,11 +30,6 @@ type uri struct {
 	Scheme string
 	Host   string
 	Path   string
-}
-
-type publicKey struct {
-	X [32]byte
-	Y [32]byte
 }
 
 type API struct {
@@ -106,29 +101,28 @@ func (api *API) ContentHash(ctx context.Context, chainID uint64, username string
 	return contentHash, nil
 }
 
-func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string) (*publicKey, error) {
+func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string) (string, error) {
 	err := validateENSUsername(username)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	resolverAddress, err := api.Resolver(ctx, chainID, username)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	resolver, err := api.contractMaker.newPublicResolver(chainID, resolverAddress)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	pubKey, err := resolver.Pubkey(callOpts, nameHash(username))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	return &publicKey{pubKey.X, pubKey.Y}, nil
+	return "0x" + hex.EncodeToString(pubKey.X[:]) + hex.EncodeToString(pubKey.Y[:]), nil
 }
 
 func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
@@ -156,39 +150,37 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 	return &addr, nil
 }
 
-func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (*big.Int, error) {
-	err := validateENSUsername(username)
-	if err != nil {
-		return nil, err
-	}
-
+func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (string, error) {
+	usernameHashed := crypto.Keccak256([]byte(username))
+	var label [32]byte
+	copy(label[:], usernameHashed)
 	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	expTime, err := registrar.GetExpirationTime(callOpts, nameHash(username))
+	expTime, err := registrar.GetExpirationTime(callOpts, label)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return expTime, nil
+	return fmt.Sprintf("%x", expTime), nil
 }
 
-func (api *API) Price(ctx context.Context, chainID uint64) (*big.Int, error) {
+func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	price, err := registrar.GetPrice(callOpts)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return price, nil
+	return fmt.Sprintf("%x", price), nil
 }
 
 // TODO: implement once the send tx as been refactored
