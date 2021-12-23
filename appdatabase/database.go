@@ -2,6 +2,7 @@ package appdatabase
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
@@ -70,4 +71,28 @@ func EncryptDatabase(oldPath, newPath, password string) error {
 
 func ChangeDatabasePassword(path, password, newPassword string) error {
 	return sqlite.ChangeEncryptionKey(path, password, newPassword)
+}
+
+// GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database
+func GetDBFilename(db *sql.DB) (string, error) {
+	var i, category, filename string
+	rows, err := db.Query("PRAGMA database_list;")
+
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&i, &category, &filename)
+		if err != nil {
+			return "", err
+		}
+
+		// The "main" database is the one we care about
+		if category == "main" {
+			return filename, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", nil
+	}
+
+	return "", errors.New("no main database found")
 }

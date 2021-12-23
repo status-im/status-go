@@ -382,7 +382,11 @@ func NewMessenger(
 	if err != nil {
 		return nil, err
 	}
-	settings := accounts.NewDB(database)
+
+	settings, err := accounts.NewDB(database)
+	if err != nil {
+		return nil, err
+	}
 
 	mailservers := mailserversDB.NewDB(database)
 	httpServer, err := server.NewServer(database, logger)
@@ -3347,82 +3351,88 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-<<<<<<< HEAD
 					case protobuf.SyncActivityCenterRead:
-=======
-					case protobuf.SyncSettings:
->>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
-
-<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterRead)
 						logger.Debug("Handling SyncActivityCenterRead", zap.Any("message", a))
 
 						err = m.handleActivityCenterRead(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterRead", zap.Error(err))
-=======
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettings)
-						logger.Debug("Handling SyncSettings", zap.Any("message", settings))
-
-						err = m.handleSyncSettings(messageState, settings)
-						if err != nil {
-							logger.Warn("failed to handle SyncSettings", zap.Error(err))
->>>>>>> Sync Settings
 							allMessagesProcessed = false
-							continue
 						}
 
-<<<<<<< HEAD
 					case protobuf.SyncActivityCenterAccepted:
-=======
-					case protobuf.SyncSettingCurrency:
->>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterAccepted)
 						logger.Debug("Handling SyncActivityCenterAccepted", zap.Any("message", a))
 
 						err = m.handleActivityCenterAccepted(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterAccepted", zap.Error(err))
-=======
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingCurrency)
-						logger.Debug("Handling SyncSettingCurrency", zap.Any("message", settings))
-
-						err = m.handleSyncSettingCurrency(messageState, settings)
-						if err != nil {
-							logger.Warn("failed to handle SyncSettingCurrency", zap.Error(err))
->>>>>>> Sync Settings
 							allMessagesProcessed = false
-							continue
 						}
 
-<<<<<<< HEAD
 					case protobuf.SyncActivityCenterDismissed:
-=======
-					case protobuf.SyncSettingGifFavorites:
->>>>>>> Sync Settings
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-<<<<<<< HEAD
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterDismissed)
 						logger.Debug("Handling SyncActivityCenterDismissed", zap.Any("message", a))
 
 						err = m.handleActivityCenterDismissed(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterDismissed", zap.Error(err))
-=======
+							allMessagesProcessed = false
+						}
+
+					case protobuf.SyncSettings:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettings)
+						logger.Debug("Handling SyncSettings", zap.Any("message", settings))
+
+						err = m.handleSyncSettings(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettings", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingCurrency:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingCurrency)
+						logger.Debug("Handling SyncSettingCurrency", zap.Any("message", settings))
+
+						err = m.handleSyncSettingCurrency(messageState, settings)
+						if err != nil {
+							logger.Warn("failed to handle SyncSettingCurrency", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSettingGifFavorites:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
 						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifFavorites)
 						logger.Debug("Handling SyncSettingGifFavorites", zap.Any("message", settings))
 
@@ -3605,7 +3615,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handleSyncSettingTelemetryServerURL(messageState, settings)
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingTelemetryServerURL", zap.Error(err))
->>>>>>> Sync Settings
 							allMessagesProcessed = false
 							continue
 						}
@@ -5496,7 +5505,10 @@ func (m *Messenger) BloomFilter() []byte {
 }
 
 func (m *Messenger) getSettings() (accounts.Settings, error) {
-	sDB := accounts.NewDB(m.database)
+	sDB, err := accounts.NewDB(m.database)
+	if err != nil {
+		return accounts.Settings{}, err
+	}
 	return sDB.GetSettings()
 }
 

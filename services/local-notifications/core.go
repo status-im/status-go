@@ -95,10 +95,13 @@ type Service struct {
 	accountsDB        *accounts.Database
 }
 
-func NewService(appDB *sql.DB, chainID uint64) *Service {
+func NewService(appDB *sql.DB, chainID uint64) (*Service, error) {
 	db := NewDB(appDB, chainID)
 	walletDB := transfer.NewDB(appDB)
-	accountsDB := accounts.NewDB(appDB)
+	accountsDB, err := accounts.NewDB(appDB)
+	if err != nil {
+		return nil, err
+	}
 	trans := &transmitter{}
 	walletTrans := &transmitter{}
 
@@ -109,7 +112,7 @@ func NewService(appDB *sql.DB, chainID uint64) *Service {
 		accountsDB:        accountsDB,
 		transmitter:       trans,
 		walletTransmitter: walletTrans,
-	}
+	}, nil
 }
 
 func (n *Notification) MarshalJSON() ([]byte, error) {

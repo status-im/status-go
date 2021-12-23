@@ -29,7 +29,8 @@ func TestServiceStartStop(t *testing.T) {
 	db, stop := setupAppTestDb(t)
 	defer stop()
 
-	s := NewService(db, 1777)
+	s, err := NewService(db, 1777)
+	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 
@@ -42,7 +43,8 @@ func TestWalletSubscription(t *testing.T) {
 	defer stop()
 
 	feed := &event.Feed{}
-	s := NewService(db, 1777)
+	s, err := NewService(db, 1777)
+	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 
@@ -66,7 +68,8 @@ func TestTransactionNotification(t *testing.T) {
 	walletDb, stop := createWalletDb(t, db)
 	defer stop()
 
-	s := NewService(db, 1777)
+	s, err := NewService(db, 1777)
+	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
 

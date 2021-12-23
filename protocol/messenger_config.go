@@ -137,7 +137,10 @@ func WithAppSettings(s accounts.Settings, nc params.NodeConfig) Option {
 				s.Networks = networks
 			}
 
-			sDB := accounts.NewDB(c.db)
+			sDB, err := accounts.NewDB(c.db)
+			if err != nil {
+				return err
+			}
 			return sDB.CreateSettings(s, nc)
 		})
 		return nil

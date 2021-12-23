@@ -105,6 +105,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 }
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
+	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
 	}
@@ -135,7 +136,10 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
 	}
-	s.accountsDB = accounts.NewDB(db)
+	s.accountsDB, err = accounts.NewDB(db)
+	if err != nil {
+		return err
+	}
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 

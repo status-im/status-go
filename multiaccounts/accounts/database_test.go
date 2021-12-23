@@ -3,8 +3,6 @@ package accounts
 import (
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -48,15 +46,27 @@ var (
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "settings-tests-")
-	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "settings-tests")
+	db, stop, err := appdatabase.SetupTestSQLDB("settings-tests-")
+	if err != nil {
+		require.NoError(t, stop())
+	}
 	require.NoError(t, err)
 
-	return NewDB(db), func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
+	d, err := NewDB(db)
+	if err != nil {
+		require.NoError(t, stop())
 	}
+	require.NoError(t, err)
+
+	return d, func() {
+		require.NoError(t, stop())
+	}
+}
+
+func TestNewDB(t *testing.T) {
+	// TODO test that
+	//  - multiple different in memory dbs can be inited
+	//  - only one instance per file name can be inited
 }
 
 func TestCreateSettings(t *testing.T) {

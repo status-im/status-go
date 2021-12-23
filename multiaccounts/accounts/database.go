@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/appdatabase"
 	"sync"
 	"time"
 
@@ -157,27 +158,46 @@ type Database struct {
 }
 
 var (
-	// TODO resolve issue where we may get a request for a new Database with a connection to
-	//  a different *sql.DB.
-	//  Perhaps find some way to compare the connection string or filename of incoming sql.DB
+	// dbInstances holds a map of singleton instances of Database
+	dbInstances map[string]*Database
 
-	// dbInstance holds the singleton instance of the multiaccounts/accounts/Database
-	dbInstance *Database
-
-	// once guards the instantiation of the dbInstance to prevent any additional instantiations
-	once sync.Once
+	// mutex guards the instantiation of the dbInstances values, to prevent any concurrent instantiations
+	mutex sync.Mutex
 )
 
-// NewDB ensures that a singleton instance of Database is returned
-func NewDB(db *sql.DB) *Database {
-	once.Do(func() {
-		dbInstance = &Database{
-			db: db,
-			syncQueue: make(chan SettingField, 100),
-		}
-	})
+// NewDB ensures that a singleton instance of Database is returned per sqlite db file
+func NewDB(db *sql.DB) (*Database, error) {
+	filename, err := appdatabase.GetDBFilename(db)
+	if err != nil {
+		return nil, err
+	}
 
-	return dbInstance
+	d := &Database{
+		db: db,
+		syncQueue: make(chan SettingField, 100),
+	}
+
+	// An empty filename means that the sqlite database is held in memory
+	// In this case we don't want to restrict the instantiation
+	if filename == "" {
+		return d, nil
+	}
+
+	// Lock to protect the map from concurrent access
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// init dbInstances if it hasn't been already
+	if dbInstances == nil {
+		dbInstances = map[string]*Database{}
+	}
+
+	// If we haven't seen this database file before make an instance
+	if _, ok := dbInstances[filename]; !ok {
+		dbInstances[filename] = d
+	}
+
+	return dbInstances[filename], nil
 }
 
 // Get database
