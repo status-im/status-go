@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ens/erc20"
 	"github.com/status-im/status-go/services/ens/registrar"
 	"github.com/status-im/status-go/services/ens/resolver"
 )
@@ -21,8 +22,13 @@ var usernameRegistrarsByChainID = map[uint64]common.Address{
 	3: common.HexToAddress("0xdaae165beb8c06e0b7613168138ebba774aff071"), // ropsten
 }
 
+var sntByChainID = map[uint64]common.Address{
+	1: common.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"), // mainnet
+	3: common.HexToAddress("0xc55cf4b03948d7ebc8b9e8bad92643703811d162"), // ropsten
+}
+
 type contractMaker struct {
-	rpcClient *rpc.Client
+	RPCClient *rpc.Client
 }
 
 func (c *contractMaker) newRegistry(chainID uint64) (*resolver.ENSRegistryWithFallback, error) {
@@ -30,7 +36,7 @@ func (c *contractMaker) newRegistry(chainID uint64) (*resolver.ENSRegistryWithFa
 		return nil, errorNotAvailableOnChainID
 	}
 
-	backend, err := c.rpcClient.EthClient(chainID)
+	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +48,7 @@ func (c *contractMaker) newRegistry(chainID uint64) (*resolver.ENSRegistryWithFa
 }
 
 func (c *contractMaker) newPublicResolver(chainID uint64, resolverAddress *common.Address) (*resolver.PublicResolver, error) {
-	backend, err := c.rpcClient.EthClient(chainID)
+	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +61,7 @@ func (c *contractMaker) newUsernameRegistrar(chainID uint64) (*registrar.Usernam
 		return nil, errorNotAvailableOnChainID
 	}
 
-	backend, err := c.rpcClient.EthClient(chainID)
+	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,4 +70,17 @@ func (c *contractMaker) newUsernameRegistrar(chainID uint64) (*registrar.Usernam
 		usernameRegistrarsByChainID[chainID],
 		backend,
 	)
+}
+
+func (c *contractMaker) newSNT(chainID uint64) (*erc20.SNT, error) {
+	if _, ok := sntByChainID[chainID]; !ok {
+		return nil, errorNotAvailableOnChainID
+	}
+
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return erc20.NewSNT(sntByChainID[chainID], backend)
 }

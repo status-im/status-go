@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -12,17 +14,30 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wealdtech/go-multicodec"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/eth-node/crypto"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ens/erc20"
+	"github.com/status-im/status-go/services/ens/registrar"
+	"github.com/status-im/status-go/services/ens/resolver"
+	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *API {
 	return &API{
 		contractMaker: &contractMaker{
-			rpcClient: rpcClient,
+			RPCClient: rpcClient,
 		},
+		accountsManager: accountsManager,
+		rpcFiltersSrvc:  rpcFiltersSrvc,
+		config:          config,
 	}
 }
 
@@ -33,7 +48,10 @@ type uri struct {
 }
 
 type API struct {
-	contractMaker *contractMaker
+	contractMaker   *contractMaker
+	accountsManager *account.GethManager
+	rpcFiltersSrvc  *rpcfilters.Service
+	config          *params.NodeConfig
 }
 
 func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
@@ -151,16 +169,13 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 }
 
 func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (string, error) {
-	usernameHashed := crypto.Keccak256([]byte(username))
-	var label [32]byte
-	copy(label[:], usernameHashed)
 	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
 	if err != nil {
 		return "", err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	expTime, err := registrar.GetExpirationTime(callOpts, label)
+	expTime, err := registrar.GetExpirationTime(callOpts, usernameToLabel(username))
 	if err != nil {
 		return "", err
 	}
@@ -183,66 +198,202 @@ func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 	return fmt.Sprintf("%x", price), nil
 }
 
-// TODO: implement once the send tx as been refactored
-// func (api *API) Release(ctx context.Context, chainID uint64, from string, gasPrice *big.Int, gasLimit uint64, password string, username string) (string, error) {
-// 	err := validateENSUsername(username)
-// 	if err != nil {
-// 		return "", err
-// 	}
+func (api *API) getSigner(chainID uint64, from types.Address, password string) bind.SignerFn {
+	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
+		selectedAccount, err := api.accountsManager.VerifyAccountPassword(api.config.KeyStoreDir, from.Hex(), password)
+		if err != nil {
+			return nil, err
+		}
+		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
+		return ethTypes.SignTx(tx, s, selectedAccount.PrivateKey)
+	}
+}
 
-// 	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
-// 	if err != nil {
-// 		return "", err
-// 	}
+func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string) (string, error) {
+	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
+	if err != nil {
+		return "", err
+	}
 
-// 	txOpts := &bind.TransactOpts{
-// 		From: common.HexToAddress(from),
-// 		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-// 			// return types.SignTx(tx, types.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
-// 			return nil, nil
-// 		},
-// 		GasPrice: gasPrice,
-// 		GasLimit: gasLimit,
-// 	}
-// 	tx, err := registrar.Release(txOpts, nameHash(username))
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return tx.Hash().String(), nil
-// }
+	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	tx, err := registrar.Release(txOpts, usernameToLabel(username))
+	if err != nil {
+		return "", err
+	}
 
-// func (api *API) Register(ctx context.Context, chainID uint64, from string, gasPrice *big.Int, gasLimit uint64, password string, username string, x [32]byte, y [32]byte) (string, error) {
-// 	err := validateENSUsername(username)
-// 	if err != nil {
-// 		return "", err
-// 	}
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	return tx.Hash().String(), nil
+}
 
-// 	registrar, err := api.contractMaker.newUsernameRegistrar(chainID)
-// 	if err != nil {
-// 		return "", err
-// 	}
+func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (uint64, error) {
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	if err != nil {
+		return 0, err
+	}
 
-// 	txOpts := &bind.TransactOpts{
-// 		From: common.HexToAddress(from),
-// 		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-// 			// return types.SignTx(tx, types.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
-// 			return nil, nil
-// 		},
-// 		GasPrice: gasPrice,
-// 		GasLimit: gasLimit,
-// 	}
-// 	tx, err := registrar.Register(
-// 		txOpts,
-// 		nameHash(username),
-// 		common.HexToAddress(from),
-// 		x,
-// 		y,
-// 	)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return tx.Hash().String(), nil
-// }
+	data, err := registrarABI.Pack("release", nameHash(username))
+	if err != nil {
+		return 0, err
+	}
+
+	ethClient, err := api.contractMaker.RPCClient.EthClient(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	registrarAddress := usernameRegistrarsByChainID[chainID]
+	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    &registrarAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+}
+
+func (api *API) Register(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+	snt, err := api.contractMaker.newSNT(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	priceHex, err := api.Price(ctx, chainID)
+	if err != nil {
+		return "", err
+	}
+	price := new(big.Int)
+	price.SetString(priceHex, 16)
+
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	if err != nil {
+		return "", err
+	}
+
+	x, y := extractCoordinates(pubkey)
+	extraData, err := registrarABI.Pack("register", usernameToLabel(username), common.Address(txArgs.From), x, y)
+	if err != nil {
+		return "", err
+	}
+
+	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	tx, err := snt.ApproveAndCall(
+		txOpts,
+		usernameRegistrarsByChainID[chainID],
+		price,
+		extraData,
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	return tx.Hash().String(), nil
+}
+
+func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+	priceHex, err := api.Price(ctx, chainID)
+	if err != nil {
+		return 0, err
+	}
+	price := new(big.Int)
+	price.SetString(priceHex, 16)
+
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	if err != nil {
+		return 0, err
+	}
+
+	x, y := extractCoordinates(pubkey)
+	extraData, err := registrarABI.Pack("register", usernameToLabel(username), common.Address(txArgs.From), x, y)
+	if err != nil {
+		return 0, err
+	}
+
+	sntABI, err := abi.JSON(strings.NewReader(erc20.SNTABI))
+	if err != nil {
+		return 0, err
+	}
+
+	data, err := sntABI.Pack("approveAndCall", usernameRegistrarsByChainID[chainID], price, extraData)
+	if err != nil {
+		return 0, err
+	}
+
+	ethClient, err := api.contractMaker.RPCClient.EthClient(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	contractAddress := sntByChainID[chainID]
+	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    &contractAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+}
+
+func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+	err := validateENSUsername(username)
+	if err != nil {
+		return "", err
+	}
+
+	resolverAddress, err := api.Resolver(ctx, chainID, username)
+	if err != nil {
+		return "", err
+	}
+
+	resolver, err := api.contractMaker.newPublicResolver(chainID, resolverAddress)
+	if err != nil {
+		return "", err
+	}
+
+	x, y := extractCoordinates(pubkey)
+	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	tx, err := resolver.SetPubkey(txOpts, nameHash(username), x, y)
+	if err != nil {
+		return "", err
+	}
+
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	return tx.Hash().String(), nil
+}
+
+func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+	err := validateENSUsername(username)
+	if err != nil {
+		return 0, err
+	}
+	x, y := extractCoordinates(pubkey)
+
+	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
+	if err != nil {
+		return 0, err
+	}
+
+	data, err := resolverABI.Pack("setPubkey", nameHash(username), x, y)
+	if err != nil {
+		return 0, err
+	}
+
+	ethClient, err := api.contractMaker.RPCClient.EthClient(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	resolverAddress, err := api.Resolver(ctx, chainID, username)
+	if err != nil {
+		return 0, err
+	}
+
+	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    resolverAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+}
 
 func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*uri, error) {
 	scheme := "https"

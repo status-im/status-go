@@ -54,7 +54,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 
-	return NewAPI(rpcClient), cancel
+	return NewAPI(rpcClient, nil, nil, nil), cancel
 }
 
 func TestResolver(t *testing.T) {

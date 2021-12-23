@@ -357,7 +357,7 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService() *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
 	}
 	return b.ensSrvc
 }
