@@ -38,13 +38,9 @@ func (pr *PingResult) Update(rttMs int, err error) {
 	}
 }
 
-func enodeToAddr(enodeAddr string) (string, error) {
-	node, err := enode.ParseV4(enodeAddr)
-	if err != nil {
-		return "", err
-	}
+func EnodeToAddr(node *enode.Node) (string, error) {
 	var ip4 enr.IPv4
-	err = node.Load(&ip4)
+	err := node.Load(&ip4)
 	if err != nil {
 		return "", err
 	}
@@ -54,6 +50,14 @@ func enodeToAddr(enodeAddr string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s:%d", net.IP(ip4).String(), tcp), nil
+}
+
+func EnodeStringToAddr(enodeAddr string) (string, error) {
+	node, err := enode.ParseV4(enodeAddr)
+	if err != nil {
+		return "", err
+	}
+	return EnodeToAddr(node)
 }
 
 func parse(addresses []string, fn parseFn) (map[string]*PingResult, []string) {
@@ -81,10 +85,10 @@ func mapValues(m map[string]*PingResult) []*PingResult {
 	return rval
 }
 
-func ping(ctx context.Context, pq PingQuery, p parseFn) ([]*PingResult, error) {
-	timeout := time.Duration(pq.TimeoutMs) * time.Millisecond
+func DoPing(ctx context.Context, addresses []string, timeoutMs int, p parseFn) ([]*PingResult, error) {
+	timeout := time.Duration(timeoutMs) * time.Millisecond
 
-	resultsMap, toPing := parse(pq.Addresses, p)
+	resultsMap, toPing := parse(addresses, p)
 
 	// run the checks concurrently
 	results, err := rtt.CheckHosts(toPing, timeout)
@@ -106,10 +110,10 @@ func ping(ctx context.Context, pq PingQuery, p parseFn) ([]*PingResult, error) {
 }
 
 func (a *API) Ping(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
-	return ping(ctx, pq, enodeToAddr)
+	return DoPing(ctx, pq.Addresses, pq.TimeoutMs, EnodeStringToAddr)
 }
 
-func multiAddressToAddress(multiAddr string) (string, error) {
+func MultiAddressToAddress(multiAddr string) (string, error) {
 
 	ma, err := multiaddr.NewMultiaddr(multiAddr)
 	if err != nil {
@@ -129,5 +133,5 @@ func multiAddressToAddress(multiAddr string) (string, error) {
 }
 
 func (a *API) MultiAddressPing(ctx context.Context, pq PingQuery) ([]*PingResult, error) {
-	return ping(ctx, pq, multiAddressToAddress)
+	return DoPing(ctx, pq.Addresses, pq.TimeoutMs, MultiAddressToAddress)
 }

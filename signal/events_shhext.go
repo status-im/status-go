@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -49,6 +48,12 @@ const (
 
 	// EventBackupPerformed is triggered when a backup has been performed
 	EventBackupPerformed = "backup.performed"
+
+	// EventMailserverAvailable is triggered when a mailserver becomes available
+	EventMailserverAvailable = "mailserver.available"
+
+	// EventMailserverChanged is triggered when switching the active mailserver
+	EventMailserverChanged = "mailserver.changed"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -82,6 +87,10 @@ type DecryptMessageFailedSignal struct {
 type BundleAddedSignal struct {
 	Identity       string `json:"identity"`
 	InstallationID string `json:"installationID"`
+}
+
+type MailserverSignal struct {
+	Address string `json:"address"`
 }
 
 type Filter struct {
@@ -194,4 +203,16 @@ func SendBundleAdded(identity string, installationID string) {
 
 func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
+}
+
+func SendMailserverAvailable(nodeAddress string) {
+	send(EventMailserverAvailable, MailserverSignal{
+		Address: nodeAddress,
+	})
+}
+
+func SendMailserverChanged(nodeAddress string) {
+	send(EventMailserverChanged, MailserverSignal{
+		Address: nodeAddress,
+	})
 }

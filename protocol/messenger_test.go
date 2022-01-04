@@ -145,6 +145,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		privateKey,
 		&testNode{shh: shh},
 		uuid.New().String(),
+		nil,
 		options...,
 	)
 	if err != nil {

@@ -2,10 +2,47 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pborman/uuid"
 )
+
+type ConnStatus struct {
+	IsOnline   bool                `json:"isOnline"`
+	HasHistory bool                `json:"hasHistory"`
+	Peers      map[string][]string `json:"peers"`
+}
+
+type ConnStatusSubscription struct {
+	sync.RWMutex
+
+	ID     string
+	C      chan ConnStatus
+	active bool
+}
+
+func NewConnStatusSubscription() *ConnStatusSubscription {
+	return &ConnStatusSubscription{
+		ID:     uuid.NewRandom().String(),
+		C:      make(chan ConnStatus, 100),
+		active: true,
+	}
+}
+
+func (u *ConnStatusSubscription) Active() bool {
+	u.RLock()
+	defer u.RUnlock()
+	return u.active
+}
+
+func (u *ConnStatusSubscription) Unsubscribe() {
+	u.Lock()
+	defer u.Unlock()
+	close(u.C)
+	u.active = false
+}
 
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
@@ -33,6 +70,8 @@ type Waku interface {
 	DialPeerByID(peerID string) error
 
 	DropPeer(peerID string) error
+
+	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64

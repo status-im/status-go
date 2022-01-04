@@ -79,6 +79,10 @@ func (w *gethWakuWrapper) DropPeer(peerID string) error {
 	return errors.New("not available in WakuV1")
 }
 
+func (w *gethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
+	return nil, errors.New("not available in WakuV1")
+}
+
 // Peers function only added for compatibility with waku V2
 func (w *gethWakuWrapper) Peers() map[string][]string {
 	p := make(map[string][]string)

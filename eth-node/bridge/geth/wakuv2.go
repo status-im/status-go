@@ -263,6 +263,10 @@ func (w *gethWakuV2Wrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
+func (w *gethWakuV2Wrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
+	return w.waku.SubscribeToConnStatusChanges(), nil
+}
+
 type wakuV2FilterWrapper struct {
 	filter *wakucommon.Filter
 	id     string

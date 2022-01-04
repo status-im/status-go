@@ -58,7 +58,7 @@ type Service struct {
 	cancelMessenger chan struct{}
 	storage         db.TransactionalStorage
 	n               types.Node
-	config          params.ShhextConfig
+	config          params.NodeConfig
 	mailMonitor     *MailRequestMonitor
 	server          *p2p.Server
 	peerStore       *mailservers.PeerStore
@@ -71,7 +71,7 @@ type Service struct {
 var _ node.Lifecycle = (*Service)(nil)
 
 func New(
-	config params.ShhextConfig,
+	config params.NodeConfig,
 	n types.Node,
 	ldb *leveldb.DB,
 	mailMonitor *MailRequestMonitor,
@@ -103,7 +103,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 }
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
-	if !s.config.PFSEnabled {
+	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
 	}
 
@@ -118,15 +118,15 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 
 	s.identity = identity
 
-	dataDir := filepath.Clean(s.config.BackupDisabledDataDir)
+	dataDir := filepath.Clean(s.config.ShhextConfig.BackupDisabledDataDir)
 
 	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return err
 	}
 
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
-		MaxAttempts:                      s.config.MaxMessageDeliveryAttempts,
-		AwaitOnlyMailServerConfirmations: s.config.MailServerConfirmations,
+		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,
+		AwaitOnlyMailServerConfirmations: s.config.ShhextConfig.MailServerConfirmations,
 		IsMailserver: func(peer types.EnodeID) bool {
 			return s.peerStore.Exist(peer)
 		},
@@ -146,13 +146,15 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 		nodeName,
 		identity,
 		s.n,
-		s.config.InstallationID,
+		s.config.ShhextConfig.InstallationID,
+		s.peerStore,
 		options...,
 	)
 	if err != nil {
 		return err
 	}
 	s.messenger = messenger
+	s.messenger.SetP2PServer(s.server)
 	return messenger.Init()
 }
 
@@ -166,7 +168,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 
-	if s.config.BandwidthStatsEnabled {
+	if s.config.ShhextConfig.BandwidthStatsEnabled {
 		go s.retrieveStats(5*time.Second, s.cancelMessenger)
 	}
 
@@ -282,7 +284,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 }
 
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
-	if s.config.VerifyTransactionURL == "" {
+	if s.config.ShhextConfig.VerifyTransactionURL == "" {
 		log.Warn("not starting transaction loop")
 		return
 	}
@@ -392,7 +394,7 @@ func (s *Service) Stop() error {
 }
 
 func buildMessengerOptions(
-	config params.ShhextConfig,
+	config params.NodeConfig,
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	multiAccounts *multiaccounts.Database,
@@ -411,10 +413,11 @@ func buildMessengerOptions(
 		protocol.WithAccount(account),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
-		protocol.WithENSVerificationConfig(publishMessengerResponse, config.VerifyENSURL, config.VerifyENSContractAddress),
+		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
+		protocol.WithClusterConfig(config.ClusterConfig),
 	}
 
-	if config.DataSyncEnabled {
+	if config.ShhextConfig.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
 
@@ -425,7 +428,7 @@ func buildMessengerOptions(
 
 	// Generate anon metrics client config
 	if settings.AnonMetricsShouldSend {
-		keyBytes, err := hex.DecodeString(config.AnonMetricsSendID)
+		keyBytes, err := hex.DecodeString(config.ShhextConfig.AnonMetricsSendID)
 		if err != nil {
 			return nil, err
 		}
@@ -443,14 +446,14 @@ func buildMessengerOptions(
 	}
 
 	// Generate anon metrics server config
-	if config.AnonMetricsServerEnabled {
-		if len(config.AnonMetricsServerPostgresURI) == 0 {
+	if config.ShhextConfig.AnonMetricsServerEnabled {
+		if len(config.ShhextConfig.AnonMetricsServerPostgresURI) == 0 {
 			return nil, errors.New("AnonMetricsServerPostgresURI must be set")
 		}
 
 		amsc := &anonmetrics.ServerConfig{
 			Enabled:     true,
-			PostgresURI: config.AnonMetricsServerPostgresURI,
+			PostgresURI: config.ShhextConfig.AnonMetricsServerPostgresURI,
 		}
 		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
 	}
@@ -468,17 +471,17 @@ func buildMessengerOptions(
 	}
 
 	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
-		DefaultServers:             config.DefaultPushNotificationsServers,
+		DefaultServers:             config.ShhextConfig.DefaultPushNotificationsServers,
 		BlockMentions:              settings.PushNotificationsBlockMentions,
 		SendEnabled:                settings.SendPushNotifications,
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
 		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,
 	}))
 
-	if config.VerifyTransactionURL != "" {
+	if config.ShhextConfig.VerifyTransactionURL != "" {
 		client := &verifyTransactionClient{
-			url:     config.VerifyTransactionURL,
-			chainID: big.NewInt(config.VerifyTransactionChainID),
+			url:     config.ShhextConfig.VerifyTransactionURL,
+			chainID: big.NewInt(config.ShhextConfig.VerifyTransactionChainID),
 		}
 		options = append(options, protocol.WithVerifyTransactionClient(client))
 	}

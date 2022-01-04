@@ -642,3 +642,7 @@ func (t *Transport) ProcessingP2PMessages() bool {
 func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
 	t.waku.MarkP2PMessageAsProcessed(hash)
 }
+
+func (t *Transport) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
+	return t.waku.SubscribeToConnStatusChanges()
+}

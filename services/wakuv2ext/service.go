@@ -15,14 +15,14 @@ type Service struct {
 	w types.Waku
 }
 
-func New(config params.ShhextConfig, n types.Node, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
+func New(config params.NodeConfig, n types.Node, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
 	w, err := n.GetWakuV2(nil)
 	if err != nil {
 		panic(err)
 	}
 	delay := ext.DefaultRequestsDelay
-	if config.RequestsDelay != 0 {
-		delay = config.RequestsDelay
+	if config.ShhextConfig.RequestsDelay != 0 {
+		delay = config.ShhextConfig.RequestsDelay
 	}
 	requestsRegistry := ext.NewRequestsRegistry(delay)
 	mailMonitor := ext.NewMailRequestMonitor(w, handler, requestsRegistry)

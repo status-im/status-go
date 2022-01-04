@@ -15,13 +15,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
@@ -47,7 +52,8 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/ext/mailservers"
+	mailserversDB "github.com/status-im/status-go/services/mailservers"
 
 	"github.com/status-im/status-go/telemetry"
 )
@@ -81,6 +87,8 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // mailservers because they can also be managed by the user.
 type Messenger struct {
 	node                       types.Node
+	server                     *p2p.Server
+	peerStore                  *mailservers.PeerStore
 	config                     *config
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
@@ -105,11 +113,13 @@ type Messenger struct {
 	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserver                 []byte
+	mailserverCycle            mailserverCycle
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
+	mailservers                *mailserversDB.Database
 	settings                   *accounts.Database
 	account                    *multiaccounts.Account
-	mailserversDatabase        *mailservers.Database
+	mailserversDatabase        *mailserversDB.Database
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
 	connectionState            connection.State
@@ -117,6 +127,28 @@ type Messenger struct {
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex sync.Mutex
+}
+
+type connStatus int
+
+const (
+	disconnected connStatus = iota + 1
+	connecting
+	connected
+)
+
+type peerStatus struct {
+	status                connStatus
+	canConnectAfter       time.Time
+	lastConnectionAttempt time.Time
+}
+type mailserverCycle struct {
+	sync.RWMutex
+	activeMailserver *enode.Node // For usage with wakuV1
+	activeStoreNode  *peer.ID    // For usage with wakuV2
+	peers            map[string]peerStatus
+	events           chan *p2p.PeerEvent
+	subscription     event.Subscription
 }
 
 type dbConfig struct {
@@ -175,6 +207,7 @@ func NewMessenger(
 	identity *ecdsa.PrivateKey,
 	node types.Node,
 	installationID string,
+	peerStore *mailservers.PeerStore,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -346,6 +379,7 @@ func NewMessenger(
 		return nil, err
 	}
 	settings := accounts.NewDB(database)
+	mailservers := mailserversDB.NewDB(database)
 	messenger = &Messenger{
 		config:                     &c,
 		node:                       node,
@@ -372,10 +406,15 @@ func NewMessenger(
 		database:                   database,
 		multiAccounts:              c.multiAccount,
 		settings:                   settings,
-		mailserversDatabase:        c.mailserversDatabase,
-		account:                    c.account,
-		quit:                       make(chan struct{}),
-		requestedCommunities:       make(map[string]*transport.Filter),
+		peerStore:                  peerStore,
+		mailservers:                mailservers,
+		mailserverCycle: mailserverCycle{
+			peers: make(map[string]peerStatus),
+		},
+		mailserversDatabase:  c.mailserversDatabase,
+		account:              c.account,
+		quit:                 make(chan struct{}),
+		requestedCommunities: make(map[string]*transport.Filter),
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
@@ -408,6 +447,10 @@ func NewMessenger(
 	}
 
 	return messenger, nil
+}
+
+func (m *Messenger) SetP2PServer(server *p2p.Server) {
+	m.server = server
 }
 
 func (m *Messenger) processSentMessages(ids []string) error {
