@@ -420,6 +420,7 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 
 	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, nil, nil, batch.Topics, true)
 	if err != nil {
+		logger.Error("failed to send messages request for topic", zap.Error(err))
 		return err
 	}
 
@@ -430,6 +431,7 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 
 		cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
 		if err != nil {
+			logger.Error("failed to send messages request for topic 2", zap.Error(err))
 			return err
 		}
 	}
