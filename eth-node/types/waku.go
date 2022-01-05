@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pborman/uuid"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type ConnStatus struct {

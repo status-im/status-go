@@ -15,9 +15,10 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/go-waku/waku/v2/dnsdisc"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/go-waku/waku/v2/dnsdisc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/signal"
@@ -104,7 +105,11 @@ func (m *Messenger) disconnectStoreNode() {
 		}
 	}
 
-	m.transport.DropPeer(string(*m.mailserverCycle.activeStoreNode))
+	err := m.transport.DropPeer(string(*m.mailserverCycle.activeStoreNode))
+	if err != nil {
+		m.logger.Warn("Could not drop peer")
+	}
+
 	m.mailserverCycle.activeStoreNode = nil
 }
 
