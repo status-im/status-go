@@ -2,6 +2,7 @@ package statusgo
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 // MultiAccountGenerateParams are the params sent to MultiAccountGenerate.
@@ -165,7 +166,10 @@ func MultiAccountImportMnemonic(paramsJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(p.MnemonicPhrase, p.Bip39Passphrase)
+	// remove any duplicate whitespaces
+	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
