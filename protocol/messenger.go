@@ -624,7 +624,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.config.featureFlags.MailserverCycle {
-		m.StartMailserverCycle()
+		err := m.StartMailserverCycle()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return response, nil
