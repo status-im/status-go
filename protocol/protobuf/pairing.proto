@@ -8,6 +8,7 @@ message Backup {
   string id = 2;
 
   repeated SyncInstallationContactV2 contacts = 3;
+  repeated SyncCommunity communities = 4;
 }
 
 message PairInstallation {

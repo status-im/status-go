@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -383,4 +384,63 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	)
 	s.Require().NoError(err)
 	s.Require().Len(bob2.BlockedContacts(), 1)
+}
+
+func (s *MessengerBackupSuite) TestBackupCommunities() {
+	bob1 := s.m
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Create a communitie
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create a community chat
+	response, err := bob1.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Backup
+	clock, err := bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Safety check
+	communities, err := bob2.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			_, err := s.m.RetrieveAll()
+			if err != nil {
+				s.logger.Info("Failed")
+				return false
+			}
+
+			communities, err := bob2.Communities()
+			s.Require().NoError(err)
+			return len(communities) >= 2
+		},
+		"communities not backed up",
+	)
+	s.Require().NoError(err)
+	communities, err = bob2.JoinedCommunities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	lastBackup, err := bob1.lastBackup()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(lastBackup)
+	s.Require().Equal(clock, lastBackup)
 }

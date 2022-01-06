@@ -302,6 +302,13 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 			return err
 		}
 	}
+
+	for _, community := range message.Communities {
+		err := m.handleSyncCommunity(state, *community)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
