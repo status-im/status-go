@@ -909,10 +909,6 @@ func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse,
 	return api.service.messenger.RequestAllHistoricMessages()
 }
 
-func (api *PublicAPI) StartMailserverCycle() error {
-	return api.service.messenger.StartMailserverCycle()
-}
-
 func (api *PublicAPI) DisconnectActiveMailserver() {
 	api.service.messenger.DisconnectActiveMailserver()
 }

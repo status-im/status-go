@@ -421,6 +421,10 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithDatasync())
 	}
 
+	if config.ShhextConfig.EnableMailserverCycle {
+		options = append(options, protocol.WithMailserverCycle())
+	}
+
 	settings, err := accountsDB.GetSettings()
 	if err != sql.ErrNoRows && err != nil {
 		return nil, err

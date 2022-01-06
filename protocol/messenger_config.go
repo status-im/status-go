@@ -239,3 +239,10 @@ func WithClusterConfig(cc params.ClusterConfig) Option {
 		return nil
 	}
 }
+
+func WithMailserverCycle() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.MailserverCycle = true
+		return nil
+	}
+}
