@@ -44,6 +44,8 @@ var (
 	ErrChatNotUnique = errors.New("another account is set to be default chat. disable it before using new")
 	// ErrInvalidConfig returned if config isn't allowed
 	ErrInvalidConfig = errors.New("configuration value not allowed")
+	// ErrNewClockOlderThanCurrent
+	ErrNewClockOlderThanCurrent = errors.New("the new clock value is older than the current clock value")
 )
 
 type Account struct {
@@ -280,49 +282,49 @@ INSERT INTO settings (
 	return nodecfg.SaveConfigWithTx(tx, &n)
 }
 
-func (db *Database) saveSetting(setting string, value interface{}) (SettingField, error) {
-	var update *sql.Stmt
-	var	err error
-	var sf SettingField
-	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
-
+func (db *Database) getSettingFieldFromReactName(reactName string) (SettingField, error) {
 	for _, s := range SettingFieldRegister {
-		if s.ReactFieldName == setting {
-			value, err = s.ValueHandler(value)
-			if err != nil {
-				return sf, err
-			}
-
-			// TODO this is ugly as hell need a more elegant solution
-			if NodeConfig.ReactFieldName == setting {
-				if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
-					return sf, err
-				}
-				value = nil
-			}
-
-			query = fmt.Sprintf(query, s.DBColumnName)
-			update, err = db.db.Prepare(query)
-			if err != nil {
-				return sf, err
-			}
-
-			sf = s
-			break
+		if s.ReactFieldName == reactName {
+			return s, nil
 		}
 	}
-	if query == "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'" {
-		return sf, ErrInvalidConfig
+	return SettingField{}, ErrInvalidConfig
+}
+
+func (db *Database) saveSetting(setting SettingField, value interface{}) error {
+	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
+	query = fmt.Sprintf(query, setting.DBColumnName)
+	update, err := db.db.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	value, err = setting.ValueHandler(value)
+	if err != nil {
+		return err
+	}
+
+	// TODO this is ugly as hell need a more elegant solution
+	if NodeConfig.ReactFieldName == setting.ReactFieldName {
+		if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
+			return err
+		}
+		value = nil
 	}
 
 	_, err = update.Exec(value)
-	return sf, err
+	return err
 }
 
 // SaveSetting stores data from any non-sync source
 // If the field requires syncing the field data is pushed on to the syncQueue
 func (db *Database) SaveSetting(setting string, value interface{}) error {
-	sf, err := db.saveSetting(setting, value)
+	sf, err := db.getSettingFieldFromReactName(setting)
+	if err != nil {
+		return err
+	}
+
+	err = db.saveSetting(sf, value)
 	if err != nil {
 		return err
 	}
@@ -334,9 +336,21 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 }
 
 // SaveSyncSetting stores setting data from a sync protobuf source
-func (db *Database) SaveSyncSetting(setting string, value interface{}) error {
-	_, err := db.saveSetting(setting, value)
-	return err
+func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock time.Time) error {
+	ls, err := db.GetSettingLastSynced(setting.DBColumnName)
+	if err != nil {
+		return err
+	}
+	if clock.Before(ls) {
+		return ErrNewClockOlderThanCurrent
+	}
+
+	err = db.saveSetting(setting, value)
+	if err != nil {
+		return err
+	}
+
+	return db.SetSettingLastSynced(setting.DBColumnName, clock)
 }
 
 func (db *Database) GetSettings() (Settings, error) {

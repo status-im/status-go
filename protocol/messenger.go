@@ -3417,10 +3417,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingCurrency)
-						logger.Debug("Handling SyncSettingCurrency", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingCurrency)
+						logger.Debug("Handling SyncSettingCurrency", zap.Any("message", setting))
 
-						err = m.handleSyncSettingCurrency(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.Currency, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingCurrency", zap.Error(err))
 							allMessagesProcessed = false
@@ -3433,10 +3433,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifFavorites)
-						logger.Debug("Handling SyncSettingGifFavorites", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifFavorites)
+						logger.Debug("Handling SyncSettingGifFavorites", zap.Any("message", setting))
 
-						err = m.handleSyncSettingGifFavorites(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.GifFavourites, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingGifFavorites", zap.Error(err))
 							allMessagesProcessed = false
@@ -3449,10 +3449,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifRecents)
-						logger.Debug("Handling SyncSettingGifRecents", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingGifRecents)
+						logger.Debug("Handling SyncSettingGifRecents", zap.Any("message", setting))
 
-						err = m.handleSyncSettingGifRecents(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.GifRecents, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingGifRecents", zap.Error(err))
 							allMessagesProcessed = false
@@ -3465,10 +3465,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingMessagesFromContactsOnly)
-						logger.Debug("Handling SyncSettingMessagesFromContactsOnly", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingMessagesFromContactsOnly)
+						logger.Debug("Handling SyncSettingMessagesFromContactsOnly", zap.Any("message", setting))
 
-						err = m.handleSyncSettingMessagesFromContactsOnly(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.MessagesFromContactsOnly, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingMessagesFromContactsOnly", zap.Error(err))
 							allMessagesProcessed = false
@@ -3481,10 +3481,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreferredName)
-						logger.Debug("Handling SyncSettingPreferredName", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreferredName)
+						logger.Debug("Handling SyncSettingPreferredName", zap.Any("message", setting))
 
-						err = m.handleSyncSettingPreferredName(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.PreferredName, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingPreferredName", zap.Error(err))
 							allMessagesProcessed = false
@@ -3497,10 +3497,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreviewPrivacy)
-						logger.Debug("Handling SyncSettingPreviewPrivacy", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingPreviewPrivacy)
+						logger.Debug("Handling SyncSettingPreviewPrivacy", zap.Any("message", setting))
 
-						err = m.handleSyncSettingPreviewPrivacy(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.PreviewPrivacy, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingPreviewPrivacy", zap.Error(err))
 							allMessagesProcessed = false
@@ -3513,10 +3513,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesShowTo)
-						logger.Debug("Handling SyncSettingProfilePicturesShowTo", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesShowTo)
+						logger.Debug("Handling SyncSettingProfilePicturesShowTo", zap.Any("message", setting))
 
-						err = m.handleSyncSettingProfilePicturesShowTo(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.ProfilePicturesShowTo, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingProfilePicturesShowTo", zap.Error(err))
 							allMessagesProcessed = false
@@ -3529,10 +3529,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesVisibility)
-						logger.Debug("Handling SyncSettingProfilePicturesVisibility", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingProfilePicturesVisibility)
+						logger.Debug("Handling SyncSettingProfilePicturesVisibility", zap.Any("message", setting))
 
-						err = m.handleSyncSettingProfilePicturesVisibility(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.ProfilePicturesVisibility, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingProfilePicturesVisibility", zap.Error(err))
 							allMessagesProcessed = false
@@ -3545,10 +3545,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingSendStatusUpdates)
-						logger.Debug("Handling SyncSettingSendStatusUpdates", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingSendStatusUpdates)
+						logger.Debug("Handling SyncSettingSendStatusUpdates", zap.Any("message", setting))
 
-						err = m.handleSyncSettingSendStatusUpdates(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.SendStatusUpdates, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingSendStatusUpdates", zap.Error(err))
 							allMessagesProcessed = false
@@ -3561,10 +3561,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksInstalled)
-						logger.Debug("Handling SyncSettingStickerPacksInstalled", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksInstalled)
+						logger.Debug("Handling SyncSettingStickerPacksInstalled", zap.Any("message", setting))
 
-						err = m.handleSyncSettingStickerPacksInstalled(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.StickersPacksInstalled, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingStickerPacksInstalled", zap.Error(err))
 							allMessagesProcessed = false
@@ -3577,10 +3577,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksPending)
-						logger.Debug("Handling SyncSettingStickerPacksPending", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickerPacksPending)
+						logger.Debug("Handling SyncSettingStickerPacksPending", zap.Any("message", setting))
 
-						err = m.handleSyncSettingStickerPacksPending(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.StickersPacksPending, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingStickerPacksPending", zap.Error(err))
 							allMessagesProcessed = false
@@ -3593,10 +3593,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickersRecentStickers)
-						logger.Debug("Handling SyncSettingStickersRecentStickers", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingStickersRecentStickers)
+						logger.Debug("Handling SyncSettingStickersRecentStickers", zap.Any("message", setting))
 
-						err = m.handleSyncSettingStickersRecentStickers(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.StickersRecentStickers, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingStickersRecentStickers", zap.Error(err))
 							allMessagesProcessed = false
@@ -3609,10 +3609,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettingTelemetryServerURL)
-						logger.Debug("Handling SyncSettingTelemetryServerURL", zap.Any("message", settings))
+						setting := msg.ParsedMessage.Interface().(protobuf.SyncSettingTelemetryServerURL)
+						logger.Debug("Handling SyncSettingTelemetryServerURL", zap.Any("message", setting))
 
-						err = m.handleSyncSettingTelemetryServerURL(messageState, settings)
+						err := m.settings.SaveSyncSetting(accounts.TelemetryServerURL, setting.GetValue(), setting.GetClock().AsTime())
 						if err != nil {
 							logger.Warn("failed to handle SyncSettingTelemetryServerURL", zap.Error(err))
 							allMessagesProcessed = false
