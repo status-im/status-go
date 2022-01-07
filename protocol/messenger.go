@@ -669,7 +669,12 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Offline()
 		}
+
+		if m.config.featureFlags.MailserverCycle {
+			m.DisconnectActiveMailserver() // force mailserver cycle to run again
+		}
 	}
+
 	m.ensVerifier.SetOnline(online)
 }
 
