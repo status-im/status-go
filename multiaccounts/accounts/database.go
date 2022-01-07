@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -152,13 +153,18 @@ type Database struct {
 	db *sql.DB
 }
 
+// Get database
+func (db Database) DB() *sql.DB {
+	return db.db
+}
+
 // Close closes database.
 func (db Database) Close() error {
 	return db.db.Close()
 }
 
 // TODO remove photoPath from settings
-func (db *Database) CreateSettings(s Settings, nodecfg params.NodeConfig) error {
+func (db *Database) CreateSettings(s Settings, n params.NodeConfig) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -222,7 +228,7 @@ INSERT INTO settings (
 		return err
 	}
 
-	return db.saveNodeConfig(tx, &nodecfg)
+	return nodecfg.SaveConfigWithTx(tx, &n)
 }
 
 func (db *Database) SaveSetting(setting string, value interface{}) error {
@@ -308,7 +314,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		update, err = db.db.Prepare("UPDATE settings SET networks = ? WHERE synthetic_id = 'id'")
 	case "node-config":
 		nodeConfig := value.(params.NodeConfig)
-		if err = db.SaveNodeConfig(&nodeConfig); err != nil {
+		if err = nodecfg.SaveNodeConfig(db.db, &nodeConfig); err != nil {
 			return err
 		}
 		value = nil

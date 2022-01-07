@@ -9,9 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/params"
 )
 
-var initNetworks = []Network{
+var initNetworks = []params.Network{
 	{
 		ChainID:                1,
 		ChainName:              "Ethereum Mainnet",

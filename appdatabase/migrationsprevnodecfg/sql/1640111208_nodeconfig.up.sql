@@ -222,6 +222,7 @@ CREATE TABLE shhext_config (
   anon_metrics_send_id VARCHAR NOT NULL DEFAULT "",
   anon_metrics_server_postgres_uri VARCHAR NOT NULL DEFAULT "",
   bandwidth_stats_enabled BOOLEAN DEFAULT false,
+  enable_mailserver_cycle BOOLEAN DEFAULT false,
   synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
 ) WITHOUT ROWID;
 

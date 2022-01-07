@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -430,7 +429,7 @@ type NodeConfig struct {
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
 	// Initial networks to load
-	Networks []network.Network
+	Networks []Network
 
 	// ClusterConfig extra configuration for supporting cluster peers.
 	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`
@@ -489,6 +488,20 @@ type NodeConfig struct {
 
 	// PushNotificationServerConfig is the config for the push notification server
 	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
+}
+
+type Network struct {
+	ChainID                uint64 `json:"chainId"`
+	ChainName              string `json:"chainName"`
+	RPCURL                 string `json:"rpcUrl"`
+	BlockExplorerURL       string `json:"blockExplorerUrl,omitempty"`
+	IconURL                string `json:"iconUrl,omitempty"`
+	NativeCurrencyName     string `json:"nativeCurrencyName,omitempty"`
+	NativeCurrencySymbol   string `json:"nativeCurrencySymbol,omitempty"`
+	NativeCurrencyDecimals uint64 `json:"nativeCurrencyDecimals"`
+	IsTest                 bool   `json:"isTest"`
+	Layer                  uint64 `json:"layer"`
+	Enabled                bool   `json:"enabled"`
 }
 
 // WalletConfig extra configuration for wallet.Service.

@@ -1,0 +1,6 @@
+-- DO NOT REMOVE
+-- -----------------------------
+-- This file does nothing
+-- It's created so the migration knows from which sql file to continue since 
+-- the migration has been splitted in two (before, and after nodecfg extraction)
+-- Do not add code here

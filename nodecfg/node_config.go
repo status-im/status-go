@@ -1,4 +1,4 @@
-package accounts
+package nodecfg
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -24,7 +23,7 @@ const LightpushNodes = "lightpush"
 const WakuRendezvousNodes = "waku_rendezvous"
 const DiscV5BootstrapNodes = "discV5boot"
 
-func (db *Database) nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
+func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
 	switch err := row.Scan(&migrated); err {
 	case sql.ErrNoRows, nil:
@@ -36,7 +35,7 @@ func (db *Database) nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error)
 
 type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 
-func (db *Database) insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key, no_discovery, rendezvous,
@@ -63,7 +62,7 @@ func (db *Database) insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func (db *Database) insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`INSERT OR REPLACE INTO http_config (enabled, host, port, synthetic_id) VALUES (?, ?, ?, 'id')`, c.HTTPEnabled, c.HTTPHost, c.HTTPPort); err != nil {
 		return err
 	}
@@ -91,7 +90,7 @@ func (db *Database) insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func (db *Database) insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO log_config (
 		enabled, mobile_system, log_dir, log_level, max_backups, max_size, 
@@ -104,7 +103,7 @@ func (db *Database) insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func (db *Database) insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM network_config WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
@@ -126,7 +125,7 @@ func (db *Database) insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error 
 	return nil
 }
 
-func (db *Database) insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeConfig) error {
+func insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM light_eth_trusted_nodes WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
@@ -140,7 +139,7 @@ func (db *Database) insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeC
 	return nil
 }
 
-func (db *Database) insertRegisterTopics(tx *sql.Tx, c *params.NodeConfig) error {
+func insertRegisterTopics(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM register_topics WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
@@ -154,7 +153,7 @@ func (db *Database) insertRegisterTopics(tx *sql.Tx, c *params.NodeConfig) error
 	return nil
 }
 
-func (db *Database) insertRequireTopics(tx *sql.Tx, c *params.NodeConfig) error {
+func insertRequireTopics(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM require_topics WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
@@ -168,40 +167,40 @@ func (db *Database) insertRequireTopics(tx *sql.Tx, c *params.NodeConfig) error 
 	return nil
 }
 
-func (db *Database) insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO ipc_config (enabled, file, synthetic_id) VALUES (?, ?, 'id')`, c.IPCEnabled, c.IPCFile)
 	return err
 }
 
-func (db *Database) insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_config (enabled, fleet, synthetic_id) VALUES (?, ?, 'id')`, c.ClusterConfig.Enabled, c.ClusterConfig.Fleet)
 	return err
 }
 
-func (db *Database) insertUpstreamConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertUpstreamConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO upstream_config (enabled, url, synthetic_id) VALUES (?, ?, 'id')`, c.UpstreamConfig.Enabled, c.UpstreamConfig.URL)
 	return err
 }
 
-func (db *Database) insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO light_eth_config (enabled, database_cache, min_trusted_fraction, synthetic_id) VALUES (?, ?, ?, 'id')`, c.LightEthConfig.Enabled, c.LightEthConfig.DatabaseCache, c.LightEthConfig.MinTrustedFraction)
 	return err
 }
 
-func (db *Database) insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
 		pfs_enabled, backup_disabled_data_dir, installation_id, mailserver_confirmations, enable_connection_manager,
 		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts, 
 		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
 		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
-		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, enable_mailserver_cycle, synthetic_id
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.ShhextConfig.PFSEnabled, c.ShhextConfig.BackupDisabledDataDir, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
 		c.ShhextConfig.EnableLastUsedMonitor, c.ShhextConfig.ConnectionTarget, c.ShhextConfig.RequestsDelay, c.ShhextConfig.MaxServerFailures, c.ShhextConfig.MaxMessageDeliveryAttempts,
 		c.ShhextConfig.WhisperCacheDir, c.ShhextConfig.DisableGenericDiscoveryTopic, c.ShhextConfig.SendV1Messages, c.ShhextConfig.DataSyncEnabled, c.ShhextConfig.VerifyTransactionURL,
 		c.ShhextConfig.VerifyENSURL, c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.VerifyTransactionChainID, c.ShhextConfig.AnonMetricsServerEnabled,
-		c.ShhextConfig.AnonMetricsSendID, c.ShhextConfig.AnonMetricsServerPostgresURI, c.ShhextConfig.BandwidthStatsEnabled,
+		c.ShhextConfig.AnonMetricsSendID, c.ShhextConfig.AnonMetricsServerPostgresURI, c.ShhextConfig.BandwidthStatsEnabled, c.ShhextConfig.EnableMailserverCycle,
 	)
 	if err != nil {
 		return err
@@ -221,7 +220,7 @@ func (db *Database) insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func (db *Database) insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
+func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
 		enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, persist_peers, data_dir,
@@ -247,7 +246,7 @@ func (db *Database) insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func (db *Database) insertWakuConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertWakuConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO waku_config (
 		enabled, light_client, full_node, enable_mailserver, data_dir, minimum_pow, mailserver_password, mailserver_rate_limit, mailserver_data_retention,
@@ -280,7 +279,7 @@ func (db *Database) insertWakuConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func (db *Database) insertPushNotificationsServerConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func insertPushNotificationsServerConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	hexPrivKey := ""
 	if c.PushNotificationServerConfig.Identity != nil {
 		hexPrivKey = hexutil.Encode(crypto.FromECDSA(c.PushNotificationServerConfig.Identity))
@@ -289,7 +288,7 @@ func (db *Database) insertPushNotificationsServerConfig(tx *sql.Tx, c *params.No
 	return err
 }
 
-func (db *Database) insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
+func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
 		return err
 	}
@@ -319,24 +318,24 @@ func (db *Database) insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) e
 	return nil
 }
 
-func (db *Database) saveNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
+func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
 	insertFNs := []insertFn{
-		db.insertNodeConfig,
-		db.insertHTTPConfig,
-		db.insertIPCConfig,
-		db.insertLogConfig,
-		db.insertUpstreamConfig,
-		db.insertNetworkConfig,
-		db.insertClusterConfig,
-		db.insertClusterConfigNodes,
-		db.insertLightETHConfig,
-		db.insertLightETHConfigTrustedNodes,
-		db.insertRegisterTopics,
-		db.insertRequireTopics,
-		db.insertPushNotificationsServerConfig,
-		db.insertShhExtConfig,
-		db.insertWakuConfig,
-		db.insertWakuV2Config,
+		insertNodeConfig,
+		insertHTTPConfig,
+		insertIPCConfig,
+		insertLogConfig,
+		insertUpstreamConfig,
+		insertNetworkConfig,
+		insertClusterConfig,
+		insertClusterConfigNodes,
+		insertLightETHConfig,
+		insertLightETHConfigTrustedNodes,
+		insertRegisterTopics,
+		insertRequireTopics,
+		insertPushNotificationsServerConfig,
+		insertShhExtConfig,
+		insertWakuConfig,
+		insertWakuV2Config,
 	}
 
 	for _, fn := range insertFNs {
@@ -349,8 +348,8 @@ func (db *Database) saveNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func (db *Database) SaveNodeConfig(c *params.NodeConfig) error {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+func SaveNodeConfig(db *sql.DB, c *params.NodeConfig) error {
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
@@ -364,25 +363,31 @@ func (db *Database) SaveNodeConfig(c *params.NodeConfig) error {
 		_ = tx.Rollback()
 	}()
 
-	return db.saveNodeConfig(tx, c)
+	return SaveConfigWithTx(tx, c)
 }
 
-func (db *Database) migrateNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
+func migrateNodeConfig(tx *sql.Tx) error {
 	nodecfg := &params.NodeConfig{}
 	err := tx.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: nodecfg})
-	if err != nil {
-		return nil, err
+
+	if err != nil && err != sql.ErrNoRows {
+		return err
 	}
 
-	err = db.saveNodeConfig(tx, nodecfg)
-	if err != nil {
-		return nil, err
+	if err == sql.ErrNoRows {
+		// Can't migrate because there's no data
+		return nil
 	}
 
-	return nodecfg, nil
+	err = SaveConfigWithTx(tx, nodecfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (db *Database) loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
+func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodecfg := &params.NodeConfig{}
 
 	err := tx.QueryRow(`
@@ -462,7 +467,7 @@ func (db *Database) loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var n network.Network
+		var n params.Network
 		err = rows.Scan(&n.ChainID, &n.ChainName, &n.RPCURL, &n.BlockExplorerURL, &n.IconURL,
 			&n.NativeCurrencyName, &n.NativeCurrencySymbol, &n.NativeCurrencyDecimals, &n.IsTest,
 			&n.Layer, &n.Enabled,
@@ -577,13 +582,13 @@ func (db *Database) loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
 	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
 	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
-	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
+	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, enable_mailserver_cycle FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.BackupDisabledDataDir, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,
 		&nodecfg.ShhextConfig.EnableLastUsedMonitor, &nodecfg.ShhextConfig.ConnectionTarget, &nodecfg.ShhextConfig.RequestsDelay, &nodecfg.ShhextConfig.MaxServerFailures, &nodecfg.ShhextConfig.MaxMessageDeliveryAttempts,
 		&nodecfg.ShhextConfig.WhisperCacheDir, &nodecfg.ShhextConfig.DisableGenericDiscoveryTopic, &nodecfg.ShhextConfig.SendV1Messages, &nodecfg.ShhextConfig.DataSyncEnabled, &nodecfg.ShhextConfig.VerifyTransactionURL,
 		&nodecfg.ShhextConfig.VerifyENSURL, &nodecfg.ShhextConfig.VerifyENSContractAddress, &nodecfg.ShhextConfig.VerifyTransactionChainID, &nodecfg.ShhextConfig.AnonMetricsServerEnabled,
-		&nodecfg.ShhextConfig.AnonMetricsSendID, &nodecfg.ShhextConfig.AnonMetricsServerPostgresURI, &nodecfg.ShhextConfig.BandwidthStatsEnabled,
+		&nodecfg.ShhextConfig.AnonMetricsSendID, &nodecfg.ShhextConfig.AnonMetricsServerPostgresURI, &nodecfg.ShhextConfig.BandwidthStatsEnabled, &nodecfg.ShhextConfig.EnableMailserverCycle,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -681,8 +686,35 @@ func (db *Database) loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	return nodecfg, nil
 }
 
-func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+func MigrateNodeConfig(db *sql.DB) error {
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	migrated, err := nodeConfigWasMigrated(tx)
+	if err != nil {
+		return err
+	}
+
+	if !migrated {
+		return migrateNodeConfig(tx)
+	}
+
+	return nil
+}
+
+func GetNodeConfig(db *sql.DB) (*params.NodeConfig, error) {
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -696,14 +728,5 @@ func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 		_ = tx.Rollback()
 	}()
 
-	migrated, err := db.nodeConfigWasMigrated(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	if !migrated {
-		return db.migrateNodeConfig(tx)
-	}
-
-	return db.loadNodeConfig(tx)
+	return loadNodeConfig(tx)
 }
