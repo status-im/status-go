@@ -174,6 +174,15 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		return nil, err
 	}
 
+	if community.IsAdmin() {
+		// Init the community filter so we can receive messages on the community
+		communityFilters, err := m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, communityFilters...)
+	}
+
 	willSync, err := m.scheduleSyncFilters(filters)
 	if err != nil {
 		logger.Debug("m.scheduleSyncFilters error", zap.Error(err))
@@ -990,6 +999,20 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
+	// associate private key with community if set
+	if syncCommunity.PrivateKey != nil {
+		orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
+		if err != nil {
+			logger.Debug("crypto.ToECDSA", zap.Error(err))
+			return err
+		}
+		err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
+		if err != nil {
+			logger.Debug("m.communitiesManager.SetPrivateKey", zap.Error(err))
+			return err
+		}
+	}
+
 	// if we are not waiting for approval, join or leave the community
 	if !pending {
 		var mr *MessengerResponse
@@ -1017,24 +1040,6 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	err = m.communitiesManager.SetSyncClock(syncCommunity.Id, syncCommunity.Clock)
 	if err != nil {
 		logger.Debug("m.communitiesManager.SetSyncClock", zap.Error(err))
-		return err
-	}
-
-	// associate private key with community if set
-	if syncCommunity.PrivateKey == nil {
-		logger.Debug("syncCommunity.PrivateKey is nil")
-		return nil
-	}
-	logger.Debug("syncCommunity.PrivateKey is not nil")
-
-	orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
-	if err != nil {
-		logger.Debug("crypto.ToECDSA", zap.Error(err))
-		return err
-	}
-	err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
-	if err != nil {
-		logger.Debug("m.communitiesManager.SetPrivateKey", zap.Error(err))
 		return err
 	}
 
