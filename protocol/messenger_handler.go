@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	sendTransactionMessage                      = "Transaction sent"
 	transactionRequestDeclinedMessage           = "Transaction request declined"
 	requestAddressForTransactionAcceptedMessage = "Request address for transaction accepted"
 	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
@@ -1071,19 +1072,42 @@ func (m *Messenger) HandleSendTransaction(messageState *ReceivedMessageState, co
 	if err != nil {
 		return err
 	}
-	transactionToValidate := &TransactionToValidate{
-		MessageID:       messageState.CurrentMessageState.MessageID,
-		CommandID:       command.Id,
-		TransactionHash: command.TransactionHash,
-		FirstSeen:       messageState.CurrentMessageState.WhisperTimestamp,
-		Signature:       command.Signature,
-		Validate:        true,
-		From:            messageState.CurrentMessageState.PublicKey,
-		RetryCount:      0,
-	}
-	m.logger.Info("Saving transction to validate", zap.Any("transaction", transactionToValidate))
 
-	return m.persistence.SaveTransactionToValidate(transactionToValidate)
+	oldMessage, err := m.persistence.MessageByID(command.Id)
+	if err != nil {
+		return err
+	}
+	if oldMessage == nil {
+		return errors.New("message not found")
+	}
+
+	if oldMessage.LocalChatID != messageState.CurrentMessageState.Contact.ID {
+		return errors.New("From must match")
+	}
+
+	if oldMessage.OutgoingStatus == "" {
+		return errors.New("Initial message must originate from us")
+	}
+
+	if oldMessage.CommandParameters.CommandState != common.CommandStateRequestTransaction {
+		return errors.New("Wrong state for command")
+	}
+
+	oldMessage.Clock = command.Clock
+	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
+	oldMessage.Text = sendTransactionMessage
+	oldMessage.Seen = false
+	oldMessage.CommandParameters.CommandState = common.CommandStateTransactionSent
+	oldMessage.ChatId = command.GetChatId()
+
+	// Hide previous message
+	err = m.persistence.HideMessage(command.Id)
+	if err != nil {
+		return err
+	}
+	oldMessage.Replace = command.Id
+
+	return m.handleCommandMessage(messageState, oldMessage)
 }
 
 func (m *Messenger) HandleDeclineRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.DeclineRequestAddressForTransaction) error {
