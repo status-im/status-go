@@ -8,3 +8,18 @@ func (m *Messenger) handleSyncSettings(messageState *ReceivedMessageState, setti
 
 	return nil
 }
+
+func (m *Messenger) startSyncSettingsLoop() {
+	go func() {
+		for {
+			select {
+			case s := <-m.settings.SyncQueue:
+				if s.Field.ShouldSync {
+
+				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}

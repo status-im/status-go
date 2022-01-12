@@ -638,6 +638,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO start settings to sync loop
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
