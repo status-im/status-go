@@ -87,12 +87,6 @@ type settings struct {
 	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
 }
 
-type ConnStatus struct {
-	IsOnline   bool                `json:"isOnline"`
-	HasHistory bool                `json:"hasHistory"`
-	Peers      map[string][]string `json:"peers"`
-}
-
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
@@ -126,6 +120,9 @@ type Waku struct {
 	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
 	storeMsgIDsMu sync.RWMutex
 
+	connStatusSubscriptions map[string]*types.ConnStatusSubscription
+	connStatusMu            sync.Mutex
+
 	timeSource func() time.Time // source of time for waku
 
 	logger *zap.Logger
@@ -142,19 +139,20 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	logger.Debug("starting wakuv2 with config", zap.Any("config", cfg))
 
 	waku := &Waku{
-		privateKeys:         make(map[string]*ecdsa.PrivateKey),
-		symKeys:             make(map[string][]byte),
-		envelopes:           make(map[gethcommon.Hash]*common.ReceivedMessage),
-		expirations:         make(map[uint32]mapset.Set),
-		msgQueue:            make(chan *common.ReceivedMessage, messageQueueLimit),
-		sendQueue:           make(chan *pb.WakuMessage, 1000),
-		quit:                make(chan struct{}),
-		dnsAddressCache:     make(map[string][]multiaddr.Multiaddr),
-		dnsAddressCacheLock: &sync.RWMutex{},
-		storeMsgIDs:         make(map[gethcommon.Hash]bool),
-		storeMsgIDsMu:       sync.RWMutex{},
-		timeSource:          time.Now,
-		logger:              logger,
+		privateKeys:             make(map[string]*ecdsa.PrivateKey),
+		symKeys:                 make(map[string][]byte),
+		envelopes:               make(map[gethcommon.Hash]*common.ReceivedMessage),
+		expirations:             make(map[uint32]mapset.Set),
+		msgQueue:                make(chan *common.ReceivedMessage, messageQueueLimit),
+		sendQueue:               make(chan *pb.WakuMessage, 1000),
+		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
+		quit:                    make(chan struct{}),
+		dnsAddressCache:         make(map[string][]multiaddr.Multiaddr),
+		dnsAddressCacheLock:     &sync.RWMutex{},
+		storeMsgIDs:             make(map[gethcommon.Hash]bool),
+		storeMsgIDsMu:           sync.RWMutex{},
+		timeSource:              time.Now,
+		logger:                  logger,
 	}
 
 	waku.settings = settings{
@@ -271,7 +269,17 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 			case <-waku.quit:
 				return
 			case c := <-connStatusChan:
-				signal.SendPeerStats(formatConnStatus(c))
+				waku.connStatusMu.Lock()
+				latestConnStatus := formatConnStatus(c)
+				for k, subs := range waku.connStatusSubscriptions {
+					if subs.Active() {
+						subs.C <- latestConnStatus
+					} else {
+						delete(waku.connStatusSubscriptions, k)
+					}
+				}
+				waku.connStatusMu.Unlock()
+				signal.SendPeerStats(latestConnStatus)
 			}
 		}
 	}()
@@ -282,6 +290,14 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appdb *sql.DB) (*Waku,
 	log.Info("setup the go-waku node successfully")
 
 	return waku, nil
+}
+
+func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
+	w.connStatusMu.Lock()
+	defer w.connStatusMu.Unlock()
+	subscription := types.NewConnStatusSubscription()
+	w.connStatusSubscriptions[subscription.ID] = subscription
+	return subscription
 }
 
 type fnApplyToEachPeer func(ma multiaddr.Multiaddr, protocol libp2pproto.ID)
@@ -1151,8 +1167,8 @@ func FormatPeerStats(peers node.PeerStats) map[string][]string {
 	return p
 }
 
-func formatConnStatus(c node.ConnStatus) ConnStatus {
-	return ConnStatus{
+func formatConnStatus(c node.ConnStatus) types.ConnStatus {
+	return types.ConnStatus{
 		IsOnline:   c.IsOnline,
 		HasHistory: c.HasHistory,
 		Peers:      FormatPeerStats(c.Peers),

@@ -55,22 +55,22 @@ func TestMessengerResponseMergeNotImplemented(t *testing.T) {
 	response1 := &MessengerResponse{}
 
 	response2 := &MessengerResponse{
-		Contacts: []*Contact{&Contact{}},
+		Contacts: []*Contact{{}},
 	}
 	require.Error(t, response1.Merge(response2))
 
 	response2 = &MessengerResponse{
-		Installations: []*multidevice.Installation{&multidevice.Installation{}},
+		Installations: []*multidevice.Installation{{}},
 	}
 	require.Error(t, response1.Merge(response2))
 
 	response2 = &MessengerResponse{
-		EmojiReactions: []*EmojiReaction{&EmojiReaction{}},
+		EmojiReactions: []*EmojiReaction{{}},
 	}
 	require.Error(t, response1.Merge(response2))
 
 	response2 = &MessengerResponse{
-		Invitations: []*GroupChatInvitation{&GroupChatInvitation{}},
+		Invitations: []*GroupChatInvitation{{}},
 	}
 	require.Error(t, response1.Merge(response2))
 

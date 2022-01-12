@@ -53,10 +53,12 @@ func TestRequestMessagesErrors(t *testing.T) {
 	defer func() { require.NoError(t, aNode.Close()) }()
 
 	handler := ext.NewHandlerMock(1)
-	config := params.ShhextConfig{
-		InstallationID:        "1",
-		BackupDisabledDataDir: os.TempDir(),
-		PFSEnabled:            true,
+	config := params.NodeConfig{
+		ShhextConfig: params.ShhextConfig{
+			InstallationID:        "1",
+			BackupDisabledDataDir: os.TempDir(),
+			PFSEnabled:            true,
+		},
 	}
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
 	service := New(config, nodeWrapper, handler, nil)
@@ -102,12 +104,14 @@ func TestInitProtocol(t *testing.T) {
 	directory, err := ioutil.TempDir("", "status-go-testing")
 	require.NoError(t, err)
 
-	config := params.ShhextConfig{
-		InstallationID:          "2",
-		BackupDisabledDataDir:   directory,
-		PFSEnabled:              true,
-		MailServerConfirmations: true,
-		ConnectionTarget:        10,
+	config := params.NodeConfig{
+		ShhextConfig: params.ShhextConfig{
+			InstallationID:          "2",
+			BackupDisabledDataDir:   directory,
+			PFSEnabled:              true,
+			MailServerConfirmations: true,
+			ConnectionTarget:        10,
+		},
 	}
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
@@ -171,12 +175,14 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.NoError(err)
 
 	// set up protocol
-	config := params.ShhextConfig{
-		InstallationID:          "1",
-		BackupDisabledDataDir:   s.dir,
-		PFSEnabled:              true,
-		MailServerConfirmations: true,
-		ConnectionTarget:        10,
+	config := params.NodeConfig{
+		ShhextConfig: params.ShhextConfig{
+			InstallationID:          "1",
+			BackupDisabledDataDir:   s.dir,
+			PFSEnabled:              true,
+			MailServerConfirmations: true,
+			ConnectionTarget:        10,
+		},
 	}
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)

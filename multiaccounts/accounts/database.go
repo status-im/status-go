@@ -459,7 +459,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 }
 
 func (db *Database) GetNodeConfig(nodecfg interface{}) error {
-	return db.db.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{nodecfg})
+	return db.db.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: nodecfg})
 }
 
 func (db *Database) GetSettings() (Settings, error) {
@@ -650,6 +650,14 @@ func (db *Database) GetProfilePicturesVisibility() (int, error) {
 
 func (db *Database) GetPublicKey() (rst string, err error) {
 	err = db.db.QueryRow("SELECT public_key FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
+	return
+}
+
+func (db *Database) GetFleet() (rst string, err error) {
+	err = db.db.QueryRow("SELECT COALESCE(fleet, '') FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
 	if err == sql.ErrNoRows {
 		return rst, nil
 	}

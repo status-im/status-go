@@ -1180,7 +1180,6 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 			return ErrWakuIdentityInjectionFailure
 		}
 		st := b.statusNode.WakuV2ExtService()
-
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}

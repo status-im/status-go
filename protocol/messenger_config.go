@@ -54,6 +54,7 @@ type config struct {
 	multiAccount        *multiaccounts.Database
 	mailserversDatabase *mailservers.Database
 	account             *multiaccounts.Account
+	clusterConfig       params.ClusterConfig
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -228,6 +229,20 @@ func WithENSVerificationConfig(onENSVerified func(*MessengerResponse), url, addr
 		c.onContactENSVerified = onENSVerified
 		c.verifyENSURL = url
 		c.verifyENSContractAddress = address
+		return nil
+	}
+}
+
+func WithClusterConfig(cc params.ClusterConfig) Option {
+	return func(c *config) error {
+		c.clusterConfig = cc
+		return nil
+	}
+}
+
+func WithMailserverCycle() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.MailserverCycle = true
 		return nil
 	}
 }
