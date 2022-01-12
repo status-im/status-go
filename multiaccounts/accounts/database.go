@@ -765,6 +765,12 @@ func (db *Database) GetChatAddress() (rst types.Address, err error) {
 	return
 }
 
+func (db *Database) GetLatestDerivedPath() (uint, error) {
+	var result uint
+	err := db.db.QueryRow("SELECT latest_derived_path FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	return result, err
+}
+
 func (db *Database) GetAddresses() (rst []types.Address, err error) {
 	rows, err := db.db.Query("SELECT address FROM accounts ORDER BY created_at")
 	if err != nil {

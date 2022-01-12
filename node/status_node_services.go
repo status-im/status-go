@@ -342,7 +342,13 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 
 func (b *StatusNode) accountsService(accountsFeed *event.Feed) *accountssvc.Service {
 	if b.accountsSrvc == nil {
-		b.accountsSrvc = accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.gethAccountManager.Manager, accountsFeed)
+		b.accountsSrvc = accountssvc.NewService(
+			accounts.NewDB(b.appDB),
+			b.multiaccountsDB,
+			b.gethAccountManager,
+			b.config,
+			accountsFeed,
+		)
 	}
 
 	return b.accountsSrvc
