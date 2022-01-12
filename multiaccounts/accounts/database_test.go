@@ -80,16 +80,6 @@ func TestSaveSetting(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestGetNodeConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	require.NoError(t, db.CreateSettings(settings, config))
-
-	_, err := db.GetSettings()
-	require.NoError(t, err)
-}
-
 func TestSaveAccounts(t *testing.T) {
 	type testCase struct {
 		description string

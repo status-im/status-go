@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -179,56 +178,13 @@ type WakuV2Config struct {
 	//it attempts to reconnect to these peers
 	PersistPeers bool
 
-	// EnableMailServer is mode when node is capable of delivering expired messages on demand
-	EnableMailServer bool
-
 	// DataDir is the file system folder Waku should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
 	DataDir string
 
-	// MailServerPassword for symmetric encryption of waku message history requests.
-	// (if no account file selected, then this password is used for symmetric encryption).
-	MailServerPassword string
-
-	// MailServerRateLimit minimum time between queries to mail server per peer.
-	MailServerRateLimit int
-
-	// MailServerDataRetention is a number of days data should be stored by MailServer.
-	MailServerDataRetention int
-
 	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
-
-	// DatabaseConfig is configuration for which data store we use.
-	DatabaseConfig DatabaseConfig
-
-	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
-	EnableRateLimiter bool
-
-	// PacketRateLimitIP sets the limit on the number of packets per second
-	// from a given IP.
-	PacketRateLimitIP int64
-
-	// PacketRateLimitPeerID sets the limit on the number of packets per second
-	// from a given peer ID.
-	PacketRateLimitPeerID int64
-
-	// BytesRateLimitIP sets the limit on the number of bytes per second
-	// from a given IP.
-	BytesRateLimitIP int64
-
-	// BytesRateLimitPeerID sets the limit on the number of bytes per second
-	// from a given peer ID.
-	BytesRateLimitPeerID int64
-
-	// RateLimitTolerance is a number of how many a limit must be exceeded
-	// in order to drop a peer.
-	// If equal to 0, the peers are never dropped.
-	RateLimitTolerance int64
-
-	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
-	SoftBlacklistedPeerIDs []string
 
 	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
 	EnableConfirmations bool
@@ -473,7 +429,7 @@ type NodeConfig struct {
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
 	// Initial networks to load
-	Networks []network.Network
+	Networks []Network
 
 	// ClusterConfig extra configuration for supporting cluster peers.
 	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`
@@ -532,6 +488,20 @@ type NodeConfig struct {
 
 	// PushNotificationServerConfig is the config for the push notification server
 	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
+}
+
+type Network struct {
+	ChainID                uint64 `json:"chainId"`
+	ChainName              string `json:"chainName"`
+	RPCURL                 string `json:"rpcUrl"`
+	BlockExplorerURL       string `json:"blockExplorerUrl,omitempty"`
+	IconURL                string `json:"iconUrl,omitempty"`
+	NativeCurrencyName     string `json:"nativeCurrencyName,omitempty"`
+	NativeCurrencySymbol   string `json:"nativeCurrencySymbol,omitempty"`
+	NativeCurrencyDecimals uint64 `json:"nativeCurrencyDecimals"`
+	IsTest                 bool   `json:"isTest"`
+	Layer                  uint64 `json:"layer"`
+	Enabled                bool   `json:"enabled"`
 }
 
 // WalletConfig extra configuration for wallet.Service.
@@ -962,14 +932,6 @@ func (c *NodeConfig) Validate() error {
 	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
 		if !strings.HasPrefix(c.WakuConfig.DataDir, c.DataDir) {
 			return fmt.Errorf("WakuConfig.DataDir must start with DataDir fragment")
-		}
-	}
-
-	// WakuV2's data directory must be relative to the main data directory
-	// if EnableMailServer is true.
-	if c.WakuV2Config.Enabled && c.WakuV2Config.EnableMailServer {
-		if !strings.HasPrefix(c.WakuV2Config.DataDir, c.DataDir) {
-			return fmt.Errorf("WakuV2Config.DataDir must start with DataDir fragment")
 		}
 	}
 

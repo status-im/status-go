@@ -1,11 +1,13 @@
 package accounts
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -151,14 +153,33 @@ type Database struct {
 	db *sql.DB
 }
 
+// Get database
+func (db Database) DB() *sql.DB {
+	return db.db
+}
+
 // Close closes database.
 func (db Database) Close() error {
 	return db.db.Close()
 }
 
 // TODO remove photoPath from settings
-func (db *Database) CreateSettings(s Settings, nodecfg params.NodeConfig) error {
-	_, err := db.db.Exec(`
+func (db *Database) CreateSettings(s Settings, n params.NodeConfig) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec(`
 INSERT INTO settings (
   address,
   currency,
@@ -174,7 +195,6 @@ INSERT INTO settings (
   mnemonic,
   name,
   networks,
-  node_config,
   photo_path,
   preview_privacy,
   public_key,
@@ -183,8 +203,7 @@ INSERT INTO settings (
   synthetic_id
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,?,
-'id')`,
+?,?,?,?,?,?,?,?,?,'id')`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -199,15 +218,17 @@ INSERT INTO settings (
 		s.Mnemonic,
 		s.Name,
 		s.Networks,
-		&sqlite.JSONBlob{Data: nodecfg},
 		s.PhotoPath,
 		s.PreviewPrivacy,
 		s.PublicKey,
 		s.SigningPhrase,
 		s.WalletRootAddress,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nodecfg.SaveConfigWithTx(tx, &n)
 }
 
 func (db *Database) SaveSetting(setting string, value interface{}) error {
@@ -292,7 +313,11 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET networks = ? WHERE synthetic_id = 'id'")
 	case "node-config":
-		value = &sqlite.JSONBlob{Data: value}
+		nodeConfig := value.(params.NodeConfig)
+		if err = nodecfg.SaveNodeConfig(db.db, &nodeConfig); err != nil {
+			return err
+		}
+		value = nil
 		update, err = db.db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
 	case "notifications-enabled?":
 		_, ok := value.(bool)
@@ -456,10 +481,6 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 
 	_, err = update.Exec(value)
 	return err
-}
-
-func (db *Database) GetNodeConfig(nodecfg interface{}) error {
-	return db.db.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: nodecfg})
 }
 
 func (db *Database) GetSettings() (Settings, error) {

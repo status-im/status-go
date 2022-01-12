@@ -24,26 +24,25 @@ import (
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize         uint32   `toml:",omitempty"`
-	SoftBlacklistedPeerIDs []string `toml:",omitempty"`
-	Host                   string   `toml:",omitempty"`
-	Port                   int      `toml:",omitempty"`
-	PersistPeers           bool     `toml:",omitempty"`
-	PeerExchange           bool     `toml:",omitempty"`
-	KeepAliveInterval      int      `toml:",omitempty"`
-	MinPeersForRelay       int      `toml:",omitempty"`
-	LightClient            bool     `toml:",omitempty"`
-	RelayNodes             []string `toml:",omitempty"`
-	StoreNodes             []string `toml:",omitempty"`
-	FilterNodes            []string `toml:",omitempty"`
-	LightpushNodes         []string `toml:",omitempty"`
-	Rendezvous             bool     `toml:",omitempty"`
-	WakuRendezvousNodes    []string `toml:",omitempty"`
-	DiscV5BootstrapNodes   []string `toml:",omitempty"`
-	EnableDiscV5           bool     `toml:",omitempty"`
-	DiscoveryLimit         int      `toml:",omitempty"`
-	AutoUpdate             bool     `toml:",omitempty"`
-	UDPPort                int      `toml:",omitempty"`
+	MaxMessageSize       uint32   `toml:",omitempty"`
+	Host                 string   `toml:",omitempty"`
+	Port                 int      `toml:",omitempty"`
+	PersistPeers         bool     `toml:",omitempty"`
+	PeerExchange         bool     `toml:",omitempty"`
+	KeepAliveInterval    int      `toml:",omitempty"`
+	MinPeersForRelay     int      `toml:",omitempty"`
+	LightClient          bool     `toml:",omitempty"`
+	RelayNodes           []string `toml:",omitempty"`
+	StoreNodes           []string `toml:",omitempty"`
+	FilterNodes          []string `toml:",omitempty"`
+	LightpushNodes       []string `toml:",omitempty"`
+	Rendezvous           bool     `toml:",omitempty"`
+	WakuRendezvousNodes  []string `toml:",omitempty"`
+	DiscV5BootstrapNodes []string `toml:",omitempty"`
+	EnableDiscV5         bool     `toml:",omitempty"`
+	DiscoveryLimit       int      `toml:",omitempty"`
+	AutoUpdate           bool     `toml:",omitempty"`
+	UDPPort              int      `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

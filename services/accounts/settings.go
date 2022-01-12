@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/nodecfg"
+	"github.com/status-im/status-go/params"
 )
 
 func NewSettingsAPI(db *accounts.Database) *SettingsAPI {
@@ -26,4 +28,12 @@ func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interfa
 
 func (api *SettingsAPI) GetSettings(ctx context.Context) (accounts.Settings, error) {
 	return api.db.GetSettings()
+}
+
+func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, error) {
+	return nodecfg.GetNodeConfig(api.db.DB())
+}
+
+func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
+	return nodecfg.SaveNodeConfig(api.db.DB(), n)
 }

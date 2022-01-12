@@ -4,6 +4,8 @@ import (
 	"database/sql"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
+	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -13,6 +15,18 @@ func InitializeDB(path, password string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = migrationsprevnodecfg.Migrate(db)
+	if err != nil {
+		return nil, err
+	}
+
+	// NodeConfig migration cannot be done with SQL
+	err = nodecfg.MigrateNodeConfig(db)
+	if err != nil {
+		return nil, err
+	}
+
 	err = migrations.Migrate(db)
 	if err != nil {
 		return nil, err

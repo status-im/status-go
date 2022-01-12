@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -240,7 +240,7 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 	return client.fetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
 }
 
-func (api *API) AddEthereumChain(ctx context.Context, network network.Network) error {
+func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
 	log.Debug("call to AddEthereumChain")
 	return api.s.rpcClient.NetworkManager.Upsert(&network)
 }
@@ -250,7 +250,7 @@ func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 	return api.s.rpcClient.NetworkManager.Delete(chainID)
 }
 
-func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*network.Network, error) {
+func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*params.Network, error) {
 	log.Debug("call to GetEthereumChains")
 	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }
