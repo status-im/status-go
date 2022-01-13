@@ -3380,8 +3380,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Clean up as not used by clients currently
 			messageState.Response.CommunityChanges = nil
 
+			// NOTE: for now we confirm messages as processed regardless whether we
+			// actually processed them, this is because we need to differentiate
+			// from messages that we want to retry to process and messages that
+			// are never going to be processed
+			m.transport.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
+
 			if allMessagesProcessed {
-				m.transport.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 				processedMessages = append(processedMessages, types.EncodeHex(shhMessage.Hash))
 			}
 		}
