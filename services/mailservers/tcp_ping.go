@@ -31,7 +31,7 @@ func (pr *PingResult) Update(rttMs int, err error) {
 		errStr := err.Error()
 		pr.Err = &errStr
 	}
-	if rttMs > 0 {
+	if rttMs >= 0 {
 		pr.RTTMs = &rttMs
 	} else {
 		pr.RTTMs = nil
