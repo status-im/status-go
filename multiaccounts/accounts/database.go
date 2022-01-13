@@ -331,7 +331,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		return err
 	}
 
-	if sf.ShouldSync {
+	if sf.SyncProtobufFactory != nil {
 		db.SyncQueue <- SyncSettingField{
 			Field: sf,
 			Value: value,

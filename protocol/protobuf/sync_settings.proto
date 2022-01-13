@@ -3,8 +3,6 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
-import "google/protobuf/timestamp.proto";
-
 message SyncSettings {
   SyncSettingCurrency                  currency = 1;
   SyncSettingGifRecents                gif_recents = 2;
@@ -22,67 +20,67 @@ message SyncSettings {
 }
 
 message SyncSettingCurrency {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   string value = 2;
 }
 
 message SyncSettingGifRecents {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bytes value = 2;
 }
 
 message SyncSettingGifFavorites {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bytes value = 2;
 }
 
 message SyncSettingMessagesFromContactsOnly {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bool value = 2;
 }
 
 message SyncSettingPreferredName {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   string value = 2;
 }
 
 message SyncSettingPreviewPrivacy {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bool value = 2;
 }
 
 message SyncSettingProfilePicturesShowTo {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   int64 value = 2;
 }
 
 message SyncSettingProfilePicturesVisibility {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   int64 value = 2;
 }
 
 message SyncSettingSendStatusUpdates {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bool value = 2;
 }
 
 message SyncSettingStickerPacksInstalled {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bytes value = 2;
 }
 
 message SyncSettingStickerPacksPending {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bytes value = 2;
 }
 
 message SyncSettingStickersRecentStickers {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   bytes value = 2;
 }
 
 message SyncSettingTelemetryServerURL {
-  google.protobuf.Timestamp clock = 1;
+  uint64 clock = 1;
   string value = 2;
 }
 
