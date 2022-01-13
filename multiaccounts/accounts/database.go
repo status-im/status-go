@@ -313,7 +313,16 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		value = &sqlite.JSONBlob{Data: value}
 		update, err = db.db.Prepare("UPDATE settings SET networks = ? WHERE synthetic_id = 'id'")
 	case "node-config":
-		nodeConfig := value.(params.NodeConfig)
+		var jsonString []byte
+		jsonString, err = json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		var nodeConfig params.NodeConfig
+		err = json.Unmarshal(jsonString, &nodeConfig)
+		if err != nil {
+			return err
+		}
 		if err = nodecfg.SaveNodeConfig(db.db, &nodeConfig); err != nil {
 			return err
 		}
