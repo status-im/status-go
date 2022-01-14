@@ -702,6 +702,21 @@ func (db *Database) GetDappsAddress() (rst types.Address, err error) {
 	return
 }
 
+func (db *Database) GetPinnedMailservers() (rst map[string]string, err error) {
+	rst = make(map[string]string)
+	var pinnedMailservers string
+	err = db.db.QueryRow("SELECT COALESCE(pinned_mailservers, '') FROM settings WHERE synthetic_id = 'id'").Scan(&pinnedMailservers)
+	if err == sql.ErrNoRows || pinnedMailservers == "" {
+		return rst, nil
+	}
+
+	err = json.Unmarshal([]byte(pinnedMailservers), &rst)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
 func (db *Database) CanUseMailservers() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT use_mailservers FROM settings WHERE synthetic_id = 'id'").Scan(&result)
