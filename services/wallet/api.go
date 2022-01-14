@@ -79,6 +79,13 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	return api.s.tokenManager.getBalances(ctx, clients, accounts, addresses)
 }
 
+func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*Token, error) {
+	log.Debug("call to get tokens")
+	rst, err := api.s.tokenManager.getTokens(chainID)
+	log.Debug("result from token store", "len", len(rst))
+	return rst, err
+}
+
 func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
 	log.Debug("call to get custom tokens")
 	rst, err := api.s.tokenManager.getCustoms()

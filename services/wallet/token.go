@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -32,6 +33,21 @@ type Token struct {
 
 type TokenManager struct {
 	db *sql.DB
+}
+
+func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
+	tokensMap, ok := tokenStore[chainID]
+	if !ok {
+		return nil, errors.New("no tokens for this network")
+	}
+
+	res := make([]*Token, 0, len(tokensMap))
+
+	for _, token := range tokensMap {
+		res = append(res, token)
+	}
+
+	return res, nil
 }
 
 func (tm *TokenManager) getCustoms() ([]*Token, error) {
