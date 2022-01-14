@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"math/big"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -76,6 +78,43 @@ func (args SendTxArgs) GetInput() types.HexBytes {
 	}
 
 	return args.Data
+}
+
+func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts {
+	var gasFeeCap *big.Int
+	if args.MaxFeePerGas != nil {
+		gasFeeCap = (*big.Int)(args.MaxFeePerGas)
+	}
+
+	var gasTipCap *big.Int
+	if args.MaxPriorityFeePerGas != nil {
+		gasTipCap = (*big.Int)(args.MaxPriorityFeePerGas)
+	}
+
+	var nonce *big.Int
+	if args.Nonce != nil {
+		nonce = new(big.Int).SetUint64((uint64)(*args.Nonce))
+	}
+
+	var gasPrice *big.Int
+	if args.GasPrice != nil {
+		gasPrice = (*big.Int)(args.GasPrice)
+	}
+
+	var gasLimit uint64
+	if args.Gas != nil {
+		gasLimit = uint64(*args.Gas)
+	}
+
+	return &bind.TransactOpts{
+		From:      common.Address(args.From),
+		Signer:    signerFn,
+		GasPrice:  gasPrice,
+		GasLimit:  gasLimit,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Nonce:     nonce,
+	}
 }
 
 func isNilOrEmpty(bytes types.HexBytes) bool {

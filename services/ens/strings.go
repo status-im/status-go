@@ -30,3 +30,24 @@ func validateENSUsername(username string) error {
 
 	return nil
 }
+
+func usernameToLabel(username string) [32]byte {
+	usernameHashed := crypto.Keccak256([]byte(username))
+	var label [32]byte
+	copy(label[:], usernameHashed)
+
+	return label
+}
+
+func extractCoordinates(pubkey string) ([32]byte, [32]byte) {
+	x := []byte("0x" + pubkey[4:68])
+	y := []byte("0x" + pubkey[68:132])
+
+	var xByte [32]byte
+	copy(xByte[:], x)
+
+	var yByte [32]byte
+	copy(yByte[:], y)
+
+	return xByte, yByte
+}
