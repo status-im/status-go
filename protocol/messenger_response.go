@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/services/browsers"
+
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -30,6 +32,7 @@ type MessengerResponse struct {
 	RequestsToJoinCommunity []*communities.RequestToJoin
 	AnonymousMetrics        []*appmetrics.AppMetric
 	Mailservers             []mailservers.Mailserver
+	Bookmarks               []*browsers.Bookmark
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -60,6 +63,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges        []*communities.CommunityChanges `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin    `json:"requestsToJoinCommunity,omitempty"`
 		Mailservers             []mailservers.Mailserver        `json:"mailservers,omitempty"`
+		Bookmarks               []*browsers.Bookmark            `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory               `json:"clearedHistories,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
@@ -76,6 +80,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
 		Mailservers:             r.Mailservers,
+		Bookmarks:               r.Bookmarks,
 		CurrentStatus:           r.currentStatus,
 	}
 
@@ -163,6 +168,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.messages)+
 		len(r.pinMessages)+
 		len(r.Contacts)+
+		len(r.Bookmarks)+
 		len(r.clearedHistories)+
 		len(r.Installations)+
 		len(r.Invitations)+
@@ -189,6 +195,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
 		len(response.EmojiReactions)+
+		len(response.Bookmarks)+
 		len(response.clearedHistories)+
 		len(response.CommunityChanges) != 0 {
 		return ErrNotImplemented
@@ -218,6 +225,16 @@ func (r *MessengerResponse) AddCommunity(c *communities.Community) {
 	}
 
 	r.communities[c.IDString()] = c
+}
+
+func (r *MessengerResponse) AddBookmark(bookmark *browsers.Bookmark) {
+	r.Bookmarks = append(r.Bookmarks, bookmark)
+}
+
+func (r *MessengerResponse) AddBookmarks(bookmarks []*browsers.Bookmark) {
+	for _, b := range bookmarks {
+		r.AddBookmark(b)
+	}
 }
 
 func (r *MessengerResponse) AddChat(c *Chat) {

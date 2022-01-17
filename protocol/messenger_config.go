@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/status-im/status-go/services/browsers"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
@@ -55,6 +57,7 @@ type config struct {
 	mailserversDatabase *mailservers.Database
 	account             *multiaccounts.Account
 	clusterConfig       params.ClusterConfig
+	browserDatabase     *browsers.Database
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -157,6 +160,19 @@ func WithMailserversDatabase(ma *mailservers.Database) Option {
 func WithAccount(acc *multiaccounts.Account) Option {
 	return func(c *config) error {
 		c.account = acc
+		return nil
+	}
+}
+
+func WithBrowserDatabase(bd *browsers.Database) Option {
+	return func(c *config) error {
+		c.browserDatabase = bd
+		if c.browserDatabase == nil {
+			c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
+				c.browserDatabase = browsers.NewDB(c.db)
+				return nil
+			})
+		}
 		return nil
 	}
 }

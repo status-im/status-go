@@ -54,3 +54,10 @@ func (api *API) DeleteBookmark(ctx context.Context, url string) error {
 	log.Debug("result from database for remove a bookmark", "err", err)
 	return err
 }
+
+func (api *API) RemoveBookmark(ctx context.Context, url string) error {
+	log.Debug("call to remove a bookmark logically")
+	err := api.db.RemoveBookmark(url)
+	log.Debug("result from database for remove a bookmark logically", "err", err)
+	return err
+}

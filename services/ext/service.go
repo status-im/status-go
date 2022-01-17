@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/status-im/status-go/services/browsers"
+
 	"github.com/syndtr/goleveldb/leveldb"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
@@ -411,6 +413,7 @@ func buildMessengerOptions(
 		protocol.WithMultiAccounts(multiAccounts),
 		protocol.WithMailserversDatabase(mailserversDB.NewDB(db)),
 		protocol.WithAccount(account),
+		protocol.WithBrowserDatabase(browsers.NewDB(db)),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/status-im/status-go/services/browsers"
+
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -151,6 +153,15 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: types.Hex2Bytes(contact.ID), Nickname: contact.LocalNickname})
 	s.Require().NoError(err)
 
+	//add bookmark
+	bookmark := browsers.Bookmark{
+		Name:    "status official site",
+		URL:     "https://status.im",
+		Removed: false,
+	}
+	_, err = s.m.browserDatabase.StoreBookmark(bookmark)
+	s.Require().NoError(err)
+
 	// add chat
 	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(chat)
@@ -241,10 +252,16 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().True(actualContact.Added)
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
+
+	bookmarks, err := theirMessenger.browserDatabase.GetBookmarks()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(bookmarks))
+
 	s.Require().NoError(theirMessenger.Shutdown())
 
 	s.Require().NotNil(removedChat)
 	s.Require().False(removedChat.Active)
+
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
