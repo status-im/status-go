@@ -131,6 +131,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
 		WithAppSettings(accounts.Settings{}, params.NodeConfig{}),
+		WithBrowserDatabase(nil),
 	}
 
 	options = append(options, extraOptions...)

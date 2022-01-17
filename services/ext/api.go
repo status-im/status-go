@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/status-im/status-go/services/browsers"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -682,6 +684,10 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
 	return api.service.messenger.SyncDevices(ctx, name, picture)
+}
+
+func (api *PublicAPI) SyncBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
+	return api.service.messenger.SyncBookmark(ctx, &bookmark)
 }
 
 func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string) (types.HexBytes, error) {

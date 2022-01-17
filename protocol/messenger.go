@@ -16,6 +16,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/status-im/status-go/services/browsers"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -120,6 +123,7 @@ type Messenger struct {
 	settings                   *accounts.Database
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
+	browserDatabase            *browsers.Database
 	imageServer                *images.Server
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
@@ -423,6 +427,7 @@ func NewMessenger(
 		account:              c.account,
 		quit:                 make(chan struct{}),
 		requestedCommunities: make(map[string]*transport.Filter),
+		browserDatabase:      c.browserDatabase,
 		imageServer:          imageServer,
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
@@ -2489,6 +2494,16 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 	}
 
+	bookmarks, err := m.browserDatabase.GetBookmarks()
+	if err != nil {
+		return err
+	}
+	for _, b := range bookmarks {
+		if err = m.SyncBookmark(ctx, b); err != nil {
+			return err
+		}
+	}
+
 	return err
 }
 
@@ -2734,6 +2749,38 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	return m.saveChat(chat)
 }
 
+func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmark) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage := &protobuf.SyncBookmark{
+		Clock:    clock,
+		Url:      bookmark.URL,
+		Name:     bookmark.Name,
+		ImageUrl: bookmark.ImageURL,
+		Removed:  bookmark.Removed,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
@@ -2785,7 +2832,8 @@ type ReceivedMessageState struct {
 	// Response to the client
 	Response *MessengerResponse
 	// Timesource is a time source for clock values/timestamps.
-	Timesource common.TimeSource
+	Timesource   common.TimeSource
+	AllBookmarks map[string]*browsers.Bookmark
 }
 
 func (m *Messenger) markDeliveredMessages(acks [][]byte) {
@@ -2900,6 +2948,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
 		Response:              response,
 		Timesource:            m.getTimesource(),
+		AllBookmarks:          make(map[string]*browsers.Bookmark),
 	}
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
@@ -3079,6 +3128,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncBookmark:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncBookmark)
+						logger.Debug("Handling SyncBookmark", zap.Any("message", p))
+						err = m.handleSyncBookmark(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncBookmark", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -3667,7 +3731,23 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	// Reset installations
 	m.modifiedInstallations = new(stringBoolMap)
 
+	if len(messageState.AllBookmarks) > 0 {
+		bookmarks, err := m.storeSyncBookmarks(messageState.AllBookmarks)
+		if err != nil {
+			return nil, err
+		}
+		messageState.Response.AddBookmarks(bookmarks)
+	}
+
 	return messageState.Response, nil
+}
+
+func (m *Messenger) storeSyncBookmarks(bookmarkMap map[string]*browsers.Bookmark) ([]*browsers.Bookmark, error) {
+	var bookmarks []*browsers.Bookmark
+	for _, bookmark := range bookmarkMap {
+		bookmarks = append(bookmarks, bookmark)
+	}
+	return m.browserDatabase.StoreSyncBookmarks(bookmarks)
 }
 
 // SetMailserver sets the currently used mailserver
@@ -5115,6 +5195,18 @@ func (m *Messenger) BloomFilter() []byte {
 func (m *Messenger) getSettings() (accounts.Settings, error) {
 	sDB := accounts.NewDB(m.database)
 	return sDB.GetSettings()
+}
+
+func (m *Messenger) handleSyncBookmark(state *ReceivedMessageState, message protobuf.SyncBookmark) error {
+	bookmark := &browsers.Bookmark{
+		URL:      message.Url,
+		Name:     message.Name,
+		ImageURL: message.ImageUrl,
+		Removed:  message.Removed,
+		Clock:    message.Clock,
+	}
+	state.AllBookmarks[message.Url] = bookmark
+	return nil
 }
 
 func (m *Messenger) handleSyncClearHistory(state *ReceivedMessageState, message protobuf.SyncClearHistory) error {
