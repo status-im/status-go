@@ -6,10 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/appdatabase"
 	"sync"
-	"time"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -306,7 +305,7 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 		}
 	}
 
-	// TODO this is ugly as hell need a more elegant solution
+	// TODO(samyoul) this is ugly as hell need a more elegant solution
 	if NodeConfig.ReactFieldName == setting.ReactFieldName {
 		if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
 			return err
@@ -341,12 +340,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 }
 
 // SaveSyncSetting stores setting data from a sync protobuf source
-func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock time.Time) error {
+func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock uint64) error {
 	ls, err := db.GetSettingLastSynced(setting.DBColumnName)
 	if err != nil {
 		return err
 	}
-	if clock.Before(ls) {
+	if clock < ls {
 		return ErrNewClockOlderThanCurrent
 	}
 
@@ -832,28 +831,24 @@ func (db *Database) GifFavorites() (favorites json.RawMessage, err error) {
 	return favorites, nil
 }
 
-func (db *Database) GetSettingLastSynced(column string) (time.Time, error) {
-	var result sql.NullTime
+func (db *Database) GetSettingLastSynced(column string) (uint64, error) {
+	var result uint64
 
 	query := "SELECT %s FROM settings_sync_clock WHERE synthetic_id = 'id'"
 	query = fmt.Sprintf(query, column)
 
 	err := db.db.QueryRow(query).Scan(&result)
 	if err != nil {
-		return time.Unix(0, 0), err
+		return 0, err
 	}
 
-	if !result.Valid {
-		return time.Unix(0, 0), nil
-	}
-
-	return result.Time, nil
+	return result, nil
 }
 
-func (db *Database) SetSettingLastSynced(column string, time time.Time) error {
-	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id'"
-	query = fmt.Sprintf(query, column)
+func (db *Database) SetSettingLastSynced(column string, clock uint64) error {
+	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
+	query = fmt.Sprintf(query, column, column)
 
-	_, err := db.db.Exec(query, time)
+	_, err := db.db.Exec(query, clock, clock)
 	return err
 }

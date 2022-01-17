@@ -3,10 +3,8 @@ package accounts
 import (
 	"database/sql"
 	"encoding/json"
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -259,25 +257,37 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	tm := time.Unix(0,0)
+	tm := uint64(0)
 
+	// Default value should be `0`
 	ct, err := db.GetSettingLastSynced(Currency.DBColumnName)
 	require.NoError(t, err)
-	require.True(t, tm.Equal(ct))
+	require.Equal(t, tm, ct)
 
-	tm = tm.Add(123 * time.Minute)
+	// Test setting clock value to something greater than `0`
+	tm += 123
 	err = db.SetSettingLastSynced(Currency.DBColumnName, tm)
 	require.NoError(t, err)
 
 	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
 	require.NoError(t, err)
-	require.True(t, tm.Equal(ct))
+	require.Equal(t, tm, ct)
 
-	now := time.Now()
+	// Test setting clock to greater than `123`
+	now := uint64(321)
 	err = db.SetSettingLastSynced(Currency.DBColumnName, now)
 	require.NoError(t, err)
 
 	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
 	require.NoError(t, err)
-	require.True(t, now.Equal(ct))
+	require.Equal(t, now, ct)
+
+	// Test setting clock to something less than `321`
+	earlier := uint64(231)
+	err = db.SetSettingLastSynced(Currency.DBColumnName, earlier)
+	require.NoError(t, err)
+
+	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	require.NoError(t, err)
+	require.Equal(t, now, ct)
 }
