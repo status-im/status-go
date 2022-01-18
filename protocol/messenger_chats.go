@@ -571,3 +571,42 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 	response.AddChat(chat)
 	return response, nil
 }
+
+func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	response := &MessengerResponse{}
+
+	msg, err := m.persistence.MessageByID(request.MessageID)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []*common.Message
+	for _, pk := range request.Users {
+		message := &common.Message{}
+		message.ChatId = pk.String()
+		message.Base64Image = msg.Base64Image
+		messages = append(messages, message)
+		r, err := m.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: pk})
+		if err != nil {
+			return nil, err
+		}
+
+		if err := response.Merge(r); err != nil {
+			return nil, err
+		}
+	}
+
+	sendMessagesResponse, err := m.SendChatMessages(context.Background(), messages)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := response.Merge(sendMessagesResponse); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}

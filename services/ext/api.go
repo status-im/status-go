@@ -409,6 +409,11 @@ func (api *PublicAPI) ShareCommunity(request *requests.ShareCommunity) (*protoco
 	return api.service.messenger.ShareCommunity(request)
 }
 
+// ShareImageMessage share the selected chat image with a set of users
+func (api *PublicAPI) ShareImageMessage(request *requests.ShareImageMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ShareImageMessage(request)
+}
+
 // RemoveUserFromCommunity removes the user with pk from the community with ID
 func (api *PublicAPI) RemoveUserFromCommunity(communityID types.HexBytes, userPublicKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveUserFromCommunity(communityID, userPublicKey)
