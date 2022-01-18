@@ -5,16 +5,15 @@ import (
 	"sync"
 
 	"github.com/cruxic/go-hmac-drbg/hmacdrbg"
-	logging "github.com/ipfs/go-log"
+	"github.com/status-im/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
-
-var log = logging.Logger("request-gen")
 
 var brHmacDrbgPool = sync.Pool{New: func() interface{} {
 	seed := make([]byte, 48)
 	_, err := rand.Read(seed)
 	if err != nil {
-		log.Fatal(err)
+		utils.Logger().Fatal("rand.Read err", zap.Error(err))
 	}
 	return hmacdrbg.NewHmacDrbg(256, seed, nil)
 }}
@@ -31,16 +30,16 @@ func GenerateRequestId() []byte {
 		seed := make([]byte, 48)
 		_, err := rand.Read(seed)
 		if err != nil {
-			log.Fatal(err)
+			utils.Logger().Fatal("rand.Read err", zap.Error(err))
 		}
 		err = rng.Reseed(seed)
 		if err != nil {
 			//only happens if seed < security-level
-			log.Fatal(err)
+			utils.Logger().Fatal("rng.Reseed err", zap.Error(err))
 		}
 
 		if !rng.Generate(randData) {
-			log.Error("could not generate random request id")
+			utils.Logger().Error("could not generate random request id")
 		}
 	}
 	return randData

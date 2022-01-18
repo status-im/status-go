@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -19,14 +20,16 @@ type MessageQueue struct {
 	wg   *sync.WaitGroup
 }
 
-func (self *MessageQueue) Push(msg IndexedWakuMessage) {
+var ErrDuplicatedMessage = errors.New("duplicated message")
+
+func (self *MessageQueue) Push(msg IndexedWakuMessage) error {
 	self.Lock()
 	defer self.Unlock()
 
 	var k [32]byte
 	copy(k[:], msg.index.Digest)
 	if _, ok := self.seen[k]; ok {
-		return
+		return ErrDuplicatedMessage
 	}
 
 	self.seen[k] = struct{}{}
@@ -36,6 +39,8 @@ func (self *MessageQueue) Push(msg IndexedWakuMessage) {
 		numToPop := len(self.messages) - self.maxMessages
 		self.messages = self.messages[numToPop:len(self.messages)]
 	}
+
+	return nil
 }
 
 func (self *MessageQueue) Messages() <-chan IndexedWakuMessage {

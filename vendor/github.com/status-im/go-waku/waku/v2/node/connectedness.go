@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	"go.opencensus.io/stats"
+	"go.uber.org/zap"
 )
 
 // A map of peer IDs to supported protocols
@@ -28,16 +29,18 @@ type ConnStatus struct {
 type ConnectionNotifier struct {
 	h              host.Host
 	ctx            context.Context
+	log            *zap.SugaredLogger
 	DisconnectChan chan peer.ID
 	quit           chan struct{}
 }
 
-func NewConnectionNotifier(ctx context.Context, h host.Host) ConnectionNotifier {
+func NewConnectionNotifier(ctx context.Context, h host.Host, log *zap.SugaredLogger) ConnectionNotifier {
 	return ConnectionNotifier{
 		h:              h,
 		ctx:            ctx,
 		DisconnectChan: make(chan peer.ID, 100),
 		quit:           make(chan struct{}),
+		log:            log,
 	}
 }
 
@@ -51,13 +54,13 @@ func (c ConnectionNotifier) ListenClose(n network.Network, m ma.Multiaddr) {
 
 func (c ConnectionNotifier) Connected(n network.Network, cc network.Conn) {
 	// called when a connection opened
-	log.Info(fmt.Sprintf("Peer %s connected", cc.RemotePeer()))
+	c.log.Info(fmt.Sprintf("Peer %s connected", cc.RemotePeer()))
 	stats.Record(c.ctx, metrics.Peers.M(1))
 }
 
 func (c ConnectionNotifier) Disconnected(n network.Network, cc network.Conn) {
 	// called when a connection closed
-	log.Info(fmt.Sprintf("Peer %s disconnected", cc.RemotePeer()))
+	c.log.Info(fmt.Sprintf("Peer %s disconnected", cc.RemotePeer()))
 	stats.Record(c.ctx, metrics.Peers.M(-1))
 	c.DisconnectChan <- cc.RemotePeer()
 }
@@ -107,7 +110,7 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 	for _, peer := range w.host.Network().Peers() {
 		protocols, err := w.host.Peerstore().GetProtocols(peer)
 		if err != nil {
-			log.Warn(fmt.Errorf("could not read peer %s protocols", peer))
+			w.log.Warn(fmt.Errorf("could not read peer %s protocols", peer))
 		}
 
 		for _, protocol := range protocols {

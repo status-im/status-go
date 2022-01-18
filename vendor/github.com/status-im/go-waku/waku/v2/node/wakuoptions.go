@@ -17,11 +17,17 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	rendezvous "github.com/status-im/go-waku-rendezvous"
+	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
+	"github.com/status-im/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
 
 // Default clientId
 const clientId string = "Go Waku v2 node"
+
+// Default minRelayPeersToPublish
+const defaultMinRelayPeersToPublish = 1
 
 type WakuNodeParameters struct {
 	hostAddr       *net.TCPAddr
@@ -31,10 +37,15 @@ type WakuNodeParameters struct {
 	privKey        *ecdsa.PrivateKey
 	libP2POpts     []libp2p.Option
 
+	logger *zap.SugaredLogger
+
 	enableRelay      bool
 	enableFilter     bool
 	isFilterFullNode bool
+	filterOpts       []filter.Option
 	wOpts            []pubsub.Option
+
+	minRelayPeersToPublish int
 
 	enableStore     bool
 	shouldResume    bool
@@ -42,6 +53,10 @@ type WakuNodeParameters struct {
 	messageProvider store.MessageProvider
 	maxMessages     int
 	maxDuration     time.Duration
+
+	swapMode                int
+	swapDisconnectThreshold int
+	swapPaymentThreshold    int
 
 	enableRendezvous       bool
 	enableRendezvousServer bool
@@ -65,6 +80,7 @@ type WakuNodeOption func(*WakuNodeParameters) error
 
 // Default options used in the libp2p node
 var DefaultWakuNodeOptions = []WakuNodeOption{
+	WithLogger(utils.Logger()),
 	WithWakuRelay(),
 }
 
@@ -80,6 +96,14 @@ func (w WakuNodeParameters) Identity() config.Option {
 
 func (w WakuNodeParameters) AddressFactory() basichost.AddrsFactory {
 	return w.addressFactory
+}
+
+// WithLogger is a WakuNodeOption that adds a custom logger
+func WithLogger(l *zap.Logger) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.logger = l.Sugar()
+		return nil
+	}
 }
 
 // WithHostAddress is a WakuNodeOption that configures libp2p to listen on a specific address
@@ -153,9 +177,16 @@ func WithLibP2POptions(opts ...libp2p.Option) WakuNodeOption {
 // WithWakuRelay enables the Waku V2 Relay protocol. This WakuNodeOption
 // accepts a list of WakuRelay gossipsub option to setup the protocol
 func WithWakuRelay(opts ...pubsub.Option) WakuNodeOption {
+	return WithWakuRelayAndMinPeers(defaultMinRelayPeersToPublish, opts...)
+}
+
+// WithWakuRelayAndMinPeers enables the Waku V2 Relay protocol. This WakuNodeOption
+// accepts a min peers require to publish and a list of WakuRelay gossipsub option to setup the protocol
+func WithWakuRelayAndMinPeers(minRelayPeersToPublish int, opts ...pubsub.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRelay = true
 		params.wOpts = opts
+		params.minRelayPeersToPublish = minRelayPeersToPublish
 		return nil
 	}
 }
@@ -194,10 +225,11 @@ func WithRendezvousServer(storage rendezvous.Storage) WakuNodeOption {
 
 // WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
 // accepts a list of WakuFilter gossipsub options to setup the protocol
-func WithWakuFilter(fullNode bool) WakuNodeOption {
+func WithWakuFilter(fullNode bool, filterOpts ...filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilter = true
 		params.isFilterFullNode = fullNode
+		params.filterOpts = filterOpts
 		return nil
 	}
 }
@@ -209,6 +241,16 @@ func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 		params.enableStore = true
 		params.storeMsgs = shouldStoreMessages
 		params.shouldResume = shouldResume
+		return nil
+	}
+}
+
+// WithWakuSwap set the option of the Waku V2 Swap protocol
+func WithWakuSwap(mode int, disconnectThreshold, paymentThreshold int) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.swapMode = mode
+		params.swapDisconnectThreshold = disconnectThreshold
+		params.swapPaymentThreshold = paymentThreshold
 		return nil
 	}
 }

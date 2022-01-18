@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.13
 
-replace github.com/ethereum/go-ethereum v1.10.4 => github.com/status-im/go-ethereum v1.10.4-status.3
+replace github.com/ethereum/go-ethereum v1.10.13 => github.com/status-im/go-ethereum v1.10.4-status.3
 
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
@@ -15,7 +15,7 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/ethereum/go-ethereum v1.10.4
+	github.com/ethereum/go-ethereum v1.10.13
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/mock v1.6.0
@@ -36,7 +36,6 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.5.5
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
-	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/multiformats/go-multiaddr v0.4.0
 	github.com/multiformats/go-multibase v0.0.3
 	github.com/multiformats/go-multihash v0.0.15
@@ -52,7 +51,7 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20211125141833-23cbb24a94d6
+	github.com/status-im/go-waku v0.0.0-20220118181706-11d1f8fb0d43
 	github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432
 	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2
@@ -60,14 +59,14 @@ require (
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.7.0
-	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e
+	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 	golang.org/x/tools v0.1.2 // indirect
 	google.golang.org/protobuf v1.27.1

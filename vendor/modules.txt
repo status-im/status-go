@@ -38,7 +38,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.14.1
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.4 => github.com/status-im/go-ethereum v1.10.4-status.3
+# github.com/ethereum/go-ethereum v1.10.13 => github.com/status-im/go-ethereum v1.10.4-status.3
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -157,7 +157,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/golang/snappy v0.0.3
+# github.com/golang/snappy v0.0.4
 github.com/golang/snappy
 # github.com/google/gopacket v1.1.19
 github.com/google/gopacket/routing
@@ -348,7 +348,7 @@ github.com/marten-seemann/tcp
 github.com/mat/besticon/besticon
 github.com/mat/besticon/colorfinder
 github.com/mat/besticon/ico
-# github.com/mattn/go-colorable v0.1.4
+# github.com/mattn/go-colorable v0.1.1
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.13
 github.com/mattn/go-isatty
@@ -447,10 +447,15 @@ github.com/shopspring/decimal
 github.com/spacemonkeygo/spacelog
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 github.com/status-im/doubleratchet
+# github.com/status-im/go-discover v0.0.0-20211207185514-87bd8c3fe429
+github.com/status-im/go-discover/discover
+github.com/status-im/go-discover/discover/v4wire
+github.com/status-im/go-discover/discover/v5wire
 # github.com/status-im/go-multiaddr-ethv4 v1.2.1
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20211125141833-23cbb24a94d6
+# github.com/status-im/go-waku v0.0.0-20220118181706-11d1f8fb0d43
 github.com/status-im/go-waku/waku/persistence
+github.com/status-im/go-waku/waku/try
 github.com/status-im/go-waku/waku/v2
 github.com/status-im/go-waku/waku/v2/discv5
 github.com/status-im/go-waku/waku/v2/dnsdisc
@@ -462,6 +467,7 @@ github.com/status-im/go-waku/waku/v2/protocol/lightpush
 github.com/status-im/go-waku/waku/v2/protocol/pb
 github.com/status-im/go-waku/waku/v2/protocol/relay
 github.com/status-im/go-waku/waku/v2/protocol/store
+github.com/status-im/go-waku/waku/v2/protocol/swap
 github.com/status-im/go-waku/waku/v2/utils
 # github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432
 github.com/status-im/go-waku-rendezvous
@@ -490,7 +496,7 @@ github.com/status-im/tcp-shaker
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
-# github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
+# github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache
 github.com/syndtr/goleveldb/leveldb/comparer
@@ -570,7 +576,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e
+# golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/chacha20
@@ -578,6 +584,7 @@ golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/hkdf
+golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
@@ -592,7 +599,7 @@ golang.org/x/image/riff
 golang.org/x/image/vp8
 golang.org/x/image/vp8l
 golang.org/x/image/webp
-# golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
+# golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html

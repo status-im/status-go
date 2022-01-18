@@ -10,18 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/status-im/go-discover/discover"
 	"github.com/status-im/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
-
-var log = logging.Logger("waku_discv5")
 
 type DiscoveryV5 struct {
 	sync.Mutex
@@ -36,6 +34,8 @@ type DiscoveryV5 struct {
 	localnode *enode.LocalNode
 	NAT       nat.Interface
 	quit      chan struct{}
+
+	log *zap.SugaredLogger
 
 	wg *sync.WaitGroup
 
@@ -60,11 +60,6 @@ type discV5Parameters struct {
 	tcpPort       int
 	advertiseAddr *net.IP
 }
-
-const WakuENRField = "waku2"
-
-// WakuEnrBitfield is a8-bit flag field to indicate Waku capabilities. Only the 4 LSBs are currently defined according to RFC31 (https://rfc.vac.dev/spec/31/).
-type WakuEnrBitfield = uint8
 
 type DiscoveryV5Option func(*discV5Parameters)
 
@@ -98,29 +93,7 @@ func DefaultOptions() []DiscoveryV5Option {
 	}
 }
 
-func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
-	var v uint8 = 0
-
-	if lightpush {
-		v |= (1 << 3)
-	}
-
-	if filter {
-		v |= (1 << 2)
-	}
-
-	if store {
-		v |= (1 << 1)
-	}
-
-	if relay {
-		v |= (1 << 0)
-	}
-
-	return v
-}
-
-func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.PrivateKey, wakuFlags WakuEnrBitfield, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.PrivateKey, wakuFlags utils.WakuEnrBitfield, log *zap.SugaredLogger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -128,9 +101,11 @@ func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.Priv
 		opt(params)
 	}
 
+	logger := log.Named("discv5")
+
 	params.tcpPort = tcpPort
 
-	localnode, err := newLocalnode(priv, ipAddr, params.udpPort, tcpPort, wakuFlags, params.advertiseAddr)
+	localnode, err := newLocalnode(priv, ipAddr, params.udpPort, tcpPort, wakuFlags, params.advertiseAddr, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -153,15 +128,20 @@ func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.Priv
 		config: discover.Config{
 			PrivateKey: priv,
 			Bootnodes:  params.bootnodes,
+			ValidNodeFn: func(n enode.Node) bool {
+				// TODO: track https://github.com/status-im/nim-waku/issues/770 for improvements over validation func
+				return evaluateNode(&n)
+			},
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,
 			Port: params.udpPort,
 		},
+		log: logger,
 	}, nil
 }
 
-func newLocalnode(priv *ecdsa.PrivateKey, ipAddr net.IP, udpPort int, tcpPort int, wakuFlags WakuEnrBitfield, advertiseAddr *net.IP) (*enode.LocalNode, error) {
+func newLocalnode(priv *ecdsa.PrivateKey, ipAddr net.IP, udpPort int, tcpPort int, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, log *zap.SugaredLogger) (*enode.LocalNode, error) {
 	db, err := enode.OpenDB("")
 	if err != nil {
 		return nil, err
@@ -169,7 +149,7 @@ func newLocalnode(priv *ecdsa.PrivateKey, ipAddr net.IP, udpPort int, tcpPort in
 	localnode := enode.NewLocalNode(db, priv)
 	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
 	localnode.SetFallbackUDP(udpPort)
-	localnode.Set(enr.WithEntry(WakuENRField, wakuFlags))
+	localnode.Set(enr.WithEntry(utils.WakuENRField, wakuFlags))
 	localnode.Set(enr.IP(ipAddr))
 
 	if udpPort > 0 && udpPort <= math.MaxUint16 {
@@ -217,8 +197,8 @@ func (d *DiscoveryV5) listen() error {
 
 	d.listener = listener
 
-	log.Info(fmt.Sprintf("Started Discovery V5 at %s:%d, advertising IP: %s:%d", d.udpAddr.IP, d.udpAddr.Port, d.localnode.Node().IP(), d.params.tcpPort))
-	log.Info("Discovery V5 ", d.localnode.Node())
+	d.log.Info(fmt.Sprintf("Started Discovery V5 at %s:%d, advertising IP: %s:%d", d.udpAddr.IP, d.udpAddr.Port, d.localnode.Node().IP(), d.params.tcpPort))
+	d.log.Info("Discovery V5 ", d.localnode.Node())
 
 	return nil
 }
@@ -248,7 +228,7 @@ func (d *DiscoveryV5) Stop() {
 	d.listener.Close()
 	d.listener = nil
 
-	log.Info("Stopped Discovery V5")
+	d.log.Info("Stopped Discovery V5")
 
 	d.wg.Wait()
 }
@@ -296,17 +276,17 @@ func (d *DiscoveryV5) UpdateAddr(addr net.IP) error {
 
 	d.localnode.Set(enr.IP(addr))
 
-	log.Info(fmt.Sprintf("Updated Discovery V5 node IP: %s", d.localnode.Node().IP()))
-	log.Info("Discovery V5 ", d.localnode.Node())
+	d.log.Info(fmt.Sprintf("Updated Discovery V5 node IP: %s", d.localnode.Node().IP()))
+	d.log.Info("Discovery V5 ", d.localnode.Node())
 
 	return nil
 }
 
 func isWakuNode(node *enode.Node) bool {
-	enrField := new(WakuEnrBitfield)
-	if err := node.Record().Load(enr.WithEntry(WakuENRField, &enrField)); err != nil {
+	enrField := new(utils.WakuEnrBitfield)
+	if err := node.Record().Load(enr.WithEntry(utils.WakuENRField, &enrField)); err != nil {
 		if !enr.IsNotFound(err) {
-			log.Error("could not retrieve port for enr ", node)
+			utils.Logger().Named("discv5").Error("could not retrieve port for enr ", zap.Any("node", node))
 		}
 		return false
 	}
@@ -322,7 +302,7 @@ func hasTCPPort(node *enode.Node) bool {
 	enrTCP := new(enr.TCP)
 	if err := node.Record().Load(enr.WithEntry(enrTCP.ENRKey(), enrTCP)); err != nil {
 		if !enr.IsNotFound(err) {
-			log.Error("could not retrieve port for enr ", node)
+			utils.Logger().Named("discv5").Error("could not retrieve port for enr ", zap.Any("node", node))
 		}
 		return false
 	}
@@ -330,7 +310,7 @@ func hasTCPPort(node *enode.Node) bool {
 	return true
 }
 
-func (d *DiscoveryV5) evaluateNode(node *enode.Node) bool {
+func evaluateNode(node *enode.Node) bool {
 	if node == nil || node.IP() == nil {
 		return false
 	}
@@ -342,14 +322,14 @@ func (d *DiscoveryV5) evaluateNode(node *enode.Node) bool {
 	_, err := utils.EnodeToPeerInfo(node)
 
 	if err != nil {
-		log.Error("could not obtain peer info from enode:", err)
+		utils.Logger().Named("discv5").Error("could not obtain peer info from enode:", zap.Error(err))
 		return false
 	}
 
 	return true
 }
 
-func (c *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discovery.Option) (time.Duration, error) {
+func (d *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discovery.Option) (time.Duration, error) {
 	// Get options
 	var options discovery.Options
 	err := options.Apply(opts...)
@@ -381,13 +361,13 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 
 		address, err := utils.EnodeToMultiAddr(iterator.Node())
 		if err != nil {
-			log.Error(err)
+			d.log.Error(err)
 			continue
 		}
 
 		peerInfo, err := peer.AddrInfoFromP2pAddr(address)
 		if err != nil {
-			log.Error(err)
+			d.log.Error(err)
 			continue
 		}
 
@@ -442,7 +422,7 @@ func (d *DiscoveryV5) FindPeers(ctx context.Context, topic string, opts ...disco
 		d.Lock()
 
 		iterator := d.listener.RandomNodes()
-		iterator = enode.Filter(iterator, d.evaluateNode)
+		iterator = enode.Filter(iterator, evaluateNode)
 		defer iterator.Close()
 
 		doneCh := make(chan struct{})

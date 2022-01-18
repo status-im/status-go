@@ -2,33 +2,22 @@ package utils
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
-	"fmt"
-	"math"
 	"math/rand"
-	"net"
-	"strconv"
 	"sync"
 	"time"
 
-	ma "github.com/multiformats/go-multiaddr"
-
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
-	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"go.uber.org/zap"
 )
-
-var log = logging.Logger("utils")
 
 var ErrNoPeersAvailable = errors.New("no suitable peers found")
 var PingServiceNotAvailable = errors.New("ping service not available")
 
 // SelectPeer is used to return a random peer that supports a given protocol.
-func SelectPeer(host host.Host, protocolId string) (*peer.ID, error) {
+func SelectPeer(host host.Host, protocolId string, log *zap.SugaredLogger) (*peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
 	// This will require us to check for various factors such as:
@@ -61,7 +50,7 @@ type pingResult struct {
 	rtt time.Duration
 }
 
-func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string) (*peer.ID, error) {
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, log *zap.SugaredLogger) (*peer.ID, error) {
 	var peers peer.IDSlice
 	for _, peer := range host.Peerstore().Peers() {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
@@ -121,63 +110,4 @@ func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId str
 	case <-ctx.Done():
 		return nil, ErrNoPeersAvailable
 	}
-}
-
-func EnodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
-	peerID, err := peer.IDFromPublicKey(&ECDSAPublicKey{node.Pubkey()})
-	if err != nil {
-		return nil, err
-	}
-
-	return ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
-}
-
-func EnodeToPeerInfo(node *enode.Node) (*peer.AddrInfo, error) {
-	address, err := EnodeToMultiAddr(node)
-	if err != nil {
-		return nil, err
-	}
-
-	return peer.AddrInfoFromP2pAddr(address)
-}
-
-func GetENRandIP(addr ma.Multiaddr, privK *ecdsa.PrivateKey) (*enode.Node, *net.TCPAddr, error) {
-	ip, err := addr.ValueForProtocol(ma.P_IP4)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	portStr, err := addr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	r := &enr.Record{}
-
-	if port > 0 && port <= math.MaxUint16 {
-		r.Set(enr.TCP(uint16(port))) // lgtm [go/incorrect-integer-conversion]
-	} else {
-		return nil, nil, fmt.Errorf("could not set port %d", port)
-	}
-
-	r.Set(enr.IP(net.ParseIP(ip)))
-
-	err = enode.SignV4(r, privK)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	node, err := enode.New(enode.ValidSchemes, r)
-
-	return node, tcpAddr, err
 }
