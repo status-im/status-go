@@ -183,6 +183,7 @@ func (o *OpenseaClient) doOpenseaRequest(url string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
 
 	resp, err := o.client.Do(req)
 	if err != nil {
