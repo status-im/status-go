@@ -7,12 +7,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
 
 type LightPushParameters struct {
 	host         host.Host
 	selectedPeer peer.ID
 	requestId    []byte
+	log          *zap.SugaredLogger
 }
 
 type LightPushOption func(*LightPushParameters)
@@ -25,22 +27,22 @@ func WithPeer(p peer.ID) LightPushOption {
 
 func WithAutomaticPeerSelection(host host.Host) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeer(host, string(LightPushID_v20beta1))
+		p, err := utils.SelectPeer(host, string(LightPushID_v20beta1), params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
-			log.Info("Error selecting peer: ", err)
+			params.log.Info("Error selecting peer: ", err)
 		}
 	}
 }
 
 func WithFastestPeerSelection(ctx context.Context) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1))
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1), params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
-			log.Info("Error selecting peer: ", err)
+			params.log.Info("Error selecting peer: ", err)
 		}
 	}
 }

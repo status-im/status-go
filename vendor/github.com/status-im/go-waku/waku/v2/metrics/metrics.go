@@ -3,13 +3,12 @@ package metrics
 import (
 	"context"
 
-	logging "github.com/ipfs/go-log"
+	"github.com/status-im/go-waku/waku/v2/utils"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
+	"go.uber.org/zap"
 )
-
-var log = logging.Logger("metrics")
 
 var (
 	Messages            = stats.Int64("node_messages", "Number of messages received", stats.UnitDimensionless)
@@ -76,18 +75,18 @@ var (
 
 func RecordLightpushError(ctx context.Context, tagType string) {
 	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(tag.Key(ErrorType), tagType)}, LightpushErrors.M(1)); err != nil {
-		log.Error("failed to record with tags", err)
+		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
 }
 
 func RecordMessage(ctx context.Context, tagType string, len int) {
 	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(KeyType, tagType)}, StoreMessages.M(int64(len))); err != nil {
-		log.Error("failed to record with tags", err)
+		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
 }
 
 func RecordStoreError(ctx context.Context, tagType string) {
 	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, StoreErrors.M(1)); err != nil {
-		log.Error("failed to record with tags", err)
+		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
 }

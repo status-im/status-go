@@ -2,11 +2,11 @@ package persistence
 
 import (
 	"database/sql"
-	"log"
 	"time"
 
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
 
 type MessageProvider interface {
@@ -18,7 +18,8 @@ type MessageProvider interface {
 // DBStore is a MessageProvider that has a *sql.DB connection
 type DBStore struct {
 	MessageProvider
-	db *sql.DB
+	db  *sql.DB
+	log *zap.SugaredLogger
 
 	maxMessages int
 	maxDuration time.Duration
@@ -65,8 +66,9 @@ func WithRetentionPolicy(maxMessages int, maxDuration time.Duration) DBOption {
 // Creates a new DB store using the db specified via options.
 // It will create a messages table if it does not exist and
 // clean up records according to the retention policy used
-func NewDBStore(options ...DBOption) (*DBStore, error) {
+func NewDBStore(log *zap.SugaredLogger, options ...DBOption) (*DBStore, error) {
 	result := new(DBStore)
+	result.log = log.Named("dbstore")
 
 	for _, opt := range options {
 		err := opt(result)
@@ -168,7 +170,7 @@ func (d *DBStore) GetAll() ([]StoredMessage, error) {
 
 		err = rows.Scan(&id, &receiverTimestamp, &senderTimestamp, &contentTopic, &pubsubTopic, &payload, &version)
 		if err != nil {
-			log.Fatal(err)
+			d.log.Fatal(err)
 		}
 
 		msg := new(pb.WakuMessage)
