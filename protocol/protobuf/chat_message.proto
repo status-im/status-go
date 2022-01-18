@@ -91,6 +91,10 @@ message ChatMessage {
   // Message author's display name, introduced in version 1
   string display_name = 14;
 
+  ContactRequestSignature sent_contact_request_signature = 15;
+  ContactRequestSignature received_contact_request_signature = 16;
+  bool contact_message = 17;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
@@ -105,7 +109,13 @@ message ChatMessage {
     COMMUNITY = 9;
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
+    CONTACT_REQUEST = 11;
   }
 
   
+}
+
+message ContactRequestSignature {
+  bytes signature = 1;
+  uint64 timestamp = 2;
 }

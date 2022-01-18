@@ -2516,6 +2516,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 
 	response.AddChat(chat)
+
 	m.logger.Debug("sent message", zap.String("id", message.ID))
 	m.prepareMessages(response.messages)
 
@@ -3239,13 +3240,8 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
-
-	m.handleMessagesMutex.Lock()
-	defer m.handleMessagesMutex.Unlock()
-
-	response := &MessengerResponse{}
-	messageState := &ReceivedMessageState{
+func (m *Messenger) buildMessageState() *ReceivedMessageState {
+	return &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
 		ModifiedContacts:      new(stringBoolMap),
@@ -3254,10 +3250,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
-		Response:              response,
+		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 		AllBookmarks:          make(map[string]*browsers.Bookmark),
 	}
+}
+
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
+
+	m.handleMessagesMutex.Lock()
+	defer m.handleMessagesMutex.Unlock()
+
+	messageState := m.buildMessageState()
+	response := messageState.Response
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
@@ -3716,6 +3721,26 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+					case protobuf.AcceptContactRequest:
+						logger.Debug("Handling AcceptContactRequest")
+						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
+						err = m.HandleAcceptContactRequest(messageState, message)
+						if err != nil {
+							logger.Warn("failed to handle AcceptContactRequest", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.RetractContactRequest:
+
+						logger.Debug("Handling RetractContactRequest")
+						message := msg.ParsedMessage.Interface().(protobuf.RetractContactRequest)
+						err = m.HandleRetractContactRequest(messageState, message)
+						if err != nil {
+							logger.Warn("failed to handle RetractContactRequest", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.PushNotificationQuery:
 						logger.Debug("Received PushNotificationQuery")
 						if m.pushNotificationServer == nil {

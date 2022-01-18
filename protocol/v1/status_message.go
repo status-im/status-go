@@ -276,6 +276,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.CommunityMessageArchiveMagnetlink))
 	case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT:
 		return m.unmarshalProtobufData(new(protobuf.SyncWalletAccounts))
+	case protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST:
+		return m.unmarshalProtobufData(new(protobuf.AcceptContactRequest))
+	case protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST:
+		return m.unmarshalProtobufData(new(protobuf.RetractContactRequest))
 	}
 	return nil
 }

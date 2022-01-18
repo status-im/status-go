@@ -491,6 +491,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.removed,
 			c.has_added_us,
 			c.local_nickname,
+                        c.contact_request_state,
+                        c.contact_request_clock,
 			i.image_type,
 			i.payload
 		FROM contacts c 
@@ -505,18 +507,20 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	for rows.Next() {
 
 		var (
-			contact            Contact
-			nickname           sql.NullString
-			displayName        sql.NullString
-			imageType          sql.NullString
-			ensName            sql.NullString
-			ensVerified        sql.NullBool
-			added              sql.NullBool
-			blocked            sql.NullBool
-			removed            sql.NullBool
-			hasAddedUs         sql.NullBool
-			lastUpdatedLocally sql.NullInt64
-			imagePayload       []byte
+			contact             Contact
+			nickname            sql.NullString
+			contactRequestState sql.NullInt64
+			contactRequestClock sql.NullInt64
+			displayName         sql.NullString
+			imageType           sql.NullString
+			ensName             sql.NullString
+			ensVerified         sql.NullBool
+			added               sql.NullBool
+			blocked             sql.NullBool
+			removed             sql.NullBool
+			hasAddedUs          sql.NullBool
+			lastUpdatedLocally  sql.NullInt64
+			imagePayload        []byte
 		)
 
 		contact.Images = make(map[string]images.IdentityImage)
@@ -536,6 +540,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&removed,
 			&hasAddedUs,
 			&nickname,
+			&contactRequestState,
+			&contactRequestClock,
 			&imageType,
 			&imagePayload,
 		)
@@ -545,6 +551,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if nickname.Valid {
 			contact.LocalNickname = nickname.String
+		}
+
+		if contactRequestState.Valid {
+			contact.ContactRequestState = ContactRequestState(contactRequestState.Int64)
+		}
+
+		if contactRequestClock.Valid {
+			contact.ContactRequestClock = uint64(contactRequestClock.Int64)
 		}
 
 		if displayName.Valid {
@@ -722,6 +736,8 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			last_updated,
 			last_updated_locally,
 			local_nickname,
+                        contact_request_state,
+                        contact_request_clock,
 			added,
 			blocked,
 			removed,
@@ -729,7 +745,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -745,6 +761,8 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.LastUpdated,
 		contact.LastUpdatedLocally,
 		contact.LocalNickname,
+		contact.ContactRequestState,
+		contact.ContactRequestClock,
 		contact.Added,
 		contact.Blocked,
 		contact.Removed,

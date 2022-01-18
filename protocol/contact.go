@@ -7,8 +7,19 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+)
+
+type ContactRequestState int
+
+const (
+	ContactRequestStateNone ContactRequestState = iota
+	ContactRequestStateMutual
+	ContactRequestStateSent
+	ContactRequestStateReceived
+	ContactRequestStateDismissed
 )
 
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
@@ -87,6 +98,9 @@ type Contact struct {
 	Blocked    bool `json:"blocked"`
 	HasAddedUs bool `json:"hasAddedUs"`
 
+	ContactRequestState ContactRequestState `json:"contactRequestState"`
+	ContactRequestClock uint64              `json:"contactRequestClock"`
+
 	IsSyncing bool
 	Removed   bool
 }
@@ -122,6 +136,50 @@ func (c *Contact) Add() {
 	c.Removed = false
 }
 
+func (c *Contact) ContactRequestSent() {
+	switch c.ContactRequestState {
+	case ContactRequestStateNone, ContactRequestStateDismissed:
+		c.ContactRequestState = ContactRequestStateSent
+	case ContactRequestStateReceived:
+		c.ContactRequestState = ContactRequestStateMutual
+	}
+}
+
+func (c *Contact) ContactRequestReceived() {
+	switch c.ContactRequestState {
+	case ContactRequestStateNone:
+		c.ContactRequestState = ContactRequestStateReceived
+	case ContactRequestStateSent:
+		c.ContactRequestState = ContactRequestStateMutual
+	}
+}
+
+func (c *Contact) ContactRequestAccepted() {
+	switch c.ContactRequestState {
+	case ContactRequestStateSent:
+		c.ContactRequestState = ContactRequestStateMutual
+	}
+}
+
+func (c *Contact) AcceptContactRequest() {
+	switch c.ContactRequestState {
+	case ContactRequestStateReceived, ContactRequestStateDismissed:
+		c.ContactRequestState = ContactRequestStateMutual
+	}
+}
+
+func (c *Contact) RetractContactRequest() {
+	c.ContactRequestState = ContactRequestStateNone
+}
+
+func (c *Contact) ContactRequestRetracted() {
+	c.ContactRequestState = ContactRequestStateNone
+}
+
+func (c *Contact) DismissContactRequest() {
+	c.ContactRequestState = ContactRequestStateDismissed
+}
+
 func buildContactFromPkString(pkString string) (*Contact, error) {
 	publicKeyBytes, err := types.DecodeHex(pkString)
 	if err != nil {
@@ -137,7 +195,7 @@ func buildContactFromPkString(pkString string) (*Contact, error) {
 }
 
 func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
-	id := types.EncodeHex(crypto.FromECDSAPub(publicKey))
+	id := common.PubkeyToHex(publicKey)
 	return buildContact(id, publicKey)
 }
 

@@ -605,8 +605,24 @@ func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddConta
 	return api.service.messenger.AddContact(ctx, request)
 }
 
+func (api *PublicAPI) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *requests.RetractContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RetractContactRequest(request)
+}
+
 func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RejectContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DismissContactRequest(ctx, request)
 }
 
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
