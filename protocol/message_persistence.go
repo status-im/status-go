@@ -54,6 +54,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		response_to,
 		gap_from,
 		gap_to,
+		contact_request_state,
 		mentioned`
 }
 
@@ -96,6 +97,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.response_to,
 		m1.gap_from,
 		m1.gap_to,
+		m1.contact_request_state,
 		m1.mentioned,
 		m2.source,
 		m2.text,
@@ -133,6 +135,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
 	var deleted sql.NullBool
+	var contactRequestState sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -178,6 +181,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ResponseTo,
 		&gapFrom,
 		&gapTo,
+		&contactRequestState,
 		&message.Mentioned,
 		&quotedFrom,
 		&quotedText,
@@ -200,6 +204,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if deleted.Valid {
 		message.Deleted = deleted.Bool
+	}
+
+	if contactRequestState.Valid {
+		message.ContactRequestState = common.ContactRequestState(contactRequestState.Int64)
 	}
 
 	if quotedText.Valid {
@@ -348,6 +356,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.ResponseTo,
 		gapFrom,
 		gapTo,
+		message.ContactRequestState,
 		message.Mentioned,
 	}, nil
 }
@@ -561,6 +570,72 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 			m1.source = c.id
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id = ? %s
+			ORDER BY cursor DESC
+			LIMIT ?
+		`, allFields, cursorWhere),
+		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.Message
+		cursors []string
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, "", err
+		}
+		result = append(result, &message)
+		cursors = append(cursors, cursor)
+	}
+
+	var newCursor string
+	if len(result) > limit {
+		newCursor = cursors[limit]
+		result = result[:limit]
+	}
+	return result, newCursor, nil
+}
+
+func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int) ([]*common.Message, string, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
+	}
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	args := []interface{}{protobuf.ChatMessage_CONTACT_REQUEST}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+				%s,
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
+			WHERE
+				NOT(m1.hide) AND NOT(m1.seen) AND m1.content_type = ? %s
 			ORDER BY cursor DESC
 			LIMIT ?
 		`, allFields, cursorWhere),
@@ -1945,5 +2020,10 @@ func (db sqlitePersistence) clearHistoryFromSyncMessage(chat *Chat, clearedAt ui
 	}
 
 	err = db.saveChat(tx, *chat)
+	return err
+}
+
+func (db sqlitePersistence) SetContactRequestState(id string, state common.ContactRequestState) error {
+	_, err := db.db.Exec(`UPDATE user_messages SET contact_request_state = ? WHERE id = ?`, state, id)
 	return err
 }

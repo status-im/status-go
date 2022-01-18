@@ -125,7 +125,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 
 	options := []Option{
 		WithCustomLogger(logger),
-		WithDatabaseConfig(":memory:", "some-key"),
+		WithDatabaseConfig(":memory:", "somekey"),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
