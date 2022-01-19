@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -32,7 +33,7 @@ import (
 
 var (
 	networks = json.RawMessage("{}")
-	settings = accounts.Settings{
+	testSettings = settings.Settings{
 		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress("0xe1300f99fDF7346986CbC766903245087394ecd0"),
@@ -462,7 +463,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -505,7 +506,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -549,7 +550,7 @@ func TestDeleteMulticcount(t *testing.T) {
 	err = backend.ensureAppDBOpened(account, "123123")
 	require.NoError(t, err)
 
-	settings := accounts.Settings{
+	s := settings.Settings{
 		Address:           types.HexToAddress(accountInfo.Address),
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress(accountInfo.Address),
@@ -566,7 +567,7 @@ func TestDeleteMulticcount(t *testing.T) {
 		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
 
 	err = backend.saveAccountsAndSettings(
-		settings,
+		s,
 		&params.NodeConfig{},
 		nil)
 	require.NoError(t, err)
@@ -624,7 +625,7 @@ func TestConvertAccount(t *testing.T) {
 	err = backend.ensureAppDBOpened(account, password)
 	require.NoError(t, err)
 
-	settings := accounts.Settings{
+	s := settings.Settings{
 		Address:           types.HexToAddress(accountInfo.Address),
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress(accountInfo.Address),
@@ -641,7 +642,7 @@ func TestConvertAccount(t *testing.T) {
 		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
 
 	err = backend.saveAccountsAndSettings(
-		settings,
+		s,
 		&params.NodeConfig{},
 		nil)
 	require.NoError(t, err)
@@ -661,7 +662,7 @@ func TestConvertAccount(t *testing.T) {
 	keycardAccount := account
 	keycardAccount.KeycardPairing = "pairing"
 
-	keycardSettings := accounts.Settings{
+	keycardSettings := settings.Settings{
 		KeycardInstanceUID: "0xdeadbeef",
 		KeycardPAiredOn:    1,
 		KeycardPairing:     "pairing",

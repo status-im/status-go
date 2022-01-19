@@ -82,8 +82,16 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
-	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
-	services = append(services, b.gifService())
+	ps, err := b.providerService()
+	if err != nil {
+		return err
+	}
+	services = appendIf(config.Web3ProviderConfig.Enabled, services, ps)
+	gs, err := b.gifService()
+	if err != nil {
+		return err
+	}
+	services = append(services, gs)
 	services = append(services, b.ChatService())
 
 	if config.WakuConfig.Enabled {
@@ -401,11 +409,15 @@ func (b *StatusNode) stickersService() *stickers.Service {
 	return b.stickersSrvc
 }
 
-func (b *StatusNode) gifService() *gif.Service {
+func (b *StatusNode) gifService() (*gif.Service, error) {
 	if b.gifSrvc == nil {
-		b.gifSrvc = gif.NewService(accounts.NewDB(b.appDB))
+		acc, err := accounts.NewDB(b.appDB)
+		if err != nil {
+			return nil, err
+		}
+		b.gifSrvc = gif.NewService(acc)
 	}
-	return b.gifSrvc
+	return b.gifSrvc, nil
 }
 
 func (b *StatusNode) ChatService() *chat.Service {
@@ -430,11 +442,16 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 	return b.mailserversSrvc
 }
 
-func (b *StatusNode) providerService() *web3provider.Service {
-	if b.providerSrvc == nil {
-		b.providerSrvc = web3provider.NewService(b.appDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
+func (b *StatusNode) providerService() (*web3provider.Service, error) {
+	web3S, err := web3provider.NewService(b.appDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
+	if err != nil {
+		return nil, err
 	}
-	return b.providerSrvc
+
+	if b.providerSrvc == nil {
+		b.providerSrvc = web3S
+	}
+	return b.providerSrvc, nil
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {

@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -12,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -69,7 +69,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().NoError(err)
 
 	// Set ENS name
-	err = theirMessenger.settings.SaveSetting(accounts.PreferredName.GetReactName(), theirName)
+	err = theirMessenger.settings.SaveSetting(settings.PreferredName.GetReactName(), theirName)
 	s.Require().NoError(err)
 
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))

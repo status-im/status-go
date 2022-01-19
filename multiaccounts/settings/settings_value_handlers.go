@@ -1,8 +1,10 @@
-package accounts
+package settings
 
 import (
 	"encoding/json"
+
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -10,7 +12,7 @@ import (
 func BoolHandler(value interface{}) (interface{}, error) {
 	_, ok := value.(bool)
 	if !ok {
-		return value, ErrInvalidConfig
+		return value, errors.ErrInvalidConfig
 	}
 
 	return value, nil
@@ -25,7 +27,7 @@ func AddressHandler(value interface{}) (interface{}, error) {
 	if ok {
 		value = types.HexToAddress(str)
 	} else {
-		return value, ErrInvalidConfig
+		return value, errors.ErrInvalidConfig
 	}
 	return value, nil
 }

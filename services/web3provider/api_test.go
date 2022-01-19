@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/t/utils"
@@ -64,10 +65,11 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		NetworkID:   1,
 	}
 
-	service := NewService(db, rpcClient, nodeConfig, accManager, nil, nil)
+	service, err := NewService(db, rpcClient, nodeConfig, accManager, nil, nil)
+	require.NoError(t, err)
 
 	networks := json.RawMessage("{}")
-	settings := accounts.Settings{
+	settings := settings.Settings{
 		DappsAddress: types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		Networks:     &networks,
 	}

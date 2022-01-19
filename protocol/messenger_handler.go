@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1453,8 +1453,8 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
-	viewFromContacts := s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly
-	viewFromNoOne := s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityNone
+	viewFromContacts := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly
+	viewFromNoOne := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityNone
 
 	m.logger.Debug("settings found",
 		zap.Bool("viewFromContacts", viewFromContacts),

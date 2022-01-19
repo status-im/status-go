@@ -1,0 +1,16 @@
+package errors
+
+import (
+	"errors"
+)
+
+var (
+	// ErrWalletNotUnique returned if another account has `wallet` field set to true.
+	ErrWalletNotUnique = errors.New("another account is set to be default wallet. disable it before using new")
+	// ErrChatNotUnique returned if another account has `chat` field set to true.
+	ErrChatNotUnique = errors.New("another account is set to be default chat. disable it before using new")
+	// ErrInvalidConfig returned if config isn't allowed
+	ErrInvalidConfig = errors.New("configuration value not allowed")
+	// ErrNewClockOlderThanCurrent
+	ErrNewClockOlderThanCurrent = errors.New("the new clock value is older than the current clock value")
+)

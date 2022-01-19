@@ -1,4 +1,4 @@
-package accounts
+package settings
 
 import (
 	"github.com/golang/protobuf/proto"

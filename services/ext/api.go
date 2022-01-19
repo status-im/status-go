@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -705,7 +705,7 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 // PushNotifications server endpoints
 
 func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsServerEnabled.GetReactName(), true)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsServerEnabled.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -714,7 +714,7 @@ func (api *PublicAPI) StartPushNotificationsServer() error {
 }
 
 func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsServerEnabled.GetReactName(), false)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsServerEnabled.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -733,7 +733,7 @@ func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error
 }
 
 func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.SendPushNotifications.GetReactName(), false)
+	err := api.service.accountsDB.SaveSetting(settings.SendPushNotifications.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -742,7 +742,7 @@ func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.SendPushNotifications.GetReactName(), true)
+	err := api.service.accountsDB.SaveSetting(settings.SendPushNotifications.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -750,7 +750,7 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsFromContactsOnly.GetReactName(), true)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsFromContactsOnly.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -758,7 +758,7 @@ func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Contex
 }
 
 func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsFromContactsOnly.GetReactName(), false)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsFromContactsOnly.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -766,7 +766,7 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 }
 
 func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsBlockMentions.GetReactName(), true)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsBlockMentions.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -774,7 +774,7 @@ func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) 
 }
 
 func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsBlockMentions.GetReactName(), false)
+	err := api.service.accountsDB.SaveSetting(settings.PushNotificationsBlockMentions.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -952,8 +952,8 @@ func (api *PublicAPI) Peers() map[string][]string {
 	return api.service.messenger.Peers()
 }
 
-func (api *PublicAPI) ChangeIdentityImageShowTo(showTo accounts.ProfilePicturesShowToType) error {
-	err := api.service.accountsDB.SaveSetting(accounts.ProfilePicturesShowTo.GetReactName(), showTo)
+func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
+	err := api.service.accountsDB.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), showTo)
 	if err != nil {
 		return err
 	}

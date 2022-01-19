@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -221,10 +221,10 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 
 func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided() {
 	s.setupTest()
-	err := s.bob.settings.SaveSetting(accounts.ProfilePicturesVisibility.GetReactName(), accounts.ProfilePicturesShowToEveryone)
+	err := s.bob.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	err = s.alice.settings.SaveSetting(accounts.ProfilePicturesVisibility.GetReactName(), accounts.ProfilePicturesShowToEveryone)
+	err = s.alice.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
 	bChat := CreateOneToOneChat(s.generateKeyUID(&s.aliceKey.PublicKey), &s.aliceKey.PublicKey, s.alice.transport)
@@ -265,16 +265,16 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePicture() {
-	profilePicShowSettings := map[string]accounts.ProfilePicturesShowToType{
-		"ShowToContactsOnly": accounts.ProfilePicturesShowToContactsOnly,
-		"ShowToEveryone":     accounts.ProfilePicturesShowToEveryone,
-		"ShowToNone":         accounts.ProfilePicturesShowToNone,
+	profilePicShowSettings := map[string]settings.ProfilePicturesShowToType{
+		"ShowToContactsOnly": settings.ProfilePicturesShowToContactsOnly,
+		"ShowToEveryone":     settings.ProfilePicturesShowToEveryone,
+		"ShowToNone":         settings.ProfilePicturesShowToNone,
 	}
 
-	profilePicViewSettings := map[string]accounts.ProfilePicturesVisibilityType{
-		"ViewFromContactsOnly": accounts.ProfilePicturesVisibilityContactsOnly,
-		"ViewFromEveryone":     accounts.ProfilePicturesVisibilityEveryone,
-		"ViewFromNone":         accounts.ProfilePicturesVisibilityNone,
+	profilePicViewSettings := map[string]settings.ProfilePicturesVisibilityType{
+		"ViewFromContactsOnly": settings.ProfilePicturesVisibilityContactsOnly,
+		"ViewFromEveryone":     settings.ProfilePicturesVisibilityEveryone,
+		"ViewFromNone":         settings.ProfilePicturesVisibilityNone,
 	}
 
 	isContactFor := map[string][]bool{
@@ -312,7 +312,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("Setting up test criteria for Bob")
 
 						s.logger.Debug("Save bob profile-pictures-visibility setting before")
-						err = s.bob.settings.SaveSetting(accounts.ProfilePicturesVisibility.GetReactName(), vs)
+						err = s.bob.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), vs)
 						s.Require().NoError(err)
 						s.logger.Debug("Save bob profile-pictures-visibility setting after")
 
@@ -359,7 +359,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("Setting up test criteria for Alice")
 
 						s.logger.Debug("Save alice profile-pictures-show-to setting before")
-						err = s.alice.settings.SaveSetting(accounts.ProfilePicturesShowTo.GetReactName(), ss)
+						err = s.alice.settings.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), ss)
 						s.Require().NoError(err)
 						s.logger.Debug("Save alice profile-pictures-show-to setting after")
 
@@ -535,29 +535,29 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 	s.setupTest()
 }
 
-func resultExpected(ss accounts.ProfilePicturesShowToType, vs accounts.ProfilePicturesVisibilityType, ac, bc bool) (bool, error) {
+func resultExpected(ss settings.ProfilePicturesShowToType, vs settings.ProfilePicturesVisibilityType, ac, bc bool) (bool, error) {
 	switch ss {
-	case accounts.ProfilePicturesShowToContactsOnly:
+	case settings.ProfilePicturesShowToContactsOnly:
 		if ac {
 			return resultExpectedVS(vs, bc)
 		}
 		return false, nil
-	case accounts.ProfilePicturesShowToEveryone:
+	case settings.ProfilePicturesShowToEveryone:
 		return resultExpectedVS(vs, bc)
-	case accounts.ProfilePicturesShowToNone:
+	case settings.ProfilePicturesShowToNone:
 		return false, nil
 	default:
 		return false, errors.New("unknown ProfilePicturesShowToType")
 	}
 }
 
-func resultExpectedVS(vs accounts.ProfilePicturesVisibilityType, bc bool) (bool, error) {
+func resultExpectedVS(vs settings.ProfilePicturesVisibilityType, bc bool) (bool, error) {
 	switch vs {
-	case accounts.ProfilePicturesVisibilityContactsOnly:
+	case settings.ProfilePicturesVisibilityContactsOnly:
 		return true, nil
-	case accounts.ProfilePicturesVisibilityEveryone:
+	case settings.ProfilePicturesVisibilityEveryone:
 		return true, nil
-	case accounts.ProfilePicturesVisibilityNone:
+	case settings.ProfilePicturesVisibilityNone:
 		// If we are contacts, we save the image regardless
 		return bc, nil
 	default:

@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
@@ -18,7 +19,7 @@ type StatusBackend interface {
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error
 	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig) error
-	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account) error
+	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []accounts.Account) error
 	StopNode() error
 	// RestartNode() error // NOTE: Only used in tests
 
@@ -29,7 +30,7 @@ type StatusBackend interface {
 	OpenAccounts() error
 	GetAccounts() ([]multiaccounts.Account, error)
 	// SaveAccount(account multiaccounts.Account) error
-	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error
+	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error
 	Recover(rpcParams personal.RecoverParams) (types.Address, error)
 	Logout() error
 

@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
@@ -261,7 +262,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var settings accounts.Settings
+	var settings settings.Settings
 	err = json.Unmarshal([]byte(settingsJSON), &settings)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -322,7 +323,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var settings accounts.Settings
+	var settings settings.Settings
 	err = json.Unmarshal([]byte(settingsJSON), &settings)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -733,7 +734,7 @@ func ConvertToKeycardAccount(keyStoreDir, accountData, settingsJSON, password, n
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var settings accounts.Settings
+	var settings settings.Settings
 	err = json.Unmarshal([]byte(settingsJSON), &settings)
 	if err != nil {
 		return makeJSONResponse(err)

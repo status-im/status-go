@@ -1,10 +1,10 @@
-package accounts
+package settings
 
 import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-type SettingsValueHandler func(interface{}) (interface{}, error)
+type ValueHandler func(interface{}) (interface{}, error)
 type SyncSettingProtobufFactory func(string, interface{}, uint64) (*common.RawMessage, error)
 
 type SyncSettingField struct {
@@ -15,7 +15,7 @@ type SyncSettingField struct {
 type SettingField struct {
 	reactFieldName string
 	dBColumnName        string
-	valueHandler        SettingsValueHandler
+	valueHandler        ValueHandler
 	syncProtobufFactory SyncSettingProtobufFactory
 }
 
@@ -27,7 +27,7 @@ func (s SettingField) GetDBName() string {
 	return s.dBColumnName
 }
 
-func (s SettingField) ValueHandler() SettingsValueHandler {
+func (s SettingField) ValueHandler() ValueHandler {
 	return s.valueHandler
 }
 

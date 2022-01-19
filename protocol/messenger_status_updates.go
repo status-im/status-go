@@ -3,12 +3,12 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -45,7 +45,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 
 	status.Clock = uint64(time.Now().Unix())
 
-	err = m.settings.SaveSetting(accounts.CurrentUserStatus.GetReactName(), status)
+	err = m.settings.SaveSetting(settings.CurrentUserStatus.GetReactName(), status)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 
 	status.Clock = uint64(time.Now().Unix())
 
-	err = m.settings.SaveSetting(accounts.CurrentUserStatus.GetReactName(), status)
+	err = m.settings.SaveSetting(settings.CurrentUserStatus.GetReactName(), status)
 	if err != nil {
 		logger.Debug("m.settings.SaveSetting error",
 			zap.Any("current-user-status", status),
@@ -245,7 +245,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 			return nil // older status message, or status does not change ignoring it
 		}
 		newStatus := ToUserStatus(statusMessage)
-		err = m.settings.SaveSetting(accounts.CurrentUserStatus.GetReactName(), newStatus)
+		err = m.settings.SaveSetting(settings.CurrentUserStatus.GetReactName(), newStatus)
 		if err != nil {
 			return err
 		}
