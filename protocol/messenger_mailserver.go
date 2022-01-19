@@ -20,7 +20,7 @@ import (
 
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
-var mailserverRequestTimeout = 45 * time.Second
+var mailserverRequestTimeout = 60 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
@@ -425,10 +425,16 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 
 	for len(cursor) != 0 || storeCursor != nil {
 		logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
-		ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
-		defer cancel()
+		err = func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+			defer cancel()
 
-		cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
+			cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
+			if err != nil {
+				return err
+			}
+			return nil
+		}()
 		if err != nil {
 			return err
 		}
