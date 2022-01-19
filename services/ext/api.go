@@ -906,7 +906,7 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages()
+	return nil, api.service.messenger.RequestAllHistoricMessages()
 }
 
 func (api *PublicAPI) DisconnectActiveMailserver() {

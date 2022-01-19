@@ -192,10 +192,9 @@ func (m *Messenger) syncBackup() error {
 }
 
 func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
-	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
-	if err != nil {
-		return 0, err
-	}
+	// hardcoding 31 days just for testing purposes
+	// defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
+	defaultSyncPeriod := uint32(31 * 86400)
 	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod, nil
 }
 
@@ -212,31 +211,35 @@ func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
-func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
+func (m *Messenger) RequestAllHistoricMessages() error {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !shouldSync {
-		return nil, nil
+		return nil
 	}
 
 	backupFetched, err := m.settings.BackupFetched()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !backupFetched {
 		m.logger.Info("fetching backup")
 		err := m.syncBackup()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		m.logger.Info("backup fetched")
 	}
 
-	return m.syncFilters(m.transport.Filters())
+	go func() {
+		m.syncFilters(m.transport.Filters())
+	}()
+
+	return nil
 }
 
 func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse, error) {
@@ -369,6 +372,8 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 			return nil, err
 		}
 	}
+
+	// TODO: should these messages be returned as signals instead?
 	return response, nil
 }
 
@@ -409,33 +414,53 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
-	var topicStrings []string
-	for _, t := range batch.Topics {
-		topicStrings = append(topicStrings, t.String())
-	}
-	logger := m.logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
-	logger.Info("syncing topic")
-	ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
-	defer cancel()
+	fmt.Println("======================================================")
+	fmt.Println("Processing batch, ", batch.From, batch.To, batch.Topics)
 
-	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, nil, nil, batch.Topics, true)
-	if err != nil {
-		return err
-	}
+	to := batch.To
 
-	for len(cursor) != 0 || storeCursor != nil {
-		logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
+	for {
+		from := to - 86400
+		if from < batch.From {
+			from = batch.From
+		}
+
+		fmt.Println("- Requesting from: ", from, " to: ", to)
+
+		var topicStrings []string
+		for _, t := range batch.Topics {
+			topicStrings = append(topicStrings, t.String())
+		}
+		logger := m.logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(from), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(to), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(from)), zap.Int64("to", int64(to)))
+		logger.Info("syncing topic")
 		ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
 		defer cancel()
 
-		cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
+		cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, from, to, nil, nil, batch.Topics, true)
 		if err != nil {
 			return err
 		}
+
+		for len(cursor) != 0 || storeCursor != nil {
+			logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
+			ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+			defer cancel()
+
+			cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, m.mailserver, from, to, cursor, storeCursor, batch.Topics, true)
+			if err != nil {
+				return err
+			}
+		}
+		logger.Info("waiting until message processed")
+		m.waitUntilP2PMessagesProcessed()
+		logger.Info("synced topic")
+
+		to -= 86400
+		if to < batch.From {
+			break // We're done!
+		}
 	}
-	logger.Info("waiting until message processed")
-	m.waitUntilP2PMessagesProcessed()
-	logger.Info("synced topic")
+	fmt.Println("Batch processed!")
 	return nil
 }
 
