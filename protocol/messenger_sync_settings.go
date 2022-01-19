@@ -20,13 +20,13 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.SyncQueue:
-				if s.Field.SyncProtobufFactory != nil {
+				if s.Field.SyncProtobufFactory() != nil {
 					logger.Debug("setting for sync received")
 
 					clock, chat := m.getLastClockWithRelatedChat()
-					rm, err := s.Field.SyncProtobufFactory(chat.ID, s.Value, clock)
+					rm, err := s.Field.SyncProtobufFactory()(chat.ID, s.Value, clock)
 					if err != nil {
-						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("syncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
 						break
 					}
 

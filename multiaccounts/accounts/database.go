@@ -283,7 +283,7 @@ INSERT INTO settings (
 
 func (db *Database) getSettingFieldFromReactName(reactName string) (SettingField, error) {
 	for _, s := range SettingFieldRegister {
-		if s.ReactFieldName == reactName {
+		if s.GetReactName() == reactName {
 			return s, nil
 		}
 	}
@@ -292,21 +292,21 @@ func (db *Database) getSettingFieldFromReactName(reactName string) (SettingField
 
 func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
-	query = fmt.Sprintf(query, setting.DBColumnName)
+	query = fmt.Sprintf(query, setting.GetDBName())
 	update, err := db.db.Prepare(query)
 	if err != nil {
 		return err
 	}
 
-	if setting.ValueHandler != nil {
-		value, err = setting.ValueHandler(value)
+	if setting.ValueHandler() != nil {
+		value, err = setting.ValueHandler()(value)
 		if err != nil {
 			return err
 		}
 	}
 
 	// TODO(samyoul) this is ugly as hell need a more elegant solution
-	if NodeConfig.ReactFieldName == setting.ReactFieldName {
+	if NodeConfig.GetReactName() == setting.GetReactName() {
 		if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		return err
 	}
 
-	if sf.SyncProtobufFactory != nil {
+	if sf.SyncProtobufFactory() != nil {
 		db.SyncQueue <- SyncSettingField{
 			Field: sf,
 			Value: value,
@@ -341,7 +341,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 
 // SaveSyncSetting stores setting data from a sync protobuf source
 func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock uint64) error {
-	ls, err := db.GetSettingLastSynced(setting.DBColumnName)
+	ls, err := db.GetSettingLastSynced(setting.GetDBName())
 	if err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 		return err
 	}
 
-	return db.SetSettingLastSynced(setting.DBColumnName, clock)
+	return db.SetSettingLastSynced(setting.GetDBName(), clock)
 }
 
 func (db *Database) GetSettings() (Settings, error) {

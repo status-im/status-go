@@ -83,7 +83,7 @@ func TestSaveSetting(t *testing.T) {
 	defer stop()
 
 	require.NoError(t, db.CreateSettings(settings, config))
-	require.NoError(t, db.SaveSetting("currency", "usd"))
+	require.NoError(t, db.SaveSetting(Currency.GetReactName(), "usd"))
 
 	_, err := db.GetSettings()
 	require.NoError(t, err)
@@ -260,34 +260,34 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 	tm := uint64(0)
 
 	// Default value should be `0`
-	ct, err := db.GetSettingLastSynced(Currency.DBColumnName)
+	ct, err := db.GetSettingLastSynced(Currency.GetDBName())
 	require.NoError(t, err)
 	require.Equal(t, tm, ct)
 
 	// Test setting clock value to something greater than `0`
 	tm += 123
-	err = db.SetSettingLastSynced(Currency.DBColumnName, tm)
+	err = db.SetSettingLastSynced(Currency.GetDBName(), tm)
 	require.NoError(t, err)
 
-	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	ct, err = db.GetSettingLastSynced(Currency.GetDBName())
 	require.NoError(t, err)
 	require.Equal(t, tm, ct)
 
 	// Test setting clock to greater than `123`
 	now := uint64(321)
-	err = db.SetSettingLastSynced(Currency.DBColumnName, now)
+	err = db.SetSettingLastSynced(Currency.GetDBName(), now)
 	require.NoError(t, err)
 
-	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	ct, err = db.GetSettingLastSynced(Currency.GetDBName())
 	require.NoError(t, err)
 	require.Equal(t, now, ct)
 
 	// Test setting clock to something less than `321`
 	earlier := uint64(231)
-	err = db.SetSettingLastSynced(Currency.DBColumnName, earlier)
+	err = db.SetSettingLastSynced(Currency.GetDBName(), earlier)
 	require.NoError(t, err)
 
-	ct, err = db.GetSettingLastSynced(Currency.DBColumnName)
+	ct, err = db.GetSettingLastSynced(Currency.GetDBName())
 	require.NoError(t, err)
 	require.Equal(t, now, ct)
 }

@@ -705,7 +705,7 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 // PushNotifications server endpoints
 
 func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", true)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsServerEnabled.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -714,7 +714,7 @@ func (api *PublicAPI) StartPushNotificationsServer() error {
 }
 
 func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", false)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsServerEnabled.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -733,7 +733,7 @@ func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error
 }
 
 func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("send-push-notifications?", false)
+	err := api.service.accountsDB.SaveSetting(accounts.SendPushNotifications.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -742,7 +742,7 @@ func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("send-push-notifications?", true)
+	err := api.service.accountsDB.SaveSetting(accounts.SendPushNotifications.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -750,7 +750,7 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", true)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsFromContactsOnly.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -758,7 +758,7 @@ func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Contex
 }
 
 func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", false)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsFromContactsOnly.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -766,7 +766,7 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 }
 
 func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", true)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsBlockMentions.GetReactName(), true)
 	if err != nil {
 		return err
 	}
@@ -774,7 +774,7 @@ func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) 
 }
 
 func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", false)
+	err := api.service.accountsDB.SaveSetting(accounts.PushNotificationsBlockMentions.GetReactName(), false)
 	if err != nil {
 		return err
 	}
@@ -953,7 +953,7 @@ func (api *PublicAPI) Peers() map[string][]string {
 }
 
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo accounts.ProfilePicturesShowToType) error {
-	err := api.service.accountsDB.SaveSetting("profile-pictures-show-to", showTo)
+	err := api.service.accountsDB.SaveSetting(accounts.ProfilePicturesShowTo.GetReactName(), showTo)
 	if err != nil {
 		return err
 	}

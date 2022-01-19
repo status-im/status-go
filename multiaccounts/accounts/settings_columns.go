@@ -13,78 +13,94 @@ type SyncSettingField struct {
 }
 
 type SettingField struct {
-	ReactFieldName      string
-	DBColumnName        string
-	ValueHandler        SettingsValueHandler
-	SyncProtobufFactory SyncSettingProtobufFactory
+	reactFieldName string
+	dBColumnName        string
+	valueHandler        SettingsValueHandler
+	syncProtobufFactory SyncSettingProtobufFactory
+}
+
+func (s SettingField) GetReactName() string {
+	return s.reactFieldName
+}
+
+func (s SettingField) GetDBName() string {
+	return s.dBColumnName
+}
+
+func (s SettingField) ValueHandler() SettingsValueHandler {
+	return s.valueHandler
+}
+
+func (s SettingField) SyncProtobufFactory() SyncSettingProtobufFactory {
+	return s.syncProtobufFactory
 }
 
 var (
 	AnonMetricsShouldSend = SettingField{
-		ReactFieldName: "anon-metrics/should-send?",
-		DBColumnName:   "anon_metrics_should_send",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "anon-metrics/should-send?",
+		dBColumnName:   "anon_metrics_should_send",
+		valueHandler:   BoolHandler,
 	}
 	Appearance = SettingField{
-		ReactFieldName: "appearance",
-		DBColumnName:   "appearance",
+		reactFieldName: "appearance",
+		dBColumnName:   "appearance",
 	}
 	AutoMessageEnabled = SettingField{
-		ReactFieldName: "auto-message-enabled?",
-		DBColumnName: "auto_message_enabled",
-		ValueHandler: BoolHandler,
+		reactFieldName: "auto-message-enabled?",
+		dBColumnName:   "auto_message_enabled",
+		valueHandler:   BoolHandler,
 	}
 	BackupEnabled = SettingField{
-		ReactFieldName: "backup-enabled?",
-		DBColumnName:   "backup_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "backup-enabled?",
+		dBColumnName:   "backup_enabled",
+		valueHandler:   BoolHandler,
 	}
 	ChaosMode = SettingField{
-		ReactFieldName: "chaos-mode?",
-		DBColumnName:   "chaos_mode",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "chaos-mode?",
+		dBColumnName:   "chaos_mode",
+		valueHandler:   BoolHandler,
 	}
 	Currency = SettingField{
-		ReactFieldName:      "currency",
-		DBColumnName:        "currency",
-		SyncProtobufFactory: currencyProtobufFactory,
+		reactFieldName:      "currency",
+		dBColumnName:        "currency",
+		syncProtobufFactory: currencyProtobufFactory,
 	}
 	CurrentUserStatus = SettingField{
-		ReactFieldName: "current-user-status",
-		DBColumnName:   "current_user_status",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "current-user-status",
+		dBColumnName:   "current_user_status",
+		valueHandler:   JSONBlobHandler,
 	}
 	CustomBootNodes = SettingField{
-		ReactFieldName: "custom-bootnodes",
-		DBColumnName:   "custom_bootnodes",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "custom-bootnodes",
+		dBColumnName:   "custom_bootnodes",
+		valueHandler:   JSONBlobHandler,
 	}
 	CustomBootNodesEnabled = SettingField{
-		ReactFieldName: "custom-bootnodes-enabled?",
-		DBColumnName:   "custom_bootnodes_enabled",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "custom-bootnodes-enabled?",
+		dBColumnName:   "custom_bootnodes_enabled",
+		valueHandler:   JSONBlobHandler,
 	}
 	DappsAddress = SettingField{
-		ReactFieldName: "dapps-address",
-		DBColumnName:   "dapps_address",
-		ValueHandler:   AddressHandler,
+		reactFieldName: "dapps-address",
+		dBColumnName:   "dapps_address",
+		valueHandler:   AddressHandler,
 	}
 	DefaultSyncPeriod = SettingField{
-		ReactFieldName: "default-sync-period",
-		DBColumnName:   "default_sync_period",
+		reactFieldName: "default-sync-period",
+		dBColumnName:   "default_sync_period",
 	}
 	DisplayName = SettingField{
 		ReactFieldName: "display-name",
 		DBColumnName:   "display_name",
 	}
 	EIP1581Address = SettingField{
-		ReactFieldName: "eip1581-address",
-		DBColumnName:   "eip1581_address",
-		ValueHandler:   AddressHandler,
+		reactFieldName: "eip1581-address",
+		dBColumnName:   "eip1581_address",
+		valueHandler:   AddressHandler,
 	}
 	Fleet = SettingField{
-		ReactFieldName: "fleet",
-		DBColumnName:   "fleet",
+		reactFieldName: "fleet",
+		dBColumnName:   "fleet",
 	}
 	GifAPIKey = SettingField{
 		ReactFieldName: "gifs/api-key",
@@ -93,221 +109,221 @@ var (
 		ShouldSync:     true,
 	}
 	GifRecents = SettingField{
-		ReactFieldName:      "gifs/recent-gifs",
-		DBColumnName:        "gif_recents",
-		ValueHandler:        JSONBlobHandler,
-		SyncProtobufFactory: gifRecentsProtobufFactory,
+		reactFieldName:      "gifs/recent-gifs",
+		dBColumnName:        "gif_recents",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: gifRecentsProtobufFactory,
 	}
 	GifFavourites = SettingField{
-		ReactFieldName:      "gifs/favorite-gifs",
-		DBColumnName:        "gif_favorites",
-		ValueHandler:        JSONBlobHandler,
-		SyncProtobufFactory: gifFavouritesProtobufFactory,
+		reactFieldName:      "gifs/favorite-gifs",
+		dBColumnName:        "gif_favorites",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: gifFavouritesProtobufFactory,
 	}
 	HideHomeTooltip = SettingField{
-		ReactFieldName: "hide-home-tooltip?",
-		DBColumnName:   "hide_home_tooltip",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "hide-home-tooltip?",
+		dBColumnName:   "hide_home_tooltip",
+		valueHandler:   BoolHandler,
 	}
 	KeycardInstanceUID = SettingField{
-		ReactFieldName: "keycard-instance_uid",
-		DBColumnName:   "keycard_instance_uid",
+		reactFieldName: "keycard-instance_uid",
+		dBColumnName:   "keycard_instance_uid",
 	}
 	KeycardPairedOn = SettingField{
-		ReactFieldName: "keycard-paired_on",
-		DBColumnName:   "keycard_paired_on",
+		reactFieldName: "keycard-paired_on",
+		dBColumnName:   "keycard_paired_on",
 	}
 	KeycardPairing = SettingField{
-		ReactFieldName: "keycard-pairing",
-		DBColumnName:   "keycard_pairing",
+		reactFieldName: "keycard-pairing",
+		dBColumnName:   "keycard_pairing",
 	}
 	LastUpdated = SettingField{
-		ReactFieldName: "last-updated",
-		DBColumnName:   "last_updated",
+		reactFieldName: "last-updated",
+		dBColumnName:   "last_updated",
 	}
 	LatestDerivedPath = SettingField{
-		ReactFieldName: "latest-derived-path",
-		DBColumnName:   "latest_derived_path",
+		reactFieldName: "latest-derived-path",
+		dBColumnName:   "latest_derived_path",
 	}
 	LinkPreviewRequestEnabled = SettingField{
-		ReactFieldName: "link-preview-request-enabled",
-		DBColumnName:   "link_preview_request_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "link-preview-request-enabled",
+		dBColumnName:   "link_preview_request_enabled",
+		valueHandler:   BoolHandler,
 	}
 	LinkPreviewsEnabledSites = SettingField{
-		ReactFieldName: "link-previews-enabled-sites",
-		DBColumnName:   "link_previews_enabled_sites",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "link-previews-enabled-sites",
+		dBColumnName:   "link_previews_enabled_sites",
+		valueHandler:   JSONBlobHandler,
 	}
 	LogLevel = SettingField{
-		ReactFieldName: "log-level",
-		DBColumnName:   "log_level",
+		reactFieldName: "log-level",
+		dBColumnName:   "log_level",
 	}
 	MessagesFromContactsOnly = SettingField{
-		ReactFieldName:      "messages-from-contacts-only",
-		DBColumnName:        "messages_from_contacts_only",
-		ValueHandler:        BoolHandler,
-		SyncProtobufFactory: messagesFromContactsOnlyProtobufFactory,
+		reactFieldName:      "messages-from-contacts-only",
+		dBColumnName:        "messages_from_contacts_only",
+		valueHandler:        BoolHandler,
+		syncProtobufFactory: messagesFromContactsOnlyProtobufFactory,
 	}
 	Mnemonic = SettingField{
-		ReactFieldName: "mnemonic",
-		DBColumnName:   "mnemonic",
+		reactFieldName: "mnemonic",
+		dBColumnName:   "mnemonic",
 	}
 	Name = SettingField{
-		ReactFieldName: "name",
-		DBColumnName:   "name",
+		reactFieldName: "name",
+		dBColumnName:   "name",
 	}
 	NetworksCurrentNetwork = SettingField{
-		ReactFieldName: "networks/current-network",
-		DBColumnName:   "current_network",
+		reactFieldName: "networks/current-network",
+		dBColumnName:   "current_network",
 	}
 	NetworksNetworks = SettingField{
-		ReactFieldName: "networks/networks",
-		DBColumnName:   "networks",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "networks/networks",
+		dBColumnName:   "networks",
+		valueHandler:   JSONBlobHandler,
 	}
 	NodeConfig = SettingField{
-		ReactFieldName: "node-config",
-		DBColumnName:   "node_config",
-		ValueHandler:   NodeConfigHandler,
+		reactFieldName: "node-config",
+		dBColumnName:   "node_config",
+		valueHandler:   NodeConfigHandler,
 	}
 	NotificationsEnabled = SettingField{
-		ReactFieldName: "notifications-enabled?",
-		DBColumnName:   "notifications_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "notifications-enabled?",
+		dBColumnName:   "notifications_enabled",
+		valueHandler:   BoolHandler,
 	}
 	OpenseaEnabled = SettingField{
-		ReactFieldName: "opensea-enabled?",
-		DBColumnName:   "opensea_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "opensea-enabled?",
+		dBColumnName:   "opensea_enabled",
+		valueHandler:   BoolHandler,
 	}
 	PhotoPath = SettingField{
-		ReactFieldName: "photo-path",
-		DBColumnName:   "photo_path",
+		reactFieldName: "photo-path",
+		dBColumnName:   "photo_path",
 	}
 	PinnedMailservers = SettingField{
-		ReactFieldName: "pinned-mailservers",
-		DBColumnName:   "pinned_mailservers",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "pinned-mailservers",
+		dBColumnName:   "pinned_mailservers",
+		valueHandler:   JSONBlobHandler,
 	}
 	PreferredName = SettingField{
-		ReactFieldName:      "preferred-name",
-		DBColumnName:        "preferred_name",
-		SyncProtobufFactory: preferredNameProtobufFactory,
+		reactFieldName:      "preferred-name",
+		dBColumnName:        "preferred_name",
+		syncProtobufFactory: preferredNameProtobufFactory,
 	}
 	PreviewPrivacy = SettingField{
-		ReactFieldName:      "preview-privacy?",
-		DBColumnName:        "preview_privacy",
-		ValueHandler:        BoolHandler,
-		SyncProtobufFactory: previewPrivacyProtobufFactory,
+		reactFieldName:      "preview-privacy?",
+		dBColumnName:        "preview_privacy",
+		valueHandler:        BoolHandler,
+		syncProtobufFactory: previewPrivacyProtobufFactory,
 	}
 	ProfilePicturesShowTo = SettingField{
-		ReactFieldName:      "profile-pictures-show-to",
-		DBColumnName:        "profile_pictures_show_to",
-		SyncProtobufFactory: profilePicturesShowToProtobufFactory,
+		reactFieldName:      "profile-pictures-show-to",
+		dBColumnName:        "profile_pictures_show_to",
+		syncProtobufFactory: profilePicturesShowToProtobufFactory,
 	}
 	ProfilePicturesVisibility = SettingField{
-		ReactFieldName:      "profile-pictures-visibility",
-		DBColumnName:        "profile_pictures_visibility",
-		SyncProtobufFactory: profilePicturesVisibilityProtobufFactory,
+		reactFieldName:      "profile-pictures-visibility",
+		dBColumnName:        "profile_pictures_visibility",
+		syncProtobufFactory: profilePicturesVisibilityProtobufFactory,
 	}
 	PublicKey = SettingField{
-		ReactFieldName: "public-key",
-		DBColumnName:   "public_key",
+		reactFieldName: "public-key",
+		dBColumnName:   "public_key",
 	}
 	PushNotificationsBlockMentions = SettingField{
-		ReactFieldName: "push-notifications-block-mentions?",
-		DBColumnName:   "push_notifications_block_mentions",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "push-notifications-block-mentions?",
+		dBColumnName:   "push_notifications_block_mentions",
+		valueHandler:   BoolHandler,
 	}
 	PushNotificationsFromContactsOnly = SettingField{
-		ReactFieldName: "push-notifications-from-contacts-only?",
-		DBColumnName:   "push_notifications_from_contacts_only",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "push-notifications-from-contacts-only?",
+		dBColumnName:   "push_notifications_from_contacts_only",
+		valueHandler:   BoolHandler,
 	}
 	PushNotificationsServerEnabled = SettingField{
-		ReactFieldName: "push-notifications-server-enabled?",
-		DBColumnName:   "push_notifications_server_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "push-notifications-server-enabled?",
+		dBColumnName:   "push_notifications_server_enabled",
+		valueHandler:   BoolHandler,
 	}
 	RememberSyncingChoice = SettingField{
-		ReactFieldName: "remember-syncing-choice?",
-		DBColumnName:   "remember_syncing_choice",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "remember-syncing-choice?",
+		dBColumnName:   "remember_syncing_choice",
+		valueHandler:   BoolHandler,
 	}
 	RemotePushNotificationsEnabled = SettingField{
-		ReactFieldName: "remote-push-notifications-enabled?",
-		DBColumnName:   "remote_push_notifications_enabled",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "remote-push-notifications-enabled?",
+		dBColumnName:   "remote_push_notifications_enabled",
+		valueHandler:   BoolHandler,
 	}
 	SendPushNotifications = SettingField{
-		ReactFieldName: "send-push-notifications?",
-		DBColumnName:   "send_push_notifications",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "send-push-notifications?",
+		dBColumnName:   "send_push_notifications",
+		valueHandler:   BoolHandler,
 	}
 	SendStatusUpdates = SettingField{
-		ReactFieldName:      "send-status-updates?",
-		DBColumnName:        "send_status_updates",
-		ValueHandler:        BoolHandler,
-		SyncProtobufFactory: sendStatusUpdatesProtobufFactory,
+		reactFieldName:      "send-status-updates?",
+		dBColumnName:        "send_status_updates",
+		valueHandler:        BoolHandler,
+		syncProtobufFactory: sendStatusUpdatesProtobufFactory,
 	}
 	StickersPacksInstalled = SettingField{
-		ReactFieldName:      "stickers/packs-installed",
-		DBColumnName:        "stickers_packs_installed",
-		ValueHandler:        JSONBlobHandler,
-		SyncProtobufFactory: stickersPacksInstalledProtobufFactory,
+		reactFieldName:      "stickers/packs-installed",
+		dBColumnName:        "stickers_packs_installed",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: stickersPacksInstalledProtobufFactory,
 	}
 	StickersPacksPending = SettingField{
-		ReactFieldName:      "stickers/packs-pending",
-		DBColumnName:        "stickers_packs_pending",
-		ValueHandler:        JSONBlobHandler,
-		SyncProtobufFactory: stickersPacksPendingProtobufFactory,
+		reactFieldName:      "stickers/packs-pending",
+		dBColumnName:        "stickers_packs_pending",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: stickersPacksPendingProtobufFactory,
 	}
 	StickersRecentStickers = SettingField{
-		ReactFieldName:      "stickers/recent-stickers",
-		DBColumnName:        "stickers_recent_stickers",
-		ValueHandler:        JSONBlobHandler,
-		SyncProtobufFactory: stickersRecentStickersProtobufFactory,
+		reactFieldName:      "stickers/recent-stickers",
+		dBColumnName:        "stickers_recent_stickers",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: stickersRecentStickersProtobufFactory,
 	}
 	SyncingOnMobileNetwork = SettingField{
-		ReactFieldName: "syncing-on-mobile-network?",
-		DBColumnName:   "syncing_on_mobile_network",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "syncing-on-mobile-network?",
+		dBColumnName:   "syncing_on_mobile_network",
+		valueHandler:   BoolHandler,
 	}
 	TelemetryServerURL = SettingField{
-		ReactFieldName:      "telemetry-server-url",
-		DBColumnName:        "telemetry_server_url",
-		SyncProtobufFactory: telemetryServerURLProtobufFactory,
+		reactFieldName:      "telemetry-server-url",
+		dBColumnName:        "telemetry_server_url",
+		syncProtobufFactory: telemetryServerURLProtobufFactory,
 	}
 	UseMailservers = SettingField{
-		ReactFieldName: "use-mailservers?",
-		DBColumnName:   "use_mailservers",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "use-mailservers?",
+		dBColumnName:   "use_mailservers",
+		valueHandler:   BoolHandler,
 	}
 	Usernames = SettingField{
-		ReactFieldName: "usernames",
-		DBColumnName:   "usernames",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "usernames",
+		dBColumnName:   "usernames",
+		valueHandler:   JSONBlobHandler,
 	}
 	WakuBloomFilterMode = SettingField{
-		ReactFieldName: "waku-bloom-filter-mode",
-		DBColumnName:   "waku_bloom_filter_mode",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "waku-bloom-filter-mode",
+		dBColumnName:   "waku_bloom_filter_mode",
+		valueHandler:   BoolHandler,
 	}
 	WalletSetUpPassed = SettingField{
-		ReactFieldName: "wallet-set-up-passed?",
-		DBColumnName:   "wallet_set_up_passed",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "wallet-set-up-passed?",
+		dBColumnName:   "wallet_set_up_passed",
+		valueHandler:   BoolHandler,
 	}
 	WalletVisibleTokens = SettingField{
-		ReactFieldName: "wallet/visible-tokens",
-		DBColumnName:   "wallet_visible_tokens",
-		ValueHandler:   JSONBlobHandler,
+		reactFieldName: "wallet/visible-tokens",
+		dBColumnName:   "wallet_visible_tokens",
+		valueHandler:   JSONBlobHandler,
 	}
 	WebviewAllowPermissionRequests = SettingField{
-		ReactFieldName: "webview-allow-permission-requests?",
-		DBColumnName:   "webview_allow_permission_requests",
-		ValueHandler:   BoolHandler,
+		reactFieldName: "webview-allow-permission-requests?",
+		dBColumnName:   "webview_allow_permission_requests",
+		valueHandler:   BoolHandler,
 	}
 
 	SettingFieldRegister = []SettingField{

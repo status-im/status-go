@@ -559,22 +559,22 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 	if err != nil {
 		return err
 	}
-	err = accountDB.SaveSetting("keycard-instance_uid", settings.KeycardInstanceUID)
+	err = accountDB.SaveSetting(accounts.KeycardInstanceUID.GetReactName(), settings.KeycardInstanceUID)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("keycard-paired_on", settings.KeycardPAiredOn)
+	err = accountDB.SaveSetting(accounts.KeycardPairedOn.GetReactName(), settings.KeycardPAiredOn)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("keycard-pairing", settings.KeycardPairing)
+	err = accountDB.SaveSetting(accounts.KeycardPairing.GetReactName(), settings.KeycardPairing)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("mnemonic", nil)
+	err = accountDB.SaveSetting(accounts.Mnemonic.GetReactName(), nil)
 	if err != nil {
 		return err
 	}
