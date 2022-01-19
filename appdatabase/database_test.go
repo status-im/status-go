@@ -9,6 +9,7 @@ import (
 func Test_GetDBFilename(t *testing.T) {
 	// Test with a temp file instance
 	db, stop, err := SetupTestSQLDB("test")
+	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, stop())
 	}()
@@ -28,4 +29,3 @@ func Test_GetDBFilename(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "", fn)
 }
-

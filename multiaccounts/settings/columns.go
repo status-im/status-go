@@ -13,7 +13,7 @@ type SyncSettingField struct {
 }
 
 type SettingField struct {
-	reactFieldName string
+	reactFieldName      string
 	dBColumnName        string
 	valueHandler        ValueHandler
 	syncProtobufFactory SyncSettingProtobufFactory

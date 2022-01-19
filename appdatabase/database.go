@@ -77,6 +77,9 @@ func ChangeDatabasePassword(path, password, newPassword string) error {
 func GetDBFilename(db *sql.DB) (string, error) {
 	var i, category, filename string
 	rows, err := db.Query("PRAGMA database_list;")
+	if err != nil {
+		return "", err
+	}
 
 	defer rows.Close()
 	for rows.Next() {

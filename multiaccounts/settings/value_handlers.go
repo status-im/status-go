@@ -32,7 +32,7 @@ func AddressHandler(value interface{}) (interface{}, error) {
 	return value, nil
 }
 
-func NodeConfigHandler(value interface{}) (interface{}, error){
+func NodeConfigHandler(value interface{}) (interface{}, error) {
 	jsonString, err := json.Marshal(value)
 	if err != nil {
 		return nil, err

@@ -7,7 +7,7 @@ import (
 )
 
 // SetupTestSQLDB creates a temporary sqlite database file, initialises and then returns with a teardown func
-func SetupTestSQLDB(prefix string) (*sql.DB, func()error, error) {
+func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
 	tmpfile, err := ioutil.TempFile("", prefix)
 	if err != nil {
 		return nil, nil, err
@@ -17,7 +17,7 @@ func SetupTestSQLDB(prefix string) (*sql.DB, func()error, error) {
 		return nil, nil, err
 	}
 
-	return db, func()error {
+	return db, func() error {
 		err := db.Close()
 		if err != nil {
 			return err

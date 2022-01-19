@@ -8,11 +8,14 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+// handleSyncSettings Handler for out inbound protobuf.SyncSettings
+// TODO
 func (m *Messenger) handleSyncSettings(messageState *ReceivedMessageState, settings protobuf.SyncSettings) error {
 
 	return nil
 }
 
+// startSyncSettingsLoop watches the m.settings.SyncQueue and sends a sync message in response to a settings update
 func (m *Messenger) startSyncSettingsLoop() {
 	go func() {
 		logger := m.logger.Named("SyncSettingsLoop")

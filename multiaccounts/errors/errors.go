@@ -11,6 +11,6 @@ var (
 	ErrChatNotUnique = errors.New("another account is set to be default chat. disable it before using new")
 	// ErrInvalidConfig returned if config isn't allowed
 	ErrInvalidConfig = errors.New("configuration value not allowed")
-	// ErrNewClockOlderThanCurrent
+	// ErrNewClockOlderThanCurrent returned if a given clock is older than the current clock
 	ErrNewClockOlderThanCurrent = errors.New("the new clock value is older than the current clock value")
 )

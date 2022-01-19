@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	networks = json.RawMessage("{}")
+	networks     = json.RawMessage("{}")
 	testSettings = settings.Settings{
 		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
 		CurrentNetwork:    "mainnet_rpc",

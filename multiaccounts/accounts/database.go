@@ -54,7 +54,7 @@ func NewDB(db *sql.DB) (*Database, error) {
 		return nil, err
 	}
 
-	return &Database{ sDB, db}, nil
+	return &Database{sDB, db}, nil
 }
 
 // DB Gets db sql.DB
