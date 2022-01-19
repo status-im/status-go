@@ -90,8 +90,8 @@ var (
 		dBColumnName:   "default_sync_period",
 	}
 	DisplayName = SettingField{
-		ReactFieldName: "display-name",
-		DBColumnName:   "display_name",
+		reactFieldName: "display-name",
+		dBColumnName:   "display_name",
 	}
 	EIP1581Address = SettingField{
 		reactFieldName: "eip1581-address",
@@ -103,10 +103,9 @@ var (
 		dBColumnName:   "fleet",
 	}
 	GifAPIKey = SettingField{
-		ReactFieldName: "gifs/api-key",
-		DBColumnName:   "gif_api_key",
-		ValueHandler:   BoolHandler,
-		ShouldSync:     true,
+		reactFieldName: "gifs/api-key",
+		dBColumnName:   "gif_api_key",
+		valueHandler:   BoolHandler,
 	}
 	GifRecents = SettingField{
 		reactFieldName:      "gifs/recent-gifs",
