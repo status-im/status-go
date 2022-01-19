@@ -215,16 +215,11 @@ func (m *Messenger) findStoreNode() error {
 	return m.connectToStoreNode(parseMultiaddresses([]string{availableMailservers[r.Int64()].Address})[0])
 }
 
-func (m *Messenger) findNewMailserverV1() error {
-	// TODO: remove this function once WakuV1 is deprecated
-
-	allMailservers := parseNodes(m.config.clusterConfig.TrustedMailServers)
-
-	// Append user mailservers
+func (m *Messenger) getFleet() (string, error) {
 	var fleet string
 	dbFleet, err := m.settings.GetFleet()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if dbFleet != "" {
 		fleet = dbFleet
@@ -232,6 +227,19 @@ func (m *Messenger) findNewMailserverV1() error {
 		fleet = m.config.clusterConfig.Fleet
 	} else {
 		fleet = params.FleetProd
+	}
+	return fleet, nil
+}
+
+func (m *Messenger) findNewMailserverV1() error {
+	// TODO: remove this function once WakuV1 is deprecated
+
+	allMailservers := parseNodes(m.config.clusterConfig.TrustedMailServers)
+
+	// Append user mailservers
+	fleet, err := m.getFleet()
+	if err != nil {
+		return err
 	}
 
 	customMailservers, err := m.mailservers.Mailservers()
@@ -425,6 +433,12 @@ func (m *Messenger) connectToStoreNode(node multiaddr.Multiaddr) error {
 	return nil
 }
 
+func (m *Messenger) getActiveMailserver() *enode.Node {
+	m.mailserverCycle.RLock()
+	defer m.mailserverCycle.RUnlock()
+	return m.mailserverCycle.activeMailserver
+}
+
 func (m *Messenger) isActiveMailserverAvailable() bool {
 	m.mailserverCycle.RLock()
 	defer m.mailserverCycle.RUnlock()
@@ -564,23 +578,61 @@ func (m *Messenger) updateWakuV1PeerStatus() {
 	}
 }
 
+func (m *Messenger) getPinnedMailserver() (string, error) {
+	// TODO: Pinned mailservers are ony available in V1 for now
+	if m.transport.WakuVersion() != 1 {
+		return "", nil
+	}
+
+	fleet, err := m.getFleet()
+	if err != nil {
+		return "", err
+	}
+
+	pinnedMailservers, err := m.settings.GetPinnedMailservers()
+	if err != nil {
+		return "", err
+	}
+
+	pinnedMailserver, ok := pinnedMailservers[fleet]
+	if !ok {
+		return "", nil
+	}
+
+	return pinnedMailserver, nil
+}
+
 func (m *Messenger) checkMailserverConnection() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		m.logger.Info("Verifying mailserver connection state...")
-		//	m.settings.GetPinnedMailserver
-		//if pinnedMailserver != "" && self.activeMailserver != pinnedMailserver {
-		// connect to current mailserver from the settings
-		// self.mailservers = pinnedMailserver
-		// self.connect(pinnedMailserver)
-		//} else {
-		// or setup a random mailserver:
-		if !m.isActiveMailserverAvailable() {
-			m.cycleMailservers()
+
+		pinnedMailserver, err := m.getPinnedMailserver()
+		if err != nil {
+			m.logger.Error("Could not obtain the pinned mailserver", zap.Error(err))
+			continue
 		}
-		// }
+
+		if pinnedMailserver != "" {
+			pinnedNode := parseNodes([]string{pinnedMailserver})[0]
+
+			activeMailserver := m.getActiveMailserver()
+			if activeMailserver == nil || activeMailserver.String() != pinnedMailserver {
+				m.logger.Info("New pinned mailserver", zap.Any("pinnedMailserver", pinnedMailserver))
+				err = m.connectToMailserver(pinnedNode)
+				if err != nil {
+					m.logger.Error("Could not connect to pinned mailserver", zap.Error(err))
+					continue
+				}
+			}
+		} else {
+			// or setup a random mailserver:
+			if !m.isActiveMailserverAvailable() {
+				m.cycleMailservers()
+			}
+		}
 
 		select {
 		case <-m.quit:
