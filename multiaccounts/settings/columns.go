@@ -1,11 +1,13 @@
 package settings
 
 import (
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/golang/protobuf/proto"
+
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactory func(string, interface{}, uint64) (*common.RawMessage, error)
+type SyncSettingProtobufFactory func(interface{}, uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type)
 
 type SyncSettingField struct {
 	Field SettingField
@@ -15,8 +17,10 @@ type SyncSettingField struct {
 type SettingField struct {
 	reactFieldName      string
 	dBColumnName        string
-	valueHandler        ValueHandler
+	valueHandler        ValueHandler // TODO this is only for data coming from API, not from protobuf
 	syncProtobufFactory SyncSettingProtobufFactory
+	// TODO add value handler: from protobuf to db
+	// TODO add value handler: from Settings field to protobuf
 }
 
 func (s SettingField) GetReactName() string {
@@ -103,21 +107,21 @@ var (
 		dBColumnName:   "fleet",
 	}
 	GifAPIKey = SettingField{
-		reactFieldName: "gifs/api-key",
-		dBColumnName:   "gif_api_key",
-		valueHandler:   BoolHandler,
-	}
-	GifRecents = SettingField{
-		reactFieldName:      "gifs/recent-gifs",
-		dBColumnName:        "gif_recents",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: gifRecentsProtobufFactory,
+		reactFieldName:      "gifs/api-key",
+		dBColumnName:        "gif_api_key",
+		syncProtobufFactory: gifAPIKeyProtobufFactory,
 	}
 	GifFavourites = SettingField{
 		reactFieldName:      "gifs/favorite-gifs",
 		dBColumnName:        "gif_favorites",
 		valueHandler:        JSONBlobHandler,
 		syncProtobufFactory: gifFavouritesProtobufFactory,
+	}
+	GifRecents = SettingField{
+		reactFieldName:      "gifs/recent-gifs",
+		dBColumnName:        "gif_recents",
+		valueHandler:        JSONBlobHandler,
+		syncProtobufFactory: gifRecentsProtobufFactory,
 	}
 	HideHomeTooltip = SettingField{
 		reactFieldName: "hide-home-tooltip?",
@@ -341,8 +345,8 @@ var (
 		EIP1581Address,
 		Fleet,
 		GifAPIKey,
-		GifRecents,
 		GifFavourites,
+		GifRecents,
 		HideHomeTooltip,
 		KeycardInstanceUID,
 		KeycardPairedOn,

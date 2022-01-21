@@ -5,18 +5,19 @@ package protobuf;
 
 message SyncSettings {
   SyncSettingCurrency                  currency = 1;
-  SyncSettingGifRecents                gif_recents = 2;
+  SyncSettingGifAPIKey                 gif_api_key = 2;
   SyncSettingGifFavorites              gif_favorites = 3;
-  SyncSettingMessagesFromContactsOnly  messages_from_contacts_only = 4;
-  SyncSettingPreferredName             preferred_name = 5;
-  SyncSettingPreviewPrivacy            previewPrivacy = 6;
-  SyncSettingProfilePicturesShowTo     profile_pictures_show_to = 7;
-  SyncSettingProfilePicturesVisibility profile_pictures_visibility = 8;
-  SyncSettingSendStatusUpdates         send_status_updates = 9;
-  SyncSettingStickerPacksInstalled     sticker_packs_installed = 10;
-  SyncSettingStickerPacksPending       sticker_packs_pending = 11;
-  SyncSettingStickersRecentStickers    stickers_recent_stickers = 12;
-  SyncSettingTelemetryServerURL        telemetry_server_URL = 13;
+  SyncSettingGifRecents                gif_recents = 4;
+  SyncSettingMessagesFromContactsOnly  messages_from_contacts_only = 5;
+  SyncSettingPreferredName             preferred_name = 6;
+  SyncSettingPreviewPrivacy            previewPrivacy = 7;
+  SyncSettingProfilePicturesShowTo     profile_pictures_show_to = 8;
+  SyncSettingProfilePicturesVisibility profile_pictures_visibility = 9;
+  SyncSettingSendStatusUpdates         send_status_updates = 10;
+  SyncSettingStickerPacksInstalled     sticker_packs_installed = 11;
+  SyncSettingStickerPacksPending       sticker_packs_pending = 12;
+  SyncSettingStickersRecentStickers    stickers_recent_stickers = 13;
+  SyncSettingTelemetryServerURL        telemetry_server_URL = 14;
 }
 
 message SyncSettingCurrency {
@@ -24,12 +25,17 @@ message SyncSettingCurrency {
   string value = 2;
 }
 
-message SyncSettingGifRecents {
+message SyncSettingGifAPIKey {
+  uint64 clock = 1;
+  string value = 2;
+}
+
+message SyncSettingGifFavorites {
   uint64 clock = 1;
   bytes value = 2;
 }
 
-message SyncSettingGifFavorites {
+message SyncSettingGifRecents {
   uint64 clock = 1;
   bytes value = 2;
 }

@@ -3407,10 +3407,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						settings := msg.ParsedMessage.Interface().(protobuf.SyncSettings)
-						logger.Debug("Handling SyncSettings", zap.Any("message", settings))
+						syncSettings := msg.ParsedMessage.Interface().(protobuf.SyncSettings)
+						logger.Debug("Handling SyncSettings", zap.Any("message", syncSettings))
 
-						err = m.handleSyncSettings(messageState, settings)
+						err = m.handleSyncSettings(syncSettings)
 						if err != nil {
 							logger.Warn("failed to handle SyncSettings", zap.Error(err))
 							allMessagesProcessed = false

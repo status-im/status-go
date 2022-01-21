@@ -3,124 +3,117 @@ package settings
 import (
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func buildRawSyncSettingMessage(msg proto.Message, messageType protobuf.ApplicationMetadataMessage_Type, chatID string) (*common.RawMessage, error) {
-	encodedMessage, err := proto.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	return &common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         messageType,
-		ResendAutomatically: true,
-	}, nil
-}
-
-func currencyProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func currencyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingCurrency)
 	pb.Value = value.(string)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_CURRENCY, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_CURRENCY
 }
 
-func gifRecentsProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
-	pb := new(protobuf.SyncSettingGifRecents)
-	pb.Value = value.([]byte)
+func gifAPIKeyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+	pb := new(protobuf.SyncSettingGifAPIKey)
+	pb.Value = value.(string)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_RECENTS, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_API_KEY
 }
 
-func gifFavouritesProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func gifFavouritesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingGifFavorites)
 	pb.Value = value.([]byte)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES
 }
 
-func messagesFromContactsOnlyProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func gifRecentsProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+	pb := new(protobuf.SyncSettingGifRecents)
+	pb.Value = value.([]byte)
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_RECENTS
+}
+
+func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingMessagesFromContactsOnly)
 	pb.Value = value.(bool)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_MESSAGES_FROM_CONTACTS_ONLY, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_MESSAGES_FROM_CONTACTS_ONLY
 }
 
-func preferredNameProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func preferredNameProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingPreferredName)
 	pb.Value = value.(string)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREFERRED_NAME, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREFERRED_NAME
 }
 
-func previewPrivacyProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func previewPrivacyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingPreviewPrivacy)
 	pb.Value = value.(bool)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREVIEW_PRIVACY, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREVIEW_PRIVACY
 }
 
-func profilePicturesShowToProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesShowTo)
 	pb.Value = value.(int64)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO
 }
 
-func profilePicturesVisibilityProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesVisibility)
 	pb.Value = value.(int64)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY
 }
 
-func sendStatusUpdatesProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingSendStatusUpdates)
 	pb.Value = value.(bool)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES
 }
 
-func stickersPacksInstalledProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingStickerPacksInstalled)
 	pb.Value = value.([]byte)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_INSTALLED, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_INSTALLED
 }
 
-func stickersPacksPendingProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func stickersPacksPendingProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingStickerPacksPending)
 	pb.Value = value.([]byte)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_PENDING, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_PENDING
 }
 
-func stickersRecentStickersProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func stickersRecentStickersProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingStickersRecentStickers)
 	pb.Value = value.([]byte)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_RECENT_STICKERS, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_RECENT_STICKERS
 }
 
-func telemetryServerURLProtobufFactory(chatID string, value interface{}, clock uint64) (*common.RawMessage, error) {
+func telemetryServerURLProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingTelemetryServerURL)
 	pb.Value = value.(string)
 	pb.Clock = clock
 
-	return buildRawSyncSettingMessage(pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL, chatID)
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL
 }
