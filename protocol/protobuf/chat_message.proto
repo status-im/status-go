@@ -41,6 +41,20 @@ message EditMessage {
   MessageType message_type = 6;
 }
 
+message SeenChatMessage {
+  uint64 clock = 1;
+
+  string chat_id = 2;
+  string message_id = 3;
+
+  // Grant for community seen chat messages
+  bytes grant = 4;
+
+  // The type of message (public/one-to-one/private-group-chat)
+  MessageType message_type = 5;
+}
+
+
 message DeleteMessage {
   uint64 clock = 1;
 

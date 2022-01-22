@@ -140,6 +140,7 @@ type Settings struct {
 	LastBackup                     uint64                        `json:"last-backup,omitempty"`
 	BackupEnabled                  bool                          `json:"backup-enabled?,omitempty"`
 	AutoMessageEnabled             bool                          `json:"auto-message-enabled?,omitempty"`
+	ReadReceiptsEnabled            bool                          `json:"read-receipts-enabled?,omitempty"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -446,6 +447,13 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		}
 
 		update, err = db.db.Prepare("UPDATE settings SET auto_message_enabled = ? WHERE synthetic_id = 'id'")
+	case "read-receipts-enabled?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+
+		update, err = db.db.Prepare("UPDATE settings SET read_receipts_enabled = ? WHERE synthetic_id = 'id'")
 
 	default:
 		return ErrInvalidConfig
@@ -464,7 +472,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, read_receipts_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -527,6 +535,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.BackupEnabled,
 		&s.TelemetryServerURL,
 		&s.AutoMessageEnabled,
+		&s.ReadReceiptsEnabled,
 	)
 
 	return s, err
@@ -628,6 +637,15 @@ func (db *Database) DeleteAccount(address types.Address) error {
 func (db *Database) DeleteSeedAndKeyAccounts() error {
 	_, err := db.db.Exec("DELETE FROM accounts WHERE type = ? OR type = ?", accountTypeSeed, accountTypeKey)
 	return err
+}
+
+func (db *Database) GetReadReceiptsEnabled() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT read-receipts-enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
 }
 
 func (db *Database) GetNotificationsEnabled() (bool, error) {

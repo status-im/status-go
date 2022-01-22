@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN read_receipts_enabled BOOLEAN DEFAULT false;
