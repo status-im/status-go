@@ -628,6 +628,10 @@ func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.M
 	return api.service.messenger.SendChatMessages(ctx, messages)
 }
 
+func (api *PublicAPI) SendSeenChatMessage(ctx context.Context, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendSeenChatMessage(ctx, messageID)
+}
+
 func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditMessage(ctx, request)
 }
