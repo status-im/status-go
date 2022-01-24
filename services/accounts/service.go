@@ -8,24 +8,26 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 )
 
 // NewService initializes service instance.
-func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.Manager, feed *event.Feed) *Service {
-	return &Service{db, mdb, manager, feed}
+func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.GethManager, config *params.NodeConfig, feed *event.Feed) *Service {
+	return &Service{db, mdb, manager, config, feed}
 }
 
 // Service is a browsers service.
 type Service struct {
 	db      *accounts.Database
 	mdb     *multiaccounts.Database
-	manager *account.Manager
+	manager *account.GethManager
+	config  *params.NodeConfig
 	feed    *event.Feed
 }
 
 // Start a service.
 func (s *Service) Start() error {
-	return nil
+	return s.manager.InitKeystore(s.config.KeyStoreDir)
 }
 
 // Stop a service.
@@ -44,12 +46,12 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "accounts",
 			Version:   "0.1.0",
-			Service:   NewAccountsAPI(s.db, s.feed),
+			Service:   NewAccountsAPI(s.manager, s.config, s.db, s.feed),
 		},
 		{
 			Namespace: "multiaccounts",
 			Version:   "0.1.0",
-			Service:   NewMultiAccountsAPI(s.mdb, s.manager),
+			Service:   NewMultiAccountsAPI(s.mdb),
 		},
 	}
 }
