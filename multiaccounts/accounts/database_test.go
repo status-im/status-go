@@ -241,3 +241,60 @@ func TestAddressDoesntExist(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
+
+func TestGetCommunitiesSettings(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	settings := []params.CommunitySettings{
+		{CommunityID: "0x01", MessageArchiveSeedingEnabled: false, MessageArchiveFetchingEnabled: true},
+		{CommunityID: "0x02", MessageArchiveSeedingEnabled: true, MessageArchiveFetchingEnabled: false},
+		{CommunityID: "0x03", MessageArchiveSeedingEnabled: false, MessageArchiveFetchingEnabled: false},
+	}
+
+	for i := range settings {
+		s := settings[i]
+		require.NoError(t, db.SaveCommunitySettings(s))
+	}
+
+	rst, err := db.GetCommunitiesSettings()
+	require.NoError(t, err)
+	require.Equal(t, settings, rst)
+}
+
+func TestDeleteCommunitySettings(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	settings := params.CommunitySettings{CommunityID: "0x01", MessageArchiveSeedingEnabled: false, MessageArchiveFetchingEnabled: true}
+
+	require.NoError(t, db.SaveCommunitySettings(settings))
+
+	rst, err := db.GetCommunitiesSettings()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.NoError(t, db.DeleteCommunitySettings(types.HexBytes{0x01}))
+	rst2, err := db.GetCommunitiesSettings()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(rst2))
+}
+
+func TestUpdateCommunitySettings(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	settings := []params.CommunitySettings{
+		{CommunityID: "0x01", MessageArchiveSeedingEnabled: false, MessageArchiveFetchingEnabled: true},
+		{CommunityID: "0x02", MessageArchiveSeedingEnabled: true, MessageArchiveFetchingEnabled: false},
+	}
+
+	require.NoError(t, db.SaveCommunitySettings(settings[0]))
+	require.NoError(t, db.SaveCommunitySettings(settings[1]))
+
+	settings[0].MessageArchiveSeedingEnabled = true
+	settings[1].MessageArchiveSeedingEnabled = false
+
+	require.NoError(t, db.UpdateCommunitySettings(settings[0]))
+	require.NoError(t, db.UpdateCommunitySettings(settings[1]))
+
+	rst, err := db.GetCommunitiesSettings()
+	require.NoError(t, err)
+	require.Equal(t, settings, rst)
+}

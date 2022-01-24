@@ -504,6 +504,12 @@ type Network struct {
 	Enabled                bool   `json:"enabled"`
 }
 
+type CommunitySettings struct {
+	CommunityID                   string `json:"communityId"`
+	MessageArchiveFetchingEnabled bool   `json:"messageArchiveFetchingEnabled"`
+	MessageArchiveSeedingEnabled  bool   `json:"messageArchiveSeedingEnabled"`
+}
+
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled bool

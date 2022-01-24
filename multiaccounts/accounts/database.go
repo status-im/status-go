@@ -71,31 +71,32 @@ func (a *Account) IsOwnAccount() bool {
 
 type Settings struct {
 	// required
-	Address                   types.Address    `json:"address"`
-	AnonMetricsShouldSend     bool             `json:"anon-metrics/should-send?,omitempty"`
-	ChaosMode                 bool             `json:"chaos-mode?,omitempty"`
-	Currency                  string           `json:"currency,omitempty"`
-	CurrentNetwork            string           `json:"networks/current-network"`
-	CustomBootnodes           *json.RawMessage `json:"custom-bootnodes,omitempty"`
-	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
-	DappsAddress              types.Address    `json:"dapps-address"`
-	EIP1581Address            types.Address    `json:"eip1581-address"`
-	Fleet                     *string          `json:"fleet,omitempty"`
-	HideHomeTooltip           bool             `json:"hide-home-tooltip?,omitempty"`
-	InstallationID            string           `json:"installation-id"`
-	KeyUID                    string           `json:"key-uid"`
-	KeycardInstanceUID        string           `json:"keycard-instance-uid,omitempty"`
-	KeycardPAiredOn           int64            `json:"keycard-paired-on,omitempty"`
-	KeycardPairing            string           `json:"keycard-pairing,omitempty"`
-	LastUpdated               *int64           `json:"last-updated,omitempty"`
-	LatestDerivedPath         uint             `json:"latest-derived-path"`
-	LinkPreviewRequestEnabled bool             `json:"link-preview-request-enabled,omitempty"`
-	LinkPreviewsEnabledSites  *json.RawMessage `json:"link-previews-enabled-sites,omitempty"`
-	LogLevel                  *string          `json:"log-level,omitempty"`
-	MessagesFromContactsOnly  bool             `json:"messages-from-contacts-only"`
-	Mnemonic                  *string          `json:"mnemonic,omitempty"`
-	Name                      string           `json:"name,omitempty"`
-	Networks                  *json.RawMessage `json:"networks/networks"`
+	Address                   types.Address              `json:"address"`
+	AnonMetricsShouldSend     bool                       `json:"anon-metrics/should-send?,omitempty"`
+	ChaosMode                 bool                       `json:"chaos-mode?,omitempty"`
+	Currency                  string                     `json:"currency,omitempty"`
+	CurrentNetwork            string                     `json:"networks/current-network"`
+	CustomBootnodes           *json.RawMessage           `json:"custom-bootnodes,omitempty"`
+	CustomBootnodesEnabled    *json.RawMessage           `json:"custom-bootnodes-enabled?,omitempty"`
+	CommunitiesSettings       []params.CommunitySettings `json:"communities-settings"`
+	DappsAddress              types.Address              `json:"dapps-address"`
+	EIP1581Address            types.Address              `json:"eip1581-address"`
+	Fleet                     *string                    `json:"fleet,omitempty"`
+	HideHomeTooltip           bool                       `json:"hide-home-tooltip?,omitempty"`
+	InstallationID            string                     `json:"installation-id"`
+	KeyUID                    string                     `json:"key-uid"`
+	KeycardInstanceUID        string                     `json:"keycard-instance-uid,omitempty"`
+	KeycardPAiredOn           int64                      `json:"keycard-paired-on,omitempty"`
+	KeycardPairing            string                     `json:"keycard-pairing,omitempty"`
+	LastUpdated               *int64                     `json:"last-updated,omitempty"`
+	LatestDerivedPath         uint                       `json:"latest-derived-path"`
+	LinkPreviewRequestEnabled bool                       `json:"link-preview-request-enabled,omitempty"`
+	LinkPreviewsEnabledSites  *json.RawMessage           `json:"link-previews-enabled-sites,omitempty"`
+	LogLevel                  *string                    `json:"log-level,omitempty"`
+	MessagesFromContactsOnly  bool                       `json:"messages-from-contacts-only"`
+	Mnemonic                  *string                    `json:"mnemonic,omitempty"`
+	Name                      string                     `json:"name,omitempty"`
+	Networks                  *json.RawMessage           `json:"networks/networks"`
 	// NotificationsEnabled indicates whether local notifications should be enabled (android only)
 	NotificationsEnabled bool             `json:"notifications-enabled?,omitempty"`
 	PhotoPath            string           `json:"photo-path"`
@@ -559,6 +560,9 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.AutoMessageEnabled,
 	)
 
+	communitiesSettings, err := db.GetCommunitiesSettings()
+	s.CommunitiesSettings = communitiesSettings
+
 	return s, err
 }
 
@@ -863,4 +867,56 @@ func (db *Database) ENSName() (string, error) {
 		return result.String, nil
 	}
 	return "", err
+}
+
+func (db *Database) SaveCommunitySettings(communitySettings params.CommunitySettings) error {
+	_, err := db.db.Exec(`INSERT INTO communities_settings (
+    community_id,
+    message_archive_seeding_enabled,
+    message_archive_fetching_enabled
+  ) VALUES (?, ?, ?)`,
+		communitySettings.CommunityID,
+		communitySettings.MessageArchiveSeedingEnabled,
+		communitySettings.MessageArchiveFetchingEnabled,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) UpdateCommunitySettings(communitySettings params.CommunitySettings) error {
+	_, err := db.db.Exec(`UPDATE communities_settings SET
+    message_archive_seeding_enabled = ?,
+    message_archive_fetching_enabled = ?
+    WHERE community_id = ?`,
+		communitySettings.MessageArchiveSeedingEnabled,
+		communitySettings.MessageArchiveFetchingEnabled,
+		communitySettings.CommunityID,
+	)
+	return err
+}
+
+func (db *Database) DeleteCommunitySettings(communityID types.HexBytes) error {
+	_, err := db.db.Exec("DELETE FROM communities_settings WHERE community_id = ?", communityID.String())
+	return err
+}
+
+func (db *Database) GetCommunitiesSettings() ([]params.CommunitySettings, error) {
+	rows, err := db.db.Query("SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled FROM communities_settings")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	communitiesSettings := []params.CommunitySettings{}
+
+	for rows.Next() {
+		settings := params.CommunitySettings{}
+		err := rows.Scan(&settings.CommunityID, &settings.MessageArchiveSeedingEnabled, &settings.MessageArchiveFetchingEnabled)
+		if err != nil {
+			return nil, err
+		}
+		communitiesSettings = append(communitiesSettings, settings)
+	}
+	return communitiesSettings, err
 }
