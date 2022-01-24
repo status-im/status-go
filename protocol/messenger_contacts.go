@@ -12,6 +12,40 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	chatID := request.ID.String()
+	// A valid added chat is required.
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		publicKey, err := common.HexToPubkey(chatID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a one to one chat and set active to false
+		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
+		chat.Active = false
+		err = m.initChatSyncFields(chat)
+		if err != nil {
+			return nil, err
+		}
+		err = m.saveChat(chat)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	chatMessage := &common.Message{}
+	chatMessage.ChatId = chatID
+	chatMessage.Text = request.Message
+	return m.sendChatMessage(ctx, chatMessage)
+}
+
 // NOTE: This sets HasAddedUs to false, so next time we receive a contact request it will be reset to true
 func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
