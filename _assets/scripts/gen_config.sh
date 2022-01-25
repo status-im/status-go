@@ -9,6 +9,7 @@ RPC_PORT="${RPC_PORT:-8545}"
 LISTEN_PORT="${LSTEN_PORT:-30303}"
 API_MODULES="${API_MODULES:-eth,web3,admin}"
 MAX_PEERS="${MAX_PEERS:-50}"
+DAYS_KEPT="${DAYS_KEPT-30}"
 FLEET_NAME="${FLEET_NAME:-eth.prod}"
 REGISTER_TOPIC="${REGISTER_TOPIC:-whispermail}"
 MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
@@ -40,6 +41,7 @@ JQ_FILTER_ARRAY=(
   ".WakuConfig.EnableMailServer = true"
   ".WakuConfig.DataDir = \"${DATA_PATH}/waku\""
   ".WakuConfig.MailServerPassword = \"${MAIL_PASSWORD}\""
+  ".WakuConfig.MailServerDataRetention = ${DAYS_KEPT}"
 )
 
 JQ_FILTER=$(printf " | %s" "${JQ_FILTER_ARRAY[@]}")

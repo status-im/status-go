@@ -60,11 +60,13 @@ If you want your node to relay Waku(modified Whisper) protocol messages you'll w
         "Enabled": true,
         "EnableMailServer": true,
         "DataDir": "/tmp/status-go-data/waku",
-        "MailServerPassword": "status-offline-inbox"
+        "MailServerPassword": "status-offline-inbox",
+        "MailServerDataRetention": 30
     }
 }
 ```
 The `MailServerPassword` is used for symmetric encryption of history requests.
+The `MailServerDataRetention` defines number of days for which to keep messages.
 
 By default it will use `leveldb` embedded database. To use postgres instead you need to 
 add this to your config:
