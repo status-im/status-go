@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
+	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/peer"
@@ -71,6 +72,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
+	services = append(services, b.gifService())
 
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -366,6 +368,13 @@ func (b *StatusNode) ensService() *ens.Service {
 		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
 	}
 	return b.ensSrvc
+}
+
+func (b *StatusNode) gifService() *gif.Service {
+	if b.gifSrvc == nil {
+		b.gifSrvc = gif.NewService(accounts.NewDB(b.appDB))
+	}
+	return b.gifSrvc
 }
 
 func (b *StatusNode) permissionsService() *permissions.Service {
