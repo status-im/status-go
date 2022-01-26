@@ -9,6 +9,8 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+const nodeCfgMigrationDate = 1640111208
+
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string) (*sql.DB, error) {
 	db, err := sqlite.OpenDB(path, password)
@@ -16,15 +18,35 @@ func InitializeDB(path, password string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	err = migrationsprevnodecfg.Migrate(db)
-	if err != nil {
+	// Check if the migration table exists
+	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name='status_go_schema_migrations')")
+	migrationTableExists := false
+	err = row.Scan(&migrationTableExists)
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	// NodeConfig migration cannot be done with SQL
-	err = nodecfg.MigrateNodeConfig(db)
-	if err != nil {
-		return nil, err
+	var lastMigration uint64 = 0
+	if migrationTableExists {
+		row = db.QueryRow("SELECT version FROM status_go_schema_migrations")
+		err = row.Scan(&lastMigration)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+	}
+
+	if !migrationTableExists || (lastMigration > 0 && lastMigration < nodeCfgMigrationDate) {
+		// If it's the first time migration's being run, or latest migration happened before migrating the nodecfg table
+		err = migrationsprevnodecfg.Migrate(db)
+		if err != nil {
+			return nil, err
+		}
+
+		// NodeConfig migration cannot be done with SQL
+		err = nodecfg.MigrateNodeConfig(db)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = migrations.Migrate(db)
