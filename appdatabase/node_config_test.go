@@ -206,7 +206,6 @@ func randomNodeConfig() *params.NodeConfig {
 		WalletConfig:              params.WalletConfig{Enabled: randomBool()},
 		LocalNotificationsConfig:  params.LocalNotificationsConfig{Enabled: randomBool()},
 		BrowsersConfig:            params.BrowsersConfig{Enabled: randomBool()},
-		ENSConfig:                 params.ENSConfig{Enabled: randomBool()},
 		PermissionsConfig:         params.PermissionsConfig{Enabled: randomBool()},
 		MailserversConfig:         params.MailserversConfig{Enabled: randomBool()},
 		Web3ProviderConfig:        params.Web3ProviderConfig{Enabled: randomBool()},

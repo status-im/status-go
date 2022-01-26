@@ -458,9 +458,6 @@ type NodeConfig struct {
 	// BrowsersConfig extra configuration for browsers.Service.
 	BrowsersConfig BrowsersConfig
 
-	// ENSConfig extra configuration for ens.Service.
-	ENSConfig ENSConfig `json:"EnsConfig" validate:"structonly"`
-
 	// PermissionsConfig extra configuration for permissions.Service.
 	PermissionsConfig PermissionsConfig
 
@@ -516,11 +513,6 @@ type LocalNotificationsConfig struct {
 
 // BrowsersConfig extra configuration for browsers.Service.
 type BrowsersConfig struct {
-	Enabled bool
-}
-
-// ENSConfig extra configuration for ens.Service.
-type ENSConfig struct {
 	Enabled bool
 }
 
