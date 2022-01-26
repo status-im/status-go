@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -725,4 +726,8 @@ func ConvertToKeycardAccount(keyStoreDir, accountData, settingsJSON, password, n
 		return makeJSONResponse(err)
 	}
 	return makeJSONResponse(nil)
+}
+
+func ImageServerTLSCert() string {
+	return images.PublicTLSCert()
 }

@@ -161,8 +161,8 @@ type Message struct {
 }
 
 func (m *Message) PrepareImageURL(port int) {
-	m.ImageLocalURL = fmt.Sprintf("http://localhost:%d/messages/images?messageId=%s", port, m.ID)
-	m.Identicon = fmt.Sprintf("http://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
+	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
+	m.Identicon = fmt.Sprintf("https://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
