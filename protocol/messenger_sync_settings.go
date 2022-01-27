@@ -36,28 +36,49 @@ func (m *Messenger) syncSettings() error {
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	// TODO implement value handler from Settings field type to protobuf type
-	//  we need to make sure that the data format is always the same in the protobuf!
+	var gr []byte
+	if s.GifRecents != nil {
+		gr, err = s.GifRecents.MarshalJSON()
+		if err != nil {
+			return err
+		}
+	}
 
-	gr, err := s.GifRecents.MarshalJSON()
-	if err != nil {
-		return err
+	var gf []byte
+	if s.GifRecents != nil {
+		gf, err = s.GifFavorites.MarshalJSON()
+		if err != nil {
+			return err
+		}
 	}
-	gf, err := s.GifFavorites.MarshalJSON()
-	if err != nil {
-		return err
+
+	var pn string
+	if s.PreferredName != nil {
+		pn = *s.PreferredName
 	}
-	spi, err := s.StickerPacksInstalled.MarshalJSON()
-	if err != nil {
-		return err
+
+	var spi []byte
+	if s.StickerPacksInstalled != nil {
+		spi, err = s.StickerPacksInstalled.MarshalJSON()
+		if err != nil {
+			return err
+		}
 	}
-	spp, err := s.StickerPacksPending.MarshalJSON()
-	if err != nil {
-		return err
+
+	var spp []byte
+	if s.StickerPacksPending != nil {
+		spp, err = s.StickerPacksPending.MarshalJSON()
+		if err != nil {
+			return err
+		}
 	}
-	srs, err := s.StickersRecentStickers.MarshalJSON()
-	if err != nil {
-		return err
+
+	var srs []byte
+	if s.StickersRecentStickers != nil {
+		srs, err = s.StickersRecentStickers.MarshalJSON()
+		if err != nil {
+			return err
+		}
 	}
 
 	ps := &protobuf.SyncSettings{
@@ -78,7 +99,7 @@ func (m *Messenger) syncSettings() error {
 			Clock: clock,
 		},
 		PreferredName: &protobuf.SyncSettingPreferredName{
-			Value: *s.PreferredName,
+			Value: pn,
 			Clock: clock,
 		},
 		PreviewPrivacy: &protobuf.SyncSettingPreviewPrivacy{
@@ -254,7 +275,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 
 					rm, err := buildRawSyncSettingMessage(pb, amt, chat.ID)
 					if err != nil {
-						logger.Error("syncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("buildRawSyncSettingMessage", zap.Error(err), zap.Any("SyncSettingField", s))
 						break
 					}
 

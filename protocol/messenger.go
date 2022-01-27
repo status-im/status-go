@@ -2613,6 +2613,11 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 	}
 
+	err = m.syncSettings()
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 

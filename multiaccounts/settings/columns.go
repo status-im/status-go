@@ -17,10 +17,8 @@ type SyncSettingField struct {
 type SettingField struct {
 	reactFieldName      string
 	dBColumnName        string
-	valueHandler        ValueHandler // TODO this is only for data coming from API, not from protobuf
+	valueHandler        ValueHandler
 	syncProtobufFactory SyncSettingProtobufFactory
-	// TODO add value handler: from protobuf to db
-	// TODO add value handler: from Settings field to protobuf
 }
 
 func (s SettingField) GetReactName() string {

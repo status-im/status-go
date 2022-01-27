@@ -64,7 +64,7 @@ func previewPrivacyProtobufFactory(value interface{}, clock uint64) (proto.Messa
 
 func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesShowTo)
-	pb.Value = value.(int64)
+	pb.Value = int64(value.(ProfilePicturesShowToType))
 	pb.Clock = clock
 
 	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO
@@ -72,7 +72,7 @@ func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (prot
 
 func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesVisibility)
-	pb.Value = value.(int64)
+	pb.Value = int64(value.(ProfilePicturesVisibilityType))
 	pb.Clock = clock
 
 	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY
