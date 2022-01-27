@@ -83,6 +83,57 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	return response, nil
 }
 
+func (m *Messenger) SendSeenChatMessage(ctx context.Context, messageID string) (*MessengerResponse, error) {
+	message, err := m.persistence.MessageByID(messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
+		return nil, ErrInvalidEditOrDeleteAuthor
+	}
+
+	// A valid added chat is required.
+	chat, ok := m.allChats.Load(message.ChatId)
+	if !ok {
+		return nil, errors.New("Chat not found")
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	seenChatMessage := &SeenChatMessage{}
+
+	seenChatMessage.ChatId = message.ChatId
+	seenChatMessage.MessageId = messageID
+	seenChatMessage.Clock = clock
+
+	encodedMessage, err := m.encodeChatEntity(chat, seenChatMessage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:          chat.ID,
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_SEEN_CHAT_MESSAGE,
+		SkipGroupMessageWrap: true,
+		ResendAutomatically:  true,
+	}
+	_, err = m.dispatchMessage(ctx, rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddMessage(message)
+	response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
+	response.AddChat(chat)
+
+	return response, nil
+
+}
+
 func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) (*MessengerResponse, error) {
 	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
