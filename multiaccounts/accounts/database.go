@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"database/sql"
-	"encoding/json"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"

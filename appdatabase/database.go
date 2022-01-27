@@ -94,7 +94,7 @@ func GetDBFilename(db *sql.DB) (string, error) {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return "", errors.New("no main database found")
