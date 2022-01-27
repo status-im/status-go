@@ -46,15 +46,11 @@ func generateTLSCert() {
 	}
 
 	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"Self-signed cert"},
-			CommonName:   "localhost",
-		},
+		SerialNumber:          serialNumber,
+		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
@@ -112,8 +108,7 @@ func (s *identiconHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "max-age:290304000, public")
-	w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
+	w.Header().Set("Cache-Control", "no-store")
 	_, err = w.Write(image)
 	if err != nil {
 		s.logger.Error("failed to write image", zap.Error(err))
