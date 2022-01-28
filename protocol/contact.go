@@ -11,6 +11,16 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
+// ContactRequest is the signed contact request received from the user
+type ContactRequest struct {
+	// SigningKey is the key of the user who created the contact request
+	SigningKey string
+	// ContactKey is the key of the user who has been added to the contacts
+	ContactKey string
+	Signature  []byte
+	Timestamp  uint64
+}
+
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
 type ContactDeviceInfo struct {
 	// The installation id of the device

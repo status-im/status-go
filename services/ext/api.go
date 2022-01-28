@@ -605,6 +605,14 @@ func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddConta
 	return api.service.messenger.AddContact(ctx, request)
 }
 
+func (api *PublicAPI) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptContactRequest(ctx, request)
+}
+
 func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RejectContactRequest(ctx, request)
 }

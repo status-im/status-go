@@ -974,3 +974,69 @@ func (db sqlitePersistence) StatusUpdates() (statusUpdates []UserStatus, err err
 
 	return
 }
+
+func (db sqlitePersistence) getReceivedContactRequest(tx *sql.Tx, pk string) (*ContactRequest, error) {
+	var err error
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+	contactRequest := &ContactRequest{
+		SigningKey: pk,
+	}
+	err = tx.QueryRow(`
+		SELECT
+			signature,
+			timestamp
+		FROM contact_requests
+		WHERE signing_key = ?
+	`, pk).Scan(&contactRequest.Signature,
+		&contactRequest.Timestamp,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return contactRequest, nil
+}
+
+func (db sqlitePersistence) GetReceivedContactRequest(pk string) (*ContactRequest, error) {
+	return db.getReceivedContactRequest(nil, pk)
+}
+
+func (db sqlitePersistence) SaveReceivedContactRequest(cr *ContactRequest) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	contactRequest, err := db.getReceivedContactRequest(tx, cr.SigningKey)
+	if err != nil {
+		return err
+	}
+	// Nothing to do
+	if contactRequest != nil && contactRequest.Timestamp >= cr.Timestamp {
+		return nil
+	}
+
+	_, err = tx.Exec(`INSERT INTO contact_requests(signing_key, contact_key, signature, timestamp) VALUES(?,?,?,?)`, cr.SigningKey, cr.ContactKey, cr.Signature, cr.Timestamp)
+
+	return err
+}

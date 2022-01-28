@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contactrequests"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -879,6 +880,28 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	chat, err := m.matchChatEntity(receivedMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
+	}
+
+	// Save ContactRequest if any
+	rawContactRequest := state.CurrentMessageState.Message.SentContactRequestSignature
+	if rawContactRequest != nil {
+		err = contactrequests.VerifySignature(rawContactRequest.Signature, &m.identity.PublicKey, state.CurrentMessageState.PublicKey, rawContactRequest.Timestamp)
+		if err != nil {
+			m.logger.Error("FAILED", zap.Error(err))
+			return err
+		}
+		contactRequest := &ContactRequest{
+			ContactKey: common.PubkeyToHex(&m.identity.PublicKey),
+			SigningKey: types.EncodeHex(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey)),
+			Signature:  rawContactRequest.Signature,
+			Timestamp:  rawContactRequest.Timestamp,
+		}
+		err = m.persistence.SaveReceivedContactRequest(contactRequest)
+		if err != nil {
+			m.logger.Error("FAILED", zap.Error(err))
+			return err
+		}
+
 	}
 
 	if chat.ReadMessagesAtClockValue > state.CurrentMessageState.WhisperTimestamp {

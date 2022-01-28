@@ -7,10 +7,27 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contactrequests"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 )
+
+func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	chatID := request.ID.String()
+
+	response, err := m.addContact(chatID, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
 
 func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
@@ -19,14 +36,20 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	}
 
 	chatID := request.ID.String()
+
+	response, err := m.addContact(chatID, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, err := common.HexToPubkey(chatID)
+	if err != nil {
+		return nil, err
+	}
+
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		publicKey, err := common.HexToPubkey(chatID)
-		if err != nil {
-			return nil, err
-		}
-
 		// Create a one to one chat and set active to false
 		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
 		chat.Active = false
@@ -43,7 +66,24 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	chatMessage := &common.Message{}
 	chatMessage.ChatId = chatID
 	chatMessage.Text = request.Message
-	return m.sendChatMessage(ctx, chatMessage)
+	timestamp := m.getTimesource().GetCurrentTime()
+	signature, err := contactrequests.BuildSignature(publicKey, m.identity, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	chatMessage.SentContactRequestSignature = &protobuf.ContactRequestSignature{Signature: signature, Timestamp: timestamp}
+	chatMessage.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
+	messageResponse, err := m.sendChatMessage(ctx, chatMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = response.Merge(messageResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 // NOTE: This sets HasAddedUs to false, so next time we receive a contact request it will be reset to true
@@ -78,16 +118,7 @@ func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey := request.ID.String()
-
-	ensName := request.ENSName
-
+func (m *Messenger) addContact(pubKey, ensName, nickname, displayName string) (*MessengerResponse, error) {
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
@@ -109,12 +140,12 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
-	if len(request.Nickname) != 0 {
-		contact.LocalNickname = request.Nickname
+	if len(nickname) != 0 {
+		contact.LocalNickname = nickname
 	}
 
-	if len(request.DisplayName) != 0 {
-		contact.DisplayName = request.DisplayName
+	if len(displayName) != 0 {
+		contact.DisplayName = displayName
 	}
 
 	if !contact.Added {
@@ -123,7 +154,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	// We sync the contact with the other devices
-	err = m.syncContact(context.Background(), contact)
+	err := m.syncContact(context.Background(), contact)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +209,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
-	displayName, err := m.settings.DisplayName()
+	displayName, err = m.settings.DisplayName()
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +249,14 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	}
 
 	return response, nil
+}
+func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName)
 }
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
@@ -297,6 +336,17 @@ func (m *Messenger) AddedContacts() []*Contact {
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.Added {
+			contacts = append(contacts, contact)
+		}
+		return true
+	})
+	return contacts
+}
+
+func (m *Messenger) MutualContacts() []*Contact {
+	var contacts []*Contact
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+		if contact.Added && contact.HasAddedUs {
 			contacts = append(contacts, contact)
 		}
 		return true

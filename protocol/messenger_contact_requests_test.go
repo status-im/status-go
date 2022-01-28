@@ -61,26 +61,52 @@ func (s *MessengerContactRequestSuite) newMessenger(shh types.Waku) *Messenger {
 func (s *MessengerContactRequestSuite) TestReceiveContactRequest() {
 
 	messageText := "hello!"
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
-		Message: messageText,
-	}
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	request := &requests.SendContactRequest{
+		ID:      types.Hex2Bytes(contactID),
+		Message: messageText,
+	}
+
 	_, err = s.m.SendContactRequest(context.Background(), request)
 	s.Require().NoError(err)
+
+	contacts := s.m.AddedContacts()
+	s.Require().Len(contacts, 1)
 
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.ActivityCenterNotifications()) > 0 },
 		"no messages",
 	)
 
 	s.Require().NoError(err)
+	contactRequest, err := theirMessenger.persistence.GetReceivedContactRequest(myID)
+	s.Require().NoError(err)
+	s.Require().NotNil(contactRequest)
 
+	_, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	contacts = theirMessenger.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	mutualContacts := theirMessenger.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.ActivityCenterNotifications()) > 0 },
+		"no messages",
+	)
+
+	mutualContacts = s.m.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
 }

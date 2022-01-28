@@ -2518,6 +2518,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.SetMessages(msg)
 
 	response.AddChat(chat)
+
 	m.logger.Debug("sent message", zap.String("id", message.ID))
 	m.prepareMessages(response.messages)
 

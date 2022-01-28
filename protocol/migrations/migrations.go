@@ -49,8 +49,8 @@
 // 1634896007_add_last_updated_locally_and_removed.up.sql (131B)
 // 1635840039_add_clock_read_at_column_in_chats.up.sql (245B)
 // 1637852321_add_received_invitation_admin_column_in_chats.up.sql (72B)
-// 1642423163_add_mutual_contact_request.up.sql (202B)
 // 1645034601_display_name.up.sql (110B)
+// 1645034602_add_mutual_contact_request.up.sql (254B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1101,26 +1101,6 @@ func _1637852321_add_received_invitation_admin_column_in_chatsUpSql() (*asset, e
 	return a, nil
 }
 
-var __1642423163_add_mutual_contact_requestUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x4e\xcd\x2b\x89\x87\x4a\xc4\x17\xa5\x16\x96\xa6\x16\x97\xc4\x17\x67\xa6\xe7\x25\x96\x94\x16\xa5\x2a\x38\xf9\xf8\x3b\x59\x73\x11\x32\xa4\x28\x35\x39\x35\xb3\x2c\x35\x85\x62\x83\x60\xfa\x73\x53\x8b\x8b\x13\xd3\x53\xe3\x33\x53\x14\xc2\x1c\x83\x9c\x3d\x1c\x83\xac\xb9\x00\x01\x00\x00\xff\xff\xd3\x07\x7d\x14\xca\x00\x00\x00")
-
-func _1642423163_add_mutual_contact_requestUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1642423163_add_mutual_contact_requestUpSql,
-		"1642423163_add_mutual_contact_request.up.sql",
-	)
-}
-
-func _1642423163_add_mutual_contact_requestUpSql() (*asset, error) {
-	bytes, err := _1642423163_add_mutual_contact_requestUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1642423163_add_mutual_contact_request.up.sql", size: 202, mode: os.FileMode(0644), modTime: time.Unix(1651569004, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0x7c, 0xb2, 0x38, 0x15, 0xf1, 0xd6, 0xf9, 0x8e, 0xfa, 0x3b, 0x20, 0x8f, 0x3b, 0xb4, 0x3a, 0xb, 0x30, 0x9e, 0x71, 0x6a, 0x6d, 0x81, 0x11, 0x85, 0xb0, 0x5b, 0xd6, 0x19, 0x6c, 0xdd, 0x73}}
-	return a, nil
-}
-
 var __1645034601_display_nameUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xc9\x2c\x2e\xc8\x49\xac\x8c\xcf\x4b\xcc\x4d\x55\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\x41\x32\x21\xd8\x35\x04\x55\xab\x2d\x58\x19\x20\x00\x00\xff\xff\xb1\x9a\x55\xd1\x6e\x00\x00\x00")
 
 func _1645034601_display_nameUpSqlBytes() ([]byte, error) {
@@ -1138,6 +1118,26 @@ func _1645034601_display_nameUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1645034601_display_name.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1651568398, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x15, 0xfc, 0xda, 0x70, 0x53, 0x19, 0x90, 0x20, 0x4, 0x1c, 0x99, 0x42, 0x53, 0x1a, 0xd6, 0xb8, 0xbb, 0x8a, 0xe8, 0xbe, 0xcc, 0xb7, 0xc, 0x7f, 0x73, 0x50, 0x18, 0xf1, 0x8b, 0x18, 0x54, 0x64}}
+	return a, nil
+}
+
+var __1645034602_add_mutual_contact_requestUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\x8f\xc1\x8a\x83\x30\x14\x45\xf7\xf9\x8a\xbb\x54\xf0\x0f\x5c\x45\x0d\x8c\x4c\x8c\x43\x88\x03\xae\x24\xd8\x87\x84\xa2\x6d\x7d\x71\xd1\xbf\x2f\x5d\x54\x74\xd1\xf5\xe1\x70\xcf\x2d\xad\x92\x4e\xc1\xc9\x42\x2b\x8c\xb7\x25\xfa\x31\x0e\x2b\x3d\x36\xe2\xc8\x48\x04\xc0\x61\x5a\xc2\x32\x0d\x57\x7a\xe2\x5f\xda\xf2\x47\x5a\x98\xd6\xc1\x74\x5a\x67\x02\xbb\xf4\x8d\xbf\x7d\x1f\xb7\x95\x50\xe8\xb6\x38\xa1\x18\x66\xe2\xe8\xe7\x3b\x6a\xe3\x4e\xe4\xcf\xd6\x8d\xb4\x3d\x7e\x55\x8f\xe4\x50\x90\x1d\xe7\x52\x91\xe6\x42\x48\xed\x94\x3d\x1f\x60\xc8\xaa\x42\xd9\xea\xae\x31\xbb\x30\x13\xb3\x9f\x68\x08\x97\x4f\x66\x2e\x5e\x01\x00\x00\xff\xff\x89\x52\x87\x07\xfe\x00\x00\x00")
+
+func _1645034602_add_mutual_contact_requestUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1645034602_add_mutual_contact_requestUpSql,
+		"1645034602_add_mutual_contact_request.up.sql",
+	)
+}
+
+func _1645034602_add_mutual_contact_requestUpSql() (*asset, error) {
+	bytes, err := _1645034602_add_mutual_contact_requestUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1645034602_add_mutual_contact_request.up.sql", size: 254, mode: os.FileMode(0644), modTime: time.Unix(1651569030, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0x4d, 0x5d, 0x9, 0x9c, 0x4b, 0xe5, 0x57, 0xc4, 0x66, 0x4a, 0x88, 0x8c, 0xe3, 0xaf, 0xd1, 0xcf, 0xb5, 0xc, 0x44, 0xe3, 0x3f, 0x87, 0x33, 0xb2, 0x15, 0xf, 0xfb, 0xf5, 0x49, 0x2a, 0xe7}}
 	return a, nil
 }
 
@@ -1370,9 +1370,9 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1637852321_add_received_invitation_admin_column_in_chats.up.sql": _1637852321_add_received_invitation_admin_column_in_chatsUpSql,
 
-	"1642423163_add_mutual_contact_request.up.sql": _1642423163_add_mutual_contact_requestUpSql,
-
 	"1645034601_display_name.up.sql": _1645034601_display_nameUpSql,
+
+	"1645034602_add_mutual_contact_request.up.sql": _1645034602_add_mutual_contact_requestUpSql,
 
 	"README.md": readmeMd,
 
@@ -1469,10 +1469,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1634896007_add_last_updated_locally_and_removed.up.sql":                  &bintree{_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
 	"1635840039_add_clock_read_at_column_in_chats.up.sql":                     &bintree{_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
 	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":         &bintree{_1637852321_add_received_invitation_admin_column_in_chatsUpSql, map[string]*bintree{}},
-	"1642423163_add_mutual_contact_request.up.sql":                            &bintree{_1642423163_add_mutual_contact_requestUpSql, map[string]*bintree{}},
 	"1645034601_display_name.up.sql":                                          &bintree{_1645034601_display_nameUpSql, map[string]*bintree{}},
-	"README.md":                                                               &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                  &bintree{docGo, map[string]*bintree{}},
+	"1645034602_add_mutual_contact_request.up.sql":                            &bintree{_1645034602_add_mutual_contact_requestUpSql, map[string]*bintree{}},
+	"README.md": &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
