@@ -108,7 +108,9 @@ func (s *identiconHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", "max-age:290304000, public")
+	w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
+
 	_, err = w.Write(image)
 	if err != nil {
 		s.logger.Error("failed to write image", zap.Error(err))
@@ -139,6 +141,8 @@ func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
 	_, err = w.Write(image)
 	if err != nil {
 		s.logger.Error("failed to write image", zap.Error(err))
