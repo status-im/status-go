@@ -18,7 +18,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/types"
@@ -145,22 +144,6 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	mailserver := "enode://e4865fe6c2a9c1a563a6447990d8e9ce672644ae3e08277ce38ec1f1b690eef6320c07a5d60c3b629f5d4494f93d6b86a745a0bf64ab295bbf6579017adc6ed8@206.189.243.161:443"
-
-	mailserverNode, err := enode.ParseV4(mailserver)
-	if err != nil {
-		logger.Error("failed to parse mailserver", "error", err)
-		return
-	}
-	err = backend.StatusNode().WakuExtService().UpdateMailservers([]*enode.Node{mailserverNode})
-	if err != nil {
-		logger.Error("failed to update mailservers", "error", err)
-		return
-
-	}
-	messenger.SetMailserver(mailserverNode.ID().Bytes())
-
-	time.Sleep(5 * time.Second)
 	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID)
 	if err != nil {
 

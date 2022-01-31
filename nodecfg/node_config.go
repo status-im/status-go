@@ -192,14 +192,13 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts, 
 		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
 		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
-		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, enable_mailserver_cycle, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, synthetic_id
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.ShhextConfig.PFSEnabled, c.ShhextConfig.BackupDisabledDataDir, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
 		c.ShhextConfig.EnableLastUsedMonitor, c.ShhextConfig.ConnectionTarget, c.ShhextConfig.RequestsDelay, c.ShhextConfig.MaxServerFailures, c.ShhextConfig.MaxMessageDeliveryAttempts,
 		c.ShhextConfig.WhisperCacheDir, c.ShhextConfig.DisableGenericDiscoveryTopic, c.ShhextConfig.SendV1Messages, c.ShhextConfig.DataSyncEnabled, c.ShhextConfig.VerifyTransactionURL,
 		c.ShhextConfig.VerifyENSURL, c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.VerifyTransactionChainID, c.ShhextConfig.AnonMetricsServerEnabled,
-		c.ShhextConfig.AnonMetricsSendID, c.ShhextConfig.AnonMetricsServerPostgresURI, c.ShhextConfig.BandwidthStatsEnabled, c.ShhextConfig.EnableMailserverCycle,
-	)
+		c.ShhextConfig.AnonMetricsSendID, c.ShhextConfig.AnonMetricsServerPostgresURI, c.ShhextConfig.BandwidthStatsEnabled)
 	if err != nil {
 		return err
 	}
@@ -580,13 +579,13 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
 	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
 	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
-	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, enable_mailserver_cycle FROM shhext_config WHERE synthetic_id = 'id'
+	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.BackupDisabledDataDir, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,
 		&nodecfg.ShhextConfig.EnableLastUsedMonitor, &nodecfg.ShhextConfig.ConnectionTarget, &nodecfg.ShhextConfig.RequestsDelay, &nodecfg.ShhextConfig.MaxServerFailures, &nodecfg.ShhextConfig.MaxMessageDeliveryAttempts,
 		&nodecfg.ShhextConfig.WhisperCacheDir, &nodecfg.ShhextConfig.DisableGenericDiscoveryTopic, &nodecfg.ShhextConfig.SendV1Messages, &nodecfg.ShhextConfig.DataSyncEnabled, &nodecfg.ShhextConfig.VerifyTransactionURL,
 		&nodecfg.ShhextConfig.VerifyENSURL, &nodecfg.ShhextConfig.VerifyENSContractAddress, &nodecfg.ShhextConfig.VerifyTransactionChainID, &nodecfg.ShhextConfig.AnonMetricsServerEnabled,
-		&nodecfg.ShhextConfig.AnonMetricsSendID, &nodecfg.ShhextConfig.AnonMetricsServerPostgresURI, &nodecfg.ShhextConfig.BandwidthStatsEnabled, &nodecfg.ShhextConfig.EnableMailserverCycle,
+		&nodecfg.ShhextConfig.AnonMetricsSendID, &nodecfg.ShhextConfig.AnonMetricsServerPostgresURI, &nodecfg.ShhextConfig.BandwidthStatsEnabled,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err

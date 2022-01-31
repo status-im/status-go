@@ -38,7 +38,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.14.1
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.13 => github.com/status-im/go-ethereum v1.10.4-status.3
+# github.com/ethereum/go-ethereum v1.10.13 => github.com/status-im/go-ethereum v1.10.4-status.4
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi

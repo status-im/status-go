@@ -739,6 +739,16 @@ func (db *Database) GetPinnedMailservers() (rst map[string]string, err error) {
 	return
 }
 
+func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
+	jsonString, err := json.Marshal(mailservers)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.db.Exec("UPDATE settings SET pinned_mailservers = ? WHERE synthetic_id = 'id'", jsonString)
+	return err
+}
+
 func (db *Database) CanUseMailservers() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT use_mailservers FROM settings WHERE synthetic_id = 'id'").Scan(&result)
@@ -746,6 +756,11 @@ func (db *Database) CanUseMailservers() (bool, error) {
 		return result, nil
 	}
 	return result, err
+}
+
+func (db *Database) SetUseMailservers(value bool) error {
+	_, err := db.db.Exec("UPDATE settings SET use_mailservers = ?", value)
+	return err
 }
 
 func (db *Database) CanSyncOnMobileNetwork() (bool, error) {

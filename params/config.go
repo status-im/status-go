@@ -554,8 +554,6 @@ type ShhextConfig struct {
 	ConnectionTarget int
 	// RequestsDelay used to ensure that no similar requests are sent within short periods of time.
 	RequestsDelay time.Duration
-	// EnableMailserverCycle is used to enable the mailserver cycle to switch between trusted servers to retrieve the message history
-	EnableMailserverCycle bool
 	// MaxServerFailures defines maximum allowed expired requests before server will be swapped to another one.
 	MaxServerFailures int
 

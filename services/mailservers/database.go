@@ -9,15 +9,62 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
 type Mailserver struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Address  string `json:"address"`
-	Password string `json:"password,omitempty"`
-	Fleet    string `json:"fleet"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Custom         bool   `json:"custom"`
+	Address        string `json:"address"`
+	Password       string `json:"password,omitempty"`
+	Fleet          string `json:"fleet"`
+	Version        uint   `json:"version"`
+	FailedRequests uint   `json:"-"`
+}
+
+func (m Mailserver) Enode() (*enode.Node, error) {
+	return enode.ParseV4(m.Address)
+}
+
+func (m Mailserver) IDBytes() ([]byte, error) {
+	if m.Version == 2 {
+		id, err := peer.Decode(m.UniqueID())
+		if err != nil {
+			return nil, err
+		}
+		return []byte(id.Pretty()), err
+	}
+
+	node, err := enode.ParseV4(m.Address)
+	if err != nil {
+		return nil, err
+	}
+	return node.ID().Bytes(), nil
+}
+
+func (m Mailserver) PeerID() (*peer.ID, error) {
+	if m.Version != 2 {
+		return nil, errors.New("not available")
+	}
+
+	pID, err := peer.Decode(m.UniqueID())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pID, nil
+}
+
+func (m Mailserver) UniqueID() string {
+	if m.Version == 2 {
+		s := strings.Split(m.Address, "/")
+		return s[len(s)-1]
+	}
+	return m.Address
 }
 
 func (m Mailserver) nullablePassword() (val sql.NullString) {
@@ -119,6 +166,7 @@ func (d *Database) Mailservers() ([]Mailserver, error) {
 		); err != nil {
 			return nil, err
 		}
+		m.Custom = true
 		if password.Valid {
 			m.Password = password.String
 		}

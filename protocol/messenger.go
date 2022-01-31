@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/pkg/errors"
@@ -29,7 +27,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
@@ -117,7 +114,6 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	mailserver                 []byte
 	mailserverCycle            mailserverCycle
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
@@ -133,7 +129,8 @@ type Messenger struct {
 	telemetryClient            *telemetry.Client
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
-	mutex sync.Mutex
+	mutex          sync.Mutex
+	mailPeersMutex sync.Mutex
 }
 
 type connStatus int
@@ -148,11 +145,11 @@ type peerStatus struct {
 	status                connStatus
 	canConnectAfter       time.Time
 	lastConnectionAttempt time.Time
+	mailserver            mailserversDB.Mailserver
 }
 type mailserverCycle struct {
 	sync.RWMutex
-	activeMailserver *enode.Node // For usage with wakuV1
-	activeStoreNode  *peer.ID    // For usage with wakuV2
+	activeMailserver *mailserversDB.Mailserver
 	peers            map[string]peerStatus
 	events           chan *p2p.PeerEvent
 	subscription     event.Subscription
@@ -488,7 +485,7 @@ func (m *Messenger) processSentMessages(ids []string) error {
 			return errors.Wrapf(err, "Can't save raw message marked as sent")
 		}
 
-		err = m.UpdateMessageOutgoingStatus(id, "sent")
+		err = m.UpdateMessageOutgoingStatus(id, common.OutgoingStatusSent)
 		if err != nil {
 			return err
 		}
@@ -643,20 +640,15 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	if m.mailserversDatabase != nil {
-		mailservers, err := m.mailserversDatabase.Mailservers()
-		if err != nil {
-			return nil, err
-		}
-		response.Mailservers = mailservers
-
+	mailservers, err := m.allMailservers()
+	if err != nil {
+		return nil, err
 	}
 
-	if m.config.featureFlags.MailserverCycle {
-		err := m.StartMailserverCycle()
-		if err != nil {
-			return nil, err
-		}
+	response.Mailservers = mailservers
+	err = m.StartMailserverCycle()
+	if err != nil {
+		return nil, err
 	}
 
 	err = m.httpServer.Start()
@@ -702,15 +694,18 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			}
 			m.shouldPublishContactCode = false
 		}
+		go func() {
+			_, err := m.RequestAllHistoricMessagesWithRetries()
+			if err != nil {
+				m.logger.Warn("failed to fetch historic messages", zap.Error(err))
+			}
+		}()
 
 	} else {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Offline()
 		}
 
-		if m.config.featureFlags.MailserverCycle {
-			m.DisconnectActiveMailserver() // force mailserver cycle to run again
-		}
 	}
 
 	m.ensVerifier.SetOnline(online)
@@ -2934,6 +2929,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 
 		messageID := messageIDBytes.String()
 		//mark messages as delivered
+
 		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
@@ -3836,24 +3832,6 @@ func (m *Messenger) storeSyncBookmarks(bookmarkMap map[string]*browsers.Bookmark
 		bookmarks = append(bookmarks, bookmark)
 	}
 	return m.browserDatabase.StoreSyncBookmarks(bookmarks)
-}
-
-// SetMailserver sets the currently used mailserver
-func (m *Messenger) SetMailserver(peer []byte) {
-	m.mailserver = peer
-}
-
-func (m *Messenger) RequestHistoricMessages(
-	ctx context.Context,
-	from, to uint32,
-	cursor []byte,
-	storeCursor *types.StoreRequestCursor,
-	waitForResponse bool,
-) ([]byte, *types.StoreRequestCursor, error) {
-	if m.mailserver == nil {
-		return nil, nil, errors.New("no mailserver selected")
-	}
-	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, storeCursor, waitForResponse)
 }
 
 func (m *Messenger) MessageByID(id string) (*common.Message, error) {

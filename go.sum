@@ -1210,8 +1210,8 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/go-discover v0.0.0-20220220162124-91b97a3e0efe h1:Wz82CcseYsvh71f5tbomwjOc3lMohohqjyvfOhplLsI=
 github.com/status-im/go-discover v0.0.0-20220220162124-91b97a3e0efe/go.mod h1:sfq3nyUDYY7Z4SnmDZ/KxTNj/7vu+Eyp4bsm1Hfj1QQ=
-github.com/status-im/go-ethereum v1.10.4-status.3 h1:RF618iSCvqJtXu3ZSg7XNg6MJaSTgZNJQZkjpTgV3C8=
-github.com/status-im/go-ethereum v1.10.4-status.3/go.mod h1:GvIhpdCOgMHI6i5xVPEZOrv/qSMeOFHbZh77AoyZUoE=
+github.com/status-im/go-ethereum v1.10.4-status.4 h1:Cs0MoHEhF0LEwii2R8U8jMSEW/gycbHvSJt//KSdP8c=
+github.com/status-im/go-ethereum v1.10.4-status.4/go.mod h1:GvIhpdCOgMHI6i5xVPEZOrv/qSMeOFHbZh77AoyZUoE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.1 h1:09v9n6426NAojNOvdgegqrAotgffWW/UPDwrpJ85DNE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.1/go.mod h1:SlBebvQcSUM5+/R/YfpfMuu5WyraW47XFmIqLYBmlKU=
 github.com/status-im/go-waku v0.0.0-20220303160403-f4f307db8734 h1:uyBsGFFH63+SHerRGKRrlWVYI8XFm3PoP4v2ma4RFIs=
