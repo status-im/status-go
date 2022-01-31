@@ -134,7 +134,10 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	if err != nil {
 		return nil, err
 	}
-	m.scheduleSyncFilter(filter)
+	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
+	if err != nil {
+		return nil, err
+	}
 
 	ensName, err = m.settings.ENSName()
 	if err != nil {

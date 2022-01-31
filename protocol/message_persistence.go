@@ -1511,8 +1511,8 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 	_, err := db.db.Exec(`
 		UPDATE user_messages
 		SET outgoing_status = ?
-		WHERE id = ?
-	`, newOutgoingStatus, id)
+		WHERE id = ? AND outgoing_status != ?
+	`, newOutgoingStatus, id, common.OutgoingStatusDelivered)
 	return err
 }
 

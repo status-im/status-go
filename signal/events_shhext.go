@@ -54,6 +54,9 @@ const (
 
 	// EventMailserverChanged is triggered when switching the active mailserver
 	EventMailserverChanged = "mailserver.changed"
+
+	// EventMailserverNotWorking is triggered when the mailserver has failed to connect or failed to respond to requests
+	EventMailserverNotWorking = "mailserver.not.working"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -91,6 +94,7 @@ type BundleAddedSignal struct {
 
 type MailserverSignal struct {
 	Address string `json:"address"`
+	ID      string `json:"id"`
 }
 
 type Filter struct {
@@ -205,14 +209,20 @@ func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
 }
 
-func SendMailserverAvailable(nodeAddress string) {
+func SendMailserverAvailable(nodeAddress, id string) {
 	send(EventMailserverAvailable, MailserverSignal{
 		Address: nodeAddress,
+		ID:      id,
 	})
 }
 
-func SendMailserverChanged(nodeAddress string) {
+func SendMailserverChanged(nodeAddress, id string) {
 	send(EventMailserverChanged, MailserverSignal{
 		Address: nodeAddress,
+		ID:      id,
 	})
+}
+
+func SendMailserverNotWorking() {
+	send(EventMailserverNotWorking, MailserverSignal{})
 }

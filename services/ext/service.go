@@ -194,6 +194,10 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 	for {
 		select {
 		case <-ticker.C:
+			// We might be shutting down here
+			if s.messenger == nil {
+				return
+			}
 			response, err := s.messenger.RetrieveAll()
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
@@ -333,24 +337,6 @@ func (s *Service) DisableInstallation(installationID string) error {
 	return s.messenger.DisableInstallation(installationID)
 }
 
-// UpdateMailservers updates information about selected mail servers.
-func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
-	if len(nodes) > 0 && s.messenger != nil {
-		s.messenger.SetMailserver(nodes[0].ID().Bytes())
-	}
-	for _, peer := range nodes {
-		s.server.AddPeer(peer)
-	}
-	if err := s.peerStore.Update(nodes); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Service) SetMailserver(peer []byte) {
-	s.messenger.SetMailserver(peer)
-}
-
 // Protocols returns a new protocols list. In this case, there are none.
 func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
@@ -422,10 +408,6 @@ func buildMessengerOptions(
 
 	if config.ShhextConfig.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
-	}
-
-	if config.ShhextConfig.EnableMailserverCycle {
-		options = append(options, protocol.WithMailserverCycle())
 	}
 
 	settings, err := accountsDB.GetSettings()

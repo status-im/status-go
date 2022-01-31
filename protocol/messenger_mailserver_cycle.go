@@ -7,15 +7,10 @@ import (
 	"math/big"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-
-	"github.com/status-im/go-waku/waku/v2/dnsdisc"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -24,29 +19,51 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-const defaultBackoff = 30 * time.Second
+const defaultBackoff = 10 * time.Second
+const graylistBackoff = 3 * time.Minute
 
-type byRTTMs []*mailservers.PingResult
+func (m *Messenger) mailserversByFleet(fleet string) []mailservers.Mailserver {
+	var items []mailservers.Mailserver
+	for _, ms := range mailservers.DefaultMailservers() {
+		if ms.Fleet == fleet {
+			items = append(items, ms)
+		}
+	}
+	return items
+}
 
-func (s byRTTMs) Len() int {
+type byRTTMsAndCanConnectBefore []SortedMailserver
+
+func (s byRTTMsAndCanConnectBefore) Len() int {
 	return len(s)
 }
 
-func (s byRTTMs) Swap(i, j int) {
+func (s byRTTMsAndCanConnectBefore) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s byRTTMs) Less(i, j int) bool {
-	return *s[i].RTTMs < *s[j].RTTMs
+func (s byRTTMsAndCanConnectBefore) Less(i, j int) bool {
+	// Slightly inaccurate as time sensitive sorting, but it does not matter so much
+	now := time.Now()
+	if s[i].CanConnectAfter.Before(now) && s[j].CanConnectAfter.Before(now) {
+		return s[i].RTTMs < s[j].RTTMs
+	}
+	return s[i].CanConnectAfter.Before(s[j].CanConnectAfter)
+}
+
+func (m *Messenger) activeMailserverID() ([]byte, error) {
+	if m.mailserverCycle.activeMailserver == nil {
+		return nil, nil
+	}
+
+	return m.mailserverCycle.activeMailserver.IDBytes()
 }
 
 func (m *Messenger) StartMailserverCycle() error {
-	canUseMailservers, err := m.settings.CanUseMailservers()
-	if err != nil {
-		return err
-	}
-	if !canUseMailservers {
-		return errors.New("mailserver use is not allowed")
+
+	if m.server == nil {
+		m.logger.Warn("not starting mailserver cycle")
+		return nil
 	}
 
 	m.logger.Debug("started mailserver cycle")
@@ -54,7 +71,6 @@ func (m *Messenger) StartMailserverCycle() error {
 	m.mailserverCycle.events = make(chan *p2p.PeerEvent, 20)
 	m.mailserverCycle.subscription = m.server.SubscribeEvents(m.mailserverCycle.events)
 
-	go m.checkMailserverConnection()
 	go m.updateWakuV1PeerStatus()
 	go m.updateWakuV2PeerStatus()
 	return nil
@@ -66,67 +82,59 @@ func (m *Messenger) DisconnectActiveMailserver() {
 	m.disconnectActiveMailserver()
 }
 
-func (m *Messenger) disconnectV1Mailserver() {
-	// TODO: remove this function once WakuV1 is deprecated
+func (m *Messenger) disconnectMailserver() error {
 	if m.mailserverCycle.activeMailserver == nil {
-		return
+		m.logger.Info("no active mailserver")
+		return nil
 	}
-	m.logger.Info("Disconnecting active mailserver", zap.Any("nodeID", m.mailserverCycle.activeMailserver.ID()))
-	pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID().String()]
+	m.logger.Info("disconnecting active mailserver", zap.String("nodeID", m.mailserverCycle.activeMailserver.ID))
+	m.mailPeersMutex.Lock()
+	pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID]
 	if ok {
 		pInfo.status = disconnected
-		pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID().String()] = pInfo
+		pInfo.canConnectAfter = time.Now().Add(graylistBackoff)
+		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = pInfo
 	} else {
-		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID().String()] = peerStatus{
+		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = peerStatus{
 			status:          disconnected,
-			canConnectAfter: time.Now().Add(defaultBackoff),
+			mailserver:      *m.mailserverCycle.activeMailserver,
+			canConnectAfter: time.Now().Add(graylistBackoff),
 		}
 	}
+	m.mailPeersMutex.Unlock()
 
-	m.server.RemovePeer(m.mailserverCycle.activeMailserver)
+	if m.mailserverCycle.activeMailserver.Version == 2 {
+		peerID, err := m.mailserverCycle.activeMailserver.PeerID()
+		if err != nil {
+			return err
+		}
+		err = m.transport.DropPeer(string(*peerID))
+		if err != nil {
+			m.logger.Warn("could not drop peer")
+			return err
+		}
+
+	} else {
+		node, err := m.mailserverCycle.activeMailserver.Enode()
+		if err != nil {
+			return err
+		}
+		m.server.RemovePeer(node)
+	}
+
 	m.mailserverCycle.activeMailserver = nil
-}
-
-func (m *Messenger) disconnectStoreNode() {
-	if m.mailserverCycle.activeStoreNode == nil {
-		return
-	}
-	m.logger.Info("Disconnecting active storeNode", zap.Any("nodeID", m.mailserverCycle.activeStoreNode.Pretty()))
-	pInfo, ok := m.mailserverCycle.peers[string(*m.mailserverCycle.activeStoreNode)]
-	if ok {
-		pInfo.status = disconnected
-		pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-		m.mailserverCycle.peers[string(*m.mailserverCycle.activeStoreNode)] = pInfo
-	} else {
-		m.mailserverCycle.peers[string(*m.mailserverCycle.activeStoreNode)] = peerStatus{
-			status:          disconnected,
-			canConnectAfter: time.Now().Add(defaultBackoff),
-		}
-	}
-
-	err := m.transport.DropPeer(string(*m.mailserverCycle.activeStoreNode))
-	if err != nil {
-		m.logger.Warn("Could not drop peer")
-	}
-
-	m.mailserverCycle.activeStoreNode = nil
+	return nil
 }
 
 func (m *Messenger) disconnectActiveMailserver() {
-	switch m.transport.WakuVersion() {
-	case 1:
-		m.disconnectV1Mailserver()
-	case 2:
-		m.disconnectStoreNode()
+	err := m.disconnectMailserver()
+	if err != nil {
+		m.logger.Error("failed to disconnect mailserver", zap.Error(err))
 	}
-	signal.SendMailserverChanged("")
+	signal.SendMailserverChanged("", "")
 }
 
 func (m *Messenger) cycleMailservers() {
-	m.mailserverCycle.Lock()
-	defer m.mailserverCycle.Unlock()
-
 	m.logger.Info("Automatically switching mailserver")
 
 	if m.mailserverCycle.activeMailserver != nil {
@@ -141,78 +149,6 @@ func (m *Messenger) cycleMailservers() {
 
 func poolSize(fleetSize int) int {
 	return int(math.Ceil(float64(fleetSize) / 4))
-}
-
-func (m *Messenger) findNewMailserver() error {
-	switch m.transport.WakuVersion() {
-	case 1:
-		return m.findNewMailserverV1()
-	case 2:
-		return m.findStoreNode()
-	default:
-		return errors.New("waku version is not supported")
-	}
-}
-
-func (m *Messenger) findStoreNode() error {
-	allMailservers := parseStoreNodeConfig(m.config.clusterConfig.StoreNodes)
-
-	// TODO: append user mailservers once that functionality is available for waku2
-
-	var mailserverList []multiaddr.Multiaddr
-	now := time.Now()
-	for _, node := range allMailservers {
-		pID, err := getPeerID(node)
-		if err != nil {
-			continue
-		}
-
-		pInfo, ok := m.mailserverCycle.peers[string(pID)]
-		if !ok || pInfo.canConnectAfter.Before(now) {
-			mailserverList = append(mailserverList, node)
-		}
-	}
-
-	m.logger.Info("Finding a new store node...")
-
-	var mailserverStr []string
-	for _, m := range mailserverList {
-		mailserverStr = append(mailserverStr, m.String())
-	}
-
-	pingResult, err := mailservers.DoPing(context.Background(), mailserverStr, 500, mailservers.MultiAddressToAddress)
-	if err != nil {
-		return err
-	}
-
-	var availableMailservers []*mailservers.PingResult
-	for _, result := range pingResult {
-		if result.Err != nil {
-			continue // The results with error are ignored
-		}
-		availableMailservers = append(availableMailservers, result)
-	}
-	sort.Sort(byRTTMs(availableMailservers))
-
-	if len(availableMailservers) == 0 {
-		m.logger.Warn("No store nodes available") // Do nothing...
-		return nil
-	}
-
-	// Picks a random mailserver amongs the ones with the lowest latency
-	// The pool size is 1/4 of the mailservers were pinged successfully
-	pSize := poolSize(len(availableMailservers) - 1)
-	if pSize <= 0 {
-		m.logger.Warn("No store nodes available") // Do nothing...
-		return nil
-	}
-
-	r, err := rand.Int(rand.Reader, big.NewInt(int64(pSize)))
-	if err != nil {
-		return err
-	}
-
-	return m.connectToStoreNode(parseMultiaddresses([]string{availableMailservers[r.Int64()].Address})[0])
 }
 
 func (m *Messenger) getFleet() (string, error) {
@@ -231,10 +167,44 @@ func (m *Messenger) getFleet() (string, error) {
 	return fleet, nil
 }
 
-func (m *Messenger) findNewMailserverV1() error {
-	// TODO: remove this function once WakuV1 is deprecated
+func (m *Messenger) allMailservers() ([]mailservers.Mailserver, error) {
+	// Append user mailservers
+	fleet, err := m.getFleet()
+	if err != nil {
+		return nil, err
+	}
 
-	allMailservers := parseNodes(m.config.clusterConfig.TrustedMailServers)
+	allMailservers := m.mailserversByFleet(fleet)
+
+	customMailservers, err := m.mailservers.Mailservers()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range customMailservers {
+		if c.Fleet == fleet {
+			allMailservers = append(allMailservers, c)
+		}
+	}
+
+	return allMailservers, nil
+}
+
+type SortedMailserver struct {
+	Address         string
+	RTTMs           int
+	CanConnectAfter time.Time
+}
+
+func (m *Messenger) findNewMailserver() error {
+	pinnedMailserver, err := m.getPinnedMailserver()
+	if err != nil {
+		m.logger.Error("Could not obtain the pinned mailserver", zap.Error(err))
+		return err
+	}
+	if pinnedMailserver != nil {
+		return m.connectToMailserver(*pinnedMailserver)
+	}
 
 	// Append user mailservers
 	fleet, err := m.getFleet()
@@ -242,36 +212,40 @@ func (m *Messenger) findNewMailserverV1() error {
 		return err
 	}
 
+	allMailservers := m.mailserversByFleet(fleet)
+
 	customMailservers, err := m.mailservers.Mailservers()
 	if err != nil {
 		return err
 	}
+
 	for _, c := range customMailservers {
 		if c.Fleet == fleet {
-			mNode, err := enode.ParseV4(c.Address)
-			if err != nil {
-				allMailservers = append(allMailservers, mNode)
-			}
-		}
-	}
-
-	var mailserverList []*enode.Node
-	now := time.Now()
-	for _, node := range allMailservers {
-		pInfo, ok := m.mailserverCycle.peers[node.ID().String()]
-		if !ok || pInfo.canConnectAfter.Before(now) {
-			mailserverList = append(mailserverList, node)
+			allMailservers = append(allMailservers, c)
 		}
 	}
 
 	m.logger.Info("Finding a new mailserver...")
 
 	var mailserverStr []string
-	for _, m := range mailserverList {
-		mailserverStr = append(mailserverStr, m.String())
+	for _, m := range allMailservers {
+		mailserverStr = append(mailserverStr, m.Address)
 	}
 
-	pingResult, err := mailservers.DoPing(context.Background(), mailserverStr, 500, mailservers.EnodeStringToAddr)
+	if len(allMailservers) == 0 {
+		m.logger.Warn("no mailservers available") // Do nothing...
+		return nil
+
+	}
+
+	var parseFn func(string) (string, error)
+	if allMailservers[0].Version == 2 {
+		parseFn = mailservers.MultiAddressToAddress
+	} else {
+		parseFn = mailservers.EnodeStringToAddr
+	}
+
+	pingResult, err := mailservers.DoPing(context.Background(), mailserverStr, 500, parseFn)
 	if err != nil {
 		return err
 	}
@@ -279,23 +253,46 @@ func (m *Messenger) findNewMailserverV1() error {
 	var availableMailservers []*mailservers.PingResult
 	for _, result := range pingResult {
 		if result.Err != nil {
+			m.logger.Info("connecting error", zap.String("eerr", *result.Err))
 			continue // The results with error are ignored
 		}
 		availableMailservers = append(availableMailservers, result)
 	}
-	sort.Sort(byRTTMs(availableMailservers))
 
 	if len(availableMailservers) == 0 {
 		m.logger.Warn("No mailservers available") // Do nothing...
 		return nil
 	}
 
+	mailserversByAddress := make(map[string]mailservers.Mailserver)
+	for idx := range allMailservers {
+		mailserversByAddress[allMailservers[idx].Address] = allMailservers[idx]
+	}
+	var sortedMailservers []SortedMailserver
+	for _, ping := range availableMailservers {
+		address := ping.Address
+		ms := mailserversByAddress[address]
+		sortedMailserver := SortedMailserver{
+			Address: address,
+			RTTMs:   *ping.RTTMs,
+		}
+		m.mailPeersMutex.Lock()
+		pInfo, ok := m.mailserverCycle.peers[ms.ID]
+		m.mailPeersMutex.Unlock()
+		if ok {
+			sortedMailserver.CanConnectAfter = pInfo.canConnectAfter
+		}
+
+		sortedMailservers = append(sortedMailservers, sortedMailserver)
+
+	}
+	sort.Sort(byRTTMsAndCanConnectBefore(sortedMailservers))
+
 	// Picks a random mailserver amongs the ones with the lowest latency
 	// The pool size is 1/4 of the mailservers were pinged successfully
-	pSize := poolSize(len(availableMailservers) - 1)
+	pSize := poolSize(len(sortedMailservers) - 1)
 	if pSize <= 0 {
-		m.logger.Warn("No store nodes available") // Do nothing...
-		return nil
+		pSize = len(sortedMailservers)
 	}
 
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(pSize)))
@@ -303,41 +300,33 @@ func (m *Messenger) findNewMailserverV1() error {
 		return err
 	}
 
-	return m.connectToMailserver(parseNodes([]string{availableMailservers[r.Int64()].Address})[0])
+	msPing := sortedMailservers[r.Int64()]
+	ms := mailserversByAddress[msPing.Address]
+	m.logger.Info("connecting to mailserver", zap.String("address", ms.Address))
+	return m.connectToMailserver(ms)
 }
 
 func (m *Messenger) activeMailserverStatus() (connStatus, error) {
-	var mailserverID string
-	switch m.transport.WakuVersion() {
-	case 1:
-		if m.mailserverCycle.activeMailserver == nil {
-			return disconnected, errors.New("Active mailserver is not set")
-		}
-		mailserverID = m.mailserverCycle.activeMailserver.ID().String()
-	case 2:
-		if m.mailserverCycle.activeStoreNode == nil {
-			return disconnected, errors.New("Active storenode is not set")
-		}
-		mailserverID = string(*m.mailserverCycle.activeStoreNode)
-	default:
-		return disconnected, errors.New("waku version is not supported")
+	if m.mailserverCycle.activeMailserver == nil {
+		return disconnected, errors.New("Active mailserver is not set")
 	}
 
-	return m.mailserverCycle.peers[mailserverID].status, nil
+	mailserverID := m.mailserverCycle.activeMailserver.ID
+
+	m.mailPeersMutex.Lock()
+	status := m.mailserverCycle.peers[mailserverID].status
+	m.mailPeersMutex.Unlock()
+
+	return status, nil
+
 }
 
-func (m *Messenger) connectToMailserver(node *enode.Node) error {
-	// TODO: remove this function once WakuV1 is deprecated
+func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
-	if m.transport.WakuVersion() != 1 {
-		return nil // This can only be used with wakuV1
-	}
+	m.logger.Info("connecting to mailserver", zap.Any("peer", ms.ID))
 
-	m.logger.Info("Connecting to mailserver", zap.Any("peer", node.ID()))
-	nodeConnected := false
-
-	m.mailserverCycle.activeMailserver = node
-	signal.SendMailserverChanged(m.mailserverCycle.activeMailserver.String())
+	m.mailserverCycle.activeMailserver = &ms
+	signal.SendMailserverChanged(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 
 	// Adding a peer and marking it as connected can't be executed sync in WakuV1, because
 	// There's a delay between requesting a peer being added, and a signal being
@@ -349,105 +338,49 @@ func (m *Messenger) connectToMailserver(node *enode.Node) error {
 		return err
 	}
 
-	if activeMailserverStatus == connected {
-		nodeConnected = true
-	} else {
+	if activeMailserverStatus != connected {
 		// Attempt to connect to mailserver by adding it as a peer
-		m.SetMailserver(node.ID().Bytes())
-		m.server.AddPeer(node)
-		if err := m.peerStore.Update([]*enode.Node{node}); err != nil {
-			return err
+
+		if ms.Version == 2 {
+			if err := m.transport.DialPeer(ms.Address); err != nil {
+				m.logger.Error("failed to dial", zap.Error(err))
+				return err
+			}
+		} else {
+			node, err := ms.Enode()
+			if err != nil {
+				return err
+			}
+			m.server.AddPeer(node)
+			if err := m.peerStore.Update([]*enode.Node{node}); err != nil {
+				return err
+			}
 		}
 
-		pInfo, ok := m.mailserverCycle.peers[node.ID().String()]
+		m.mailPeersMutex.Lock()
+		pInfo, ok := m.mailserverCycle.peers[ms.ID]
 		if ok {
 			pInfo.status = connecting
 			pInfo.lastConnectionAttempt = time.Now()
-			m.mailserverCycle.peers[node.ID().String()] = pInfo
+			pInfo.mailserver = ms
+			m.mailserverCycle.peers[ms.ID] = pInfo
 		} else {
-			m.mailserverCycle.peers[node.ID().String()] = peerStatus{
+			m.mailserverCycle.peers[ms.ID] = peerStatus{
 				status:                connecting,
+				mailserver:            ms,
 				lastConnectionAttempt: time.Now(),
 			}
 		}
+		m.mailPeersMutex.Unlock()
 	}
-
-	if nodeConnected {
-		m.logger.Info("Mailserver available")
-		signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.String())
-	}
-
 	return nil
 }
 
-func (m *Messenger) connectToStoreNode(node multiaddr.Multiaddr) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil // This can only be used with wakuV2
-	}
-
-	m.logger.Info("Connecting to storenode", zap.Any("peer", node))
-
-	nodeConnected := false
-
-	peerID, err := getPeerID(node)
-	if err != nil {
-		return err
-	}
-
-	m.mailserverCycle.activeStoreNode = &peerID
-	signal.SendMailserverChanged(m.mailserverCycle.activeStoreNode.Pretty())
-
-	// Adding a peer and marking it as connected can't be executed sync in WakuV1, because
-	// There's a delay between requesting a peer being added, and a signal being
-	// received after the peer was added. So we first set the peer status as
-	// Connecting and once a peerConnected signal is received, we mark it as
-	// Connected
-	activeMailserverStatus, err := m.activeMailserverStatus()
-	if err != nil {
-		return err
-	}
-
-	if activeMailserverStatus == connected {
-		nodeConnected = true
-	} else {
-		// Attempt to connect to mailserver by adding it as a peer
-		m.SetMailserver([]byte(peerID.Pretty()))
-		if err := m.transport.DialPeer(node.String()); err != nil {
-			return err
-		}
-
-		pInfo, ok := m.mailserverCycle.peers[string(peerID)]
-		if ok {
-			pInfo.status = connected
-			pInfo.lastConnectionAttempt = time.Now()
-		} else {
-			m.mailserverCycle.peers[string(peerID)] = peerStatus{
-				status:                connected,
-				lastConnectionAttempt: time.Now(),
-			}
-		}
-
-		nodeConnected = true
-	}
-
-	if nodeConnected {
-		m.logger.Info("Storenode available")
-		signal.SendMailserverAvailable(m.mailserverCycle.activeStoreNode.Pretty())
-	}
-
-	return nil
-}
-
-func (m *Messenger) getActiveMailserver() *enode.Node {
-	m.mailserverCycle.RLock()
-	defer m.mailserverCycle.RUnlock()
+func (m *Messenger) getActiveMailserver() *mailservers.Mailserver {
 	return m.mailserverCycle.activeMailserver
 }
 
 func (m *Messenger) isActiveMailserverAvailable() bool {
-	m.mailserverCycle.RLock()
-	defer m.mailserverCycle.RUnlock()
-
 	mailserverStatus, err := m.activeMailserverStatus()
 	if err != nil {
 		return false
@@ -456,9 +389,201 @@ func (m *Messenger) isActiveMailserverAvailable() bool {
 	return mailserverStatus == connected
 }
 
+func (m *Messenger) mailserverAddressToID(uniqueID string) (string, error) {
+	allMailservers, err := m.allMailservers()
+	if err != nil {
+		return "", err
+	}
+
+	for _, ms := range allMailservers {
+		if uniqueID == ms.UniqueID() {
+			return ms.ID, nil
+		}
+
+	}
+
+	return "", nil
+}
+
+type ConnectedPeer struct {
+	UniqueID string
+}
+
+func (m *Messenger) mailserverPeersInfo() []ConnectedPeer {
+	var connectedPeers []ConnectedPeer
+	for _, connectedPeer := range m.server.PeersInfo() {
+		connectedPeers = append(connectedPeers, ConnectedPeer{
+			// This is a bit fragile, but should work
+			UniqueID: strings.TrimSuffix(connectedPeer.Enode, "?discport=0"),
+		})
+	}
+
+	return connectedPeers
+}
+
+func (m *Messenger) penalizeMailserver(id string) {
+	m.mailPeersMutex.Lock()
+	defer m.mailPeersMutex.Unlock()
+	pInfo, ok := m.mailserverCycle.peers[id]
+	if !ok {
+		pInfo.status = disconnected
+	}
+
+	pInfo.canConnectAfter = time.Now().Add(graylistBackoff)
+	m.mailserverCycle.peers[id] = pInfo
+}
+
+func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) error {
+	m.logger.Debug("connected peers", zap.Any("connected", connectedPeers))
+	m.logger.Debug("peers info", zap.Any("peer-info", m.mailserverCycle.peers))
+
+	m.mailPeersMutex.Lock()
+	for pID, pInfo := range m.mailserverCycle.peers {
+		if pInfo.status == disconnected {
+			continue
+		}
+
+		// Removing disconnected
+
+		found := false
+		for _, connectedPeer := range connectedPeers {
+			id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
+			if err != nil {
+				m.logger.Error("failed to convert id to hex", zap.Error(err))
+				return err
+			}
+
+			if pID == id {
+				found = true
+				break
+			}
+		}
+		if !found && (pInfo.status == connected || (pInfo.status == connecting && pInfo.lastConnectionAttempt.Add(8*time.Second).Before(time.Now()))) {
+			m.logger.Info("peer disconnected", zap.String("peer", pID))
+			pInfo.status = disconnected
+			pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
+		}
+
+		m.mailserverCycle.peers[pID] = pInfo
+	}
+
+	for _, connectedPeer := range connectedPeers {
+		id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
+		if err != nil {
+			m.logger.Error("failed to convert id to hex", zap.Error(err))
+			return err
+		}
+		if id == "" {
+			continue
+		}
+		pInfo, ok := m.mailserverCycle.peers[id]
+		if !ok || pInfo.status != connected {
+			m.logger.Info("peer connected", zap.String("peer", connectedPeer.UniqueID))
+			pInfo.status = connected
+			if pInfo.canConnectAfter.Before(time.Now()) {
+				pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
+			}
+
+			if m.mailserverCycle.activeMailserver != nil && id == m.mailserverCycle.activeMailserver.ID {
+				m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
+				signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
+			}
+			// Query mailserver
+			go func() {
+				_, err := m.performMailserverRequest(m.RequestAllHistoricMessages)
+				if err != nil {
+					m.logger.Error("could not perform mailserver request", zap.Error(err))
+				}
+			}()
+
+			m.mailserverCycle.peers[id] = pInfo
+		}
+	}
+	m.mailPeersMutex.Unlock()
+	// Check whether we want to disconnect the mailserver
+	if m.mailserverCycle.activeMailserver != nil {
+		if m.mailserverCycle.activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
+			m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
+			signal.SendMailserverNotWorking()
+			m.logger.Info("connecting too many failed requests")
+			m.mailserverCycle.activeMailserver.FailedRequests = 0
+
+			return m.connectToNewMailserverAndWait()
+		}
+
+		m.mailPeersMutex.Lock()
+		pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID]
+		m.mailPeersMutex.Unlock()
+		if ok {
+			if pInfo.status != connected && pInfo.lastConnectionAttempt.Add(30*time.Second).Before(time.Now()) {
+				m.logger.Info("penalizing mailserver & disconnecting connecting", zap.String("id", m.mailserverCycle.activeMailserver.ID))
+
+				signal.SendMailserverNotWorking()
+				m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
+				m.disconnectActiveMailserver()
+			}
+		}
+
+	} else {
+		m.cycleMailservers()
+	}
+
+	m.logger.Debug("updated-peers", zap.Any("peers", m.mailserverCycle.peers))
+
+	return nil
+}
+
+func (m *Messenger) updateWakuV1PeerStatus() {
+
+	if m.transport.WakuVersion() != 1 {
+		m.logger.Debug("waku version not 1, returning")
+		return
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := m.handleMailserverCycleEvent(m.mailserverPeersInfo())
+			if err != nil {
+				m.logger.Error("failed to handle mailserver cycle event", zap.Error(err))
+				continue
+			}
+
+			ms := m.getActiveMailserver()
+			if ms != nil {
+				node, err := ms.Enode()
+				if err != nil {
+					m.logger.Error("failed to parse enode", zap.Error(err))
+					continue
+				}
+				m.server.AddPeer(node)
+				if err := m.peerStore.Update([]*enode.Node{node}); err != nil {
+					m.logger.Error("failed to update peers", zap.Error(err))
+					continue
+				}
+			}
+
+		case <-m.mailserverCycle.events:
+			err := m.handleMailserverCycleEvent(m.mailserverPeersInfo())
+			if err != nil {
+				m.logger.Error("failed to handle mailserver cycle event", zap.Error(err))
+				return
+			}
+		case <-m.quit:
+			close(m.mailserverCycle.events)
+			m.mailserverCycle.subscription.Unsubscribe()
+			return
+		}
+	}
+}
+
 func (m *Messenger) updateWakuV2PeerStatus() {
 	if m.transport.WakuVersion() != 2 {
-		return // This can only be used with wakuV2
+		m.logger.Debug("waku version not 2, returning")
+		return
 	}
 
 	connSubscription, err := m.transport.SubscribeToConnStatusChanges()
@@ -469,255 +594,59 @@ func (m *Messenger) updateWakuV2PeerStatus() {
 	for {
 		select {
 		case status := <-connSubscription.C:
-			m.mailserverCycle.Lock()
-
-			for pID, pInfo := range m.mailserverCycle.peers {
-				if pInfo.status == disconnected {
-					continue
-				}
-
-				// Removing disconnected
-
-				found := false
-				for connectedPeer := range status.Peers {
-					peerID, err := peer.Decode(connectedPeer)
-					if err != nil {
-						continue
-					}
-
-					if string(peerID) == pID {
-						found = true
-						break
-					}
-				}
-				if !found && pInfo.status == connected {
-					m.logger.Info("Peer disconnected", zap.String("peer", peer.ID(pID).Pretty()))
-					pInfo.status = disconnected
-					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-				}
-
-				m.mailserverCycle.peers[pID] = pInfo
+			var connectedPeers []ConnectedPeer
+			for id := range status.Peers {
+				connectedPeers = append(connectedPeers, ConnectedPeer{UniqueID: id})
 			}
-
-			for connectedPeer := range status.Peers {
-				peerID, err := peer.Decode(connectedPeer)
-				if err != nil {
-					continue
-				}
-
-				pInfo, ok := m.mailserverCycle.peers[string(peerID)]
-				if !ok || pInfo.status != connected {
-					m.logger.Info("Peer connected", zap.String("peer", connectedPeer))
-					pInfo.status = connected
-					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-					m.mailserverCycle.peers[string(peerID)] = pInfo
-				}
+			err := m.handleMailserverCycleEvent(connectedPeers)
+			if err != nil {
+				m.logger.Error("failed to handle mailserver cycle event", zap.Error(err))
+				return
 			}
-			m.mailserverCycle.Unlock()
 
 		case <-m.quit:
+			close(m.mailserverCycle.events)
+			m.mailserverCycle.subscription.Unsubscribe()
 			connSubscription.Unsubscribe()
 			return
 		}
 	}
 }
 
-func (m *Messenger) updateWakuV1PeerStatus() {
-	// TODO: remove this function once WakuV1 is deprecated
-
-	if m.transport.WakuVersion() != 1 {
-		return // This can only be used with wakuV1
-	}
-
-	for {
-		select {
-		case <-m.mailserverCycle.events:
-			connectedPeers := m.server.PeersInfo()
-			m.mailserverCycle.Lock()
-
-			for pID, pInfo := range m.mailserverCycle.peers {
-				if pInfo.status == disconnected {
-					continue
-				}
-
-				// Removing disconnected
-
-				found := false
-				for _, connectedPeer := range connectedPeers {
-					if enode.HexID(connectedPeer.ID) == enode.HexID(pID) {
-						found = true
-						break
-					}
-				}
-				if !found && (pInfo.status == connected || (pInfo.status == connecting && pInfo.lastConnectionAttempt.Add(8*time.Second).Before(time.Now()))) {
-					m.logger.Info("Peer disconnected", zap.String("peer", enode.HexID(pID).String()))
-					pInfo.status = disconnected
-					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-				}
-
-				m.mailserverCycle.peers[pID] = pInfo
-			}
-
-			for _, connectedPeer := range connectedPeers {
-				hexID := enode.HexID(connectedPeer.ID).String()
-				pInfo, ok := m.mailserverCycle.peers[hexID]
-				if !ok || pInfo.status != connected {
-					m.logger.Info("Peer connected", zap.String("peer", hexID))
-					pInfo.status = connected
-					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
-					if m.mailserverCycle.activeMailserver != nil && hexID == m.mailserverCycle.activeMailserver.ID().String() {
-						m.logger.Info("Mailserver available")
-						signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.String())
-					}
-					m.mailserverCycle.peers[hexID] = pInfo
-				}
-			}
-			m.mailserverCycle.Unlock()
-		case <-m.quit:
-			m.mailserverCycle.Lock()
-			defer m.mailserverCycle.Unlock()
-			close(m.mailserverCycle.events)
-			m.mailserverCycle.subscription.Unsubscribe()
-			return
-		}
-	}
-}
-
-func (m *Messenger) getPinnedMailserver() (string, error) {
-	// TODO: Pinned mailservers are ony available in V1 for now
-	if m.transport.WakuVersion() != 1 {
-		return "", nil
-	}
-
+func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 	fleet, err := m.getFleet()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	pinnedMailservers, err := m.settings.GetPinnedMailservers()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	pinnedMailserver, ok := pinnedMailservers[fleet]
 	if !ok {
-		return "", nil
+		return nil, nil
 	}
 
-	return pinnedMailserver, nil
-}
-
-func (m *Messenger) checkMailserverConnection() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		m.logger.Info("Verifying mailserver connection state...")
-
-		pinnedMailserver, err := m.getPinnedMailserver()
-		if err != nil {
-			m.logger.Error("Could not obtain the pinned mailserver", zap.Error(err))
-			continue
-		}
-
-		if pinnedMailserver != "" {
-			pinnedNode := parseNodes([]string{pinnedMailserver})[0]
-
-			activeMailserver := m.getActiveMailserver()
-			if activeMailserver == nil || activeMailserver.String() != pinnedMailserver {
-				m.logger.Info("New pinned mailserver", zap.Any("pinnedMailserver", pinnedMailserver))
-				err = m.connectToMailserver(pinnedNode)
-				if err != nil {
-					m.logger.Error("Could not connect to pinned mailserver", zap.Error(err))
-					continue
-				}
-			}
-		} else {
-			// or setup a random mailserver:
-			if !m.isActiveMailserverAvailable() {
-				m.cycleMailservers()
-			}
-		}
-
-		select {
-		case <-m.quit:
-			return
-		case <-ticker.C:
-			continue
-		}
-	}
-}
-
-func parseNodes(enodes []string) []*enode.Node {
-	var nodes []*enode.Node
-	for _, item := range enodes {
-		parsedPeer, err := enode.ParseV4(item)
-		if err == nil {
-			nodes = append(nodes, parsedPeer)
-		}
-	}
-	return nodes
-}
-
-func parseMultiaddresses(addresses []string) []multiaddr.Multiaddr {
-	var result []multiaddr.Multiaddr
-	for _, item := range addresses {
-		ma, err := multiaddr.NewMultiaddr(item)
-		if err == nil {
-			result = append(result, ma)
-		}
-	}
-	return result
-}
-
-func parseStoreNodeConfig(addresses []string) []multiaddr.Multiaddr {
-	// TODO: once a scoring/reputation mechanism is added to waku,
-	// this function can be modified to retrieve the storenodes
-	// from waku peerstore.
-	// We don't do that now because we can't trust any random storenode
-	// So we use only those specified in the cluster config
-	var result []multiaddr.Multiaddr
-	var dnsDiscWg sync.WaitGroup
-
-	maChan := make(chan multiaddr.Multiaddr, 1000)
-
-	for _, addrString := range addresses {
-		if strings.HasPrefix(addrString, "enrtree://") {
-			// Use DNS Discovery
-			dnsDiscWg.Add(1)
-			go func(addr string) {
-				defer dnsDiscWg.Done()
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				multiaddresses, err := dnsdisc.RetrieveNodes(ctx, addr)
-				if err == nil {
-					for _, ma := range multiaddresses {
-						maChan <- ma
-					}
-				}
-			}(addrString)
-
-		} else {
-			// It's a normal multiaddress
-			ma, err := multiaddr.NewMultiaddr(addrString)
-			if err == nil {
-				maChan <- ma
-			}
-		}
-	}
-	dnsDiscWg.Wait()
-	close(maChan)
-	for ma := range maChan {
-		result = append(result, ma)
-	}
-
-	return result
-}
-
-func getPeerID(addr multiaddr.Multiaddr) (peer.ID, error) {
-	idStr, err := addr.ValueForProtocol(multiaddr.P_P2P)
+	customMailservers, err := m.mailservers.Mailservers()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return peer.Decode(idStr)
+
+	fleetMailservers := mailservers.DefaultMailservers()
+
+	for _, c := range fleetMailservers {
+		if c.Fleet == fleet && c.ID == pinnedMailserver {
+			return &c, nil
+		}
+	}
+
+	for _, c := range customMailservers {
+		if c.Fleet == fleet && c.ID == pinnedMailserver {
+			return &c, nil
+		}
+	}
+
+	return nil, nil
 }

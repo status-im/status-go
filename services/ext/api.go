@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -703,24 +702,6 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 	return api.service.messenger.SignMessage(message)
 }
 
-func (api *PublicAPI) UpdateMailservers(enodes []string) error {
-	nodes := make([]*enode.Node, len(enodes))
-	for i, rawurl := range enodes {
-		node, err := enode.ParseV4(rawurl)
-		if err != nil {
-			return err
-		}
-		nodes[i] = node
-	}
-	return api.service.UpdateMailservers(nodes)
-}
-
-// Used in WakuV2 - Once proper peer management is added, we should probably remove this, or at least
-// change mailserver so we use a peer.ID instead of a string / []byte
-func (api *PublicAPI) SetMailserver(peer string) {
-	api.service.SetMailserver([]byte(peer))
-}
-
 // PushNotifications server endpoints
 
 func (api *PublicAPI) StartPushNotificationsServer() error {
@@ -909,6 +890,10 @@ func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse,
 	return api.service.messenger.RequestAllHistoricMessages()
 }
 
+func (api *PublicAPI) RequestAllHistoricMessagesWithRetries() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessagesWithRetries()
+}
+
 func (api *PublicAPI) DisconnectActiveMailserver() {
 	api.service.messenger.DisconnectActiveMailserver()
 }
@@ -978,6 +963,14 @@ func (api *PublicAPI) BackupData() (uint64, error) {
 
 func (api *PublicAPI) ImageServerURL() string {
 	return api.service.messenger.ImageServerURL()
+}
+
+func (api *PublicAPI) ToggleUseMailservers(value bool) error {
+	return api.service.messenger.ToggleUseMailservers(value)
+}
+
+func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) error {
+	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
 }
 
 // -----
