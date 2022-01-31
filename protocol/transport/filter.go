@@ -25,6 +25,8 @@ type Filter struct {
 	Listen bool `json:"listen"`
 	// Ephemeral indicates that this is an ephemeral filter
 	Ephemeral bool `json:"ephemeral"`
+	// Priority
+	Priority uint64
 }
 
 func (c *Filter) IsPublic() bool {

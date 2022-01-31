@@ -3736,7 +3736,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
-	return nil
+	return m.persistence.SaveChats([]*Chat{chat})
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
