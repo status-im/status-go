@@ -136,7 +136,7 @@ func _0001_appDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0001_app.down.sql", size: 356, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0001_app.down.sql", size: 356, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -156,7 +156,7 @@ func _0001_appUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0001_app.up.sql", size: 2967, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0001_app.up.sql", size: 2967, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -176,7 +176,7 @@ func _0002_tokensDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0002_tokens.down.sql", size: 19, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0002_tokens.down.sql", size: 19, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -196,7 +196,7 @@ func _0002_tokensUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0002_tokens.up.sql", size: 248, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0002_tokens.up.sql", size: 248, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -216,7 +216,7 @@ func _0003_settingsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0003_settings.down.sql", size: 118, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0003_settings.down.sql", size: 118, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -236,7 +236,7 @@ func _0003_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0003_settings.up.sql", size: 1311, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0003_settings.up.sql", size: 1311, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -256,7 +256,7 @@ func _0004_pending_stickersDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -276,7 +276,7 @@ func _0004_pending_stickersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -296,7 +296,7 @@ func _0005_waku_modeDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -316,7 +316,7 @@ func _0005_waku_modeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -336,7 +336,7 @@ func _0006_appearanceUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -356,7 +356,7 @@ func _0007_enable_waku_defaultUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0007_enable_waku_default.up.sql", size: 38, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0007_enable_waku_default.up.sql", size: 38, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -376,7 +376,7 @@ func _0008_add_push_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -396,7 +396,7 @@ func _0009_enable_sending_push_notificationsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.down.sql", size: 49, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.down.sql", size: 49, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -416,7 +416,7 @@ func _0009_enable_sending_push_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.up.sql", size: 49, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.up.sql", size: 49, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -436,7 +436,7 @@ func _0010_add_block_mentionsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0010_add_block_mentions.down.sql", size: 83, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0010_add_block_mentions.down.sql", size: 83, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -456,7 +456,7 @@ func _0010_add_block_mentionsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0010_add_block_mentions.up.sql", size: 89, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0010_add_block_mentions.up.sql", size: 89, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -476,7 +476,7 @@ func _0011_allow_webview_permission_requestsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0011_allow_webview_permission_requests.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0011_allow_webview_permission_requests.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -496,7 +496,7 @@ func _0011_allow_webview_permission_requestsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0011_allow_webview_permission_requests.up.sql", size: 88, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0011_allow_webview_permission_requests.up.sql", size: 88, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -516,7 +516,7 @@ func _0012_pending_transactionsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0012_pending_transactions.down.sql", size: 33, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0012_pending_transactions.down.sql", size: 33, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -536,7 +536,7 @@ func _0012_pending_transactionsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0012_pending_transactions.up.sql", size: 321, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0012_pending_transactions.up.sql", size: 321, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -556,7 +556,7 @@ func _0013_favouritesDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0013_favourites.down.sql", size: 23, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0013_favourites.down.sql", size: 23, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -576,7 +576,7 @@ func _0013_favouritesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0013_favourites.up.sql", size: 132, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0013_favourites.up.sql", size: 132, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -596,7 +596,7 @@ func _0014_add_use_mailserversDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0014_add_use_mailservers.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0014_add_use_mailservers.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -616,7 +616,7 @@ func _0014_add_use_mailserversUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0014_add_use_mailservers.up.sql", size: 111, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0014_add_use_mailservers.up.sql", size: 111, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -636,7 +636,7 @@ func _0015_link_previewsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0015_link_previews.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0015_link_previews.down.sql", size: 0, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -656,7 +656,7 @@ func _0015_link_previewsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0015_link_previews.up.sql", size: 203, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0015_link_previews.up.sql", size: 203, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -676,7 +676,7 @@ func _0016_local_notifications_preferencesDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0016_local_notifications_preferences.down.sql", size: 43, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0016_local_notifications_preferences.down.sql", size: 43, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -696,7 +696,7 @@ func _0016_local_notifications_preferencesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0016_local_notifications_preferences.up.sql", size: 204, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0016_local_notifications_preferences.up.sql", size: 204, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -716,7 +716,7 @@ func _0017_bookmarksDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0017_bookmarks.down.sql", size: 22, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0017_bookmarks.down.sql", size: 22, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -736,7 +736,7 @@ func _0017_bookmarksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0017_bookmarks.up.sql", size: 147, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0017_bookmarks.up.sql", size: 147, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -756,7 +756,7 @@ func _0018_profile_pictures_visibilityUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0018_profile_pictures_visibility.up.sql", size: 84, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0018_profile_pictures_visibility.up.sql", size: 84, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -776,7 +776,7 @@ func _0019_blocks_ranges_extra_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0019_blocks_ranges_extra_data.up.sql", size: 89, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0019_blocks_ranges_extra_data.up.sql", size: 89, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -796,7 +796,7 @@ func _0020_metricsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0020_metrics.up.sql", size: 235, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0020_metrics.up.sql", size: 235, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -816,7 +816,7 @@ func _0021_add_session_id_to_metricsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0021_add_session_id_to_metrics.up.sql", size: 55, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0021_add_session_id_to_metrics.up.sql", size: 55, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -836,7 +836,7 @@ func _0022_pending_transfersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0022_pending_transfers.up.sql", size: 706, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "0022_pending_transfers.up.sql", size: 706, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -856,7 +856,7 @@ func _1618237885_settings_anon_metrics_should_sendUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1618237885_settings_anon_metrics_should_send.up.sql", size: 80, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1618237885_settings_anon_metrics_should_send.up.sql", size: 80, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -876,7 +876,7 @@ func _1618395756_contacts_onlyUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1618395756_contacts_only.up.sql", size: 136, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1618395756_contacts_only.up.sql", size: 136, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -896,7 +896,7 @@ func _1622184614_add_default_sync_periodUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622184614_add_default_sync_period.up.sql", size: 125, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1622184614_add_default_sync_period.up.sql", size: 125, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -916,7 +916,7 @@ func _1625872445_user_statusUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1625872445_user_status.up.sql", size: 351, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1625872445_user_status.up.sql", size: 351, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -936,7 +936,7 @@ func _1627983977_add_gif_to_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1627983977_add_gif_to_settings.up.sql", size: 102, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1627983977_add_gif_to_settings.up.sql", size: 102, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -956,7 +956,7 @@ func _1628580203_add_hidden_accountUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1628580203_add_hidden_account.up.sql", size: 67, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1628580203_add_hidden_account.up.sql", size: 67, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -976,7 +976,7 @@ func _1629123384_add_id_to_app_metricsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1629123384_add_id_to_app_metrics.up.sql", size: 589, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1629123384_add_id_to_app_metrics.up.sql", size: 589, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -996,7 +996,7 @@ func _1630401853_add_opensea_enabled_to_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1630401853_add_opensea_enabled_to_settings.up.sql", size: 70, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1630401853_add_opensea_enabled_to_settings.up.sql", size: 70, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1016,7 +1016,7 @@ func _1630464455_createSaved_addressesTableDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1630464455_create-saved_addresses-table.down.sql", size: 28, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1630464455_create-saved_addresses-table.down.sql", size: 28, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1036,7 +1036,7 @@ func _1630464455_createSaved_addressesTableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1630464455_create-saved_addresses-table.up.sql", size: 187, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1630464455_create-saved_addresses-table.up.sql", size: 187, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1056,7 +1056,7 @@ func _1630485153_networksDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1630485153_networks.down.sql", size: 21, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1630485153_networks.down.sql", size: 21, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1076,7 +1076,7 @@ func _1630485153_networksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1630485153_networks.up.sql", size: 394, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1630485153_networks.up.sql", size: 394, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1096,7 +1096,7 @@ func _1632262444_profile_pictures_show_toUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1632262444_profile_pictures_show_to.up.sql", size: 81, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1632262444_profile_pictures_show_to.up.sql", size: 81, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1116,7 +1116,7 @@ func _1635942153_add_telemetry_server_url_to_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1635942153_add_telemetry_server_url_to_settings.up.sql", size: 128, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1635942153_add_telemetry_server_url_to_settings.up.sql", size: 128, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1136,7 +1136,7 @@ func _1635942154_add_backup_settingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1635942154_add_backup_setting.up.sql", size: 287, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1635942154_add_backup_setting.up.sql", size: 287, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1156,7 +1156,7 @@ func _1637745568_add_auto_message_settingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1637745568_add_auto_message_setting.up.sql", size: 122, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "1637745568_add_auto_message_setting.up.sql", size: 122, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1176,7 +1176,7 @@ func _1640111208_nodeconfigUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1640111208_nodeconfig.up.sql", size: 7659, mode: os.FileMode(436), modTime: time.Unix(1642016840, 0)}
+	info := bindataFileInfo{name: "1640111208_nodeconfig.up.sql", size: 7659, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1196,7 +1196,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 85, mode: os.FileMode(436), modTime: time.Unix(1642016353, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 85, mode: os.FileMode(436), modTime: time.Unix(1643103821, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
