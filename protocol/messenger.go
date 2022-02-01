@@ -2391,10 +2391,13 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
+
 	response.SetMessages(msg)
 
 	response.AddChat(chat)
 	m.logger.Debug("sent message", zap.String("id", message.ID))
+	m.prepareMessages(response.messages)
+
 	return &response, m.saveChat(chat)
 }
 
