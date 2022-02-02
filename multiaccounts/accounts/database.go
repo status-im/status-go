@@ -760,6 +760,21 @@ func (db *Database) GetMessagesFromContactsOnly() (bool, error) {
 	return result, err
 }
 
+func (db *Database) GetInstalledStickerPacks() (rst *json.RawMessage, err error) {
+	err = db.db.QueryRow("SELECT stickers_packs_installed FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	return
+}
+
+func (db *Database) GetPendingStickerPacks() (rst *json.RawMessage, err error) {
+	err = db.db.QueryRow("SELECT stickers_packs_pending FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	return
+}
+
+func (db *Database) GetRecentStickers() (rst *json.RawMessage, err error) {
+	err = db.db.QueryRow("SELECT stickers_recent_stickers FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	return
+}
+
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = 1").Scan(&rst)
 	return
