@@ -687,3 +687,5 @@ gopkg.in/natefinch/npipe.v2
 gopkg.in/urfave/cli.v1
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
+# olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3
+olympos.io/encoding/edn
