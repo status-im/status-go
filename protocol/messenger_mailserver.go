@@ -288,7 +288,7 @@ func (m *Messenger) syncFilters(filters []*transport.Filter) (*MessengerResponse
 	prioritizedBatches := getPrioritizedBatches()
 	currentBatch := 0
 
-	if filters[0].Priority == 0 {
+	if len(filters) == 0 || filters[0].Priority == 0 {
 		currentBatch = len(prioritizedBatches)
 	}
 
