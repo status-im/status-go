@@ -1,4 +1,3 @@
-//nolint // TODO Fix test
 package protocol
 
 import (
@@ -31,8 +30,6 @@ const (
 )
 
 func TestMessengerPushNotificationSuite(t *testing.T) {
-	// TODO Fix test
-	t.Skip("Skipped")
 	suite.Run(t, new(MessengerPushNotificationSuite))
 }
 
