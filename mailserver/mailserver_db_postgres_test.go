@@ -4,7 +4,6 @@
 //   docker run -e POSTGRES_HOST_AUTH_METHOD=trust -d -p 5432:5432 postgres:9.6-alpine
 //
 
-//nolint // TODO Fix test
 package mailserver
 
 import (
@@ -23,8 +22,6 @@ import (
 )
 
 func TestMailServerPostgresDBSuite(t *testing.T) {
-	// TODO Fix test
-	t.Skip("Skipped")
 	suite.Run(t, new(MailServerPostgresDBSuite))
 }
 

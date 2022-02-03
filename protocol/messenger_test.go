@@ -1,4 +1,3 @@
-//nolint // TODO Fix test
 package protocol
 
 import (
@@ -45,14 +44,10 @@ const (
 )
 
 func TestMessengerSuite(t *testing.T) {
-	// TODO Fix test
-	t.Skip("Skipped")
 	suite.Run(t, new(MessengerSuite))
 }
 
 func TestMessengerWithDataSyncEnabledSuite(t *testing.T) {
-	// TODO Fix test
-	t.Skip("Skipped")
 	suite.Run(t, &MessengerSuite{enableDataSync: true})
 }
 
