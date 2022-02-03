@@ -86,6 +86,10 @@ func (m *Messenger) syncSettings() error {
 			Value: s.Currency,
 			Clock: clock,
 		},
+		GifApiKey: &protobuf.SyncSettingGifAPIKey{
+			Value: s.GifAPIKey,
+			Clock: clock,
+		},
 		GifFavorites: &protobuf.SyncSettingGifFavorites{
 			Value: gf,
 			Clock: clock,
@@ -156,6 +160,14 @@ func (m *Messenger) handleSyncSettings(syncSettings protobuf.SyncSettings) error
 		settings.Currency,
 		syncSettings.Currency.GetValue(),
 		syncSettings.Currency.GetClock(),
+	); err != nil {
+		return err
+	}
+
+	if err := m.settings.SaveSyncSetting(
+		settings.GifAPIKey,
+		syncSettings.GifApiKey.GetValue(),
+		syncSettings.GifApiKey.GetClock(),
 	); err != nil {
 		return err
 	}

@@ -24,7 +24,9 @@ func setupSQLTestDb(t *testing.T) (*sql.DB, func()) {
 }
 
 func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {
-	return accounts.NewDB(db), func() {
+	acc, err := accounts.NewDB(db)
+	require.NoError(t, err)
+	return acc, func() {
 		require.NoError(t, db.Close())
 	}
 }

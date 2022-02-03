@@ -96,4 +96,5 @@ type Settings struct {
 	LastBackup                     uint64                        `json:"last-backup,omitempty"`
 	BackupEnabled                  bool                          `json:"backup-enabled?,omitempty"`
 	AutoMessageEnabled             bool                          `json:"auto-message-enabled?,omitempty"`
+	GifAPIKey                      string                        `json:"gifs/api-key"`
 }
