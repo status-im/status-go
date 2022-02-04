@@ -382,7 +382,11 @@ func NewMessenger(
 	settings := accounts.NewDB(database)
 
 	mailservers := mailserversDB.NewDB(database)
-	imageServer := images.NewServer(database, logger)
+	imageServer, err := images.NewServer(database, logger)
+
+	if err != nil {
+		return nil, err
+	}
 
 	messenger = &Messenger{
 		config:                     &c,
@@ -3648,7 +3652,6 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 			}
 			return true
 		})
-		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
 		msgs, nextCursor, err = m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
 		if err != nil {
 			return nil, "", err

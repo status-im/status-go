@@ -162,13 +162,18 @@ type Server struct {
 	cert   *tls.Certificate
 }
 
-func NewServer(db *sql.DB, logger *zap.Logger) *Server {
-	generateTLSCert()
-	return &Server{db: db, logger: logger, cert: globalCertificate}
+func NewServer(db *sql.DB, logger *zap.Logger) (*Server, error) {
+	err := generateTLSCert()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Server{db: db, logger: logger, cert: globalCertificate}, nil
 }
 
 func (s *Server) Start() error {
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost"}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost", MinVersion: tls.VersionTLS12}
 	listener, err := tls.Listen("tcp", "localhost:0", cfg)
 	if err != nil {
 		return err
