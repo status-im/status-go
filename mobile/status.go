@@ -729,5 +729,11 @@ func ConvertToKeycardAccount(keyStoreDir, accountData, settingsJSON, password, n
 }
 
 func ImageServerTLSCert() string {
-	return images.PublicTLSCert()
+	cert, err := images.PublicTLSCert()
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cert
 }

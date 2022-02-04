@@ -10,7 +10,6 @@ import (
 	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/pem"
-	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -24,15 +23,15 @@ import (
 var globalCertificate *tls.Certificate = nil
 var globalPem string
 
-func generateTLSCert() {
+func generateTLSCert() error {
 	if globalCertificate != nil {
-		return
+		return nil
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	if err != nil {
-		log.Fatalf("Failed to generate private key: %v", err)
+		return err
 	}
 
 	notBefore := time.Now()
@@ -42,7 +41,7 @@ func generateTLSCert() {
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 
 	if err != nil {
-		log.Fatalf("Failed to generate serial number: %v", err)
+		return err
 	}
 
 	template := x509.Certificate{
@@ -59,14 +58,14 @@ func generateTLSCert() {
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %v", err)
+		return err
 	}
 
 	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
 	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
-		log.Fatalf("Unable to marshal private key: %v", err)
+		return err
 	}
 
 	keyPem := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
@@ -74,16 +73,22 @@ func generateTLSCert() {
 	finalCert, err := tls.X509KeyPair(certPem, keyPem)
 
 	if err != nil {
-		log.Fatalf("Unable to decode certificate: %v", err)
+		return err
 	}
 
 	globalCertificate = &finalCert
 	globalPem = string(certPem)
+	return nil
 }
 
-func PublicTLSCert() string {
-	generateTLSCert()
-	return globalPem
+func PublicTLSCert() (string, error) {
+	err := generateTLSCert()
+
+	if err != nil {
+		return "", err
+	}
+
+	return globalPem, nil
 }
 
 type messageHandler struct {
