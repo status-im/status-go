@@ -195,5 +195,9 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop() error {
-	return s.server.Shutdown(context.Background())
+	if s.server != nil {
+		return s.server.Shutdown(context.Background())
+	}
+
+	return nil
 }
