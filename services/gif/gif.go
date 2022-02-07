@@ -31,13 +31,12 @@ const maxRetry = 3
 const baseURL = "https://g.tenor.com/v1/"
 
 func NewGifAPI(db *accounts.Database) *API {
-	return &API{db, &http.Client{Timeout: time.Minute}}
+	return &API{db}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	db         *accounts.Database
-	httpClient *http.Client
+	db *accounts.Database
 }
 
 func (api *API) SetTenorAPIKey(key string) (err error) {
@@ -53,11 +52,21 @@ func (api *API) SetTenorAPIKey(key string) (err error) {
 func (api *API) GetContentWithRetry(path string) (value string, err error) {
 	var currentRetry = 0
 	var response *http.Response
-
 	for currentRetry < maxRetry {
-		response, err = api.httpClient.Get(baseURL + path + defaultParams + tenorAPIKey)
+		transport := &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ResponseHeaderTimeout: time.Second * 1,
+		}
+
+		client := http.Client{
+			Timeout:   1 * time.Second,
+			Transport: transport,
+		}
+
+		response, err = client.Get(baseURL + path + defaultParams + tenorAPIKey)
+
 		if err != nil {
-			log.Error("can't get content from path %s", path)
+			log.Error("can't get content from path %s with %s", path, err.Error())
 			currentRetry++
 			time.Sleep(100 * time.Millisecond)
 		} else {
@@ -65,6 +74,9 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 		}
 	}
 
+	if response == nil {
+		return "", fmt.Errorf("Could not reach Tenor API")
+	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
