@@ -36,9 +36,10 @@ const ipfsGateway = ".ipfs.cf-ipfs.com"
 type stickerStatus int
 
 const (
-	statusInstalled stickerStatus = iota
-	statusPurchased
+	statusAvailable stickerStatus = iota
+	statusInstalled
 	statusPending
+	statusPurchased
 )
 
 type API struct {
@@ -141,6 +142,8 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 				_, isPurchased := purchasedPacks[packID]
 				if isPurchased {
 					pack.Status = statusPurchased
+				} else {
+					pack.Status = statusAvailable
 				}
 				result = append(result, pack)
 			}
