@@ -1820,7 +1820,7 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	// Reset synced-to/from
 	syncedTo := uint32(currentClockValue / 1000)
 	chat.SyncedTo = syncedTo
-	chat.SyncedFrom = syncedTo
+	chat.SyncedFrom = 0
 
 	chat.LastMessage = nil
 	chat.UnviewedMessagesCount = 0
