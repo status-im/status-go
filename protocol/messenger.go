@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
@@ -2455,34 +2456,37 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	return err
 }
 
-func (m *Messenger) dispatchSynWalletsMessage(ctx context.Context, spec common.RawMessage) ([]byte, error) {
-	var err error
-	var id []byte
-
-	id, err = m.sender.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
-
-	if err != nil {
-		return nil, err
-	}
-	spec.ID = types.EncodeHex(id)
-	spec.SendCount++
-	err = m.persistence.SaveRawMessage(&spec)
-	if err != nil {
-		return nil, err
-	}
-
-	return id, nil
-}
-
 // watchAccountListChanges checks for account changes and publishes to the account feed when it happens
-func (m *Messenger) watchAccountListChanges(accountFeed *event.Feed, initial []gethcommon.Address) {
+func (m *Messenger) watchAccountListChanges(ctx context.Context, accountFeed *event.Feed, initial []gethcommon.Address, accountsDB *accounts.Database) {
 	accounts := make(chan []accounts.Account, 1)
 	sub := accountFeed.Subscribe(accounts)
 	defer sub.Unsubscribe()
 	listen := make(map[gethcommon.Address]struct{}, len(initial))
 	for _, address := range initial {
 		listen[address] = struct{}{}
-
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-sub.Err():
+			if err != nil {
+				log.Error("accounts watcher subscription failed", "error", err)
+			}
+		case n := <-accounts:
+			log.Debug("wallet received updated list of accounts", "accounts", n)
+			restart := false
+			for _, acc := range n {
+				_, exist := listen[gethcommon.Address(acc.Address)]
+				if !exist {
+					accountsDB.SaveAccounts(n) //TODO: handle only one account instead of a list of accounts.
+					restart = true
+				}
+			}
+			if !restart {
+				continue
+			}
+		}
 	}
 
 }
