@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -169,27 +170,37 @@ func NewServer(db *sql.DB, logger *zap.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	return &Server{db: db, logger: logger, cert: globalCertificate}, nil
+	return &Server{db: db, logger: logger, cert: globalCertificate, Port: 0}, nil
+}
+
+func (s *Server) listenAndServe() {
+	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost", MinVersion: tls.VersionTLS12}
+
+	// in case of restart, we should use the same port as the first start in order not to break existing links
+	addr := fmt.Sprintf("localhost:%d", s.Port)
+
+	listener, err := tls.Listen("tcp", addr, cfg)
+	if err != nil {
+		s.logger.Error("failed to start server", zap.Error(err))
+		return
+	}
+
+	s.Port = listener.Addr().(*net.TCPAddr).Port
+
+	err = s.server.Serve(listener)
+	if err != http.ErrServerClosed {
+		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
+		go s.listenAndServe()
+	}
 }
 
 func (s *Server) Start() error {
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost", MinVersion: tls.VersionTLS12}
-	listener, err := tls.Listen("tcp", "localhost:0", cfg)
-	if err != nil {
-		return err
-	}
-	s.Port = listener.Addr().(*net.TCPAddr).Port
 	handler := http.NewServeMux()
 	handler.Handle("/messages/images", &messageHandler{db: s.db, logger: s.logger})
 	handler.Handle("/messages/identicons", &identiconHandler{logger: s.logger})
 	s.server = &http.Server{Handler: handler}
-	go func() {
-		err := s.server.Serve(listener)
-		if err != nil {
-			s.logger.Error("failed to start server", zap.Error(err))
-			return
-		}
-	}()
+
+	go s.listenAndServe()
 
 	return nil
 }
