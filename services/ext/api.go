@@ -967,6 +967,10 @@ func (api *PublicAPI) BackupData() (uint64, error) {
 	return api.service.messenger.BackupData(context.Background())
 }
 
+func (api *PublicAPI) ImageServerURL() string {
+	return api.service.messenger.ImageServerURL()
+}
+
 // -----
 // HELPER
 // -----
