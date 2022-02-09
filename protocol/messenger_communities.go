@@ -665,6 +665,10 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 	return response, nil
 }
 
+func (m *Messenger) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
+	return m.communitiesManager.GetByID(communityID)
+}
+
 func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

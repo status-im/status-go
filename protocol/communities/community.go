@@ -1221,6 +1221,10 @@ func (o *Community) isMember() bool {
 	return o.hasMember(o.config.MemberIdentity)
 }
 
+func (o *Community) CanMemberIdentityPost(chatID string) (bool, error) {
+	return o.CanPost(o.config.MemberIdentity, chatID, nil)
+}
+
 // CanJoin returns whether a user can join the community, only if it's
 func (o *Community) canJoin() bool {
 	if o.config.Joined {
