@@ -784,6 +784,11 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
+
+	limitStr := ""
+	if limit > -1 {
+		args = append(args, limit+1) // take one more to figure our whether a cursor should be returned
+	}
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
@@ -812,9 +817,9 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 				pm.pinned = 1
 				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
 			ORDER BY cursor DESC
-			LIMIT ?
-		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere),
-		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
+			%s
+		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr),
+		args..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
 		return nil, "", err
@@ -845,7 +850,8 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	}
 
 	var newCursor string
-	if len(result) > limit && cursors != nil {
+
+	if limit > -1 && len(result) > limit && cursors != nil {
 		newCursor = cursors[limit]
 		result = result[:limit]
 	}
