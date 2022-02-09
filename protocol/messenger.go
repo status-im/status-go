@@ -555,6 +555,14 @@ func (m *Messenger) resendExpiredMessages() error {
 	return nil
 }
 
+func (m *Messenger) ToForeground() {
+	m.imageServer.ToForeground()
+}
+
+func (m *Messenger) ToBackground() {
+	m.imageServer.ToBackground()
+}
+
 func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server

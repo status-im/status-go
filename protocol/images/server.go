@@ -157,6 +157,7 @@ func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type Server struct {
 	Port   int
+	run    bool
 	server *http.Server
 	logger *zap.Logger
 	db     *sql.DB
@@ -181,16 +182,20 @@ func (s *Server) listenAndServe() {
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
-		s.logger.Error("failed to start server", zap.Error(err))
+		s.logger.Error("failed to start server, retrying", zap.Error(err))
+		s.Start()
 		return
 	}
 
 	s.Port = listener.Addr().(*net.TCPAddr).Port
-
+	s.run = true
 	err = s.server.Serve(listener)
 	if err != http.ErrServerClosed {
 		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
-		go s.listenAndServe()
+		s.Start()
+		return
+	} else {
+		s.run = false
 	}
 }
 
@@ -211,4 +216,16 @@ func (s *Server) Stop() error {
 	}
 
 	return nil
+}
+
+func (s *Server) ToForeground() {
+	if !s.run && (s.server != nil) {
+		s.Start()
+	}
+}
+
+func (s *Server) ToBackground() {
+	if s.run {
+		s.Stop()
+	}
 }
