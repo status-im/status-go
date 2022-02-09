@@ -20,7 +20,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
@@ -2453,7 +2452,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 	}
 
-	return err
+	return m.syncWallets(ctx)
 }
 
 // watchAccountListChanges checks for account changes and publishes to the account feed when it happens
@@ -2465,47 +2464,50 @@ func (m *Messenger) watchAccountListChanges(ctx context.Context, accountFeed *ev
 	for _, address := range initial {
 		listen[address] = struct{}{}
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-sub.Err():
-			if err != nil {
-				log.Error("accounts watcher subscription failed", "error", err)
-			}
-		case n := <-accounts:
-			log.Debug("wallet received updated list of accounts", "accounts", n)
-			restart := false
-			for _, acc := range n {
-				_, exist := listen[gethcommon.Address(acc.Address)]
-				if !exist {
-					accountsDB.SaveAccounts(n) //TODO: handle only one account instead of a list of accounts.
-					restart = true
-				}
-			}
-			if !restart {
-				continue
-			}
-		}
-	}
+	// for {
+	// 	select {
+	// 	case <-ctx.Done():
+	// 		return
+	// 	case err := <-sub.Err():
+	// 		if err != nil {
+	// 			log.Error("accounts watcher subscription failed", "error", err)
+	// 		}
+	// 	case n := <-accounts:
+	// 		log.Debug("wallet received updated list of accounts", "accounts", n)
+	// 		restart := false
+	// 		for _, acc := range n {
+	// 			_, exist := listen[gethcommon.Address(acc.Address)]
+	// 			if !exist {
+	// 				accountsDB.SaveAccounts(n) //TODO: handle only one account instead of a list of accounts.
+	// 				restart = true
+	// 			}
+	// 		}
+	// 		if !restart {
+	// 			continue
+	// 		}
+	// 	}
+	// }
 
 }
 
 // syncWallets syncs all wallets with paired devices
-func (m *Messenger) syncWallets(ctx context.Context, accounts *accounts.Database) error {
+func (m *Messenger) syncWallets(ctx context.Context) error {
 	var err error
 
-	localAccounts, err := accounts.GetAccounts()
+	localAccounts, err := m.settings.GetAccounts()
 
 	if err != nil {
 		return err
 	}
 
-	for i := range localAccounts {
-		acc := &localAccounts[i]
-		// Mounts the message to be sent to paired devices through protobuf
+	for _, acc := range localAccounts {
+
+		if acc.Type != accounts.AccountTypeWatch {
+			continue
+		}
 		syncMessage := &protobuf.SyncWalletAccount{
-			Address:   acc.Address, //TODO: handle this type error
+			Clock:     m.getTimesource().GetCurrentTime(),
+			Address:   acc.Address.Bytes(),
 			Wallet:    acc.Wallet,
 			Chat:      acc.Chat,
 			Type:      acc.Type,
@@ -2518,9 +2520,13 @@ func (m *Messenger) syncWallets(ctx context.Context, accounts *accounts.Database
 		}
 		encodedMessage, err := proto.Marshal(syncMessage)
 
+		if err != nil {
+			return err
+		}
+
 		err = m.sendToPairedDevices(ctx, common.RawMessage{
 			Payload:             encodedMessage,
-			MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT_SEND,
+			MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
 			ResendAutomatically: true,
 		})
 
@@ -3456,6 +3462,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
 
+					case protobuf.SyncWalletAccount:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccount)
+						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
+						err = m.HandleSyncWalletAccount(p)
+						if err != nil {
+							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {

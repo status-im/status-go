@@ -59,7 +59,7 @@ const (
 	accountTypeGenerated = "generated"
 	accountTypeKey       = "key"
 	accountTypeSeed      = "seed"
-	accountTypeWatch     = "watch"
+	AccountTypeWatch     = "watch"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -919,4 +919,24 @@ func (db *Database) GifFavorites() (favorites json.RawMessage, err error) {
 		return nil, err
 	}
 	return favorites, nil
+}
+
+func (db *Database) GetAccountLastSynced(address types.Address) (uint64, error) {
+	var result uint64
+
+	query := "SELECT clock FROM accounts WHERE address = ?"
+
+	err := db.db.QueryRow(query, address).Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
+
+func (db *Database) SetAccountLastSynced(address types.Address, clock uint64) error {
+	query := "UPDATE accounts SET clock = ? WHERE address = ? AND clock < ?"
+
+	_, err := db.db.Exec(query, address, clock)
+	return err
 }

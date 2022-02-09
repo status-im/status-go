@@ -1572,3 +1572,37 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {
 		chat.UnviewedMentionsCount++
 	}
 }
+
+func (m *Messenger) HandleSyncWalletAccount(message protobuf.SyncWalletAccount) error {
+
+	acc := accounts.Account{
+		Address:   types.BytesToAddress(message.Address),
+		Wallet:    message.Wallet,
+		Chat:      message.Chat,
+		Type:      message.Type,
+		Storage:   message.Storage,
+		PublicKey: types.HexBytes(message.PublicKey),
+		Path:      message.Path,
+		Color:     message.Color,
+		Hidden:    message.Hidden,
+		Name:      message.Name,
+	}
+
+	clock, err := m.settings.GetAccountLastSynced(acc.Address)
+
+	if err != nil {
+		return err
+	}
+
+	if message.Clock < clock {
+		return errors.New("clock is lower than last synced")
+	}
+
+	err = m.settings.SaveAccounts([]accounts.Account{acc})
+
+	if err != nil {
+		return err
+	}
+
+	return m.settings.SetAccountLastSynced(acc.Address, message.Clock)
+}

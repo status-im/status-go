@@ -106,17 +106,17 @@ message SyncActivityCenterDismissed {
   repeated bytes ids = 2;
 }
 
-// Should I duplicate this struct for sender and receiver as there are differnts of SyncActivityCenter*
 message SyncWalletAccount {
-	bytes address = 1;
-	bool wallet = 2;
-	bool chat = 3;
-	string type = 4;
-	string storage = 5;
-	string path = 6;
-	bytes publicKey = 7;
-	string name = 8;
-	string color = 9;
-	bool hidden = 10;
+  uint64 clock = 1;
+	bytes address = 2;
+	bool wallet = 3;
+	bool chat = 4;
+	string type = 5;
+	string storage = 6;
+	string path = 7;
+	bytes publicKey = 8;
+	string name = 9;
+	string color = 10;
+	bool hidden = 11;
 }
 

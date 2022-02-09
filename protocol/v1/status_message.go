@@ -263,9 +263,7 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterAccepted))
 	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED:
 		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterDismissed))
-	case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT_SEND:
-		return m.unmarshalProtobufData(new(protobuf.SyncWalletAccount))
-	case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT_RECEIVE:
+	case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT:
 		return m.unmarshalProtobufData(new(protobuf.SyncWalletAccount))
 	}
 	return nil
