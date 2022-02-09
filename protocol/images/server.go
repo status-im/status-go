@@ -183,7 +183,10 @@ func (s *Server) listenAndServe() {
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
-		s.Start()
+		err = s.Start()
+		if err != nil {
+			s.logger.Error("server start failed, giving up", zap.Error(err))
+		}
 		return
 	}
 
@@ -192,11 +195,14 @@ func (s *Server) listenAndServe() {
 	err = s.server.Serve(listener)
 	if err != http.ErrServerClosed {
 		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
-		s.Start()
+		err = s.Start()
+		if err != nil {
+			s.logger.Error("server start failed, giving up", zap.Error(err))
+		}
 		return
-	} else {
-		s.run = false
 	}
+
+	s.run = false
 }
 
 func (s *Server) Start() error {
@@ -220,12 +226,18 @@ func (s *Server) Stop() error {
 
 func (s *Server) ToForeground() {
 	if !s.run && (s.server != nil) {
-		s.Start()
+		err := s.Start()
+		if err != nil {
+			s.logger.Error("server start failed during foreground transition", zap.Error(err))
+		}
 	}
 }
 
 func (s *Server) ToBackground() {
 	if s.run {
-		s.Stop()
+		err := s.Stop()
+		if err != nil {
+			s.logger.Error("server stop failed during background transition", zap.Error(err))
+		}
 	}
 }
