@@ -556,11 +556,15 @@ func (m *Messenger) resendExpiredMessages() error {
 }
 
 func (m *Messenger) ToForeground() {
-	m.imageServer.ToForeground()
+	if m.imageServer != nil {
+		m.imageServer.ToForeground()
+	}
 }
 
 func (m *Messenger) ToBackground() {
-	m.imageServer.ToBackground()
+	if m.imageServer != nil {
+		m.imageServer.ToBackground()
+	}
 }
 
 func (m *Messenger) Start() (*MessengerResponse, error) {
