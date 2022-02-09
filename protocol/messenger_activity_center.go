@@ -5,6 +5,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/pkg/errors"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -159,6 +161,11 @@ func (m *Messenger) AcceptAllActivityCenterNotifications(ctx context.Context) (*
 }
 
 func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
+
+	if len(ids) == 0 {
+		return nil, errors.New("notifications ids are not provided")
+	}
+
 	notifications, err := m.persistence.AcceptActivityCenterNotifications(ids)
 	if err != nil {
 		return nil, err
