@@ -229,7 +229,7 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 
 func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]OpenseaCollection, error) {
 	log.Debug("call to get opensea collections")
-	client, err := newOpenseaClient(chainID)
+	client, err := newOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64
 
 func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
 	log.Debug("call to get opensea assets")
-	client, err := newOpenseaClient(chainID)
+	client, err := newOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
 		return nil, err
 	}

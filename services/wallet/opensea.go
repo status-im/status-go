@@ -109,15 +109,16 @@ type OpenseaCollection struct {
 type OpenseaClient struct {
 	client *http.Client
 	url    string
+	apiKey string
 }
 
 // new opensea client.
-func newOpenseaClient(chainID uint64) (*OpenseaClient, error) {
+func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
 	if url, ok := BaseURLs[chainID]; ok {
-		return &OpenseaClient{client: client, url: url}, nil
+		return &OpenseaClient{client: client, url: url, apiKey: apiKey}, nil
 	}
 
 	return nil, errors.New("ChainID not supported")
@@ -184,6 +185,7 @@ func (o *OpenseaClient) doOpenseaRequest(url string) ([]byte, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
+	req.Header.Set("X-API-KEY", o.apiKey)
 
 	resp, err := o.client.Do(req)
 	if err != nil {

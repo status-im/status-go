@@ -503,7 +503,8 @@ type Network struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled bool
+	Enabled       bool
+	OpenseaAPIKey string `json:"OpenseaAPIKey"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
