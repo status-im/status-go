@@ -120,6 +120,7 @@ type Messenger struct {
 	settings                   *accounts.Database
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
+	imageServer                *images.Server
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
 	connectionState            connection.State
@@ -379,7 +380,14 @@ func NewMessenger(
 		return nil, err
 	}
 	settings := accounts.NewDB(database)
+
 	mailservers := mailserversDB.NewDB(database)
+	imageServer, err := images.NewServer(database, logger)
+
+	if err != nil {
+		return nil, err
+	}
+
 	messenger = &Messenger{
 		config:                     &c,
 		node:                       node,
@@ -415,12 +423,14 @@ func NewMessenger(
 		account:              c.account,
 		quit:                 make(chan struct{}),
 		requestedCommunities: make(map[string]*transport.Filter),
+		imageServer:          imageServer,
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
 			transp.ResetFilters,
+			imageServer.Stop,
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
@@ -545,6 +555,18 @@ func (m *Messenger) resendExpiredMessages() error {
 	return nil
 }
 
+func (m *Messenger) ToForeground() {
+	if m.imageServer != nil {
+		m.imageServer.ToForeground()
+	}
+}
+
+func (m *Messenger) ToBackground() {
+	if m.imageServer != nil {
+		m.imageServer.ToBackground()
+	}
+}
+
 func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
@@ -628,6 +650,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = m.imageServer.Start()
+	if err != nil {
+		return nil, err
 	}
 
 	return response, nil
@@ -2380,10 +2407,13 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
+
 	response.SetMessages(msg)
 
 	response.AddChat(chat)
 	m.logger.Debug("sent message", zap.String("id", message.ID))
+	m.prepareMessages(response.messages)
+
 	return &response, m.saveChat(chat)
 }
 
@@ -3561,6 +3591,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return nil, err
 	}
 
+	m.prepareMessages(messageState.Response.messages)
+
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
@@ -3621,6 +3653,9 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		return nil, "", ErrChatNotFound
 	}
 
+	var msgs []*common.Message
+	var nextCursor string
+
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
@@ -3629,9 +3664,29 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 			}
 			return true
 		})
-		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
+		msgs, nextCursor, err = m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
+		if err != nil {
+			return nil, "", err
+		}
+	} else {
+		msgs, nextCursor, err = m.persistence.MessageByChatID(chatID, cursor, limit)
+		if err != nil {
+			return nil, "", err
+		}
+
 	}
-	return m.persistence.MessageByChatID(chatID, cursor, limit)
+	for idx := range msgs {
+		msgs[idx].PrepareImageURL(m.imageServer.Port)
+	}
+
+	return msgs, nextCursor, nil
+}
+
+func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
+	for idx := range messages {
+		messages[idx].PrepareImageURL(m.imageServer.Port)
+	}
+
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {

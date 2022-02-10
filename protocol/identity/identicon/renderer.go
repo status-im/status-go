@@ -10,22 +10,11 @@ import (
 )
 
 func renderBase64(id Identicon) (string, error) {
-	img := image.NewRGBA(image.Rect(0, 0, 50, 50))
-	var buff bytes.Buffer
-
-	setBackgroundTransparent(img)
-
-	for i, v := range id.bitmap {
-		if v == 1 {
-			drawRect(img, i, id.color)
-		}
-	}
-
-	if err := png.Encode(&buff, img); err != nil {
+	img, err := render(id)
+	if err != nil {
 		return "", err
 	}
-
-	encodedString := base64.StdEncoding.EncodeToString(buff.Bytes())
+	encodedString := base64.StdEncoding.EncodeToString(img)
 	image := "data:image/png;base64," + encodedString
 	return image, nil
 }
@@ -48,8 +37,32 @@ func drawRect(rgba *image.RGBA, i int, c color.Color) {
 	draw.Draw(rgba, r, &image.Uniform{C: c}, image.Point{}, draw.Src)
 }
 
+func render(id Identicon) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, 50, 50))
+	var buff bytes.Buffer
+
+	setBackgroundTransparent(img)
+
+	for i, v := range id.bitmap {
+		if v == 1 {
+			drawRect(img, i, id.color)
+		}
+	}
+
+	if err := png.Encode(&buff, img); err != nil {
+		return nil, err
+	}
+
+	return buff.Bytes(), nil
+}
+
 // GenerateBase64 generates an identicon in base64 png format given a string
 func GenerateBase64(id string) (string, error) {
 	i := generate(id)
 	return renderBase64(i)
+}
+
+func Generate(id string) ([]byte, error) {
+	i := generate(id)
+	return render(i)
 }

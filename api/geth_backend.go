@@ -1026,6 +1026,23 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
+	if b.statusNode != nil {
+		wakuext := b.statusNode.WakuExtService()
+
+		if wakuext != nil {
+			messenger := wakuext.Messenger()
+
+			if messenger != nil {
+				if s == appStateForeground {
+					messenger.ToForeground()
+				} else {
+					messenger.ToBackground()
+				}
+			}
+		}
+
+	}
+
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }
