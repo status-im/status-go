@@ -1,6 +1,7 @@
 package ens
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -40,8 +41,8 @@ func usernameToLabel(username string) [32]byte {
 }
 
 func extractCoordinates(pubkey string) ([32]byte, [32]byte) {
-	x := []byte("0x" + pubkey[4:68])
-	y := []byte("0x" + pubkey[68:132])
+	x, _ := hex.DecodeString(pubkey[4:68])
+	y, _ := hex.DecodeString(pubkey[68:132])
 
 	var xByte [32]byte
 	copy(xByte[:], x)
