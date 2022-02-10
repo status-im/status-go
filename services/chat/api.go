@@ -6,12 +6,14 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -61,7 +63,7 @@ type Chat struct {
 	InvitationAdmin          string                             `json:"invitationAdmin,omitempty"`
 	ReceivedInvitationAdmin  string                             `json:"receivedInvitationAdmin,omitempty"`
 	Profile                  string                             `json:"profile,omitempty"`
-	CommunityID              string                             `json:"communityId,omitempty"`
+	CommunityID              string                             `json:"communityId"`
 	CategoryID               string                             `json:"categoryId"`
 	Position                 int32                              `json:"position,omitempty"`
 	Permissions              *protobuf.CommunityPermissions     `json:"permissions,omitempty"`
@@ -93,7 +95,7 @@ type API struct {
 	s *Service
 }
 
-func (api *API) GetChats(parent context.Context) (map[string]ChannelGroup, error) {
+func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 	joinedCommunities, err := api.s.messenger.JoinedCommunities()
 	if err != nil {
 		return nil, err
@@ -101,10 +103,7 @@ func (api *API) GetChats(parent context.Context) (map[string]ChannelGroup, error
 
 	channels := api.s.messenger.Chats()
 
-	pubKey, err := api.s.accountsDB.GetPublicKey()
-	if err != nil {
-		return nil, err
-	}
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 
 	result := make(map[string]ChannelGroup)
 
@@ -179,38 +178,11 @@ func (api *API) GetChats(parent context.Context) (map[string]ChannelGroup, error
 	return result, nil
 }
 
-func (api *API) GetChat(parent context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
-	fullChatID := chatID
-
-	pubKey, err := api.s.accountsDB.GetPublicKey()
+func (api *API) GetChat(ctx context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	messengerChat, community, err := api.getChatAndCommunity(pubKey, communityID, chatID)
 	if err != nil {
 		return nil, err
-	}
-
-	if string(communityID.Bytes()) == pubKey { // Obtaining chats from personal
-		communityID = []byte{}
-	}
-
-	if len(communityID) != 0 {
-		fullChatID = string(communityID.Bytes()) + chatID
-	}
-
-	messengerChat := api.s.messenger.Chat(fullChatID)
-	if messengerChat == nil {
-		return nil, ErrChatNotFound
-	}
-
-	var community *communities.Community
-	if messengerChat.CommunityID != "" {
-		communityID, err := hexutil.Decode(messengerChat.CommunityID)
-		if err != nil {
-			return nil, err
-		}
-
-		community, err = api.s.messenger.GetCommunityByID(communityID)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(messengerChat.ID, "", -1)
@@ -224,6 +196,36 @@ func (api *API) GetChat(parent context.Context, communityID types.HexBytes, chat
 	}
 
 	return result, nil
+}
+
+func (api *API) GetMembers(ctx context.Context, communityID types.HexBytes, chatID string) (map[string]Member, error) {
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	messengerChat, community, err := api.getChatAndCommunity(pubKey, communityID, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return getChatMembers(messengerChat, community, pubKey)
+}
+
+func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
+	if len(communityID) != 0 {
+		return nil, errors.New("joining community chats is not supported (you already joined all the community chats)")
+	}
+
+	response, err := api.s.messenger.CreatePublicChat(&requests.CreatePublicChat{ID: chatID})
+	if err != nil {
+		return nil, err
+	}
+
+	chat := response.Chats()[0]
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
+	if err != nil {
+		return nil, err
+	}
+
+	return toAPIChat(chat, nil, pubKey, pinnedMessages, cursor)
 }
 
 func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string, pinnedMessages []*common.PinnedMessage, cursor string) (*Chat, error) {
@@ -242,7 +244,6 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 		UnviewedMessagesCount:    protocolChat.UnviewedMessagesCount,
 		UnviewedMentionsCount:    protocolChat.UnviewedMentionsCount,
 		LastMessage:              protocolChat.LastMessage,
-		Members:                  make(map[string]Member),
 		MembershipUpdates:        protocolChat.MembershipUpdates,
 		Alias:                    protocolChat.Alias,
 		Identicon:                protocolChat.Identicon,
@@ -274,48 +275,58 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 		return nil, err
 	}
 
-	chat.setChatMembers(protocolChat, community, pubKey)
+	chatMembers, err := getChatMembers(protocolChat, community, pubKey)
+	if err != nil {
+		return nil, err
+	}
+	chat.Members = chatMembers
+
+	if chat.CommunityID == "" {
+		chat.CommunityID = pubKey
+	}
 
 	return chat, nil
 }
 
-func (chat *Chat) setChatMembers(sourceChat *protocol.Chat, community *communities.Community, userPubKey string) {
+func getChatMembers(sourceChat *protocol.Chat, community *communities.Community, userPubKey string) (map[string]Member, error) {
+	result := make(map[string]Member)
 	if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
 		for _, m := range sourceChat.Members {
-			chat.Members[m.ID] = Member{
+			result[m.ID] = Member{
 				Admin:  m.Admin,
 				Joined: m.Joined,
 			}
 		}
-		return
+		return result, nil
 	}
 
 	if sourceChat.ChatType == protocol.ChatTypeOneToOne {
-		chat.Members[sourceChat.ID] = Member{
+		result[sourceChat.ID] = Member{
 			Joined: true,
 		}
-		chat.Members[userPubKey] = Member{
+		result[userPubKey] = Member{
 			Joined: true,
 		}
-		return
+		return result, nil
 	}
 
 	if community != nil {
-		for pubKey, m := range community.Description().Members {
-			if pubKey == userPubKey {
-				chat.Members[pubKey] = Member{
-					Roles:  m.Roles,
-					Joined: true,
-				}
-			} else {
-				chat.Members[pubKey] = Member{
-					Roles:  m.Roles,
-					Joined: community.Joined(),
-				}
+		for member, m := range community.Description().Members {
+			pubKey, err := common.HexToPubkey(member)
+			if err != nil {
+				return nil, err
 			}
+			result[member] = Member{
+				Roles:  m.Roles,
+				Joined: community.Joined(),
+				Admin:  community.IsMemberAdmin(pubKey),
+			}
+
 		}
-		return
+		return result, nil
 	}
+
+	return nil, nil
 }
 
 func (chat *Chat) populateCommunityFields(community *communities.Community) error {
@@ -343,4 +354,36 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	chat.CanPost = canPost
 
 	return nil
+}
+
+func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, chatID string) (*protocol.Chat, *communities.Community, error) {
+	fullChatID := chatID
+
+	if string(communityID.Bytes()) == pubKey { // Obtaining chats from personal
+		communityID = []byte{}
+	}
+
+	if len(communityID) != 0 {
+		fullChatID = string(communityID.Bytes()) + chatID
+	}
+
+	messengerChat := api.s.messenger.Chat(fullChatID)
+	if messengerChat == nil {
+		return nil, nil, ErrChatNotFound
+	}
+
+	var community *communities.Community
+	if messengerChat.CommunityID != "" {
+		communityID, err := hexutil.Decode(messengerChat.CommunityID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		community, err = api.s.messenger.GetCommunityByID(communityID)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return messengerChat, community, nil
 }

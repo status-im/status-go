@@ -390,7 +390,7 @@ func (b *StatusNode) gifService() *gif.Service {
 
 func (b *StatusNode) ChatService() *chat.Service {
 	if b.chatSrvc == nil {
-		b.chatSrvc = chat.NewService(b.appDB)
+		b.chatSrvc = chat.NewService()
 	}
 	return b.chatSrvc
 }
