@@ -105,3 +105,8 @@ message SyncActivityCenterDismissed {
   uint64 clock = 1;
   repeated bytes ids = 2;
 }
+
+message SyncClearHistory {
+  string chat_id = 1;
+  uint64 cleared_at = 2;
+}

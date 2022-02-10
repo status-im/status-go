@@ -558,11 +558,15 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 	}
 
 	if chat.Public() {
-
 		err = m.transport.ClearProcessedMessageIDsCache()
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = m.syncClearHistory(context.Background(), chat)
+	if err != nil {
+		return nil, err
 	}
 
 	m.allChats.Store(id, chat)
