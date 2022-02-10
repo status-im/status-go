@@ -16,6 +16,11 @@ type RemovedMessage struct {
 	MessageID string `json:"messageId"`
 }
 
+type ClearedHistory struct {
+	ChatID    string `json:"chatId"`
+	ClearedAt uint64 `json:"clearedAt"`
+}
+
 type MessengerResponse struct {
 	Contacts                []*Contact
 	Installations           []*multidevice.Installation
@@ -38,6 +43,7 @@ type MessengerResponse struct {
 	pinMessages                 map[string]*common.PinMessage
 	currentStatus               *UserStatus
 	statusUpdates               map[string]UserStatus
+	clearedHistories            map[string]*ClearedHistory
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -54,6 +60,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges        []*communities.CommunityChanges `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin    `json:"requestsToJoinCommunity,omitempty"`
 		Mailservers             []mailservers.Mailserver        `json:"mailservers,omitempty"`
+		ClearedHistories        []*ClearedHistory               `json:"clearedHistories,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
 		Notifications               []*localnotifications.Notification `json:"notifications"`
@@ -78,6 +85,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem.Communities = r.Communities()
 	responseItem.RemovedChats = r.RemovedChats()
 	responseItem.RemovedMessages = r.RemovedMessages()
+	responseItem.ClearedHistories = r.ClearedHistories()
 	responseItem.ActivityCenterNotifications = r.ActivityCenterNotifications()
 	responseItem.PinMessages = r.PinMessages()
 	responseItem.StatusUpdates = r.StatusUpdates()
@@ -107,6 +115,14 @@ func (r *MessengerResponse) RemovedMessages() []*RemovedMessage {
 		messages = append(messages, r.removedMessages[messageID])
 	}
 	return messages
+}
+
+func (r *MessengerResponse) ClearedHistories() []*ClearedHistory {
+	var clearedHistories []*ClearedHistory
+	for chatID := range r.clearedHistories {
+		clearedHistories = append(clearedHistories, r.clearedHistories[chatID])
+	}
+	return clearedHistories
 }
 
 func (r *MessengerResponse) Communities() []*communities.Community {
@@ -147,6 +163,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.messages)+
 		len(r.pinMessages)+
 		len(r.Contacts)+
+		len(r.clearedHistories)+
 		len(r.Installations)+
 		len(r.Invitations)+
 		len(r.EmojiReactions)+
@@ -172,6 +189,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
 		len(response.EmojiReactions)+
+		len(response.clearedHistories)+
 		len(response.CommunityChanges) != 0 {
 		return ErrNotImplemented
 	}
@@ -264,6 +282,17 @@ func (r *MessengerResponse) AddRemovedMessage(rm *RemovedMessage) {
 
 	if len(r.messages) != 0 && r.messages[rm.MessageID] != nil {
 		delete(r.messages, rm.MessageID)
+	}
+}
+
+func (r *MessengerResponse) AddClearedHistory(ch *ClearedHistory) {
+	if r.clearedHistories == nil {
+		r.clearedHistories = make(map[string]*ClearedHistory)
+	}
+
+	existingClearedHistory, ok := r.clearedHistories[ch.ChatID]
+	if !ok || existingClearedHistory.ClearedAt < ch.ClearedAt {
+		r.clearedHistories[ch.ChatID] = ch
 	}
 }
 

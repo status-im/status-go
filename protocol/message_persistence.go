@@ -1298,6 +1298,55 @@ func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err e
 	return
 }
 
+func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(id string, clock uint64, tx *sql.Tx) (unViewedMessages, unViewedMentions uint, err error) {
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return 0, 0, err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ? AND clock_value <= ?`, id, clock)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE local_chat_id = ? AND clock_value <= ?`, id, clock)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(
+		`UPDATE chats
+		   SET unviewed_message_count =
+		   (SELECT COUNT(1)
+		   FROM user_messages
+		   WHERE local_chat_id = ? AND seen = 0),
+		   unviewed_mentions_count =
+		   (SELECT COUNT(1)
+		   FROM user_messages
+		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+                   highlight = 0
+		WHERE id = ?`, id, id, id)
+
+	if err != nil {
+		return 0, 0, err
+	}
+
+	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats 
+				WHERE id = ?`, id).Scan(&unViewedMessages, &unViewedMentions)
+
+	return
+}
+
 func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int64, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -1719,6 +1768,27 @@ func (db sqlitePersistence) ClearHistory(chat *Chat, currentClockValue uint64) (
 	return
 }
 
+func (db sqlitePersistence) ClearHistoryFromSyncMessage(chat *Chat, currentClockValue uint64) (err error) {
+	var tx *sql.Tx
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	err = db.clearHistoryFromSyncMessage(chat, currentClockValue, tx)
+
+	return
+}
+
 // Deactivate chat sets a chat as inactive and clear its history
 func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64) (err error) {
 	var tx *sql.Tx
@@ -1824,6 +1894,30 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	err := db.deleteMessagesByChatID(chat.ID, tx)
 	if err != nil {
 		return err
+	}
+
+	err = db.saveChat(tx, *chat)
+	return err
+}
+
+func (db sqlitePersistence) clearHistoryFromSyncMessage(chat *Chat, clearedAt uint64, tx *sql.Tx) error {
+	chat.DeletedAtClockValue = clearedAt
+
+	// Reset synced-to/from
+	syncedTo := uint32(clearedAt / 1000)
+	chat.SyncedTo = syncedTo
+	chat.SyncedFrom = 0
+
+	unViewedMessagesCount, unViewedMentionsCount, err := db.deleteMessagesByChatIDAndClockValueLessThanOrEqual(chat.ID, clearedAt, tx)
+	if err != nil {
+		return err
+	}
+
+	chat.UnviewedMessagesCount = unViewedMessagesCount
+	chat.UnviewedMentionsCount = unViewedMentionsCount
+
+	if chat.LastMessage != nil && chat.LastMessage.Clock <= clearedAt {
+		chat.LastMessage = nil
 	}
 
 	err = db.saveChat(tx, *chat)

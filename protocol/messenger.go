@@ -2456,6 +2456,13 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 			}
 		}
 
+		if isPublicChat && chat.Active && chat.DeletedAtClockValue > 0 {
+			err = m.syncClearHistory(ctx, chat)
+			if err != nil {
+				return false
+			}
+		}
+
 		return true
 	})
 	if err != nil {
@@ -2568,6 +2575,37 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat) error {
+	var err error
+	if !m.hasPairedDevices() {
+		return nil
+	}
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage := &protobuf.SyncClearHistory{
+		ChatId:    publicChat.ID,
+		ClearedAt: publicChat.DeletedAtClockValue,
+	}
+
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY,
 		ResendAutomatically: true,
 	})
 	if err != nil {
@@ -3041,6 +3079,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncClearHistory:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncClearHistory)
+						logger.Debug("Handling SyncClearHistory", zap.Any("message", p))
+						err = m.handleSyncClearHistory(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncClearHistory", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -5062,4 +5115,36 @@ func (m *Messenger) BloomFilter() []byte {
 func (m *Messenger) getSettings() (accounts.Settings, error) {
 	sDB := accounts.NewDB(m.database)
 	return sDB.GetSettings()
+}
+
+func (m *Messenger) handleSyncClearHistory(state *ReceivedMessageState, message protobuf.SyncClearHistory) error {
+	chatID := message.ChatId
+	existingChat, ok := state.AllChats.Load(chatID)
+	if !ok {
+		return ErrChatNotFound
+	}
+
+	if existingChat.DeletedAtClockValue >= message.ClearedAt {
+		return nil
+	}
+
+	err := m.persistence.ClearHistoryFromSyncMessage(existingChat, message.ClearedAt)
+	if err != nil {
+		return err
+	}
+
+	if existingChat.Public() {
+		err = m.transport.ClearProcessedMessageIDsCache()
+		if err != nil {
+			return err
+		}
+	}
+
+	state.AllChats.Store(chatID, existingChat)
+	state.Response.AddChat(existingChat)
+	state.Response.AddClearedHistory(&ClearedHistory{
+		ClearedAt: message.ClearedAt,
+		ChatID:    chatID,
+	})
+	return nil
 }
