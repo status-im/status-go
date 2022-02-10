@@ -633,6 +633,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	return response, nil
 }
 
+func (m *Messenger) IdentityPublicKey() *ecdsa.PublicKey {
+	return &m.identity.PublicKey
+}
+
 // cleanTopics remove any topic that does not have a Listen flag set
 func (m *Messenger) cleanTopics() error {
 	if m.mailserversDatabase == nil {
