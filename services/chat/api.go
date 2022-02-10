@@ -1,4 +1,4 @@
-package ext
+package chat
 
 import (
 	"context"
@@ -24,12 +24,12 @@ type ChannelGroupType string
 const Personal ChannelGroupType = "personal"
 const Community ChannelGroupType = "community"
 
-type ChatPinnedMessages struct {
+type PinnedMessages struct {
 	Cursor         string
 	PinnedMessages []*common.PinnedMessage
 }
 
-type ChatMember struct {
+type Member struct {
 	// Community Roles
 	Roles []protobuf.CommunityMember_Roles `json:"roles,omitempty"`
 	// Admin indicates if the member is an admin of the group chat
@@ -53,7 +53,7 @@ type Chat struct {
 	UnviewedMessagesCount    uint                               `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount    uint                               `json:"unviewedMentionsCount"`
 	LastMessage              *common.Message                    `json:"lastMessage"`
-	Members                  map[string]ChatMember              `json:"members,omitempty"`
+	Members                  map[string]Member                  `json:"members,omitempty"`
 	MembershipUpdates        []v1protocol.MembershipUpdateEvent `json:"membershipUpdateEvents"`
 	Alias                    string                             `json:"alias,omitempty"`
 	Identicon                string                             `json:"identicon"`
@@ -69,7 +69,7 @@ type Chat struct {
 	SyncedTo                 uint32                             `json:"syncedTo,omitempty"`
 	SyncedFrom               uint32                             `json:"syncedFrom,omitempty"`
 	Highlight                bool                               `json:"highlight,omitempty"`
-	PinnedMessages           *ChatPinnedMessages                `json:"pinnedMessages,omitempty"`
+	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
 	CanPost                  bool                               `json:"canPost"`
 }
 
@@ -83,15 +83,25 @@ type ChannelGroup struct {
 	EnsName    string                                   `json:"ensName"`
 }
 
-func (api *PublicAPI) GetChats(parent context.Context) (map[string]ChannelGroup, error) {
-	joinedCommunities, err := api.service.messenger.JoinedCommunities()
+func NewAPI(service *Service) *API {
+	return &API{
+		s: service,
+	}
+}
+
+type API struct {
+	s *Service
+}
+
+func (api *API) GetChats(parent context.Context) (map[string]ChannelGroup, error) {
+	joinedCommunities, err := api.s.messenger.JoinedCommunities()
 	if err != nil {
 		return nil, err
 	}
 
-	channels := api.service.messenger.Chats()
+	channels := api.s.messenger.Chats()
 
-	pubKey, err := api.service.accountsDB.GetPublicKey()
+	pubKey, err := api.s.accountsDB.GetPublicKey()
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +123,7 @@ func (api *PublicAPI) GetChats(parent context.Context) (map[string]ChannelGroup,
 			continue
 		}
 
-		pinnedMessages, cursor, err := api.service.messenger.PinnedMessageByChatID(chat.ID, "", -1)
+		pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +159,7 @@ func (api *PublicAPI) GetChats(parent context.Context) (map[string]ChannelGroup,
 
 		for _, chat := range channels {
 			if chat.CommunityID == community.IDString() {
-				pinnedMessages, cursor, err := api.service.messenger.PinnedMessageByChatID(chat.ID, "", -1)
+				pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
 				if err != nil {
 					return nil, err
 				}
@@ -169,21 +179,25 @@ func (api *PublicAPI) GetChats(parent context.Context) (map[string]ChannelGroup,
 	return result, nil
 }
 
-func (api *PublicAPI) GetChat(parent context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
+func (api *API) GetChat(parent context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
 	fullChatID := chatID
+
+	pubKey, err := api.s.accountsDB.GetPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	if string(communityID.Bytes()) == pubKey { // Obtaining chats from personal
+		communityID = []byte{}
+	}
 
 	if len(communityID) != 0 {
 		fullChatID = string(communityID.Bytes()) + chatID
 	}
 
-	messengerChat := api.service.messenger.Chat(fullChatID)
+	messengerChat := api.s.messenger.Chat(fullChatID)
 	if messengerChat == nil {
 		return nil, ErrChatNotFound
-	}
-
-	pubKey, err := api.service.accountsDB.GetPublicKey()
-	if err != nil {
-		return nil, err
 	}
 
 	var community *communities.Community
@@ -193,13 +207,13 @@ func (api *PublicAPI) GetChat(parent context.Context, communityID types.HexBytes
 			return nil, err
 		}
 
-		community, err = api.service.messenger.GetCommunityByID(communityID)
+		community, err = api.s.messenger.GetCommunityByID(communityID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	pinnedMessages, cursor, err := api.service.messenger.PinnedMessageByChatID(messengerChat.ID, "", -1)
+	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(messengerChat.ID, "", -1)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +242,7 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 		UnviewedMessagesCount:    protocolChat.UnviewedMessagesCount,
 		UnviewedMentionsCount:    protocolChat.UnviewedMentionsCount,
 		LastMessage:              protocolChat.LastMessage,
-		Members:                  make(map[string]ChatMember),
+		Members:                  make(map[string]Member),
 		MembershipUpdates:        protocolChat.MembershipUpdates,
 		Alias:                    protocolChat.Alias,
 		Identicon:                protocolChat.Identicon,
@@ -249,7 +263,7 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 	}
 
 	if len(pinnedMessages) != 0 {
-		chat.PinnedMessages = &ChatPinnedMessages{
+		chat.PinnedMessages = &PinnedMessages{
 			Cursor:         cursor,
 			PinnedMessages: pinnedMessages,
 		}
@@ -268,7 +282,7 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 func (chat *Chat) setChatMembers(sourceChat *protocol.Chat, community *communities.Community, userPubKey string) {
 	if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
 		for _, m := range sourceChat.Members {
-			chat.Members[m.ID] = ChatMember{
+			chat.Members[m.ID] = Member{
 				Admin:  m.Admin,
 				Joined: m.Joined,
 			}
@@ -277,10 +291,10 @@ func (chat *Chat) setChatMembers(sourceChat *protocol.Chat, community *communiti
 	}
 
 	if sourceChat.ChatType == protocol.ChatTypeOneToOne {
-		chat.Members[sourceChat.ID] = ChatMember{
+		chat.Members[sourceChat.ID] = Member{
 			Joined: true,
 		}
-		chat.Members[userPubKey] = ChatMember{
+		chat.Members[userPubKey] = Member{
 			Joined: true,
 		}
 		return
@@ -289,12 +303,12 @@ func (chat *Chat) setChatMembers(sourceChat *protocol.Chat, community *communiti
 	if community != nil {
 		for pubKey, m := range community.Description().Members {
 			if pubKey == userPubKey {
-				chat.Members[pubKey] = ChatMember{
+				chat.Members[pubKey] = Member{
 					Roles:  m.Roles,
 					Joined: true,
 				}
 			} else {
-				chat.Members[pubKey] = ChatMember{
+				chat.Members[pubKey] = Member{
 					Roles:  m.Roles,
 					Joined: community.Joined(),
 				}
@@ -305,6 +319,10 @@ func (chat *Chat) setChatMembers(sourceChat *protocol.Chat, community *communiti
 }
 
 func (chat *Chat) populateCommunityFields(community *communities.Community) error {
+	if community == nil {
+		return nil
+	}
+
 	commChat, exists := community.Chats()[chat.ID]
 	if !exists {
 		return ErrChatNotFound

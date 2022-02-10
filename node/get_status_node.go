@@ -32,6 +32,7 @@ import (
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -113,6 +114,7 @@ type StatusNode struct {
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	gifSrvc                *gif.Service
+	chatSrvc               *chat.Service
 }
 
 // New makes new instance of StatusNode.
