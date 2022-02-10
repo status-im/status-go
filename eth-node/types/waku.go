@@ -45,6 +45,21 @@ func (u *ConnStatusSubscription) Unsubscribe() {
 	u.active = false
 }
 
+type WakuKeyManager interface {
+	// GetPrivateKey retrieves the private key of the specified identity.
+	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
+	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
+	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
+	// DeleteKeyPair deletes the key with the specified ID if it exists.
+	DeleteKeyPair(keyID string) bool
+	// DeleteKeyPairs deletes all the keys
+	DeleteKeyPairs() error
+	AddSymKeyDirect(key []byte) (string, error)
+	AddSymKeyFromPassword(password string) (string, error)
+	DeleteSymKey(id string) bool
+	GetSymKey(id string) ([]byte, error)
+}
+
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {

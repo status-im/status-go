@@ -24,6 +24,7 @@ import (
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
@@ -75,6 +76,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
 	services = append(services, b.gifService())
+	services = append(services, b.ChatService())
 
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -384,6 +386,13 @@ func (b *StatusNode) gifService() *gif.Service {
 		b.gifSrvc = gif.NewService(accounts.NewDB(b.appDB))
 	}
 	return b.gifSrvc
+}
+
+func (b *StatusNode) ChatService() *chat.Service {
+	if b.chatSrvc == nil {
+		b.chatSrvc = chat.NewService(b.appDB)
+	}
+	return b.chatSrvc
 }
 
 func (b *StatusNode) permissionsService() *permissions.Service {
