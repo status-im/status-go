@@ -183,6 +183,7 @@ func (s *Server) listenAndServe() {
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
+		s.Port = 0
 		err = s.Start()
 		if err != nil {
 			s.logger.Error("server start failed, giving up", zap.Error(err))
