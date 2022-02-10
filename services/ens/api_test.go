@@ -92,7 +92,7 @@ func TestPublicKeyOf(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		"0xe25da6994ea2dc4ac70727e07eca153ae92bf7609db7befb7ebdceaad348f4fc55bbe90abf9501176301db5aa103fc0eb3bc3750272a26c424a10887db2a7ea8",
+		"0x04e25da6994ea2dc4ac70727e07eca153ae92bf7609db7befb7ebdceaad348f4fc55bbe90abf9501176301db5aa103fc0eb3bc3750272a26c424a10887db2a7ea8",
 		pubKey,
 	)
 }

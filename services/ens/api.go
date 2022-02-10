@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
@@ -140,7 +141,7 @@ func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string
 	if err != nil {
 		return "", err
 	}
-	return "0x" + hex.EncodeToString(pubKey.X[:]) + hex.EncodeToString(pubKey.Y[:]), nil
+	return "0x04" + hex.EncodeToString(pubKey.X[:]) + hex.EncodeToString(pubKey.Y[:]), nil
 }
 
 func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
@@ -290,47 +291,66 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 	return tx.Hash().String(), nil
 }
 
-func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
 	priceHex, err := api.Price(ctx, chainID)
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 	price := new(big.Int)
 	price.SetString(priceHex, 16)
 
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
 	x, y := extractCoordinates(pubkey)
 	extraData, err := registrarABI.Pack("register", usernameToLabel(username), common.Address(txArgs.From), x, y)
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
 	sntABI, err := abi.JSON(strings.NewReader(erc20.SNTABI))
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
 	data, err := sntABI.Pack("approveAndCall", usernameRegistrarsByChainID[chainID], price, extraData)
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
+	contractAddress := sntByChainID[chainID]
+
+	return ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    &contractAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	}, nil
+}
+
+func (api *API) RegisterPrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
+	callMsg, err := api.RegisterPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	return toCallArg(callMsg), nil
+}
+
+func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
 	ethClient, err := api.contractMaker.RPCClient.EthClient(chainID)
 	if err != nil {
 		return 0, err
 	}
 
-	contractAddress := sntByChainID[chainID]
-	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
-		From:  common.Address(txArgs.From),
-		To:    &contractAddress,
-		Value: big.NewInt(0),
-		Data:  data,
-	})
+	callMsg, err := api.RegisterPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
+	if err != nil {
+		return 0, err
+	}
+
+	return ethClient.EstimateGas(ctx, callMsg)
 }
 
 func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
@@ -360,39 +380,57 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 	return tx.Hash().String(), nil
 }
 
-func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
 	err := validateENSUsername(username)
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 	x, y := extractCoordinates(pubkey)
 
 	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
 	data, err := resolverABI.Pack("setPubkey", nameHash(username), x, y)
 	if err != nil {
-		return 0, err
+		return ethereum.CallMsg{}, err
 	}
 
+	resolverAddress, err := api.Resolver(ctx, chainID, username)
+	if err != nil {
+		return ethereum.CallMsg{}, err
+	}
+
+	return ethereum.CallMsg{
+		From:  common.Address(txArgs.From),
+		To:    resolverAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	}, nil
+}
+
+func (api *API) SetPubKeyPrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
+	callMsg, err := api.SetPubKeyPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	return toCallArg(callMsg), nil
+}
+
+func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
 	ethClient, err := api.contractMaker.RPCClient.EthClient(chainID)
 	if err != nil {
 		return 0, err
 	}
 
-	resolverAddress, err := api.Resolver(ctx, chainID, username)
+	callMsg, err := api.SetPubKeyPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
 	if err != nil {
 		return 0, err
 	}
 
-	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
-		From:  common.Address(txArgs.From),
-		To:    resolverAddress,
-		Value: big.NewInt(0),
-		Data:  data,
-	})
+	return ethClient.EstimateGas(ctx, callMsg)
 }
 
 func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*uri, error) {
@@ -461,4 +499,24 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 	default:
 		return nil, fmt.Errorf("unknown codec name %s", codecName)
 	}
+}
+
+func toCallArg(msg ethereum.CallMsg) interface{} {
+	arg := map[string]interface{}{
+		"from": msg.From,
+		"to":   msg.To,
+	}
+	if len(msg.Data) > 0 {
+		arg["data"] = hexutil.Bytes(msg.Data)
+	}
+	if msg.Value != nil {
+		arg["value"] = (*hexutil.Big)(msg.Value)
+	}
+	if msg.Gas != 0 {
+		arg["gas"] = hexutil.Uint64(msg.Gas)
+	}
+	if msg.GasPrice != nil {
+		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
+	}
+	return arg
 }
