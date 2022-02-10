@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -1144,7 +1145,7 @@ func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
 	return b.account, nil
 }
 
-func (b *GethStatusBackend) injectAccountsIntoServices() error {
+func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager, st *ext.Service) error {
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
@@ -1157,46 +1158,48 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		return err
 	}
 
-	wakuService := b.statusNode.WakuService()
-
-	if wakuService != nil {
-		if err := wakuService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
-			return err
-		}
-		b.selectedAccountKeyID, err = wakuService.AddKeyPair(identity)
-		if err != nil {
-			return ErrWakuIdentityInjectionFailure
-		}
-		st := b.statusNode.WakuExtService()
-
-		if st != nil {
-			if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
-				return err
-			}
-			// Set initial connection state
-			st.ConnectionChanged(b.connectionState)
-
-			messenger := st.Messenger()
-			// Init public status api
-			b.statusNode.StatusPublicService().Init(messenger)
-		}
-
+	if err := w.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+		return err
+	}
+	b.selectedAccountKeyID, err = w.AddKeyPair(identity)
+	if err != nil {
+		return ErrWakuIdentityInjectionFailure
 	}
 
-	wakuV2Service := b.statusNode.WakuV2Service()
-
-	if wakuV2Service != nil {
-		if err := wakuV2Service.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
-			return err
-		}
-		b.selectedAccountKeyID, err = wakuV2Service.AddKeyPair(identity)
-		if err != nil {
-			return ErrWakuIdentityInjectionFailure
-		}
-		st := b.statusNode.WakuV2ExtService()
+	if st != nil {
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
+		// Set initial connection state
+		st.ConnectionChanged(b.connectionState)
+
+		messenger := st.Messenger()
+		// Init public status api
+		b.statusNode.StatusPublicService().Init(messenger)
+		// Init chat service
+		b.statusNode.ChatService().Init(messenger)
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) injectAccountsIntoServices() error {
+	if b.statusNode.WakuService() != nil {
+		return b.injectAccountsIntoWakuService(b.statusNode.WakuService(), func() *ext.Service {
+			if b.statusNode.WakuExtService() == nil {
+				return nil
+			}
+			return b.statusNode.WakuExtService().Service
+		}())
+	}
+
+	if b.statusNode.WakuV2Service() != nil {
+		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
+			if b.statusNode.WakuV2ExtService() == nil {
+				return nil
+			}
+			return b.statusNode.WakuV2ExtService().Service
+		}())
 	}
 
 	return nil

@@ -1,0 +1,48 @@
+package chat
+
+import (
+	"database/sql"
+
+	"github.com/ethereum/go-ethereum/p2p"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/protocol"
+)
+
+func NewService(appDB *sql.DB) *Service {
+	return &Service{
+		accountsDB: accounts.NewDB(appDB),
+	}
+}
+
+type Service struct {
+	accountsDB *accounts.Database
+	messenger  *protocol.Messenger
+}
+
+func (s *Service) Init(messenger *protocol.Messenger) {
+	s.messenger = messenger
+}
+
+func (s *Service) Start() error {
+	return nil
+}
+
+func (s *Service) Stop() error {
+	return nil
+}
+
+func (s *Service) APIs() []gethrpc.API {
+	return []gethrpc.API{
+		{
+			Namespace: "chat",
+			Version:   "0.1.0",
+			Service:   NewAPI(s),
+		},
+	}
+}
+
+func (s *Service) Protocols() []p2p.Protocol {
+	return nil
+}
