@@ -729,29 +729,10 @@ func (api *PublicAPI) StopPushNotificationsServer() error {
 // PushNotification client endpoints
 
 func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {
-	// We set both for now as they are equivalent
-	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled?", true)
-	if err != nil {
-		return err
-	}
-	err = api.service.accountsDB.SaveSetting("notifications-enabled?", true)
-	if err != nil {
-		return err
-	}
-
 	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken, apnTopic, tokenType)
 }
 
 func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled?", false)
-	if err != nil {
-		return err
-	}
-	err = api.service.accountsDB.SaveSetting("notifications-enabled?", false)
-	if err != nil {
-		return err
-	}
-
 	return api.service.messenger.UnregisterFromPushNotifications(ctx)
 }
 
