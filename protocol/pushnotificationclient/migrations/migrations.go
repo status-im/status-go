@@ -90,7 +90,7 @@ func _1593601729_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601729_initial_schema.down.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1593601729_initial_schema.down.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa, 0x95, 0x55, 0x64, 0x38, 0x40, 0x16, 0xbf, 0x8b, 0x1c, 0x18, 0xb4, 0xc5, 0x7f, 0xd0, 0xb8, 0xf0, 0x3c, 0xa2, 0x82, 0xf8, 0x8d, 0x5a, 0xd3, 0xb6, 0x6e, 0xa3, 0xb4, 0xc, 0x9, 0x33, 0x0}}
 	return a, nil
 }
@@ -110,7 +110,7 @@ func _1593601729_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601729_initial_schema.up.sql", size: 1773, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1593601729_initial_schema.up.sql", size: 1773, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4e, 0x1e, 0x5, 0x35, 0x9, 0xb2, 0x2d, 0x6f, 0x33, 0x63, 0xa2, 0x7a, 0x5b, 0xd2, 0x2d, 0xcb, 0x79, 0x7e, 0x6, 0xb4, 0x9d, 0x35, 0xd8, 0x9b, 0x55, 0xe5, 0xf8, 0x44, 0xca, 0xa6, 0xf3, 0xd3}}
 	return a, nil
 }
@@ -130,7 +130,7 @@ func _1597909626_add_server_typeDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1597909626_add_server_type.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1597909626_add_server_type.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -150,7 +150,7 @@ func _1597909626_add_server_typeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1597909626_add_server_type.up.sql", size: 145, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1597909626_add_server_type.up.sql", size: 145, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc8, 0x3f, 0xe0, 0xe7, 0x57, 0x0, 0x5d, 0x60, 0xf3, 0x55, 0x64, 0x71, 0x80, 0x3c, 0xca, 0x8, 0x61, 0xb5, 0x3c, 0xe, 0xa1, 0xe4, 0x61, 0xd1, 0x4e, 0xd8, 0xb2, 0x55, 0xdd, 0x87, 0x62, 0x9b}}
 	return a, nil
 }
@@ -170,7 +170,7 @@ func _1599053776_add_chat_id_and_typeDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599053776_add_chat_id_and_type.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1599053776_add_chat_id_and_type.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -190,7 +190,7 @@ func _1599053776_add_chat_id_and_typeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599053776_add_chat_id_and_type.up.sql", size: 264, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1599053776_add_chat_id_and_type.up.sql", size: 264, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xea, 0x7a, 0xf9, 0xc4, 0xa2, 0x96, 0x2e, 0xf9, 0x8f, 0x7, 0xf1, 0x1e, 0x73, 0x8a, 0xa6, 0x3a, 0x13, 0x4, 0x73, 0x82, 0x83, 0xb, 0xe3, 0xb5, 0x3b, 0x7e, 0xd, 0x23, 0xce, 0x98, 0xd4, 0xdc}}
 	return a, nil
 }
@@ -210,7 +210,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc0, 0x2f, 0x1e, 0x64, 0x9, 0x93, 0xe4, 0x8b, 0xf2, 0x98, 0x5a, 0x45, 0xe2, 0x80, 0x88, 0x67, 0x7a, 0x2d, 0xd7, 0x4b, 0xd1, 0x73, 0xb6, 0x6d, 0x15, 0xc2, 0x0, 0x34, 0xcd, 0xa0, 0xdb, 0x20}}
 	return a, nil
 }
