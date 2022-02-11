@@ -32,19 +32,18 @@ type StartGroupChatResponse struct {
 	Messages []*common.Message   `json:"messages,omitempty"`
 }
 
-func (api *API) CreateOneToOneChat(ctx context.Context, ID types.HexBytes, ensName string) (*CreateOneToOneChatResponse, error) {
+func (api *API) CreateOneToOneChat(ctx context.Context, communityID types.HexBytes, ID types.HexBytes, ensName string) (*CreateOneToOneChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 	response, err := api.s.messenger.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: ID, ENSName: ensName})
 	if err != nil {
 		return nil, err
 	}
 
-	protocolChat := response.Chats()[0]
-	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
-	if err != nil {
-		return nil, err
-	}
-	chat, err := toAPIChat(protocolChat, nil, pubKey, pinnedMessages, cursor)
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -60,55 +59,91 @@ func (api *API) CreateOneToOneChat(ctx context.Context, ID types.HexBytes, ensNa
 	}, nil
 }
 
-func (api *API) CreateGroupChat(ctx context.Context, name string, members []string) (*GroupChatResponse, error) {
+func (api *API) CreateGroupChat(ctx context.Context, communityID types.HexBytes, name string, members []string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.CreateGroupChatWithMembers(ctx, name, members)
 	})
 }
 
-func (api *API) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*GroupChatResponse, error) {
+func (api *API) CreateGroupChatFromInvitation(communityID types.HexBytes, name string, chatID string, adminPK string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.CreateGroupChatFromInvitation(name, chatID, adminPK)
 	})
 }
 
-func (api *API) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*GroupChatResponse, error) {
+func (api *API) LeaveChat(ctx context.Context, communityID types.HexBytes, chatID string, remove bool) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.LeaveGroupChat(ctx, chatID, remove)
 	})
 }
 
-func (api *API) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*GroupChatResponseWithInvitations, error) {
+func (api *API) AddMembers(ctx context.Context, communityID types.HexBytes, chatID string, members []string) (*GroupChatResponseWithInvitations, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponseWithInvitations(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.AddMembersToGroupChat(ctx, chatID, members)
 	})
 }
 
-func (api *API) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*GroupChatResponse, error) {
+func (api *API) RemoveMember(ctx context.Context, communityID types.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
 	})
 }
 
-func (api *API) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*GroupChatResponse, error) {
+func (api *API) MakeAdmin(ctx context.Context, communityID types.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
-		return api.s.messenger.AddAdminsToGroupChat(ctx, chatID, members)
+		return api.s.messenger.AddAdminsToGroupChat(ctx, chatID, []string{member})
 	})
 }
 
-func (api *API) ConfirmJoiningGroup(ctx context.Context, chatID string) (*GroupChatResponse, error) {
+func (api *API) ConfirmJoiningGroup(ctx context.Context, communityID types.HexBytes, chatID string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.ConfirmJoiningGroup(ctx, chatID)
 	})
 }
 
-func (api *API) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*GroupChatResponse, error) {
+func (api *API) RenameChat(ctx context.Context, communityID types.HexBytes, chatID string, name string) (*GroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.ChangeGroupChatName(ctx, chatID, name)
 	})
 }
 
-func (api *API) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string, message string) (*GroupChatResponseWithInvitations, error) {
+func (api *API) SendGroupChatInvitationRequest(ctx context.Context, communityID types.HexBytes, chatID string, adminPK string, message string) (*GroupChatResponseWithInvitations, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	return api.execAndGetGroupChatResponseWithInvitations(func() (*protocol.MessengerResponse, error) {
 		return api.s.messenger.SendGroupChatInvitationRequest(ctx, chatID, adminPK, message)
 	})
@@ -126,7 +161,11 @@ func (api *API) SendGroupChatInvitationRejection(ctx context.Context, invitation
 	return response.Invitations, nil
 }
 
-func (api *API) StartGroupChat(ctx context.Context, name string, members []string) (*StartGroupChatResponse, error) {
+func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, name string, members []string) (*StartGroupChatResponse, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
 	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 
 	var response *protocol.MessengerResponse
@@ -149,7 +188,7 @@ func (api *API) StartGroupChat(ctx context.Context, name string, members []strin
 		}
 	}
 
-	chat, err := toAPIChat(response.Chats()[0], nil, pubKey, nil, "")
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +200,8 @@ func (api *API) StartGroupChat(ctx context.Context, name string, members []strin
 	}, nil
 }
 
-func toGroupChatResponse(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponse, error) {
-	chat, err := toAPIChat(response.Chats()[0], nil, pubKey, nil, "")
+func (api *API) toGroupChatResponse(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponse, error) {
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +212,8 @@ func toGroupChatResponse(pubKey string, response *protocol.MessengerResponse) (*
 	}, nil
 }
 
-func toGroupChatResponseWithInvitations(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponseWithInvitations, error) {
-	g, err := toGroupChatResponse(pubKey, response)
+func (api *API) toGroupChatResponseWithInvitations(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponseWithInvitations, error) {
+	g, err := api.toGroupChatResponse(pubKey, response)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +231,7 @@ func (api *API) execAndGetGroupChatResponse(fn func() (*protocol.MessengerRespon
 	if err != nil {
 		return nil, err
 	}
-	return toGroupChatResponse(pubKey, response)
+	return api.toGroupChatResponse(pubKey, response)
 }
 
 func (api *API) execAndGetGroupChatResponseWithInvitations(fn func() (*protocol.MessengerResponse, error)) (*GroupChatResponseWithInvitations, error) {
@@ -203,5 +242,5 @@ func (api *API) execAndGetGroupChatResponseWithInvitations(fn func() (*protocol.
 		return nil, err
 	}
 
-	return toGroupChatResponseWithInvitations(pubKey, response)
+	return api.toGroupChatResponseWithInvitations(pubKey, response)
 }

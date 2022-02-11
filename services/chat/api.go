@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	ErrChatNotFound = errors.New("can't find chat")
+	ErrChatNotFound            = errors.New("can't find chat")
+	ErrCommunitiesNotSupported = errors.New("communities are not supported")
 )
 
 type ChannelGroupType string
@@ -122,12 +123,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			continue
 		}
 
-		pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
-		if err != nil {
-			return nil, err
-		}
-
-		c, err := toAPIChat(chat, nil, pubKey, pinnedMessages, cursor)
+		c, err := api.toAPIChat(chat, nil, pubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -158,12 +154,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 
 		for _, chat := range channels {
 			if chat.CommunityID == community.IDString() {
-				pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
-				if err != nil {
-					return nil, err
-				}
-
-				c, err := toAPIChat(chat, community, pubKey, pinnedMessages, cursor)
+				c, err := api.toAPIChat(chat, community, pubKey)
 				if err != nil {
 					return nil, err
 				}
@@ -185,12 +176,7 @@ func (api *API) GetChat(ctx context.Context, communityID types.HexBytes, chatID 
 		return nil, err
 	}
 
-	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(messengerChat.ID, "", -1)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := toAPIChat(messengerChat, community, pubKey, pinnedMessages, cursor)
+	result, err := api.toAPIChat(messengerChat, community, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +196,7 @@ func (api *API) GetMembers(ctx context.Context, communityID types.HexBytes, chat
 
 func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
 	if len(communityID) != 0 {
-		return nil, errors.New("joining community chats is not supported (you already joined all the community chats)")
+		return nil, ErrCommunitiesNotSupported
 	}
 
 	response, err := api.s.messenger.CreatePublicChat(&requests.CreatePublicChat{ID: chatID})
@@ -218,17 +204,17 @@ func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID
 		return nil, err
 	}
 
-	chat := response.Chats()[0]
 	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
-	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(chat.ID, "", -1)
+
+	return api.toAPIChat(response.Chats()[0], nil, pubKey)
+}
+
+func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string) (*Chat, error) {
+	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
 	if err != nil {
 		return nil, err
 	}
 
-	return toAPIChat(chat, nil, pubKey, pinnedMessages, cursor)
-}
-
-func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string, pinnedMessages []*common.PinnedMessage, cursor string) (*Chat, error) {
 	chat := &Chat{
 		ID:                       strings.TrimPrefix(protocolChat.ID, protocolChat.CommunityID),
 		Name:                     protocolChat.Name,
@@ -270,7 +256,7 @@ func toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pu
 		}
 	}
 
-	err := chat.populateCommunityFields(community)
+	err = chat.populateCommunityFields(community)
 	if err != nil {
 		return nil, err
 	}
