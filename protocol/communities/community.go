@@ -682,6 +682,10 @@ func (o *Community) Muted() bool {
 	return o.config.Muted
 }
 
+func (o *Community) MemberIdentity() *ecdsa.PublicKey {
+	return o.config.MemberIdentity
+}
+
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
 func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
 	o.mutex.Lock()
