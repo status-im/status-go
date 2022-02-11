@@ -920,3 +920,16 @@ func (db *Database) GifFavorites() (favorites json.RawMessage, err error) {
 	}
 	return favorites, nil
 }
+
+func (db *Database) GetPaperclipPreference() (preference string, err error) {
+	err = db.db.QueryRow("SELECT paperclip_preference FROM settings WHERE synthetic_id = 'id'").Scan(&preference)
+	if err == sql.ErrNoRows {
+		return "", err
+	}
+	return preference, nil
+}
+
+func (db *Database) SetPaperclipPreference(preference string) error {
+	_, err := db.db.Exec("UPDATE settings SET paperclip_preference = ?", preference)
+	return err
+}

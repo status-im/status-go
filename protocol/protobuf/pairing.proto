@@ -105,3 +105,7 @@ message SyncActivityCenterDismissed {
   uint64 clock = 1;
   repeated bytes ids = 2;
 }
+
+message PaperclipPreference {
+  string preference = 1;
+}
