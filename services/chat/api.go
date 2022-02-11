@@ -77,13 +77,20 @@ type Chat struct {
 }
 
 type ChannelGroup struct {
-	Type       ChannelGroupType                         `json:"channelGroupType"`
-	Name       string                                   `json:"name"`
-	Images     map[string]images.IdentityImage          `json:"images"`
-	Color      string                                   `json:"color"`
-	Chats      map[string]*Chat                         `json:"chats"`
-	Categories map[string]communities.CommunityCategory `json:"categories"`
-	EnsName    string                                   `json:"ensName"`
+	Type           ChannelGroupType                         `json:"channelGroupType"`
+	Name           string                                   `json:"name"`
+	Images         map[string]images.IdentityImage          `json:"images"`
+	Color          string                                   `json:"color"`
+	Chats          map[string]*Chat                         `json:"chats"`
+	Categories     map[string]communities.CommunityCategory `json:"categories"`
+	EnsName        string                                   `json:"ensName"`
+	Admin          bool                                     `json:"admin"`
+	Verified       bool                                     `json:"verified"`
+	Description    string                                   `json:"description"`
+	Permissions    *protobuf.CommunityPermissions           `json:"permissions"`
+	Members        map[string]*protobuf.CommunityMember     `json:"members"`
+	CanManageUsers bool                                     `json:"canManageUsers"`
+	Muted          bool                                     `json:"muted"`
 }
 
 func NewAPI(service *Service) *API {
@@ -109,13 +116,18 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 	result := make(map[string]ChannelGroup)
 
 	result[pubKey] = ChannelGroup{
-		Type:       Personal,
-		Name:       "",
-		Images:     make(map[string]images.IdentityImage),
-		Color:      "",
-		Chats:      make(map[string]*Chat),
-		Categories: make(map[string]communities.CommunityCategory),
-		EnsName:    "", // Not implemented yet in communities
+		Type:        Personal,
+		Name:        "",
+		Images:      make(map[string]images.IdentityImage),
+		Color:       "",
+		Chats:       make(map[string]*Chat),
+		Categories:  make(map[string]communities.CommunityCategory),
+		EnsName:     "", // Not implemented yet in communities
+		Admin:       true,
+		Verified:    true,
+		Description: "",
+		Permissions: &protobuf.CommunityPermissions{},
+		Muted:       false,
 	}
 
 	for _, chat := range channels {
@@ -132,12 +144,18 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 
 	for _, community := range joinedCommunities {
 		chGrp := ChannelGroup{
-			Type:       Community,
-			Name:       community.Name(),
-			Color:      community.Description().Identity.Color,
-			Images:     make(map[string]images.IdentityImage),
-			Chats:      make(map[string]*Chat),
-			Categories: make(map[string]communities.CommunityCategory),
+			Type:           Community,
+			Name:           community.Name(),
+			Color:          community.Description().Identity.Color,
+			Images:         make(map[string]images.IdentityImage),
+			Chats:          make(map[string]*Chat),
+			Categories:     make(map[string]communities.CommunityCategory),
+			Admin:          community.IsAdmin(),
+			Verified:       community.Verified(),
+			Description:    community.DescriptionText(),
+			Permissions:    community.Description().Permissions,
+			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),
+			Muted:          community.Muted(),
 		}
 
 		for t, i := range community.Description().Identity.Images {
