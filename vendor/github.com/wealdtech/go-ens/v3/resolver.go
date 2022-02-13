@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"compress/zlib"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -51,7 +50,6 @@ func NewResolver(backend bind.ContractBackend, domain string) (*Resolver, error)
 
 	// Ensure the name is registered
 	ownerAddress, err := registry.Owner(domain)
-	fmt.Println("OWNER ADDRESS: ", ownerAddress, err)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +59,6 @@ func NewResolver(backend bind.ContractBackend, domain string) (*Resolver, error)
 
 	// Obtain the resolver address for this domain
 	resolver, err := registry.ResolverAddress(domain)
-	fmt.Println("RESOLVER ADDRESS: ", resolver, err)
-
 	if err != nil {
 		return nil, err
 	}
