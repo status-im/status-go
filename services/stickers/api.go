@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const ipfsGateway = ".ipfs.cf-ipfs.com"
+const ipfsGateway = ".ipfs.infura-ipfs.io/"
 const maxConcurrentRequests = 3
 
 // ConnectionType constants

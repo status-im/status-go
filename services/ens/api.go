@@ -480,7 +480,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to obtain base36 representation")
 		}
-		host := str + ".ipfs.cf-ipfs.com"
+		host := str + ".ipfs.infura-ipfs.io/"
 		return &uri{scheme, host, ""}, nil
 	case "ipns-ns":
 		id, offset := binary.Uvarint(data)
