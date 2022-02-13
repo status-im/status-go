@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -27,8 +28,8 @@ func (api *API) getSigner(chainID uint64, from types.Address, password string) b
 	}
 }
 
-func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *big.Int, password string) (string, error) {
-	err := api.AddPending(chainID, packID.Uint64())
+func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt, password string) (string, error) {
+	err := api.AddPending(chainID, packID)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +46,7 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
-	packInfo, err := stickerType.GetPackData(callOpts, packID)
+	packInfo, err := stickerType.GetPackData(callOpts, packID.Int)
 	if err != nil {
 		return "", err
 	}

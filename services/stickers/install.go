@@ -3,18 +3,17 @@ package stickers
 import (
 	"encoding/json"
 	"errors"
-	"math/big"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-func (api *API) Install(chainID uint64, packID uint64) error {
+func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {
 	installedPacks, err := api.installedStickerPacks()
 	if err != nil {
 		return err
 	}
 
-	if _, exists := installedPacks[uint(packID)]; exists {
+	if _, exists := installedPacks[uint(packID.Uint64())]; exists {
 		return errors.New("sticker pack is already installed")
 	}
 
@@ -25,12 +24,12 @@ func (api *API) Install(chainID uint64, packID uint64) error {
 		return err
 	}
 
-	stickerPack, err := api.fetchPackData(stickerType, new(big.Int).SetUint64(packID), false)
+	stickerPack, err := api.fetchPackData(stickerType, packID.Int, false)
 	if err != nil {
 		return err
 	}
 
-	installedPacks[uint(packID)] = *stickerPack
+	installedPacks[uint(packID.Uint64())] = *stickerPack
 
 	err = api.accountsDB.SaveSetting("stickers/packs-installed", installedPacks)
 	if err != nil {
@@ -93,17 +92,17 @@ func (api *API) Installed() (map[uint]StickerPack, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) Uninstall(packID uint64) error {
+func (api *API) Uninstall(packID *bigint.BigInt) error {
 	installedPacks, err := api.installedStickerPacks()
 	if err != nil {
 		return err
 	}
 
-	if _, exists := installedPacks[uint(packID)]; !exists {
+	if _, exists := installedPacks[uint(packID.Uint64())]; !exists {
 		return errors.New("sticker pack is not installed")
 	}
 
-	delete(installedPacks, uint(packID))
+	delete(installedPacks, uint(packID.Uint64()))
 
 	err = api.accountsDB.SaveSetting("stickers/packs-installed", installedPacks)
 	if err != nil {
@@ -117,10 +116,9 @@ func (api *API) Uninstall(packID uint64) error {
 		return err
 	}
 
-	pID := &bigint.BigInt{Int: new(big.Int).SetUint64(packID)}
 	idx := -1
 	for i, r := range recentStickers {
-		if r.PackID.Cmp(pID.Int) == 0 {
+		if r.PackID.Cmp(packID.Int) == 0 {
 			idx = i
 			break
 		}
