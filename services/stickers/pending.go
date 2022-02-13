@@ -3,16 +3,17 @@ package stickers
 import (
 	"encoding/json"
 	"errors"
-	"math/big"
+
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-func (api *API) AddPending(chainID uint64, packID uint64) error {
+func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
 	pendingPacks, err := api.pendingStickerPacks()
 	if err != nil {
 		return err
 	}
 
-	if _, exists := pendingPacks[uint(packID)]; exists {
+	if _, exists := pendingPacks[uint(packID.Uint64())]; exists {
 		return errors.New("sticker pack is already pending")
 	}
 
@@ -21,12 +22,12 @@ func (api *API) AddPending(chainID uint64, packID uint64) error {
 		return err
 	}
 
-	stickerPack, err := api.fetchPackData(stickerType, new(big.Int).SetUint64(packID), false)
+	stickerPack, err := api.fetchPackData(stickerType, packID.Int, false)
 	if err != nil {
 		return err
 	}
 
-	pendingPacks[uint(packID)] = *stickerPack
+	pendingPacks[uint(packID.Uint64())] = *stickerPack
 
 	return api.accountsDB.SaveSetting("stickers/packs-pending", pendingPacks)
 }
@@ -65,17 +66,17 @@ func (api *API) Pending() (map[uint]StickerPack, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) RemovePending(packID uint64) error {
+func (api *API) RemovePending(packID *bigint.BigInt) error {
 	pendingPacks, err := api.pendingStickerPacks()
 	if err != nil {
 		return err
 	}
 
-	if _, exists := pendingPacks[uint(packID)]; !exists {
+	if _, exists := pendingPacks[uint(packID.Uint64())]; !exists {
 		return errors.New("sticker pack is not pending")
 	}
 
-	delete(pendingPacks, uint(packID))
+	delete(pendingPacks, uint(packID.Uint64()))
 
 	return api.accountsDB.SaveSetting("stickers/packs-pending", pendingPacks)
 }
