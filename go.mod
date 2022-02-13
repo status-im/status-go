@@ -16,6 +16,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.10.13
+	github.com/forPelevin/gomoji v1.1.2
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/mock v1.6.0
@@ -29,7 +30,7 @@ require (
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 	github.com/leodido/go-urn v1.2.0 // indirect
-	github.com/lib/pq v1.9.0
+	github.com/lib/pq v1.10.3
 	github.com/libp2p/go-libp2p v0.15.1
 	github.com/libp2p/go-libp2p-core v0.9.0
 	github.com/libp2p/go-libp2p-peerstore v0.3.0
@@ -68,7 +69,6 @@ require (
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
-	golang.org/x/tools v0.1.2 // indirect
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
