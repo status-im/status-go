@@ -7,12 +7,12 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
 	"github.com/wealdtech/go-multicodec"
+	"github.com/zenthangplus/goccm"
 	"olympos.io/encoding/edn"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -31,6 +31,7 @@ import (
 )
 
 const ipfsGateway = ".ipfs.cf-ipfs.com"
+const maxConcurrentRequests = 3
 
 // ConnectionType constants
 type stickerStatus int
@@ -104,7 +105,6 @@ func NewAPI(ctx context.Context, appDB *sql.DB, rpcClient *rpc.Client, accountsM
 
 func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 	// TODO: eventually this should be changed to include pagination
-
 	accounts, err := api.accountsDB.GetAccounts()
 	if err != nil {
 		return nil, err
@@ -163,13 +163,17 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 		return
 	}
 
+	if len(tokenIDs) == 0 {
+		return
+	}
+
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(tokenIDs))
+	c := goccm.New(maxConcurrentRequests)
 	for _, tokenID := range tokenIDs {
+		c.Wait()
 		go func(tokenID *big.Int) {
-			defer wg.Done()
+			defer c.Done()
 			packID, err := stickerPack.TokenPackId(callOpts, tokenID)
 			if err != nil {
 				errChan <- err
@@ -178,7 +182,7 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 			resultChan <- packID
 		}(tokenID)
 	}
-	wg.Wait()
+	c.WaitAllDone()
 }
 
 func (api *API) getTokenPackIDs(chainID uint64, tokenIDs []*big.Int) ([]*big.Int, error) {
@@ -292,11 +296,15 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 		return
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(int(numPacks.Int64()))
+	if numPacks.Uint64() == 0 {
+		return
+	}
+
+	c := goccm.New(maxConcurrentRequests)
 	for i := uint64(0); i < numPacks.Uint64(); i++ {
+		c.Wait()
 		go func(i uint64) {
-			defer wg.Done()
+			defer c.Done()
 
 			packID := new(big.Int).SetUint64(i)
 
@@ -319,7 +327,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 			resultChan <- stickerPack
 		}(i)
 	}
-	wg.Wait()
+	c.WaitAllDone()
 }
 
 func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int, translateHashes bool) (*StickerPack, error) {
@@ -469,11 +477,15 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []accounts.Account
 	defer close(errChan)
 	defer close(resultChan)
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(accs))
+	if len(accs) == 0 {
+		return
+	}
+
+	c := goccm.New(maxConcurrentRequests)
 	for _, account := range accs {
+		c.Wait()
 		go func(acc accounts.Account) {
-			defer wg.Done()
+			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {
 				errChan <- err
@@ -485,7 +497,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []accounts.Account
 			}
 		}(account)
 	}
-	wg.Wait()
+	c.WaitAllDone()
 }
 
 func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, balance *big.Int, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
@@ -499,13 +511,17 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 		return
 	}
 
+	if balance.Int64() == 0 {
+		return
+	}
+
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
-	wg := sync.WaitGroup{}
-	wg.Add(int(balance.Int64()))
+	c := goccm.New(maxConcurrentRequests)
 	for i := uint64(0); i < balance.Uint64(); i++ {
+		c.Wait()
 		go func(i uint64) {
-			defer wg.Done()
+			defer c.Done()
 			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(i))
 			if err != nil {
 				errChan <- err
@@ -515,7 +531,7 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 			resultChan <- tokenID
 		}(i)
 	}
-	wg.Wait()
+	c.WaitAllDone()
 }
 
 func (api *API) getTokenOwnerOfIndex(chainID uint64, account types.Address, balance *big.Int) ([]*big.Int, error) {
