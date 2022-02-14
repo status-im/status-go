@@ -56,7 +56,7 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 		return "", err
 	}
 
-	extraData, err := stickerMarketABI.Pack("buyToken", packID, packInfo.Price)
+	extraData, err := stickerMarketABI.Pack("buyToken", packID.Int, txArgs.From, packInfo.Price)
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +84,7 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 	return tx.Hash().String(), nil
 }
 
-func (api *API) BuyEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *big.Int) (uint64, error) {
+func (api *API) BuyEstimate(ctx context.Context, chainID uint64, from types.Address, packID *bigint.BigInt) (uint64, error) {
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
 	stickerType, err := api.contractMaker.NewStickerType(chainID)
@@ -92,7 +92,7 @@ func (api *API) BuyEstimate(ctx context.Context, chainID uint64, txArgs transact
 		return 0, err
 	}
 
-	packInfo, err := stickerType.GetPackData(callOpts, packID)
+	packInfo, err := stickerType.GetPackData(callOpts, packID.Int)
 	if err != nil {
 		return 0, err
 	}
@@ -102,7 +102,7 @@ func (api *API) BuyEstimate(ctx context.Context, chainID uint64, txArgs transact
 		return 0, err
 	}
 
-	extraData, err := stickerMarketABI.Pack("buyToken", packID, packInfo.Price)
+	extraData, err := stickerMarketABI.Pack("buyToken", packID.Int, from, packInfo.Price)
 	if err != nil {
 		return 0, err
 	}
@@ -133,9 +133,10 @@ func (api *API) BuyEstimate(ctx context.Context, chainID uint64, txArgs transact
 	}
 
 	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
-		From:  common.Address(txArgs.From),
+		From:  common.Address(from),
 		To:    &sntAddress,
 		Value: big.NewInt(0),
 		Data:  data,
 	})
+
 }

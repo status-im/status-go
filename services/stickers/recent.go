@@ -52,7 +52,7 @@ func (api *API) AddRecent(sticker Sticker) error {
 	// Remove duplicated
 	idx := -1
 	for i, currSticker := range recentStickersList {
-		if currSticker.PackID.Cmp(sticker.PackID.Int) == 0 {
+		if currSticker.PackID.Cmp(sticker.PackID.Int) == 0 && currSticker.Hash == sticker.Hash {
 			idx = i
 		}
 	}
