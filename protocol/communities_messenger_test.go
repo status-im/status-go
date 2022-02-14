@@ -1186,6 +1186,68 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 }
 
+func (s *MessengerCommunitiesSuite) TestSyncAccounts() {
+
+	accounts1 := []accounts.Account{
+		{Address: types.Address{0x01}, Name: "Alice watch only", Color: "green", Type: "watch"},
+	}
+
+	accounts2 := []accounts.Account{
+		{Address: types.Address{0x01}, Name: "Alice watch only 2", Color: "blue", Type: "watch"},
+	}
+
+	// Retrieve alice's initial account list
+	alice := s.newMessenger()
+	acc, err := alice.settings.GetAccounts()
+	s.Require().NoError(err, "alice.settings.GetAccounts")
+	s.Len(acc, 1, "Must have 1 main account")
+
+	// Create new device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	// Pair devices
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+
+	// Retrieve alice's initial account list from alicesOtherDevice.
+	newDev, err := alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err, "alicesOtherDevice.settings.GetAccounts")
+	s.Len(newDev, 1, "Must have 1 main account")
+
+	// Creates a new watch only account on alice's main Device
+	s.Require().NoError(alice.settings.SaveAccounts(accounts1))
+
+	// Trigger's a sync between devices
+	err = alice.SyncDevices(context.Background(), "ens-name", "profile-image")
+	s.Require().NoError(err)
+
+	// Check if watch only account has been synced
+	newDev, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err, "alicesOtherDevice.settings.GetAccounts")
+	s.Len(newDev, 2, "Must have 2 accounts")
+	s.Len(newDev, 1, "Must have 1 watch only account")
+
+	// Updates alice's watch only account attributes
+	s.Require().NoError(alice.settings.SaveAccounts(accounts2))
+
+	// Trigger's a sync between devices
+	err = alice.SyncDevices(context.Background(), "ens-name", "profile-image")
+	s.Require().NoError(err)
+
+	// Check the community on their device matched the new account on Alice's device
+	for _, acc := range newDev {
+		if (acc.Address == types.Address{0x01}) {
+			s.Equal("Alice watch only 2", acc.Name)
+			s.Equal("blue", acc.Color)
+		}
+	}
+}
+
 // TestSyncCommunity_RequestToJoin tests more complex pairing and syncing scenario where one paired device
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
