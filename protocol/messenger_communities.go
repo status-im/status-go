@@ -746,21 +746,21 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
-// from mailserver. When response received it will be passed through signals handler
+// from mailserver. It waits until it  has the community before returning it
 func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return m.requestCommunityInfoFromMailserver(communityID)
+	return m.requestCommunityInfoFromMailserver(communityID, true)
 }
 
-// RequestCommunityInfoFromMailserverSync installs filter for community and requests its details
-// from mailserver. It will wait for a response and return it if any community is found
-func (m *Messenger) RequestCommunityInfoFromMailserverSync(communityID string) (*communities.Community, error) {
-	return m.requestCommunityInfoFromMailserver(communityID)
+// RequestCommunityInfoFromMailserverAsync installs filter for community and requests its details
+// from mailserver. When response received it will be passed through signals handler
+func (m *Messenger) RequestCommunityInfoFromMailserverAsync(communityID string) error {
+	_, err := m.requestCommunityInfoFromMailserver(communityID, false)
+	return err
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-
+func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitForResponse bool) (*communities.Community, error) {
 	if _, ok := m.requestedCommunities[communityID]; ok {
 		return nil, nil
 	}
@@ -792,10 +792,14 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string) (*com
 		nil,
 		nil,
 		filter,
-		true)
+		waitForResponse)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if !waitForResponse {
+		return nil, nil
 	}
 
 	ctx := context.Background()
