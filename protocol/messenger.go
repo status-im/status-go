@@ -2455,15 +2455,15 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	return m.syncWallets(ctx)
 }
 
-// watchAccountListChanges checks for account changes and publishes to the account feed when it happens
+// TODO: Implement a watchAccountListChanges method which checks for account changes and publishes to the account feed when it happens
 func (m *Messenger) watchAccountListChanges(ctx context.Context, accountFeed *event.Feed, initial []gethcommon.Address, accountsDB *accounts.Database) {
-	accounts := make(chan []accounts.Account, 1)
-	sub := accountFeed.Subscribe(accounts)
-	defer sub.Unsubscribe()
-	listen := make(map[gethcommon.Address]struct{}, len(initial))
-	for _, address := range initial {
-		listen[address] = struct{}{}
-	}
+	// accounts := make(chan []accounts.Account, 1)
+	// sub := accountFeed.Subscribe(accounts)
+	// defer sub.Unsubscribe()
+	// listen := make(map[gethcommon.Address]struct{}, len(initial))
+	// for _, address := range initial {
+	// 	listen[address] = struct{}{}
+	// }
 	// for {
 	// 	select {
 	// 	case <-ctx.Done():
@@ -2487,7 +2487,6 @@ func (m *Messenger) watchAccountListChanges(ctx context.Context, accountFeed *ev
 	// 		}
 	// 	}
 	// }
-
 }
 
 // syncWallets syncs all wallets with paired devices
