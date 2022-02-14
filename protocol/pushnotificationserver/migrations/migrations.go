@@ -88,7 +88,7 @@ func _1593601728_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601728_initial_schema.down.sql", size: 200, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1593601728_initial_schema.down.sql", size: 200, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x88, 0x8a, 0x61, 0x81, 0x57, 0x45, 0x9b, 0x97, 0x9b, 0x1f, 0xf6, 0x94, 0x8a, 0x20, 0xb3, 0x2b, 0xff, 0x69, 0x49, 0xf4, 0x58, 0xcc, 0xd0, 0x55, 0xcc, 0x9a, 0x8b, 0xb6, 0x7f, 0x29, 0x53, 0xc1}}
 	return a, nil
 }
@@ -108,7 +108,7 @@ func _1593601728_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601728_initial_schema.up.sql", size: 675, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1593601728_initial_schema.up.sql", size: 675, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfd, 0x61, 0x90, 0x79, 0xd9, 0x14, 0x65, 0xe9, 0x96, 0x53, 0x17, 0x33, 0x54, 0xeb, 0x8b, 0x5d, 0x95, 0x99, 0x10, 0x36, 0x58, 0xdd, 0xb2, 0xbf, 0x45, 0xd9, 0xbb, 0xc4, 0x92, 0xe, 0xce, 0x2}}
 	return a, nil
 }
@@ -128,7 +128,7 @@ func _1598419937_add_push_notifications_tableDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.down.sql", size: 51, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.down.sql", size: 51, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0x98, 0xc8, 0x30, 0x45, 0x5b, 0xc5, 0x7d, 0x13, 0x5d, 0xe7, 0xc8, 0x23, 0x43, 0xf7, 0xdc, 0x9c, 0xe2, 0xdd, 0x63, 0xf0, 0xb7, 0x16, 0x40, 0xc, 0xda, 0xb9, 0x16, 0x70, 0x2b, 0x5a, 0x7e}}
 	return a, nil
 }
@@ -148,7 +148,7 @@ func _1598419937_add_push_notifications_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "1598419937_add_push_notifications_table.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2, 0x3e, 0xef, 0xf, 0xc2, 0xdf, 0xbc, 0x99, 0x7a, 0xc2, 0xd3, 0x64, 0x4f, 0x4c, 0x7e, 0xfc, 0x2e, 0x8c, 0xa7, 0x54, 0xd3, 0x4d, 0x25, 0x98, 0x41, 0xbc, 0xea, 0xd7, 0x2, 0xc1, 0xd0, 0x52}}
 	return a, nil
 }
@@ -168,7 +168,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1633220904, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1621263711, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc0, 0x2f, 0x1e, 0x64, 0x9, 0x93, 0xe4, 0x8b, 0xf2, 0x98, 0x5a, 0x45, 0xe2, 0x80, 0x88, 0x67, 0x7a, 0x2d, 0xd7, 0x4b, 0xd1, 0x73, 0xb6, 0x6d, 0x15, 0xc2, 0x0, 0x34, 0xcd, 0xa0, 0xdb, 0x20}}
 	return a, nil
 }

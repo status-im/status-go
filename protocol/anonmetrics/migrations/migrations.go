@@ -86,7 +86,7 @@ func _1619446565_postgres_make_anon_metrics_tableDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1633220905, 0)}
+	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.down.sql", size: 24, mode: os.FileMode(0644), modTime: time.Unix(1630498597, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x75, 0xea, 0x1, 0x74, 0xe6, 0xa3, 0x11, 0xd0, 0x86, 0x87, 0x7e, 0x31, 0xb4, 0x1a, 0x27, 0x5d, 0xda, 0x77, 0xa3, 0xf5, 0x1d, 0x88, 0x79, 0xcf, 0xd5, 0x95, 0x75, 0xd, 0x47, 0xa1, 0x90, 0x5}}
 	return a, nil
 }
@@ -106,7 +106,7 @@ func _1619446565_postgres_make_anon_metrics_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.up.sql", size: 443, mode: os.FileMode(0644), modTime: time.Unix(1633220905, 0)}
+	info := bindataFileInfo{name: "1619446565_postgres_make_anon_metrics_table.up.sql", size: 443, mode: os.FileMode(0644), modTime: time.Unix(1630498597, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0xdc, 0x72, 0x28, 0x3c, 0xf6, 0x94, 0xb0, 0x47, 0x3d, 0xca, 0x55, 0x3d, 0xf7, 0x83, 0xb8, 0x7d, 0x2f, 0x1e, 0x98, 0xb7, 0xde, 0xa, 0xff, 0xa0, 0x52, 0x60, 0x83, 0x56, 0xc5, 0xd1, 0xa2}}
 	return a, nil
 }
@@ -126,7 +126,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 380, mode: os.FileMode(0644), modTime: time.Unix(1633220905, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 380, mode: os.FileMode(0644), modTime: time.Unix(1630498597, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x49, 0x1, 0xd4, 0xd6, 0xc7, 0x44, 0xd4, 0xfd, 0x7b, 0x69, 0x1f, 0xe3, 0xe, 0x48, 0x14, 0x99, 0xf0, 0x8e, 0x43, 0xae, 0x54, 0x64, 0xa2, 0x8b, 0x82, 0x1c, 0x2b, 0xb, 0xec, 0xf5, 0xb3, 0xfc}}
 	return a, nil
 }
