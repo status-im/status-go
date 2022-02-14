@@ -74,7 +74,7 @@ func (p *PublicAPI) CommunityInfo(communityID types.HexBytes) (json.RawMessage, 
 		return nil, ErrNotInitialized
 	}
 
-	community, err := p.service.messenger.RequestCommunityInfoFromMailserverSync(communityID.String())
+	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String())
 	if err != nil {
 		return nil, err
 	}

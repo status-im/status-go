@@ -848,6 +848,10 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*c
 	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
 }
 
+func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
+	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID)
+}
+
 func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
