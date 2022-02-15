@@ -153,7 +153,7 @@ func PushMessages(ns []*Notification) {
 }
 
 func pushMessage(notification *Notification) {
-	log.Debug("Pushing a new push notification", "notification", notification)
+	log.Debug("Pushing a new push notification")
 	signal.SendLocalNotifications(notification)
 }
 
