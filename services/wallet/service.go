@@ -13,7 +13,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Service {
+func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, openseaAPIKey string) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
@@ -31,6 +31,7 @@ func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Ser
 		transactionManager:    transactionManager,
 		transferController:    transferController,
 		cryptoOnRampManager:   cryptoOnRampManager,
+		openseaAPIKey:         openseaAPIKey,
 	}
 }
 
@@ -44,6 +45,7 @@ type Service struct {
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	started               bool
+	openseaAPIKey         string
 }
 
 // Start signals transmitter.
