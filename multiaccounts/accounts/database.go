@@ -927,6 +927,9 @@ func (db *Database) GetAccountLastSynced(address types.Address) (uint64, error) 
 	query := "SELECT clock FROM accounts WHERE address = ?"
 
 	err := db.db.QueryRow(query, address).Scan(&result)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -937,6 +940,6 @@ func (db *Database) GetAccountLastSynced(address types.Address) (uint64, error) 
 func (db *Database) SetAccountLastSynced(address types.Address, clock uint64) error {
 	query := "UPDATE accounts SET clock = ? WHERE address = ? AND clock < ?"
 
-	_, err := db.db.Exec(query, address, clock)
+	_, err := db.db.Exec(query, clock, address, clock)
 	return err
 }

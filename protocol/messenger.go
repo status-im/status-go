@@ -2491,16 +2491,13 @@ func (m *Messenger) watchAccountListChanges(ctx context.Context, accountFeed *ev
 
 // syncWallets syncs all wallets with paired devices
 func (m *Messenger) syncWallets(ctx context.Context) error {
-	var err error
-
 	localAccounts, err := m.settings.GetAccounts()
-
 	if err != nil {
 		return err
 	}
 
 	for _, acc := range localAccounts {
-
+		// Only sync watch type accounts
 		if acc.Type != accounts.AccountTypeWatch {
 			continue
 		}
