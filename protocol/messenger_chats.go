@@ -274,7 +274,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 				return nil, err
 			}
 		}
-		contact.Name = ensName
+		contact.EnsName = ensName
 		contact.ENSVerified = true
 		err = m.persistence.SaveContact(contact, nil)
 		if err != nil {

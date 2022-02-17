@@ -683,6 +683,10 @@ func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, pi
 	return api.service.messenger.SendContactUpdate(ctx, contactID, name, picture)
 }
 
+func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {
+	return api.service.messenger.SetDisplayName(displayName)
+}
+
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPairInstallation(ctx)
 }

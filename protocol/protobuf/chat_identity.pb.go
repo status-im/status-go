@@ -62,7 +62,7 @@ type ChatIdentity struct {
 	EnsName string `protobuf:"bytes,2,opt,name=ens_name,json=ensName,proto3" json:"ens_name,omitempty"`
 	// images is a string indexed mapping of images associated with an identity
 	Images map[string]*IdentityImage `protobuf:"bytes,3,rep,name=images,proto3" json:"images,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// display name is the user set identity, valid only for organisations
+	// display name is the user set identity
 	DisplayName string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// description is the user set description, valid only for organisations
 	Description          string   `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`

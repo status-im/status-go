@@ -193,6 +193,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ResponseTo        string                           `json:"responseTo"`
 		New               bool                             `json:"new,omitempty"`
 		EnsName           string                           `json:"ensName"`
+		DisplayName       string                           `json:"displayName"`
 		Image             string                           `json:"image,omitempty"`
 		Audio             string                           `json:"audio,omitempty"`
 		AudioDurationMs   uint64                           `json:"audioDurationMs,omitempty"`
@@ -228,6 +229,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ResponseTo:        m.ResponseTo,
 		New:               m.New,
 		EnsName:           m.EnsName,
+		DisplayName:       m.DisplayName,
 		Image:             m.ImageLocalURL,
 		Audio:             m.AudioLocalURL,
 		CommunityID:       m.CommunityID,
@@ -262,6 +264,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		*Alias
 		ResponseTo      string                           `json:"responseTo"`
 		EnsName         string                           `json:"ensName"`
+		DisplayName     string                           `json:"displayName"`
 		ChatID          string                           `json:"chatId"`
 		Sticker         *protobuf.StickerMessage         `json:"sticker"`
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
@@ -283,6 +286,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	}
 	m.ResponseTo = aux.ResponseTo
 	m.EnsName = aux.EnsName
+	m.DisplayName = aux.DisplayName
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText

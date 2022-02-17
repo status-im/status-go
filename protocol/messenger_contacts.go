@@ -79,6 +79,10 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		contact.LocalNickname = request.Nickname
 	}
 
+	if len(request.DisplayName) != 0 {
+		contact.DisplayName = request.DisplayName
+	}
+
 	if !contact.Added {
 		contact.Added = true
 	}
@@ -137,8 +141,13 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
 	// Finally we send a contact update so they are notified we added them
-	response, err := m.sendContactUpdate(context.Background(), pubKey, ensName, "")
+	response, err := m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "")
 	if err != nil {
 		return nil, err
 	}
@@ -414,14 +423,19 @@ func (m *Messenger) UnblockContact(contactID string) error {
 func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	if _, err = m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return err
+	}
+
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, profileImage); err != nil {
 		return err
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.Added {
-			if _, err = m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
+			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage); err != nil {
 				return false
 			}
 		}
@@ -438,10 +452,15 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	return m.sendContactUpdate(ctx, chatID, ensName, profileImage)
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	return m.sendContactUpdate(ctx, chatID, displayName, ensName, profileImage)
 }
 
-func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
+func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, ensName, profileImage string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
@@ -466,8 +485,10 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 
 	contactUpdate := &protobuf.ContactUpdate{
 		Clock:        clock,
+		DisplayName:  displayName,
 		EnsName:      ensName,
-		ProfileImage: profileImage}
+		ProfileImage: profileImage,
+	}
 	encodedMessage, err := proto.Marshal(contactUpdate)
 	if err != nil {
 		return nil, err
@@ -505,7 +526,7 @@ func (m *Messenger) addENSNameToContact(contact *Contact) error {
 		return nil
 	}
 
-	contact.Name = ensRecord.Name
+	contact.EnsName = ensRecord.Name
 	contact.ENSVerified = true
 
 	return nil

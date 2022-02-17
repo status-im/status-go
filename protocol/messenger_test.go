@@ -40,7 +40,7 @@ const (
 	testContract        = "0x314159265dd8dbb310642f98f50c066173c1259b"
 	testValue           = "2000"
 	testTransactionHash = "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
-	newName             = "new-name"
+	newEnsName          = "new-name"
 )
 
 func TestMessengerSuite(t *testing.T) {
@@ -708,7 +708,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	blockedContact := Contact{
 		ID:          publicKeyHex,
-		Name:        "contact-name",
+		EnsName:     "contact-name",
 		LastUpdated: 20,
 		Blocked:     true,
 	}
@@ -995,7 +995,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	)
 	s.Require().NoError(err)
 
-	_, err = s.m.ChangeGroupChatName(context.Background(), ourChat.ID, newName)
+	_, err = s.m.ChangeGroupChatName(context.Background(), ourChat.ID, newEnsName)
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
@@ -1008,7 +1008,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 
 	s.Require().Len(response.Chats(), 1)
 	actualChat := response.Chats()[0]
-	s.Require().Equal(newName, actualChat.Name)
+	s.Require().Equal(newEnsName, actualChat.Name)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -1297,7 +1297,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 func (s *MessengerSuite) TestBlockContact() {
 	contact := Contact{
 		ID:          testPK,
-		Name:        "contact-name",
+		EnsName:     "contact-name",
 		LastUpdated: 20,
 		Added:       true,
 	}
