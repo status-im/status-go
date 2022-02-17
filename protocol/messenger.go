@@ -4743,12 +4743,11 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 
 		if notificationsEnabled {
-			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts, profilePicturesVisibility)
-			if err != nil {
-				return nil, err
-			}
-
 			if chat.Muted {
+				notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts, profilePicturesVisibility)
+				if err != nil {
+					return nil, err
+				}
 				response.AddNotification(notification)
 			}
 		}
