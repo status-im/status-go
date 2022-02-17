@@ -77,6 +77,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *syst
 			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP,
 			Clock:       e.ClockValue,
 			Timestamp:   timestamp,
+			Version:     common.MessagePBVersion,
 		},
 		From:             e.From,
 		WhisperTimestamp: timestamp,

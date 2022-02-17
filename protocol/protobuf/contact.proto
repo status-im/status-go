@@ -7,4 +7,10 @@ message ContactUpdate {
   uint64 clock = 1;
   string ens_name = 2;
   string profile_image = 3;
+
+  // Version of the ChatIdentity message. Use this for version dependent behavior
+  uint64 version = 4;
+
+  // Contact's display name, introduced in version 1
+  string display_name = 5;
 }

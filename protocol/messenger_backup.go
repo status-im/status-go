@@ -142,7 +142,7 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 
 	var ensName string
 	if contact.ENSVerified {
-		ensName = contact.Name
+		ensName = contact.EnsName
 	}
 
 	oneToOneChat, ok := m.allChats.Load(contact.ID)

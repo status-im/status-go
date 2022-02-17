@@ -346,8 +346,8 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		if message.Added {
 			contact.Added = true
 		}
-		if message.EnsName != "" && contact.Name != message.EnsName {
-			contact.Name = message.EnsName
+		if message.EnsName != "" && contact.EnsName != message.EnsName {
+			contact.EnsName = message.EnsName
 			publicKey, err := contact.PublicKey()
 			if err != nil {
 				return err
@@ -543,6 +543,12 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		return ErrMessageNotAllowed
 	}
 
+	if message.Version >= 1 {
+		if err = ValidateDisplayName(message.DisplayName); err != nil {
+			return err
+		}
+	}
+
 	if !ok {
 		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
 		// We don't want to show the chat to the user
@@ -553,10 +559,12 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 	if contact.LastUpdated < message.Clock {
 		logger.Info("Updating contact")
-		if contact.Name != message.EnsName {
-			contact.Name = message.EnsName
+		if contact.EnsName != message.EnsName {
+			contact.EnsName = message.EnsName
 			contact.ENSVerified = false
 		}
+
+		contact.DisplayName = message.DisplayName
 		contact.HasAddedUs = true
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts.Store(contact.ID, true)
@@ -932,6 +940,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			state.ModifiedContacts.Store(contact.ID, true)
 			state.AllContacts.Store(contact.ID, contact)
 		}
+	}
+
+	if contact.DisplayName != receivedMessage.DisplayName {
+		contact.DisplayName = receivedMessage.DisplayName
+		state.ModifiedContacts.Store(contact.ID, true)
 	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {

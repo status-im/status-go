@@ -79,6 +79,7 @@ type Settings struct {
 	CustomBootnodes           *json.RawMessage `json:"custom-bootnodes,omitempty"`
 	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
 	DappsAddress              types.Address    `json:"dapps-address"`
+	DisplayName               string           `json:"display-name"`
 	EIP1581Address            types.Address    `json:"eip1581-address"`
 	Fleet                     *string          `json:"fleet,omitempty"`
 	HideHomeTooltip           bool             `json:"hide-home-tooltip?,omitempty"`
@@ -186,6 +187,7 @@ INSERT INTO settings (
   currency,
   current_network,
   dapps_address,
+  display_name,
   eip1581_address,
   installation_id,
   key_uid,
@@ -203,12 +205,13 @@ INSERT INTO settings (
   wallet_root_address,
   synthetic_id
 ) VALUES (
-?,?,?,?,?,?,?,?,?,?,
+?,?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,'id')`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
 		s.DappsAddress,
+		s.DisplayName,
 		s.EIP1581Address,
 		s.InstallationID,
 		s.KeyUID,
@@ -261,6 +264,8 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET dapps_address = ? WHERE synthetic_id = 'id'")
+	case "display-name":
+		update, err = db.db.Prepare("UPDATE settings SET display_name = ? WHERE synthetic_id = 'id'")
 	case "eip1581-address":
 		str, ok := value.(string)
 		if ok {
@@ -500,7 +505,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -509,6 +514,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.CustomBootnodes,
 		&s.CustomBootnodesEnabled,
 		&s.DappsAddress,
+		&s.DisplayName,
 		&s.EIP1581Address,
 		&s.Fleet,
 		&s.HideHomeTooltip,
@@ -884,6 +890,18 @@ func (db *Database) BackupFetched() (bool, error) {
 func (db *Database) ENSName() (string, error) {
 	var result sql.NullString
 	err := db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if result.Valid {
+		return result.String, nil
+	}
+	return "", err
+}
+
+func (db *Database) DisplayName() (string, error) {
+	var result sql.NullString
+	err := db.db.QueryRow("SELECT display_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

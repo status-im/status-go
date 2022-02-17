@@ -100,13 +100,13 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().NoError(err)
 
 	receivedContact := response.Contacts[0]
-	s.Require().Equal(theirName, receivedContact.Name)
+	s.Require().Equal(theirName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 	s.Require().True(receivedContact.HasAddedUs)
 
 	newPicture := "new-picture"
-	err = theirMessenger.SendContactUpdates(context.Background(), newName, newPicture)
+	err = theirMessenger.SendContactUpdates(context.Background(), newDisplayName, newEnsName, newPicture)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -122,7 +122,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	receivedContact = response.Contacts[0]
 	s.Require().Equal(theirContactID, receivedContact.ID)
-	s.Require().Equal(newName, receivedContact.Name)
+	s.Require().Equal(newEnsName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -174,7 +174,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Contacts, 1)
-	s.Require().Equal(ensName, response.Contacts[0].Name)
+	s.Require().Equal(ensName, response.Contacts[0].EnsName)
 	s.Require().True(response.Contacts[0].ENSVerified)
 
 	s.Require().Len(response.Contacts, 1)

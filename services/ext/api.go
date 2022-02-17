@@ -670,20 +670,24 @@ func (api *PublicAPI) AcceptRequestTransaction(ctx context.Context, transactionH
 	return api.service.messenger.AcceptRequestTransaction(ctx, transactionHash, messageID, signature)
 }
 
-func (api *PublicAPI) SendContactUpdates(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SendContactUpdates(ctx, name, picture)
+func (api *PublicAPI) SendContactUpdates(ctx context.Context, displayName, ensName, picture string) error {
+	return api.service.messenger.SendContactUpdates(ctx, displayName, ensName, picture)
 }
 
-func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, picture string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendContactUpdate(ctx, contactID, name, picture)
+func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, displayName, ensName, picture string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendContactUpdate(ctx, contactID, displayName, ensName, picture)
+}
+
+func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {
+	return api.service.messenger.SetDisplayName(displayName)
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPairInstallation(ctx)
 }
 
-func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SyncDevices(ctx, name, picture)
+func (api *PublicAPI) SyncDevices(ctx context.Context, displayName, ensName, picture string) error {
+	return api.service.messenger.SyncDevices(ctx, displayName, ensName, picture)
 }
 
 func (api *PublicAPI) SyncBookmark(ctx context.Context, bookmark browsers.Bookmark) error {

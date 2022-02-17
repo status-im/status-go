@@ -1056,7 +1056,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 		}
 
 		contact.ENSVerified = record.Verified
-		contact.Name = record.Name
+		contact.EnsName = record.Name
 		contacts = append(contacts, contact)
 	}
 
@@ -2293,6 +2293,13 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	message.Version = common.MessagePBVersion
+	message.DisplayName = displayName
 	if len(message.ImagePath) != 0 {
 		file, err := os.Open(message.ImagePath)
 		if err != nil {
@@ -2362,7 +2369,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, errors.New("Chat not found")
 	}
 
-	err := m.handleStandaloneChatIdentity(chat)
+	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
 	}
@@ -2424,10 +2431,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
+func (m *Messenger) SyncDevices(ctx context.Context, displayName, ensName, photoPath string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath); err != nil {
 		return err
 	}
 
@@ -2674,7 +2681,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 
 	var ensName string
 	if contact.ENSVerified {
-		ensName = contact.Name
+		ensName = contact.EnsName
 	}
 
 	oneToOneChat, ok := m.allChats.Load(contact.ID)

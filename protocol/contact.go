@@ -27,7 +27,7 @@ func (c *Contact) CanonicalName() string {
 	}
 
 	if c.ENSVerified {
-		return c.Name
+		return c.EnsName
 	}
 
 	return c.Alias
@@ -62,7 +62,7 @@ type Contact struct {
 	// Ethereum address of the contact
 	Address string `json:"address,omitempty"`
 	// ENS name of contact
-	Name string `json:"name,omitempty"`
+	EnsName string `json:"ensName,omitempty"`
 	// EnsVerified whether we verified the name of the contact
 	ENSVerified bool `json:"ensVerified"`
 	// Generated username name of the contact
@@ -77,6 +77,9 @@ type Contact struct {
 	LastUpdatedLocally uint64 `json:"lastUpdatedLocally"`
 
 	LocalNickname string `json:"localNickname,omitempty"`
+
+	// Display name of the contact
+	DisplayName string `json:"displayName"`
 
 	Images map[string]images.IdentityImage `json:"images"`
 

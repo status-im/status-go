@@ -289,6 +289,12 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		}
 	}
 
+	if message.Version >= 1 {
+		if err := ValidateDisplayName(message.DisplayName); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -504,6 +504,7 @@ func buildMessage(chat *protocol.Chat, count int) *common.Message {
 	message.ChatId = chat.ID
 	message.Clock = clock
 	message.Timestamp = timestamp
+	message.Version = common.MessagePBVersion
 	message.From = common.PubkeyToHex(&key.PublicKey)
 	data := []byte(uuid.New().String())
 	message.ID = types.HexBytes(crypto.Keccak256(data)).String()
