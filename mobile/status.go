@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
@@ -637,6 +638,10 @@ func GenerateAlias(pk string) string {
 	// We ignore any error, empty string is considered an error
 	name, _ := protocol.GenerateAlias(pk)
 	return name
+}
+
+func IsAlias(value string) string {
+	return prepareJSONResponse(alias.IsAlias(value), nil)
 }
 
 func Identicon(pk string) string {

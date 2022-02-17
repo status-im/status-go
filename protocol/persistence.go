@@ -482,6 +482,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			v.name,
 			v.verified,
 			c.alias,
+			c.display_name,
 			c.identicon,
 			c.last_updated,
 			c.last_updated_locally,
@@ -506,6 +507,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		var (
 			contact            Contact
 			nickname           sql.NullString
+			displayName        sql.NullString
 			imageType          sql.NullString
 			ensName            sql.NullString
 			ensVerified        sql.NullBool
@@ -525,6 +527,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&ensName,
 			&ensVerified,
 			&contact.Alias,
+			&displayName,
 			&contact.Identicon,
 			&contact.LastUpdated,
 			&lastUpdatedLocally,
@@ -544,8 +547,12 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact.LocalNickname = nickname.String
 		}
 
+		if displayName.Valid {
+			contact.DisplayName = displayName.String
+		}
+
 		if ensName.Valid {
-			contact.Name = ensName.String
+			contact.EnsName = ensName.String
 		}
 
 		if ensVerified.Valid {
@@ -710,6 +717,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			id,
 			address,
 			alias,
+			display_name,
 			identicon,
 			last_updated,
 			last_updated_locally,
@@ -721,7 +729,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -732,6 +740,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.ID,
 		contact.Address,
 		contact.Alias,
+		contact.DisplayName,
 		contact.Identicon,
 		contact.LastUpdated,
 		contact.LastUpdatedLocally,

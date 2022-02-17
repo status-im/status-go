@@ -88,6 +88,9 @@ message ChatMessage {
   // Grant for community chat messages
   bytes grant = 13;
 
+  // Message author's display name, introduced in version 1
+  string display_name = 14;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
@@ -103,4 +106,6 @@ message ChatMessage {
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
   }
+
+  
 }

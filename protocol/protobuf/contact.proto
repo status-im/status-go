@@ -7,4 +7,5 @@ message ContactUpdate {
   uint64 clock = 1;
   string ens_name = 2;
   string profile_image = 3;
+  string display_name = 4;
 }

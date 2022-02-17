@@ -780,10 +780,12 @@ func (m *Messenger) publishContactCode() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
+
 	m.logger.Debug("contact code sent")
 	return err
 }
@@ -792,9 +794,7 @@ func (m *Messenger) publishContactCode() error {
 // if the `shouldPublish` conditions are met
 func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
-
 	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
-
 	if err != nil {
 		return err
 	}
@@ -812,11 +812,13 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 	if err != nil {
 		return err
 	}
-	if img == nil {
-		return errors.New("could not find image")
+
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, img.Hash())
+	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, m.getIdentityHash(displayName, img))
 	if err != nil {
 		return err
 	}
@@ -875,16 +877,25 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	if err != nil {
 		return err
 	}
-	if img == nil {
-		return errors.New("could not find image")
+
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, img.Hash())
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, m.getIdentityHash(displayName, img))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (m *Messenger) getIdentityHash(displayName string, img *userimage.IdentityImage) []byte {
+	if img == nil {
+		return crypto.Keccak256([]byte(displayName))
+	}
+	return crypto.Keccak256(img.Payload, []byte(displayName))
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -893,13 +904,18 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, nil
 	}
 
-	// Check we have at least one image
+	// Check we have at least one image or a display name
 	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 	if err != nil {
 		return false, err
 	}
 
-	if img == nil {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return false, err
+	}
+
+	if img == nil && displayName == "" {
 		return false, nil
 	}
 
@@ -908,7 +924,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	if !bytes.Equal(hash, img.Hash()) {
+	if !bytes.Equal(hash, m.getIdentityHash(displayName, img)) {
 		return true, nil
 	}
 
@@ -923,11 +939,18 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
 	m.logger.Info(fmt.Sprintf("context '%s'", context))
 
-	ci := &protobuf.ChatIdentity{
-		Clock:   m.transport.GetCurrentTime(),
-		EnsName: "", // TODO add ENS name handling to dedicate PR
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
 	}
-	err := m.attachIdentityImagesToChatIdentity(context, ci)
+
+	ci := &protobuf.ChatIdentity{
+		Clock:       m.transport.GetCurrentTime(),
+		EnsName:     "", // TODO add ENS name handling to dedicate PR
+		DisplayName: displayName,
+	}
+
+	err = m.attachIdentityImagesToChatIdentity(context, ci)
 	if err != nil {
 		return nil, err
 	}
@@ -964,6 +987,10 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 		if err != nil {
 			return err
+		}
+
+		if img == nil {
+			return nil
 		}
 
 		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
@@ -1062,7 +1089,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 		}
 
 		contact.ENSVerified = record.Verified
-		contact.Name = record.Name
+		contact.EnsName = record.Name
 		contacts = append(contacts, contact)
 	}
 
@@ -2299,6 +2326,12 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	message.DisplayName = displayName
 	if len(message.ImagePath) != 0 {
 		file, err := os.Open(message.ImagePath)
 		if err != nil {
@@ -2368,7 +2401,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, errors.New("Chat not found")
 	}
 
-	err := m.handleStandaloneChatIdentity(chat)
+	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
 	}
@@ -2475,7 +2508,12 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return err
+	}
+
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath); err != nil {
 		return err
 	}
 
@@ -2722,7 +2760,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 
 	var ensName string
 	if contact.ENSVerified {
-		ensName = contact.Name
+		ensName = contact.EnsName
 	}
 
 	oneToOneChat, ok := m.allChats.Load(contact.ID)
