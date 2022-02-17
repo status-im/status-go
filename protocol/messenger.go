@@ -4747,7 +4747,10 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			if err != nil {
 				return nil, err
 			}
-			response.AddNotification(notification)
+
+			if chat.Muted {
+				response.AddNotification(notification)
+			}
 		}
 
 	}
