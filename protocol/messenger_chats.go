@@ -42,7 +42,6 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				UnviewedMessagesCount: chat.UnviewedMessagesCount,
 				UnviewedMentionsCount: chat.UnviewedMentionsCount,
 				Alias:                 chat.Alias,
-				Identicon:             chat.Identicon,
 				Muted:                 chat.Muted,
 				Profile:               chat.Profile,
 				CommunityID:           chat.CommunityID,
@@ -431,13 +430,12 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 func (m *Messenger) saveChat(chat *Chat) error {
 	_, ok := m.allChats.Load(chat.ID)
 	if chat.OneToOne() {
-		name, identicon, err := generateAliasAndIdenticon(chat.ID)
+		name, err := generateAlias(chat.ID)
 		if err != nil {
 			return err
 		}
 
 		chat.Alias = name
-		chat.Identicon = identicon
 	}
 	// Sync chat if it's a new active public chat, but not a timeline chat
 	if !ok && chat.Active && chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {

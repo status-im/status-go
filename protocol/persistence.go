@@ -483,7 +483,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			v.verified,
 			c.alias,
 			c.display_name,
-			c.identicon,
 			c.last_updated,
 			c.last_updated_locally,
 			c.added,
@@ -528,7 +527,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&ensVerified,
 			&contact.Alias,
 			&displayName,
-			&contact.Identicon,
 			&contact.LastUpdated,
 			&lastUpdatedLocally,
 			&added,
@@ -718,7 +716,6 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			address,
 			alias,
 			display_name,
-			identicon,
 			last_updated,
 			last_updated_locally,
 			local_nickname,
@@ -729,7 +726,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -741,7 +738,6 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.Address,
 		contact.Alias,
 		contact.DisplayName,
-		contact.Identicon,
 		contact.LastUpdated,
 		contact.LastUpdatedLocally,
 		contact.LocalNickname,

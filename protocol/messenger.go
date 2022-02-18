@@ -3617,7 +3617,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return true
 	})
 
-	// Hydrate chat alias and identicon
+	// Hydrate chat alias
 	for id := range messageState.Response.chats {
 		chat, _ := messageState.AllChats.Load(id)
 		if chat == nil {
@@ -3627,7 +3627,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			contact, ok := m.allContacts.Load(chat.ID)
 			if ok {
 				chat.Alias = contact.Alias
-				chat.Identicon = contact.Identicon
 			}
 		}
 
@@ -4965,17 +4964,12 @@ func (m *Messenger) StopPushNotificationsServer() error {
 	return nil
 }
 
-func generateAliasAndIdenticon(pk string) (string, string, error) {
-	identicon, err := identicon.GenerateBase64(pk)
-	if err != nil {
-		return "", "", err
-	}
-
+func generateAlias(pk string) (string, error) {
 	name, err := alias.GenerateFromPublicKeyString(pk)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return name, identicon, nil
+	return name, nil
 
 }
 

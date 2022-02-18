@@ -189,7 +189,6 @@ func WaitForExpiredOrCompleted(requestID types.Hash, events chan types.EnvelopeE
 type Author struct {
 	PublicKey types.HexBytes `json:"publicKey"`
 	Alias     string         `json:"alias"`
-	Identicon string         `json:"identicon"`
 }
 
 type Metadata struct {

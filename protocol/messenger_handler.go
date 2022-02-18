@@ -229,7 +229,6 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	message.From = state.CurrentMessageState.Contact.ID
 	message.Alias = state.CurrentMessageState.Contact.Alias
 	message.SigPubKey = state.CurrentMessageState.PublicKey
-	message.Identicon = state.CurrentMessageState.Contact.Identicon
 	message.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
 	if err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey)); err != nil {
@@ -488,7 +487,6 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 		From:             state.CurrentMessageState.Contact.ID,
 		SigPubKey:        state.CurrentMessageState.PublicKey,
-		Identicon:        state.CurrentMessageState.Contact.Identicon,
 		Alias:            state.CurrentMessageState.Contact.Alias,
 	}
 
@@ -815,7 +813,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		From:             state.CurrentMessageState.Contact.ID,
 		Alias:            state.CurrentMessageState.Contact.Alias,
 		SigPubKey:        state.CurrentMessageState.PublicKey,
-		Identicon:        state.CurrentMessageState.Contact.Identicon,
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 

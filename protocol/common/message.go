@@ -100,8 +100,6 @@ type Message struct {
 	From string `json:"from"`
 	// Random 3 words name
 	Alias string `json:"alias"`
-	// Identicon of the author
-	Identicon string `json:"identicon"`
 	// The chat id to be stored locally
 	LocalChatID string `json:"localChatId"`
 	// Seen set to true when user have read this message already
@@ -164,7 +162,6 @@ type Message struct {
 
 func (m *Message) PrepareImageURL(port int) {
 	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
-	m.Identicon = fmt.Sprintf("https://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -177,7 +174,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		WhisperTimestamp  uint64                           `json:"whisperTimestamp"`
 		From              string                           `json:"from"`
 		Alias             string                           `json:"alias"`
-		Identicon         string                           `json:"identicon"`
 		Seen              bool                             `json:"seen"`
 		OutgoingStatus    string                           `json:"outgoingStatus,omitempty"`
 		QuotedMessage     *QuotedMessage                   `json:"quotedMessage"`
@@ -213,7 +209,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		WhisperTimestamp:  m.WhisperTimestamp,
 		From:              m.From,
 		Alias:             m.Alias,
-		Identicon:         m.Identicon,
 		Seen:              m.Seen,
 		OutgoingStatus:    m.OutgoingStatus,
 		QuotedMessage:     m.QuotedMessage,

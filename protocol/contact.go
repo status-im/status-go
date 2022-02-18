@@ -8,7 +8,6 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
@@ -35,7 +34,7 @@ func (c *Contact) CanonicalName() string {
 
 func (c *Contact) CanonicalImage(profilePicturesVisibility accounts.ProfilePicturesVisibilityType) string {
 	if profilePicturesVisibility == accounts.ProfilePicturesVisibilityNone || (profilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly && !c.Added) {
-		return c.Identicon
+		return ""
 	}
 
 	if largeImage, ok := c.Images[images.LargeDimName]; ok {
@@ -52,7 +51,7 @@ func (c *Contact) CanonicalImage(profilePicturesVisibility accounts.ProfilePictu
 		}
 	}
 
-	return c.Identicon
+	return ""
 }
 
 // Contact has information about a "Contact"
@@ -67,8 +66,7 @@ type Contact struct {
 	ENSVerified bool `json:"ensVerified"`
 	// Generated username name of the contact
 	Alias string `json:"alias,omitempty"`
-	// Identicon generated from public key
-	Identicon string `json:"identicon"`
+
 	// LastUpdated is the last time we received an update from the contact
 	// updates should be discarded if last updated is less than the one stored
 	LastUpdated uint64 `json:"lastUpdated"`
@@ -133,15 +131,9 @@ func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
 }
 
 func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
-	newIdenticon, err := identicon.GenerateBase64(publicKeyString)
-	if err != nil {
-		return nil, err
-	}
-
 	contact := &Contact{
-		ID:        publicKeyString,
-		Alias:     alias.GenerateFromPublicKey(publicKey),
-		Identicon: newIdenticon,
+		ID:    publicKeyString,
+		Alias: alias.GenerateFromPublicKey(publicKey),
 	}
 
 	return contact, nil

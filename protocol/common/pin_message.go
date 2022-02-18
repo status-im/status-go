@@ -21,8 +21,6 @@ type PinMessage struct {
 	// The chat id to be stored locally
 	LocalChatID string           `json:"localChatId"`
 	SigPubKey   *ecdsa.PublicKey `json:"-"`
-	// Identicon of the author
-	Identicon string `json:"identicon"`
 	// Random 3 words name
 	Alias string `json:"alias"`
 }

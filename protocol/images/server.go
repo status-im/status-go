@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
 var globalCertificate *tls.Certificate = nil
@@ -95,32 +93,6 @@ func PublicTLSCert() (string, error) {
 type messageHandler struct {
 	db     *sql.DB
 	logger *zap.Logger
-}
-
-type identiconHandler struct {
-	logger *zap.Logger
-}
-
-func (s *identiconHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	pks, ok := r.URL.Query()["publicKey"]
-	if !ok || len(pks) == 0 {
-		s.logger.Error("no publicKey")
-		return
-	}
-	pk := pks[0]
-	image, err := identicon.Generate(pk)
-	if err != nil {
-		s.logger.Error("could not generate identicon")
-	}
-
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "max-age:290304000, public")
-	w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
-
-	_, err = w.Write(image)
-	if err != nil {
-		s.logger.Error("failed to write image", zap.Error(err))
-	}
 }
 
 func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +181,6 @@ func (s *Server) listenAndServe() {
 func (s *Server) Start() error {
 	handler := http.NewServeMux()
 	handler.Handle("/messages/images", &messageHandler{db: s.db, logger: s.logger})
-	handler.Handle("/messages/identicons", &identiconHandler{logger: s.logger})
 	s.server = &http.Server{Handler: handler}
 
 	go s.listenAndServe()

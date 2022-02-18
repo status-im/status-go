@@ -102,8 +102,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.audio_duration_ms,
 		m2.audio_base64,
 		m2.community_id,
-		c.alias,
-		c.identicon`
+		c.alias`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsCount() int {
@@ -124,7 +123,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var alias sql.NullString
-	var identicon sql.NullString
 	var communityID sql.NullString
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
@@ -181,7 +179,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedAudio,
 		&quotedCommunityID,
 		&alias,
-		&identicon,
 	}
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
@@ -207,7 +204,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		}
 	}
 	message.Alias = alias.String
-	message.Identicon = identicon.String
 
 	if gapFrom.Valid && gapTo.Valid {
 		message.GapParameters = &common.GapParameters{

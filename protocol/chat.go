@@ -76,8 +76,6 @@ type Chat struct {
 
 	// Generated username name of the chat for one-to-ones
 	Alias string `json:"alias,omitempty"`
-	// Identicon generated from public key
-	Identicon string `json:"identicon"`
 
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat
@@ -139,8 +137,6 @@ type ChatPreview struct {
 
 	// Generated username name of the chat for one-to-ones
 	Alias string `json:"alias,omitempty"`
-	// Identicon generated from public key
-	Identicon string `json:"identicon"`
 
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat

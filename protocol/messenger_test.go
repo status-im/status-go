@@ -1214,7 +1214,6 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	s.Require().Equal(pk, actualPk)
 
 	s.Require().Equal(chat, actualChat)
-	s.Require().NotEmpty(actualChat.Identicon)
 	s.Require().NotEmpty(actualChat.Alias)
 }
 
