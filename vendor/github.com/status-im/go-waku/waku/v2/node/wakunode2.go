@@ -414,10 +414,11 @@ func (w *WakuNode) mountRelay(minRelayPeersToPublish int, opts ...pubsub.Option)
 	}
 
 	if w.opts.enableRelay {
-		_, err = w.relay.Subscribe(w.ctx)
+		sub, err := w.relay.Subscribe(w.ctx)
 		if err != nil {
 			return err
 		}
+		w.Broadcaster().Unregister(sub.C)
 	}
 
 	// TODO: rlnRelay
