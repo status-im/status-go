@@ -61,6 +61,11 @@ func MakeNewDB(db *sql.DB) (*Database, error) {
 		dbInstances[filename] = d
 	}
 
+	// Check if the current dbInstance is closed, if closed assign new Database
+	if err := dbInstances[filename].db.Ping(); err != nil {
+		dbInstances[filename] = d
+	}
+
 	return dbInstances[filename], nil
 }
 

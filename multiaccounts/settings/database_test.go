@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,6 +61,48 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	return d, func() {
 		require.NoError(t, stop())
 	}
+}
+
+func TestClosingsqlDB(t *testing.T) {
+	testFileName := "./test.db"
+	password := "settings-tests"
+
+	// Make connection with sql.DB
+	db, err := appdatabase.InitializeDB(testFileName, password)
+
+	// handle removing the test file on any exit
+	defer func(){
+		require.NoError(t, os.Remove(testFileName))
+		require.NoError(t, os.Remove(testFileName + "-shm"))
+		require.NoError(t, os.Remove(testFileName + "-wal"))
+	}()
+
+	// Then check the first error
+	require.NoError(t, err)
+
+	// Init settings.Database struct
+	d, err := MakeNewDB(db)
+	require.NoError(t, err)
+
+	// Add settings data to the db
+	err = d.CreateSettings(settings, config)
+	require.NoError(t, err)
+
+	// close the sql.DB connection
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Make another connection with sql.DB
+	db2, err := appdatabase.InitializeDB(testFileName, password)
+	require.NoError(t, err)
+
+	// Init settings.Database struct using second connection
+	d, err = MakeNewDB(db2)
+	require.NoError(t, err)
+
+	// Ping db expect no error
+	err = d.db.Ping()
+	require.NoError(t, err)
 }
 
 func TestNewDB(t *testing.T) {

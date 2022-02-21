@@ -3,6 +3,7 @@ package gif
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -41,7 +42,7 @@ type API struct {
 
 func (api *API) SetTenorAPIKey(key string) (err error) {
 	log.Info("[GifAPI::SetTenorAPIKey]")
-	err = api.db.SaveSetting("gifs/api-key", key)
+	err = api.db.SaveSetting(settings.GifAPIKey.GetReactName(), key)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func (api *API) UpdateRecentGifs(updatedGifs json.RawMessage) (err error) {
 	if err != nil {
 		return err
 	}
-	err = api.db.SaveSetting("gifs/recent-gifs", recentGifsContainer.Items)
+	err = api.db.SaveSetting(settings.GifRecents.GetReactName(), recentGifsContainer.Items)
 	if err != nil {
 		return err
 	}
@@ -117,7 +118,7 @@ func (api *API) UpdateFavoriteGifs(updatedGifs json.RawMessage) (err error) {
 	if err != nil {
 		return err
 	}
-	err = api.db.SaveSetting("gifs/favorite-gifs", favsGifsContainer.Items)
+	err = api.db.SaveSetting(settings.GifFavourites.GetReactName(), favsGifsContainer.Items)
 	if err != nil {
 		return err
 	}

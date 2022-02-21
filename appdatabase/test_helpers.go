@@ -2,6 +2,7 @@ package appdatabase
 
 import (
 	"database/sql"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"io/ioutil"
 	"os"
 )
@@ -24,4 +25,13 @@ func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
 		}
 		return os.Remove(tmpfile.Name())
 	}, nil
+}
+
+func SetupTestMemorySQLDB(prefix string) (*sql.DB, error) {
+	db, err := InitializeDB(sqlite.InMemoryPath, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
