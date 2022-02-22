@@ -71,10 +71,10 @@ func TestClosingsqlDB(t *testing.T) {
 	db, err := appdatabase.InitializeDB(testFileName, password)
 
 	// handle removing the test file on any exit
-	defer func(){
+	defer func() {
 		require.NoError(t, os.Remove(testFileName))
-		require.NoError(t, os.Remove(testFileName + "-shm"))
-		require.NoError(t, os.Remove(testFileName + "-wal"))
+		require.NoError(t, os.Remove(testFileName+"-shm"))
+		require.NoError(t, os.Remove(testFileName+"-wal"))
 	}()
 
 	// Then check the first error

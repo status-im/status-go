@@ -2,9 +2,10 @@ package appdatabase
 
 import (
 	"database/sql"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"io/ioutil"
 	"os"
+
+	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 // SetupTestSQLDB creates a temporary sqlite database file, initialises and then returns with a teardown func

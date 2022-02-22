@@ -3,13 +3,13 @@ package gif
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 )
 
 type Gif struct {

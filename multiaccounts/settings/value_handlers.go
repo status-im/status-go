@@ -38,8 +38,8 @@ func NodeConfigHandler(value interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	var nodeConfig params.NodeConfig
-	err = json.Unmarshal(jsonString, &nodeConfig)
+	nodeConfig := new(params.NodeConfig)
+	err = json.Unmarshal(jsonString, nodeConfig)
 	if err != nil {
 		return nil, err
 	}
