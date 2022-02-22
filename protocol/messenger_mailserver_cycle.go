@@ -293,6 +293,11 @@ func (m *Messenger) findNewMailserverV1() error {
 	// Picks a random mailserver amongs the ones with the lowest latency
 	// The pool size is 1/4 of the mailservers were pinged successfully
 	pSize := poolSize(len(availableMailservers) - 1)
+	if pSize <= 0 {
+		m.logger.Warn("No store nodes available") // Do nothing...
+		return nil
+	}
+
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(pSize)))
 	if err != nil {
 		return err
