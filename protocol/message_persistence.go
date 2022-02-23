@@ -76,7 +76,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.sticker_hash,
 		m1.image_payload,
 		COALESCE(m1.audio_duration_ms,0),
-		m1.audio_base64,
 		m1.community_id,
 		m1.mentions,
 		m1.links,
@@ -101,7 +100,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.text,
 		m2.parsed_text,
 		m2.audio_duration_ms,
-		m2.audio_base64,
 		m2.community_id,
 		c.alias,
 		c.identicon`
@@ -119,7 +117,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedText sql.NullString
 	var quotedParsedText []byte
 	var quotedFrom sql.NullString
-	var quotedAudio sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
 	var serializedMentions []byte
@@ -156,7 +153,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Hash,
 		&image.Payload,
 		&audio.DurationMs,
-		&message.Base64Audio,
 		&communityID,
 		&serializedMentions,
 		&serializedLinks,
@@ -181,7 +177,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedText,
 		&quotedParsedText,
 		&quotedAudioDuration,
-		&quotedAudio,
 		&quotedCommunityID,
 		&alias,
 		&identicon,
@@ -205,7 +200,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			Text:            quotedText.String,
 			ParsedText:      quotedParsedText,
 			AudioDurationMs: uint64(quotedAudioDuration.Int64),
-			Base64Audio:     quotedAudio.String,
 			CommunityID:     quotedCommunityID.String,
 		}
 	}
