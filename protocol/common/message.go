@@ -133,6 +133,8 @@ type Message struct {
 	AudioPath string `json:"audioPath,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
+	// AudioLocalURL is the local url of the audio
+	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
@@ -160,9 +162,10 @@ type Message struct {
 	Deleted bool `json:"deleted"`
 }
 
-func (m *Message) PrepareImageURL(port int) {
+func (m *Message) PrepareServerURLs(port int) {
 	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
 	m.Identicon = fmt.Sprintf("https://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
+	m.AudioLocalURL = fmt.Sprintf("https://localhost:%d/messages/audio?messageId=%s", port, m.ID)
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -226,7 +229,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		New:               m.New,
 		EnsName:           m.EnsName,
 		Image:             m.ImageLocalURL,
-		Audio:             m.Base64Audio,
+		Audio:             m.AudioLocalURL,
 		CommunityID:       m.CommunityID,
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,

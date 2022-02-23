@@ -1,4 +1,4 @@
-package images
+package server
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/images"
 )
 
 var globalCertificate *tls.Certificate = nil
@@ -92,7 +93,12 @@ func PublicTLSCert() (string, error) {
 	return globalPem, nil
 }
 
-type messageHandler struct {
+type imageHandler struct {
+	db     *sql.DB
+	logger *zap.Logger
+}
+
+type audioHandler struct {
 	db     *sql.DB
 	logger *zap.Logger
 }
@@ -123,7 +129,7 @@ func (s *identiconHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *imageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	messageIDs, ok := r.URL.Query()["messageId"]
 	if !ok || len(messageIDs) == 0 {
@@ -141,7 +147,7 @@ func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("empty image")
 		return
 	}
-	mime, err := ImageMime(image)
+	mime, err := images.ImageMime(image)
 	if err != nil {
 		s.logger.Error("failed to get mime", zap.Error(err))
 	}
@@ -152,6 +158,34 @@ func (s *messageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(image)
 	if err != nil {
 		s.logger.Error("failed to write image", zap.Error(err))
+	}
+}
+
+func (s *audioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	messageIDs, ok := r.URL.Query()["messageId"]
+	if !ok || len(messageIDs) == 0 {
+		s.logger.Error("no messageID")
+		return
+	}
+	messageID := messageIDs[0]
+	var audio []byte
+	err := s.db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, messageID).Scan(&audio)
+	if err != nil {
+		s.logger.Error("failed to find image", zap.Error(err))
+		return
+	}
+	if len(audio) == 0 {
+		s.logger.Error("empty audio")
+		return
+	}
+
+	w.Header().Set("Content-Type", "audio/aac")
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(audio)
+	if err != nil {
+		s.logger.Error("failed to write audio", zap.Error(err))
 	}
 }
 
@@ -208,7 +242,8 @@ func (s *Server) listenAndServe() {
 
 func (s *Server) Start() error {
 	handler := http.NewServeMux()
-	handler.Handle("/messages/images", &messageHandler{db: s.db, logger: s.logger})
+	handler.Handle("/messages/images", &imageHandler{db: s.db, logger: s.logger})
+	handler.Handle("/messages/audio", &audioHandler{db: s.db, logger: s.logger})
 	handler.Handle("/messages/identicons", &identiconHandler{logger: s.logger})
 	s.server = &http.Server{Handler: handler}
 

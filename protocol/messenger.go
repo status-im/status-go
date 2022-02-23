@@ -55,6 +55,7 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 
@@ -124,7 +125,7 @@ type Messenger struct {
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
 	browserDatabase            *browsers.Database
-	imageServer                *images.Server
+	httpServer                 *server.Server
 	quit                       chan struct{}
 	requestedCommunities       map[string]*transport.Filter
 	connectionState            connection.State
@@ -386,7 +387,7 @@ func NewMessenger(
 	settings := accounts.NewDB(database)
 
 	mailservers := mailserversDB.NewDB(database)
-	imageServer, err := images.NewServer(database, logger)
+	httpServer, err := server.NewServer(database, logger)
 
 	if err != nil {
 		return nil, err
@@ -428,14 +429,14 @@ func NewMessenger(
 		quit:                 make(chan struct{}),
 		requestedCommunities: make(map[string]*transport.Filter),
 		browserDatabase:      c.browserDatabase,
-		imageServer:          imageServer,
+		httpServer:           httpServer,
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
 			transp.ResetFilters,
-			imageServer.Stop,
+			httpServer.Stop,
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
@@ -561,14 +562,14 @@ func (m *Messenger) resendExpiredMessages() error {
 }
 
 func (m *Messenger) ToForeground() {
-	if m.imageServer != nil {
-		m.imageServer.ToForeground()
+	if m.httpServer != nil {
+		m.httpServer.ToForeground()
 	}
 }
 
 func (m *Messenger) ToBackground() {
-	if m.imageServer != nil {
-		m.imageServer.ToBackground()
+	if m.httpServer != nil {
+		m.httpServer.ToBackground()
 	}
 }
 
@@ -657,7 +658,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	err = m.imageServer.Start()
+	err = m.httpServer.Start()
 	if err != nil {
 		return nil, err
 	}
@@ -3811,7 +3812,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	}
 	for idx := range msgs {
-		msgs[idx].PrepareImageURL(m.imageServer.Port)
+		msgs[idx].PrepareServerURLs(m.httpServer.Port)
 	}
 
 	return msgs, nextCursor, nil
@@ -3819,7 +3820,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 	for idx := range messages {
-		messages[idx].PrepareImageURL(m.imageServer.Port)
+		messages[idx].PrepareServerURLs(m.httpServer.Port)
 	}
 
 }
