@@ -303,7 +303,14 @@ func (db sqlitePersistence) HasPendingNotificationsForChat(chatID string) (bool,
 		return false, err
 	}
 
-	return rows.Next(), nil
+	result := false
+
+	if rows.Next() {
+		result = true
+		rows.Close()
+	}
+
+	return result, nil
 }
 
 func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
