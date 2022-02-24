@@ -2888,12 +2888,14 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 		return fmt.Errorf("contact ID '%s' not present", contactID)
 	}
 
-	if showMessageNotification(publicKey, m, chat, responseTo) {
-		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts, profilePicturesVisibility)
-		if err != nil {
-			return err
+	if !chat.Muted {
+		if showMessageNotification(publicKey, m, chat, responseTo) {
+			notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts, profilePicturesVisibility)
+			if err != nil {
+				return err
+			}
+			r.Response.AddNotification(notification)
 		}
-		r.Response.AddNotification(notification)
 	}
 
 	return nil
