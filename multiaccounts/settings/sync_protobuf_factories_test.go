@@ -40,10 +40,12 @@ func TestProfilePicturesVisibilityProtobufFactory(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		msg, amt := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock)
-		ppvp, ok := msg.(*protobuf.SyncSettingProfilePicturesVisibility)
-
 		a := require.New(t)
+
+		msg, amt, err := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock)
+		a.NoError(err, c.Name)
+
+		ppvp, ok := msg.(*protobuf.SyncSettingProfilePicturesVisibility)
 		a.True(ok, c.Name)
 		a.Equal(c.Expected.Value, ppvp.Value, c.Name)
 		a.Equal(c.Expected.Clock, ppvp.Clock, c.Name)

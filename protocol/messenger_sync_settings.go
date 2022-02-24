@@ -283,7 +283,11 @@ func (m *Messenger) startSyncSettingsLoop() {
 					logger.Debug("setting for sync received")
 
 					clock, chat := m.getLastClockWithRelatedChat()
-					pb, amt := s.Field.SyncProtobufFactory()(s.Value, clock)
+					pb, amt, err := s.Field.SyncProtobufFactory()(s.Value, clock)
+					if err != nil {
+						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
+						break
+					}
 
 					rm, err := buildRawSyncSettingMessage(pb, amt, chat.ID)
 					if err != nil {

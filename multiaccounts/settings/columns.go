@@ -7,7 +7,7 @@ import (
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactory func(interface{}, uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type)
+type SyncSettingProtobufFactory func(interface{}, uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error)
 
 type SyncSettingField struct {
 	Field SettingField

@@ -1,94 +1,116 @@
 package settings
 
 import (
-	"errors"
-
 	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func currencyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+var (
+	ErrTypeAssertionFailed = errors.New("type assertion of interface value failed")
+)
+
+func currencyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingCurrency)
-	pb.Value = value.(string)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_CURRENCY
-}
-
-func gifAPIKeyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingGifAPIKey)
-	pb.Value = value.(string)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_API_KEY
-}
-
-func gifFavouritesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingGifFavorites)
-	pb.Value = value.([]byte)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES
-}
-
-func gifRecentsProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingGifRecents)
-	pb.Value = value.([]byte)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_RECENTS
-}
-
-func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingMessagesFromContactsOnly)
-	pb.Value = value.(bool)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_MESSAGES_FROM_CONTACTS_ONLY
-}
-
-func preferredNameProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingPreferredName)
-	pb.Value = value.(string)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREFERRED_NAME
-}
-
-func previewPrivacyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingPreviewPrivacy)
-	pb.Value = value.(bool)
-	pb.Clock = clock
-
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREVIEW_PRIVACY
-}
-
-func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingProfilePicturesShowTo)
-	v, ok := value.(ProfilePicturesShowToType)
+	v, ok := value.(string)
 	if !ok {
-
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'string', received %T", value)
 	}
-	pb.Value = int64(v)
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_CURRENCY, nil
 }
 
-// profilePicturesVisibilityProtobufFactory
-// TODO change the SyncSettingProtobufFactory signature to return an error if the data type can't match
-//  something like `pb.Value, ok := value.(bool)`
-func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
-	pb := new(protobuf.SyncSettingProfilePicturesVisibility)
+func gifAPIKeyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingGifAPIKey)
+	v, ok := value.(string)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'string', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_API_KEY, nil
+}
+
+func gifFavouritesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingGifFavorites)
+	v, ok := value.([]byte)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES, nil
+}
+
+func gifRecentsProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingGifRecents)
+	v, ok := value.([]byte)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_RECENTS, nil
+}
+
+func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingMessagesFromContactsOnly)
+	v, ok := value.(bool)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'bool', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_MESSAGES_FROM_CONTACTS_ONLY, nil
+}
+
+func preferredNameProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingPreferredName)
+	v, ok := value.(string)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'string', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREFERRED_NAME, nil
+}
+
+func previewPrivacyProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingPreviewPrivacy)
+	v, ok := value.(bool)
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREVIEW_PRIVACY, nil
+}
+
+func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingProfilePicturesShowTo)
 	val, err := parseNumberToInt64(value)
 	if err != nil {
 		switch v := value.(type) {
-		case ProfilePicturesVisibilityType:
+		case ProfilePicturesShowToType:
 			pb.Value = int64(v)
 		default:
-			// TODO throw error once SyncSettingProtobufFactory signature has changed
-			pb.Value = int64(value.(int))
+			return nil, 0, errors.Wrapf(err, "expected a numeric type, received %T", value)
 		}
 	} else {
 		pb.Value = val
@@ -96,47 +118,97 @@ func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (
 
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO, nil
 }
 
-func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+// profilePicturesVisibilityProtobufFactory
+func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
+	pb := new(protobuf.SyncSettingProfilePicturesVisibility)
+	val, err := parseNumberToInt64(value)
+	if err != nil {
+		switch v := value.(type) {
+		case ProfilePicturesVisibilityType:
+			pb.Value = int64(v)
+		default:
+			return nil, 0, errors.Wrapf(err, "expected a numeric type, received %T", value)
+		}
+	} else {
+		pb.Value = val
+	}
+
+	pb.Clock = clock
+
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY, nil
+}
+
+func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingSendStatusUpdates)
-	pb.Value = value.(bool)
+	v, ok := value.(bool)
+
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'bool', received %T", value)
+	}
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES, nil
 }
 
-func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingStickerPacksInstalled)
-	pb.Value = value.([]byte)
+	v, ok := value.([]byte)
+
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_INSTALLED
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_INSTALLED, nil
 }
 
-func stickersPacksPendingProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+func stickersPacksPendingProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingStickerPacksPending)
-	pb.Value = value.([]byte)
+	v, ok := value.([]byte)
+
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_PENDING
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_PENDING, nil
 }
 
-func stickersRecentStickersProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+func stickersRecentStickersProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingStickersRecentStickers)
-	pb.Value = value.([]byte)
+	v, ok := value.([]byte)
+
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected '[]byte', received %T", value)
+	}
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_RECENT_STICKERS
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_RECENT_STICKERS, nil
 }
 
-func telemetryServerURLProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
+func telemetryServerURLProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error) {
 	pb := new(protobuf.SyncSettingTelemetryServerURL)
-	pb.Value = value.(string)
+	v, ok := value.(string)
+
+	if !ok {
+		return nil, 0, errors.Wrapf(ErrTypeAssertionFailed, "expected 'string', received %T", value)
+	}
+
+	pb.Value = v
 	pb.Clock = clock
 
-	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL
+	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL, nil
 }
 
 func parseNumberToInt64(value interface{}) (int64, error) {
@@ -166,7 +238,6 @@ func parseNumberToInt64(value interface{}) (int64, error) {
 	case uint64:
 		return int64(v), nil
 	default:
-		// TODO create Err const for type match not found
-		return 0, errors.New("")
+		return 0, ErrTypeAssertionFailed
 	}
 }
