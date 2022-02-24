@@ -300,9 +300,20 @@ func (w *WakuRelay) subscribeToTopic(t string, subscription *Subscription, sub *
 	for {
 		select {
 		case <-subscription.quit:
-			if w.bcaster != nil {
-				w.bcaster.Unregister(subscription.C) // Remove from broadcast list
-			}
+			func() {
+				subscription.Lock()
+				defer subscription.Unlock()
+
+				if subscription.closed {
+					return
+				}
+				subscription.closed = true
+				if w.bcaster != nil {
+					<-w.bcaster.WaitUnregister(subscription.C) // Remove from broadcast list
+				}
+
+				close(subscription.C)
+			}()
 			// TODO: if there are no more relay subscriptions, close the pubsub subscription
 		case msg := <-subChannel:
 			if msg == nil {

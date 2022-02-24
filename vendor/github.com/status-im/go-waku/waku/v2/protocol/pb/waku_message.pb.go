@@ -4,7 +4,6 @@
 package pb
 
 import (
-	encoding_binary "encoding/binary"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	io "io"
@@ -27,7 +26,7 @@ type WakuMessage struct {
 	Payload              []byte   `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 	ContentTopic         string   `protobuf:"bytes,2,opt,name=contentTopic,proto3" json:"contentTopic,omitempty"`
 	Version              uint32   `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	Timestamp            float64  `protobuf:"fixed64,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp            int64    `protobuf:"zigzag64,10,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Proof                []byte   `protobuf:"bytes,21,opt,name=proof,proto3" json:"proof,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -88,7 +87,7 @@ func (m *WakuMessage) GetVersion() uint32 {
 	return 0
 }
 
-func (m *WakuMessage) GetTimestamp() float64 {
+func (m *WakuMessage) GetTimestamp() int64 {
 	if m != nil {
 		return m.Timestamp
 	}
@@ -117,11 +116,11 @@ var fileDescriptor_6f0a20862b3bf714 = []byte{
 	0x82, 0x71, 0x85, 0x94, 0xb8, 0x78, 0x92, 0xf3, 0xf3, 0x4a, 0x52, 0xf3, 0x4a, 0x42, 0xf2, 0x0b,
 	0x32, 0x93, 0x25, 0x98, 0x14, 0x18, 0x35, 0x38, 0x83, 0x50, 0xc4, 0x40, 0xba, 0xcb, 0x52, 0x8b,
 	0x8a, 0x33, 0xf3, 0xf3, 0x24, 0x98, 0x15, 0x18, 0x35, 0x78, 0x83, 0x60, 0x5c, 0x21, 0x19, 0x2e,
-	0xce, 0x92, 0xcc, 0xdc, 0xd4, 0xe2, 0x92, 0xc4, 0xdc, 0x02, 0x09, 0x16, 0x05, 0x46, 0x0d, 0xc6,
+	0xce, 0x92, 0xcc, 0xdc, 0xd4, 0xe2, 0x92, 0xc4, 0xdc, 0x02, 0x09, 0x2e, 0x05, 0x46, 0x0d, 0xa1,
 	0x20, 0x84, 0x80, 0x90, 0x08, 0x17, 0x6b, 0x41, 0x51, 0x7e, 0x7e, 0x9a, 0x84, 0x28, 0xd8, 0x4e,
 	0x08, 0xc7, 0x49, 0xe0, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63,
 	0x9c, 0xf1, 0x58, 0x8e, 0x21, 0x89, 0x0d, 0xec, 0x70, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x0a, 0xc6, 0x91, 0x28, 0xce, 0x00, 0x00, 0x00,
+	0x33, 0x1b, 0x64, 0x81, 0xce, 0x00, 0x00, 0x00,
 }
 
 func (m *WakuMessage) Marshal() (dAtA []byte, err error) {
@@ -158,10 +157,9 @@ func (m *WakuMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		dAtA[i] = 0xaa
 	}
 	if m.Timestamp != 0 {
-		i -= 8
-		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.Timestamp))))
+		i = encodeVarintWakuMessage(dAtA, i, uint64((uint64(m.Timestamp)<<1)^uint64((m.Timestamp>>63))))
 		i--
-		dAtA[i] = 0x21
+		dAtA[i] = 0x50
 	}
 	if m.Version != 0 {
 		i = encodeVarintWakuMessage(dAtA, i, uint64(m.Version))
@@ -214,7 +212,7 @@ func (m *WakuMessage) Size() (n int) {
 		n += 1 + sovWakuMessage(uint64(m.Version))
 	}
 	if m.Timestamp != 0 {
-		n += 9
+		n += 1 + sozWakuMessage(uint64(m.Timestamp))
 	}
 	l = len(m.Proof)
 	if l > 0 {
@@ -346,17 +344,27 @@ func (m *WakuMessage) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-		case 4:
-			if wireType != 1 {
+		case 10:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
 			}
 			var v uint64
-			if (iNdEx + 8) > l {
-				return io.ErrUnexpectedEOF
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
 			}
-			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
-			iNdEx += 8
-			m.Timestamp = float64(math.Float64frombits(v))
+			v = (v >> 1) ^ uint64((int64(v&1)<<63)>>63)
+			m.Timestamp = int64(v)
 		case 21:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Proof", wireType)

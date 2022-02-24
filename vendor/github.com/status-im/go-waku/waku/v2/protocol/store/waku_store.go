@@ -26,8 +26,8 @@ import (
 	"github.com/status-im/go-waku/waku/v2/utils"
 )
 
-// StoreID_v20beta3 is the current Waku Store protocol identifier
-const StoreID_v20beta3 = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta3")
+// StoreID_v20beta4 is the current Waku Store protocol identifier
+const StoreID_v20beta4 = libp2pProtocol.ID("/vac/waku/store/2.0.0-beta4")
 
 // MaxPageSize is the maximum number of waku messages to return per page
 const MaxPageSize = 100
@@ -193,8 +193,8 @@ type MessageProvider interface {
 type Query struct {
 	Topic         string
 	ContentTopics []string
-	StartTime     float64
-	EndTime       float64
+	StartTime     int64
+	EndTime       int64
 }
 
 // Result represents a valid response from a store node
@@ -266,7 +266,7 @@ func (store *WakuStore) Start(ctx context.Context) {
 	store.ctx = ctx
 	store.MsgC = make(chan *protocol.Envelope, 1024)
 
-	store.h.SetStreamHandlerMatch(StoreID_v20beta3, protocol.PrefixTextMatch(string(StoreID_v20beta3)), store.onRequest)
+	store.h.SetStreamHandlerMatch(StoreID_v20beta4, protocol.PrefixTextMatch(string(StoreID_v20beta4)), store.onRequest)
 
 	store.wg.Add(1)
 	go store.storeIncomingMessages(ctx)
@@ -296,7 +296,7 @@ func (store *WakuStore) fetchDBRecords(ctx context.Context) {
 	for _, storedMessage := range storedMessages {
 		idx := &pb.Index{
 			Digest:       storedMessage.ID,
-			ReceiverTime: float64(storedMessage.ReceiverTime),
+			ReceiverTime: storedMessage.ReceiverTime,
 		}
 
 		_ = store.addToMessageQueue(storedMessage.PubsubTopic, idx, storedMessage.Message)
@@ -309,21 +309,21 @@ func (store *WakuStore) addToMessageQueue(pubsubTopic string, idx *pb.Index, msg
 	return store.messageQueue.Push(IndexedWakuMessage{msg: msg, index: idx, pubsubTopic: pubsubTopic})
 }
 
-func (store *WakuStore) storeMessage(env *protocol.Envelope) {
+func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 	index, err := computeIndex(env)
 	if err != nil {
 		store.log.Error("could not calculate message index", err)
-		return
+		return err
 	}
 
 	err = store.addToMessageQueue(env.PubsubTopic(), index, env.Message())
 	if err == ErrDuplicatedMessage {
-		return
+		return err
 	}
 
 	if store.msgProvider == nil {
 		metrics.RecordMessage(store.ctx, "stored", store.messageQueue.Length())
-		return
+		return err
 	}
 
 	// TODO: Move this to a separate go routine if DB writes becomes a bottleneck
@@ -331,16 +331,17 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) {
 	if err != nil {
 		store.log.Error("could not store message", err)
 		metrics.RecordStoreError(store.ctx, "store_failure")
-		return
+		return err
 	}
 
 	metrics.RecordMessage(store.ctx, "stored", store.messageQueue.Length())
+	return nil
 }
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
 	defer store.wg.Done()
 	for envelope := range store.MsgC {
-		store.storeMessage(envelope)
+		_ = store.storeMessage(envelope)
 	}
 }
 
@@ -445,7 +446,7 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 // to request the message history
 func WithAutomaticPeerSelection() HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeer(params.s.h, string(StoreID_v20beta3), params.s.log)
+		p, err := utils.SelectPeer(params.s.h, string(StoreID_v20beta4), params.s.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -456,7 +457,7 @@ func WithAutomaticPeerSelection() HistoryRequestOption {
 
 func WithFastestPeerSelection(ctx context.Context) HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.s.h, string(StoreID_v20beta3), params.s.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.s.h, string(StoreID_v20beta4), params.s.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -503,7 +504,7 @@ func DefaultOptions() []HistoryRequestOption {
 func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
 	store.log.Info(fmt.Sprintf("Querying message history with peer %s", selectedPeer))
 
-	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta3)
+	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta4)
 	if err != nil {
 		store.log.Error("Failed to connect to remote peer", err)
 		return nil, err
@@ -650,6 +651,7 @@ func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, c
 			result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestId())
 			if err == nil {
 				resultChan <- result
+				return
 			}
 			store.log.Error(fmt.Errorf("resume history with peer %s failed: %w", peer, err))
 		}()
@@ -672,14 +674,21 @@ func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, c
 	return nil, ErrFailedQuery
 }
 
-func (store *WakuStore) findLastSeen() float64 {
-	var lastSeenTime float64 = 0
+func (store *WakuStore) findLastSeen() int64 {
+	var lastSeenTime int64 = 0
 	for imsg := range store.messageQueue.Messages() {
 		if imsg.msg.Timestamp > lastSeenTime {
 			lastSeenTime = imsg.msg.Timestamp
 		}
 	}
 	return lastSeenTime
+}
+
+func max(x, y int64) int64 {
+	if x > y {
+		return x
+	}
+	return y
 }
 
 // Resume retrieves the history of waku messages published on the default waku pubsub topic since the last time the waku store node has been online
@@ -698,9 +707,9 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 	currentTime := utils.GetUnixEpoch()
 	lastSeenTime := store.findLastSeen()
 
-	var offset float64 = 200000
+	var offset int64 = int64(20 * time.Nanosecond)
 	currentTime = currentTime + offset
-	lastSeenTime = math.Max(lastSeenTime-offset, 0)
+	lastSeenTime = max(lastSeenTime-offset, 0)
 
 	rpc := &pb.HistoryQuery{
 		PubsubTopic: pubsubTopic,
@@ -713,7 +722,7 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 	}
 
 	if len(peerList) == 0 {
-		p, err := utils.SelectPeer(store.h, string(StoreID_v20beta3), store.log)
+		p, err := utils.SelectPeer(store.h, string(StoreID_v20beta4), store.log)
 		if err != nil {
 			store.log.Info("Error selecting peer: ", err)
 			return -1, ErrNoPeersAvailable
@@ -728,13 +737,16 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 		return -1, ErrFailedToResumeHistory
 	}
 
+	msgCount := 0
 	for _, msg := range messages {
-		store.storeMessage(protocol.NewEnvelope(msg, pubsubTopic))
+		if err = store.storeMessage(protocol.NewEnvelope(msg, pubsubTopic)); err == nil {
+			msgCount++
+		}
 	}
 
 	store.log.Info("Retrieved messages since the last online time: ", len(messages))
 
-	return len(messages), nil
+	return msgCount, nil
 }
 
 // TODO: queryWithAccounting
@@ -748,7 +760,7 @@ func (store *WakuStore) Stop() {
 	}
 
 	if store.h != nil {
-		store.h.RemoveStreamHandler(StoreID_v20beta3)
+		store.h.RemoveStreamHandler(StoreID_v20beta4)
 	}
 
 	store.wg.Wait()
