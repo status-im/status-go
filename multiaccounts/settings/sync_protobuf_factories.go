@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"errors"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -64,15 +66,34 @@ func previewPrivacyProtobufFactory(value interface{}, clock uint64) (proto.Messa
 
 func profilePicturesShowToProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesShowTo)
-	pb.Value = int64(value.(ProfilePicturesShowToType))
+	v, ok := value.(ProfilePicturesShowToType)
+	if !ok {
+
+	}
+	pb.Value = int64(v)
 	pb.Clock = clock
 
 	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO
 }
 
+// profilePicturesVisibilityProtobufFactory
+// TODO change the SyncSettingProtobufFactory signature to return an error if the data type can't match
+//  something like `pb.Value, ok := value.(bool)`
 func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type) {
 	pb := new(protobuf.SyncSettingProfilePicturesVisibility)
-	pb.Value = int64(value.(ProfilePicturesVisibilityType))
+	val, err := parseNumberToInt64(value)
+	if err != nil {
+		switch v := value.(type) {
+		case ProfilePicturesVisibilityType:
+			pb.Value = int64(v)
+		default:
+			// TODO throw error once SyncSettingProtobufFactory signature has changed
+			pb.Value = int64(value.(int))
+		}
+	} else {
+		pb.Value = val
+	}
+
 	pb.Clock = clock
 
 	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY
@@ -116,4 +137,36 @@ func telemetryServerURLProtobufFactory(value interface{}, clock uint64) (proto.M
 	pb.Clock = clock
 
 	return pb, protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL
+}
+
+func parseNumberToInt64(value interface{}) (int64, error) {
+	switch v := value.(type) {
+	case float32:
+		return int64(v), nil
+	case float64:
+		return int64(v), nil
+	case int:
+		return int64(v), nil
+	case int8:
+		return int64(v), nil
+	case int16:
+		return int64(v), nil
+	case int32:
+		return int64(v), nil
+	case int64:
+		return v, nil
+	case uint:
+		return int64(v), nil
+	case uint8:
+		return int64(v), nil
+	case uint16:
+		return int64(v), nil
+	case uint32:
+		return int64(v), nil
+	case uint64:
+		return int64(v), nil
+	default:
+		// TODO create Err const for type match not found
+		return 0, errors.New("")
+	}
 }
