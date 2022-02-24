@@ -74,6 +74,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.parsed_text,
 		m1.sticker_pack,
 		m1.sticker_hash,
+		m1.image_payload,
 		COALESCE(m1.audio_duration_ms,0),
 		m1.audio_base64,
 		m1.community_id,
@@ -134,6 +135,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
 	audio := &protobuf.AudioMessage{}
+	image := &protobuf.ImageMessage{}
 
 	args := []interface{}{
 		&message.ID,
@@ -152,6 +154,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ParsedText,
 		&sticker.Pack,
 		&sticker.Hash,
+		&image.Payload,
 		&audio.DurationMs,
 		&message.Base64Audio,
 		&communityID,
@@ -242,6 +245,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	case protobuf.ChatMessage_TRANSACTION_COMMAND:
 		message.CommandParameters = command
+
+	case protobuf.ChatMessage_IMAGE:
+		message.Payload = &protobuf.ChatMessage_Image{Image: image}
 	}
 
 	return nil
