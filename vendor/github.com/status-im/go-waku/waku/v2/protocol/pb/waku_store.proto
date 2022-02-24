@@ -6,8 +6,8 @@ import "waku_message.proto";
 
 message Index {
   bytes digest = 1;
-  double receiverTime = 2;
-  double senderTime = 3;
+  sint64 receiverTime = 2;
+  sint64 senderTime = 3;
 }
 
 message PagingInfo {
@@ -28,8 +28,8 @@ message HistoryQuery {
   string pubsubTopic = 2;
   repeated ContentFilter contentFilters = 3;
   PagingInfo pagingInfo = 4; // used for pagination
-  double startTime = 5;
-  double endTime = 6;
+  sint64 startTime = 5;
+  sint64 endTime = 6;
 }
 
 message HistoryResponse {

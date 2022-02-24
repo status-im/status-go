@@ -28,7 +28,7 @@ type DBStore struct {
 type StoredMessage struct {
 	ID           []byte
 	PubsubTopic  string
-	ReceiverTime float64
+	ReceiverTime int64
 	Message      *pb.WakuMessage
 }
 
@@ -93,8 +93,8 @@ func NewDBStore(log *zap.SugaredLogger, options ...DBOption) (*DBStore, error) {
 func (d *DBStore) createTable() error {
 	sqlStmt := `CREATE TABLE IF NOT EXISTS message (
 		id BLOB PRIMARY KEY,
-		receiverTimestamp REAL NOT NULL,
-		senderTimestamp REAL NOT NULL,
+		receiverTimestamp INTEGER NOT NULL,
+		senderTimestamp INTEGER NOT NULL,
 		contentTopic BLOB NOT NULL,
 		pubsubTopic BLOB NOT NULL,
 		payload BLOB,
@@ -161,8 +161,8 @@ func (d *DBStore) GetAll() ([]StoredMessage, error) {
 
 	for rows.Next() {
 		var id []byte
-		var receiverTimestamp float64
-		var senderTimestamp float64
+		var receiverTimestamp int64
+		var senderTimestamp int64
 		var contentTopic string
 		var payload []byte
 		var version uint32

@@ -377,7 +377,7 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 		log.Info("peer added successfully", peerID)
 	}
 
-	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta3, addToStore)
+	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta4, addToStore)
 	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1, addToStore)
 	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1, addToStore)
 	w.addPeers(cfg.WakuRendezvousNodes, rendezvous.RendezvousID_v001, addToStore)
@@ -869,8 +869,8 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	}
 
 	query := store.Query{
-		StartTime:     float64(from),
-		EndTime:       float64(to),
+		StartTime:     int64(from),
+		EndTime:       int64(to),
 		ContentTopics: strTopics,
 		Topic:         relay.DefaultWakuTopic,
 	}
@@ -1074,7 +1074,7 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta3)
+	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}

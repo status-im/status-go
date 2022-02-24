@@ -120,7 +120,7 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 			if !hasLightPush && protocol == string(lightpush.LightPushID_v20beta1) {
 				hasLightPush = true
 			}
-			if !hasStore && protocol == string(store.StoreID_v20beta3) {
+			if !hasStore && protocol == string(store.StoreID_v20beta4) {
 				hasStore = true
 			}
 			if !hasFilter && protocol == string(filter.FilterID_v20beta1) {

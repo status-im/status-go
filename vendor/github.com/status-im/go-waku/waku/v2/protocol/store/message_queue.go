@@ -28,6 +28,7 @@ func (self *MessageQueue) Push(msg IndexedWakuMessage) error {
 
 	var k [32]byte
 	copy(k[:], msg.index.Digest)
+
 	if _, ok := self.seen[k]; ok {
 		return ErrDuplicatedMessage
 	}

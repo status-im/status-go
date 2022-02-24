@@ -6,6 +6,6 @@ message WakuMessage {
     bytes payload = 1;
     string contentTopic = 2;
     uint32 version = 3;
-    double timestamp = 4;
+    sint64 timestamp = 10;
     bytes proof = 21;
 }
