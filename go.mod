@@ -10,12 +10,15 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 
+replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
+
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.10.13
+	github.com/forPelevin/gomoji v1.1.2
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/mock v1.6.0

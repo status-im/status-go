@@ -693,6 +693,14 @@ func (db *Database) GetPublicKey() (rst string, err error) {
 	return
 }
 
+func (db *Database) GetPreferredUsername() (rst string, err error) {
+	err = db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
+	return
+}
+
 func (db *Database) GetFleet() (rst string, err error) {
 	err = db.db.QueryRow("SELECT COALESCE(fleet, '') FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
 	if err == sql.ErrNoRows {
