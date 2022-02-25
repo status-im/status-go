@@ -120,6 +120,8 @@ github.com/fjl/memsize
 github.com/fjl/memsize/memsizeui
 # github.com/flynn/noise v1.0.0
 github.com/flynn/noise
+# github.com/forPelevin/gomoji v1.1.2 => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
+github.com/forPelevin/gomoji
 # github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 github.com/gballet/go-libpcsclite
 # github.com/go-ole/go-ole v1.2.5

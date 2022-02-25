@@ -1,18 +1,24 @@
 package chat
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
 )
 
-func NewService() *Service {
-	return &Service{}
+func NewService(appDB *sql.DB) *Service {
+	return &Service{
+		accountsDB: accounts.NewDB(appDB),
+	}
 }
 
 type Service struct {
-	messenger *protocol.Messenger
+	messenger  *protocol.Messenger
+	accountsDB *accounts.Database
 }
 
 func (s *Service) Init(messenger *protocol.Messenger) {
