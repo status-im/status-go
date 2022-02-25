@@ -43,6 +43,7 @@ import (
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/subscriptions"
+	visualIdentity "github.com/status-im/status-go/services/visual-identity"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -113,6 +114,7 @@ type StatusNode struct {
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	gifSrvc                *gif.Service
+	visualIdentitySrvc     *visualIdentity.Service
 }
 
 // New makes new instance of StatusNode.

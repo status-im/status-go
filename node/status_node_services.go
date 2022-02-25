@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/subscriptions"
+	visualIdentity "github.com/status-im/status-go/services/visual-identity"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -73,6 +74,12 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService())
 	services = append(services, b.gifService())
+
+	visualIdentitySrvc, err := b.visualIdentityService()
+	if err != nil {
+		return err
+	}
+	services = append(services, visualIdentitySrvc)
 
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -375,6 +382,21 @@ func (b *StatusNode) gifService() *gif.Service {
 		b.gifSrvc = gif.NewService(accounts.NewDB(b.appDB))
 	}
 	return b.gifSrvc
+}
+
+func (b *StatusNode) visualIdentityService() (*visualIdentity.Service, error) {
+	if b.visualIdentitySrvc != nil {
+		return b.visualIdentitySrvc, nil
+	}
+
+	srvc := visualIdentity.NewService()
+	err := srvc.Init()
+	if err != nil {
+		return nil, err
+	}
+	b.visualIdentitySrvc = srvc
+
+	return b.visualIdentitySrvc, nil
 }
 
 func (b *StatusNode) permissionsService() *permissions.Service {
