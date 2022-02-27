@@ -744,7 +744,7 @@ func MigrateNodeConfig(db *sql.DB) error {
 	return nil
 }
 
-func GetNodeConfig(db *sql.DB) (*params.NodeConfig, error) {
+func GetNodeConfigFromDB(db *sql.DB) (*params.NodeConfig, error) {
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err

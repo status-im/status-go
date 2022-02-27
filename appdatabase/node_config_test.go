@@ -41,7 +41,7 @@ func TestGetNodeConfig(t *testing.T) {
 	nodeConfig := randomNodeConfig()
 	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
 
-	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
 	require.Equal(t, nodeConfig, dbNodeConfig)
 }
@@ -55,7 +55,7 @@ func TestSaveNodeConfig(t *testing.T) {
 	newNodeConfig := randomNodeConfig()
 	require.NoError(t, nodecfg.SaveNodeConfig(db, newNodeConfig))
 
-	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
 	require.Equal(t, *newNodeConfig, *dbNodeConfig)
 }
@@ -92,7 +92,7 @@ func TestMigrateNodeConfig(t *testing.T) {
 	err = nodecfg.MigrateNodeConfig(db)
 	require.NoError(t, err)
 
-	dbNodeConfig, err := nodecfg.GetNodeConfig(db)
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
 	require.Equal(t, nodeConfig, dbNodeConfig)
 
