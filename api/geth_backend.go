@@ -269,20 +269,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	return nil
 }
 
-// StartNodeWithKey instead of loading addresses from database this method derives address from key
-// and uses it in application.
-// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
-// with small variants for keycard, this created too many bugs
-func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
-	err := b.ensureAppDBOpened(acc, password)
-	if err != nil {
-		return err
-	}
-
-	if b.loadNodeConfig(nil) != nil {
-		return err
-	}
-
+func (b *GethStatusBackend) setupLogSettings() error {
 	logSettings := logutils.LogSettings{
 		Enabled:         b.config.LogEnabled,
 		MobileSystem:    b.config.LogMobileSystem,
@@ -293,6 +280,28 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		CompressRotated: b.config.LogCompressRotated,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+		return err
+	}
+	return nil
+}
+
+// StartNodeWithKey instead of loading addresses from database this method derives address from key
+// and uses it in application.
+// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
+// with small variants for keycard, this created too many bugs
+func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	err := b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+
+	err = b.loadNodeConfig(nil)
+	if err != nil {
+		return err
+	}
+
+	err = b.setupLogSettings()
+	if err != nil {
 		return err
 	}
 
@@ -367,18 +376,11 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 
-	logSettings := logutils.LogSettings{
-		Enabled:         b.config.LogEnabled,
-		MobileSystem:    b.config.LogMobileSystem,
-		Level:           b.config.LogLevel,
-		File:            b.config.LogFile,
-		MaxSize:         b.config.LogMaxSize,
-		MaxBackups:      b.config.LogMaxBackups,
-		CompressRotated: b.config.LogCompressRotated,
-	}
-	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+	err = b.setupLogSettings()
+	if err != nil {
 		return err
 	}
+
 	b.account = &acc
 	accountsDB := accounts.NewDB(b.appDB)
 	chatAddr, err := accountsDB.GetChatAddress()
