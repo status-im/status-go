@@ -8,13 +8,14 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-func NewSettingsAPI(db *accounts.Database) *SettingsAPI {
-	return &SettingsAPI{db}
+func NewSettingsAPI(db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
+	return &SettingsAPI{db, config}
 }
 
 // SettingsAPI is class with methods available over RPC.
 type SettingsAPI struct {
-	db *accounts.Database
+	db     *accounts.Database
+	config *params.NodeConfig
 }
 
 func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interface{}) error {
@@ -30,10 +31,12 @@ func (api *SettingsAPI) GetSettings(ctx context.Context) (accounts.Settings, err
 	return api.db.GetSettings()
 }
 
+// NodeConfig returns the currently used node configuration
 func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, error) {
-	return nodecfg.GetNodeConfig(api.db.DB())
+	return api.config, nil
 }
 
+// Saves the nodeconfig in the database. The node must be restarted for the changes to be applied
 func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
 	return nodecfg.SaveNodeConfig(api.db.DB(), n)
 }

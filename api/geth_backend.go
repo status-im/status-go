@@ -51,6 +51,8 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
 	ErrDBNotAvailable = errors.New("DB is unavailable")
+	// ErrConfigNotAvailable is returned if a method is called before the nodeconfig is set
+	ErrConfigNotAvailable = errors.New("NodeConfig is not available")
 )
 
 var _ StatusBackend = (*GethStatusBackend)(nil)
@@ -59,8 +61,10 @@ var _ StatusBackend = (*GethStatusBackend)(nil)
 type GethStatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
-	rootDataDir          string
-	appDB                *sql.DB
+	rootDataDir string
+	appDB       *sql.DB
+	config      *params.NodeConfig
+
 	statusNode           *node.StatusNode
 	personalAPI          *personal.PublicAPI
 	multiaccountsDB      *multiaccounts.Database
@@ -274,19 +278,19 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	conf, err := b.loadNodeConfig()
-	if err != nil {
+
+	if b.loadNodeConfig(nil) != nil {
 		return err
 	}
 
 	logSettings := logutils.LogSettings{
-		Enabled:         conf.LogEnabled,
-		MobileSystem:    conf.LogMobileSystem,
-		Level:           conf.LogLevel,
-		File:            conf.LogFile,
-		MaxSize:         conf.LogMaxSize,
-		MaxBackups:      conf.LogMaxBackups,
-		CompressRotated: conf.LogCompressRotated,
+		Enabled:         b.config.LogEnabled,
+		MobileSystem:    b.config.LogMobileSystem,
+		Level:           b.config.LogLevel,
+		File:            b.config.LogFile,
+		MaxSize:         b.config.LogMaxSize,
+		MaxBackups:      b.config.LogMaxBackups,
+		CompressRotated: b.config.LogCompressRotated,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
 		return err
@@ -306,7 +310,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	err = b.StartNode(conf)
+	err = b.StartNode(b.config)
 	if err != nil {
 		return err
 	}
@@ -339,12 +343,7 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	return err
 }
 
-func (b *GethStatusBackend) mergeConfig(n *params.NodeConfig) (*params.NodeConfig, error) {
-	conf, err := nodecfg.GetNodeConfig(b.appDB)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
 	// Overwrite db configuration (only adds new values)
 	if err := mergo.Merge(conf, n); err != nil {
 		return nil, err
@@ -354,34 +353,28 @@ func (b *GethStatusBackend) mergeConfig(n *params.NodeConfig) (*params.NodeConfi
 		return nil, err
 	}
 
-	return b.loadNodeConfig()
+	return conf, nil
 }
 
-func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
+func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
-	conf, err := b.loadNodeConfig()
+
+	err = b.loadNodeConfig(inputNodeCfg)
 	if err != nil {
 		return err
 	}
 
-	if nodecfg != nil {
-		conf, err = b.mergeConfig(nodecfg)
-		if err != nil {
-			return err
-		}
-	}
-
 	logSettings := logutils.LogSettings{
-		Enabled:         conf.LogEnabled,
-		MobileSystem:    conf.LogMobileSystem,
-		Level:           conf.LogLevel,
-		File:            conf.LogFile,
-		MaxSize:         conf.LogMaxSize,
-		MaxBackups:      conf.LogMaxBackups,
-		CompressRotated: conf.LogCompressRotated,
+		Enabled:         b.config.LogEnabled,
+		MobileSystem:    b.config.LogMobileSystem,
+		Level:           b.config.LogLevel,
+		File:            b.config.LogFile,
+		MaxSize:         b.config.LogMaxSize,
+		MaxBackups:      b.config.LogMaxBackups,
+		CompressRotated: b.config.LogCompressRotated,
 	}
 	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
 		return err
@@ -407,7 +400,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		MainAccount:    walletAddr,
 	}
 
-	err = b.StartNode(conf)
+	err = b.StartNode(b.config)
 	if err != nil {
 		return err
 	}
@@ -657,12 +650,20 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings accounts.Settings, 
 	return accdb.SaveAccounts(subaccs)
 }
 
-func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
+func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	conf, err := nodecfg.GetNodeConfig(b.appDB)
+
+	conf, err := nodecfg.GetNodeConfigFromDB(b.appDB)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	if inputNodeCfg != nil {
+		conf, err = b.OverwriteNodeConfigValues(conf, inputNodeCfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Start WakuV1 if WakuV2 is not enabled
@@ -681,7 +682,9 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	}
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
-	return conf, nil
+	b.config = conf
+
+	return nil
 }
 
 func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
@@ -695,10 +698,10 @@ func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
 }
 
 func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
-	if b.appDB == nil {
-		return nil, ErrDBNotAvailable
+	if b.config == nil {
+		return nil, ErrConfigNotAvailable
 	}
-	return b.loadNodeConfig()
+	return b.config, nil
 }
 
 func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
@@ -792,11 +795,11 @@ func (b *GethStatusBackend) RestartNode() error {
 		return node.ErrNoRunningNode
 	}
 
-	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
 	}
-	return b.startNode(&newcfg)
+
+	return b.startNode(b.config)
 }
 
 // ResetChainData remove chain data from data directory.
@@ -804,16 +807,16 @@ func (b *GethStatusBackend) RestartNode() error {
 func (b *GethStatusBackend) ResetChainData() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	newcfg := *(b.statusNode.Config())
+
 	if err := b.stopNode(); err != nil {
 		return err
 	}
 	// config is cleaned when node is stopped
-	if err := b.statusNode.ResetChainData(&newcfg); err != nil {
+	if err := b.statusNode.ResetChainData(b.config); err != nil {
 		return err
 	}
 	signal.SendChainDataRemoved()
-	return b.startNode(&newcfg)
+	return b.startNode(b.config)
 }
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.

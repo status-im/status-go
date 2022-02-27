@@ -238,7 +238,7 @@ func Login(accountData, password string) string {
 
 // Login loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
-// and injects verified key as shh identity. It then updates the accounts node configuration
+// and injects verified key as shh identity. It then updates the accounts node db configuration
 // mergin the values received in the configJSON parameter
 func LoginWithConfig(accountData, password, configJSON string) string {
 	err := login(accountData, password, configJSON)
