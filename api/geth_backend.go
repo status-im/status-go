@@ -718,6 +718,9 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 
+	// Updating node config
+	b.config = config
+
 	b.log.Debug("updated config with defaults", "config", config)
 
 	// Start by validating configuration
