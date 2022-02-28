@@ -92,7 +92,7 @@ func (api *API) RemovePending(packID *bigint.BigInt) error {
 	}
 
 	if _, exists := pendingPacks[uint(packID.Uint64())]; !exists {
-		return errors.New("sticker pack is not pending")
+		return nil
 	}
 
 	delete(pendingPacks, uint(packID.Uint64()))

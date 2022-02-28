@@ -131,7 +131,7 @@ func TestResourceURL(t *testing.T) {
 	uri, err := api.ResourceURL(context.Background(), 1, "simpledapp.eth")
 	require.NoError(t, err)
 	require.Equal(t, "https", uri.Scheme)
-	require.Equal(t, "bafybeidzlqpkbtvpjtxnzgew6ffxhozq5f4ojbk64iq3tjl7lkjue2biby.ipfs.cf-ipfs.com", uri.Host)
+	require.Equal(t, "bafybeidzlqpkbtvpjtxnzgew6ffxhozq5f4ojbk64iq3tjl7lkjue2biby.ipfs.infura-ipfs.io/", uri.Host)
 	require.Equal(t, "", uri.Path)
 
 	uri, err = api.ResourceURL(context.Background(), 1, "swarm.eth")
