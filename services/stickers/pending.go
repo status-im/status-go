@@ -60,6 +60,25 @@ func (api *API) Pending() (map[uint]StickerPack, error) {
 
 	for packID, stickerPack := range stickerPacks {
 		stickerPack.Status = statusPending
+
+		stickerPack.Preview, err = decodeStringHash(stickerPack.Preview)
+		if err != nil {
+			return nil, err
+		}
+
+		stickerPack.Thumbnail, err = decodeStringHash(stickerPack.Thumbnail)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, sticker := range stickerPack.Stickers {
+			sticker.URL, err = decodeStringHash(sticker.Hash)
+			if err != nil {
+				return nil, err
+			}
+			stickerPack.Stickers[i] = sticker
+		}
+
 		stickerPacks[packID] = stickerPack
 	}
 

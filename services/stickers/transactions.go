@@ -29,11 +29,6 @@ func (api *API) getSigner(chainID uint64, from types.Address, password string) b
 }
 
 func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt, password string) (string, error) {
-	err := api.AddPending(chainID, packID)
-	if err != nil {
-		return "", err
-	}
-
 	snt, err := api.contractMaker.NewSNT(chainID)
 	if err != nil {
 		return "", err
@@ -74,6 +69,11 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 		extraData,
 	)
 
+	if err != nil {
+		return "", err
+	}
+
+	err = api.AddPending(chainID, packID)
 	if err != nil {
 		return "", err
 	}
@@ -139,4 +139,8 @@ func (api *API) BuyEstimate(ctx context.Context, chainID uint64, from types.Addr
 		Data:  data,
 	})
 
+}
+
+func (api *API) StickerMarketAddress(ctx context.Context, chainID uint64) (common.Address, error) {
+	return stickers.StickerMarketContractAddress(chainID)
 }
