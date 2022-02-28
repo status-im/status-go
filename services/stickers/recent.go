@@ -7,23 +7,28 @@ import (
 const maxNumberRecentStickers = 24
 
 func (api *API) recentStickers() ([]Sticker, error) {
-	var recentStickersList []Sticker
+	recentStickersList := make([]Sticker, 0)
 
 	recentStickersJSON, err := api.accountsDB.GetRecentStickers()
 	if err != nil {
-		return nil, err
+		return recentStickersList, err
 	}
 
 	if recentStickersJSON == nil {
-		return nil, nil
+		return recentStickersList, nil
 	}
 
 	err = json.Unmarshal(*recentStickersJSON, &recentStickersList)
 	if err != nil {
-		return nil, err
+		return recentStickersList, err
 	}
 
 	return recentStickersList, nil
+}
+
+func (api *API) ClearRecent() error {
+	recentStickersList := []Sticker{}
+	return api.accountsDB.SaveSetting("stickers/recent-stickers", recentStickersList)
 }
 
 func (api *API) Recent() ([]Sticker, error) {

@@ -134,8 +134,6 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 			}
 
 		case <-doneChan:
-			// TODO: add an attribute to indicate if the sticker pack
-			// is bought, but the transaction is still pending confirmation.
 			var result []StickerPack
 			for _, pack := range allStickerPacks {
 				packID := uint(pack.ID.Uint64())
@@ -147,6 +145,7 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 				}
 				result = append(result, pack)
 			}
+
 			return result, nil
 		}
 	}
@@ -327,6 +326,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 			resultChan <- stickerPack
 		}(i)
 	}
+
 	c.WaitAllDone()
 }
 
