@@ -87,6 +87,7 @@ type HistoryMessagesSignal struct {
 type UpdateAvailableSignal struct {
 	Available bool   `json:"available"`
 	Version   string `json:"version"`
+	URL       string `json:"url"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -162,8 +163,8 @@ func SendHistoricMessagesRequestCompleted(requestID string) {
 	send(EventHistoryRequestCompleted, HistoryMessagesSignal{RequestID: requestID})
 }
 
-func SendUpdateAvailable(available bool, latestVersion string) {
-	send(EventUpdateAvailable, UpdateAvailableSignal{Available: available, Version: latestVersion})
+func SendUpdateAvailable(available bool, latestVersion string, url string) {
+	send(EventUpdateAvailable, UpdateAvailableSignal{Available: available, Version: latestVersion, URL: url})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received

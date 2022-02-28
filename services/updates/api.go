@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/hashicorp/go-version"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/signal"
 	"go.uber.org/zap"
@@ -28,7 +27,7 @@ type API struct {
 }
 
 func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVersion string) {
-	func() {
+	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 
@@ -38,10 +37,11 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 			return
 		}
 
-		url := uri.Scheme + "://" + uri.Host + uri.Path + "VERSION"
-		response, err := api.httpClient.Get(url)
+		url := uri.Scheme + "://" + uri.Host + uri.Path
+		versionURL := url + "VERSION"
+		response, err := api.httpClient.Get(versionURL)
 		if err != nil {
-			log.Error("can't get content", zap.String("any", url))
+			log.Error("can't get content", zap.String("any", versionURL))
 			return
 		}
 
@@ -84,6 +84,6 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 			return
 		}
 
-		signal.SendUpdateAvailable(latest.GreaterThan(current), latestStr)
+		signal.SendUpdateAvailable(latest.GreaterThan(current), latestStr, url)
 	}()
 }
