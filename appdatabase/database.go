@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/nodecfg"
@@ -76,7 +78,9 @@ func ChangeDatabasePassword(path, password, newPassword string) error {
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database
 func GetDBFilename(db *sql.DB) (string, error) {
 	if db == nil {
-		return "", errors.New("no database found")
+		logger := log.New()
+		logger.Warn("GetDBFilename was passed a nil pointer sql.DB")
+		return "", nil
 	}
 
 	var i, category, filename string
