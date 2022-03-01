@@ -95,7 +95,6 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		Name:                      "Test",
 		Networks:                  &networks,
 		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreferredName:             &pf, // TODO this won't work, need to do a raw saveSettings call
 		PreviewPrivacy:            false,
 		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
 		SigningPhrase:             "yurt joey vibe",
@@ -107,7 +106,11 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 
-	_ = m.settings.CreateSettings(setting, config)
+	err = m.settings.CreateSettings(setting, config)
+	s.Require().NoError(err)
+
+	err = m.settings.SaveSetting(settings.PreferredName.GetReactName(), &pf)
+	s.Require().NoError(err)
 
 	return m
 }
@@ -189,7 +192,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Equal("eth", as.Currency)
-	s.Require().Equal(pf, as.PreferredName)
+	s.Require().Equal(pf, *as.PreferredName)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
 
@@ -197,7 +200,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	aos, err := alicesOtherDevice.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Equal("", aos.Currency)
-	s.Require().Equal("", aos.PreferredName)
+	s.Require().Nil(aos.PreferredName)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
 
@@ -258,4 +261,72 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	as, err = s.alice.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Exactly(settings.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
+}
+
+func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
+	// Set Alice's installation metadata
+	aim := &multidevice.InstallationMetadata{
+		Name:       "alice's-device",
+		DeviceType: "alice's-device-type",
+	}
+	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
+	s.Require().NoError(err)
+
+	// Create Alice's other device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	s.Require().NoError(err)
+
+	// Check alice 1 settings values
+	as, err := s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(as.StickerPacksInstalled)
+	s.Require().Nil(as.StickerPacksPending)
+	s.Require().Nil(as.StickersRecentStickers)
+
+	// Check alice 2 settings values
+	aos, err := alicesOtherDevice.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(aos.StickerPacksInstalled)
+	s.Require().Nil(aos.StickerPacksPending)
+	s.Require().Nil(aos.StickersRecentStickers)
+
+	// Pair devices. Allows alice to send to alicesOtherDevice
+	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
+
+	// alice triggers global settings sync
+	err = s.alice.syncSettings()
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		ns, err := alicesOtherDevice.settings.GetSettings()
+		if err != nil {
+			return err
+		}
+
+		if ns.Currency != "eth" {
+			return errors.New("settings sync not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	aos, err = alicesOtherDevice.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(aos.StickerPacksInstalled)
+	s.Require().Nil(aos.StickerPacksPending)
+	s.Require().Nil(aos.StickersRecentStickers)
 }

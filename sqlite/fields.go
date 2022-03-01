@@ -32,7 +32,7 @@ func (blob *JSONBlob) Scan(value interface{}) error {
 // Value implements interface.
 func (blob *JSONBlob) Value() (driver.Value, error) {
 	dataVal := reflect.ValueOf(blob.Data)
-	if blob.Data == nil || dataVal.Kind() == reflect.Ptr && dataVal.IsNil() {
+	if (blob.Data == nil) || (dataVal.Kind() == reflect.Ptr && dataVal.IsNil()) || (dataVal.Len() == 0) {
 		return nil, nil
 	}
 	return json.Marshal(blob.Data)

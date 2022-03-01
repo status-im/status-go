@@ -75,6 +75,10 @@ func ChangeDatabasePassword(path, password, newPassword string) error {
 
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database
 func GetDBFilename(db *sql.DB) (string, error) {
+	if db == nil {
+		return "", errors.New("no database found")
+	}
+
 	var i, category, filename string
 	rows, err := db.Query("PRAGMA database_list;")
 	if err != nil {
