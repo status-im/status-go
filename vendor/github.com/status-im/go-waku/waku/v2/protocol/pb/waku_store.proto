@@ -8,6 +8,7 @@ message Index {
   bytes digest = 1;
   sint64 receiverTime = 2;
   sint64 senderTime = 3;
+  string pubsubTopic = 4;
 }
 
 message PagingInfo {

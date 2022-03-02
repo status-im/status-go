@@ -92,13 +92,14 @@ func NewDBStore(log *zap.SugaredLogger, options ...DBOption) (*DBStore, error) {
 
 func (d *DBStore) createTable() error {
 	sqlStmt := `CREATE TABLE IF NOT EXISTS message (
-		id BLOB PRIMARY KEY,
+		id BLOB,
 		receiverTimestamp INTEGER NOT NULL,
 		senderTimestamp INTEGER NOT NULL,
 		contentTopic BLOB NOT NULL,
 		pubsubTopic BLOB NOT NULL,
 		payload BLOB,
-		version INTEGER NOT NULL DEFAULT 0
+		version INTEGER NOT NULL DEFAULT 0,
+		CONSTRAINT messageIndex PRIMARY KEY (senderTimestamp, id, pubsubTopic)
 	) WITHOUT ROWID;`
 	_, err := d.db.Exec(sqlStmt)
 	if err != nil {

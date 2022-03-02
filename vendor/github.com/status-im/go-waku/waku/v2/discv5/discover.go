@@ -132,6 +132,9 @@ func NewDiscoveryV5(host host.Host, ipAddr net.IP, tcpPort int, priv *ecdsa.Priv
 				// TODO: track https://github.com/status-im/nim-waku/issues/770 for improvements over validation func
 				return evaluateNode(&n)
 			},
+			V5Config: discover.V5Config{
+				ProtocolID: [6]byte{'d', '5', 'w', 'a', 'k', 'u'},
+			},
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,

@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	"github.com/status-im/go-discover/discover/v5wire"
 )
 
 // UDPConn is a network connection on which discovery can operate.
@@ -33,6 +34,10 @@ type UDPConn interface {
 	WriteToUDP(b []byte, addr *net.UDPAddr) (n int, err error)
 	Close() error
 	LocalAddr() net.Addr
+}
+
+type V5Config struct {
+	ProtocolID [6]byte
 }
 
 // Config holds settings for the discovery listener.
@@ -48,6 +53,7 @@ type Config struct {
 	ValidSchemes enr.IdentityScheme // allowed identity schemes
 	Clock        mclock.Clock
 	ValidNodeFn  func(enode.Node) bool // function to validate a node before it's added to routing tables
+	V5Config     V5Config              // DiscV5 settings
 }
 
 func (cfg Config) withDefaults() Config {
@@ -59,6 +65,9 @@ func (cfg Config) withDefaults() Config {
 	}
 	if cfg.Clock == nil {
 		cfg.Clock = mclock.System{}
+	}
+	if len(cfg.V5Config.ProtocolID) == 0 {
+		cfg.V5Config.ProtocolID = v5wire.DefaultProtocolID
 	}
 	return cfg
 }
