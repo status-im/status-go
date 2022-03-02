@@ -54,6 +54,8 @@ var (
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
 	// This is a normal situation when a node is stopped.
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
+	// OpenseaKeyFromEnv passed from on env var during build time
+	OpenseaKeyFromEnv string
 )
 
 func (b *StatusNode) initServices(config *params.NodeConfig) error {
@@ -114,7 +116,11 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	}
 
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accountsFeed, config.WalletConfig.OpenseaAPIKey)
+		openseaKey := config.WalletConfig.OpenseaAPIKey
+		if len(openseaKey) == 0 {
+			openseaKey = OpenseaKeyFromEnv
+		}
+		walletService := b.walletService(accountsFeed, openseaKey)
 		services = append(services, walletService)
 	}
 
