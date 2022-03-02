@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"testing"
 
@@ -329,4 +330,39 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().Nil(aos.StickerPacksInstalled)
 	s.Require().Nil(aos.StickerPacksPending)
 	s.Require().Nil(aos.StickersRecentStickers)
+}
+
+func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
+	// Set Alice's installation metadata
+	aim := &multidevice.InstallationMetadata{
+		Name:       "alice's-device",
+		DeviceType: "alice's-device-type",
+	}
+	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
+	s.Require().NoError(err)
+
+	// Create Alice's other device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	s.Require().NoError(err)
+
+	// Check alice 1 settings values
+	as, err := s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+
+	spew.Dump(as.PreferredName)
+	s.Require().Equal(pf, *as.PreferredName)
+
+	// Check alice 2 settings values
+	aos, err := alicesOtherDevice.settings.GetSettings()
+	s.Require().NoError(err)
+	spew.Dump(aos.PreferredName)
+
+	// TODO rest of this test
 }
