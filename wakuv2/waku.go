@@ -869,8 +869,8 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	}
 
 	query := store.Query{
-		StartTime:     int64(from),
-		EndTime:       int64(to),
+		StartTime:     int64(from) * int64(time.Second),
+		EndTime:       int64(to) * int64(time.Second),
 		ContentTopics: strTopics,
 		Topic:         relay.DefaultWakuTopic,
 	}
