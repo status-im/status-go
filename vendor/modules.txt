@@ -447,13 +447,13 @@ github.com/shopspring/decimal
 github.com/spacemonkeygo/spacelog
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 github.com/status-im/doubleratchet
-# github.com/status-im/go-discover v0.0.0-20211207185514-87bd8c3fe429
+# github.com/status-im/go-discover v0.0.0-20220220162124-91b97a3e0efe
 github.com/status-im/go-discover/discover
 github.com/status-im/go-discover/discover/v4wire
 github.com/status-im/go-discover/discover/v5wire
 # github.com/status-im/go-multiaddr-ethv4 v1.2.1
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20220224134018-cdc0c9c69d18
+# github.com/status-im/go-waku v0.0.0-20220302160213-b820d797c85b
 github.com/status-im/go-waku/waku/persistence
 github.com/status-im/go-waku/waku/try
 github.com/status-im/go-waku/waku/v2

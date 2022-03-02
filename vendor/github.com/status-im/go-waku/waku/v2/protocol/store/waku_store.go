@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -380,6 +381,7 @@ func computeIndex(env *protocol.Envelope) (*pb.Index, error) {
 		Digest:       env.Hash(),
 		ReceiverTime: utils.GetUnixEpoch(),
 		SenderTime:   env.Message().Timestamp,
+		PubsubTopic:  env.PubsubTopic(),
 	}, nil
 }
 
@@ -390,18 +392,35 @@ func indexComparison(x, y *pb.Index) int {
 	// returns 1 if x > y
 
 	var timecmp int = 0
-	if x.SenderTime > y.SenderTime {
-		timecmp = 1
-	} else if x.SenderTime < y.SenderTime {
-		timecmp = -1
-	}
 
-	digestcm := bytes.Compare(x.Digest, y.Digest)
+	if x.SenderTime != 0 && y.SenderTime != 0 {
+		if x.SenderTime > y.SenderTime {
+			timecmp = 1
+		} else if x.SenderTime < y.SenderTime {
+			timecmp = -1
+		}
+	}
 	if timecmp != 0 {
 		return timecmp // timestamp has a higher priority for comparison
 	}
 
-	return digestcm
+	digestcm := bytes.Compare(x.Digest, y.Digest)
+	if digestcm != 0 {
+		return digestcm
+	}
+
+	pubsubTopicCmp := strings.Compare(x.PubsubTopic, y.PubsubTopic)
+	if pubsubTopicCmp != 0 {
+		return pubsubTopicCmp
+	}
+
+	// receiverTimestamp (a fallback only if senderTimestamp unset on either side, and all other fields unequal)
+	if x.ReceiverTime > y.ReceiverTime {
+		timecmp = 1
+	} else if x.ReceiverTime < y.ReceiverTime {
+		timecmp = -1
+	}
+	return timecmp
 }
 
 func indexedWakuMessageComparison(x, y IndexedWakuMessage) int {
@@ -416,7 +435,7 @@ func findIndex(msgList []IndexedWakuMessage, index *pb.Index) int {
 	// returns the position of an IndexedWakuMessage in msgList whose index value matches the given index
 	// returns -1 if no match is found
 	for i, indexedWakuMessage := range msgList {
-		if bytes.Equal(indexedWakuMessage.index.Digest, index.Digest) && indexedWakuMessage.index.ReceiverTime == index.ReceiverTime {
+		if bytes.Equal(indexedWakuMessage.index.Digest, index.Digest) && indexedWakuMessage.index.SenderTime == index.SenderTime && indexedWakuMessage.index.PubsubTopic == index.PubsubTopic {
 			return i
 		}
 	}
@@ -615,6 +634,7 @@ func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
 				Digest:       r.cursor.Digest,
 				ReceiverTime: r.cursor.ReceiverTime,
 				SenderTime:   r.cursor.SenderTime,
+				PubsubTopic:  r.cursor.PubsubTopic,
 			},
 		},
 	}
