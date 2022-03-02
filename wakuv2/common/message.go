@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/go-waku/waku/v2/protocol"
@@ -225,7 +226,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	result.Signature = raw.Signature
 	result.Src = raw.PubKey
 
-	result.Sent = uint32(msg.Envelope.Message().Timestamp)
+	result.Sent = uint32(msg.Envelope.Message().Timestamp / int64(time.Second))
 	result.Topic = StringToTopic(msg.Envelope.Message().ContentTopic)
 
 	return result
