@@ -194,6 +194,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 			Digest:       r.StoreCursor.Digest,
 			ReceiverTime: r.StoreCursor.ReceiverTime,
 			SenderTime:   r.StoreCursor.SenderTime,
+			PubsubTopic:  r.StoreCursor.PubsubTopic,
 		}))
 	}
 
@@ -212,6 +213,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 			Digest:       pbCursor.Digest,
 			ReceiverTime: pbCursor.ReceiverTime,
 			SenderTime:   pbCursor.SenderTime,
+			PubsubTopic:  pbCursor.PubsubTopic,
 		}, nil
 	}
 

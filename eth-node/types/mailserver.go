@@ -38,6 +38,7 @@ type StoreRequestCursor struct {
 	Digest       []byte `json:"digest"`
 	ReceiverTime int64  `json:"receiverTime"`
 	SenderTime   int64  `json:"senderTime"`
+	PubsubTopic  string `json:"pubsubTopic"`
 }
 
 // SetDefaults sets the From and To defaults
