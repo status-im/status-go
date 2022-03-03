@@ -149,6 +149,12 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) error {
 	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*pb.WakuMessage{msg}}}
 
+	// We connect first so dns4 addresses are resolved (NewStream does not do it)
+	err := wf.h.Connect(wf.ctx, wf.h.Peerstore().PeerInfo(subscriber.peer))
+	if err != nil {
+		return err
+	}
+
 	conn, err := wf.h.NewStream(wf.ctx, subscriber.peer, FilterID_v20beta1)
 	if err != nil {
 		wf.subscribers.FlagAsFailure(subscriber.peer)
@@ -233,6 +239,12 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
 	}
 
+	// We connect first so dns4 addresses are resolved (NewStream does not do it)
+	err = wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(params.selectedPeer))
+	if err != nil {
+		return
+	}
+
 	request := pb.FilterRequest{
 		Subscribe:      true,
 		Topic:          filter.Topic,
@@ -267,8 +279,13 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 }
 
 func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilter, peer peer.ID) error {
-	conn, err := wf.h.NewStream(ctx, peer, FilterID_v20beta1)
+	// We connect first so dns4 addresses are resolved (NewStream does not do it)
+	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(peer))
+	if err != nil {
+		return err
+	}
 
+	conn, err := wf.h.NewStream(ctx, peer, FilterID_v20beta1)
 	if err != nil {
 		return err
 	}
