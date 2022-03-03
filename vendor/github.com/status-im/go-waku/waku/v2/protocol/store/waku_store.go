@@ -523,6 +523,12 @@ func DefaultOptions() []HistoryRequestOption {
 func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
 	store.log.Info(fmt.Sprintf("Querying message history with peer %s", selectedPeer))
 
+	// We connect first so dns4 addresses are resolved (NewStream does not do it)
+	err := store.h.Connect(ctx, store.h.Peerstore().PeerInfo(selectedPeer))
+	if err != nil {
+		return nil, err
+	}
+
 	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta4)
 	if err != nil {
 		store.log.Error("Failed to connect to remote peer", err)
