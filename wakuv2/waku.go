@@ -361,7 +361,7 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 				if err != nil {
 					log.Warn("could not dial peer", err)
 				} else {
-					log.Info("relay peer dialed successfully", node)
+					log.Info("relay peer dialed successfully", "multiaddr", node)
 				}
 			}(m)
 		}
@@ -371,10 +371,10 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 	addToStore := func(m multiaddr.Multiaddr, protocol libp2pproto.ID) {
 		peerID, err := w.node.AddPeer(m, protocol)
 		if err != nil {
-			log.Warn("could not add peer", m, err)
+			log.Warn("could not add peer", "multiaddr", m, "err", err)
 			return
 		}
-		log.Info("peer added successfully", peerID)
+		log.Info("peer added successfully", "peerId", peerID)
 	}
 
 	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta4, addToStore)
