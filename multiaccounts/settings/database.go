@@ -189,10 +189,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	}
 
 	if sf.SyncProtobufFactory() != nil {
-		db.SyncQueue <- SyncSettingField{
-			Field: sf,
-			Value: value,
-		}
+		db.SyncQueue <- SyncSettingField{sf, value}
 	}
 	return nil
 }
@@ -211,6 +208,12 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 	if err != nil {
 		return err
 	}
+
+	/*
+		if setting.storeHandler != nil {
+			currentValue, err := db.GetSetting(setting)
+			value = setting.storeHandler(currentValue, value)
+		}*/
 
 	return db.saveSetting(setting, value)
 }

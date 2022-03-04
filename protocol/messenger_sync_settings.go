@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"github.com/status-im/status-go/multiaccounts/errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -25,6 +26,23 @@ func buildRawSyncSettingMessage(msg proto.Message, messageType protobuf.Applicat
 	}, nil
 }
 
+func (m *Messenger) buildAndDispatch(msg proto.Message, messageType protobuf.ApplicationMetadataMessage_Type, chatID string) error {
+	logger := m.logger.Named("buildAndDispatch")
+
+	rm, err := buildRawSyncSettingMessage(msg, messageType, chatID)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(context.Background(), *rm)
+	if err != nil {
+		logger.Error("dispatchMessage", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
 // syncSettings syncs all settings that are syncable
 func (m *Messenger) syncSettings() error {
 	logger := m.logger.Named("syncSettings")
@@ -36,6 +54,44 @@ func (m *Messenger) syncSettings() error {
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
+	/*if s.Currency != "usd" {
+		pm, amt, err := settings.Currency.SyncProtobufFactory()(s.Currency, clock)
+		if err != nil {
+			return err
+		}
+
+		m.buildAndDispatch(pm, amt, chat.ID)
+	}
+
+	if s.GifFavorites != nil || len(*s.GifFavorites) == 0 {
+		gf, _ := s.GifFavorites.MarshalJSON() // Don't need to parse error because it is always nil
+		pm, amt, err := settings.GifFavourites.SyncProtobufFactory()(gf, clock)
+		if err != nil {
+			return err
+		}
+
+		m.buildAndDispatch(pm, amt, chat.ID)
+	}
+
+	if s.GifRecents != nil || len(*s.GifRecents) == 0 {
+		gf, _ := s.GifRecents.MarshalJSON() // Don't need to parse error because it is always nil
+		pm, amt, err := settings.GifRecents.SyncProtobufFactory()(gf, clock)
+		if err != nil {
+			return err
+		}
+
+		m.buildAndDispatch(pm, amt, chat.ID)
+	}
+
+	if s.PreferredName != nil || *s.PreferredName == "" {
+		pm, amt, err := settings.PreferredName.SyncProtobufFactory()(*s.PreferredName, clock)
+		if err != nil {
+			return err
+		}
+
+		m.buildAndDispatch(pm, amt, chat.ID)
+	}*/
+
 	var gr []byte
 	if s.GifRecents != nil {
 		gr, err = s.GifRecents.MarshalJSON()
@@ -45,7 +101,7 @@ func (m *Messenger) syncSettings() error {
 	}
 
 	var gf []byte
-	if s.GifRecents != nil {
+	if s.GifFavorites != nil {
 		gf, err = s.GifFavorites.MarshalJSON()
 		if err != nil {
 			return err
@@ -86,6 +142,7 @@ func (m *Messenger) syncSettings() error {
 			Value: s.Currency,
 			Clock: clock,
 		},
+		// TODO DROP
 		GifApiKey: &protobuf.SyncSettingGifAPIKey{
 			Value: s.GifAPIKey,
 			Clock: clock,
@@ -134,6 +191,7 @@ func (m *Messenger) syncSettings() error {
 			Value: srs,
 			Clock: clock,
 		},
+		// TODO DROP
 		TelemetryServer_URL: &protobuf.SyncSettingTelemetryServerURL{
 			Value: s.TelemetryServerURL,
 			Clock: clock,
@@ -150,6 +208,20 @@ func (m *Messenger) syncSettings() error {
 		logger.Error("dispatchMessage", zap.Error(err))
 	}
 
+	return nil
+}
+
+func (m *Messenger) handleSyncSetting(response *MessengerResponse, field settings.SettingField, value interface{}, clock uint64) error {
+	err := m.settings.SaveSyncSetting(field, value, clock)
+	if err == errors.ErrNewClockOlderThanCurrent {
+		m.logger.Info("handleSyncSetting - SaveSyncSetting :", zap.Error(err))
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	response.Settings = append(response.Settings, &settings.SyncSettingField{SettingField:field, Value: value})
 	return nil
 }
 
@@ -279,11 +351,11 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.SyncQueue:
-				if s.Field.SyncProtobufFactory() != nil {
+				if s.SyncProtobufFactory() != nil {
 					logger.Debug("setting for sync received")
 
 					clock, chat := m.getLastClockWithRelatedChat()
-					pb, amt, err := s.Field.SyncProtobufFactory()(s.Value, clock)
+					pb, amt, err := s.SyncProtobufFactory()(s.Value, clock)
 					if err != nil {
 						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
 						break

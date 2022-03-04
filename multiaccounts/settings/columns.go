@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -10,8 +11,20 @@ type ValueHandler func(interface{}) (interface{}, error)
 type SyncSettingProtobufFactory func(interface{}, uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error)
 
 type SyncSettingField struct {
-	Field SettingField
+	SettingField
 	Value interface{}
+}
+
+func (s SyncSettingField) MarshalJSON() ([]byte, error) {
+	alias := struct{
+		Name string `json:"name"`
+		Value interface{} `json:"value"`
+	}{
+		s.reactFieldName,
+		s.Value,
+	}
+
+	return json.Marshal(alias)
 }
 
 type SettingField struct {
@@ -19,6 +32,7 @@ type SettingField struct {
 	dBColumnName        string
 	valueHandler        ValueHandler
 	syncProtobufFactory SyncSettingProtobufFactory
+	//storeHandler
 }
 
 func (s SettingField) GetReactName() string {

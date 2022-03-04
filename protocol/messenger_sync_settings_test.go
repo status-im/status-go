@@ -240,20 +240,15 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		_, err = s.alice.RetrieveAll()
+		mr, err := s.alice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		ns, err := s.alice.settings.GetSettings()
-		if err != nil {
-			return err
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
 		}
 
-		if ns.ProfilePicturesShowTo != settings.ProfilePicturesShowToEveryone {
-			return errors.New("settings sync not received")
-		}
 		return nil
 	})
 	s.Require().NoError(err)
