@@ -185,6 +185,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Contacts)+
 		len(r.Bookmarks)+
 		len(r.clearedHistories)+
+		len(r.Settings)+
 		len(r.Installations)+
 		len(r.Invitations)+
 		len(r.EmojiReactions)+
