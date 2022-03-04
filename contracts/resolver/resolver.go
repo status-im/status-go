@@ -27,7 +27,7 @@ var (
 )
 
 // ABIResolverABI is the input ABI used to generate the binding from.
-const ABIResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"contentType\",\"type\":\"uint256\"}],\"name\":\"ABIChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"contentTypes\",\"type\":\"uint256\"}],\"name\":\"ABI\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"contentType\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setABI\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const ABIResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"contentTypes\",\"type\":\"uint256\"}],\"name\":\"ABI\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"contentType\",\"type\":\"uint256\"},{\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setABI\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"contentType\",\"type\":\"uint256\"}],\"name\":\"ABIChanged\",\"type\":\"event\"}]"
 
 // ABIResolverFuncSigs maps the 4-byte function signature to its string representation.
 var ABIResolverFuncSigs = map[string]string{
@@ -416,7 +416,7 @@ func (_ABIResolver *ABIResolverFilterer) ParseABIChanged(log types.Log) (*ABIRes
 }
 
 // AddrResolverABI is the input ABI used to generate the binding from.
-const AddrResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"addresspayable\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const AddrResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"},{\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"}]"
 
 // AddrResolverFuncSigs maps the 4-byte function signature to its string representation.
 var AddrResolverFuncSigs = map[string]string{
@@ -995,332 +995,8 @@ func (_AddrResolver *AddrResolverFilterer) ParseAddressChanged(log types.Log) (*
 	return event, nil
 }
 
-// BufferABI is the input ABI used to generate the binding from.
-const BufferABI = "[]"
-
-// BufferBin is the compiled bytecode used for deploying new contracts.
-var BufferBin = "0x60636023600b82828239805160001a607314601657fe5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea365627a7a72315820647c0863f64050caae01687a6554cacac441945c464fe1096061ca7812e50b476c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployBuffer deploys a new Ethereum contract, binding an instance of Buffer to it.
-func DeployBuffer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Buffer, error) {
-	parsed, err := abi.JSON(strings.NewReader(BufferABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(BufferBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &Buffer{BufferCaller: BufferCaller{contract: contract}, BufferTransactor: BufferTransactor{contract: contract}, BufferFilterer: BufferFilterer{contract: contract}}, nil
-}
-
-// Buffer is an auto generated Go binding around an Ethereum contract.
-type Buffer struct {
-	BufferCaller     // Read-only binding to the contract
-	BufferTransactor // Write-only binding to the contract
-	BufferFilterer   // Log filterer for contract events
-}
-
-// BufferCaller is an auto generated read-only Go binding around an Ethereum contract.
-type BufferCaller struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BufferTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type BufferTransactor struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BufferFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type BufferFilterer struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BufferSession is an auto generated Go binding around an Ethereum contract,
-// with pre-set call and transact options.
-type BufferSession struct {
-	Contract     *Buffer           // Generic contract binding to set the session for
-	CallOpts     bind.CallOpts     // Call options to use throughout this session
-	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
-}
-
-// BufferCallerSession is an auto generated read-only Go binding around an Ethereum contract,
-// with pre-set call options.
-type BufferCallerSession struct {
-	Contract *BufferCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts // Call options to use throughout this session
-}
-
-// BufferTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
-// with pre-set transact options.
-type BufferTransactorSession struct {
-	Contract     *BufferTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
-}
-
-// BufferRaw is an auto generated low-level Go binding around an Ethereum contract.
-type BufferRaw struct {
-	Contract *Buffer // Generic contract binding to access the raw methods on
-}
-
-// BufferCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type BufferCallerRaw struct {
-	Contract *BufferCaller // Generic read-only contract binding to access the raw methods on
-}
-
-// BufferTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type BufferTransactorRaw struct {
-	Contract *BufferTransactor // Generic write-only contract binding to access the raw methods on
-}
-
-// NewBuffer creates a new instance of Buffer, bound to a specific deployed contract.
-func NewBuffer(address common.Address, backend bind.ContractBackend) (*Buffer, error) {
-	contract, err := bindBuffer(address, backend, backend, backend)
-	if err != nil {
-		return nil, err
-	}
-	return &Buffer{BufferCaller: BufferCaller{contract: contract}, BufferTransactor: BufferTransactor{contract: contract}, BufferFilterer: BufferFilterer{contract: contract}}, nil
-}
-
-// NewBufferCaller creates a new read-only instance of Buffer, bound to a specific deployed contract.
-func NewBufferCaller(address common.Address, caller bind.ContractCaller) (*BufferCaller, error) {
-	contract, err := bindBuffer(address, caller, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &BufferCaller{contract: contract}, nil
-}
-
-// NewBufferTransactor creates a new write-only instance of Buffer, bound to a specific deployed contract.
-func NewBufferTransactor(address common.Address, transactor bind.ContractTransactor) (*BufferTransactor, error) {
-	contract, err := bindBuffer(address, nil, transactor, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &BufferTransactor{contract: contract}, nil
-}
-
-// NewBufferFilterer creates a new log filterer instance of Buffer, bound to a specific deployed contract.
-func NewBufferFilterer(address common.Address, filterer bind.ContractFilterer) (*BufferFilterer, error) {
-	contract, err := bindBuffer(address, nil, nil, filterer)
-	if err != nil {
-		return nil, err
-	}
-	return &BufferFilterer{contract: contract}, nil
-}
-
-// bindBuffer binds a generic wrapper to an already deployed contract.
-func bindBuffer(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(BufferABI))
-	if err != nil {
-		return nil, err
-	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_Buffer *BufferRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Buffer.Contract.BufferCaller.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_Buffer *BufferRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Buffer.Contract.BufferTransactor.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_Buffer *BufferRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Buffer.Contract.BufferTransactor.contract.Transact(opts, method, params...)
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_Buffer *BufferCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Buffer.Contract.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_Buffer *BufferTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Buffer.Contract.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_Buffer *BufferTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Buffer.Contract.contract.Transact(opts, method, params...)
-}
-
-// BytesUtilsABI is the input ABI used to generate the binding from.
-const BytesUtilsABI = "[]"
-
-// BytesUtilsBin is the compiled bytecode used for deploying new contracts.
-var BytesUtilsBin = "0x60636023600b82828239805160001a607314601657fe5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea365627a7a723158205426c2d9b700a537665e075d1704d239ed3aa8ff09861b1c2be39b2c08af39296c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployBytesUtils deploys a new Ethereum contract, binding an instance of BytesUtils to it.
-func DeployBytesUtils(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *BytesUtils, error) {
-	parsed, err := abi.JSON(strings.NewReader(BytesUtilsABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(BytesUtilsBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &BytesUtils{BytesUtilsCaller: BytesUtilsCaller{contract: contract}, BytesUtilsTransactor: BytesUtilsTransactor{contract: contract}, BytesUtilsFilterer: BytesUtilsFilterer{contract: contract}}, nil
-}
-
-// BytesUtils is an auto generated Go binding around an Ethereum contract.
-type BytesUtils struct {
-	BytesUtilsCaller     // Read-only binding to the contract
-	BytesUtilsTransactor // Write-only binding to the contract
-	BytesUtilsFilterer   // Log filterer for contract events
-}
-
-// BytesUtilsCaller is an auto generated read-only Go binding around an Ethereum contract.
-type BytesUtilsCaller struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BytesUtilsTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type BytesUtilsTransactor struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BytesUtilsFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type BytesUtilsFilterer struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// BytesUtilsSession is an auto generated Go binding around an Ethereum contract,
-// with pre-set call and transact options.
-type BytesUtilsSession struct {
-	Contract     *BytesUtils       // Generic contract binding to set the session for
-	CallOpts     bind.CallOpts     // Call options to use throughout this session
-	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
-}
-
-// BytesUtilsCallerSession is an auto generated read-only Go binding around an Ethereum contract,
-// with pre-set call options.
-type BytesUtilsCallerSession struct {
-	Contract *BytesUtilsCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts     // Call options to use throughout this session
-}
-
-// BytesUtilsTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
-// with pre-set transact options.
-type BytesUtilsTransactorSession struct {
-	Contract     *BytesUtilsTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts     // Transaction auth options to use throughout this session
-}
-
-// BytesUtilsRaw is an auto generated low-level Go binding around an Ethereum contract.
-type BytesUtilsRaw struct {
-	Contract *BytesUtils // Generic contract binding to access the raw methods on
-}
-
-// BytesUtilsCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type BytesUtilsCallerRaw struct {
-	Contract *BytesUtilsCaller // Generic read-only contract binding to access the raw methods on
-}
-
-// BytesUtilsTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type BytesUtilsTransactorRaw struct {
-	Contract *BytesUtilsTransactor // Generic write-only contract binding to access the raw methods on
-}
-
-// NewBytesUtils creates a new instance of BytesUtils, bound to a specific deployed contract.
-func NewBytesUtils(address common.Address, backend bind.ContractBackend) (*BytesUtils, error) {
-	contract, err := bindBytesUtils(address, backend, backend, backend)
-	if err != nil {
-		return nil, err
-	}
-	return &BytesUtils{BytesUtilsCaller: BytesUtilsCaller{contract: contract}, BytesUtilsTransactor: BytesUtilsTransactor{contract: contract}, BytesUtilsFilterer: BytesUtilsFilterer{contract: contract}}, nil
-}
-
-// NewBytesUtilsCaller creates a new read-only instance of BytesUtils, bound to a specific deployed contract.
-func NewBytesUtilsCaller(address common.Address, caller bind.ContractCaller) (*BytesUtilsCaller, error) {
-	contract, err := bindBytesUtils(address, caller, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &BytesUtilsCaller{contract: contract}, nil
-}
-
-// NewBytesUtilsTransactor creates a new write-only instance of BytesUtils, bound to a specific deployed contract.
-func NewBytesUtilsTransactor(address common.Address, transactor bind.ContractTransactor) (*BytesUtilsTransactor, error) {
-	contract, err := bindBytesUtils(address, nil, transactor, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &BytesUtilsTransactor{contract: contract}, nil
-}
-
-// NewBytesUtilsFilterer creates a new log filterer instance of BytesUtils, bound to a specific deployed contract.
-func NewBytesUtilsFilterer(address common.Address, filterer bind.ContractFilterer) (*BytesUtilsFilterer, error) {
-	contract, err := bindBytesUtils(address, nil, nil, filterer)
-	if err != nil {
-		return nil, err
-	}
-	return &BytesUtilsFilterer{contract: contract}, nil
-}
-
-// bindBytesUtils binds a generic wrapper to an already deployed contract.
-func bindBytesUtils(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(BytesUtilsABI))
-	if err != nil {
-		return nil, err
-	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_BytesUtils *BytesUtilsRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _BytesUtils.Contract.BytesUtilsCaller.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_BytesUtils *BytesUtilsRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _BytesUtils.Contract.BytesUtilsTransactor.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_BytesUtils *BytesUtilsRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _BytesUtils.Contract.BytesUtilsTransactor.contract.Transact(opts, method, params...)
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_BytesUtils *BytesUtilsCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _BytesUtils.Contract.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_BytesUtils *BytesUtilsTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _BytesUtils.Contract.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_BytesUtils *BytesUtilsTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _BytesUtils.Contract.contract.Transact(opts, method, params...)
-}
-
 // ContentHashResolverABI is the input ABI used to generate the binding from.
-const ContentHashResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"ContenthashChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"contenthash\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"setContenthash\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const ContentHashResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"setContenthash\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"contenthash\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"ContenthashChanged\",\"type\":\"event\"}]"
 
 // ContentHashResolverFuncSigs maps the 4-byte function signature to its string representation.
 var ContentHashResolverFuncSigs = map[string]string{
@@ -1700,7 +1376,7 @@ func (_ContentHashResolver *ContentHashResolverFilterer) ParseContenthashChanged
 }
 
 // DNSResolverABI is the input ABI used to generate the binding from.
-const DNSResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"record\",\"type\":\"bytes\"}],\"name\":\"DNSRecordChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"DNSRecordDeleted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"DNSZoneCleared\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"clearDNSZone\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\"},{\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"dnsRecord\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\"}],\"name\":\"hasDNSRecords\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setDNSRecords\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const DNSResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setDNSRecords\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"bytes32\"}],\"name\":\"hasDNSRecords\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"bytes32\"},{\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"dnsRecord\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"clearDNSZone\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"name\":\"resource\",\"type\":\"uint16\"},{\"indexed\":false,\"name\":\"record\",\"type\":\"bytes\"}],\"name\":\"DNSRecordChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"DNSRecordDeleted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"DNSZoneCleared\",\"type\":\"event\"}]"
 
 // DNSResolverFuncSigs maps the 4-byte function signature to its string representation.
 var DNSResolverFuncSigs = map[string]string{
@@ -2426,7 +2102,7 @@ func (_DNSResolver *DNSResolverFilterer) ParseDNSZoneCleared(log types.Log) (*DN
 }
 
 // ENSABI is the input ABI used to generate the binding from.
-const ENSABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const ENSABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"operator\",\"type\":\"address\"},{\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"}]"
 
 // ENSFuncSigs maps the 4-byte function signature to its string representation.
 var ENSFuncSigs = map[string]string{
@@ -3632,7 +3308,7 @@ func (_ENS *ENSFilterer) ParseTransfer(log types.Log) (*ENSTransfer, error) {
 }
 
 // ENSRegistryABI is the input ABI used to generate the binding from.
-const ENSRegistryABI = "[{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const ENSRegistryABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"operator\",\"type\":\"address\"},{\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"}]"
 
 // ENSRegistryFuncSigs maps the 4-byte function signature to its string representation.
 var ENSRegistryFuncSigs = map[string]string{
@@ -3648,23 +3324,6 @@ var ENSRegistryFuncSigs = map[string]string{
 	"5ef2c7f0": "setSubnodeRecord(bytes32,bytes32,address,address,uint64)",
 	"14ab9038": "setTTL(bytes32,uint64)",
 	"16a25cbd": "ttl(bytes32)",
-}
-
-// ENSRegistryBin is the compiled bytecode used for deploying new contracts.
-var ENSRegistryBin = "0x608060405234801561001057600080fd5b5060008080526020527fad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb580546001600160a01b03191633179055610aff806100596000396000f3fe608060405234801561001057600080fd5b50600436106100b45760003560e01c80635b0fc9c3116100715780635b0fc9c31461015d5780635ef2c7f014610170578063a22cb46514610183578063cf40882314610196578063e985e9c5146101a9578063f79fe538146101c9576100b4565b80630178b8bf146100b957806302571be3146100e257806306ab5923146100f557806314ab90381461011557806316a25cbd1461012a5780631896f70a1461014a575b600080fd5b6100cc6100c736600461082d565b6101dc565b6040516100d99190610a26565b60405180910390f35b6100cc6100f036600461082d565b6101fd565b6101086101033660046108d3565b61022d565b6040516100d99190610a42565b610128610123366004610995565b6102fb565b005b61013d61013836600461082d565b6103c7565b6040516100d99190610a50565b610128610158366004610853565b6103ed565b61012861016b366004610853565b6104ac565b61012861017e366004610920565b610548565b6101286101913660046107fd565b61056a565b6101286101a4366004610872565b6105d9565b6101bc6101b73660046107c3565b6105f4565b6040516100d99190610a34565b6101bc6101d736600461082d565b610622565b6000818152602081905260409020600101546001600160a01b03165b919050565b6000818152602081905260408120546001600160a01b0316308114156102275760009150506101f8565b92915050565b60008381526020819052604081205484906001600160a01b03163381148061027857506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61028157600080fd5b60008686604051602001610296929190610a00565b6040516020818303038152906040528051906020012090506102b8818661063f565b85877fce0457fe73731f824cc272376169235128c118b49d344817417c6d108d155e82876040516102e99190610a26565b60405180910390a39695505050505050565b60008281526020819052604090205482906001600160a01b03163381148061034657506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61034f57600080fd5b837f1d4f9bbfc9cab89d66e1a1562f2233ccbf1308cb4f63de2ead5787adddb8fa688460405161037f9190610a50565b60405180910390a25050600091825260208290526040909120600101805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b600090815260208190526040902060010154600160a01b900467ffffffffffffffff1690565b60008281526020819052604090205482906001600160a01b03163381148061043857506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61044157600080fd5b837f335721b01866dc23fbee8b6b2c7b1e14d6f05c28cd35a2c934239f94095602a0846040516104719190610a26565b60405180910390a2505060009182526020829052604090912060010180546001600160a01b0319166001600160a01b03909216919091179055565b60008281526020819052604090205482906001600160a01b0316338114806104f757506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61050057600080fd5b61050a848461063f565b837fd4735d920b0f87494915f556dd9b54c8f309026070caea5c737245152564d2668460405161053a9190610a26565b60405180910390a250505050565b600061055586868661022d565b905061056281848461066d565b505050505050565b3360008181526001602090815260408083206001600160a01b038716808552925291829020805460ff191685151517905590519091907f17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31906105cd908590610a34565b60405180910390a35050565b6105e384846104ac565b6105ee84838361066d565b50505050565b6001600160a01b03918216600090815260016020908152604080832093909416825291909152205460ff1690565b6000908152602081905260409020546001600160a01b0316151590565b60009182526020829052604090912080546001600160a01b0319166001600160a01b03909216919091179055565b6000838152602081905260409020600101546001600160a01b038381169116146106f6576000838152602081905260409081902060010180546001600160a01b0319166001600160a01b0385161790555183907f335721b01866dc23fbee8b6b2c7b1e14d6f05c28cd35a2c934239f94095602a0906106ed908590610a26565b60405180910390a25b60008381526020819052604090206001015467ffffffffffffffff828116600160a01b90920416146107925760008381526020819052604090819020600101805467ffffffffffffffff60a01b1916600160a01b67ffffffffffffffff8516021790555183907f1d4f9bbfc9cab89d66e1a1562f2233ccbf1308cb4f63de2ead5787adddb8fa6890610789908490610a50565b60405180910390a25b505050565b803561022781610a8a565b803561022781610aa1565b803561022781610aaa565b803561022781610ab3565b600080604083850312156107d657600080fd5b60006107e28585610797565b92505060206107f385828601610797565b9150509250929050565b6000806040838503121561081057600080fd5b600061081c8585610797565b92505060206107f3858286016107a2565b60006020828403121561083f57600080fd5b600061084b84846107ad565b949350505050565b6000806040838503121561086657600080fd5b60006107e285856107ad565b6000806000806080858703121561088857600080fd5b600061089487876107ad565b94505060206108a587828801610797565b93505060406108b687828801610797565b92505060606108c7878288016107b8565b91505092959194509250565b6000806000606084860312156108e857600080fd5b60006108f486866107ad565b9350506020610905868287016107ad565b925050604061091686828701610797565b9150509250925092565b600080600080600060a0868803121561093857600080fd5b600061094488886107ad565b9550506020610955888289016107ad565b945050604061096688828901610797565b935050606061097788828901610797565b9250506080610988888289016107b8565b9150509295509295909350565b600080604083850312156109a857600080fd5b60006109b485856107ad565b92505060206107f3858286016107b8565b6109ce81610a5e565b82525050565b6109ce81610a69565b6109ce81610a6e565b6109ce6109f282610a6e565b610a6e565b6109ce81610a7d565b6000610a0c82856109e6565b602082019150610a1c82846109e6565b5060200192915050565b6020810161022782846109c5565b6020810161022782846109d4565b6020810161022782846109dd565b6020810161022782846109f7565b600061022782610a71565b151590565b90565b6001600160a01b031690565b67ffffffffffffffff1690565b610a9381610a5e565b8114610a9e57600080fd5b50565b610a9381610a69565b610a9381610a6e565b610a9381610a7d56fea365627a7a7231582096f50d6651b464b604ebcaab601b6428156215776033aec8a01ff45ea75883796c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployENSRegistry deploys a new Ethereum contract, binding an instance of ENSRegistry to it.
-func DeployENSRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ENSRegistry, error) {
-	parsed, err := abi.JSON(strings.NewReader(ENSRegistryABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(ENSRegistryBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &ENSRegistry{ENSRegistryCaller: ENSRegistryCaller{contract: contract}, ENSRegistryTransactor: ENSRegistryTransactor{contract: contract}, ENSRegistryFilterer: ENSRegistryFilterer{contract: contract}}, nil
 }
 
 // ENSRegistry is an auto generated Go binding around an Ethereum contract.
@@ -4855,12 +4514,11 @@ func (_ENSRegistry *ENSRegistryFilterer) ParseTransfer(log types.Log) (*ENSRegis
 }
 
 // ENSRegistryWithFallbackABI is the input ABI used to generate the binding from.
-const ENSRegistryWithFallbackABI = "[{\"inputs\":[{\"internalType\":\"contractENS\",\"name\":\"_old\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"old\",\"outputs\":[{\"internalType\":\"contractENS\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"label\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"resolver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const ENSRegistryWithFallbackABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"resolver\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setSubnodeOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setTTL\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"ttl\",\"outputs\":[{\"name\":\"\",\"type\":\"uint64\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"setResolver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"setOwner\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"label\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setSubnodeRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"operator\",\"type\":\"address\"},{\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setApprovalForAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"resolver\",\"type\":\"address\"},{\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"setRecord\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"owner\",\"type\":\"address\"},{\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"isApprovedForAll\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"recordExists\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"label\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"NewOwner\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"resolver\",\"type\":\"address\"}],\"name\":\"NewResolver\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"ttl\",\"type\":\"uint64\"}],\"name\":\"NewTTL\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"operator\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"ApprovalForAll\",\"type\":\"event\"}]"
 
 // ENSRegistryWithFallbackFuncSigs maps the 4-byte function signature to its string representation.
 var ENSRegistryWithFallbackFuncSigs = map[string]string{
 	"e985e9c5": "isApprovedForAll(address,address)",
-	"b83f8663": "old()",
 	"02571be3": "owner(bytes32)",
 	"f79fe538": "recordExists(bytes32)",
 	"0178b8bf": "resolver(bytes32)",
@@ -4872,23 +4530,6 @@ var ENSRegistryWithFallbackFuncSigs = map[string]string{
 	"5ef2c7f0": "setSubnodeRecord(bytes32,bytes32,address,address,uint64)",
 	"14ab9038": "setTTL(bytes32,uint64)",
 	"16a25cbd": "ttl(bytes32)",
-}
-
-// ENSRegistryWithFallbackBin is the compiled bytecode used for deploying new contracts.
-var ENSRegistryWithFallbackBin = "0x608060405234801561001057600080fd5b50604051610e5a380380610e5a83398101604081905261002f9161009a565b60008080526020527fad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb58054336001600160a01b031991821617909155600280549091166001600160a01b03929092169190911790556100f9565b8051610094816100e2565b92915050565b6000602082840312156100ac57600080fd5b60006100b88484610089565b949350505050565b6000610094826100d6565b6000610094826100c0565b6001600160a01b031690565b6100eb816100cb565b81146100f657600080fd5b50565b610d52806101086000396000f3fe608060405234801561001057600080fd5b50600436106100cf5760003560e01c80635b0fc9c31161008c578063b83f866311610066578063b83f8663146101b1578063cf408823146101c6578063e985e9c5146101d9578063f79fe538146101f9576100cf565b80635b0fc9c3146101785780635ef2c7f01461018b578063a22cb4651461019e576100cf565b80630178b8bf146100d457806302571be3146100fd57806306ab59231461011057806314ab90381461013057806316a25cbd146101455780631896f70a14610165575b600080fd5b6100e76100e2366004610a48565b61020c565b6040516100f49190610c60565b60405180910390f35b6100e761010b366004610a48565b6102b3565b61012361011e366004610ae6565b6102fb565b6040516100f49190610c7c565b61014361013e366004610ba8565b6103c9565b005b610158610153366004610a48565b610495565b6040516100f49190610c98565b610143610173366004610a66565b61052d565b610143610186366004610a66565b6105ec565b610143610199366004610b33565b610688565b6101436101ac366004610a18565b6106aa565b6101b9610719565b6040516100f49190610c8a565b6101436101d4366004610a85565b610728565b6101ec6101e73660046109de565b610743565b6040516100f49190610c6e565b6101ec610207366004610a48565b610773565b600061021782610773565b6102a257600254604051630178b8bf60e01b81526001600160a01b0390911690630178b8bf9061024b908590600401610c7c565b60206040518083038186803b15801561026357600080fd5b505afa158015610277573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525061029b91908101906109b8565b90506102ae565b6102ab82610790565b90505b919050565b60006102be82610773565b6102f2576002546040516302571be360e01b81526001600160a01b03909116906302571be39061024b908590600401610c7c565b6102ab826107ae565b60008381526020819052604081205484906001600160a01b03163381148061034657506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61034f57600080fd5b60008686604051602001610364929190610c3a565b60405160208183030381529060405280519060200120905061038681866107d8565b85877fce0457fe73731f824cc272376169235128c118b49d344817417c6d108d155e82876040516103b79190610c60565b60405180910390a39695505050505050565b60008281526020819052604090205482906001600160a01b03163381148061041457506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61041d57600080fd5b837f1d4f9bbfc9cab89d66e1a1562f2233ccbf1308cb4f63de2ead5787adddb8fa688460405161044d9190610c98565b60405180910390a25050600091825260208290526040909120600101805467ffffffffffffffff909216600160a01b0267ffffffffffffffff60a01b19909216919091179055565b60006104a082610773565b610524576002546040516316a25cbd60e01b81526001600160a01b03909116906316a25cbd906104d4908590600401610c7c565b60206040518083038186803b1580156104ec57600080fd5b505afa158015610500573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525061029b9190810190610bd8565b6102ab826107f9565b60008281526020819052604090205482906001600160a01b03163381148061057857506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61058157600080fd5b837f335721b01866dc23fbee8b6b2c7b1e14d6f05c28cd35a2c934239f94095602a0846040516105b19190610c60565b60405180910390a2505060009182526020829052604090912060010180546001600160a01b0319166001600160a01b03909216919091179055565b60008281526020819052604090205482906001600160a01b03163381148061063757506001600160a01b038116600090815260016020908152604080832033845290915290205460ff165b61064057600080fd5b61064a84846107d8565b837fd4735d920b0f87494915f556dd9b54c8f309026070caea5c737245152564d2668460405161067a9190610c60565b60405180910390a250505050565b60006106958686866102fb565b90506106a281848461081f565b505050505050565b3360008181526001602090815260408083206001600160a01b038716808552925291829020805460ff191685151517905590519091907f17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c319061070d908590610c6e565b60405180910390a35050565b6002546001600160a01b031681565b61073284846105ec565b61073d84838361081f565b50505050565b6001600160a01b0380831660009081526001602090815260408083209385168352929052205460ff165b92915050565b6000908152602081905260409020546001600160a01b0316151590565b6000908152602081905260409020600101546001600160a01b031690565b6000818152602081905260408120546001600160a01b0316308114156102ab5760009150506102ae565b806001600160a01b0381166107ea5750305b6107f48382610948565b505050565b600090815260208190526040902060010154600160a01b900467ffffffffffffffff1690565b6000838152602081905260409020600101546001600160a01b038381169116146108a8576000838152602081905260409081902060010180546001600160a01b0319166001600160a01b0385161790555183907f335721b01866dc23fbee8b6b2c7b1e14d6f05c28cd35a2c934239f94095602a09061089f908590610c60565b60405180910390a25b60008381526020819052604090206001015467ffffffffffffffff828116600160a01b90920416146107f45760008381526020819052604090819020600101805467ffffffffffffffff60a01b1916600160a01b67ffffffffffffffff8516021790555183907f1d4f9bbfc9cab89d66e1a1562f2233ccbf1308cb4f63de2ead5787adddb8fa689061093b908490610c98565b60405180910390a2505050565b60009182526020829052604090912080546001600160a01b0319166001600160a01b03909216919091179055565b803561076d81610cdd565b805161076d81610cdd565b803561076d81610cf4565b803561076d81610cfd565b803561076d81610d06565b805161076d81610d06565b6000602082840312156109ca57600080fd5b60006109d68484610981565b949350505050565b600080604083850312156109f157600080fd5b60006109fd8585610976565b9250506020610a0e85828601610976565b9150509250929050565b60008060408385031215610a2b57600080fd5b6000610a378585610976565b9250506020610a0e8582860161098c565b600060208284031215610a5a57600080fd5b60006109d68484610997565b60008060408385031215610a7957600080fd5b60006109fd8585610997565b60008060008060808587031215610a9b57600080fd5b6000610aa78787610997565b9450506020610ab887828801610976565b9350506040610ac987828801610976565b9250506060610ada878288016109a2565b91505092959194509250565b600080600060608486031215610afb57600080fd5b6000610b078686610997565b9350506020610b1886828701610997565b9250506040610b2986828701610976565b9150509250925092565b600080600080600060a08688031215610b4b57600080fd5b6000610b578888610997565b9550506020610b6888828901610997565b9450506040610b7988828901610976565b9350506060610b8a88828901610976565b9250506080610b9b888289016109a2565b9150509295509295909350565b60008060408385031215610bbb57600080fd5b6000610bc78585610997565b9250506020610a0e858286016109a2565b600060208284031215610bea57600080fd5b60006109d684846109ad565b610bff81610ca6565b82525050565b610bff81610cb1565b610bff81610cb6565b610bff610c2382610cb6565b610cb6565b610bff81610cd2565b610bff81610cc5565b6000610c468285610c17565b602082019150610c568284610c17565b5060200192915050565b6020810161076d8284610bf6565b6020810161076d8284610c05565b6020810161076d8284610c0e565b6020810161076d8284610c28565b6020810161076d8284610c31565b60006102ab82610cb9565b151590565b90565b6001600160a01b031690565b67ffffffffffffffff1690565b60006102ab82610ca6565b610ce681610ca6565b8114610cf157600080fd5b50565b610ce681610cb1565b610ce681610cb6565b610ce681610cc556fea365627a7a723158200ea5ae06e5bee6d7731377a7a3cfee335a5d3653d347de7ea4a87a3a969a155e6c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployENSRegistryWithFallback deploys a new Ethereum contract, binding an instance of ENSRegistryWithFallback to it.
-func DeployENSRegistryWithFallback(auth *bind.TransactOpts, backend bind.ContractBackend, _old common.Address) (common.Address, *types.Transaction, *ENSRegistryWithFallback, error) {
-	parsed, err := abi.JSON(strings.NewReader(ENSRegistryWithFallbackABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(ENSRegistryWithFallbackBin), backend, _old)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &ENSRegistryWithFallback{ENSRegistryWithFallbackCaller: ENSRegistryWithFallbackCaller{contract: contract}, ENSRegistryWithFallbackTransactor: ENSRegistryWithFallbackTransactor{contract: contract}, ENSRegistryWithFallbackFilterer: ENSRegistryWithFallbackFilterer{contract: contract}}, nil
 }
 
 // ENSRegistryWithFallback is an auto generated Go binding around an Ethereum contract.
@@ -5062,37 +4703,6 @@ func (_ENSRegistryWithFallback *ENSRegistryWithFallbackSession) IsApprovedForAll
 // Solidity: function isApprovedForAll(address owner, address operator) view returns(bool)
 func (_ENSRegistryWithFallback *ENSRegistryWithFallbackCallerSession) IsApprovedForAll(owner common.Address, operator common.Address) (bool, error) {
 	return _ENSRegistryWithFallback.Contract.IsApprovedForAll(&_ENSRegistryWithFallback.CallOpts, owner, operator)
-}
-
-// Old is a free data retrieval call binding the contract method 0xb83f8663.
-//
-// Solidity: function old() view returns(address)
-func (_ENSRegistryWithFallback *ENSRegistryWithFallbackCaller) Old(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _ENSRegistryWithFallback.contract.Call(opts, &out, "old")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-// Old is a free data retrieval call binding the contract method 0xb83f8663.
-//
-// Solidity: function old() view returns(address)
-func (_ENSRegistryWithFallback *ENSRegistryWithFallbackSession) Old() (common.Address, error) {
-	return _ENSRegistryWithFallback.Contract.Old(&_ENSRegistryWithFallback.CallOpts)
-}
-
-// Old is a free data retrieval call binding the contract method 0xb83f8663.
-//
-// Solidity: function old() view returns(address)
-func (_ENSRegistryWithFallback *ENSRegistryWithFallbackCallerSession) Old() (common.Address, error) {
-	return _ENSRegistryWithFallback.Contract.Old(&_ENSRegistryWithFallback.CallOpts)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x02571be3.
@@ -6110,7 +5720,7 @@ func (_ENSRegistryWithFallback *ENSRegistryWithFallbackFilterer) ParseTransfer(l
 }
 
 // InterfaceResolverABI is the input ABI used to generate the binding from.
-const InterfaceResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"InterfaceChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"addresspayable\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"interfaceImplementer\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"setInterface\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const InterfaceResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"interfaceImplementer\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"},{\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"setInterface\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"indexed\":false,\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"InterfaceChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"}]"
 
 // InterfaceResolverFuncSigs maps the 4-byte function signature to its string representation.
 var InterfaceResolverFuncSigs = map[string]string{
@@ -6898,7 +6508,7 @@ func (_InterfaceResolver *InterfaceResolverFilterer) ParseInterfaceChanged(log t
 }
 
 // NameResolverABI is the input ABI used to generate the binding from.
-const NameResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"NameChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"setName\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const NameResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"name\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"string\"}],\"name\":\"setName\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"string\"}],\"name\":\"NameChanged\",\"type\":\"event\"}]"
 
 // NameResolverFuncSigs maps the 4-byte function signature to its string representation.
 var NameResolverFuncSigs = map[string]string{
@@ -7278,7 +6888,7 @@ func (_NameResolver *NameResolverFilterer) ParseNameChanged(log types.Log) (*Nam
 }
 
 // PubkeyResolverABI is the input ABI used to generate the binding from.
-const PubkeyResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"PubkeyChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"pubkey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"setPubkey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const PubkeyResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"x\",\"type\":\"bytes32\"},{\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"setPubkey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"pubkey\",\"outputs\":[{\"name\":\"x\",\"type\":\"bytes32\"},{\"name\":\"y\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"x\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"PubkeyChanged\",\"type\":\"event\"}]"
 
 // PubkeyResolverFuncSigs maps the 4-byte function signature to its string representation.
 var PubkeyResolverFuncSigs = map[string]string{
@@ -7673,7 +7283,7 @@ func (_PubkeyResolver *PubkeyResolverFilterer) ParsePubkeyChanged(log types.Log)
 }
 
 // PublicResolverABI is the input ABI used to generate the binding from.
-const PublicResolverABI = "[{\"inputs\":[{\"internalType\":\"contractENS\",\"name\":\"_ens\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"contentType\",\"type\":\"uint256\"}],\"name\":\"ABIChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"isAuthorised\",\"type\":\"bool\"}],\"name\":\"AuthorisationChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"ContenthashChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"record\",\"type\":\"bytes\"}],\"name\":\"DNSRecordChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"DNSRecordDeleted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"DNSZoneCleared\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"InterfaceChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"NameChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"PubkeyChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"string\",\"name\":\"indexedKey\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"}],\"name\":\"TextChanged\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"contentTypes\",\"type\":\"uint256\"}],\"name\":\"ABI\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"addresspayable\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"authorisations\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"clearDNSZone\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"contenthash\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\"},{\"internalType\":\"uint16\",\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"dnsRecord\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"name\",\"type\":\"bytes32\"}],\"name\":\"hasDNSRecords\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"interfaceImplementer\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\"}],\"name\":\"multicall\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"pubkey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"contentType\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setABI\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"coinType\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"isAuthorised\",\"type\":\"bool\"}],\"name\":\"setAuthorisation\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"setContenthash\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setDNSRecords\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"setInterface\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"setName\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"x\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"setPubkey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"}],\"name\":\"setText\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"}],\"name\":\"text\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const PublicResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setDNSRecords\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"key\",\"type\":\"string\"},{\"name\":\"value\",\"type\":\"string\"}],\"name\":\"setText\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"interfaceImplementer\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"contentTypes\",\"type\":\"uint256\"}],\"name\":\"ABI\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"x\",\"type\":\"bytes32\"},{\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"setPubkey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"setContenthash\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"target\",\"type\":\"address\"},{\"name\":\"isAuthorised\",\"type\":\"bool\"}],\"name\":\"setAuthorisation\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"bytes32\"}],\"name\":\"hasDNSRecords\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"key\",\"type\":\"string\"}],\"name\":\"text\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"contentType\",\"type\":\"uint256\"},{\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"setABI\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"name\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"string\"}],\"name\":\"setName\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"},{\"name\":\"a\",\"type\":\"bytes\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"name\",\"type\":\"bytes32\"},{\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"dnsRecord\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"data\",\"type\":\"bytes[]\"}],\"name\":\"multicall\",\"outputs\":[{\"name\":\"results\",\"type\":\"bytes[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"clearDNSZone\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"contenthash\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"pubkey\",\"outputs\":[{\"name\":\"x\",\"type\":\"bytes32\"},{\"name\":\"y\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"a\",\"type\":\"address\"}],\"name\":\"setAddr\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"setInterface\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"coinType\",\"type\":\"uint256\"}],\"name\":\"addr\",\"outputs\":[{\"name\":\"\",\"type\":\"bytes\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"bytes32\"},{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"address\"}],\"name\":\"authorisations\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"target\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"isAuthorised\",\"type\":\"bool\"}],\"name\":\"AuthorisationChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"indexedKey\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"key\",\"type\":\"string\"}],\"name\":\"TextChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"x\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"y\",\"type\":\"bytes32\"}],\"name\":\"PubkeyChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"string\"}],\"name\":\"NameChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"interfaceID\",\"type\":\"bytes4\"},{\"indexed\":false,\"name\":\"implementer\",\"type\":\"address\"}],\"name\":\"InterfaceChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"name\":\"resource\",\"type\":\"uint16\"},{\"indexed\":false,\"name\":\"record\",\"type\":\"bytes\"}],\"name\":\"DNSRecordChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"name\",\"type\":\"bytes\"},{\"indexed\":false,\"name\":\"resource\",\"type\":\"uint16\"}],\"name\":\"DNSRecordDeleted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"}],\"name\":\"DNSZoneCleared\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"hash\",\"type\":\"bytes\"}],\"name\":\"ContenthashChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"a\",\"type\":\"address\"}],\"name\":\"AddrChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":false,\"name\":\"coinType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"bytes\"}],\"name\":\"AddressChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"contentType\",\"type\":\"uint256\"}],\"name\":\"ABIChanged\",\"type\":\"event\"}]"
 
 // PublicResolverFuncSigs maps the 4-byte function signature to its string representation.
 var PublicResolverFuncSigs = map[string]string{
@@ -7701,23 +7311,6 @@ var PublicResolverFuncSigs = map[string]string{
 	"10f13a8c": "setText(bytes32,string,string)",
 	"01ffc9a7": "supportsInterface(bytes4)",
 	"59d1d43c": "text(bytes32,string)",
-}
-
-// PublicResolverBin is the compiled bytecode used for deploying new contracts.
-var PublicResolverBin = "0x60806040523480156200001157600080fd5b50604051620025bf380380620025bf83398101604081905262000034916200006d565b600a80546001600160a01b0319166001600160a01b0392909216919091179055620000d6565b80516200006781620000bc565b92915050565b6000602082840312156200008057600080fd5b60006200008e84846200005a565b949350505050565b60006200006782620000b0565b6000620000678262000096565b6001600160a01b031690565b620000c781620000a3565b8114620000d357600080fd5b50565b6124d980620000e66000396000f3fe608060405234801561001057600080fd5b50600436106101585760003560e01c8063691f3431116100c3578063bc1c58d11161007c578063bc1c58d114610300578063c869023314610313578063d5fa2b0014610334578063e59d895d14610347578063f1cb7e061461035a578063f86bc8791461036d57610158565b8063691f34311461028157806377372213146102945780638b95dd71146102a7578063a8fa5682146102ba578063ac9650d8146102cd578063ad5780af146102ed57610158565b8063304e6ade11610115578063304e6ade146102025780633b3b57de146102155780633e9ce794146102285780634cbf6ba41461023b57806359d1d43c1461024e578063623195b01461026e57610158565b806301ffc9a71461015d5780630af179d71461018657806310f13a8c1461019b578063124a319c146101ae5780632203ab56146101ce57806329cd62ea146101ef575b600080fd5b61017061016b36600461207f565b610380565b60405161017d9190612292565b60405180910390f35b610199610194366004611edf565b6103ad565b005b6101996101a9366004611f35565b61059a565b6101c16101bc366004611e7d565b610647565b60405161017d9190612265565b6101e16101dc366004611dc7565b610872565b60405161017d929190612355565b6101996101fd366004611df7565b610991565b610199610210366004611edf565b610a11565b6101c1610223366004611cdf565b610a70565b610199610236366004611d84565b610aa5565b610170610249366004611dc7565b610b1f565b61026161025c366004611edf565b610b51565b60405161017d91906122e9565b61019961027c366004611fbc565b610c13565b61026161028f366004611cdf565b610c8e565b6101996102a2366004611edf565b610d2f565b6101996102b5366004612024565b610d8e565b6102616102c8366004611e3a565b610e53565b6102e06102db366004611c9d565b610ee0565b60405161017d9190612281565b6101996102fb366004611cdf565b611006565b61026161030e366004611cdf565b611059565b610326610321366004611cdf565b6110c1565b60405161017d9291906122ae565b610199610342366004611cfd565b6110db565b610199610355366004611ead565b611102565b610261610368366004611dc7565b611192565b61017061037b366004611d37565b61123b565b60006001600160e01b03198216631674750f60e21b14806103a557506103a582611261565b90505b919050565b826103b781611286565b6103c057600080fd5b600080606080826103cf6119c9565b61041960008a8a8080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929392505063ffffffff611355169050565b90505b61042581611370565b61053d5761ffff861661047d57806040015195506104428161137e565b935083604051602001610455919061224e565b604051602081830303815290604052805190602001209150610476816113a5565b925061052f565b60606104888261137e565b9050816040015161ffff168761ffff161415806104b257506104b0858263ffffffff6113c616565b155b1561052d576105068b86898d8d8080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250505050602087015189518c9182900390156113e4565b81604001519650816020015195508094508480519060200120925061052a826113a5565b93505b505b61053881611611565b61041c565b5082511561058f5761058f8984878b8b8080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920191909152505088518b9250828f039150156113e4565b505050505050505050565b846105a481611286565b6105ad57600080fd5b82826009600089815260200190815260200160002087876040516105d2929190612241565b9081526040519081900360200190206105ec929091611a14565b5084846040516105fd929190612241565b6040518091039020867fd8c9334b1a9c2f9da342a0a2b32629c1a229b6445dad78947f674b44444a755087876040516106379291906122d7565b60405180910390a3505050505050565b60008281526006602090815260408083206001600160e01b0319851684529091528120546001600160a01b0316801561068157905061086c565b600061068c85610a70565b90506001600160a01b0381166106a75760009250505061086c565b60006060826001600160a01b03166301ffc9a760e01b6040516024016106cd91906122c9565b60408051601f198184030181529181526020820180516001600160e01b03166301ffc9a760e01b17905251610702919061224e565b600060405180830381855afa9150503d806000811461073d576040519150601f19603f3d011682016040523d82523d6000602084013e610742565b606091505b5091509150811580610755575060208151105b80610779575080601f8151811061076857fe5b01602001516001600160f81b031916155b1561078b57600094505050505061086c565b826001600160a01b0316866040516024016107a691906122c9565b60408051601f198184030181529181526020820180516001600160e01b03166301ffc9a760e01b179052516107db919061224e565b600060405180830381855afa9150503d8060008114610816576040519150601f19603f3d011682016040523d82523d6000602084013e61081b565b606091505b50909250905081158061082f575060208151105b80610853575080601f8151811061084257fe5b01602001516001600160f81b031916155b1561086557600094505050505061086c565b5090925050505b92915050565b600082815260208190526040812060609060015b84811161097357808516158015906108be57506000818152602083905260409020546002600019610100600184161502019091160415155b1561096b576000818152602083815260409182902080548351601f60026000196101006001861615020190931692909204918201849004840281018401909452808452849391928391908301828280156109595780601f1061092e57610100808354040283529160200191610959565b820191906000526020600020905b81548152906001019060200180831161093c57829003601f168201915b5050505050905093509350505061098a565b60011b610886565b505060408051602081019091526000808252925090505b9250929050565b8261099b81611286565b6109a457600080fd5b6040805180820182528481526020808201858152600088815260089092529083902091518255516001909101555184907f1d6f5e03d3f63eb58751986629a5439baee5079ff04f345becb66e23eb154e4690610a0390869086906122ae565b60405180910390a250505050565b82610a1b81611286565b610a2457600080fd5b6000848152600260205260409020610a3d908484611a14565b50837fe379c1624ed7e714cc0937528a32359d69d5281337765313dba4e081b72d75788484604051610a039291906122d7565b60006060610a7f83603c611192565b9050805160001415610a955760009150506103a8565b610a9e816116e4565b9392505050565b6000838152600b60209081526040808320338085529083528184206001600160a01b038716808652935292819020805460ff19168515151790555190919085907fe1c5610a6e0cbe10764ecd182adcef1ec338dc4e199c99c32ce98f38e12791df90610b12908690612292565b60405180910390a4505050565b600091825260056020908152604080842060038352818520548552825280842092845291905290205461ffff16151590565b6060600960008581526020019081526020016000208383604051610b76929190612241565b9081526040805160209281900383018120805460026001821615610100026000190190911604601f81018590048502830185019093528282529092909190830182828015610c055780601f10610bda57610100808354040283529160200191610c05565b820191906000526020600020905b815481529060010190602001808311610be857829003601f168201915b505050505090509392505050565b83610c1d81611286565b610c2657600080fd5b6000198401841615610c3757600080fd5b6000858152602081815260408083208784529091529020610c59908484611a14565b50604051849086907faa121bbeef5f32f5961a2a28966e769023910fc9479059ee3495d4c1a696efe390600090a35050505050565b60008181526007602090815260409182902080548351601f6002600019610100600186161502019093169290920491820184900484028101840190945280845260609392830182828015610d235780601f10610cf857610100808354040283529160200191610d23565b820191906000526020600020905b815481529060010190602001808311610d0657829003601f168201915b50505050509050919050565b82610d3981611286565b610d4257600080fd5b6000848152600760205260409020610d5b908484611a14565b50837fb7d29e911041e8d9b843369e890bcb72c9388692ba48b65ac54e7214c4c348f78484604051610a039291906122d7565b82610d9881611286565b610da157600080fd5b837f65412581168e88a1e60c6459d7f44ae83ad0832e670826c05a4e2476b57af7528484604051610dd3929190612355565b60405180910390a2603c831415610e2557837f52d7d861f09ab3d26239d492e8968629f95e9e318cf0b73bfddc441522a15fd2610e0f846116e4565b604051610e1c9190612273565b60405180910390a25b600084815260016020908152604080832086845282529091208351610e4c92850190611a92565b5050505050565b6000838152600460209081526040808320600383528184205484528252808320858452825280832061ffff8516845282529182902080548351601f6002600019610100600186161502019093169290920491820184900484028101840190945280845260609392830182828015610c055780601f10610bda57610100808354040283529160200191610c05565b604080518281526020808402820101909152606090828015610f1657816020015b6060815260200190600190039081610f015790505b50905060005b82811015610fff576000606030868685818110610f3557fe5b602002820190508035601e1936849003018112610f5157600080fd5b9091016020810191503567ffffffffffffffff811115610f7057600080fd5b36819003821315610f8057600080fd5b604051610f8e929190612241565b600060405180830381855af49150503d8060008114610fc9576040519150601f19603f3d011682016040523d82523d6000602084013e610fce565b606091505b509150915081610fdd57600080fd5b80848481518110610fea57fe5b60209081029190910101525050600101610f1c565b5092915050565b8061101081611286565b61101957600080fd5b600082815260036020526040808220805460010190555183917fb757169b8492ca2f1c6619d9d76ce22803035c3b1d5f6930dffe7b127c1a198391a25050565b600081815260026020818152604092839020805484516001821615610100026000190190911693909304601f81018390048302840183019094528383526060939091830182828015610d235780601f10610cf857610100808354040283529160200191610d23565b600090815260086020526040902080546001909101549091565b816110e581611286565b6110ee57600080fd5b6110fd83603c6102b585611703565b505050565b8261110c81611286565b61111557600080fd5b60008481526006602090815260408083206001600160e01b0319871680855292529182902080546001600160a01b0319166001600160a01b038616179055905185907f7c69f06bea0bdef565b709e93a147836b0063ba2dd89f02d0b7e8d931e6a6daa90611184908690612265565b60405180910390a350505050565b600082815260016020818152604080842085855282529283902080548451600294821615610100026000190190911693909304601f8101839004830284018301909452838352606093909183018282801561122e5780601f106112035761010080835404028352916020019161122e565b820191906000526020600020905b81548152906001019060200180831161121157829003601f168201915b5050505050905092915050565b600b60209081526000938452604080852082529284528284209052825290205460ff1681565b60006001600160e01b0319821663c869023360e01b14806103a557506103a582611733565b600a546040516302571be360e01b815260009182916001600160a01b03909116906302571be3906112bb9086906004016122a0565b60206040518083038186803b1580156112d357600080fd5b505afa1580156112e7573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525061130b9190810190611c77565b90506001600160a01b038116331480610a9e57506000838152600b602090815260408083206001600160a01b0385168452825280832033845290915290205460ff16915050919050565b61135d6119c9565b82815260c0810182905261086c81611611565b805151602090910151101590565b602081015181516060916103a5916113969082611758565b8451919063ffffffff61179f16565b60a081015160c082015182516060926103a59281900363ffffffff61179f16565b600081518351148015610a9e5750610a9e8360008460008751611801565b600087815260036020908152604090912054875191880191909120606061141287878763ffffffff61179f16565b9050831561150f5760008a81526004602090815260408083208684528252808320858452825280832061ffff8c168452909152902054600260001961010060018416150201909116041561149a5760008a815260056020908152604080832086845282528083208584529091529020805461ffff19811661ffff918216600019019091161790555b60008a81526004602090815260408083208684528252808320858452825280832061ffff8c16845290915281206114d091611b00565b897f03528ed0c2a3ebc993b12ce3c16bb382f9c7d88ef7d8a1bf290eaf35955a12078a8a6040516115029291906122fa565b60405180910390a2611605565b60008a81526004602090815260408083208684528252808320858452825280832061ffff8c1684529091529020546002600019610100600184161502019091160461158c5760008a815260056020908152604080832086845282528083208584529091529020805461ffff8082166001011661ffff199091161790555b60008a81526004602090815260408083208684528252808320858452825280832061ffff8c168452825290912082516115c792840190611a92565b50897f52a608b3303a48862d07a73d82fa221318c0027fbbcfb1b2329bface3f19ff2b8a8a846040516115fc9392919061231a565b60405180910390a25b50505050505050505050565b60c0810151602082018190528151511161162a576116e1565b600061163e82600001518360200151611758565b6020830151835191019150611659908263ffffffff61182416565b61ffff16604083015281516002919091019061167b908263ffffffff61182416565b61ffff16606083015281516002919091019061169d908263ffffffff61184416565b63ffffffff90811660808401528251600492909201916000916116c39190849061182416565b600283810160a086015261ffff9190911690920190910160c0830152505b50565b600081516014146116f457600080fd5b5060200151600160601b900490565b604080516014808252818301909252606091602082018180388339505050600160601b9290920260208301525090565b60006001600160e01b0319821663691f343160e01b14806103a557506103a582611866565b6000815b8351811061176657fe5b6000611778858363ffffffff6118a116565b60ff169182016001019190508061178f5750611795565b5061175c565b9190910392915050565b6060835182840111156117b157600080fd5b6060826040519080825280601f01601f1916602001820160405280156117de576020820181803883390190505b509050602080820190868601016117f68282876118bf565b509095945050505050565b600061180e8484846118fd565b6118198787856118fd565b149695505050505050565b6000825182600201111561183757600080fd5b50016002015161ffff1690565b6000825182600401111561185757600080fd5b50016004015163ffffffff1690565b60006040516118749061225a565b60405180910390206001600160e01b031916826001600160e01b03191614806103a557506103a582611919565b60008282815181106118af57fe5b016020015160f81c905092915050565b5b602081106118df578151835260209283019290910190601f19016118c0565b905182516020929092036101000a6000190180199091169116179052565b60008351828401111561190f57600080fd5b5091016020012090565b60006001600160e01b0319821663547d2b4160e11b14806103a557506103a58260006001600160e01b0319821663bc1c58d160e01b14806103a557506103a58260006001600160e01b03198216631d9dabef60e11b148061198a57506001600160e01b031982166378e5bf0360e11b145b806103a557506103a58260006001600160e01b03198216631101d5ab60e11b14806103a557506301ffc9a760e01b6001600160e01b03198316146103a5565b6040518060e001604052806060815260200160008152602001600061ffff168152602001600061ffff168152602001600063ffffffff16815260200160008152602001600081525090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10611a555782800160ff19823516178555611a82565b82800160010185558215611a82579182015b82811115611a82578235825591602001919060010190611a67565b50611a8e929150611b40565b5090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10611ad357805160ff1916838001178555611a82565b82800160010185558215611a82579182015b82811115611a82578251825591602001919060010190611ae5565b50805460018160011615610100020316600290046000825580601f10611b2657506116e1565b601f0160209004906000526020600020908101906116e191905b611b5a91905b80821115611a8e5760008155600101611b46565b90565b803561086c8161245e565b805161086c8161245e565b60008083601f840112611b8557600080fd5b50813567ffffffffffffffff811115611b9d57600080fd5b60208301915083602082028301111561098a57600080fd5b803561086c81612472565b803561086c8161247b565b803561086c81612484565b60008083601f840112611be857600080fd5b50813567ffffffffffffffff811115611c0057600080fd5b60208301915083600182028301111561098a57600080fd5b600082601f830112611c2957600080fd5b8135611c3c611c378261239c565b612375565b91508082526020830160208301858383011115611c5857600080fd5b611c63838284612418565b50505092915050565b803561086c8161248d565b600060208284031215611c8957600080fd5b6000611c958484611b68565b949350505050565b60008060208385031215611cb057600080fd5b823567ffffffffffffffff811115611cc757600080fd5b611cd385828601611b73565b92509250509250929050565b600060208284031215611cf157600080fd5b6000611c958484611bc0565b60008060408385031215611d1057600080fd5b6000611d1c8585611bc0565b9250506020611d2d85828601611b5d565b9150509250929050565b600080600060608486031215611d4c57600080fd5b6000611d588686611bc0565b9350506020611d6986828701611b5d565b9250506040611d7a86828701611b5d565b9150509250925092565b600080600060608486031215611d9957600080fd5b6000611da58686611bc0565b9350506020611db686828701611b5d565b9250506040611d7a86828701611bb5565b60008060408385031215611dda57600080fd5b6000611de68585611bc0565b9250506020611d2d85828601611bc0565b600080600060608486031215611e0c57600080fd5b6000611e188686611bc0565b9350506020611e2986828701611bc0565b9250506040611d7a86828701611bc0565b600080600060608486031215611e4f57600080fd5b6000611e5b8686611bc0565b9350506020611e6c86828701611bc0565b9250506040611d7a86828701611c6c565b60008060408385031215611e9057600080fd5b6000611e9c8585611bc0565b9250506020611d2d85828601611bcb565b600080600060608486031215611ec257600080fd5b6000611ece8686611bc0565b9350506020611d6986828701611bcb565b600080600060408486031215611ef457600080fd5b6000611f008686611bc0565b935050602084013567ffffffffffffffff811115611f1d57600080fd5b611f2986828701611bd6565b92509250509250925092565b600080600080600060608688031215611f4d57600080fd5b6000611f598888611bc0565b955050602086013567ffffffffffffffff811115611f7657600080fd5b611f8288828901611bd6565b9450945050604086013567ffffffffffffffff811115611fa157600080fd5b611fad88828901611bd6565b92509250509295509295909350565b60008060008060608587031215611fd257600080fd5b6000611fde8787611bc0565b9450506020611fef87828801611bc0565b935050604085013567ffffffffffffffff81111561200c57600080fd5b61201887828801611bd6565b95989497509550505050565b60008060006060848603121561203957600080fd5b60006120458686611bc0565b935050602061205686828701611bc0565b925050604084013567ffffffffffffffff81111561207357600080fd5b611d7a86828701611c18565b60006020828403121561209157600080fd5b6000611c958484611bcb565b6000610a9e8383612195565b6120b281612407565b82525050565b6120b2816123d7565b60006120cc826123ca565b6120d681856123ce565b9350836020820285016120e8856123c4565b8060005b858110156121225784840389528151612105858261209d565b9450612110836123c4565b60209a909a01999250506001016120ec565b5091979650505050505050565b6120b2816123e2565b6120b281611b5a565b6120b2816123e7565b600061215683856123ce565b9350612163838584612418565b61216c83612454565b9093019392505050565b600061218283856103a8565b935061218f838584612418565b50500190565b60006121a0826123ca565b6121aa81856123ce565b93506121ba818560208601612424565b61216c81612454565b60006121ce826123ca565b6121d881856103a8565b93506121e8818560208601612424565b9290920192915050565b60006121ff6024836103a8565b7f696e74657266616365496d706c656d656e74657228627974657333322c6279748152636573342960e01b602082015260240192915050565b6120b2816123f4565b6000611c95828486612176565b6000610a9e82846121c3565b600061086c826121f2565b6020810161086c82846120b8565b6020810161086c82846120a9565b60208082528101610a9e81846120c1565b6020810161086c828461212f565b6020810161086c8284612138565b604081016122bc8285612138565b610a9e6020830184612138565b6020810161086c8284612141565b60208082528101611c9581848661214a565b60208082528101610a9e8184612195565b6040808252810161230b8185612195565b9050610a9e6020830184612238565b6060808252810161232b8186612195565b905061233a6020830185612238565b818103604083015261234c8184612195565b95945050505050565b604081016123638285612138565b8181036020830152611c958184612195565b60405181810167ffffffffffffffff8111828210171561239457600080fd5b604052919050565b600067ffffffffffffffff8211156123b357600080fd5b506020601f91909101601f19160190565b60200190565b5190565b90815260200190565b60006103a5826123fb565b151590565b6001600160e01b03191690565b61ffff1690565b6001600160a01b031690565b60006103a58260006103a5826123d7565b82818337506000910152565b60005b8381101561243f578181015183820152602001612427565b8381111561244e576000848401525b50505050565b601f01601f191690565b612467816123d7565b81146116e157600080fd5b612467816123e2565b61246781611b5a565b612467816123e7565b612467816123f456fea365627a7a72315820bde1f6451baec3f5d999e266e6a337ffb461c80607c34cdb655c6022f5f5c63c6c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployPublicResolver deploys a new Ethereum contract, binding an instance of PublicResolver to it.
-func DeployPublicResolver(auth *bind.TransactOpts, backend bind.ContractBackend, _ens common.Address) (common.Address, *types.Transaction, *PublicResolver, error) {
-	parsed, err := abi.JSON(strings.NewReader(PublicResolverABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(PublicResolverBin), backend, _ens)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &PublicResolver{PublicResolverCaller: PublicResolverCaller{contract: contract}, PublicResolverTransactor: PublicResolverTransactor{contract: contract}, PublicResolverFilterer: PublicResolverFilterer{contract: contract}}, nil
 }
 
 // PublicResolver is an auto generated Go binding around an Ethereum contract.
@@ -10289,170 +9882,8 @@ func (_PublicResolver *PublicResolverFilterer) ParseTextChanged(log types.Log) (
 	return event, nil
 }
 
-// RRUtilsABI is the input ABI used to generate the binding from.
-const RRUtilsABI = "[]"
-
-// RRUtilsBin is the compiled bytecode used for deploying new contracts.
-var RRUtilsBin = "0x60636023600b82828239805160001a607314601657fe5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea365627a7a72315820a86e54fccc99836852ccbdca1cafae4380178b1967bc360aaa58f64288b4a6396c6578706572696d656e74616cf564736f6c63430005100040"
-
-// DeployRRUtils deploys a new Ethereum contract, binding an instance of RRUtils to it.
-func DeployRRUtils(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *RRUtils, error) {
-	parsed, err := abi.JSON(strings.NewReader(RRUtilsABI))
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(RRUtilsBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &RRUtils{RRUtilsCaller: RRUtilsCaller{contract: contract}, RRUtilsTransactor: RRUtilsTransactor{contract: contract}, RRUtilsFilterer: RRUtilsFilterer{contract: contract}}, nil
-}
-
-// RRUtils is an auto generated Go binding around an Ethereum contract.
-type RRUtils struct {
-	RRUtilsCaller     // Read-only binding to the contract
-	RRUtilsTransactor // Write-only binding to the contract
-	RRUtilsFilterer   // Log filterer for contract events
-}
-
-// RRUtilsCaller is an auto generated read-only Go binding around an Ethereum contract.
-type RRUtilsCaller struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// RRUtilsTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type RRUtilsTransactor struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// RRUtilsFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type RRUtilsFilterer struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// RRUtilsSession is an auto generated Go binding around an Ethereum contract,
-// with pre-set call and transact options.
-type RRUtilsSession struct {
-	Contract     *RRUtils          // Generic contract binding to set the session for
-	CallOpts     bind.CallOpts     // Call options to use throughout this session
-	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
-}
-
-// RRUtilsCallerSession is an auto generated read-only Go binding around an Ethereum contract,
-// with pre-set call options.
-type RRUtilsCallerSession struct {
-	Contract *RRUtilsCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts  // Call options to use throughout this session
-}
-
-// RRUtilsTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
-// with pre-set transact options.
-type RRUtilsTransactorSession struct {
-	Contract     *RRUtilsTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts  // Transaction auth options to use throughout this session
-}
-
-// RRUtilsRaw is an auto generated low-level Go binding around an Ethereum contract.
-type RRUtilsRaw struct {
-	Contract *RRUtils // Generic contract binding to access the raw methods on
-}
-
-// RRUtilsCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type RRUtilsCallerRaw struct {
-	Contract *RRUtilsCaller // Generic read-only contract binding to access the raw methods on
-}
-
-// RRUtilsTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type RRUtilsTransactorRaw struct {
-	Contract *RRUtilsTransactor // Generic write-only contract binding to access the raw methods on
-}
-
-// NewRRUtils creates a new instance of RRUtils, bound to a specific deployed contract.
-func NewRRUtils(address common.Address, backend bind.ContractBackend) (*RRUtils, error) {
-	contract, err := bindRRUtils(address, backend, backend, backend)
-	if err != nil {
-		return nil, err
-	}
-	return &RRUtils{RRUtilsCaller: RRUtilsCaller{contract: contract}, RRUtilsTransactor: RRUtilsTransactor{contract: contract}, RRUtilsFilterer: RRUtilsFilterer{contract: contract}}, nil
-}
-
-// NewRRUtilsCaller creates a new read-only instance of RRUtils, bound to a specific deployed contract.
-func NewRRUtilsCaller(address common.Address, caller bind.ContractCaller) (*RRUtilsCaller, error) {
-	contract, err := bindRRUtils(address, caller, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &RRUtilsCaller{contract: contract}, nil
-}
-
-// NewRRUtilsTransactor creates a new write-only instance of RRUtils, bound to a specific deployed contract.
-func NewRRUtilsTransactor(address common.Address, transactor bind.ContractTransactor) (*RRUtilsTransactor, error) {
-	contract, err := bindRRUtils(address, nil, transactor, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &RRUtilsTransactor{contract: contract}, nil
-}
-
-// NewRRUtilsFilterer creates a new log filterer instance of RRUtils, bound to a specific deployed contract.
-func NewRRUtilsFilterer(address common.Address, filterer bind.ContractFilterer) (*RRUtilsFilterer, error) {
-	contract, err := bindRRUtils(address, nil, nil, filterer)
-	if err != nil {
-		return nil, err
-	}
-	return &RRUtilsFilterer{contract: contract}, nil
-}
-
-// bindRRUtils binds a generic wrapper to an already deployed contract.
-func bindRRUtils(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(RRUtilsABI))
-	if err != nil {
-		return nil, err
-	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_RRUtils *RRUtilsRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _RRUtils.Contract.RRUtilsCaller.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_RRUtils *RRUtilsRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _RRUtils.Contract.RRUtilsTransactor.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_RRUtils *RRUtilsRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _RRUtils.Contract.RRUtilsTransactor.contract.Transact(opts, method, params...)
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_RRUtils *RRUtilsCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _RRUtils.Contract.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_RRUtils *RRUtilsTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _RRUtils.Contract.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_RRUtils *RRUtilsTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _RRUtils.Contract.contract.Transact(opts, method, params...)
-}
-
 // ResolverBaseABI is the input ABI used to generate the binding from.
-const ResolverBaseABI = "[{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+const ResolverBaseABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"}]"
 
 // ResolverBaseFuncSigs maps the 4-byte function signature to its string representation.
 var ResolverBaseFuncSigs = map[string]string{
@@ -10633,7 +10064,7 @@ func (_ResolverBase *ResolverBaseCallerSession) SupportsInterface(interfaceID [4
 }
 
 // TextResolverABI is the input ABI used to generate the binding from.
-const TextResolverABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"string\",\"name\":\"indexedKey\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"}],\"name\":\"TextChanged\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"}],\"name\":\"setText\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"node\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\"}],\"name\":\"text\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]"
+const TextResolverABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"interfaceID\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"key\",\"type\":\"string\"},{\"name\":\"value\",\"type\":\"string\"}],\"name\":\"setText\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"bytes32\"},{\"name\":\"key\",\"type\":\"string\"}],\"name\":\"text\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"node\",\"type\":\"bytes32\"},{\"indexed\":true,\"name\":\"indexedKey\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"key\",\"type\":\"string\"}],\"name\":\"TextChanged\",\"type\":\"event\"}]"
 
 // TextResolverFuncSigs maps the 4-byte function signature to its string representation.
 var TextResolverFuncSigs = map[string]string{
