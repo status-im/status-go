@@ -148,7 +148,7 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 
 	// Test setting clock value to something greater than `0`
 	tm += 123
-	err = db.setSettingLastSynced(Currency, tm)
+	err = db.SetSettingLastSynced(Currency, tm)
 	require.NoError(t, err)
 
 	ct, err = db.GetSettingLastSynced(Currency)
@@ -157,7 +157,7 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 
 	// Test setting clock to greater than `123`
 	now := uint64(321)
-	err = db.setSettingLastSynced(Currency, now)
+	err = db.SetSettingLastSynced(Currency, now)
 	require.NoError(t, err)
 
 	ct, err = db.GetSettingLastSynced(Currency)
@@ -166,10 +166,12 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 
 	// Test setting clock to something less than `321`
 	earlier := uint64(231)
-	err = db.setSettingLastSynced(Currency, earlier)
+	err = db.SetSettingLastSynced(Currency, earlier)
 	require.NoError(t, err)
 
 	ct, err = db.GetSettingLastSynced(Currency)
 	require.NoError(t, err)
 	require.Equal(t, now, ct)
 }
+
+// TODO add test that loops through register and checks that there is a sync clock column for each.

@@ -200,20 +200,14 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 	if err != nil {
 		return err
 	}
-	if clock < ls {
+	if clock <= ls {
 		return errors.ErrNewClockOlderThanCurrent
 	}
 
-	err = db.setSettingLastSynced(setting, clock)
+	err = db.SetSettingLastSynced(setting, clock)
 	if err != nil {
 		return err
 	}
-
-	/*
-		if setting.storeHandler != nil {
-			currentValue, err := db.GetSetting(setting)
-			value = setting.storeHandler(currentValue, value)
-		}*/
 
 	return db.saveSetting(setting, value)
 }
@@ -520,7 +514,7 @@ func (db *Database) GetSettingLastSynced(setting SettingField) (uint64, error) {
 	return result, nil
 }
 
-func (db *Database) setSettingLastSynced(setting SettingField, clock uint64) error {
+func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
 	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
 	query = fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
 

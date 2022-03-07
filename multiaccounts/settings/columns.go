@@ -2,13 +2,18 @@ package settings
 
 import (
 	"encoding/json"
-	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/common"
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactory func(interface{}, uint64) (proto.Message, protobuf.ApplicationMetadataMessage_Type, error)
+type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, error)
+type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, error)
+
+type SyncProtobufFactory struct {
+	Interface SyncSettingProtobufFactoryInterface
+	Struct    SyncSettingProtobufFactoryStruct
+}
 
 type SyncSettingField struct {
 	SettingField
@@ -16,8 +21,8 @@ type SyncSettingField struct {
 }
 
 func (s SyncSettingField) MarshalJSON() ([]byte, error) {
-	alias := struct{
-		Name string `json:"name"`
+	alias := struct {
+		Name  string      `json:"name"`
 		Value interface{} `json:"value"`
 	}{
 		s.reactFieldName,
@@ -31,8 +36,7 @@ type SettingField struct {
 	reactFieldName      string
 	dBColumnName        string
 	valueHandler        ValueHandler
-	syncProtobufFactory SyncSettingProtobufFactory
-	//storeHandler
+	syncProtobufFactory *SyncProtobufFactory
 }
 
 func (s SettingField) GetReactName() string {
@@ -47,7 +51,7 @@ func (s SettingField) ValueHandler() ValueHandler {
 	return s.valueHandler
 }
 
-func (s SettingField) SyncProtobufFactory() SyncSettingProtobufFactory {
+func (s SettingField) SyncProtobufFactory() *SyncProtobufFactory {
 	return s.syncProtobufFactory
 }
 
@@ -77,9 +81,12 @@ var (
 		valueHandler:   BoolHandler,
 	}
 	Currency = SettingField{
-		reactFieldName:      "currency",
-		dBColumnName:        "currency",
-		syncProtobufFactory: currencyProtobufFactory,
+		reactFieldName: "currency",
+		dBColumnName:   "currency",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: currencyProtobufFactory,
+			Struct:    currencyProtobufFactoryStruct,
+		},
 	}
 	CurrentUserStatus = SettingField{
 		reactFieldName: "current-user-status",
@@ -119,21 +126,30 @@ var (
 		dBColumnName:   "fleet",
 	}
 	GifAPIKey = SettingField{
-		reactFieldName:      "gifs/api-key",
-		dBColumnName:        "gif_api_key",
-		syncProtobufFactory: gifAPIKeyProtobufFactory,
+		reactFieldName: "gifs/api-key",
+		dBColumnName:   "gif_api_key",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: gifAPIKeyProtobufFactory,
+			Struct:    gifAPIKeyProtobufFactoryStruct,
+		},
 	}
 	GifFavourites = SettingField{
-		reactFieldName:      "gifs/favorite-gifs",
-		dBColumnName:        "gif_favorites",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: gifFavouritesProtobufFactory,
+		reactFieldName: "gifs/favorite-gifs",
+		dBColumnName:   "gif_favorites",
+		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: gifFavouritesProtobufFactory,
+			Struct:    gifFavouritesProtobufFactoryStruct,
+		},
 	}
 	GifRecents = SettingField{
-		reactFieldName:      "gifs/recent-gifs",
-		dBColumnName:        "gif_recents",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: gifRecentsProtobufFactory,
+		reactFieldName: "gifs/recent-gifs",
+		dBColumnName:   "gif_recents",
+		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: gifRecentsProtobufFactory,
+			Struct:    gifRecentsProtobufFactoryStruct,
+		},
 	}
 	HideHomeTooltip = SettingField{
 		reactFieldName: "hide-home-tooltip?",
@@ -175,10 +191,13 @@ var (
 		dBColumnName:   "log_level",
 	}
 	MessagesFromContactsOnly = SettingField{
-		reactFieldName:      "messages-from-contacts-only",
-		dBColumnName:        "messages_from_contacts_only",
-		valueHandler:        BoolHandler,
-		syncProtobufFactory: messagesFromContactsOnlyProtobufFactory,
+		reactFieldName: "messages-from-contacts-only",
+		dBColumnName:   "messages_from_contacts_only",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: messagesFromContactsOnlyProtobufFactory,
+			Struct:    messagesFromContactsOnlyProtobufFactoryStruct,
+		},
 	}
 	Mnemonic = SettingField{
 		reactFieldName: "mnemonic",
@@ -222,25 +241,37 @@ var (
 		valueHandler:   JSONBlobHandler,
 	}
 	PreferredName = SettingField{
-		reactFieldName:      "preferred-name",
-		dBColumnName:        "preferred_name",
-		syncProtobufFactory: preferredNameProtobufFactory,
+		reactFieldName: "preferred-name",
+		dBColumnName:   "preferred_name",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: preferredNameProtobufFactory,
+			Struct:    preferredNameProtobufFactoryStruct,
+		},
 	}
 	PreviewPrivacy = SettingField{
-		reactFieldName:      "preview-privacy?",
-		dBColumnName:        "preview_privacy",
-		valueHandler:        BoolHandler,
-		syncProtobufFactory: previewPrivacyProtobufFactory,
+		reactFieldName: "preview-privacy?",
+		dBColumnName:   "preview_privacy",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: previewPrivacyProtobufFactory,
+			Struct:    previewPrivacyProtobufFactoryStruct,
+		},
 	}
 	ProfilePicturesShowTo = SettingField{
-		reactFieldName:      "profile-pictures-show-to",
-		dBColumnName:        "profile_pictures_show_to",
-		syncProtobufFactory: profilePicturesShowToProtobufFactory,
+		reactFieldName: "profile-pictures-show-to",
+		dBColumnName:   "profile_pictures_show_to",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: profilePicturesShowToProtobufFactory,
+			Struct:    profilePicturesShowToProtobufFactoryStruct,
+		},
 	}
 	ProfilePicturesVisibility = SettingField{
-		reactFieldName:      "profile-pictures-visibility",
-		dBColumnName:        "profile_pictures_visibility",
-		syncProtobufFactory: profilePicturesVisibilityProtobufFactory,
+		reactFieldName: "profile-pictures-visibility",
+		dBColumnName:   "profile_pictures_visibility",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: profilePicturesVisibilityProtobufFactory,
+			Struct:    profilePicturesVisibilityProtobufFactoryStruct,
+		},
 	}
 	PublicKey = SettingField{
 		reactFieldName: "public-key",
@@ -277,28 +308,40 @@ var (
 		valueHandler:   BoolHandler,
 	}
 	SendStatusUpdates = SettingField{
-		reactFieldName:      "send-status-updates?",
-		dBColumnName:        "send_status_updates",
-		valueHandler:        BoolHandler,
-		syncProtobufFactory: sendStatusUpdatesProtobufFactory,
+		reactFieldName: "send-status-updates?",
+		dBColumnName:   "send_status_updates",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: sendStatusUpdatesProtobufFactory,
+			Struct:    sendStatusUpdatesProtobufFactoryStruct,
+		},
 	}
 	StickersPacksInstalled = SettingField{
-		reactFieldName:      "stickers/packs-installed",
-		dBColumnName:        "stickers_packs_installed",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: stickersPacksInstalledProtobufFactory,
+		reactFieldName: "stickers/packs-installed",
+		dBColumnName:   "stickers_packs_installed",
+		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: stickersPacksInstalledProtobufFactory,
+			Struct:    stickersPacksInstalledProtobufFactoryStruct,
+		},
 	}
 	StickersPacksPending = SettingField{
-		reactFieldName:      "stickers/packs-pending",
-		dBColumnName:        "stickers_packs_pending",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: stickersPacksPendingProtobufFactory,
+		reactFieldName: "stickers/packs-pending",
+		dBColumnName:   "stickers_packs_pending",
+		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: stickersPacksPendingProtobufFactory,
+			Struct:    stickersPacksPendingProtobufFactoryStruct,
+		},
 	}
 	StickersRecentStickers = SettingField{
-		reactFieldName:      "stickers/recent-stickers",
-		dBColumnName:        "stickers_recent_stickers",
-		valueHandler:        JSONBlobHandler,
-		syncProtobufFactory: stickersRecentStickersProtobufFactory,
+		reactFieldName: "stickers/recent-stickers",
+		dBColumnName:   "stickers_recent_stickers",
+		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: stickersRecentStickersProtobufFactory,
+			Struct:    stickersRecentStickersProtobufFactoryStruct,
+		},
 	}
 	SyncingOnMobileNetwork = SettingField{
 		reactFieldName: "syncing-on-mobile-network?",
@@ -306,9 +349,12 @@ var (
 		valueHandler:   BoolHandler,
 	}
 	TelemetryServerURL = SettingField{
-		reactFieldName:      "telemetry-server-url",
-		dBColumnName:        "telemetry_server_url",
-		syncProtobufFactory: telemetryServerURLProtobufFactory,
+		reactFieldName: "telemetry-server-url",
+		dBColumnName:   "telemetry_server_url",
+		syncProtobufFactory: &SyncProtobufFactory{
+			Interface: telemetryServerURLProtobufFactory,
+			Struct:    telemetryServerURLProtobufFactoryStruct,
+		},
 	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",

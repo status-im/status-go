@@ -2,46 +2,13 @@ package protocol
 
 import (
 	"context"
-	"github.com/status-im/status-go/multiaccounts/errors"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
-
-func buildRawSyncSettingMessage(msg proto.Message, messageType protobuf.ApplicationMetadataMessage_Type, chatID string) (*common.RawMessage, error) {
-	encodedMessage, err := proto.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	return &common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         messageType,
-		ResendAutomatically: true,
-	}, nil
-}
-
-func (m *Messenger) buildAndDispatch(msg proto.Message, messageType protobuf.ApplicationMetadataMessage_Type, chatID string) error {
-	logger := m.logger.Named("buildAndDispatch")
-
-	rm, err := buildRawSyncSettingMessage(msg, messageType, chatID)
-	if err != nil {
-		return err
-	}
-
-	_, err = m.dispatchMessage(context.Background(), *rm)
-	if err != nil {
-		logger.Error("dispatchMessage", zap.Error(err))
-		return err
-	}
-
-	return nil
-}
 
 // syncSettings syncs all settings that are syncable
 func (m *Messenger) syncSettings() error {
@@ -52,162 +19,38 @@ func (m *Messenger) syncSettings() error {
 		return err
 	}
 
-	clock, chat := m.getLastClockWithRelatedChat()
+	// Do not use the network clock, use the db value
+	_, chat := m.getLastClockWithRelatedChat()
 
-	/*if s.Currency != "usd" {
-		pm, amt, err := settings.Currency.SyncProtobufFactory()(s.Currency, clock)
-		if err != nil {
-			return err
-		}
+	var errs []error
+	for _, sf := range settings.SettingFieldRegister {
+		if sf.SyncProtobufFactory() != nil && sf.SyncProtobufFactory().Struct != nil {
+			// Pull clock from the db
+			clock, err := m.settings.GetSettingLastSynced(sf)
+			if err != nil {
+				logger.Error("m.settings.GetSettingLastSynced", zap.Error(err), zap.Any("SettingField", sf))
+				return err
+			}
 
-		m.buildAndDispatch(pm, amt, chat.ID)
-	}
+			rm, err := sf.SyncProtobufFactory().Struct(s, clock, chat.ID)
+			if err != nil {
+				// Collect errors to give other sync messages a chance to send
+				logger.Error("SyncProtobufFactory.Struct", zap.Error(err))
+				errs = append(errs, err)
+			}
 
-	if s.GifFavorites != nil || len(*s.GifFavorites) == 0 {
-		gf, _ := s.GifFavorites.MarshalJSON() // Don't need to parse error because it is always nil
-		pm, amt, err := settings.GifFavourites.SyncProtobufFactory()(gf, clock)
-		if err != nil {
-			return err
-		}
-
-		m.buildAndDispatch(pm, amt, chat.ID)
-	}
-
-	if s.GifRecents != nil || len(*s.GifRecents) == 0 {
-		gf, _ := s.GifRecents.MarshalJSON() // Don't need to parse error because it is always nil
-		pm, amt, err := settings.GifRecents.SyncProtobufFactory()(gf, clock)
-		if err != nil {
-			return err
-		}
-
-		m.buildAndDispatch(pm, amt, chat.ID)
-	}
-
-	if s.PreferredName != nil || *s.PreferredName == "" {
-		pm, amt, err := settings.PreferredName.SyncProtobufFactory()(*s.PreferredName, clock)
-		if err != nil {
-			return err
-		}
-
-		m.buildAndDispatch(pm, amt, chat.ID)
-	}*/
-
-	var gr []byte
-	if s.GifRecents != nil {
-		gr, err = s.GifRecents.MarshalJSON()
-		if err != nil {
-			return err
+			_, err = m.dispatchMessage(context.Background(), *rm)
+			if err != nil {
+				logger.Error("dispatchMessage", zap.Error(err))
+				return err
+			}
 		}
 	}
 
-	var gf []byte
-	if s.GifFavorites != nil {
-		gf, err = s.GifFavorites.MarshalJSON()
-		if err != nil {
-			return err
-		}
+	if len(errs) != 0 {
+		// return just the first error, the others have been logged
+		return errs[0]
 	}
-
-	var pn string
-	if s.PreferredName != nil {
-		pn = *s.PreferredName
-	}
-
-	var spi []byte
-	if s.StickerPacksInstalled != nil {
-		spi, err = s.StickerPacksInstalled.MarshalJSON()
-		if err != nil {
-			return err
-		}
-	}
-
-	var spp []byte
-	if s.StickerPacksPending != nil {
-		spp, err = s.StickerPacksPending.MarshalJSON()
-		if err != nil {
-			return err
-		}
-	}
-
-	var srs []byte
-	if s.StickersRecentStickers != nil {
-		srs, err = s.StickersRecentStickers.MarshalJSON()
-		if err != nil {
-			return err
-		}
-	}
-
-	ps := &protobuf.SyncSettings{
-		Currency: &protobuf.SyncSettingCurrency{
-			Value: s.Currency,
-			Clock: clock,
-		},
-		// TODO DROP
-		GifApiKey: &protobuf.SyncSettingGifAPIKey{
-			Value: s.GifAPIKey,
-			Clock: clock,
-		},
-		GifFavorites: &protobuf.SyncSettingGifFavorites{
-			Value: gf,
-			Clock: clock,
-		},
-		GifRecents: &protobuf.SyncSettingGifRecents{
-			Value: gr,
-			Clock: clock,
-		},
-		MessagesFromContactsOnly: &protobuf.SyncSettingMessagesFromContactsOnly{
-			Value: s.MessagesFromContactsOnly,
-			Clock: clock,
-		},
-		PreferredName: &protobuf.SyncSettingPreferredName{
-			Value: pn,
-			Clock: clock,
-		},
-		PreviewPrivacy: &protobuf.SyncSettingPreviewPrivacy{
-			Value: s.PreviewPrivacy,
-			Clock: clock,
-		},
-		ProfilePicturesShowTo: &protobuf.SyncSettingProfilePicturesShowTo{
-			Value: int64(s.ProfilePicturesShowTo),
-			Clock: clock,
-		},
-		ProfilePicturesVisibility: &protobuf.SyncSettingProfilePicturesVisibility{
-			Value: int64(s.ProfilePicturesVisibility),
-			Clock: clock,
-		},
-		SendStatusUpdates: &protobuf.SyncSettingSendStatusUpdates{
-			Value: s.SendStatusUpdates,
-			Clock: clock,
-		},
-		StickerPacksInstalled: &protobuf.SyncSettingStickerPacksInstalled{
-			Value: spi,
-			Clock: clock,
-		},
-		StickerPacksPending: &protobuf.SyncSettingStickerPacksPending{
-			Value: spp,
-			Clock: clock,
-		},
-		StickersRecentStickers: &protobuf.SyncSettingStickersRecentStickers{
-			Value: srs,
-			Clock: clock,
-		},
-		// TODO DROP
-		TelemetryServer_URL: &protobuf.SyncSettingTelemetryServerURL{
-			Value: s.TelemetryServerURL,
-			Clock: clock,
-		},
-	}
-
-	rm, err := buildRawSyncSettingMessage(ps, protobuf.ApplicationMetadataMessage_SYNC_SETTINGS, chat.ID)
-	if err != nil {
-		return err
-	}
-
-	_, err = m.dispatchMessage(context.Background(), *rm)
-	if err != nil {
-		logger.Error("dispatchMessage", zap.Error(err))
-	}
-
 	return nil
 }
 
@@ -226,6 +69,7 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, field setting
 }
 
 // handleSyncSettings Handler for inbound protobuf.SyncSettings
+// TODO remove this func
 func (m *Messenger) handleSyncSettings(syncSettings protobuf.SyncSettings) error {
 
 	if err := m.settings.SaveSyncSetting(
@@ -351,19 +195,21 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.SyncQueue:
-				if s.SyncProtobufFactory() != nil {
+				if s.SyncProtobufFactory() != nil && s.SyncProtobufFactory().Interface != nil {
 					logger.Debug("setting for sync received")
 
 					clock, chat := m.getLastClockWithRelatedChat()
-					pb, amt, err := s.SyncProtobufFactory()(s.Value, clock)
+
+					// Only the messenger has access to the clock, so set the settings sync clock here.
+					err :=  m.settings.SetSettingLastSynced(s.SettingField, clock)
 					if err != nil {
-						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("m.settings.SetSettingLastSynced", zap.Error(err))
 						break
 					}
 
-					rm, err := buildRawSyncSettingMessage(pb, amt, chat.ID)
+					rm, err := s.SyncProtobufFactory().Interface(s.Value, clock, chat.ID)
 					if err != nil {
-						logger.Error("buildRawSyncSettingMessage", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
 						break
 					}
 
