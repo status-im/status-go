@@ -137,6 +137,18 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 		return nil, err
 	}
 
+	communitySettings := communities.CommunitySettings{
+		CommunityID:                  communityID.String(),
+		HistoryArchiveSupportEnabled: false,
+	}
+
+	err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+	if err != nil {
+		return nil, err
+	}
+
+	mr.AddCommunitySettings(&communitySettings)
+
 	if com, ok := mr.communities[communityID.String()]; ok {
 		err = m.syncCommunity(context.Background(), com)
 		if err != nil {
@@ -400,6 +412,11 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
+	err = m.communitiesManager.DeleteCommunitySettings(communityID)
+	if err != nil {
+		return nil, err
+	}
+
 	if com, ok := mr.communities[communityID.String()]; ok {
 		err = m.syncCommunity(context.Background(), com)
 		if err != nil {
@@ -546,6 +563,15 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
+	communitySettings := communities.CommunitySettings{
+		CommunityID:                  community.IDString(),
+		HistoryArchiveSupportEnabled: request.HistoryArchiveSupportEnabled,
+	}
+	err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+	if err != nil {
+		return nil, err
+	}
+
 	// Init the community filter so we can receive messages on the community
 	_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
 	if err != nil {
@@ -560,6 +586,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddCommunitySettings(&communitySettings)
 	err = m.syncCommunity(context.Background(), community)
 	if err != nil {
 		return nil, err
@@ -578,8 +605,18 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 		return nil, err
 	}
 
+	communitySettings := communities.CommunitySettings{
+		CommunityID:                  community.IDString(),
+		HistoryArchiveSupportEnabled: request.HistoryArchiveSupportEnabled,
+	}
+	err = m.communitiesManager.UpdateCommunitySettings(communitySettings)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddCommunitySettings(&communitySettings)
 
 	return response, nil
 }
@@ -610,7 +647,12 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	return m.JoinCommunity(ctx, community.ID())
+	response, err := m.JoinCommunity(ctx, community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*MessengerResponse, error) {
@@ -1054,4 +1096,12 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	}
 
 	return nil
+}
+
+func (m *Messenger) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
+	settings, err := m.communitiesManager.GetCommunitiesSettings()
+	if err != nil {
+		return nil, err
+	}
+	return settings, nil
 }

@@ -8,6 +8,7 @@
 // 1646841105_add_emoji_account.up.sql (96B)
 // 1647278782_display_name.up.sql (110B)
 // 1647860168_add_torrent_config.up.sql (211B)
+// 1647862837_add_communities_settings_table.up.sql (206B)
 // doc.go (74B)
 
 package migrations
@@ -232,8 +233,28 @@ func _1647860168_add_torrent_configUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647860168_add_torrent_config.up.sql", size: 211, mode: os.FileMode(0664), modTime: time.Unix(1647860188, 0)}
+	info := bindataFileInfo{name: "1647860168_add_torrent_config.up.sql", size: 211, mode: os.FileMode(0664), modTime: time.Unix(1647862710, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0x92, 0x22, 0x37, 0x96, 0xf3, 0xb5, 0x5b, 0x27, 0xd0, 0x7d, 0x43, 0x5, 0x4e, 0x9d, 0xe2, 0x49, 0xbe, 0x86, 0x31, 0xa1, 0x89, 0xff, 0xd6, 0x51, 0xe0, 0x9c, 0xb, 0xda, 0xfc, 0xf2, 0x93}}
+	return a, nil
+}
+
+var __1647862837_add_communities_settings_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\xcb\xb1\xaa\xc2\x30\x14\x06\xe0\x3d\x4f\xf1\x8f\xf7\x82\x2f\x71\x1a\x4f\xa1\x18\x9b\x12\x23\xd8\x29\xd4\xf6\xd8\x06\x6c\x04\x13\x05\xdf\xde\xcd\x49\x70\xfe\xf8\xb4\x63\xf2\x0c\x4f\x95\x61\x8c\xb7\x75\x7d\xa4\x58\xa2\xe4\x90\xa5\x94\x98\xe6\x8c\x3f\x85\x0f\xbc\x42\x9c\xe0\xf9\xe4\xd1\xb9\x66\x4f\xae\xc7\x8e\x7b\xd8\x16\xda\xb6\xb5\x69\xb4\x87\xe3\xce\x90\xe6\x8d\x02\x56\xc9\x79\x98\x25\x0c\xf7\x71\x89\x4f\x09\x59\x64\x8a\x69\x0e\x92\x86\xf3\x55\x26\x54\xd6\x1a\xa6\x16\x5b\xae\xe9\x68\x3c\x6a\x32\x87\xaf\xf1\x22\x65\x5c\x7e\x4e\xf5\xaf\xd4\x3b\x00\x00\xff\xff\x01\x6b\xfa\x19\xce\x00\x00\x00")
+
+func _1647862837_add_communities_settings_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1647862837_add_communities_settings_tableUpSql,
+		"1647862837_add_communities_settings_table.up.sql",
+	)
+}
+
+func _1647862837_add_communities_settings_tableUpSql() (*asset, error) {
+	bytes, err := _1647862837_add_communities_settings_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1647862837_add_communities_settings_table.up.sql", size: 206, mode: os.FileMode(0664), modTime: time.Unix(1647862858, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbd, 0x87, 0x78, 0x99, 0xd9, 0x5d, 0xbd, 0xf7, 0x57, 0x9c, 0xca, 0x97, 0xbd, 0xb3, 0xe9, 0xb5, 0x89, 0x31, 0x3f, 0xf6, 0x5c, 0x13, 0xb, 0xc3, 0x54, 0x93, 0x18, 0x40, 0x7, 0x82, 0xfe, 0x7e}}
 	return a, nil
 }
 
@@ -364,6 +385,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1647860168_add_torrent_config.up.sql": _1647860168_add_torrent_configUpSql,
 
+	"1647862837_add_communities_settings_table.up.sql": _1647862837_add_communities_settings_tableUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -416,7 +439,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1646841105_add_emoji_account.up.sql":               &bintree{_1646841105_add_emoji_accountUpSql, map[string]*bintree{}},
 	"1647278782_display_name.up.sql":                    &bintree{_1647278782_display_nameUpSql, map[string]*bintree{}},
 	"1647860168_add_torrent_config.up.sql":              &bintree{_1647860168_add_torrent_configUpSql, map[string]*bintree{}},
-	"doc.go":                                            &bintree{docGo, map[string]*bintree{}},
+	"1647862837_add_communities_settings_table.up.sql":  &bintree{_1647862837_add_communities_settings_tableUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

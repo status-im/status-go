@@ -916,3 +916,27 @@ func (m *Manager) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
 func (m *Manager) GetSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
 	return m.persistence.getSyncedRawCommunity(id)
 }
+
+func (m *Manager) GetCommunitySettingsByID(id types.HexBytes) (*CommunitySettings, error) {
+	return m.persistence.GetCommunitySettingsByID(id)
+}
+
+func (m *Manager) GetCommunitiesSettings() ([]CommunitySettings, error) {
+	return m.persistence.GetCommunitiesSettings()
+}
+
+func (m *Manager) SaveCommunitySettings(settings CommunitySettings) error {
+	return m.persistence.SaveCommunitySettings(settings)
+}
+
+func (m *Manager) CommunitySettingsExist(id types.HexBytes) (bool, error) {
+	return m.persistence.CommunitySettingsExist(id)
+}
+
+func (m *Manager) DeleteCommunitySettings(id types.HexBytes) error {
+	return m.persistence.DeleteCommunitySettings(id)
+}
+
+func (m *Manager) UpdateCommunitySettings(settings CommunitySettings) error {
+	return m.persistence.UpdateCommunitySettings(settings)
+}
