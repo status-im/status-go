@@ -2,12 +2,12 @@ package protocol
 
 import (
 	"context"
+	"github.com/status-im/status-go/protocol/protobuf"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 // syncSettings syncs all settings that are syncable
@@ -54,7 +54,9 @@ func (m *Messenger) syncSettings() error {
 	return nil
 }
 
-func (m *Messenger) handleSyncSetting(response *MessengerResponse, field settings.SettingField, value interface{}, clock uint64) error {
+func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *protobuf.SyncSetting) error {
+	// TODO a method of mapping the syncSetting to field, could add a protobuf.SyncSetting_Type
+
 	err := m.settings.SaveSyncSetting(field, value, clock)
 	if err == errors.ErrNewClockOlderThanCurrent {
 		m.logger.Info("handleSyncSetting - SaveSyncSetting :", zap.Error(err))
@@ -65,125 +67,6 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, field setting
 	}
 
 	response.Settings = append(response.Settings, &settings.SyncSettingField{SettingField:field, Value: value})
-	return nil
-}
-
-// handleSyncSettings Handler for inbound protobuf.SyncSettings
-// TODO remove this func
-func (m *Messenger) handleSyncSettings(syncSettings protobuf.SyncSettings) error {
-
-	if err := m.settings.SaveSyncSetting(
-		settings.Currency,
-		syncSettings.Currency.GetValue(),
-		syncSettings.Currency.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.GifAPIKey,
-		syncSettings.GifApiKey.GetValue(),
-		syncSettings.GifApiKey.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.GifFavourites,
-		syncSettings.GifFavorites.GetValue(),
-		syncSettings.GifFavorites.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.GifRecents,
-		syncSettings.GifRecents.GetValue(),
-		syncSettings.GifRecents.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.MessagesFromContactsOnly,
-		syncSettings.MessagesFromContactsOnly.GetValue(),
-		syncSettings.MessagesFromContactsOnly.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.PreferredName,
-		syncSettings.PreferredName.GetValue(),
-		syncSettings.PreferredName.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.PreviewPrivacy,
-		syncSettings.PreviewPrivacy.GetValue(),
-		syncSettings.PreviewPrivacy.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.ProfilePicturesShowTo,
-		syncSettings.ProfilePicturesShowTo.GetValue(),
-		syncSettings.ProfilePicturesShowTo.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.ProfilePicturesVisibility,
-		syncSettings.ProfilePicturesVisibility.GetValue(),
-		syncSettings.ProfilePicturesVisibility.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.SendStatusUpdates,
-		syncSettings.SendStatusUpdates.GetValue(),
-		syncSettings.SendStatusUpdates.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.StickersPacksInstalled,
-		syncSettings.StickerPacksInstalled.GetValue(),
-		syncSettings.StickerPacksInstalled.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.StickersPacksPending,
-		syncSettings.StickerPacksPending.GetValue(),
-		syncSettings.StickerPacksPending.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.StickersRecentStickers,
-		syncSettings.StickersRecentStickers.GetValue(),
-		syncSettings.StickersRecentStickers.GetClock(),
-	); err != nil {
-		return err
-	}
-
-	if err := m.settings.SaveSyncSetting(
-		settings.TelemetryServerURL,
-		syncSettings.TelemetryServer_URL.GetValue(),
-		syncSettings.TelemetryServer_URL.GetClock(),
-	); err != nil {
-		return err
-	}
-
 	return nil
 }
 

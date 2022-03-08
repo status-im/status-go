@@ -3,91 +3,31 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
-message SyncSettings {
-  SyncSettingCurrency                  currency = 1;
-  SyncSettingGifAPIKey                 gif_api_key = 2;
-  SyncSettingGifFavorites              gif_favorites = 3;
-  SyncSettingGifRecents                gif_recents = 4;
-  SyncSettingMessagesFromContactsOnly  messages_from_contacts_only = 5;
-  SyncSettingPreferredName             preferred_name = 6;
-  SyncSettingPreviewPrivacy            previewPrivacy = 7;
-  SyncSettingProfilePicturesShowTo     profile_pictures_show_to = 8;
-  SyncSettingProfilePicturesVisibility profile_pictures_visibility = 9;
-  SyncSettingSendStatusUpdates         send_status_updates = 10;
-  SyncSettingStickerPacksInstalled     sticker_packs_installed = 11;
-  SyncSettingStickerPacksPending       sticker_packs_pending = 12;
-  SyncSettingStickersRecentStickers    stickers_recent_stickers = 13;
-  SyncSettingTelemetryServerURL        telemetry_server_URL = 14;
-}
+message SyncSetting {
+  Type type = 1;
+  uint64 clock = 2;
 
-message SyncSettingCurrency {
-  uint64 clock = 1;
-  string value = 2;
-}
+  oneof value {
+    string value_string = 3;
+    bytes value_bytes = 4;
+    bool value_bool = 5;
+    int64 value_int64 = 6;
+  }
 
-message SyncSettingGifAPIKey {
-  uint64 clock = 1;
-  string value = 2;
-}
-
-message SyncSettingGifFavorites {
-  uint64 clock = 1;
-  bytes value = 2;
-}
-
-message SyncSettingGifRecents {
-  uint64 clock = 1;
-  bytes value = 2;
-}
-
-message SyncSettingMessagesFromContactsOnly {
-  uint64 clock = 1;
-  bool value = 2;
-}
-
-message SyncSettingPreferredName {
-  uint64 clock = 1;
-  string value = 2;
-}
-
-message SyncSettingPreviewPrivacy {
-  uint64 clock = 1;
-  bool value = 2;
-}
-
-message SyncSettingProfilePicturesShowTo {
-  uint64 clock = 1;
-  int64 value = 2;
-}
-
-message SyncSettingProfilePicturesVisibility {
-  uint64 clock = 1;
-  int64 value = 2;
-}
-
-message SyncSettingSendStatusUpdates {
-  uint64 clock = 1;
-  bool value = 2;
-}
-
-message SyncSettingStickerPacksInstalled {
-  uint64 clock = 1;
-  bytes value = 2;
-}
-
-message SyncSettingStickerPacksPending {
-  uint64 clock = 1;
-  bytes value = 2;
-}
-
-message SyncSettingStickersRecentStickers {
-  uint64 clock = 1;
-  bytes value = 2;
-}
-
-message SyncSettingTelemetryServerURL {
-  uint64 clock = 1;
-  string value = 2;
+  enum Type {
+    CURRENCY = 0;
+    GIF_RECENTS = 1;
+    GIF_FAVOURITES = 2;
+    MESSAGES_FROM_CONTACTS_ONLY = 3;
+    PREFERRED_NAME = 4;
+    PREVIEW_PRIVACY = 5;
+    PROFILE_PICTURES_SHOW_TO = 6;
+    PROFILE_PICTURES_VISIBILITY = 7;
+    SEND_STATUS_UPDATES = 8;
+    STICKERS_PACKS_INSTALLED = 9;
+    STICKERS_PACKS_PENDING = 10;
+    STICKERS_RECENT_STICKERS = 11;
+  }
 }
 
 /* TODOs

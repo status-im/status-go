@@ -20,823 +20,190 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-type SyncSettings struct {
-	Currency                  *SyncSettingCurrency                  `protobuf:"bytes,1,opt,name=currency,proto3" json:"currency,omitempty"`
-	GifApiKey                 *SyncSettingGifAPIKey                 `protobuf:"bytes,2,opt,name=gif_api_key,json=gifApiKey,proto3" json:"gif_api_key,omitempty"`
-	GifFavorites              *SyncSettingGifFavorites              `protobuf:"bytes,3,opt,name=gif_favorites,json=gifFavorites,proto3" json:"gif_favorites,omitempty"`
-	GifRecents                *SyncSettingGifRecents                `protobuf:"bytes,4,opt,name=gif_recents,json=gifRecents,proto3" json:"gif_recents,omitempty"`
-	MessagesFromContactsOnly  *SyncSettingMessagesFromContactsOnly  `protobuf:"bytes,5,opt,name=messages_from_contacts_only,json=messagesFromContactsOnly,proto3" json:"messages_from_contacts_only,omitempty"`
-	PreferredName             *SyncSettingPreferredName             `protobuf:"bytes,6,opt,name=preferred_name,json=preferredName,proto3" json:"preferred_name,omitempty"`
-	PreviewPrivacy            *SyncSettingPreviewPrivacy            `protobuf:"bytes,7,opt,name=previewPrivacy,proto3" json:"previewPrivacy,omitempty"`
-	ProfilePicturesShowTo     *SyncSettingProfilePicturesShowTo     `protobuf:"bytes,8,opt,name=profile_pictures_show_to,json=profilePicturesShowTo,proto3" json:"profile_pictures_show_to,omitempty"`
-	ProfilePicturesVisibility *SyncSettingProfilePicturesVisibility `protobuf:"bytes,9,opt,name=profile_pictures_visibility,json=profilePicturesVisibility,proto3" json:"profile_pictures_visibility,omitempty"`
-	SendStatusUpdates         *SyncSettingSendStatusUpdates         `protobuf:"bytes,10,opt,name=send_status_updates,json=sendStatusUpdates,proto3" json:"send_status_updates,omitempty"`
-	StickerPacksInstalled     *SyncSettingStickerPacksInstalled     `protobuf:"bytes,11,opt,name=sticker_packs_installed,json=stickerPacksInstalled,proto3" json:"sticker_packs_installed,omitempty"`
-	StickerPacksPending       *SyncSettingStickerPacksPending       `protobuf:"bytes,12,opt,name=sticker_packs_pending,json=stickerPacksPending,proto3" json:"sticker_packs_pending,omitempty"`
-	StickersRecentStickers    *SyncSettingStickersRecentStickers    `protobuf:"bytes,13,opt,name=stickers_recent_stickers,json=stickersRecentStickers,proto3" json:"stickers_recent_stickers,omitempty"`
-	TelemetryServer_URL       *SyncSettingTelemetryServerURL        `protobuf:"bytes,14,opt,name=telemetry_server_URL,json=telemetryServerURL,proto3" json:"telemetry_server_URL,omitempty"`
-	XXX_NoUnkeyedLiteral      struct{}                              `json:"-"`
-	XXX_unrecognized          []byte                                `json:"-"`
-	XXX_sizecache             int32                                 `json:"-"`
+type SyncSetting_Type int32
+
+const (
+	SyncSetting_CURRENCY                    SyncSetting_Type = 0
+	SyncSetting_GIF_RECENTS                 SyncSetting_Type = 1
+	SyncSetting_GIF_FAVOURITES              SyncSetting_Type = 2
+	SyncSetting_MESSAGES_FROM_CONTACTS_ONLY SyncSetting_Type = 3
+	SyncSetting_PREFERRED_NAME              SyncSetting_Type = 4
+	SyncSetting_PREVIEW_PRIVACY             SyncSetting_Type = 5
+	SyncSetting_PROFILE_PICTURES_SHOW_TO    SyncSetting_Type = 6
+	SyncSetting_PROFILE_PICTURES_VISIBILITY SyncSetting_Type = 7
+	SyncSetting_SEND_STATUS_UPDATES         SyncSetting_Type = 8
+	SyncSetting_STICKERS_PACKS_INSTALLED    SyncSetting_Type = 9
+	SyncSetting_STICKERS_PACKS_PENDING      SyncSetting_Type = 10
+	SyncSetting_STICKERS_RECENT_STICKERS    SyncSetting_Type = 11
+)
+
+var SyncSetting_Type_name = map[int32]string{
+	0:  "CURRENCY",
+	1:  "GIF_RECENTS",
+	2:  "GIF_FAVOURITES",
+	3:  "MESSAGES_FROM_CONTACTS_ONLY",
+	4:  "PREFERRED_NAME",
+	5:  "PREVIEW_PRIVACY",
+	6:  "PROFILE_PICTURES_SHOW_TO",
+	7:  "PROFILE_PICTURES_VISIBILITY",
+	8:  "SEND_STATUS_UPDATES",
+	9:  "STICKERS_PACKS_INSTALLED",
+	10: "STICKERS_PACKS_PENDING",
+	11: "STICKERS_RECENT_STICKERS",
 }
 
-func (m *SyncSettings) Reset()         { *m = SyncSettings{} }
-func (m *SyncSettings) String() string { return proto.CompactTextString(m) }
-func (*SyncSettings) ProtoMessage()    {}
-func (*SyncSettings) Descriptor() ([]byte, []int) {
+var SyncSetting_Type_value = map[string]int32{
+	"CURRENCY":                    0,
+	"GIF_RECENTS":                 1,
+	"GIF_FAVOURITES":              2,
+	"MESSAGES_FROM_CONTACTS_ONLY": 3,
+	"PREFERRED_NAME":              4,
+	"PREVIEW_PRIVACY":             5,
+	"PROFILE_PICTURES_SHOW_TO":    6,
+	"PROFILE_PICTURES_VISIBILITY": 7,
+	"SEND_STATUS_UPDATES":         8,
+	"STICKERS_PACKS_INSTALLED":    9,
+	"STICKERS_PACKS_PENDING":      10,
+	"STICKERS_RECENT_STICKERS":    11,
+}
+
+func (x SyncSetting_Type) String() string {
+	return proto.EnumName(SyncSetting_Type_name, int32(x))
+}
+
+func (SyncSetting_Type) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_e2f7a0bce2873c78, []int{0, 0}
+}
+
+type SyncSetting struct {
+	Type  SyncSetting_Type `protobuf:"varint,1,opt,name=type,proto3,enum=protobuf.SyncSetting_Type" json:"type,omitempty"`
+	Clock uint64           `protobuf:"varint,2,opt,name=clock,proto3" json:"clock,omitempty"`
+	// Types that are valid to be assigned to Value:
+	//	*SyncSetting_ValueString
+	//	*SyncSetting_ValueBytes
+	//	*SyncSetting_ValueBool
+	//	*SyncSetting_ValueInt64
+	Value                isSyncSetting_Value `protobuf_oneof:"value"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
+}
+
+func (m *SyncSetting) Reset()         { *m = SyncSetting{} }
+func (m *SyncSetting) String() string { return proto.CompactTextString(m) }
+func (*SyncSetting) ProtoMessage()    {}
+func (*SyncSetting) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e2f7a0bce2873c78, []int{0}
 }
 
-func (m *SyncSettings) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettings.Unmarshal(m, b)
+func (m *SyncSetting) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SyncSetting.Unmarshal(m, b)
 }
-func (m *SyncSettings) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettings.Marshal(b, m, deterministic)
+func (m *SyncSetting) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SyncSetting.Marshal(b, m, deterministic)
 }
-func (m *SyncSettings) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettings.Merge(m, src)
+func (m *SyncSetting) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SyncSetting.Merge(m, src)
 }
-func (m *SyncSettings) XXX_Size() int {
-	return xxx_messageInfo_SyncSettings.Size(m)
+func (m *SyncSetting) XXX_Size() int {
+	return xxx_messageInfo_SyncSetting.Size(m)
 }
-func (m *SyncSettings) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettings.DiscardUnknown(m)
+func (m *SyncSetting) XXX_DiscardUnknown() {
+	xxx_messageInfo_SyncSetting.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SyncSettings proto.InternalMessageInfo
+var xxx_messageInfo_SyncSetting proto.InternalMessageInfo
 
-func (m *SyncSettings) GetCurrency() *SyncSettingCurrency {
+func (m *SyncSetting) GetType() SyncSetting_Type {
 	if m != nil {
-		return m.Currency
+		return m.Type
 	}
-	return nil
+	return SyncSetting_CURRENCY
 }
 
-func (m *SyncSettings) GetGifApiKey() *SyncSettingGifAPIKey {
-	if m != nil {
-		return m.GifApiKey
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetGifFavorites() *SyncSettingGifFavorites {
-	if m != nil {
-		return m.GifFavorites
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetGifRecents() *SyncSettingGifRecents {
-	if m != nil {
-		return m.GifRecents
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetMessagesFromContactsOnly() *SyncSettingMessagesFromContactsOnly {
-	if m != nil {
-		return m.MessagesFromContactsOnly
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetPreferredName() *SyncSettingPreferredName {
-	if m != nil {
-		return m.PreferredName
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetPreviewPrivacy() *SyncSettingPreviewPrivacy {
-	if m != nil {
-		return m.PreviewPrivacy
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetProfilePicturesShowTo() *SyncSettingProfilePicturesShowTo {
-	if m != nil {
-		return m.ProfilePicturesShowTo
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetProfilePicturesVisibility() *SyncSettingProfilePicturesVisibility {
-	if m != nil {
-		return m.ProfilePicturesVisibility
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetSendStatusUpdates() *SyncSettingSendStatusUpdates {
-	if m != nil {
-		return m.SendStatusUpdates
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetStickerPacksInstalled() *SyncSettingStickerPacksInstalled {
-	if m != nil {
-		return m.StickerPacksInstalled
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetStickerPacksPending() *SyncSettingStickerPacksPending {
-	if m != nil {
-		return m.StickerPacksPending
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetStickersRecentStickers() *SyncSettingStickersRecentStickers {
-	if m != nil {
-		return m.StickersRecentStickers
-	}
-	return nil
-}
-
-func (m *SyncSettings) GetTelemetryServer_URL() *SyncSettingTelemetryServerURL {
-	if m != nil {
-		return m.TelemetryServer_URL
-	}
-	return nil
-}
-
-type SyncSettingCurrency struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                string   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingCurrency) Reset()         { *m = SyncSettingCurrency{} }
-func (m *SyncSettingCurrency) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingCurrency) ProtoMessage()    {}
-func (*SyncSettingCurrency) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{1}
-}
-
-func (m *SyncSettingCurrency) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingCurrency.Unmarshal(m, b)
-}
-func (m *SyncSettingCurrency) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingCurrency.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingCurrency) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingCurrency.Merge(m, src)
-}
-func (m *SyncSettingCurrency) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingCurrency.Size(m)
-}
-func (m *SyncSettingCurrency) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingCurrency.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingCurrency proto.InternalMessageInfo
-
-func (m *SyncSettingCurrency) GetClock() uint64 {
+func (m *SyncSetting) GetClock() uint64 {
 	if m != nil {
 		return m.Clock
 	}
 	return 0
 }
 
-func (m *SyncSettingCurrency) GetValue() string {
+type isSyncSetting_Value interface {
+	isSyncSetting_Value()
+}
+
+type SyncSetting_ValueString struct {
+	ValueString string `protobuf:"bytes,3,opt,name=value_string,json=valueString,proto3,oneof"`
+}
+
+type SyncSetting_ValueBytes struct {
+	ValueBytes []byte `protobuf:"bytes,4,opt,name=value_bytes,json=valueBytes,proto3,oneof"`
+}
+
+type SyncSetting_ValueBool struct {
+	ValueBool bool `protobuf:"varint,5,opt,name=value_bool,json=valueBool,proto3,oneof"`
+}
+
+type SyncSetting_ValueInt64 struct {
+	ValueInt64 int64 `protobuf:"varint,6,opt,name=value_int64,json=valueInt64,proto3,oneof"`
+}
+
+func (*SyncSetting_ValueString) isSyncSetting_Value() {}
+
+func (*SyncSetting_ValueBytes) isSyncSetting_Value() {}
+
+func (*SyncSetting_ValueBool) isSyncSetting_Value() {}
+
+func (*SyncSetting_ValueInt64) isSyncSetting_Value() {}
+
+func (m *SyncSetting) GetValue() isSyncSetting_Value {
 	if m != nil {
 		return m.Value
+	}
+	return nil
+}
+
+func (m *SyncSetting) GetValueString() string {
+	if x, ok := m.GetValue().(*SyncSetting_ValueString); ok {
+		return x.ValueString
 	}
 	return ""
 }
 
-type SyncSettingGifAPIKey struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                string   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingGifAPIKey) Reset()         { *m = SyncSettingGifAPIKey{} }
-func (m *SyncSettingGifAPIKey) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingGifAPIKey) ProtoMessage()    {}
-func (*SyncSettingGifAPIKey) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{2}
-}
-
-func (m *SyncSettingGifAPIKey) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingGifAPIKey.Unmarshal(m, b)
-}
-func (m *SyncSettingGifAPIKey) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingGifAPIKey.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingGifAPIKey) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingGifAPIKey.Merge(m, src)
-}
-func (m *SyncSettingGifAPIKey) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingGifAPIKey.Size(m)
-}
-func (m *SyncSettingGifAPIKey) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingGifAPIKey.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingGifAPIKey proto.InternalMessageInfo
-
-func (m *SyncSettingGifAPIKey) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingGifAPIKey) GetValue() string {
-	if m != nil {
-		return m.Value
-	}
-	return ""
-}
-
-type SyncSettingGifFavorites struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingGifFavorites) Reset()         { *m = SyncSettingGifFavorites{} }
-func (m *SyncSettingGifFavorites) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingGifFavorites) ProtoMessage()    {}
-func (*SyncSettingGifFavorites) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{3}
-}
-
-func (m *SyncSettingGifFavorites) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingGifFavorites.Unmarshal(m, b)
-}
-func (m *SyncSettingGifFavorites) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingGifFavorites.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingGifFavorites) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingGifFavorites.Merge(m, src)
-}
-func (m *SyncSettingGifFavorites) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingGifFavorites.Size(m)
-}
-func (m *SyncSettingGifFavorites) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingGifFavorites.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingGifFavorites proto.InternalMessageInfo
-
-func (m *SyncSettingGifFavorites) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingGifFavorites) GetValue() []byte {
-	if m != nil {
-		return m.Value
+func (m *SyncSetting) GetValueBytes() []byte {
+	if x, ok := m.GetValue().(*SyncSetting_ValueBytes); ok {
+		return x.ValueBytes
 	}
 	return nil
 }
 
-type SyncSettingGifRecents struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingGifRecents) Reset()         { *m = SyncSettingGifRecents{} }
-func (m *SyncSettingGifRecents) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingGifRecents) ProtoMessage()    {}
-func (*SyncSettingGifRecents) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{4}
-}
-
-func (m *SyncSettingGifRecents) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingGifRecents.Unmarshal(m, b)
-}
-func (m *SyncSettingGifRecents) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingGifRecents.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingGifRecents) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingGifRecents.Merge(m, src)
-}
-func (m *SyncSettingGifRecents) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingGifRecents.Size(m)
-}
-func (m *SyncSettingGifRecents) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingGifRecents.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingGifRecents proto.InternalMessageInfo
-
-func (m *SyncSettingGifRecents) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingGifRecents) GetValue() []byte {
-	if m != nil {
-		return m.Value
-	}
-	return nil
-}
-
-type SyncSettingMessagesFromContactsOnly struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                bool     `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingMessagesFromContactsOnly) Reset()         { *m = SyncSettingMessagesFromContactsOnly{} }
-func (m *SyncSettingMessagesFromContactsOnly) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingMessagesFromContactsOnly) ProtoMessage()    {}
-func (*SyncSettingMessagesFromContactsOnly) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{5}
-}
-
-func (m *SyncSettingMessagesFromContactsOnly) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingMessagesFromContactsOnly.Unmarshal(m, b)
-}
-func (m *SyncSettingMessagesFromContactsOnly) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingMessagesFromContactsOnly.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingMessagesFromContactsOnly) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingMessagesFromContactsOnly.Merge(m, src)
-}
-func (m *SyncSettingMessagesFromContactsOnly) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingMessagesFromContactsOnly.Size(m)
-}
-func (m *SyncSettingMessagesFromContactsOnly) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingMessagesFromContactsOnly.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingMessagesFromContactsOnly proto.InternalMessageInfo
-
-func (m *SyncSettingMessagesFromContactsOnly) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingMessagesFromContactsOnly) GetValue() bool {
-	if m != nil {
-		return m.Value
+func (m *SyncSetting) GetValueBool() bool {
+	if x, ok := m.GetValue().(*SyncSetting_ValueBool); ok {
+		return x.ValueBool
 	}
 	return false
 }
 
-type SyncSettingPreferredName struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                string   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingPreferredName) Reset()         { *m = SyncSettingPreferredName{} }
-func (m *SyncSettingPreferredName) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingPreferredName) ProtoMessage()    {}
-func (*SyncSettingPreferredName) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{6}
-}
-
-func (m *SyncSettingPreferredName) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingPreferredName.Unmarshal(m, b)
-}
-func (m *SyncSettingPreferredName) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingPreferredName.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingPreferredName) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingPreferredName.Merge(m, src)
-}
-func (m *SyncSettingPreferredName) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingPreferredName.Size(m)
-}
-func (m *SyncSettingPreferredName) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingPreferredName.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingPreferredName proto.InternalMessageInfo
-
-func (m *SyncSettingPreferredName) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
+func (m *SyncSetting) GetValueInt64() int64 {
+	if x, ok := m.GetValue().(*SyncSetting_ValueInt64); ok {
+		return x.ValueInt64
 	}
 	return 0
 }
 
-func (m *SyncSettingPreferredName) GetValue() string {
-	if m != nil {
-		return m.Value
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SyncSetting) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*SyncSetting_ValueString)(nil),
+		(*SyncSetting_ValueBytes)(nil),
+		(*SyncSetting_ValueBool)(nil),
+		(*SyncSetting_ValueInt64)(nil),
 	}
-	return ""
-}
-
-type SyncSettingPreviewPrivacy struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                bool     `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingPreviewPrivacy) Reset()         { *m = SyncSettingPreviewPrivacy{} }
-func (m *SyncSettingPreviewPrivacy) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingPreviewPrivacy) ProtoMessage()    {}
-func (*SyncSettingPreviewPrivacy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{7}
-}
-
-func (m *SyncSettingPreviewPrivacy) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingPreviewPrivacy.Unmarshal(m, b)
-}
-func (m *SyncSettingPreviewPrivacy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingPreviewPrivacy.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingPreviewPrivacy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingPreviewPrivacy.Merge(m, src)
-}
-func (m *SyncSettingPreviewPrivacy) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingPreviewPrivacy.Size(m)
-}
-func (m *SyncSettingPreviewPrivacy) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingPreviewPrivacy.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingPreviewPrivacy proto.InternalMessageInfo
-
-func (m *SyncSettingPreviewPrivacy) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingPreviewPrivacy) GetValue() bool {
-	if m != nil {
-		return m.Value
-	}
-	return false
-}
-
-type SyncSettingProfilePicturesShowTo struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                int64    `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingProfilePicturesShowTo) Reset()         { *m = SyncSettingProfilePicturesShowTo{} }
-func (m *SyncSettingProfilePicturesShowTo) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingProfilePicturesShowTo) ProtoMessage()    {}
-func (*SyncSettingProfilePicturesShowTo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{8}
-}
-
-func (m *SyncSettingProfilePicturesShowTo) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingProfilePicturesShowTo.Unmarshal(m, b)
-}
-func (m *SyncSettingProfilePicturesShowTo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingProfilePicturesShowTo.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingProfilePicturesShowTo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingProfilePicturesShowTo.Merge(m, src)
-}
-func (m *SyncSettingProfilePicturesShowTo) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingProfilePicturesShowTo.Size(m)
-}
-func (m *SyncSettingProfilePicturesShowTo) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingProfilePicturesShowTo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingProfilePicturesShowTo proto.InternalMessageInfo
-
-func (m *SyncSettingProfilePicturesShowTo) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingProfilePicturesShowTo) GetValue() int64 {
-	if m != nil {
-		return m.Value
-	}
-	return 0
-}
-
-type SyncSettingProfilePicturesVisibility struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                int64    `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingProfilePicturesVisibility) Reset()         { *m = SyncSettingProfilePicturesVisibility{} }
-func (m *SyncSettingProfilePicturesVisibility) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingProfilePicturesVisibility) ProtoMessage()    {}
-func (*SyncSettingProfilePicturesVisibility) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{9}
-}
-
-func (m *SyncSettingProfilePicturesVisibility) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingProfilePicturesVisibility.Unmarshal(m, b)
-}
-func (m *SyncSettingProfilePicturesVisibility) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingProfilePicturesVisibility.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingProfilePicturesVisibility) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingProfilePicturesVisibility.Merge(m, src)
-}
-func (m *SyncSettingProfilePicturesVisibility) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingProfilePicturesVisibility.Size(m)
-}
-func (m *SyncSettingProfilePicturesVisibility) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingProfilePicturesVisibility.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingProfilePicturesVisibility proto.InternalMessageInfo
-
-func (m *SyncSettingProfilePicturesVisibility) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingProfilePicturesVisibility) GetValue() int64 {
-	if m != nil {
-		return m.Value
-	}
-	return 0
-}
-
-type SyncSettingSendStatusUpdates struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                bool     `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingSendStatusUpdates) Reset()         { *m = SyncSettingSendStatusUpdates{} }
-func (m *SyncSettingSendStatusUpdates) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingSendStatusUpdates) ProtoMessage()    {}
-func (*SyncSettingSendStatusUpdates) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{10}
-}
-
-func (m *SyncSettingSendStatusUpdates) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingSendStatusUpdates.Unmarshal(m, b)
-}
-func (m *SyncSettingSendStatusUpdates) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingSendStatusUpdates.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingSendStatusUpdates) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingSendStatusUpdates.Merge(m, src)
-}
-func (m *SyncSettingSendStatusUpdates) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingSendStatusUpdates.Size(m)
-}
-func (m *SyncSettingSendStatusUpdates) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingSendStatusUpdates.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingSendStatusUpdates proto.InternalMessageInfo
-
-func (m *SyncSettingSendStatusUpdates) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingSendStatusUpdates) GetValue() bool {
-	if m != nil {
-		return m.Value
-	}
-	return false
-}
-
-type SyncSettingStickerPacksInstalled struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingStickerPacksInstalled) Reset()         { *m = SyncSettingStickerPacksInstalled{} }
-func (m *SyncSettingStickerPacksInstalled) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingStickerPacksInstalled) ProtoMessage()    {}
-func (*SyncSettingStickerPacksInstalled) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{11}
-}
-
-func (m *SyncSettingStickerPacksInstalled) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingStickerPacksInstalled.Unmarshal(m, b)
-}
-func (m *SyncSettingStickerPacksInstalled) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingStickerPacksInstalled.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingStickerPacksInstalled) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingStickerPacksInstalled.Merge(m, src)
-}
-func (m *SyncSettingStickerPacksInstalled) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingStickerPacksInstalled.Size(m)
-}
-func (m *SyncSettingStickerPacksInstalled) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingStickerPacksInstalled.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingStickerPacksInstalled proto.InternalMessageInfo
-
-func (m *SyncSettingStickerPacksInstalled) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingStickerPacksInstalled) GetValue() []byte {
-	if m != nil {
-		return m.Value
-	}
-	return nil
-}
-
-type SyncSettingStickerPacksPending struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingStickerPacksPending) Reset()         { *m = SyncSettingStickerPacksPending{} }
-func (m *SyncSettingStickerPacksPending) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingStickerPacksPending) ProtoMessage()    {}
-func (*SyncSettingStickerPacksPending) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{12}
-}
-
-func (m *SyncSettingStickerPacksPending) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingStickerPacksPending.Unmarshal(m, b)
-}
-func (m *SyncSettingStickerPacksPending) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingStickerPacksPending.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingStickerPacksPending) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingStickerPacksPending.Merge(m, src)
-}
-func (m *SyncSettingStickerPacksPending) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingStickerPacksPending.Size(m)
-}
-func (m *SyncSettingStickerPacksPending) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingStickerPacksPending.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingStickerPacksPending proto.InternalMessageInfo
-
-func (m *SyncSettingStickerPacksPending) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingStickerPacksPending) GetValue() []byte {
-	if m != nil {
-		return m.Value
-	}
-	return nil
-}
-
-type SyncSettingStickersRecentStickers struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingStickersRecentStickers) Reset()         { *m = SyncSettingStickersRecentStickers{} }
-func (m *SyncSettingStickersRecentStickers) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingStickersRecentStickers) ProtoMessage()    {}
-func (*SyncSettingStickersRecentStickers) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{13}
-}
-
-func (m *SyncSettingStickersRecentStickers) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingStickersRecentStickers.Unmarshal(m, b)
-}
-func (m *SyncSettingStickersRecentStickers) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingStickersRecentStickers.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingStickersRecentStickers) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingStickersRecentStickers.Merge(m, src)
-}
-func (m *SyncSettingStickersRecentStickers) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingStickersRecentStickers.Size(m)
-}
-func (m *SyncSettingStickersRecentStickers) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingStickersRecentStickers.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingStickersRecentStickers proto.InternalMessageInfo
-
-func (m *SyncSettingStickersRecentStickers) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingStickersRecentStickers) GetValue() []byte {
-	if m != nil {
-		return m.Value
-	}
-	return nil
-}
-
-type SyncSettingTelemetryServerURL struct {
-	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Value                string   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SyncSettingTelemetryServerURL) Reset()         { *m = SyncSettingTelemetryServerURL{} }
-func (m *SyncSettingTelemetryServerURL) String() string { return proto.CompactTextString(m) }
-func (*SyncSettingTelemetryServerURL) ProtoMessage()    {}
-func (*SyncSettingTelemetryServerURL) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e2f7a0bce2873c78, []int{14}
-}
-
-func (m *SyncSettingTelemetryServerURL) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SyncSettingTelemetryServerURL.Unmarshal(m, b)
-}
-func (m *SyncSettingTelemetryServerURL) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SyncSettingTelemetryServerURL.Marshal(b, m, deterministic)
-}
-func (m *SyncSettingTelemetryServerURL) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SyncSettingTelemetryServerURL.Merge(m, src)
-}
-func (m *SyncSettingTelemetryServerURL) XXX_Size() int {
-	return xxx_messageInfo_SyncSettingTelemetryServerURL.Size(m)
-}
-func (m *SyncSettingTelemetryServerURL) XXX_DiscardUnknown() {
-	xxx_messageInfo_SyncSettingTelemetryServerURL.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SyncSettingTelemetryServerURL proto.InternalMessageInfo
-
-func (m *SyncSettingTelemetryServerURL) GetClock() uint64 {
-	if m != nil {
-		return m.Clock
-	}
-	return 0
-}
-
-func (m *SyncSettingTelemetryServerURL) GetValue() string {
-	if m != nil {
-		return m.Value
-	}
-	return ""
 }
 
 func init() {
-	proto.RegisterType((*SyncSettings)(nil), "protobuf.SyncSettings")
-	proto.RegisterType((*SyncSettingCurrency)(nil), "protobuf.SyncSettingCurrency")
-	proto.RegisterType((*SyncSettingGifAPIKey)(nil), "protobuf.SyncSettingGifAPIKey")
-	proto.RegisterType((*SyncSettingGifFavorites)(nil), "protobuf.SyncSettingGifFavorites")
-	proto.RegisterType((*SyncSettingGifRecents)(nil), "protobuf.SyncSettingGifRecents")
-	proto.RegisterType((*SyncSettingMessagesFromContactsOnly)(nil), "protobuf.SyncSettingMessagesFromContactsOnly")
-	proto.RegisterType((*SyncSettingPreferredName)(nil), "protobuf.SyncSettingPreferredName")
-	proto.RegisterType((*SyncSettingPreviewPrivacy)(nil), "protobuf.SyncSettingPreviewPrivacy")
-	proto.RegisterType((*SyncSettingProfilePicturesShowTo)(nil), "protobuf.SyncSettingProfilePicturesShowTo")
-	proto.RegisterType((*SyncSettingProfilePicturesVisibility)(nil), "protobuf.SyncSettingProfilePicturesVisibility")
-	proto.RegisterType((*SyncSettingSendStatusUpdates)(nil), "protobuf.SyncSettingSendStatusUpdates")
-	proto.RegisterType((*SyncSettingStickerPacksInstalled)(nil), "protobuf.SyncSettingStickerPacksInstalled")
-	proto.RegisterType((*SyncSettingStickerPacksPending)(nil), "protobuf.SyncSettingStickerPacksPending")
-	proto.RegisterType((*SyncSettingStickersRecentStickers)(nil), "protobuf.SyncSettingStickersRecentStickers")
-	proto.RegisterType((*SyncSettingTelemetryServerURL)(nil), "protobuf.SyncSettingTelemetryServerURL")
+	proto.RegisterEnum("protobuf.SyncSetting_Type", SyncSetting_Type_name, SyncSetting_Type_value)
+	proto.RegisterType((*SyncSetting)(nil), "protobuf.SyncSetting")
 }
 
 func init() {
@@ -844,48 +211,33 @@ func init() {
 }
 
 var fileDescriptor_e2f7a0bce2873c78 = []byte{
-	// 685 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x94, 0xef, 0x4e, 0xdb, 0x48,
-	0x14, 0xc5, 0xc5, 0xf2, 0x67, 0x93, 0x9b, 0x04, 0x69, 0x27, 0x64, 0x19, 0xc4, 0xc2, 0x42, 0x58,
-	0xed, 0xa2, 0x5d, 0x6d, 0x2a, 0xb5, 0x9f, 0xaa, 0x4a, 0x55, 0x01, 0x35, 0x88, 0x86, 0x42, 0x3a,
-	0x01, 0xa4, 0x56, 0x95, 0x46, 0x8e, 0x73, 0x1d, 0x46, 0x71, 0xc6, 0xd6, 0xcc, 0x24, 0xc8, 0xaf,
-	0xd8, 0xa7, 0xaa, 0x32, 0x8e, 0xa3, 0x14, 0xec, 0x10, 0xab, 0x9f, 0xe2, 0x7b, 0x7d, 0xce, 0xef,
-	0x38, 0xd6, 0xf8, 0x40, 0x55, 0x47, 0xd2, 0xe5, 0x1a, 0x8d, 0x11, 0xb2, 0xaf, 0x1b, 0xa1, 0x0a,
-	0x4c, 0x40, 0x0a, 0xf6, 0xa7, 0x3b, 0xf2, 0xea, 0xdf, 0x8a, 0x50, 0xee, 0x44, 0xd2, 0xed, 0x4c,
-	0x05, 0xe4, 0x35, 0x14, 0xdc, 0x91, 0x52, 0x28, 0xdd, 0x88, 0xae, 0x1c, 0xac, 0x1c, 0x97, 0x5e,
-	0xee, 0x35, 0x12, 0x75, 0x63, 0x4e, 0x79, 0x36, 0x15, 0xb1, 0x99, 0x9c, 0xbc, 0x85, 0x52, 0x5f,
-	0x78, 0xdc, 0x09, 0x05, 0x1f, 0x60, 0x44, 0x7f, 0xb1, 0xee, 0xfd, 0x54, 0xf7, 0xb9, 0xf0, 0x4e,
-	0xda, 0x17, 0x2d, 0x8c, 0x58, 0xb1, 0x2f, 0xbc, 0x93, 0x50, 0xb4, 0x30, 0x22, 0x4d, 0xa8, 0x4c,
-	0xfc, 0x9e, 0x33, 0x0e, 0x94, 0x30, 0xa8, 0xe9, 0xaa, 0x25, 0x1c, 0x66, 0x11, 0x9a, 0x89, 0x90,
-	0x95, 0xfb, 0x73, 0x13, 0x79, 0x17, 0x3f, 0x87, 0x42, 0x17, 0xa5, 0xd1, 0x74, 0xcd, 0x52, 0xfe,
-	0xcc, 0xa2, 0xb0, 0x58, 0xc6, 0xa0, 0x3f, 0xbb, 0x26, 0x3e, 0xec, 0x0e, 0x51, 0x6b, 0xa7, 0x8f,
-	0x9a, 0x7b, 0x2a, 0x18, 0x72, 0x37, 0x90, 0xc6, 0x71, 0x8d, 0xe6, 0x81, 0xf4, 0x23, 0xba, 0x6e,
-	0x89, 0xff, 0xa7, 0x12, 0x3f, 0x4e, 0x7d, 0x4d, 0x15, 0x0c, 0xcf, 0xa6, 0xae, 0x6b, 0xe9, 0x47,
-	0x8c, 0x0e, 0x33, 0xee, 0x90, 0x0b, 0xd8, 0x0c, 0x15, 0x7a, 0xa8, 0x14, 0xf6, 0xb8, 0x74, 0x86,
-	0x48, 0x37, 0x6c, 0x40, 0x3d, 0x35, 0xa0, 0x9d, 0x48, 0xaf, 0x9c, 0x21, 0xb2, 0x4a, 0x38, 0x3f,
-	0x92, 0x96, 0x45, 0x8d, 0x05, 0x3e, 0xb4, 0x95, 0x18, 0x3b, 0x6e, 0x44, 0x7f, 0xb5, 0xa8, 0xa3,
-	0x2c, 0xd4, 0x9c, 0x94, 0x3d, 0xb2, 0x12, 0x17, 0x68, 0xa8, 0x02, 0x4f, 0xf8, 0xc8, 0x43, 0xe1,
-	0x9a, 0x91, 0x42, 0xcd, 0xf5, 0x7d, 0xf0, 0xc0, 0x4d, 0x40, 0x0b, 0x16, 0xfb, 0x6f, 0x06, 0xd6,
-	0x9a, 0xda, 0x53, 0x4f, 0xe7, 0x3e, 0x78, 0xb8, 0x09, 0x58, 0x2d, 0x4c, 0x5b, 0x13, 0x09, 0xbb,
-	0x4f, 0x42, 0xc6, 0x42, 0x8b, 0xae, 0xf0, 0x85, 0x89, 0x68, 0xd1, 0xe6, 0x34, 0x96, 0xc9, 0xb9,
-	0x9b, 0xb9, 0xd8, 0x4e, 0x98, 0x75, 0x8b, 0xdc, 0x41, 0x55, 0xa3, 0xec, 0x71, 0x6d, 0x1c, 0x33,
-	0xd2, 0x7c, 0x14, 0xf6, 0x9c, 0xc9, 0x51, 0x03, 0x9b, 0xf3, 0x77, 0x6a, 0x4e, 0x07, 0x65, 0xaf,
-	0x63, 0xe5, 0xb7, 0xb1, 0x9a, 0xfd, 0xa6, 0x1f, 0xaf, 0x48, 0x17, 0xb6, 0xb5, 0x11, 0xee, 0x00,
-	0x15, 0x0f, 0x1d, 0x77, 0xa0, 0xb9, 0x90, 0xda, 0x38, 0xbe, 0x8f, 0x3d, 0x5a, 0x5a, 0xf0, 0xae,
-	0x3a, 0xb1, 0xa7, 0x3d, 0xb1, 0x5c, 0x24, 0x0e, 0x56, 0xd3, 0x69, 0x6b, 0xf2, 0x15, 0x6a, 0x3f,
-	0x66, 0x84, 0x28, 0x7b, 0x42, 0xf6, 0x69, 0xd9, 0x26, 0x1c, 0x3f, 0x9b, 0xd0, 0x8e, 0xf5, 0xac,
-	0xaa, 0x9f, 0x2e, 0x09, 0x02, 0x9d, 0xae, 0xf5, 0xf4, 0xdb, 0xe1, 0xc9, 0x4c, 0x2b, 0x36, 0xe0,
-	0xbf, 0x45, 0x01, 0x3a, 0xfe, 0x78, 0x66, 0xd3, 0xef, 0x3a, 0x75, 0x4f, 0x3e, 0xc3, 0x96, 0x41,
-	0x1f, 0x87, 0x68, 0x54, 0xc4, 0x35, 0xaa, 0x31, 0x2a, 0x7e, 0xcb, 0x2e, 0xe9, 0xa6, 0x8d, 0xf8,
-	0x27, 0x35, 0xe2, 0x26, 0x31, 0x74, 0xac, 0xfe, 0x96, 0x5d, 0x32, 0x62, 0x9e, 0xec, 0xea, 0x27,
-	0x50, 0x4d, 0x69, 0x28, 0xb2, 0x05, 0xeb, 0xae, 0x1f, 0xb8, 0x03, 0xdb, 0x67, 0x6b, 0x2c, 0x1e,
-	0x26, 0xdb, 0xb1, 0xe3, 0x8f, 0xd0, 0xf6, 0x54, 0x91, 0xc5, 0x43, 0xfd, 0x14, 0xb6, 0xd2, 0x6a,
-	0x2a, 0x17, 0xe3, 0x3d, 0x6c, 0x67, 0x14, 0xd5, 0x32, 0x98, 0x72, 0x82, 0x39, 0x83, 0x5a, 0x6a,
-	0x53, 0xe5, 0x82, 0x7c, 0x82, 0xa3, 0x25, 0xca, 0x69, 0x19, 0x64, 0x21, 0x41, 0x36, 0x81, 0x66,
-	0xd5, 0x51, 0xae, 0xd7, 0x74, 0x0e, 0x3b, 0x99, 0x5d, 0x94, 0xeb, 0x81, 0xae, 0xe0, 0xe0, 0xb9,
-	0xf6, 0x59, 0x86, 0xb7, 0x9a, 0xf0, 0x18, 0xfc, 0xb5, 0x4c, 0xcb, 0xe4, 0x62, 0x7e, 0x80, 0x3f,
-	0x16, 0x35, 0xca, 0x4f, 0xfc, 0xdf, 0xd4, 0x06, 0xc9, 0x75, 0x46, 0x2e, 0x61, 0x7f, 0x71, 0x5f,
-	0xe4, 0xa2, 0x5d, 0xc3, 0xe1, 0xb3, 0xe5, 0x90, 0x0b, 0xd8, 0x82, 0xbd, 0x85, 0x55, 0x90, 0xe7,
-	0xd0, 0x9d, 0x56, 0xbe, 0x94, 0x1a, 0x2f, 0xde, 0x24, 0x1d, 0xd3, 0xdd, 0xb0, 0x57, 0xaf, 0xbe,
-	0x07, 0x00, 0x00, 0xff, 0xff, 0x66, 0x9a, 0x08, 0xf1, 0x26, 0x09, 0x00, 0x00,
+	// 438 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x92, 0x5f, 0x8f, 0x93, 0x40,
+	0x10, 0xc0, 0x4b, 0x4b, 0x7b, 0xed, 0x50, 0xef, 0x36, 0x5b, 0xa3, 0xe4, 0x34, 0x39, 0x3c, 0x5f,
+	0x78, 0xc2, 0x44, 0x8d, 0x2f, 0x3e, 0x51, 0x58, 0xda, 0xcd, 0x51, 0x20, 0x3b, 0x4b, 0x2f, 0xf5,
+	0x65, 0x63, 0x1b, 0xbc, 0x34, 0x36, 0xd0, 0x1c, 0x9c, 0x09, 0x5f, 0xc6, 0x2f, 0xe1, 0x17, 0x34,
+	0x80, 0xf5, 0xdf, 0x3d, 0xed, 0xce, 0x6f, 0x7e, 0x33, 0x3b, 0x99, 0x2c, 0xcc, 0xca, 0x3a, 0xdf,
+	0xa9, 0x32, 0xab, 0xaa, 0x7d, 0x7e, 0x57, 0x3a, 0xc7, 0xfb, 0xa2, 0x2a, 0xe8, 0xb8, 0x3d, 0xb6,
+	0x0f, 0x5f, 0xae, 0xbf, 0xeb, 0x60, 0x60, 0x9d, 0xef, 0xb0, 0x13, 0xa8, 0x03, 0x7a, 0x55, 0x1f,
+	0x33, 0x53, 0xb3, 0x34, 0xfb, 0xfc, 0xed, 0xa5, 0x73, 0x12, 0x9d, 0xbf, 0x24, 0x47, 0xd6, 0xc7,
+	0x4c, 0xb4, 0x1e, 0x7d, 0x0a, 0xc3, 0xdd, 0xa1, 0xd8, 0x7d, 0x35, 0xfb, 0x96, 0x66, 0xeb, 0xa2,
+	0x0b, 0xe8, 0x6b, 0x98, 0x7e, 0xfb, 0x7c, 0x78, 0xc8, 0x54, 0x59, 0xdd, 0xef, 0xf3, 0x3b, 0x73,
+	0x60, 0x69, 0xf6, 0x64, 0xd9, 0x13, 0x46, 0x4b, 0xb1, 0x85, 0xf4, 0x15, 0x74, 0xa1, 0xda, 0xd6,
+	0x55, 0x56, 0x9a, 0xba, 0xa5, 0xd9, 0xd3, 0x65, 0x4f, 0x40, 0x0b, 0xe7, 0x0d, 0xa3, 0x57, 0x00,
+	0xbf, 0x94, 0xa2, 0x38, 0x98, 0x43, 0x4b, 0xb3, 0xc7, 0xcb, 0x9e, 0x98, 0x74, 0x46, 0x51, 0x1c,
+	0xfe, 0xf4, 0xd8, 0xe7, 0xd5, 0x87, 0xf7, 0xe6, 0xc8, 0xd2, 0xec, 0xc1, 0xef, 0x1e, 0xbc, 0x61,
+	0xd7, 0x3f, 0xfa, 0xa0, 0x37, 0x03, 0xd3, 0x29, 0x8c, 0xbd, 0x54, 0x08, 0x16, 0x79, 0x1b, 0xd2,
+	0xa3, 0x17, 0x60, 0x2c, 0x78, 0xa0, 0x04, 0xf3, 0x58, 0x24, 0x91, 0x68, 0x94, 0xc2, 0x79, 0x03,
+	0x02, 0x77, 0x1d, 0xa7, 0x82, 0x4b, 0x86, 0xa4, 0x4f, 0xaf, 0xe0, 0xc5, 0x8a, 0x21, 0xba, 0x0b,
+	0x86, 0x2a, 0x10, 0xf1, 0x4a, 0x79, 0x71, 0x24, 0x5d, 0x4f, 0xa2, 0x8a, 0xa3, 0x70, 0x43, 0x06,
+	0x4d, 0x51, 0x22, 0x58, 0xc0, 0x84, 0x60, 0xbe, 0x8a, 0xdc, 0x15, 0x23, 0x3a, 0x9d, 0xc1, 0x45,
+	0x22, 0xd8, 0x9a, 0xb3, 0x5b, 0x95, 0x08, 0xbe, 0x76, 0xbd, 0x0d, 0x19, 0xd2, 0x97, 0x60, 0x26,
+	0x22, 0x0e, 0x78, 0xc8, 0x54, 0xc2, 0x3d, 0x99, 0x0a, 0x86, 0x0a, 0x97, 0xf1, 0xad, 0x92, 0x31,
+	0x19, 0x35, 0xef, 0x3c, 0xca, 0xae, 0x39, 0xf2, 0x39, 0x0f, 0xb9, 0xdc, 0x90, 0x33, 0xfa, 0x1c,
+	0x66, 0xc8, 0x22, 0x5f, 0xa1, 0x74, 0x65, 0x8a, 0x2a, 0x4d, 0x7c, 0xb7, 0x99, 0x70, 0xdc, 0xf4,
+	0x45, 0xc9, 0xbd, 0x1b, 0x26, 0x50, 0x25, 0xae, 0x77, 0x83, 0x8a, 0x47, 0x28, 0xdd, 0x30, 0x64,
+	0x3e, 0x99, 0xd0, 0x4b, 0x78, 0xf6, 0x5f, 0x36, 0x61, 0x91, 0xcf, 0xa3, 0x05, 0x81, 0x7f, 0x2a,
+	0xbb, 0x2d, 0xa8, 0x53, 0x4c, 0x8c, 0xf9, 0x19, 0x0c, 0xbb, 0x2d, 0x3f, 0xf9, 0x64, 0x38, 0x6f,
+	0x3e, 0x9e, 0xbe, 0xc1, 0x76, 0xd4, 0xde, 0xde, 0xfd, 0x0c, 0x00, 0x00, 0xff, 0xff, 0xd4, 0xfb,
+	0xea, 0x07, 0x57, 0x02, 0x00, 0x00,
 }

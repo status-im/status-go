@@ -128,10 +128,6 @@ var (
 	GifAPIKey = SettingField{
 		reactFieldName: "gifs/api-key",
 		dBColumnName:   "gif_api_key",
-		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: gifAPIKeyProtobufFactory,
-			Struct:    gifAPIKeyProtobufFactoryStruct,
-		},
 	}
 	GifFavourites = SettingField{
 		reactFieldName: "gifs/favorite-gifs",
@@ -351,10 +347,6 @@ var (
 	TelemetryServerURL = SettingField{
 		reactFieldName: "telemetry-server-url",
 		dBColumnName:   "telemetry_server_url",
-		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: telemetryServerURLProtobufFactory,
-			Struct:    telemetryServerURLProtobufFactoryStruct,
-		},
 	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",

@@ -267,34 +267,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncBookmark))
 	case protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY:
 		return m.unmarshalProtobufData(new(protobuf.SyncClearHistory))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTINGS:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettings))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_CURRENCY:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingCurrency))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_RECENTS:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingGifRecents))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_GIF_FAVOURITES:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingGifFavorites))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_MESSAGES_FROM_CONTACTS_ONLY:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingMessagesFromContactsOnly))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREFERRED_NAME:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingPreferredName))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_PREVIEW_PRIVACY:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingPreviewPrivacy))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_SHOW_TO:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingProfilePicturesShowTo))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingProfilePicturesVisibility))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_SEND_STATUS_UPDATES:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingSendStatusUpdates))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_INSTALLED:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingStickerPacksInstalled))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_PACKS_PENDING:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingStickerPacksPending))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_STICKERS_RECENT_STICKERS:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingStickersRecentStickers))
-	case protobuf.ApplicationMetadataMessage_SYNC_SETTING_TELEMETRY_SERVER_URL:
-		return m.unmarshalProtobufData(new(protobuf.SyncSettingTelemetryServerURL))
+	case protobuf.ApplicationMetadataMessage_SYNC_SETTING:
+		return m.unmarshalProtobufData(new(protobuf.SyncSetting))
 	}
 	return nil
 }

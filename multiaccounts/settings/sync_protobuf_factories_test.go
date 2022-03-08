@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -31,7 +32,7 @@ func TestProfilePicturesVisibilityProtobufFactory(t *testing.T) {
 	err := json.Unmarshal([]byte(`3`), &v)
 	require.NoError(t, err)
 
-	expected := expectedCriteria{3, 123, protobuf.ApplicationMetadataMessage_SYNC_SETTING_PROFILE_PICTURES_VISIBILITY}
+	expected := expectedCriteria{3, 123, protobuf.ApplicationMetadataMessage_SYNC_SETTING}
 
 	cs := []testCriteria{
 		{"json.Unmarshal int into interface{}", inputCriteria{Value: v, Clock: 123}, expected},
@@ -42,13 +43,16 @@ func TestProfilePicturesVisibilityProtobufFactory(t *testing.T) {
 	for _, c := range cs {
 		a := require.New(t)
 
-		msg, amt, err := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock)
+		rm, err := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock, "0x123def")
 		a.NoError(err, c.Name)
 
-		ppvp, ok := msg.(*protobuf.SyncSettingProfilePicturesVisibility)
-		a.True(ok, c.Name)
-		a.Equal(c.Expected.Value, ppvp.Value, c.Name)
+		ppvp := new(protobuf.SyncSetting)
+		err = proto.Unmarshal(rm.Payload, ppvp)
+		a.NoError(err, c.Name)
+
+		a.Equal(protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY, ppvp.Type, c.Name)
+		a.Equal(c.Expected.Value, ppvp.GetValueInt64(), c.Name)
 		a.Equal(c.Expected.Clock, ppvp.Clock, c.Name)
-		a.Equal(c.Expected.AMT, amt, c.Name)
+		a.Equal(c.Expected.AMT, rm.MessageType, c.Name)
 	}
 }
