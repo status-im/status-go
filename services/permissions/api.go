@@ -22,5 +22,9 @@ func (api *API) GetDappPermissions(ctx context.Context) ([]DappPermissions, erro
 }
 
 func (api *API) DeleteDappPermissions(ctx context.Context, name string) error {
-	return api.db.DeletePermission(name)
+	return api.db.DeletePermission(name, "")
+}
+
+func (api *API) DeleteDappPermissionsByNameAndAddress(ctx context.Context, name string, address string) error {
+	return api.db.DeletePermission(name, address)
 }

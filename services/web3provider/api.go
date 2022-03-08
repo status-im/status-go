@@ -83,6 +83,7 @@ type Web3SendAsyncReadOnlyRequest struct {
 	MessageID interface{} `json:"messageId"`
 	Payload   ETHPayload  `json:"payload"`
 	Hostname  string      `json:"hostname"`
+	Address   string      `json:"address,omitempty"`
 }
 
 type Web3SendAsyncReadOnlyError struct {
@@ -100,6 +101,7 @@ type Web3SendAsyncReadOnlyResponse struct {
 
 type APIRequest struct {
 	MessageID  interface{} `json:"messageId,omitempty"`
+	Address    string      `json:"address,omitempty"`
 	Hostname   string      `json:"hostname"`
 	Permission string      `json:"permission"`
 }
@@ -300,7 +302,7 @@ func (api *API) web3SignatureResponse(request Web3SendAsyncReadOnlyRequest) (*We
 }
 
 func (api *API) ProcessWeb3ReadOnlyRequest(request Web3SendAsyncReadOnlyRequest) (*Web3SendAsyncReadOnlyResponse, error) {
-	hasPermission, err := api.s.permissionsDB.HasPermission(request.Hostname, PermissionWeb3)
+	hasPermission, err := api.s.permissionsDB.HasPermission(request.Hostname, request.Address, PermissionWeb3)
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +358,7 @@ func (api *API) ProcessAPIRequest(request APIRequest) (*APIResponse, error) {
 	if request.Permission == "" {
 		return nil, ErrorInvalidAPIRequest
 	}
-
-	hasPermission, err := api.s.permissionsDB.HasPermission(request.Hostname, request.Permission)
+	hasPermission, err := api.s.permissionsDB.HasPermission(request.Hostname, request.Address, request.Permission)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +374,6 @@ func (api *API) ProcessAPIRequest(request APIRequest) (*APIResponse, error) {
 			IsAllowed:  false,
 		}, nil
 	}
-
 	var data interface{}
 	switch request.Permission {
 	case PermissionWeb3:
@@ -393,7 +393,6 @@ func (api *API) ProcessAPIRequest(request APIRequest) (*APIResponse, error) {
 	default:
 		return nil, ErrorUnknownPermission
 	}
-
 	return &APIResponse{
 		ProviderResponse: ProviderResponse{
 			ResponseType: ResponseAPI,
