@@ -563,9 +563,7 @@ func init() {
 	proto.RegisterMapType((map[string]*EncryptedMessageProtocol)(nil), "encryption.ProtocolMessage.EncryptedMessageEntry")
 }
 
-func init() {
-	proto.RegisterFile("protocol_message.proto", fileDescriptor_4e37b52004a72e16)
-}
+func init() { proto.RegisterFile("protocol_message.proto", fileDescriptor_4e37b52004a72e16) }
 
 var fileDescriptor_4e37b52004a72e16 = []byte{
 	// 633 bytes of a gzipped FileDescriptorProto

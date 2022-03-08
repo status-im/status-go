@@ -125,9 +125,7 @@ func init() {
 	proto.RegisterType((*StatusUpdate)(nil), "protobuf.StatusUpdate")
 }
 
-func init() {
-	proto.RegisterFile("status_update.proto", fileDescriptor_911acd91e62cd3d7)
-}
+func init() { proto.RegisterFile("status_update.proto", fileDescriptor_911acd91e62cd3d7) }
 
 var fileDescriptor_911acd91e62cd3d7 = []byte{
 	// 253 bytes of a gzipped FileDescriptorProto

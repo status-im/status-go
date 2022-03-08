@@ -621,9 +621,7 @@ func init() {
 	proto.RegisterType((*ChatMessage)(nil), "protobuf.ChatMessage")
 }
 
-func init() {
-	proto.RegisterFile("chat_message.proto", fileDescriptor_263952f55fd35689)
-}
+func init() { proto.RegisterFile("chat_message.proto", fileDescriptor_263952f55fd35689) }
 
 var fileDescriptor_263952f55fd35689 = []byte{
 	// 734 bytes of a gzipped FileDescriptorProto
