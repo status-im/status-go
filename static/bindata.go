@@ -5,7 +5,7 @@
 // ../config/cli/anon-metric-node-client.json (857B)
 // ../config/cli/anon-metric-node-server.json (696B)
 // ../config/cli/fleet-eth.prod.json (4.47kB)
-// ../config/cli/fleet-eth.staging.json (1.98kB)
+// ../config/cli/fleet-eth.staging.json (2.145kB)
 // ../config/cli/fleet-eth.test.json (2.174kB)
 // ../config/cli/fleet-status.prod.json (1.92kB)
 // ../config/cli/fleet-status.test.json (937B)
@@ -104,7 +104,7 @@ func emojisTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "emojis.txt", size: 28134, mode: os.FileMode(0644), modTime: time.Unix(1647462278, 0)}
+	info := bindataFileInfo{name: "emojis.txt", size: 28134, mode: os.FileMode(0664), modTime: time.Unix(1647273704, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf5, 0x28, 0xc, 0x22, 0x34, 0xa1, 0xeb, 0x8, 0x8d, 0xef, 0x38, 0x1b, 0xd8, 0xc2, 0x1a, 0x6d, 0xa2, 0x62, 0xad, 0x43, 0xfc, 0x1c, 0x38, 0xda, 0x8c, 0x3f, 0x34, 0xa, 0x8c, 0x6f, 0x5d, 0xd8}}
 	return a, nil
 }
@@ -124,7 +124,7 @@ func ConfigReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/README.md", size: 3031, mode: os.FileMode(0644), modTime: time.Unix(1646392728, 0)}
+	info := bindataFileInfo{name: "../config/README.md", size: 3031, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x15, 0x44, 0x2b, 0x13, 0x14, 0x34, 0xa, 0x66, 0x62, 0x1b, 0xc6, 0x4a, 0x2c, 0x7d, 0x4d, 0x89, 0xfb, 0xc9, 0x69, 0xe4, 0x18, 0x5f, 0x3, 0x98, 0x6d, 0x3c, 0x9e, 0xa8, 0xcd, 0x53, 0x5d, 0x75}}
 	return a, nil
 }
@@ -144,7 +144,7 @@ func ConfigCliAnonMetricNodeClientJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/anon-metric-node-client.json", size: 857, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/anon-metric-node-client.json", size: 857, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0xdf, 0xcd, 0xc8, 0x92, 0x1d, 0x63, 0x5e, 0xe1, 0xf9, 0x7f, 0xed, 0xf2, 0x68, 0x6b, 0x20, 0xff, 0x1d, 0x3b, 0xc9, 0x7b, 0xb9, 0x6a, 0xba, 0xd3, 0xbd, 0xf7, 0x48, 0x7b, 0x5a, 0x52, 0x79}}
 	return a, nil
 }
@@ -164,7 +164,7 @@ func ConfigCliAnonMetricNodeServerJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/anon-metric-node-server.json", size: 696, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/anon-metric-node-server.json", size: 696, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf0, 0x2f, 0x97, 0xab, 0x77, 0x61, 0x93, 0x9d, 0x1f, 0x33, 0x18, 0x72, 0xad, 0xce, 0xa3, 0x35, 0xa9, 0x44, 0xbf, 0x29, 0xa8, 0xea, 0x21, 0xb7, 0x22, 0x7f, 0x7d, 0x3a, 0x6b, 0x55, 0x3c, 0x66}}
 	return a, nil
 }
@@ -184,12 +184,12 @@ func ConfigCliFleetEthProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 4470, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 4470, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0x7b, 0x71, 0xe3, 0x8a, 0xb0, 0x7f, 0xc3, 0xe, 0xd2, 0x67, 0x38, 0x50, 0xf4, 0x27, 0xaa, 0xec, 0x47, 0xa1, 0x1, 0xf7, 0x5d, 0xe9, 0x8f, 0x3c, 0x35, 0x9f, 0xdb, 0x9b, 0x30, 0x88, 0x26}}
 	return a, nil
 }
 
-var _ConfigCliFleetEthStagingJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xc4\x95\xcf\x8b\x1d\xc9\x0d\xc7\xef\xfe\x2b\x1e\xef\x1c\x7a\xa5\x2a\x95\xa4\x9a\x93\xc9\x26\xb9\xc5\x84\x6c\x6e\x21\x07\xfd\xf4\x0e\x0c\xf3\x60\xe6\xd9\x90\x84\xfd\xdf\x43\x7b\x0d\xf1\x92\xc9\xd9\xb7\x46\xdd\x54\x7d\xfa\x53\xfa\xaa\xfe\xfd\xee\x72\xb9\xfe\xb5\x9e\xb3\xfe\xf5\xf9\xf6\xe9\xf5\xfa\x70\x69\x7b\x7a\xad\xdf\x9d\xe5\x0f\xb7\x3f\x3c\xbe\xc6\xed\x73\xbd\xfc\xf3\x37\xf5\x1f\x9f\x3e\xbd\xde\xeb\xe5\xc7\xdb\x73\x3f\x7e\xbc\x3e\x5c\xce\x35\x2e\x97\xeb\x1f\x9f\xcd\x9f\x2a\xaf\x0f\x97\xfb\xcb\xa7\x2f\x5f\x5e\x2e\xd7\x3f\x3d\x55\xdd\xaf\x0f\x97\x6b\xdd\x7f\x3e\x5e\xef\xf6\xf1\xf1\xf9\xe3\xf5\xeb\xbb\xdf\xdf\x6e\xf7\x0f\xb7\xac\x73\xd7\xbf\x7f\x29\x5d\x2e\xd7\x7a\xbe\x65\x3d\xfc\xf0\x03\x4f\x70\x98\x34\xc2\xa8\xf6\x5a\xa3\x17\x08\x92\x73\x68\x0d\x4d\xde\x6b\x79\x40\x27\x52\xc9\x5e\xd0\x7b\x7a\x4c\x1f\xae\x11\x1a\xd8\xd3\x39\x11\x66\x36\x73\x2f\x34\x9c\x29\x32\x7d\xa5\x43\xe3\x04\x66\x6c\x5f\x21\xae\x6d\x03\x83\x54\x37\x04\x53\xc8\x76\x42\x5b\x6c\xb4\xe1\x3d\xc9\xb1\xf1\x18\x63\x1f\x44\x0f\x44\xf3\x2b\xf5\x37\x88\x2d\xbb\x7d\x6e\xdc\x2d\x23\x6c\x31\x58\x02\x4d\xca\x88\xa9\x62\xde\x45\x58\xc0\xcc\x03\xb0\x3c\x2d\x4d\x2b\x0b\x88\x07\x2d\x3a\x91\xca\x61\x45\x1a\xae\x1e\x2a\x39\x82\x3c\x75\xa5\x29\x36\x94\x8f\x95\x60\xa4\xec\xee\xa1\xd9\x34\xc4\xb7\xa0\xc5\xc2\x35\xa7\x27\x40\xd7\x7b\x14\x3a\x70\xea\x81\x20\xc7\x98\xfb\x6d\x4a\x04\x13\x0d\x94\x3d\xb6\x09\xe0\xae\x26\xb3\x31\x68\xa7\x4c\x18\x2d\x6c\xa5\x06\xdc\x04\x3e\x32\x54\x5d\x7c\x62\x79\x37\x19\x8f\xd9\xee\x44\x7e\x3e\x8a\x85\xdb\xd8\x1c\x18\x95\x53\x64\xe5\xc6\xf6\x42\x25\x9e\x81\x0b\xb6\x18\xdb\xe4\x4e\x1f\xa1\x40\xdd\xb3\x63\xf9\x5c\xef\xe7\x3a\xc6\xd4\x63\x9f\x8c\xbf\x9a\xfc\x82\xf8\x8f\xaf\x5d\xf0\xb7\x97\xb3\x9b\xf2\xcf\xf6\xf8\xf4\x53\xbd\x7c\xae\x97\x37\xdb\xc1\x85\x74\x6d\x14\x8e\x2d\x0b\x73\x22\x59\x55\x77\x0c\xae\xd8\xad\xcc\x46\x38\x64\x8d\x92\xcc\x8a\x8d\x8e\x1b\x50\x0d\xb5\x24\xc2\x34\x79\x4a\x74\x8d\xa8\x0c\xdf\x32\x5a\xcb\x99\x52\x91\xdb\x73\x39\x95\xee\x90\xd2\x90\x4e\xc9\x56\xc3\x39\x76\x1b\xcd\x74\x05\x07\xef\x3a\xdb\x61\x8d\x63\xc3\x81\x8b\xdf\x16\x5d\xd4\x81\x10\xd8\xbc\x42\xad\x52\xa7\xc5\x60\x0f\xf4\xf6\x81\x46\x2b\x02\x4d\xd7\x02\x5b\x0a\x22\xa1\x39\xb2\x86\x41\x41\x24\x6a\x11\x74\x12\xb4\x14\xb7\x24\x8c\x0c\x8e\x04\xde\x3a\x1c\x90\xa2\x54\x93\x8b\x58\x65\xac\x3e\x7f\x04\xa7\xd6\x5e\x2a\xaa\x09\x00\xc3\xa4\x7f\x15\xbd\x0f\xdc\xf3\x20\xfc\x5f\xd1\x7f\xf9\xf4\xfa\xf3\x87\xdb\xfd\xb1\x1f\xc3\xee\x8f\xb7\xe7\xd7\x37\x74\x03\x7d\x6f\xd1\xff\xf5\x0a\xc4\x67\xb2\xdc\x4c\x1a\x65\x8c\x44\x44\xd3\xd8\xc1\x1a\x73\xdb\x44\x9a\x50\x3b\x17\x0b\xef\xd5\x8c\xa0\x3d\x31\xc2\x39\x52\x1b\x2c\xbb\x69\x6f\x2c\xe9\x0c\xd3\x36\x11\x28\x59\x1e\x6a\xeb\x5c\x47\x72\x10\x6f\x08\x0f\x85\x02\x50\x94\xd5\x04\x81\x4b\x92\x9b\x4f\xad\xa4\xdf\xb2\x7c\xef\xd3\xfd\xed\x59\xfe\x74\xb7\xfb\x63\xfc\xdf\xe1\x09\xaa\xd1\xcb\xf6\x8c\x25\xdc\x56\x6b\x34\x37\xc8\x42\x51\xe2\x73\xec\xf5\x56\xb7\x68\x19\xbd\x76\xa9\x56\x3b\x72\xb6\xdb\xf2\x09\xad\x60\x94\x2e\xda\x5a\x33\x7c\xa6\x4a\x8f\xe6\x35\x50\x88\xcf\xe9\xa1\xc2\x4a\xbc\xaa\x87\x6e\x0e\xb6\x1e\xd4\x29\x62\x34\x56\xed\xe5\x9c\xf9\x35\x2d\x63\xf0\x81\x53\xde\x8e\xcb\x46\x0a\x38\xb7\x1b\xe2\xe6\x13\x02\xb3\x73\x62\x5a\x0a\xaf\x61\xc4\x9d\xb6\xa7\xc0\xa2\x61\x55\xe8\xc0\x83\xb6\x3a\x4e\x5a\x55\xb0\x71\x32\x92\xab\xef\x9a\xa5\xc4\x63\x94\x92\xc9\x80\x19\x4b\x97\x5a\x61\x6e\xc5\xdd\x3c\xad\xa2\x70\x56\x31\x6b\x51\x33\xb3\x02\xcf\xad\xfb\x3d\xb2\x1c\xfb\x8c\xcb\x81\xa4\x6f\x33\xe6\x54\x51\x22\xe4\x35\x1a\x10\xe6\x60\xd5\xdd\x43\x27\x43\xf1\xee\x91\xb0\x13\x78\xd1\x79\xff\x50\x5b\x1a\x14\x8a\x4f\xa1\xa8\x35\x71\x67\x31\x0d\xd9\xe6\x36\x83\xc8\x96\xb7\x82\xe4\xde\x2c\xc1\x29\xb0\x7c\x3a\x05\x3b\xcc\x36\x01\xe1\x39\x08\x6a\x54\xb1\x35\xa0\xad\xb9\xeb\x8c\x34\xee\x71\xc0\xa1\xfc\x4d\xa0\xdf\x5d\x2e\xbf\xbc\xfb\xe5\xdd\x7f\x02\x00\x00\xff\xff\xd6\xb8\xb9\xd5\xbc\x07\x00\x00")
+var _ConfigCliFleetEthStagingJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xc4\x95\x4f\x8b\x1d\xd9\xcd\x87\xf7\xfe\x14\x97\xbb\x7e\xa9\x91\xce\xd1\x91\x74\x7a\x65\xde\x49\xb2\x8b\x09\x99\xec\x42\x16\xfa\xeb\x69\x68\xfa\x42\xf7\xb5\x21\x09\xf3\xdd\x43\x79\x0c\xf1\x90\x9e\xb5\x77\x85\xaa\x38\xe7\x41\x7a\x7e\xaa\x7f\xbf\xbb\x5c\xae\x7f\xad\xe7\xac\x7f\x7d\xbe\x7d\x7a\xbd\x3e\x5c\xda\x9e\x5e\xeb\xff\xce\xf2\x87\xdb\x1f\x1e\x5f\xe3\xf6\xb9\x5e\xfe\xf9\x9b\xfa\x8f\x4f\x9f\x5e\xef\xf5\xf2\xe3\xed\xb9\x1f\x3f\x5e\x1f\x2e\xe7\x19\x97\xcb\xf5\x8f\xcf\xe6\x4f\x95\xd7\x87\xcb\xfd\xe5\xd3\x97\x2f\x2f\x97\xeb\x9f\x9e\xaa\xee\xd7\x87\xcb\xb5\xee\x3f\x1f\xaf\x77\xfb\xf8\xf8\xfc\xf1\xfa\xf5\xdd\xff\xdf\x6e\xf7\x0f\xb7\xac\xf3\xd6\xbf\x7f\x29\x5d\x2e\xd7\x7a\xbe\x65\x3d\xfc\xf0\x03\x4f\x70\x98\x34\xc2\xa8\xf6\x5a\xa3\x17\x08\x92\x73\x68\x0d\x4d\xde\x6b\x79\x40\x27\x52\xc9\x5e\xd0\x7b\x7a\x4c\x1f\xae\x11\x1a\xd8\xd3\x39\x11\x66\x36\x73\x2f\x34\x9c\x29\x32\x7d\xa5\x43\xe3\x04\x66\x6c\x5f\x21\xae\x6d\x03\x83\x54\x37\x04\x53\xc8\x76\x42\x5b\x6c\xb4\xe1\x3d\xc9\xb1\xf1\x18\x63\x1f\x44\x0f\x44\xf3\x2b\xf5\x37\x88\x2d\xbb\x7d\x6e\xdc\x2d\x23\x6c\x31\x58\x02\x4d\xca\x88\xa9\x62\xde\x45\x58\xc0\xcc\x03\xb0\x3c\x2d\x4d\x2b\x0b\x88\x07\x2d\x3a\x91\xca\x61\x45\x1a\xae\x1e\x2a\x39\x82\x3c\x75\xa5\x29\x36\x94\x8f\x95\x60\xa4\xec\xee\xa1\xd9\x34\xc4\xb7\xa0\xc5\xc2\x35\xa7\x27\x40\xd7\x7b\x14\x3a\x70\xea\x81\x20\xc7\x98\xfb\x6d\x4a\x04\x13\x0d\x94\x3d\xb6\x09\xe0\xae\x26\xb3\x31\x68\xa7\x4c\x18\x2d\x6c\xa5\x06\xdc\x04\x3e\x32\x54\x5d\x7c\x62\x79\x37\x19\x8f\xd9\xee\x44\x7e\x3e\x8a\x85\xdb\xd8\x1c\x18\x95\x53\x64\xe5\xc6\xf6\x42\x25\x9e\x81\x0b\xb6\x18\xdb\xe4\x4e\x1f\xa1\x40\xdd\xb3\x63\xf9\x5c\xef\xe7\x3a\xc6\xd4\x63\x9f\x8c\xbf\x76\xf2\x0b\xe2\x3f\xbe\x5a\xf0\xb7\x97\xd3\xa6\xfc\xb3\x3d\x3e\xfd\x54\x2f\x9f\xeb\xe5\x4d\x1d\x5c\x48\xd7\x46\xe1\xd8\xb2\x30\x27\x92\x55\x75\xc7\xe0\x8a\xdd\xca\x6c\x84\x43\xd6\x28\xc9\xac\xd8\xe8\xb8\x01\xd5\x50\x4b\x22\x4c\x93\xa7\x44\xd7\x88\xca\xf0\x2d\xa3\xb5\x9c\x29\x15\xb9\x3d\x97\x53\xe9\x0e\x29\x0d\xe9\x94\x6c\x35\x9c\x63\xb7\xd1\x4c\x57\x70\xf0\xae\x53\x87\x35\x8e\x0d\x07\x2e\x7e\xbb\xd1\x7c\x7a\xe0\x66\xd2\x28\x63\x24\x22\x9a\xc6\x0e\xd6\x98\xdb\x26\xd2\x84\xda\xb9\x58\x78\xaf\x66\x04\xed\x89\x11\xce\x91\xda\x60\xd9\x4d\x7b\x63\x49\x67\x98\xb6\x89\x40\xc9\xf2\x50\x5b\xe7\x39\x92\x83\x78\x43\x78\x28\x14\x80\xa2\xac\x26\x08\x5c\x92\xdc\x2c\xaa\x49\xfa\x7e\x00\x1f\xa8\xfb\x18\x04\x07\xfe\x0e\x64\x51\x07\x42\x60\xf3\x0a\xb5\x4a\x9d\x16\x83\x3d\xd0\xdb\x07\x1a\xad\x08\x34\x5d\x0b\x6c\x29\x88\x84\xe6\xc8\x1a\x06\x05\x91\xa8\x45\xd0\x49\xd0\x52\xdc\x92\x30\x32\x38\x12\x78\xeb\x70\x40\x8a\x52\x4d\x2e\x62\x95\xb1\xfa\xec\x36\x4e\xad\xbd\xf4\xe4\x03\x80\x61\xd2\xbf\xda\xb0\x0f\xdc\xf3\x20\xfc\x5f\x1b\xfe\xf2\xe9\xf5\xe7\x0f\xb7\xfb\x63\x3f\x86\xdd\x1f\x6f\xcf\xaf\x6f\x38\x01\xf4\xbd\x6d\xf8\x6f\x5f\x81\xbe\xf7\xd8\xbf\x65\xf9\xde\xd3\xfd\xed\x2c\x7f\xba\xdb\xfd\x31\x7e\x77\xc3\x83\x6a\xf4\xb2\x3d\x63\x09\xb7\xd5\x1a\xcd\x0d\xb2\x50\x94\xf8\xdc\xcd\xbd\xd5\x2d\x5a\x46\xaf\x5d\xaa\xd5\x8e\x9c\xed\xb6\x7c\x42\x2b\x18\xa5\x8b\xb6\xd6\x0c\x9f\xa9\xd2\xa3\x79\x0d\x14\xe2\x73\xc5\xa9\xb0\x12\xaf\xea\xa1\x9b\x83\xad\x07\x75\x8a\x18\x8d\x55\x7b\x39\x67\x7e\x8d\xf4\x18\x7c\xe0\x94\xb7\xe3\xb2\x91\x02\xce\xeb\x86\xb8\xf9\x84\xc0\xec\x9c\x98\x96\xc2\x6b\x18\x71\xa7\xed\x29\xb0\x68\x58\x15\x3a\xf0\xa0\xad\x8e\x93\x56\x15\x6c\x9c\x8c\xe4\xea\xbb\x66\x29\xf1\x18\xa5\x64\x32\x60\xc6\xd2\xa5\x56\x98\x5b\x71\x37\x4f\xab\x28\x9c\x55\xcc\x5a\xd4\xcc\xac\xc0\x73\xeb\x7e\x8f\x2c\xc7\x3e\xe3\x72\x20\xe9\xdb\x8c\x39\x55\x94\x08\x79\x8d\x06\x84\x39\x58\x75\xf7\xd0\xc9\x50\xbc\x7b\x24\xec\x04\x5e\x74\xfe\x24\xa9\x2d\x0d\x0a\xc5\xa7\x50\xd4\x9a\xb8\xb3\x98\x86\x6c\x73\x9b\x41\x64\xcb\x5b\x41\x72\x6f\x96\xe0\x14\x58\x3e\x9d\x82\x1d\x66\x9b\x80\xf0\x1c\x04\x35\xaa\xd8\x1a\xd0\xd6\xdc\x75\x46\x1a\xf7\x38\xe0\x50\xfe\x26\xd0\xef\x2e\x97\x5f\xde\xfd\xf2\xee\x3f\x01\x00\x00\xff\xff\xff\x1f\xf2\xb6\x61\x08\x00\x00")
 
 func ConfigCliFleetEthStagingJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -204,8 +204,8 @@ func ConfigCliFleetEthStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1980, mode: os.FileMode(0644), modTime: time.Unix(1647462281, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf5, 0x9c, 0x6d, 0x7c, 0xd8, 0xb7, 0xd2, 0x5f, 0x83, 0x52, 0x83, 0x72, 0x43, 0xb7, 0x81, 0x1e, 0x33, 0x5e, 0xfb, 0x79, 0xb8, 0x26, 0xce, 0x4c, 0x7f, 0x10, 0xa6, 0x96, 0x38, 0xc3, 0xde, 0x19}}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 2145, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa2, 0xe9, 0x85, 0x4b, 0x66, 0xa4, 0x1d, 0x4e, 0xaf, 0x21, 0xd7, 0xc2, 0x59, 0xf7, 0xd, 0xc2, 0x61, 0x4e, 0x4a, 0x9e, 0x38, 0x90, 0x6a, 0x2a, 0x16, 0xa6, 0x5c, 0x6d, 0x0, 0x5, 0x6, 0xb3}}
 	return a, nil
 }
 
@@ -224,7 +224,7 @@ func ConfigCliFleetEthTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 2174, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 2174, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x55, 0x19, 0xca, 0x8d, 0xaa, 0x69, 0x9b, 0xa2, 0xa1, 0xdd, 0xef, 0xf2, 0x63, 0x5e, 0xcd, 0xe2, 0x8f, 0xc7, 0x37, 0x7e, 0x41, 0xa1, 0xc1, 0x3f, 0x65, 0x80, 0xa, 0xa4, 0x27, 0x74, 0x8d, 0xc6}}
 	return a, nil
 }
@@ -244,7 +244,7 @@ func ConfigCliFleetStatusProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-status.prod.json", size: 1920, mode: os.FileMode(0644), modTime: time.Unix(1647462278, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-status.prod.json", size: 1920, mode: os.FileMode(0664), modTime: time.Unix(1647273704, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5, 0xf, 0x4a, 0x61, 0xd2, 0xfd, 0x7d, 0x59, 0xcf, 0x49, 0x81, 0x6, 0x71, 0xdb, 0x63, 0xe8, 0xeb, 0xdf, 0x9e, 0x65, 0x22, 0xae, 0x9b, 0xb0, 0x16, 0x17, 0xe0, 0x52, 0xe6, 0xb, 0xcf, 0x88}}
 	return a, nil
 }
@@ -264,7 +264,7 @@ func ConfigCliFleetStatusTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-status.test.json", size: 937, mode: os.FileMode(0644), modTime: time.Unix(1646392728, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-status.test.json", size: 937, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5c, 0x3b, 0xc5, 0xd2, 0xe9, 0xd3, 0x52, 0xd4, 0x5a, 0xf3, 0xed, 0x37, 0xed, 0xde, 0xda, 0xc1, 0x57, 0x37, 0x17, 0x8c, 0x40, 0xee, 0x12, 0x82, 0x14, 0x2c, 0x8b, 0xc7, 0x4b, 0x2, 0xf8, 0x82}}
 	return a, nil
 }
@@ -284,7 +284,7 @@ func ConfigCliFleetWakuv2ProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.prod.json", size: 747, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.prod.json", size: 747, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc3, 0x81, 0x84, 0xfd, 0x7d, 0x7e, 0x27, 0xc8, 0x5e, 0xb6, 0x38, 0xe1, 0x6, 0xa, 0xbc, 0x86, 0x87, 0x54, 0xa2, 0x2f, 0xe1, 0xa1, 0xc8, 0x6, 0x80, 0xfa, 0xed, 0xfe, 0x13, 0x6c, 0x81, 0xd9}}
 	return a, nil
 }
@@ -304,7 +304,7 @@ func ConfigCliFleetWakuv2TestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.test.json", size: 748, mode: os.FileMode(0644), modTime: time.Unix(1637600491, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-wakuv2.test.json", size: 748, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0x6d, 0x28, 0xb7, 0xc2, 0xf3, 0x22, 0xe3, 0x6d, 0xc1, 0xeb, 0x4b, 0x42, 0xe2, 0x6, 0xb0, 0x60, 0x30, 0xdb, 0xe3, 0x26, 0xff, 0x9, 0xf5, 0xea, 0xe6, 0x56, 0xce, 0xa8, 0x98, 0x61, 0x70}}
 	return a, nil
 }
@@ -324,7 +324,7 @@ func ConfigCliLesEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1599559876, 0)}
+	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xee, 0x27, 0xa7, 0x74, 0xa0, 0x46, 0xa1, 0x41, 0xed, 0x4d, 0x16, 0x5b, 0xf3, 0xf0, 0x7c, 0xc8, 0x2f, 0x6f, 0x47, 0xa4, 0xbb, 0x5f, 0x43, 0x33, 0xd, 0x9, 0x9d, 0xea, 0x9e, 0x15, 0xee}}
 	return a, nil
 }
@@ -344,7 +344,7 @@ func ConfigCliMailserverEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0644), modTime: time.Unix(1599559876, 0)}
+	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0xec, 0x81, 0x8b, 0x99, 0xb6, 0xdb, 0xc0, 0x8b, 0x46, 0x97, 0x96, 0xc7, 0x58, 0x30, 0x33, 0xef, 0x54, 0x25, 0x87, 0x7b, 0xb9, 0x94, 0x6b, 0x18, 0xa4, 0x5b, 0x58, 0x67, 0x7c, 0x44, 0xa6}}
 	return a, nil
 }
@@ -364,7 +364,7 @@ func ConfigStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(0644), modTime: time.Unix(1599559876, 0)}
+	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb, 0xf0, 0xc, 0x1, 0x95, 0x65, 0x6, 0x55, 0x48, 0x8f, 0x83, 0xa0, 0xb4, 0x81, 0xda, 0xad, 0x30, 0x6d, 0xb2, 0x78, 0x1b, 0x26, 0x4, 0x13, 0x12, 0x9, 0x6, 0xae, 0x3a, 0x2c, 0x1, 0x71}}
 	return a, nil
 }
@@ -384,7 +384,7 @@ func keysBootnodeKey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x31, 0xcf, 0x27, 0xd4, 0x96, 0x2e, 0x32, 0xcd, 0x58, 0x96, 0x2a, 0xe5, 0x8c, 0xa0, 0xf1, 0x73, 0x1f, 0xd6, 0xd6, 0x8b, 0xb, 0x73, 0xd3, 0x2c, 0x84, 0x1a, 0x56, 0xa4, 0x74, 0xb6, 0x95, 0x20}}
 	return a, nil
 }
@@ -404,7 +404,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0644), modTime: time.Unix(1536843582, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x69, 0x23, 0x64, 0x7d, 0xf9, 0x14, 0x37, 0x6f, 0x2b, 0x1, 0xf0, 0xb0, 0xa4, 0xb2, 0xd0, 0x18, 0xcd, 0xf9, 0xeb, 0x57, 0xa3, 0xfd, 0x79, 0x25, 0xa7, 0x9c, 0x3, 0xce, 0x26, 0xec, 0xe1}}
 	return a, nil
 }
@@ -424,7 +424,7 @@ func keysTestAccount1StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0xba, 0x35, 0x1, 0x2b, 0x9d, 0xad, 0xf0, 0x2d, 0x3c, 0x4d, 0x6, 0xb5, 0x22, 0x2, 0x47, 0xd4, 0x1c, 0xf4, 0x31, 0x2f, 0xb, 0x5b, 0x27, 0x5d, 0x43, 0x97, 0x58, 0x2d, 0xf0, 0xe1, 0xbe}}
 	return a, nil
 }
@@ -444,7 +444,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0x43, 0xc2, 0xf4, 0x8c, 0xc6, 0x64, 0x25, 0x8c, 0x7, 0x8c, 0xa8, 0x89, 0x2b, 0x7b, 0x9b, 0x4f, 0x81, 0xcb, 0xce, 0x3d, 0xef, 0x82, 0x9c, 0x27, 0x27, 0xa9, 0xc5, 0x46, 0x70, 0x30, 0x38}}
 	return a, nil
 }
@@ -464,7 +464,7 @@ func keysTestAccount2StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0xf8, 0x5c, 0xe9, 0x92, 0x96, 0x2d, 0x88, 0x2b, 0x8e, 0x42, 0x3f, 0xa4, 0x93, 0x6c, 0xad, 0xe9, 0xc0, 0x1b, 0x8a, 0x8, 0x8c, 0x5e, 0x7a, 0x84, 0xa2, 0xf, 0x9f, 0x77, 0x58, 0x2c, 0x2c}}
 	return a, nil
 }
@@ -484,7 +484,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9f, 0x72, 0xd5, 0x95, 0x5c, 0x5a, 0x99, 0x9d, 0x2f, 0x21, 0x83, 0xd7, 0x10, 0x17, 0x4a, 0x3d, 0x65, 0xc9, 0x26, 0x1a, 0x2c, 0x9d, 0x65, 0x63, 0xd2, 0xa0, 0xfc, 0x7c, 0x0, 0x87, 0x38, 0x9f}}
 	return a, nil
 }
@@ -504,7 +504,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1599559877, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0664), modTime: time.Unix(1646322504, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x40, 0x56, 0xc1, 0x5e, 0x10, 0x6e, 0x28, 0x15, 0x3, 0x4e, 0xc4, 0xc4, 0x71, 0x4d, 0x16, 0x99, 0xcc, 0x1b, 0x63, 0xee, 0x10, 0x20, 0xe4, 0x59, 0x52, 0x3f, 0xc0, 0xad, 0x15, 0x13, 0x72}}
 	return a, nil
 }
