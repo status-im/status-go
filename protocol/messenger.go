@@ -1244,6 +1244,28 @@ func (m *Messenger) Init() error {
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
 		publicChatIDs = append(publicChatIDs, org.IDString(), org.StatusUpdatesChannelID(), org.MagnetlinkMessageChannelID())
+
+		// This is for status-go versions that didn't have `CommunitySettings`
+		// We need to ensure communities that existed before community settings
+		// were introduced will have community settings as well
+		exists, err := m.communitiesManager.CommunitySettingsExist(org.ID())
+		if err != nil {
+			logger.Warn("failed to check if community settings exist", zap.Error(err))
+			continue
+		}
+		if exists {
+			continue
+		}
+
+		communitySettings := communities.CommunitySettings{
+			CommunityID:                  org.IDString(),
+			HistoryArchiveSupportEnabled: false,
+		}
+		err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+		if err != nil {
+			logger.Warn("failed to save community settings", zap.Error(err))
+			continue
+		}
 	}
 
 	// Init filters for the communities we are an admin of

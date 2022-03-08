@@ -146,7 +146,13 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
+
 	community := response.Communities()[0]
+	communitySettings := response.CommunitiesSettings()[0]
+
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	// Send an community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, s.alice.transport)
@@ -197,8 +203,13 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
 
+	communitySettings := response.CommunitiesSettings()[0]
 	community := response.Communities()[0]
+
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	orgChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
@@ -541,8 +552,13 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
 
 	community := response.Communities()[0]
+	communitySettings := response.CommunitiesSettings()[0]
+
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	category := &requests.CreateCommunityCategory{
 		CommunityID:  community.ID(),

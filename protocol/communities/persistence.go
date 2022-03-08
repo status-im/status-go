@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -343,5 +344,74 @@ func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
 
 func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
 	_, err := p.db.Exec(`UPDATE communities_communities SET private_key = ? WHERE id = ?`, crypto.FromECDSA(privKey), id)
+	return err
+}
+
+func (p *Persistence) GetCommunitiesSettings() ([]CommunitySettings, error) {
+	rows, err := p.db.Query("SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled FROM communities_settings")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	communitiesSettings := []CommunitySettings{}
+
+	for rows.Next() {
+		settings := CommunitySettings{}
+		err := rows.Scan(&settings.CommunityID, &settings.HistoryArchiveSupportEnabled, &settings.HistoryArchiveSupportEnabled)
+		if err != nil {
+			return nil, err
+		}
+		communitiesSettings = append(communitiesSettings, settings)
+	}
+	return communitiesSettings, err
+}
+
+func (p *Persistence) CommunitySettingsExist(communityID types.HexBytes) (bool, error) {
+	var count int
+	err := p.db.QueryRow(`SELECT count(1) FROM communities_settings WHERE community_id = ?`, communityID.String()).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (p *Persistence) GetCommunitySettingsByID(communityID types.HexBytes) (*CommunitySettings, error) {
+	settings := CommunitySettings{}
+	err := p.db.QueryRow(`SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled FROM communities_settings WHERE community_id = ?`, communityID.String()).Scan(&settings.CommunityID, &settings.HistoryArchiveSupportEnabled, &settings.HistoryArchiveSupportEnabled)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &settings, nil
+}
+
+func (p *Persistence) DeleteCommunitySettings(communityID types.HexBytes) error {
+	_, err := p.db.Exec("DELETE FROM communities_settings WHERE community_id = ?", communityID.String())
+	return err
+}
+
+func (p *Persistence) SaveCommunitySettings(communitySettings CommunitySettings) error {
+	_, err := p.db.Exec(`INSERT INTO communities_settings (
+    community_id,
+    message_archive_seeding_enabled,
+    message_archive_fetching_enabled
+  ) VALUES (?, ?, ?)`,
+		communitySettings.CommunityID,
+		communitySettings.HistoryArchiveSupportEnabled,
+		communitySettings.HistoryArchiveSupportEnabled,
+	)
+	return err
+}
+
+func (p *Persistence) UpdateCommunitySettings(communitySettings CommunitySettings) error {
+	_, err := p.db.Exec(`UPDATE communities_settings SET
+    message_archive_seeding_enabled = ?,
+    message_archive_fetching_enabled = ?
+    WHERE community_id = ?`,
+		communitySettings.HistoryArchiveSupportEnabled,
+		communitySettings.HistoryArchiveSupportEnabled,
+		communitySettings.CommunityID,
+	)
 	return err
 }

@@ -269,6 +269,11 @@ func (o *Community) initialize() {
 	}
 }
 
+type CommunitySettings struct {
+	CommunityID                  string `json:"communityId"`
+	HistoryArchiveSupportEnabled bool   `json:"historyArchiveSupportEnabled"`
+}
+
 type CommunityChatChanges struct {
 	ChatModified     *protobuf.CommunityChat
 	MembersAdded     map[string]*protobuf.CommunityMember

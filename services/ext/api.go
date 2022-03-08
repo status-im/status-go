@@ -924,6 +924,10 @@ func (api *PublicAPI) StopDiscV5() error {
 	return api.service.messenger.StopDiscV5()
 }
 
+func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
+	return api.service.messenger.GetCommunitiesSettings()
+}
+
 func (api *PublicAPI) AddStorePeer(address string) (string, error) {
 	return api.service.messenger.AddStorePeer(address)
 }

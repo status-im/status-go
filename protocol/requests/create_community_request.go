@@ -17,17 +17,18 @@ var (
 )
 
 type CreateCommunity struct {
-	Name        string                               `json:"name"`
-	Description string                               `json:"description"`
-	Color       string                               `json:"color"`
-	Emoji       string                               `json:"emoji"`
-	Membership  protobuf.CommunityPermissions_Access `json:"membership"`
-	EnsOnly     bool                                 `json:"ensOnly"`
-	Image       string                               `json:"image"`
-	ImageAx     int                                  `json:"imageAx"`
-	ImageAy     int                                  `json:"imageAy"`
-	ImageBx     int                                  `json:"imageBx"`
-	ImageBy     int                                  `json:"imageBy"`
+	Name                         string                               `json:"name"`
+	Description                  string                               `json:"description"`
+	Color                        string                               `json:"color"`
+	Emoji                        string                               `json:"emoji"`
+	Membership                   protobuf.CommunityPermissions_Access `json:"membership"`
+	EnsOnly                      bool                                 `json:"ensOnly"`
+	Image                        string                               `json:"image"`
+	ImageAx                      int                                  `json:"imageAx"`
+	ImageAy                      int                                  `json:"imageAy"`
+	ImageBx                      int                                  `json:"imageBx"`
+	ImageBy                      int                                  `json:"imageBy"`
+	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
 }
 
 func adaptIdentityImageToProtobuf(img *userimages.IdentityImage) *protobuf.IdentityImage {
