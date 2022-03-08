@@ -58,6 +58,7 @@ type config struct {
 	account             *multiaccounts.Account
 	clusterConfig       params.ClusterConfig
 	browserDatabase     *browsers.Database
+	torrentConfig       *params.TorrentConfig
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -252,6 +253,13 @@ func WithENSVerificationConfig(onENSVerified func(*MessengerResponse), url, addr
 func WithClusterConfig(cc params.ClusterConfig) Option {
 	return func(c *config) error {
 		c.clusterConfig = cc
+		return nil
+	}
+}
+
+func WithTorrentConfig(tc *params.TorrentConfig) Option {
+	return func(c *config) error {
+		c.torrentConfig = tc
 		return nil
 	}
 }

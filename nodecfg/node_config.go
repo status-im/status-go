@@ -217,6 +217,16 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
+func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	_, err := tx.Exec(`
+  INSERT OR REPLACE INTO torrent_config (
+    enabled, port, data_dir, torrent_dir, synthetic_id
+  ) VALUES (?, ?, ?, ?, 'id')`,
+		c.TorrentConfig.Enabled, c.TorrentConfig.Port, c.TorrentConfig.DataDir, c.TorrentConfig.TorrentDir,
+	)
+	return err
+}
+
 func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
@@ -333,6 +343,7 @@ func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
 		insertShhExtConfig,
 		insertWakuConfig,
 		insertWakuV2Config,
+		insertTorrentConfig,
 	}
 
 	for _, fn := range insertFNs {
@@ -615,6 +626,16 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 			}
 			nodecfg.ShhextConfig.DefaultPushNotificationsServers = append(nodecfg.ShhextConfig.DefaultPushNotificationsServers, pubKey)
 		}
+	}
+
+	err = tx.QueryRow(`
+  SELECT enabled, port, data_dir, torrent_dir
+  FROM torrent_config WHERE synthetic_id = 'id'
+  `).Scan(
+		&nodecfg.TorrentConfig.Enabled, &nodecfg.TorrentConfig.Port, &nodecfg.TorrentConfig.DataDir, &nodecfg.TorrentConfig.TorrentDir,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
 	}
 
 	err = tx.QueryRow(`

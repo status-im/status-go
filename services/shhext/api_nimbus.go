@@ -1,3 +1,4 @@
+//go:build nimbus
 // +build nimbus
 
 package shhext

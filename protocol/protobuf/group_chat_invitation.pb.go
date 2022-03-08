@@ -123,9 +123,7 @@ func init() {
 	proto.RegisterType((*GroupChatInvitation)(nil), "protobuf.GroupChatInvitation")
 }
 
-func init() {
-	proto.RegisterFile("group_chat_invitation.proto", fileDescriptor_a6a73333de6a8ebe)
-}
+func init() { proto.RegisterFile("group_chat_invitation.proto", fileDescriptor_a6a73333de6a8ebe) }
 
 var fileDescriptor_a6a73333de6a8ebe = []byte{
 	// 243 bytes of a gzipped FileDescriptorProto
