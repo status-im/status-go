@@ -949,7 +949,8 @@ func (o *Community) StatusUpdatesChannelID() string {
 
 func (o *Community) DefaultFilters() []string {
 	cID := o.IDString()
-	return []string{cID, cID + "-ping"}
+	updatesChannelID := o.StatusUpdatesChannelID()
+	return []string{cID, updatesChannelID}
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {
