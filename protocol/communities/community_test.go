@@ -765,6 +765,13 @@ func (s *CommunitySuite) TestValidateCommunityDescription() {
 	}
 }
 
+func (s *CommunitySuite) TestChatIDs() {
+	community := s.buildCommunity(&s.identity.PublicKey)
+	chatIDs := community.ChatIDs()
+
+	s.Require().Len(chatIDs, 1)
+}
+
 func (s *CommunitySuite) emptyCommunityDescription() *protobuf.CommunityDescription {
 	return &protobuf.CommunityDescription{
 		Permissions: &protobuf.CommunityPermissions{},

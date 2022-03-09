@@ -104,3 +104,34 @@ func (s *ManagerSuite) TestEditCommunity() {
 	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.DisplayName, update.CreateCommunity.Name)
 	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.Description, update.CreateCommunity.Description)
 }
+
+func (s *ManagerSuite) TestGetAdminCommuniesChatIDs() {
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+
+	community, err := s.manager.CreateCommunity(createRequest)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "added-chat",
+			Description: "description",
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Members: make(map[string]*protobuf.CommunityMember),
+	}
+
+	_, _, err = s.manager.CreateChat(community.ID(), chat)
+	s.Require().NoError(err)
+
+	adminChatIDs, err := s.manager.GetAdminCommunitiesChatIDs()
+	s.Require().NoError(err)
+	s.Require().Len(adminChatIDs, 1)
+}

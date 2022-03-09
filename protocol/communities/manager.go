@@ -940,3 +940,24 @@ func (m *Manager) DeleteCommunitySettings(id types.HexBytes) error {
 func (m *Manager) UpdateCommunitySettings(settings CommunitySettings) error {
 	return m.persistence.UpdateCommunitySettings(settings)
 }
+
+func (m *Manager) GetAdminCommunitiesChatIDs() (map[string]bool, error) {
+	adminCommunities, err := m.Created()
+	if err != nil {
+		return nil, err
+	}
+
+	chatIDs := make(map[string]bool)
+	for _, c := range adminCommunities {
+		if c.Joined() {
+			for _, id := range c.ChatIDs() {
+				chatIDs[id] = true
+			}
+		}
+	}
+	return chatIDs, nil
+}
+
+func (m *Manager) StoreWakuMessage(message *types.Message) error {
+	return m.persistence.SaveWakuMessage(message)
+}
