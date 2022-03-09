@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
+	visualIdentity "github.com/status-im/status-go/services/visual-identity"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -60,6 +61,10 @@ var (
 
 func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	accountsFeed := &event.Feed{}
+	accDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
 
 	services := []common.StatusService{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
@@ -70,29 +75,15 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
 	services = append(services, b.ensService())
-	services = append(services, b.stickersService())
+	services = append(services, b.stickersService(accDB))
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
-
-	accService, err := b.accountsService(accountsFeed)
-	if err != nil {
-		return err
-	}
-	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, accService)
-
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
-	ps, err := b.providerService()
-	if err != nil {
-		return err
-	}
-	services = appendIf(config.Web3ProviderConfig.Enabled, services, ps)
-	gs, err := b.gifService()
-	if err != nil {
-		return err
-	}
-	services = append(services, gs)
-	services = append(services, b.ChatService())
+	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService(accDB))
+	services = append(services, b.gifService(accDB))
+	services = append(services, b.ChatService(accDB))
 
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -370,14 +361,10 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 	return b.rpcStatsSrvc
 }
 
-func (b *StatusNode) accountsService(accountsFeed *event.Feed) (*accountssvc.Service, error) {
+func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.Database) *accountssvc.Service {
 	if b.accountsSrvc == nil {
-		accs, err := accounts.NewDB(b.appDB)
-		if err != nil {
-			return nil, err
-		}
 		b.accountsSrvc = accountssvc.NewService(
-			accs,
+			accDB,
 			b.multiaccountsDB,
 			b.gethAccountManager,
 			b.config,
@@ -385,7 +372,7 @@ func (b *StatusNode) accountsService(accountsFeed *event.Feed) (*accountssvc.Ser
 		)
 	}
 
-	return b.accountsSrvc, nil
+	return b.accountsSrvc
 }
 
 func (b *StatusNode) browsersService() *browsers.Service {
@@ -402,27 +389,38 @@ func (b *StatusNode) ensService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) stickersService() *stickers.Service {
+func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(b.appDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
 	}
 	return b.stickersSrvc
 }
 
-func (b *StatusNode) gifService() (*gif.Service, error) {
+func (b *StatusNode) gifService(accountsDB *accounts.Database) *gif.Service {
 	if b.gifSrvc == nil {
-		acc, err := accounts.NewDB(b.appDB)
-		if err != nil {
-			return nil, err
-		}
-		b.gifSrvc = gif.NewService(acc)
+		b.gifSrvc = gif.NewService(accountsDB)
 	}
-	return b.gifSrvc, nil
+	return b.gifSrvc
 }
 
-func (b *StatusNode) ChatService() *chat.Service {
+func (b *StatusNode) visualIdentityService() (*visualIdentity.Service, error) {
+	if b.visualIdentitySrvc != nil {
+		return b.visualIdentitySrvc, nil
+	}
+
+	srvc := visualIdentity.NewService()
+	err := srvc.Init()
+	if err != nil {
+		return nil, err
+	}
+	b.visualIdentitySrvc = srvc
+
+	return b.visualIdentitySrvc, nil
+}
+
+func (b *StatusNode) ChatService(accountsDB *accounts.Database) *chat.Service {
 	if b.chatSrvc == nil {
-		b.chatSrvc = chat.NewService(b.appDB)
+		b.chatSrvc = chat.NewService(accountsDB)
 	}
 	return b.chatSrvc
 }
@@ -442,16 +440,12 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 	return b.mailserversSrvc
 }
 
-func (b *StatusNode) providerService() (*web3provider.Service, error) {
-	web3S, err := web3provider.NewService(b.appDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *StatusNode) providerService(accountsDB *accounts.Database) *web3provider.Service {
+	web3S := web3provider.NewService(b.appDB, accountsDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
 	if b.providerSrvc == nil {
 		b.providerSrvc = web3S
 	}
-	return b.providerSrvc, nil
+	return b.providerSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {

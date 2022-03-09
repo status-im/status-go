@@ -1,7 +1,7 @@
 package errors
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -13,4 +13,6 @@ var (
 	ErrInvalidConfig = errors.New("configuration value not allowed")
 	// ErrNewClockOlderThanCurrent returned if a given clock is older than the current clock
 	ErrNewClockOlderThanCurrent = errors.New("the new clock value is older than the current clock value")
+	// ErrUnrecognisedSyncSettingProtobufType returned if there is no handler or record of a given protobuf.SyncSetting_Type
+	ErrUnrecognisedSyncSettingProtobufType = errors.New("unrecognised protobuf.SyncSetting_Type")
 )

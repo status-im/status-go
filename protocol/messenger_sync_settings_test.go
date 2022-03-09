@@ -5,10 +5,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -87,7 +87,6 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 	setting := settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		AnonMetricsShouldSend:     false,
-		Currency:                  "eth",
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
@@ -111,6 +110,9 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 	s.Require().NoError(err)
 
 	err = m.settings.SaveSetting(settings.PreferredName.GetReactName(), &pf)
+	s.Require().NoError(err)
+
+	err = m.settings.SaveSetting(settings.Currency.GetReactName(), "eth")
 	s.Require().NoError(err)
 
 	return m
@@ -211,20 +213,15 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		_, err = alicesOtherDevice.RetrieveAll()
+		mr, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		ns, err := alicesOtherDevice.settings.GetSettings()
-		if err != nil {
-			return err
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
 		}
 
-		if ns.Currency != "eth" {
-			return errors.New("settings sync not received")
-		}
 		return nil
 	})
 	s.Require().NoError(err)
@@ -302,20 +299,15 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		_, err = alicesOtherDevice.RetrieveAll()
+		mr, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		ns, err := alicesOtherDevice.settings.GetSettings()
-		if err != nil {
-			return err
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
 		}
 
-		if ns.Currency != "eth" {
-			return errors.New("settings sync not received")
-		}
 		return nil
 	})
 	s.Require().NoError(err)

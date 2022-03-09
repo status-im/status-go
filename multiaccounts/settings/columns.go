@@ -3,16 +3,37 @@ package settings
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
 type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, error)
 type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, error)
+type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
 type SyncProtobufFactory struct {
-	Interface SyncSettingProtobufFactoryInterface
-	Struct    SyncSettingProtobufFactoryStruct
+	fromInterface     SyncSettingProtobufFactoryInterface
+	fromStruct        SyncSettingProtobufFactoryStruct
+	valueFromProtobuf SyncSettingProtobufToValue
+	protobufType      protobuf.SyncSetting_Type
+}
+
+func (spf *SyncProtobufFactory) FromInterface() SyncSettingProtobufFactoryInterface {
+	return spf.fromInterface
+}
+
+func (spf *SyncProtobufFactory) FromStruct() SyncSettingProtobufFactoryStruct {
+	return spf.fromStruct
+}
+
+func (spf *SyncProtobufFactory) ValueFrom() SyncSettingProtobufToValue {
+	return spf.valueFromProtobuf
+}
+
+func (spf *SyncProtobufFactory) SyncSettingProtobufType() protobuf.SyncSetting_Type {
+	return spf.protobufType
 }
 
 type SyncSettingField struct {
@@ -84,8 +105,10 @@ var (
 		reactFieldName: "currency",
 		dBColumnName:   "currency",
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: currencyProtobufFactory,
-			Struct:    currencyProtobufFactoryStruct,
+			fromInterface:     currencyProtobufFactory,
+			fromStruct:        currencyProtobufFactoryStruct,
+			valueFromProtobuf: StringFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_CURRENCY,
 		},
 	}
 	CurrentUserStatus = SettingField{
@@ -134,8 +157,10 @@ var (
 		dBColumnName:   "gif_favorites",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: gifFavouritesProtobufFactory,
-			Struct:    gifFavouritesProtobufFactoryStruct,
+			fromInterface:     gifFavouritesProtobufFactory,
+			fromStruct:        gifFavouritesProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_GIF_FAVOURITES,
 		},
 	}
 	GifRecents = SettingField{
@@ -143,8 +168,10 @@ var (
 		dBColumnName:   "gif_recents",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: gifRecentsProtobufFactory,
-			Struct:    gifRecentsProtobufFactoryStruct,
+			fromInterface:     gifRecentsProtobufFactory,
+			fromStruct:        gifRecentsProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_GIF_RECENTS,
 		},
 	}
 	HideHomeTooltip = SettingField{
@@ -191,8 +218,10 @@ var (
 		dBColumnName:   "messages_from_contacts_only",
 		valueHandler:   BoolHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: messagesFromContactsOnlyProtobufFactory,
-			Struct:    messagesFromContactsOnlyProtobufFactoryStruct,
+			fromInterface:     messagesFromContactsOnlyProtobufFactory,
+			fromStruct:        messagesFromContactsOnlyProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_MESSAGES_FROM_CONTACTS_ONLY,
 		},
 	}
 	Mnemonic = SettingField{
@@ -240,8 +269,10 @@ var (
 		reactFieldName: "preferred-name",
 		dBColumnName:   "preferred_name",
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: preferredNameProtobufFactory,
-			Struct:    preferredNameProtobufFactoryStruct,
+			fromInterface:     preferredNameProtobufFactory,
+			fromStruct:        preferredNameProtobufFactoryStruct,
+			valueFromProtobuf: StringFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_PREFERRED_NAME,
 		},
 	}
 	PreviewPrivacy = SettingField{
@@ -249,24 +280,30 @@ var (
 		dBColumnName:   "preview_privacy",
 		valueHandler:   BoolHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: previewPrivacyProtobufFactory,
-			Struct:    previewPrivacyProtobufFactoryStruct,
+			fromInterface:     previewPrivacyProtobufFactory,
+			fromStruct:        previewPrivacyProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_PREVIEW_PRIVACY,
 		},
 	}
 	ProfilePicturesShowTo = SettingField{
 		reactFieldName: "profile-pictures-show-to",
 		dBColumnName:   "profile_pictures_show_to",
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: profilePicturesShowToProtobufFactory,
-			Struct:    profilePicturesShowToProtobufFactoryStruct,
+			fromInterface:     profilePicturesShowToProtobufFactory,
+			fromStruct:        profilePicturesShowToProtobufFactoryStruct,
+			valueFromProtobuf: Int64FromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_PROFILE_PICTURES_SHOW_TO,
 		},
 	}
 	ProfilePicturesVisibility = SettingField{
 		reactFieldName: "profile-pictures-visibility",
 		dBColumnName:   "profile_pictures_visibility",
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: profilePicturesVisibilityProtobufFactory,
-			Struct:    profilePicturesVisibilityProtobufFactoryStruct,
+			fromInterface:     profilePicturesVisibilityProtobufFactory,
+			fromStruct:        profilePicturesVisibilityProtobufFactoryStruct,
+			valueFromProtobuf: Int64FromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY,
 		},
 	}
 	PublicKey = SettingField{
@@ -308,8 +345,10 @@ var (
 		dBColumnName:   "send_status_updates",
 		valueHandler:   BoolHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: sendStatusUpdatesProtobufFactory,
-			Struct:    sendStatusUpdatesProtobufFactoryStruct,
+			fromInterface:     sendStatusUpdatesProtobufFactory,
+			fromStruct:        sendStatusUpdatesProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_SEND_STATUS_UPDATES,
 		},
 	}
 	StickersPacksInstalled = SettingField{
@@ -317,8 +356,10 @@ var (
 		dBColumnName:   "stickers_packs_installed",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: stickersPacksInstalledProtobufFactory,
-			Struct:    stickersPacksInstalledProtobufFactoryStruct,
+			fromInterface:     stickersPacksInstalledProtobufFactory,
+			fromStruct:        stickersPacksInstalledProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
 		},
 	}
 	StickersPacksPending = SettingField{
@@ -326,8 +367,10 @@ var (
 		dBColumnName:   "stickers_packs_pending",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: stickersPacksPendingProtobufFactory,
-			Struct:    stickersPacksPendingProtobufFactoryStruct,
+			fromInterface:     stickersPacksPendingProtobufFactory,
+			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_PENDING,
 		},
 	}
 	StickersRecentStickers = SettingField{
@@ -335,8 +378,10 @@ var (
 		dBColumnName:   "stickers_recent_stickers",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
-			Interface: stickersRecentStickersProtobufFactory,
-			Struct:    stickersRecentStickersProtobufFactoryStruct,
+			fromInterface:     stickersRecentStickersProtobufFactory,
+			fromStruct:        stickersRecentStickersProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
 		},
 	}
 	SyncingOnMobileNetwork = SettingField{
@@ -441,3 +486,20 @@ var (
 		WebviewAllowPermissionRequests,
 	}
 )
+
+func GetFieldFromProtobufType(pbt protobuf.SyncSetting_Type) (SettingField, error) {
+	if pbt == protobuf.SyncSetting_UNKNOWN {
+		return SettingField{}, errors.ErrUnrecognisedSyncSettingProtobufType
+	}
+
+	for _, s := range SettingFieldRegister {
+		if s.SyncProtobufFactory() == nil {
+			continue
+		}
+		if s.SyncProtobufFactory().SyncSettingProtobufType() == pbt {
+			return s, nil
+		}
+	}
+
+	return SettingField{}, errors.ErrUnrecognisedSyncSettingProtobufType
+}

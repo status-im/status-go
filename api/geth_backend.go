@@ -1200,7 +1200,11 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		// Init public status api
 		b.statusNode.StatusPublicService().Init(messenger)
 		// Init chat service
-		b.statusNode.ChatService().Init(messenger)
+		accDB, err := accounts.NewDB(b.appDB)
+		if err != nil {
+			return err
+		}
+		b.statusNode.ChatService(accDB).Init(messenger)
 	}
 
 	return nil

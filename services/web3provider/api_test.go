@@ -65,8 +65,10 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		NetworkID:   1,
 	}
 
-	service, err := NewService(db, rpcClient, nodeConfig, accManager, nil, nil)
+	accDB, err := accounts.NewDB(db)
 	require.NoError(t, err)
+
+	service := NewService(db, accDB, rpcClient, nodeConfig, accManager, nil, nil)
 
 	networks := json.RawMessage("{}")
 	settings := settings.Settings{

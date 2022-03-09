@@ -1,6 +1,10 @@
 package settings
 
 import (
+	"bytes"
+	"encoding/json"
+	"reflect"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
@@ -29,8 +33,8 @@ func buildRawSyncSettingMessage(msg *protobuf.SyncSetting, chatID string) (*comm
 // Currency
 
 func buildRawCurrencySyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_CURRENCY,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_CURRENCY,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
 		Clock: clock,
 	}
@@ -53,8 +57,8 @@ func currencyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*co
 // GifFavorites
 
 func buildRawGifFavoritesSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_GIF_FAVOURITES,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_GIF_FAVOURITES,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
 		Clock: clock,
 	}
@@ -71,15 +75,15 @@ func gifFavouritesProtobufFactory(value interface{}, clock uint64, chatID string
 }
 
 func gifFavouritesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	gf, _ := s.GifFavorites.MarshalJSON() // Don't need to parse error because it is always nil
+	gf := extractJSONRawMessage(s.GifFavorites)
 	return buildRawGifFavoritesSyncMessage(gf, clock, chatID)
 }
 
 // GifFavorites
 
 func buildRawGifRecentsSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_GIF_RECENTS,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_GIF_RECENTS,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
 		Clock: clock,
 	}
@@ -96,15 +100,15 @@ func gifRecentsProtobufFactory(value interface{}, clock uint64, chatID string) (
 }
 
 func gifRecentsProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	gr, _ := s.GifRecents.MarshalJSON() // Don't need to parse error because it is always nil
+	gr := extractJSONRawMessage(s.GifRecents)
 	return buildRawGifRecentsSyncMessage(gr, clock, chatID)
 }
 
 // MessagesFromContactsOnly
 
 func buildRawMessagesFromContactsOnlySyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_MESSAGES_FROM_CONTACTS_ONLY,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_MESSAGES_FROM_CONTACTS_ONLY,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
 		Clock: clock,
 	}
@@ -127,8 +131,8 @@ func messagesFromContactsOnlyProtobufFactoryStruct(s Settings, clock uint64, cha
 // PreferredName
 
 func buildRawPreferredNameSyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_PREFERRED_NAME,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_PREFERRED_NAME,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
 		Clock: clock,
 	}
@@ -156,8 +160,8 @@ func preferredNameProtobufFactoryStruct(s Settings, clock uint64, chatID string)
 // PreviewPrivacy
 
 func buildRawPreviewPrivacySyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_PREVIEW_PRIVACY,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_PREVIEW_PRIVACY,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
 		Clock: clock,
 	}
@@ -180,8 +184,8 @@ func previewPrivacyProtobufFactoryStruct(s Settings, clock uint64, chatID string
 // ProfilePicturesShowTo
 
 func buildRawProfilePicturesShowToSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_PROFILE_PICTURES_SHOW_TO,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_PROFILE_PICTURES_SHOW_TO,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
 		Clock: clock,
 	}
@@ -204,8 +208,8 @@ func profilePicturesShowToProtobufFactoryStruct(s Settings, clock uint64, chatID
 // ProfilePicturesVisibility
 
 func buildRawProfilePicturesVisibilitySyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
 		Clock: clock,
 	}
@@ -228,8 +232,8 @@ func profilePicturesVisibilityProtobufFactoryStruct(s Settings, clock uint64, ch
 // SendStatusUpdates
 
 func buildRawSendStatusUpdatesSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_SEND_STATUS_UPDATES,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_SEND_STATUS_UPDATES,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
 		Clock: clock,
 	}
@@ -252,8 +256,8 @@ func sendStatusUpdatesProtobufFactoryStruct(s Settings, clock uint64, chatID str
 // StickerPacksInstalled
 
 func buildRawStickerPacksInstalledSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
 		Clock: clock,
 	}
@@ -270,15 +274,15 @@ func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64, chat
 }
 
 func stickersPacksInstalledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	spi, _ := s.StickerPacksInstalled.MarshalJSON() // Don't need to parse error because it is always nil
+	spi := extractJSONRawMessage(s.StickerPacksInstalled)
 	return buildRawStickerPacksInstalledSyncMessage(spi, clock, chatID)
 }
 
 // StickerPacksPending
 
 func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_STICKERS_PACKS_PENDING,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_STICKERS_PACKS_PENDING,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
 		Clock: clock,
 	}
@@ -295,15 +299,15 @@ func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID
 }
 
 func stickersPacksPendingProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	spp, _ := s.StickerPacksPending.MarshalJSON() // Don't need to parse error because it is always nil
+	spp := extractJSONRawMessage(s.StickerPacksPending)
 	return buildRawStickerPacksPendingSyncMessage(spp, clock, chatID)
 }
 
-// StickerPacksPending
+// StickersRecentStickers
 
 func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting {
-		Type: protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
 		Clock: clock,
 	}
@@ -320,7 +324,7 @@ func stickersRecentStickersProtobufFactory(value interface{}, clock uint64, chat
 }
 
 func stickersRecentStickersProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	srs, _ := s.StickersRecentStickers.MarshalJSON() // Don't need to parse error because it is always nil
+	srs := extractJSONRawMessage(s.StickersRecentStickers)
 	return buildRawStickersRecentStickersSyncMessage(srs, clock, chatID)
 }
 
@@ -341,6 +345,10 @@ func assertBool(value interface{}) (bool, error) {
 }
 
 func assertString(value interface{}) (string, error) {
+	rv := reflect.ValueOf(value)
+	if rv.Kind() == reflect.Ptr {
+		value = *value.(*string)
+	}
 	v, ok := value.(string)
 	if !ok {
 		return "", errors.Wrapf(ErrTypeAssertionFailed, "expected 'string', received %T", value)
@@ -381,4 +389,15 @@ func parseNumberToInt64(value interface{}) (int64, error) {
 	default:
 		return 0, errors.Wrapf(ErrTypeAssertionFailed, "expected a numeric type, received %T", value)
 	}
+}
+
+func extractJSONRawMessage(jrm *json.RawMessage) []byte {
+	if jrm == nil {
+		return nil
+	}
+	out, _ := jrm.MarshalJSON() // Don't need to parse error because it is always nil
+	if len(out) == 0 || bytes.Equal(out, []byte("null")) {
+		return nil
+	}
+	return out
 }

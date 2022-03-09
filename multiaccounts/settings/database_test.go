@@ -174,4 +174,14 @@ func TestDatabase_SetSettingLastSynced(t *testing.T) {
 	require.Equal(t, now, ct)
 }
 
-// TODO add test that loops through register and checks that there is a sync clock column for each.
+func TestSyncColumnsSet(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	for _, sf := range SettingFieldRegister {
+		if sf.SyncProtobufFactory() != nil {
+			_, err := db.GetSettingLastSynced(sf)
+			require.NoError(t, err)
+		}
+	}
+}

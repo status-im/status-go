@@ -17,21 +17,16 @@ import (
 	"github.com/status-im/status-go/services/rpcfilters"
 )
 
-func NewService(appDB *sql.DB, rpcClient *rpc.Client, config *params.NodeConfig, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, transactor *transactions.Transactor) (*Service, error) {
-	accDB, err := accounts.NewDB(appDB)
-	if err != nil {
-		return nil, err
-	}
-
+func NewService(appDB *sql.DB, accountsDB *accounts.Database, rpcClient *rpc.Client, config *params.NodeConfig, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, transactor *transactions.Transactor) *Service {
 	return &Service{
 		permissionsDB:   permissions.NewDB(appDB),
-		accountsDB:      accDB,
+		accountsDB:      accountsDB,
 		rpcClient:       rpcClient,
 		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
 		accountsManager: accountsManager,
 		transactor:      transactor,
-	}, nil
+	}
 }
 
 type Service struct {

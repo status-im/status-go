@@ -6,8 +6,25 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/sqlite"
 )
+
+func StringFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueString()
+}
+
+func BoolFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueBool()
+}
+
+func BytesFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueBytes()
+}
+
+func Int64FromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueInt64()
+}
 
 func BoolHandler(value interface{}) (interface{}, error) {
 	_, ok := value.(bool)
