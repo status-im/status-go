@@ -407,9 +407,7 @@ func init() {
 	proto.RegisterType((*SendTransaction)(nil), "protobuf.SendTransaction")
 }
 
-func init() {
-	proto.RegisterFile("command.proto", fileDescriptor_213c0bb044472049)
-}
+func init() { proto.RegisterFile("command.proto", fileDescriptor_213c0bb044472049) }
 
 var fileDescriptor_213c0bb044472049 = []byte{
 	// 301 bytes of a gzipped FileDescriptorProto

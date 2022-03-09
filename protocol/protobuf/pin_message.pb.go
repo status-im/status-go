@@ -96,9 +96,7 @@ func init() {
 	proto.RegisterType((*PinMessage)(nil), "protobuf.PinMessage")
 }
 
-func init() {
-	proto.RegisterFile("pin_message.proto", fileDescriptor_b3c2ad1be7128a0a)
-}
+func init() { proto.RegisterFile("pin_message.proto", fileDescriptor_b3c2ad1be7128a0a) }
 
 var fileDescriptor_b3c2ad1be7128a0a = []byte{
 	// 192 bytes of a gzipped FileDescriptorProto

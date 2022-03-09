@@ -3070,12 +3070,26 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
+	adminCommunitiesChatIDs, err := m.communitiesManager.GetAdminCommunitiesChatIDs()
+	if err != nil {
+		logger.Info("failed to retrieve admin communities", zap.Error(err))
+	}
+
 	for filter, messages := range chatWithMessages {
 		var processedMessages []string
 		for _, shhMessage := range messages {
 			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
+
+			if adminCommunitiesChatIDs[filter.ChatID] {
+				logger.Debug("storing waku message")
+				err := m.communitiesManager.StoreWakuMessage(shhMessage)
+				if err != nil {
+					logger.Warn("failed to store waku message", zap.Error(err))
+				}
+			}
+
 			statusMessages, acks, err := m.sender.HandleMessages(shhMessage, true)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
@@ -3760,7 +3774,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.AddChat(chat)
 	}
 
-	var err error
 	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool) {
 		installation, _ := messageState.AllInstallations.Load(id)
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)

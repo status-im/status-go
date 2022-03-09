@@ -1290,6 +1290,13 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
 }
 
+func (o *Community) ChatIDs() (chatIDs []string) {
+	for id := range o.config.CommunityDescription.Chats {
+		chatIDs = append(chatIDs, o.IDString()+id)
+	}
+	return chatIDs
+}
+
 func emptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:   make(map[string]*protobuf.CommunityMember),

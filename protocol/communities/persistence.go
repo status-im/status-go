@@ -347,6 +347,18 @@ func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error 
 	return err
 }
 
+func (p *Persistence) SaveWakuMessage(message *types.Message) error {
+	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash) VALUES (?, ?, ?, ?, ?, ?)`,
+		message.Sig,
+		message.Timestamp,
+		message.Topic.String(),
+		message.Payload,
+		message.Padding,
+		types.Bytes2Hex(message.Hash),
+	)
+	return err
+}
+
 func (p *Persistence) GetCommunitiesSettings() ([]CommunitySettings, error) {
 	rows, err := p.db.Query("SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled FROM communities_settings")
 	if err != nil {
