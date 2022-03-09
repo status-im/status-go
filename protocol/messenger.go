@@ -1220,7 +1220,7 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
-		publicChatIDs = append(publicChatIDs, org.IDString())
+		publicChatIDs = append(publicChatIDs, org.IDString(), org.StatusUpdatesChannelID())
 	}
 
 	// Init filters for the communities we are an admin of
