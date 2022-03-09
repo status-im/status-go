@@ -26,7 +26,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.12
 	github.com/ipfs/go-cid v0.0.7
-	github.com/ipfs/go-ds-sql v0.2.0
+	github.com/ipfs/go-ds-sql v0.3.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
@@ -34,8 +34,8 @@ require (
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.15.1
-	github.com/libp2p/go-libp2p-core v0.9.0
-	github.com/libp2p/go-libp2p-peerstore v0.3.0
+	github.com/libp2p/go-libp2p-core v0.12.0
+	github.com/libp2p/go-libp2p-peerstore v0.6.0
 	github.com/libp2p/go-libp2p-pubsub v0.5.5
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7

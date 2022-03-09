@@ -9,7 +9,7 @@ import (
 
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -50,7 +50,7 @@ func (r *addrsRecord) flush(write ds.Write) (err error) {
 	key := addrBookBase.ChildString(b32.RawStdEncoding.EncodeToString([]byte(r.Id.ID)))
 
 	if len(r.Addrs) == 0 {
-		if err = write.Delete(key); err == nil {
+		if err = write.Delete(context.TODO(), key); err == nil {
 			r.dirty = false
 		}
 		return err
@@ -60,7 +60,7 @@ func (r *addrsRecord) flush(write ds.Write) (err error) {
 	if err != nil {
 		return err
 	}
-	if err = write.Put(key, data); err != nil {
+	if err = write.Put(context.TODO(), key, data); err != nil {
 		return err
 	}
 	// write succeeded; record is no longer dirty.
@@ -223,7 +223,7 @@ func (ab *dsAddrBook) loadRecord(id peer.ID, cache bool, update bool) (pr *addrs
 
 	pr = &addrsRecord{AddrBookRecord: &pb.AddrBookRecord{}}
 	key := addrBookBase.ChildString(b32.RawStdEncoding.EncodeToString([]byte(id)))
-	data, err := ab.ds.Get(key)
+	data, err := ab.ds.Get(context.TODO(), key)
 
 	switch err {
 	case ds.ErrNotFound:
@@ -446,7 +446,7 @@ func (ab *dsAddrBook) ClearAddrs(p peer.ID) {
 	ab.cache.Remove(p)
 
 	key := addrBookBase.ChildString(b32.RawStdEncoding.EncodeToString([]byte(p)))
-	if err := ab.ds.Delete(key); err != nil {
+	if err := ab.ds.Delete(context.TODO(), key); err != nil {
 		log.Errorf("failed to clear addresses for peer %s: %v", p.Pretty(), err)
 	}
 }

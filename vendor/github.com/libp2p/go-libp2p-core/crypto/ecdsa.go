@@ -67,6 +67,11 @@ func ECDSAKeyPairFromKey(priv *ecdsa.PrivateKey) (PrivKey, PubKey, error) {
 	return &ECDSAPrivateKey{priv}, &ECDSAPublicKey{&priv.PublicKey}, nil
 }
 
+// ECDSAPublicKeyFromPubKey generates a new ecdsa public key from an input public key
+func ECDSAPublicKeyFromPubKey(pub ecdsa.PublicKey) (PubKey, error) {
+	return &ECDSAPublicKey{pub: &pub}, nil
+}
+
 // MarshalECDSAPrivateKey returns x509 bytes from a private key
 func MarshalECDSAPrivateKey(ePriv ECDSAPrivateKey) ([]byte, error) {
 	return x509.MarshalECPrivateKey(ePriv.priv)

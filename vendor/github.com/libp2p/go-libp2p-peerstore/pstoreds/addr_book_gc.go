@@ -152,7 +152,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 		if err != nil {
 			log.Warnf("failed while %s record with GC key: %v, err: %v; deleting", msg, key, err)
 		}
-		if err = batch.Delete(key); err != nil {
+		if err = batch.Delete(context.TODO(), key); err != nil {
 			log.Warnf("failed to delete corrupt GC lookahead entry: %v, err: %v", key, err)
 		}
 	}
@@ -160,20 +160,20 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 	// This function drops a GC key if the entry is cleaned correctly. It may reschedule another visit
 	// if the next earliest expiry falls within the current window again.
 	dropOrReschedule := func(key ds.Key, ar *addrsRecord) {
-		if err := batch.Delete(key); err != nil {
+		if err := batch.Delete(context.TODO(), key); err != nil {
 			log.Warnf("failed to delete lookahead entry: %v, err: %v", key, err)
 		}
 
 		// re-add the record if it needs to be visited again in this window.
 		if len(ar.Addrs) != 0 && ar.Addrs[0].Expiry <= gc.currWindowEnd {
 			gcKey := gcLookaheadBase.ChildString(fmt.Sprintf("%d/%s", ar.Addrs[0].Expiry, key.Name()))
-			if err := batch.Put(gcKey, []byte{}); err != nil {
+			if err := batch.Put(context.TODO(), gcKey, []byte{}); err != nil {
 				log.Warnf("failed to add new GC key: %v, err: %v", gcKey, err)
 			}
 		}
 	}
 
-	results, err := gc.ab.ds.Query(purgeLookaheadQuery)
+	results, err := gc.ab.ds.Query(context.TODO(), purgeLookaheadQuery)
 	if err != nil {
 		log.Warnf("failed while fetching entries to purge: %v", err)
 		return
@@ -228,7 +228,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 
 		// otherwise, fetch it from the store, clean it and flush it.
 		entryKey := addrBookBase.ChildString(gcKey.Name())
-		val, err := gc.ab.ds.Get(entryKey)
+		val, err := gc.ab.ds.Get(context.TODO(), entryKey)
 		if err != nil {
 			// captures all errors, including ErrNotFound.
 			dropInError(gcKey, err, "fetching entry")
@@ -248,7 +248,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 		dropOrReschedule(gcKey, record)
 	}
 
-	if err = batch.Commit(); err != nil {
+	if err = batch.Commit(context.TODO()); err != nil {
 		log.Warnf("failed to commit GC purge batch: %v", err)
 	}
 }
@@ -268,7 +268,7 @@ func (gc *dsAddrBookGc) purgeStore() {
 		log.Warnf("failed while creating batch to purge GC entries: %v", err)
 	}
 
-	results, err := gc.ab.ds.Query(purgeStoreQuery)
+	results, err := gc.ab.ds.Query(context.TODO(), purgeStoreQuery)
 	if err != nil {
 		log.Warnf("failed while opening iterator: %v", err)
 		return
@@ -294,7 +294,7 @@ func (gc *dsAddrBookGc) purgeStore() {
 		gc.ab.cache.Remove(id)
 	}
 
-	if err = batch.Commit(); err != nil {
+	if err = batch.Commit(context.TODO()); err != nil {
 		log.Warnf("failed to commit GC purge batch: %v", err)
 	}
 }
@@ -321,7 +321,7 @@ func (gc *dsAddrBookGc) populateLookahead() {
 
 	var id peer.ID
 	record := &addrsRecord{AddrBookRecord: &pb.AddrBookRecord{}}
-	results, err := gc.ab.ds.Query(populateLookaheadQuery)
+	results, err := gc.ab.ds.Query(context.TODO(), populateLookaheadQuery)
 	if err != nil {
 		log.Warnf("failed while querying to populate lookahead GC window: %v", err)
 		return
@@ -354,7 +354,7 @@ func (gc *dsAddrBookGc) populateLookahead() {
 				continue
 			}
 			gcKey := gcLookaheadBase.ChildString(fmt.Sprintf("%d/%s", cached.Addrs[0].Expiry, idb32))
-			if err = batch.Put(gcKey, []byte{}); err != nil {
+			if err = batch.Put(context.TODO(), gcKey, []byte{}); err != nil {
 				log.Warnf("failed while inserting GC entry for peer: %v, err: %v", id.Pretty(), err)
 			}
 			cached.RUnlock()
@@ -363,7 +363,7 @@ func (gc *dsAddrBookGc) populateLookahead() {
 
 		record.Reset()
 
-		val, err := gc.ab.ds.Get(ds.RawKey(result.Key))
+		val, err := gc.ab.ds.Get(context.TODO(), ds.RawKey(result.Key))
 		if err != nil {
 			log.Warnf("failed which getting record from store for peer: %v, err: %v", id.Pretty(), err)
 			continue
@@ -374,13 +374,13 @@ func (gc *dsAddrBookGc) populateLookahead() {
 		}
 		if len(record.Addrs) > 0 && record.Addrs[0].Expiry <= until {
 			gcKey := gcLookaheadBase.ChildString(fmt.Sprintf("%d/%s", record.Addrs[0].Expiry, idb32))
-			if err = batch.Put(gcKey, []byte{}); err != nil {
+			if err = batch.Put(context.TODO(), gcKey, []byte{}); err != nil {
 				log.Warnf("failed while inserting GC entry for peer: %v, err: %v", id.Pretty(), err)
 			}
 		}
 	}
 
-	if err = batch.Commit(); err != nil {
+	if err = batch.Commit(context.TODO()); err != nil {
 		log.Warnf("failed to commit GC lookahead batch: %v", err)
 	}
 

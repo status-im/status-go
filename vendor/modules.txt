@@ -190,10 +190,10 @@ github.com/huin/goupnp/ssdp
 github.com/imdario/mergo
 # github.com/ipfs/go-cid v0.0.7
 github.com/ipfs/go-cid
-# github.com/ipfs/go-datastore v0.4.6
+# github.com/ipfs/go-datastore v0.5.1
 github.com/ipfs/go-datastore
 github.com/ipfs/go-datastore/query
-# github.com/ipfs/go-ds-sql v0.2.0
+# github.com/ipfs/go-ds-sql v0.3.0
 github.com/ipfs/go-ds-sql
 # github.com/ipfs/go-ipfs-util v0.0.2
 github.com/ipfs/go-ipfs-util
@@ -259,7 +259,7 @@ github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
 # github.com/libp2p/go-libp2p-connmgr v0.2.4
 github.com/libp2p/go-libp2p-connmgr
-# github.com/libp2p/go-libp2p-core v0.9.0
+# github.com/libp2p/go-libp2p-core v0.12.0
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
 github.com/libp2p/go-libp2p-core/crypto
@@ -294,7 +294,7 @@ github.com/libp2p/go-libp2p-nat
 # github.com/libp2p/go-libp2p-noise v0.2.2
 github.com/libp2p/go-libp2p-noise
 github.com/libp2p/go-libp2p-noise/pb
-# github.com/libp2p/go-libp2p-peerstore v0.3.0
+# github.com/libp2p/go-libp2p-peerstore v0.6.0
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
 github.com/libp2p/go-libp2p-peerstore/pb
