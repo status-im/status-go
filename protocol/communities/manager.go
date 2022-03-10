@@ -7,6 +7,12 @@ import (
 	"strings"
 	"time"
 
+	// These will be used in the following commit
+	// The reason import and usage is done in multiple commits
+	// is to make reviewing the changes easier
+	_ "github.com/anacrolix/torrent"
+	_ "github.com/anacrolix/torrent/bencode"
+	_ "github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/google/uuid"
