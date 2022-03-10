@@ -4,6 +4,7 @@
 // 1642666031_add_removed_clock_to_bookmarks.up.sql
 // 1643644541_gif_api_key_setting.up.sql
 // 1644188994_recent_stickers.up.sql
+// 1646841105_add_emoji_account.up.sql
 // doc.go
 // DO NOT EDIT!
 
@@ -87,7 +88,7 @@ func _1640111208_dummyUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1640111208_dummy.up.sql", size: 258, mode: os.FileMode(436), modTime: time.Unix(1645543084, 0)}
+	info := bindataFileInfo{name: "1640111208_dummy.up.sql", size: 258, mode: os.FileMode(436), modTime: time.Unix(1646839963, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -107,7 +108,7 @@ func _1642666031_add_removed_clock_to_bookmarksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1642666031_add_removed_clock_to_bookmarks.up.sql", size: 117, mode: os.FileMode(436), modTime: time.Unix(1646418868, 0)}
+	info := bindataFileInfo{name: "1642666031_add_removed_clock_to_bookmarks.up.sql", size: 117, mode: os.FileMode(436), modTime: time.Unix(1646839963, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -127,7 +128,7 @@ func _1643644541_gif_api_key_settingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1643644541_gif_api_key_setting.up.sql", size: 108, mode: os.FileMode(436), modTime: time.Unix(1645543084, 0)}
+	info := bindataFileInfo{name: "1643644541_gif_api_key_setting.up.sql", size: 108, mode: os.FileMode(436), modTime: time.Unix(1646839963, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -147,7 +148,27 @@ func _1644188994_recent_stickersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1644188994_recent_stickers.up.sql", size: 79, mode: os.FileMode(436), modTime: time.Unix(1646661962, 0)}
+	info := bindataFileInfo{name: "1644188994_recent_stickers.up.sql", size: 79, mode: os.FileMode(436), modTime: time.Unix(1646839963, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var __1646841105_add_emoji_accountUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x4e\xce\x2f\xcd\x2b\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcd\xcd\xcf\xca\x54\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\x41\xd2\x1a\xec\x1a\x02\xd5\x63\x0b\x96\x07\x04\x00\x00\xff\xff\x2b\x1c\x4e\xaa\x60\x00\x00\x00")
+
+func _1646841105_add_emoji_accountUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1646841105_add_emoji_accountUpSql,
+		"1646841105_add_emoji_account.up.sql",
+	)
+}
+
+func _1646841105_add_emoji_accountUpSql() (*asset, error) {
+	bytes, err := _1646841105_add_emoji_accountUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1646841105_add_emoji_account.up.sql", size: 96, mode: os.FileMode(436), modTime: time.Unix(1646839402, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -167,7 +188,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(436), modTime: time.Unix(1643209233, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(436), modTime: time.Unix(1646818623, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -228,6 +249,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1642666031_add_removed_clock_to_bookmarks.up.sql": _1642666031_add_removed_clock_to_bookmarksUpSql,
 	"1643644541_gif_api_key_setting.up.sql": _1643644541_gif_api_key_settingUpSql,
 	"1644188994_recent_stickers.up.sql": _1644188994_recent_stickersUpSql,
+	"1646841105_add_emoji_account.up.sql": _1646841105_add_emoji_accountUpSql,
 	"doc.go": docGo,
 }
 
@@ -275,6 +297,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1642666031_add_removed_clock_to_bookmarks.up.sql": &bintree{_1642666031_add_removed_clock_to_bookmarksUpSql, map[string]*bintree{}},
 	"1643644541_gif_api_key_setting.up.sql": &bintree{_1643644541_gif_api_key_settingUpSql, map[string]*bintree{}},
 	"1644188994_recent_stickers.up.sql": &bintree{_1644188994_recent_stickersUpSql, map[string]*bintree{}},
+	"1646841105_add_emoji_account.up.sql": &bintree{_1646841105_add_emoji_accountUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
