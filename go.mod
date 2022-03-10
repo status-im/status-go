@@ -13,6 +13,7 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
 
 require (
+	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.2.0
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
@@ -71,7 +72,7 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
+	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 	golang.org/x/tools v0.1.2 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
