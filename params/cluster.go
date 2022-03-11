@@ -9,6 +9,7 @@ const (
 	FleetWakuV2Prod = "wakuv2.prod"
 	FleetWakuV2Test = "wakuv2.test"
 	FleetStatusTest = "status.test"
+	FleetStatusProd = "status.prod"
 )
 
 // Cluster defines a list of Ethereum nodes.
