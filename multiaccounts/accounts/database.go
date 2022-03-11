@@ -51,6 +51,7 @@ type Account struct {
 	Path      string         `json:"path,omitempty"`
 	PublicKey types.HexBytes `json:"public-key,omitempty"`
 	Name      string         `json:"name"`
+	Emoji     string         `json:"emoji"`
 	Color     string         `json:"color"`
 	Hidden    bool           `json:"hidden"`
 }
@@ -570,7 +571,7 @@ func (db *Database) GetSettings() (Settings, error) {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, color, hidden FROM accounts ORDER BY created_at")
+	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden FROM accounts ORDER BY created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -581,7 +582,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 		acc := Account{}
 		err := rows.Scan(
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-			&pubkey, &acc.Path, &acc.Name, &acc.Color, &acc.Hidden)
+			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden)
 		if err != nil {
 			return nil, err
 		}
@@ -595,13 +596,13 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, err error) {
-	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, color, hidden FROM accounts  WHERE address = ? COLLATE NOCASE", address)
+	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden FROM accounts  WHERE address = ? COLLATE NOCASE", address)
 
 	acc := &Account{}
 	pubkey := []byte{}
 	err = row.Scan(
 		&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-		&pubkey, &acc.Path, &acc.Name, &acc.Color, &acc.Hidden)
+		&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden)
 
 	if err != nil {
 		return nil, err
@@ -633,7 +634,7 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	if err != nil {
 		return err
 	}
-	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?, color = ?, hidden = ?, updated_at = datetime('now') WHERE address = ?")
+	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?,  emoji = ?, color = ?, hidden = ?, updated_at = datetime('now') WHERE address = ?")
 	if err != nil {
 		return err
 	}
@@ -643,7 +644,7 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Color, acc.Hidden, acc.Address)
+		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color, acc.Hidden, acc.Address)
 		if err != nil {
 			switch err.Error() {
 			case uniqueChatConstraint:

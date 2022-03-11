@@ -50,11 +50,12 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	return api.db.DeleteAccount(address)
 }
 
-func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string) error {
+func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
 	account := accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
 		Type:    "watch",
 		Name:    name,
+		Emoji:   emoji,
 		Color:   color,
 	}
 	return api.SaveAccounts(ctx, []accounts.Account{account})
@@ -66,6 +67,7 @@ func (api *API) AddAccountWithMnemonic(
 	password string,
 	name string,
 	color string,
+	emoji string,
 ) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
@@ -95,6 +97,7 @@ func (api *API) AddAccountWithMnemonic(
 		PublicKey: types.HexBytes(infos[pathWalletRoot].PublicKey),
 		Type:      "seed",
 		Name:      name,
+		Emoji:     emoji,
 		Color:     color,
 		Path:      pathDefaultWallet,
 	}
@@ -107,6 +110,7 @@ func (api *API) AddAccountWithPrivateKey(
 	password string,
 	name string,
 	color string,
+	emoji string,
 ) error {
 	err := api.verifyPassword(password)
 	if err != nil {
@@ -128,6 +132,7 @@ func (api *API) AddAccountWithPrivateKey(
 		PublicKey: types.HexBytes(info.PublicKey),
 		Type:      "key",
 		Name:      name,
+		Emoji:     emoji,
 		Color:     color,
 		Path:      pathDefaultWallet,
 	}
@@ -140,6 +145,7 @@ func (api *API) GenerateAccount(
 	password string,
 	name string,
 	color string,
+	emoji string,
 ) error {
 	err := api.verifyPassword(password)
 	if err != nil {
@@ -177,6 +183,7 @@ func (api *API) GenerateAccount(
 		PublicKey: types.HexBytes(infos[path].PublicKey),
 		Type:      "generated",
 		Name:      name,
+		Emoji:     emoji,
 		Color:     color,
 		Path:      path,
 	}
