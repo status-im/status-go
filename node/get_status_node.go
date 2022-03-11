@@ -45,6 +45,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
+	visualIdentity "github.com/status-im/status-go/services/visual-identity"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -117,6 +118,7 @@ type StatusNode struct {
 	gifSrvc                *gif.Service
 	stickersSrvc           *stickers.Service
 	chatSrvc               *chat.Service
+	visualIdentitySrvc     *visualIdentity.Service
 }
 
 // New makes new instance of StatusNode.
@@ -427,6 +429,7 @@ func (n *StatusNode) stop() error {
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
 	n.stickersSrvc = nil
+	n.visualIdentitySrvc = nil
 	n.publicMethods = make(map[string]bool)
 
 	return nil
