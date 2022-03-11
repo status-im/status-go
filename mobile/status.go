@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	signercore "github.com/ethereum/go-ethereum/signer/core"
 
+	"github.com/status-im/zxcvbn-go"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
@@ -403,7 +405,7 @@ func SignTypedData(data, address, password string) string {
 }
 
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
-//export HashTypeData
+//export HashTypedData
 func HashTypedData(data string) string {
 	var typed typeddata.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
@@ -431,7 +433,7 @@ func SignTypedDataV4(data, address, password string) string {
 }
 
 // HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
-//export HashTypeDataV4
+//export HashTypedDataV4
 func HashTypedDataV4(data string) string {
 	var typed signercore.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
@@ -736,4 +738,27 @@ func ImageServerTLSCert() string {
 	}
 
 	return cert
+}
+
+// GetPasswordStrength uses zxcvbn module and generates a JSON containing information about the quality of the given password
+// (Entropy, CrackTime, CrackTimeDisplay, Score, MatchSequence and CalcTime).
+// userInputs argument can be whatever list of strings like user's personal info or site-specific vocabulary that zxcvbn will
+// make use to determine the result.
+// For more details on usage see https://github.com/status-im/zxcvbn-go
+func GetPasswordStrength(paramsJSON string) string {
+	var params struct {
+		Password   string   `json:"password"`
+		UserInputs []string `json:"userInputs"`
+	}
+
+	err := json.Unmarshal([]byte(paramsJSON), &params)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(zxcvbn.PasswordStrength(params.Password, params.UserInputs))
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
+	}
+	return string(data)
 }
