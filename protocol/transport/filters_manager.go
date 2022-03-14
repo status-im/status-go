@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"sync"
@@ -219,6 +220,17 @@ func (f *FiltersManager) FilterByFilterID(filterID string) *Filter {
 	defer f.mutex.Unlock()
 	for _, f := range f.filters {
 		if f.FilterID == filterID {
+			return f
+		}
+	}
+	return nil
+}
+
+func (f *FiltersManager) FilterByTopic(topic []byte) *Filter {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	for _, f := range f.filters {
+		if bytes.Equal(types.TopicTypeToByteArray(f.Topic), topic) {
 			return f
 		}
 	}

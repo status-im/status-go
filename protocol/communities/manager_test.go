@@ -233,7 +233,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
 	// Partition of 7 days
 	partition := 7 * 24 * time.Hour
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
 	// There are no waku messages in the database so we don't expect
@@ -275,7 +275,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 	err = s.manager.StoreWakuMessage(&message3)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
 	_, err = os.Stat(s.manager.archiveDataFile(community.IDString()))
@@ -285,7 +285,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 	_, err = os.Stat(s.manager.torrentFile(community.IDString()))
 	s.Require().NoError(err)
 
-	index, err := s.manager.loadHistoryArchiveIndexFromFile(community.ID())
+	index, err := s.manager.LoadHistoryArchiveIndexFromFile(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
@@ -336,10 +336,10 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchi
 	err = s.manager.StoreWakuMessage(&message4)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
-	index, err := s.manager.loadHistoryArchiveIndexFromFile(community.ID())
+	index, err := s.manager.LoadHistoryArchiveIndexFromFile(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 3)
 
@@ -385,10 +385,10 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
-	index, err := s.manager.loadHistoryArchiveIndexFromFile(community.ID())
+	index, err := s.manager.LoadHistoryArchiveIndexFromFile(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 1)
 
@@ -400,10 +400,10 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	err = s.manager.StoreWakuMessage(&message2)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
-	index, err = s.manager.loadHistoryArchiveIndexFromFile(community.ID())
+	index, err = s.manager.LoadHistoryArchiveIndexFromFile(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(index.Archives, 2)
 }
@@ -430,7 +430,7 @@ func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
 	err = s.manager.SeedHistoryArchiveTorrent(community.ID())
@@ -467,7 +467,7 @@ func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
 	err = s.manager.StoreWakuMessage(&message1)
 	s.Require().NoError(err)
 
-	err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
+	_, err = s.manager.CreateHistoryArchiveTorrent(community.ID(), topics, startDate, endDate, partition)
 	s.Require().NoError(err)
 
 	err = s.manager.SeedHistoryArchiveTorrent(community.ID())
