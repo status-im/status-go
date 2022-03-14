@@ -2917,7 +2917,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	return m.handleRetrievedMessages(chatWithMessages)
+	return m.handleRetrievedMessages(chatWithMessages, true)
 }
 
 func (m *Messenger) GetStats() types.StatsSummary {
@@ -3066,7 +3066,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
@@ -3096,7 +3096,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if adminCommunitiesChatIDs[filter.ChatID] {
+			if adminCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
@@ -3669,6 +3669,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
+							continue
+						}
+
+					case protobuf.CommunityMessageArchiveMagnetlink:
+						logger.Debug("Handling CommunityMessageArchiveMagnetlink")
+						magnetlinkMessage := msg.ParsedMessage.Interface().(protobuf.CommunityMessageArchiveMagnetlink)
+						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
+						if err != nil {
+							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
 							continue
 						}
 
