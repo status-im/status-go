@@ -56,7 +56,8 @@ func TestDappPermissionsStored(t *testing.T) {
 	sort.Slice(rst, func(i, j int) bool {
 		return rst[i].Name < rst[j].Name
 	})
-	require.Equal(t, expected, rst)
+	require.Equal(t, expected[0].Name, rst[0].Name)
+	require.Equal(t, expected[0].Permissions, rst[0].Permissions)
 
 	data, err := json.Marshal(rst)
 	require.NoError(t, err)
@@ -77,7 +78,9 @@ func TestDappPermissionsReplacedOnUpdated(t *testing.T) {
 	rst, err := api.GetDappPermissions(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, rst, 1)
-	require.Equal(t, perms, rst[0])
+	require.Equal(t, perms.Name, rst[0].Name)
+	require.Equal(t, perms.Permissions, rst[0].Permissions)
+
 }
 
 func TestDappPermissionsDeleted(t *testing.T) {

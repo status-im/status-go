@@ -19,8 +19,10 @@ func NewDB(db *sql.DB) *Database {
 }
 
 type DappPermissions struct {
+	ID          int
 	Name        string   `json:"dapp"`
 	Permissions []string `json:"permissions,omitempty"`
+	Address     string   `json:"address,omitempty"`
 }
 
 func (db *Database) AddPermissions(perms DappPermissions) (err error) {
@@ -35,13 +37,41 @@ func (db *Database) AddPermissions(perms DappPermissions) (err error) {
 		}
 		_ = tx.Rollback()
 	}()
-
-	dInsert, err := tx.Prepare("INSERT OR REPLACE INTO dapps(name) VALUES(?)")
+	dRows, err := tx.Query("SELECT id FROM dapps where name = ? AND address = ?", perms.Name, perms.Address)
 	if err != nil {
 		return
 	}
-	_, err = dInsert.Exec(perms.Name)
-	dInsert.Close()
+	defer dRows.Close()
+
+	var id int64
+	if dRows.Next() {
+		err = dRows.Scan(&id)
+		if err != nil {
+			return
+		}
+	} else {
+		dInsert, err := tx.Prepare("INSERT INTO dapps(name, address) VALUES(?, ?)")
+		if err != nil {
+			return err
+		}
+		res, err := dInsert.Exec(perms.Name, perms.Address)
+		dInsert.Close()
+		if err != nil {
+			return err
+		}
+
+		id, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+	}
+
+	pDelete, err := tx.Prepare("DELETE FROM permissions WHERE dapp_id = ?")
+	if err != nil {
+		return
+	}
+	defer pDelete.Close()
+	_, err = pDelete.Exec(id)
 	if err != nil {
 		return
 	}
@@ -49,13 +79,14 @@ func (db *Database) AddPermissions(perms DappPermissions) (err error) {
 	if len(perms.Permissions) == 0 {
 		return
 	}
-	pInsert, err := tx.Prepare("INSERT INTO permissions(dapp_name, permission) VALUES(?, ?)")
+
+	pInsert, err := tx.Prepare("INSERT INTO permissions(dapp_id, permission) VALUES(?, ?)")
 	if err != nil {
 		return
 	}
 	defer pInsert.Close()
 	for _, perm := range perms.Permissions {
-		_, err = pInsert.Exec(perms.Name, perm)
+		_, err = pInsert.Exec(id, perm)
 		if err != nil {
 			return
 		}
@@ -77,36 +108,36 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 	}()
 
 	// FULL and RIGHT joins are not supported
-	dRows, err := tx.Query("SELECT name FROM dapps")
+	dRows, err := tx.Query("SELECT id, name, address FROM dapps")
 	if err != nil {
 		return
 	}
 	defer dRows.Close()
-	dapps := map[string]*DappPermissions{}
+	dapps := map[int]*DappPermissions{}
 	for dRows.Next() {
 		perms := DappPermissions{}
-		err = dRows.Scan(&perms.Name)
+		err = dRows.Scan(&perms.ID, &perms.Name, &perms.Address)
 		if err != nil {
 			return nil, err
 		}
-		dapps[perms.Name] = &perms
+		dapps[perms.ID] = &perms
 	}
 
-	pRows, err := tx.Query("SELECT dapp_name, permission from permissions")
+	pRows, err := tx.Query("SELECT dapp_id, permission from permissions")
 	if err != nil {
 		return
 	}
 	defer pRows.Close()
 	var (
-		name       string
+		id         int
 		permission string
 	)
 	for pRows.Next() {
-		err = pRows.Scan(&name, &permission)
+		err = pRows.Scan(&id, &permission)
 		if err != nil {
 			return
 		}
-		dapps[name].Permissions = append(dapps[name].Permissions, permission)
+		dapps[id].Permissions = append(dapps[id].Permissions, permission)
 	}
 	rst = make([]DappPermissions, 0, len(dapps))
 	for key := range dapps {
@@ -116,55 +147,22 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 	return rst, nil
 }
 
-func (db *Database) GetPermissionsByDappName(dappName string) (rst *DappPermissions, err error) {
-	tx, err := db.db.Begin()
+func (db *Database) DeletePermission(name string, address string) error {
+	_, err := db.db.Exec("DELETE FROM dapps WHERE name = ? AND address = ?", name, address)
+	return err
+}
+
+func (db *Database) HasPermission(dappName string, address string, permission string) (bool, error) {
+	var id int64
+	err := db.db.QueryRow("SELECT id FROM dapps where name = ? AND address = ?", dappName, address).Scan(&id)
 	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	rst = &DappPermissions{
-		Name: dappName,
+		return false, nil
 	}
 
-	pRows, err := tx.Query("SELECT permission from permissions WHERE dapp_name = ?", dappName)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	defer pRows.Close()
-
-	var permission string
-	for pRows.Next() {
-		err = pRows.Scan(&permission)
-		if err != nil {
-			return
-		}
-		rst.Permissions = append(rst.Permissions, permission)
-	}
-
-	return rst, nil
-}
-
-func (db *Database) DeletePermission(name string) error {
-	_, err := db.db.Exec("DELETE FROM dapps WHERE name = ?", name)
-	return err
-}
-
-func (db *Database) DeleteDappPermission(dappName, permission string) error {
-	_, err := db.db.Exec("DELETE FROM permissions WHERE dapp_name = ? AND permission = ?", dappName, permission)
-	return err
-}
-
-func (db *Database) HasPermission(dappName string, permission string) (bool, error) {
 	var count uint64
-	err := db.db.QueryRow(`SELECT COUNT(1) FROM permissions WHERE dapp_name = ? AND permission = ?`, dappName, permission).Scan(&count)
+	err = db.db.QueryRow(
+		`SELECT COUNT(1) FROM permissions WHERE dapp_id = ? AND permission = ?`,
+		id, permission,
+	).Scan(&count)
 	return count > 0, err
 }
