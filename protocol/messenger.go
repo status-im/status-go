@@ -2354,6 +2354,8 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		audioMessage.Payload = payload
 		audioMessage.Type = audio.Type(payload)
 		message.Payload = &protobuf.ChatMessage_Audio{Audio: audioMessage}
+
+		_ = file.Close()
 		err = os.Remove(message.AudioPath)
 		if err != nil {
 			return nil, err

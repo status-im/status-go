@@ -17,12 +17,22 @@ func amr(buf []byte) bool {
 		buf[4] == 0x52 && buf[5] == 0x0A
 }
 
+func ogg(buf []byte) bool {
+	return len(buf) > 4 &&
+		buf[0] == 0x4F &&
+		buf[1] == 0x67 &&
+		buf[2] == 0x67 &&
+		buf[3] == 0x53
+}
+
 func Type(buf []byte) protobuf.AudioMessage_AudioType {
 	switch {
 	case aac(buf):
 		return protobuf.AudioMessage_AAC
 	case amr(buf):
 		return protobuf.AudioMessage_AMR
+	case ogg(buf):
+		return protobuf.AudioMessage_OGG
 	default:
 		return protobuf.AudioMessage_UNKNOWN_AUDIO_TYPE
 	}
