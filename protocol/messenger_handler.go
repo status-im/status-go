@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -639,6 +640,63 @@ func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signe
 	state.Response.AddCommunity(community)
 	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 
+	return nil
+}
+
+func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
+
+	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
+	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
+	if err != nil {
+		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
+		return err
+	}
+
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && settings.HistoryArchiveSupportEnabled {
+		signedByOwnedCommunity, err := m.communitiesManager.IsAdminCommunity(communityPubKey)
+		if err != nil {
+			return err
+		}
+		joinedCommunity, err := m.communitiesManager.IsJoinedCommunity(communityPubKey)
+		if err != nil {
+			return err
+		}
+		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
+		if err != nil {
+			return err
+		}
+		// We are only interested in a community archive magnet link
+		// if it originates from a community that the current account is
+		// part of and doesn't own the private key at the same time
+		if !signedByOwnedCommunity && joinedCommunity && clock >= lastClock {
+
+			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
+			go func() {
+				downloadedArchiveIDs, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
+				if err != nil {
+					log.Println("failed to download history archive data", err)
+					m.logger.Debug("failed to download history archive data", zap.Error(err))
+					return
+				}
+
+				messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, downloadedArchiveIDs)
+				if err != nil {
+					log.Println("failed to extract history archive messages", err)
+					m.logger.Debug("failed to extract history archive messages", zap.Error(err))
+					return
+				}
+
+				_, err = m.handleRetrievedMessages(messagesToHandle, false)
+				if err != nil {
+					log.Println("failed to write history archive messages to database", err)
+					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+					return
+				}
+			}()
+
+			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
+		}
+	}
 	return nil
 }
 

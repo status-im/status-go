@@ -1867,7 +1867,7 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 }
 
 func (db sqlitePersistence) SaveEdit(editMessage EditMessage) error {
-	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
+	_, err := db.db.Exec(`INSERT OR REPLACE INTO user_messages_edits (clock, chat_id, message_id, text, source, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
 	return err
 }
 
