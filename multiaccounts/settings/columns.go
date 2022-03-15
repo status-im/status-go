@@ -351,6 +351,11 @@ var (
 		reactFieldName: "telemetry-server-url",
 		dBColumnName:   "telemetry_server_url",
 	}
+	TestNetworksEnabled = SettingField{
+		reactFieldName: "test-networks-enabled?",
+		dBColumnName:   "test_networks_enabled",
+		valueHandler:   BoolHandler,
+	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",
 		dBColumnName:   "use_mailservers",
@@ -438,6 +443,7 @@ var (
 		StickersRecentStickers,
 		SyncingOnMobileNetwork,
 		TelemetryServerURL,
+		TestNetworksEnabled,
 		UseMailservers,
 		Usernames,
 		WakuBloomFilterMode,
