@@ -23,18 +23,20 @@ import (
 
 // QuotedMessage contains the original text of the message replied to
 type QuotedMessage struct {
+	ID          string `json:"id"`
+	ContentType int64  `json:"contentType"`
 	// From is a public key of the author of the message.
 	From       string          `json:"from"`
 	Text       string          `json:"text"`
 	ParsedText json.RawMessage `json:"parsedText,omitempty"`
-	// Base64Image is the converted base64 image
-	Base64Image string `json:"image,omitempty"`
-	// Base64Audio is the converted base64 audio
-	Base64Audio string `json:"audio,omitempty"`
-	// AudioDurationMs is the audio duration in milliseconds
-	AudioDurationMs uint64 `json:"audioDurationMs,omitempty"`
+	// ImageLocalURL is the local url of the image
+	ImageLocalURL string `json:"image,omitempty"`
 	// CommunityID is the id of the community advertised
 	CommunityID string `json:"communityId,omitempty"`
+}
+
+func (m *QuotedMessage) PrepareImageURL(port int) {
+	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
 }
 
 type CommandState int
@@ -163,9 +165,17 @@ type Message struct {
 }
 
 func (m *Message) PrepareServerURLs(port int) {
-	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
 	m.Identicon = fmt.Sprintf("https://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
-	m.AudioLocalURL = fmt.Sprintf("https://localhost:%d/messages/audio?messageId=%s", port, m.ID)
+
+	if m.QuotedMessage != nil && m.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
+		m.QuotedMessage.PrepareImageURL(port)
+	}
+	if m.ContentType == protobuf.ChatMessage_IMAGE {
+		m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
+	}
+	if m.ContentType == protobuf.ChatMessage_AUDIO {
+		m.AudioLocalURL = fmt.Sprintf("https://localhost:%d/messages/audio?messageId=%s", port, m.ID)
+	}
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
