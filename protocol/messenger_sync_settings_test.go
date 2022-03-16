@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -20,11 +19,46 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/waku"
 )
 
 var (
-	pf = "A Preferred Name"
+	pf         = "A Preferred Name"
+	pf2        = "AnotherPreferredName.eth"
+	rawSticker = []byte(`{
+  "1":{
+    "author":"cryptoworld1373",
+    "id":1,
+    "name":"Status Cat",
+    "preview":"e3010170122050efc0a3e661339f31e1e44b3d15a1bf4e501c965a0523f57b701667fa90ccca",
+    "price":0,
+    "stickers":[
+      {"hash":"e30101701220eab9a8ef4eac6c3e5836a3768d8e04935c10c67d9a700436a0e53199e9b64d29"},
+      {"hash":"e30101701220c8f28aebe4dbbcee896d1cdff89ceeaceaf9f837df55c79125388f954ee5f1fe"},
+      {"hash":"e301017012204861f93e29dd8e7cf6699135c7b13af1bce8ceeaa1d9959ab8592aa20f05d15f"},
+      {"hash":"e301017012203ffa57a51cceaf2ce040852de3b300d395d5ba4d70e08ba993f93a25a387e3a9"},
+      {"hash":"e301017012204f2674db0bc7f7cfc0382d1d7f79b4ff73c41f5c487ef4c3bb3f3a4cf3f87d70"},
+      {"hash":"e30101701220e8d4d8b9fb5f805add2f63c1cb5c891e60f9929fc404e3bb725aa81628b97b5f"},
+      {"hash":"e301017012206fdad56fe7a2facb02dabe8294f3ac051443fcc52d67c2fbd8615eb72f9d74bd"},
+      {"hash":"e30101701220a691193cf0559905c10a3c5affb9855d730eae05509d503d71327e6c820aaf98"},
+      {"hash":"e30101701220d8004af925f8e85b4e24813eaa5ef943fa6a0c76035491b64fbd2e632a5cc2fd"},
+      {"hash":"e3010170122049f7bc650615568f14ee1cfa9ceaf89bfbc4745035479a7d8edee9b4465e64de"},
+      {"hash":"e301017012201915dc0faad8e6783aca084a854c03553450efdabf977d57b4f22f73d5c53b50"},
+      {"hash":"e301017012200b9fb71a129048c2a569433efc8e4d9155c54d598538be7f65ea26f665be1e84"},
+      {"hash":"e30101701220d37944e3fb05213d45416fa634cf9e10ec1f43d3bf72c4eb3062ae6cc4ed9b08"},
+      {"hash":"e3010170122059390dca66ba8713a9c323925bf768612f7dd16298c13a07a6b47cb5af4236e6"},
+      {"hash":"e30101701220daaf88ace8a3356559be5d6912d5d442916e3cc92664954526c9815d693dc32b"},
+      {"hash":"e301017012203ae30594fdf56d7bfd686cef1a45c201024e9c10a792722ef07ba968c83c064d"},
+      {"hash":"e3010170122016e5eba0bbd32fc1ff17d80d1247fc67432705cd85731458b52febb84fdd6408"},
+      {"hash":"e3010170122014fe2c2186cbf9d15ff61e04054fd6b0a5dbd7f365a1807f6f3d3d3e93e50875"},
+      {"hash":"e30101701220f23a7dad3ea7ad3f3553a98fb305148d285e4ebf66b427d85a2340f66d51da94"},
+      {"hash":"e3010170122047a637c6af02904a8ae702ec74b3df5fd8914df6fb11c99446a36d890beeb7ee"},
+      {"hash":"e30101701220776f1ff89f6196ae68414545f6c6a5314c35eee7406cb8591d607a2b0533cc86"}
+    ],
+    "thumbnail":"e30101701220e9876531554a7cb4f20d7ebbf9daef2253e6734ad9c96ba288586a9b88bef491"
+  }
+}`)
 )
 
 func TestMessengerSyncSettings(t *testing.T) {
@@ -33,8 +67,8 @@ func TestMessengerSyncSettings(t *testing.T) {
 
 type MessengerSyncSettingsSuite struct {
 	suite.Suite
-	bob   *Messenger
-	alice *Messenger
+	alice  *Messenger
+	alice2 *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
 	shh    types.Waku
@@ -50,16 +84,17 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
-	_, err := s.bob.Start()
+	_, err := s.alice.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+
+	s.alice2, err = newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
 	s.Require().NoError(err)
+
+	s.prepAliceMessengersForPairing()
 }
 
 func (s *MessengerSyncSettingsSuite) TearDownTest() {
-	s.Require().NoError(s.bob.Shutdown())
 	s.Require().NoError(s.alice.Shutdown())
 	_ = s.logger.Sync()
 }
@@ -137,7 +172,7 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
-func (s *MessengerSyncSettingsSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
+func (s *MessengerSyncSettingsSuite) pairTwoDevices(device1, device2 *Messenger) {
 	// Send pairing data
 	response, err := device1.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
@@ -145,13 +180,18 @@ func (s *MessengerSyncSettingsSuite) pairTwoDevices(device1, device2 *Messenger,
 	s.Len(response.Chats(), 1)
 	s.False(response.Chats()[0].Active)
 
+	i, ok := device1.allInstallations.Load(device1.installationID)
+	s.Require().True(ok)
+
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		device2,
 		func(r *MessengerResponse) bool {
 			for _, installation := range r.Installations {
 				if installation.ID == device1.installationID {
-					return installation.InstallationMetadata != nil && deviceName == installation.InstallationMetadata.Name && deviceType == installation.InstallationMetadata.DeviceType
+					return installation.InstallationMetadata != nil &&
+						i.InstallationMetadata.Name == installation.InstallationMetadata.Name &&
+						i.InstallationMetadata.DeviceType == installation.InstallationMetadata.DeviceType
 				}
 			}
 			return false
@@ -167,7 +207,7 @@ func (s *MessengerSyncSettingsSuite) pairTwoDevices(device1, device2 *Messenger,
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
+func (s *MessengerSyncSettingsSuite) prepAliceMessengersForPairing() {
 	// Set Alice's installation metadata
 	aim := &multidevice.InstallationMetadata{
 		Name:       "alice's-device",
@@ -176,44 +216,39 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
 	s.Require().NoError(err)
 
-	// Create Alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
-
-	im1 := &multidevice.InstallationMetadata{
+	// Set Alice 2's installation metadata
+	a2im := &multidevice.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	err = s.alice2.SetInstallationMetadata(s.alice2.installationID, a2im)
 	s.Require().NoError(err)
+}
 
+func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	// Pair alice's two devices
-	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
-	s.pairTwoDevices(s.alice, alicesOtherDevice, aim.Name, aim.DeviceType)
+	s.pairTwoDevices(s.alice2, s.alice)
+	s.pairTwoDevices(s.alice, s.alice2)
 
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Equal("eth", as.Currency)
-	s.Require().Equal(pf, *as.PreferredName)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
 
 	// Check alice 2 settings values
-	aos, err := alicesOtherDevice.settings.GetSettings()
+	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Equal("", aos.Currency)
-	s.Require().Nil(aos.PreferredName)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
 
-	// alice triggers global settings sync
-	err = s.alice.syncSettings()
+	// Update alice ProfilePicturesVisibility setting
+	err = s.alice.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesVisibilityEveryone)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		mr, err := alicesOtherDevice.RetrieveAll()
+		mr, err := s.alice2.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -227,12 +262,12 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().NoError(err)
 
 	// Check alice 2 settings values
-	aos, err = alicesOtherDevice.settings.GetSettings()
+	aos, err = s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Equal("eth", aos.Currency)
+	s.Require().Equal(settings.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
 
 	// Alice 2 updated a setting which triggers the sync functionality
-	err = alicesOtherDevice.settings.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), settings.ProfilePicturesShowToEveryone)
+	err = s.alice2.settings.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -257,25 +292,6 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
-	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
-		Name:       "alice's-device",
-		DeviceType: "alice's-device-type",
-	}
-	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
-	s.Require().NoError(err)
-
-	// Create Alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
-
-	im1 := &multidevice.InstallationMetadata{
-		Name:       "alice's-other-device",
-		DeviceType: "alice's-other-device-type",
-	}
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
-	s.Require().NoError(err)
-
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
@@ -284,22 +300,32 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().Nil(as.StickersRecentStickers)
 
 	// Check alice 2 settings values
-	aos, err := alicesOtherDevice.settings.GetSettings()
+	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Nil(aos.StickerPacksInstalled)
 	s.Require().Nil(aos.StickerPacksPending)
 	s.Require().Nil(aos.StickersRecentStickers)
 
 	// Pair devices. Allows alice to send to alicesOtherDevice
-	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
+	s.pairTwoDevices(s.alice2, s.alice)
 
-	// alice triggers global settings sync
-	err = s.alice.syncSettings()
+	// Add sticker pack to alice device
+	stickerPacks := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker, &stickerPacks)
 	s.Require().NoError(err)
+
+	err = s.alice.settings.SaveSetting(settings.StickersPacksInstalled.GetReactName(), stickerPacks)
+	s.Require().NoError(err)
+
+	as, err = s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+	spi, err := as.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Equal(2169, len(spi))
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
-		mr, err := alicesOtherDevice.RetrieveAll()
+		mr, err := s.alice2.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -312,44 +338,51 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	})
 	s.Require().NoError(err)
 
-	aos, err = alicesOtherDevice.settings.GetSettings()
+	aos, err = s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Nil(aos.StickerPacksInstalled)
-	s.Require().Nil(aos.StickerPacksPending)
-	s.Require().Nil(aos.StickersRecentStickers)
+	ospi, err := aos.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Exactly(spi, ospi)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
-	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
-		Name:       "alice's-device",
-		DeviceType: "alice's-device-type",
-	}
-	err := s.alice.SetInstallationMetadata(s.alice.installationID, aim)
-	s.Require().NoError(err)
-
-	// Create Alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
-
-	im1 := &multidevice.InstallationMetadata{
-		Name:       "alice's-other-device",
-		DeviceType: "alice's-other-device-type",
-	}
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
-	s.Require().NoError(err)
-
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
-
-	spew.Dump(as.PreferredName)
 	s.Require().Equal(pf, *as.PreferredName)
 
 	// Check alice 2 settings values
-	aos, err := alicesOtherDevice.settings.GetSettings()
+	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
-	spew.Dump(aos.PreferredName)
+	s.Require().Nil(aos.PreferredName)
 
-	// TODO rest of this test
+	// Pair devices. Allows alice to send to alicesOtherDevice
+	s.pairTwoDevices(s.alice2, s.alice)
+
+	// Update Alice's PreferredName
+	err = s.alice.settings.SaveSetting(settings.PreferredName.GetReactName(), pf2)
+	s.Require().NoError(err)
+
+	apn, err := s.alice.settings.GetPreferredUsername()
+	s.Require().NoError(err)
+	s.Require().Equal(pf2, apn)
+
+	// Wait for the sync message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	opn, err := s.alice2.settings.GetPreferredUsername()
+	s.Require().NoError(err)
+	s.Require().Equal(pf2, opn)
 }

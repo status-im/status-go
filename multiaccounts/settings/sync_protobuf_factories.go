@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/sqlite"
 )
 
 var (
@@ -265,7 +266,7 @@ func buildRawStickerPacksInstalledSyncMessage(v []byte, clock uint64, chatID str
 }
 
 func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, error) {
-	v, err := assertBytes(value)
+	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +291,7 @@ func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID strin
 }
 
 func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, error) {
-	v, err := assertBytes(value)
+	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +316,7 @@ func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID st
 }
 
 func stickersRecentStickersProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, error) {
-	v, err := assertBytes(value)
+	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +357,17 @@ func assertString(value interface{}) (string, error) {
 	return v, nil
 }
 
+func parseJSONBlobData(value interface{}) ([]byte, error) {
+	switch v := value.(type) {
+	case []byte:
+		return v, nil
+	case *sqlite.JSONBlob:
+		return extractJSONBlob(v)
+	default:
+		return nil, errors.Wrapf(ErrTypeAssertionFailed, "expected []byte or *sqlite.JSONBlob, received %T", value)
+	}
+}
+
 func parseNumberToInt64(value interface{}) (int64, error) {
 	switch v := value.(type) {
 	case float32:
@@ -389,6 +401,15 @@ func parseNumberToInt64(value interface{}) (int64, error) {
 	default:
 		return 0, errors.Wrapf(ErrTypeAssertionFailed, "expected a numeric type, received %T", value)
 	}
+}
+
+func extractJSONBlob(jb *sqlite.JSONBlob) ([]byte, error) {
+	value, err := jb.Value()
+	if err != nil {
+		return nil, err
+	}
+
+	return value.([]byte), nil
 }
 
 func extractJSONRawMessage(jrm *json.RawMessage) []byte {

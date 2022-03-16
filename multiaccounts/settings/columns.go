@@ -104,12 +104,13 @@ var (
 	Currency = SettingField{
 		reactFieldName: "currency",
 		dBColumnName:   "currency",
-		syncProtobufFactory: &SyncProtobufFactory{
+		// TODO resolve issue 6 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		/*syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     currencyProtobufFactory,
 			fromStruct:        currencyProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_CURRENCY,
-		},
+		},*/
 	}
 	CurrentUserStatus = SettingField{
 		reactFieldName: "current-user-status",
@@ -156,23 +157,27 @@ var (
 		reactFieldName: "gifs/favorite-gifs",
 		dBColumnName:   "gif_favorites",
 		valueHandler:   JSONBlobHandler,
-		syncProtobufFactory: &SyncProtobufFactory{
+		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
+		/*syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     gifFavouritesProtobufFactory,
 			fromStruct:        gifFavouritesProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_FAVOURITES,
-		},
+		},*/
 	}
 	GifRecents = SettingField{
 		reactFieldName: "gifs/recent-gifs",
 		dBColumnName:   "gif_recents",
 		valueHandler:   JSONBlobHandler,
-		syncProtobufFactory: &SyncProtobufFactory{
+		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
+		/*syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     gifRecentsProtobufFactory,
 			fromStruct:        gifRecentsProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_RECENTS,
-		},
+		},*/
 	}
 	HideHomeTooltip = SettingField{
 		reactFieldName: "hide-home-tooltip?",
@@ -279,12 +284,13 @@ var (
 		reactFieldName: "preview-privacy?",
 		dBColumnName:   "preview_privacy",
 		valueHandler:   BoolHandler,
-		syncProtobufFactory: &SyncProtobufFactory{
+		// TODO resolved issue 7 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		/*syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     previewPrivacyProtobufFactory,
 			fromStruct:        previewPrivacyProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PREVIEW_PRIVACY,
-		},
+		},*/
 	}
 	ProfilePicturesShowTo = SettingField{
 		reactFieldName: "profile-pictures-show-to",
@@ -355,6 +361,7 @@ var (
 		reactFieldName: "stickers/packs-installed",
 		dBColumnName:   "stickers_packs_installed",
 		valueHandler:   JSONBlobHandler,
+		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     stickersPacksInstalledProtobufFactory,
 			fromStruct:        stickersPacksInstalledProtobufFactoryStruct,
@@ -366,6 +373,7 @@ var (
 		reactFieldName: "stickers/packs-pending",
 		dBColumnName:   "stickers_packs_pending",
 		valueHandler:   JSONBlobHandler,
+		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     stickersPacksPendingProtobufFactory,
 			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
@@ -377,6 +385,7 @@ var (
 		reactFieldName: "stickers/recent-stickers",
 		dBColumnName:   "stickers_recent_stickers",
 		valueHandler:   JSONBlobHandler,
+		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
 			fromInterface:     stickersRecentStickersProtobufFactory,
 			fromStruct:        stickersRecentStickersProtobufFactoryStruct,

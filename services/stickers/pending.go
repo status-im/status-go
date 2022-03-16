@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -29,11 +30,11 @@ func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
 
 	pendingPacks[uint(packID.Uint64())] = *stickerPack
 
-	return api.accountsDB.SaveSetting("stickers/packs-pending", pendingPacks)
+	return api.accountsDB.SaveSetting(settings.StickersPacksPending.GetReactName(), pendingPacks)
 }
 
-func (api *API) pendingStickerPacks() (map[uint]StickerPack, error) {
-	stickerPacks := make(map[uint]StickerPack)
+func (api *API) pendingStickerPacks() (StickerPackCollection, error) {
+	stickerPacks := make(StickerPackCollection)
 
 	pendingStickersJSON, err := api.accountsDB.GetPendingStickerPacks()
 	if err != nil {
@@ -52,7 +53,7 @@ func (api *API) pendingStickerPacks() (map[uint]StickerPack, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) Pending() (map[uint]StickerPack, error) {
+func (api *API) Pending() (StickerPackCollection, error) {
 	stickerPacks, err := api.pendingStickerPacks()
 	if err != nil {
 		return nil, err
@@ -97,5 +98,5 @@ func (api *API) RemovePending(packID *bigint.BigInt) error {
 
 	delete(pendingPacks, uint(packID.Uint64()))
 
-	return api.accountsDB.SaveSetting("stickers/packs-pending", pendingPacks)
+	return api.accountsDB.SaveSetting(settings.StickersPacksPending.GetReactName(), pendingPacks)
 }

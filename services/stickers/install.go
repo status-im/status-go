@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -31,7 +32,7 @@ func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {
 
 	installedPacks[uint(packID.Uint64())] = *stickerPack
 
-	err = api.accountsDB.SaveSetting("stickers/packs-installed", installedPacks)
+	err = api.accountsDB.SaveSetting(settings.StickersPacksInstalled.GetReactName(), installedPacks)
 	if err != nil {
 		return err
 	}
@@ -39,8 +40,8 @@ func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {
 	return nil
 }
 
-func (api *API) installedStickerPacks() (map[uint]StickerPack, error) {
-	stickerPacks := make(map[uint]StickerPack)
+func (api *API) installedStickerPacks() (StickerPackCollection, error) {
+	stickerPacks := make(StickerPackCollection)
 
 	installedStickersJSON, err := api.accountsDB.GetInstalledStickerPacks()
 	if err != nil {
@@ -59,7 +60,7 @@ func (api *API) installedStickerPacks() (map[uint]StickerPack, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) Installed() (map[uint]StickerPack, error) {
+func (api *API) Installed() (StickerPackCollection, error) {
 	stickerPacks, err := api.installedStickerPacks()
 	if err != nil {
 		return nil, err
@@ -104,7 +105,7 @@ func (api *API) Uninstall(packID *bigint.BigInt) error {
 
 	delete(installedPacks, uint(packID.Uint64()))
 
-	err = api.accountsDB.SaveSetting("stickers/packs-installed", installedPacks)
+	err = api.accountsDB.SaveSetting(settings.StickersPacksInstalled.GetReactName(), installedPacks)
 	if err != nil {
 		return err
 	}
@@ -130,7 +131,7 @@ func (api *API) Uninstall(packID *bigint.BigInt) error {
 		if idx != len(recentStickers)-1 {
 			newRecentStickers = append(newRecentStickers, recentStickers[idx+1:]...)
 		}
-		return api.accountsDB.SaveSetting("stickers/recent-stickers", newRecentStickers)
+		return api.accountsDB.SaveSetting(settings.StickersRecentStickers.GetReactName(), newRecentStickers)
 	}
 
 	return nil

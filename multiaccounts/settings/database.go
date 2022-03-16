@@ -156,21 +156,6 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 		return err
 	}
 
-	if setting.ValueHandler() != nil {
-		value, err = setting.ValueHandler()(value)
-		if err != nil {
-			return err
-		}
-	}
-
-	// TODO(samyoul) this is ugly as hell need a more elegant solution
-	if NodeConfig.GetReactName() == setting.GetReactName() {
-		if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
-			return err
-		}
-		value = nil
-	}
-
 	_, err = update.Exec(value)
 	return err
 }
@@ -181,6 +166,21 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	sf, err := db.getSettingFieldFromReactName(setting)
 	if err != nil {
 		return err
+	}
+
+	if sf.ValueHandler() != nil {
+		value, err = sf.ValueHandler()(value)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO(samyoul) this is ugly as hell need a more elegant solution
+	if NodeConfig.GetReactName() == sf.GetReactName() {
+		if err = nodecfg.SaveNodeConfig(db.db, value.(*params.NodeConfig)); err != nil {
+			return err
+		}
+		value = nil
 	}
 
 	err = db.saveSetting(sf, value)

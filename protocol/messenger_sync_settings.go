@@ -85,7 +85,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 			select {
 			case s := <-m.settings.SyncQueue:
 				if s.SyncProtobufFactory() != nil && s.SyncProtobufFactory().FromInterface() != nil {
-					logger.Debug("setting for sync received")
+					logger.Debug("setting for sync received from settings.SyncQueue")
 
 					clock, chat := m.getLastClockWithRelatedChat()
 

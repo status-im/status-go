@@ -53,7 +53,7 @@ type API struct {
 }
 
 type Sticker struct {
-	PackID *bigint.BigInt `json:"packID"`
+	PackID *bigint.BigInt `json:"packID,omitempty"`
 	URL    string         `json:"url,omitempty"`
 	Hash   string         `json:"hash,omitempty"`
 }
@@ -62,14 +62,16 @@ type StickerPack struct {
 	ID        *bigint.BigInt `json:"id"`
 	Name      string         `json:"name"`
 	Author    string         `json:"author"`
-	Owner     common.Address `json:"owner"`
+	Owner     common.Address `json:"owner,omitempty"`
 	Price     *bigint.BigInt `json:"price"`
 	Preview   string         `json:"preview"`
 	Thumbnail string         `json:"thumbnail"`
 	Stickers  []Sticker      `json:"stickers"`
 
-	Status stickerStatus `json:"status"`
+	Status stickerStatus `json:"status,omitempty"`
 }
+
+type StickerPackCollection map[uint]StickerPack
 
 type ednSticker struct {
 	Hash string
