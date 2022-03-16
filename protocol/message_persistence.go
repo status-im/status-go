@@ -102,6 +102,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.parsed_text,
 		m2.audio_duration_ms,
 		m2.community_id,
+		m2.id,
+        m2.content_type,
 		c.alias,
 		c.identicon`
 }
@@ -115,6 +117,8 @@ type scanner interface {
 }
 
 func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *common.Message, others ...interface{}) error {
+	var quotedID sql.NullString
+	var ContentType sql.NullInt64
 	var quotedText sql.NullString
 	var quotedParsedText []byte
 	var quotedFrom sql.NullString
@@ -180,6 +184,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedParsedText,
 		&quotedAudioDuration,
 		&quotedCommunityID,
+		&quotedID,
+		&ContentType,
 		&alias,
 		&identicon,
 	}
@@ -198,11 +204,12 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if quotedText.Valid {
 		message.QuotedMessage = &common.QuotedMessage{
-			From:            quotedFrom.String,
-			Text:            quotedText.String,
-			ParsedText:      quotedParsedText,
-			AudioDurationMs: uint64(quotedAudioDuration.Int64),
-			CommunityID:     quotedCommunityID.String,
+			ID:          quotedID.String,
+			ContentType: ContentType.Int64,
+			From:        quotedFrom.String,
+			Text:        quotedText.String,
+			ParsedText:  quotedParsedText,
+			CommunityID: quotedCommunityID.String,
 		}
 	}
 	message.Alias = alias.String

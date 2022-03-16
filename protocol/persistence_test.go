@@ -354,7 +354,7 @@ func TestMessageReplies(t *testing.T) {
 	require.Nil(t, retrievedMessages[0].QuotedMessage)
 
 	require.Equal(t, "id-1", retrievedMessages[1].ResponseTo)
-	require.Equal(t, &common.QuotedMessage{From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
+	require.Equal(t, &common.QuotedMessage{ID: "id-1", From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
 
 	require.Equal(t, "", retrievedMessages[2].ResponseTo)
 	require.Nil(t, retrievedMessages[2].QuotedMessage)
