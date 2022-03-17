@@ -91,3 +91,12 @@ func CreateTable(db *sql.DB, tableName string) error {
 	}
 	return nil
 }
+
+func Clean(db *sql.DB, tableName string) error {
+	sqlStmt := fmt.Sprintf("DELETE FROM %s;", tableName)
+	_, err := db.Exec(sqlStmt)
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -1240,3 +1240,27 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	hexEncodedSignature := types.EncodeHex(signature)
 	return hexEncodedSignature, nil
 }
+
+func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) error {
+	if b.appDB == nil {
+		return ErrDBNotAvailable
+	}
+
+	accountDB := accounts.NewDB(b.appDB)
+	err := accountDB.SaveSetting("fleet", fleet)
+	if err != nil {
+		return err
+	}
+
+	err = nodecfg.SaveNodeConfig(b.appDB, conf)
+	if err != nil {
+		return err
+	}
+
+	waku2 := b.statusNode.WakuV2Service()
+	if waku2 != nil {
+		return waku2.ClearPeerCache()
+	}
+
+	return nil
+}

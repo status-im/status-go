@@ -777,3 +777,19 @@ func GetPasswordStrength(paramsJSON string) string {
 	}
 	return string(data)
 }
+
+func SwitchFleet(fleet string, configJSON string) string {
+	var conf params.NodeConfig
+	if configJSON != "" {
+		err := json.Unmarshal([]byte(configJSON), &conf)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
+	conf.ClusterConfig.Fleet = fleet
+
+	err := statusBackend.SwitchFleet(fleet, &conf)
+
+	return makeJSONResponse(err)
+}
