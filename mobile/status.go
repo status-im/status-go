@@ -24,6 +24,8 @@ import (
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
+	"github.com/status-im/status-go/protocol/identity/emojihash"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
@@ -648,6 +650,14 @@ func Identicon(pk string) string {
 	// We ignore any error, empty string is considered an error
 	identicon, _ := protocol.Identicon(pk)
 	return identicon
+}
+
+func EmojiHash(pk string) string {
+	return prepareJSONResponse(emojihash.GenerateFor(pk))
+}
+
+func ColorHash(pk string) string {
+	return prepareJSONResponse(colorhash.GenerateFor(pk))
 }
 
 func ValidateMnemonic(mnemonic string) string {
