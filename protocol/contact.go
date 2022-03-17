@@ -62,7 +62,7 @@ type Contact struct {
 	// Ethereum address of the contact
 	Address string `json:"address,omitempty"`
 	// ENS name of contact
-	EnsName string `json:"ensName,omitempty"`
+	EnsName string `json:"name,omitempty"`
 	// EnsVerified whether we verified the name of the contact
 	ENSVerified bool `json:"ensVerified"`
 	// Generated username name of the contact
