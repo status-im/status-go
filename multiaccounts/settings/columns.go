@@ -1,85 +1,9 @@
 package settings
 
 import (
-	"encoding/json"
-
 	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
-
-type ValueHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, error)
-type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, error)
-type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
-
-type SyncProtobufFactory struct {
-	inactive          bool
-	fromInterface     SyncSettingProtobufFactoryInterface
-	fromStruct        SyncSettingProtobufFactoryStruct
-	valueFromProtobuf SyncSettingProtobufToValue
-	protobufType      protobuf.SyncSetting_Type
-}
-
-func (spf *SyncProtobufFactory) Inactive() bool {
-	return spf.inactive
-}
-
-func (spf *SyncProtobufFactory) FromInterface() SyncSettingProtobufFactoryInterface {
-	return spf.fromInterface
-}
-
-func (spf *SyncProtobufFactory) FromStruct() SyncSettingProtobufFactoryStruct {
-	return spf.fromStruct
-}
-
-func (spf *SyncProtobufFactory) ExtractValueFromProtobuf() SyncSettingProtobufToValue {
-	return spf.valueFromProtobuf
-}
-
-func (spf *SyncProtobufFactory) SyncSettingProtobufType() protobuf.SyncSetting_Type {
-	return spf.protobufType
-}
-
-type SyncSettingField struct {
-	SettingField
-	Value interface{}
-}
-
-func (s SyncSettingField) MarshalJSON() ([]byte, error) {
-	alias := struct {
-		Name  string      `json:"name"`
-		Value interface{} `json:"value"`
-	}{
-		s.reactFieldName,
-		s.Value,
-	}
-
-	return json.Marshal(alias)
-}
-
-type SettingField struct {
-	reactFieldName      string
-	dBColumnName        string
-	valueHandler        ValueHandler
-	syncProtobufFactory *SyncProtobufFactory
-}
-
-func (s SettingField) GetReactName() string {
-	return s.reactFieldName
-}
-
-func (s SettingField) GetDBName() string {
-	return s.dBColumnName
-}
-
-func (s SettingField) ValueHandler() ValueHandler {
-	return s.valueHandler
-}
-
-func (s SettingField) SyncProtobufFactory() *SyncProtobufFactory {
-	return s.syncProtobufFactory
-}
 
 var (
 	AnonMetricsShouldSend = SettingField{

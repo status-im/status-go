@@ -25,7 +25,7 @@ func (m *Messenger) syncSettings() error {
 	var errs []error
 	for _, sf := range settings.SettingFieldRegister {
 		spf := sf.SyncProtobufFactory()
-		if spf != nil && spf.FromStruct() != nil && !spf.Inactive(){
+		if spf != nil && spf.FromStruct() != nil && !spf.Inactive() {
 			// Pull clock from the db
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {

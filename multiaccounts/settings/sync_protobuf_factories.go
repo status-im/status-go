@@ -80,7 +80,7 @@ func gifFavouritesProtobufFactoryStruct(s Settings, clock uint64, chatID string)
 	return buildRawGifFavoritesSyncMessage(gf, clock, chatID)
 }
 
-// GifFavorites
+// GifRecents
 
 func buildRawGifRecentsSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
 	pb := &protobuf.SyncSetting{
