@@ -14,10 +14,15 @@ type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.Ra
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
 type SyncProtobufFactory struct {
+	inactive          bool
 	fromInterface     SyncSettingProtobufFactoryInterface
 	fromStruct        SyncSettingProtobufFactoryStruct
 	valueFromProtobuf SyncSettingProtobufToValue
 	protobufType      protobuf.SyncSetting_Type
+}
+
+func (spf *SyncProtobufFactory) Inactive() bool {
+	return spf.inactive
 }
 
 func (spf *SyncProtobufFactory) FromInterface() SyncSettingProtobufFactoryInterface {
@@ -28,7 +33,7 @@ func (spf *SyncProtobufFactory) FromStruct() SyncSettingProtobufFactoryStruct {
 	return spf.fromStruct
 }
 
-func (spf *SyncProtobufFactory) ValueFrom() SyncSettingProtobufToValue {
+func (spf *SyncProtobufFactory) ExtractValueFromProtobuf() SyncSettingProtobufToValue {
 	return spf.valueFromProtobuf
 }
 
@@ -105,12 +110,13 @@ var (
 		reactFieldName: "currency",
 		dBColumnName:   "currency",
 		// TODO resolve issue 6 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
-		/*syncProtobufFactory: &SyncProtobufFactory{
+		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     currencyProtobufFactory,
 			fromStruct:        currencyProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_CURRENCY,
-		},*/
+		},
 	}
 	CurrentUserStatus = SettingField{
 		reactFieldName: "current-user-status",
@@ -159,12 +165,13 @@ var (
 		valueHandler:   JSONBlobHandler,
 		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
-		/*syncProtobufFactory: &SyncProtobufFactory{
+		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     gifFavouritesProtobufFactory,
 			fromStruct:        gifFavouritesProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_FAVOURITES,
-		},*/
+		},
 	}
 	GifRecents = SettingField{
 		reactFieldName: "gifs/recent-gifs",
@@ -172,12 +179,13 @@ var (
 		valueHandler:   JSONBlobHandler,
 		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
-		/*syncProtobufFactory: &SyncProtobufFactory{
+		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     gifRecentsProtobufFactory,
 			fromStruct:        gifRecentsProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_RECENTS,
-		},*/
+		},
 	}
 	HideHomeTooltip = SettingField{
 		reactFieldName: "hide-home-tooltip?",
@@ -285,12 +293,13 @@ var (
 		dBColumnName:   "preview_privacy",
 		valueHandler:   BoolHandler,
 		// TODO resolved issue 7 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
-		/*syncProtobufFactory: &SyncProtobufFactory{
+		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     previewPrivacyProtobufFactory,
 			fromStruct:        previewPrivacyProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PREVIEW_PRIVACY,
-		},*/
+		},
 	}
 	ProfilePicturesShowTo = SettingField{
 		reactFieldName: "profile-pictures-show-to",

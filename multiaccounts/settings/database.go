@@ -188,7 +188,8 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		return err
 	}
 
-	if sf.SyncProtobufFactory() != nil {
+	spf := sf.SyncProtobufFactory()
+	if spf != nil || !spf.Inactive() {
 		db.SyncQueue <- SyncSettingField{sf, value}
 	}
 	return nil

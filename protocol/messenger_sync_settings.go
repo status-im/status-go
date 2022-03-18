@@ -24,7 +24,8 @@ func (m *Messenger) syncSettings() error {
 
 	var errs []error
 	for _, sf := range settings.SettingFieldRegister {
-		if sf.SyncProtobufFactory() != nil && sf.SyncProtobufFactory().FromStruct() != nil {
+		spf := sf.SyncProtobufFactory()
+		if spf != nil && spf.FromStruct() != nil && !spf.Inactive(){
 			// Pull clock from the db
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {
@@ -32,7 +33,7 @@ func (m *Messenger) syncSettings() error {
 				return err
 			}
 
-			rm, err := sf.SyncProtobufFactory().FromStruct()(s, clock, chat.ID)
+			rm, err := spf.FromStruct()(s, clock, chat.ID)
 			if err != nil {
 				// Collect errors to give other sync messages a chance to send
 				logger.Error("SyncProtobufFactory.Struct", zap.Error(err))
@@ -55,15 +56,27 @@ func (m *Messenger) syncSettings() error {
 	return nil
 }
 
+// handleSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
 func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *protobuf.SyncSetting) error {
-	field, err := settings.GetFieldFromProtobufType(syncSetting.Type)
+	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
 	if err != nil {
+		m.logger.Error(
+			"handleSyncSetting - settings.GetFieldFromProtobufType",
+			zap.Error(err),
+			zap.Any("syncSetting", syncSetting),
+		)
 		return err
 	}
 
-	value := field.SyncProtobufFactory().ValueFrom()(syncSetting)
+	spf := sf.SyncProtobufFactory()
+	if spf.Inactive() {
+		m.logger.Warn("handleSyncSetting - received protobuf for inactive sync setting", zap.Any("SettingField", sf))
+		return nil
+	}
 
-	err = m.settings.SaveSyncSetting(field, value, syncSetting.Clock)
+	value := spf.ExtractValueFromProtobuf()(syncSetting)
+
+	err = m.settings.SaveSyncSetting(sf, value, syncSetting.Clock)
 	if err == errors.ErrNewClockOlderThanCurrent {
 		m.logger.Info("handleSyncSetting - SaveSyncSetting :", zap.Error(err))
 		return nil
@@ -72,7 +85,7 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *
 		return err
 	}
 
-	response.Settings = append(response.Settings, &settings.SyncSettingField{SettingField: field, Value: value})
+	response.Settings = append(response.Settings, &settings.SyncSettingField{SettingField: sf, Value: value})
 	return nil
 }
 
@@ -84,7 +97,8 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.SyncQueue:
-				if s.SyncProtobufFactory() != nil && s.SyncProtobufFactory().FromInterface() != nil {
+				spf := s.SyncProtobufFactory()
+				if spf != nil && spf.FromInterface() != nil && !spf.Inactive() {
 					logger.Debug("setting for sync received from settings.SyncQueue")
 
 					clock, chat := m.getLastClockWithRelatedChat()
@@ -96,7 +110,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 						break
 					}
 
-					rm, err := s.SyncProtobufFactory().FromInterface()(s.Value, clock, chat.ID)
+					rm, err := spf.FromInterface()(s.Value, clock, chat.ID)
 					if err != nil {
 						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
 						break
