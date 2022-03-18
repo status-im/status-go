@@ -494,6 +494,16 @@ github.com/status-im/rendezvous/server
 github.com/status-im/status-go/extkeys
 # github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 github.com/status-im/tcp-shaker
+# github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
+github.com/status-im/zxcvbn-go
+github.com/status-im/zxcvbn-go/adjacency
+github.com/status-im/zxcvbn-go/data
+github.com/status-im/zxcvbn-go/entropy
+github.com/status-im/zxcvbn-go/frequency
+github.com/status-im/zxcvbn-go/match
+github.com/status-im/zxcvbn-go/matching
+github.com/status-im/zxcvbn-go/scoring
+github.com/status-im/zxcvbn-go/utils/math
 # github.com/stretchr/testify v1.7.0
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require

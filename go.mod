@@ -61,6 +61,7 @@ require (
 	github.com/status-im/rendezvous v1.3.4-0.20211008144244-bdf13155817d
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
+	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
