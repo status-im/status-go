@@ -24,8 +24,7 @@ func (m *Messenger) syncSettings() error {
 
 	var errs []error
 	for _, sf := range settings.SettingFieldRegister {
-		spf := sf.SyncProtobufFactory()
-		if spf != nil && spf.FromStruct() != nil && !spf.Inactive() {
+		if sf.CanSync(settings.FromStruct) {
 			// Pull clock from the db
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {
@@ -33,7 +32,8 @@ func (m *Messenger) syncSettings() error {
 				return err
 			}
 
-			rm, err := spf.FromStruct()(s, clock, chat.ID)
+			// Build protobuf
+			rm, err := sf.SyncProtobufFactory().FromStruct()(s, clock, chat.ID)
 			if err != nil {
 				// Collect errors to give other sync messages a chance to send
 				logger.Error("SyncProtobufFactory.Struct", zap.Error(err))
@@ -69,6 +69,10 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *
 	}
 
 	spf := sf.SyncProtobufFactory()
+	if spf == nil {
+		m.logger.Warn("handleSyncSetting - received protobuf for setting with no SyncProtobufFactory", zap.Any("SettingField", sf))
+		return nil
+	}
 	if spf.Inactive() {
 		m.logger.Warn("handleSyncSetting - received protobuf for inactive sync setting", zap.Any("SettingField", sf))
 		return nil
@@ -97,8 +101,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.SyncQueue:
-				spf := s.SyncProtobufFactory()
-				if spf != nil && spf.FromInterface() != nil && !spf.Inactive() {
+				if s.CanSync(settings.FromInterface) {
 					logger.Debug("setting for sync received from settings.SyncQueue")
 
 					clock, chat := m.getLastClockWithRelatedChat()
@@ -109,10 +112,9 @@ func (m *Messenger) startSyncSettingsLoop() {
 						logger.Error("m.settings.SetSettingLastSynced", zap.Error(err))
 						break
 					}
-
-					rm, err := spf.FromInterface()(s.Value, clock, chat.ID)
+					rm, err := s.SyncProtobufFactory().FromInterface()(s.Value, clock, chat.ID)
 					if err != nil {
-						logger.Error("SyncProtobufFactory", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("SyncProtobufFactory().FromInterface", zap.Error(err), zap.Any("SyncSettingField", s))
 						break
 					}
 

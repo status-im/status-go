@@ -85,6 +85,28 @@ func (s SettingField) SyncProtobufFactory() *SyncProtobufFactory {
 	return s.syncProtobufFactory
 }
 
+// CanSync checks if a SettingField has functions supporting the syncing of
+func (s SettingField) CanSync(source SyncSource) bool {
+	spf := s.syncProtobufFactory
+
+	if spf == nil {
+		return false
+	}
+
+	if spf.inactive {
+		return false
+	}
+
+	switch source {
+	case FromInterface:
+		return spf.fromInterface != nil
+	case FromStruct:
+		return spf.fromStruct != nil
+	default:
+		return false
+	}
+}
+
 // Settings represents the entire setting row stored in the application db
 type Settings struct {
 	// required

@@ -1,5 +1,12 @@
 package settings
 
+type SyncSource int
+
+const (
+	FromInterface SyncSource = iota + 1
+	FromStruct
+)
+
 type ProfilePicturesVisibilityType int
 
 const (
