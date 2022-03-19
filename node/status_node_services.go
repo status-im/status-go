@@ -38,7 +38,6 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
-	visualIdentity "github.com/status-im/status-go/services/visual-identity"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -401,21 +400,6 @@ func (b *StatusNode) gifService(accountsDB *accounts.Database) *gif.Service {
 		b.gifSrvc = gif.NewService(accountsDB)
 	}
 	return b.gifSrvc
-}
-
-func (b *StatusNode) visualIdentityService() (*visualIdentity.Service, error) {
-	if b.visualIdentitySrvc != nil {
-		return b.visualIdentitySrvc, nil
-	}
-
-	srvc := visualIdentity.NewService()
-	err := srvc.Init()
-	if err != nil {
-		return nil, err
-	}
-	b.visualIdentitySrvc = srvc
-
-	return b.visualIdentitySrvc, nil
 }
 
 func (b *StatusNode) ChatService(accountsDB *accounts.Database) *chat.Service {
