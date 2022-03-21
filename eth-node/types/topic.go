@@ -1,5 +1,9 @@
 package types
 
+import (
+	"github.com/ethereum/go-ethereum/common/hexutil"
+)
+
 const (
 	// TopicLength is the expected length of the topic, in bytes
 	TopicLength = 4
@@ -83,4 +87,17 @@ func MakeFullNodeBloom() []byte {
 		bloom[i] = 0xFF
 	}
 	return bloom
+}
+
+func StringToTopic(s string) (t TopicType) {
+	str, _ := hexutil.Decode(s)
+	return BytesToTopic(str)
+}
+
+func TopicTypeToByteArray(t TopicType) []byte {
+	topic := make([]byte, 4)
+	for i, b := range t {
+		topic[i] = b
+	}
+	return topic
 }

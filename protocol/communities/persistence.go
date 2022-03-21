@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -22,6 +23,7 @@ type Persistence struct {
 
 var ErrOldRequestToJoin = errors.New("old request to join")
 
+const OR = " OR "
 const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
@@ -359,6 +361,114 @@ func (p *Persistence) SaveWakuMessage(message *types.Message) error {
 	return err
 }
 
+func wakuMessageTimestampQuery(topics []types.TopicType) string {
+	query := " FROM waku_messages WHERE "
+	for i, topic := range topics {
+		query += `topic = "` + topic.String() + `"`
+		if i < len(topics)-1 {
+			query += OR
+		}
+	}
+	return query
+}
+
+func (p *Persistence) GetOldestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
+	var timestamp sql.NullInt64
+	query := "SELECT MIN(timestamp)"
+	query += wakuMessageTimestampQuery(topics)
+	err := p.db.QueryRow(query).Scan(&timestamp)
+	return uint64(timestamp.Int64), err
+}
+
+func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
+	var timestamp sql.NullInt64
+	query := "SELECT MAX(timestamp)"
+	query += wakuMessageTimestampQuery(topics)
+	err := p.db.QueryRow(query).Scan(&timestamp)
+	return uint64(timestamp.Int64), err
+}
+
+func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
+
+	query := "SELECT sig, timestamp, topic, payload, padding, hash FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
+
+	for i, topic := range topics {
+		query += `topic = "` + topic.String() + `"`
+		if i < len(topics)-1 {
+			query += OR
+		}
+	}
+	query += ")"
+
+	rows, err := p.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	messages := []types.Message{}
+
+	for rows.Next() {
+		msg := types.Message{}
+		var topicStr string
+		var hashStr string
+		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr)
+		if err != nil {
+			return nil, err
+		}
+		msg.Topic = types.StringToTopic(topicStr)
+		msg.Hash = types.Hex2Bytes(hashStr)
+		messages = append(messages, msg)
+	}
+
+	return messages, nil
+}
+
+func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
+	var magnetlinkClock uint64
+	err := p.db.QueryRow(`SELECT magnetlink_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&magnetlinkClock)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return magnetlinkClock, err
+}
+
+func (p *Persistence) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
+	_, err := p.db.Exec(`UPDATE communities_archive_info SET
+    magnetlink_clock = ?
+    WHERE community_id = ?`,
+		clock,
+		communityID.String())
+	return err
+}
+
+func (p *Persistence) SaveLastMessageArchiveEndDate(communityID types.HexBytes, endDate uint64) error {
+	_, err := p.db.Exec(`INSERT INTO communities_archive_info (last_message_archive_end_date, community_id) VALUES (?, ?)`,
+		endDate,
+		communityID.String())
+	return err
+}
+
+func (p *Persistence) UpdateLastMessageArchiveEndDate(communityID types.HexBytes, endDate uint64) error {
+	_, err := p.db.Exec(`UPDATE communities_archive_info SET
+    last_message_archive_end_date = ?
+    WHERE community_id = ?`,
+		endDate,
+		communityID.String())
+	return err
+}
+
+func (p *Persistence) GetLastMessageArchiveEndDate(communityID types.HexBytes) (uint64, error) {
+
+	var lastMessageArchiveEndDate uint64
+	err := p.db.QueryRow(`SELECT last_message_archive_end_date FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&lastMessageArchiveEndDate)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return lastMessageArchiveEndDate, nil
+}
+
 func (p *Persistence) GetCommunitiesSettings() ([]CommunitySettings, error) {
 	rows, err := p.db.Query("SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled FROM communities_settings")
 	if err != nil {
@@ -426,4 +536,23 @@ func (p *Persistence) UpdateCommunitySettings(communitySettings CommunitySetting
 		communitySettings.CommunityID,
 	)
 	return err
+}
+
+func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string, error) {
+	rows, err := p.db.Query(`SELECT id FROM chats WHERE community_id = ?`, communityID.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := []string{}
+	for rows.Next() {
+		id := ""
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

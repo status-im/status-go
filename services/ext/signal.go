@@ -86,3 +86,35 @@ func (m *MessengerSignalsHandler) HistoryRequestFailed(requestID string, err err
 func (m *MessengerSignalsHandler) HistoryRequestCompleted(requestID string) {
 	signal.SendHistoricMessagesRequestCompleted(requestID)
 }
+
+func (m *MessengerSignalsHandler) HistoryArchivesProtocolEnabled() {
+	signal.SendHistoryArchivesProtocolEnabled()
+}
+
+func (m *MessengerSignalsHandler) HistoryArchivesProtocolDisabled() {
+	signal.SendHistoryArchivesProtocolDisabled()
+}
+
+func (m *MessengerSignalsHandler) CreatingHistoryArchives(communityID string) {
+	signal.SendCreatingHistoryArchives(communityID)
+}
+
+func (m *MessengerSignalsHandler) NoHistoryArchivesCreated(communityID string, from int, to int) {
+	signal.SendNoHistoryArchivesCreated(communityID, from, to)
+}
+
+func (m *MessengerSignalsHandler) HistoryArchivesCreated(communityID string, from int, to int) {
+	signal.SendHistoryArchivesCreated(communityID, from, to)
+}
+
+func (m *MessengerSignalsHandler) HistoryArchivesSeeding(communityID string) {
+	signal.SendHistoryArchivesSeeding(communityID)
+}
+
+func (m *MessengerSignalsHandler) HistoryArchivesUnseeded(communityID string) {
+	signal.SendHistoryArchivesUnseeded(communityID)
+}
+
+func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, from int, to int) {
+	signal.SendHistoryArchiveDownloaded(communityID, from, to)
+}
