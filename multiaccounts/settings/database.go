@@ -154,6 +154,18 @@ func (db *Database) makeSelectRow(setting SettingField) *sql.Row {
 	return db.db.QueryRow(query)
 }
 
+func (db *Database) makeSelectString(setting SettingField) (string, error) {
+	var result sql.NullString
+	err := db.makeSelectRow(setting).Scan(&result)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if result.Valid {
+		return result.String, nil
+	}
+	return "", err
+}
+
 func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
 	query = fmt.Sprintf(query, setting.GetDBName())
@@ -229,6 +241,26 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 	}
 
 	return db.saveSetting(setting, value)
+}
+
+func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, err error) {
+	query := "SELECT %s FROM settings_sync_clock WHERE synthetic_id = 'id'"
+	query = fmt.Sprintf(query, setting.GetDBName())
+
+	err = db.db.QueryRow(query).Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
+
+func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
+	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
+	query = fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
+
+	_, err := db.db.Exec(query, clock, clock)
+	return err
 }
 
 func (db *Database) GetSettings() (Settings, error) {
@@ -319,20 +351,12 @@ func (db *Database) GetProfilePicturesVisibility() (result int, err error) {
 	return result, err
 }
 
-func (db *Database) GetPublicKey() (rst string, err error) {
-	err = db.makeSelectRow(PublicKey).Scan(&rst)
-	if err == sql.ErrNoRows {
-		return rst, nil
-	}
-	return
+func (db *Database) GetPublicKey() (string, error) {
+	return db.makeSelectString(PublicKey)
 }
 
-func (db *Database) GetFleet() (rst string, err error) {
-	err = db.db.QueryRow("SELECT COALESCE(fleet, '') FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
-	if err == sql.ErrNoRows {
-		return rst, nil
-	}
-	return
+func (db *Database) GetFleet() (string, error) {
+	return db.makeSelectString(Fleet)
 }
 
 func (db *Database) GetDappsAddress() (rst types.Address, err error) {
@@ -454,39 +478,15 @@ func (db *Database) BackupFetched() (result bool, err error) {
 }
 
 func (db *Database) ENSName() (string, error) {
-	var result sql.NullString
-	err := db.makeSelectRow(PreferredName).Scan(&result)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if result.Valid {
-		return result.String, nil
-	}
-	return "", err
+	return db.makeSelectString(PreferredName)
 }
 
 func (db *Database) DisplayName() (string, error) {
-	var result sql.NullString
-	err := db.makeSelectRow(DisplayName).Scan(&result)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if result.Valid {
-		return result.String, nil
-	}
-	return "", err
+	return db.makeSelectString(DisplayName)
 }
 
 func (db *Database) GifAPIKey() (string, error) {
-	var result sql.NullString
-	err := db.makeSelectRow(GifAPIKey).Scan(&result)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if result.Valid {
-		return result.String, nil
-	}
-	return "", err
+	return db.makeSelectString(GifAPIKey)
 }
 
 func (db *Database) GifRecents() (recents json.RawMessage, err error) {
@@ -505,32 +505,8 @@ func (db *Database) GifFavorites() (favorites json.RawMessage, err error) {
 	return favorites, nil
 }
 
-func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, err error) {
-	query := "SELECT %s FROM settings_sync_clock WHERE synthetic_id = 'id'"
-	query = fmt.Sprintf(query, setting.GetDBName())
-
-	err = db.db.QueryRow(query).Scan(&result)
-	if err != nil {
-		return 0, err
-	}
-
-	return result, nil
-}
-
-func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
-	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
-	query = fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
-
-	_, err := db.db.Exec(query, clock, clock)
-	return err
-}
-
-func (db *Database) GetPreferredUsername() (rst string, err error) {
-	err = db.makeSelectRow(PreferredName).Scan(&rst)
-	if err == sql.ErrNoRows {
-		return rst, nil
-	}
-	return
+func (db *Database) GetPreferredUsername() (string, error) {
+	return db.makeSelectString(PreferredName)
 }
 
 func (db *Database) GetInstalledStickerPacks() (rst *json.RawMessage, err error) {
