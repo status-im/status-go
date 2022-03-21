@@ -34,6 +34,14 @@ type MessengerSignalsHandler interface {
 	HistoryRequestCompleted(requestID string)
 	HistoryRequestFailed(requestID string, err error)
 	BackupPerformed(uint64)
+	HistoryArchivesProtocolEnabled()
+	HistoryArchivesProtocolDisabled()
+	CreatingHistoryArchives(communityID string)
+	NoHistoryArchivesCreated(communityID string, from int, to int)
+	HistoryArchivesCreated(communityID string, from int, to int)
+	HistoryArchivesSeeding(communityID string)
+	HistoryArchivesUnseeded(communityID string)
+	HistoryArchiveDownloaded(communityID string, from int, to int)
 }
 
 type config struct {

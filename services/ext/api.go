@@ -928,6 +928,14 @@ func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings,
 	return api.service.messenger.GetCommunitiesSettings()
 }
 
+func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
+	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
+}
+
+func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
+	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
+}
+
 func (api *PublicAPI) AddStorePeer(address string) (string, error) {
 	return api.service.messenger.AddStorePeer(address)
 }
