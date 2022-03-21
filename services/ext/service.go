@@ -404,7 +404,6 @@ func buildMessengerOptions(
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
 		protocol.WithClusterConfig(config.ClusterConfig),
-		protocol.WithTorrentConfig(&config.TorrentConfig),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

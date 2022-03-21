@@ -45,11 +45,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, false, c.HTTPEnabled)
 	assert.Equal(t, false, c.IPCEnabled)
 
-	assert.Equal(t, "/some/data/path/archivedata", c.TorrentConfig.DataDir)
-	assert.Equal(t, "/some/data/path/torrents", c.TorrentConfig.TorrentDir)
-	assert.Equal(t, 9025, c.TorrentConfig.Port)
-	assert.Equal(t, false, c.TorrentConfig.Enabled)
-
 	assert.NoError(t, c.UpdateWithDefaults())
 	assert.NotEmpty(t, c.ShhextConfig.DefaultPushNotificationsServers)
 }
@@ -64,23 +59,13 @@ func TestNewConfigFromJSON(t *testing.T) {
 		"NetworkId": 3,
 		"DataDir": "` + tmpDir + `",
 		"KeyStoreDir": "` + tmpDir + `",
-		"NoDiscovery": true,
-    "TorrentConfig": {
-      "Port": 9025,
-      "Enabled": false,
-      "DataDir": "` + tmpDir + `/archivedata",
-      "TorrentDir": "` + tmpDir + `/torrents"
-    }
+		"NoDiscovery": true
 	}`
 	c, err := params.NewConfigFromJSON(json)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), c.NetworkID)
 	require.Equal(t, tmpDir, c.DataDir)
 	require.Equal(t, tmpDir, c.KeyStoreDir)
-	require.Equal(t, false, c.TorrentConfig.Enabled)
-	require.Equal(t, 9025, c.TorrentConfig.Port)
-	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
-	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 }
 
 func TestConfigWriteRead(t *testing.T) {
@@ -294,21 +279,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			FieldErrors: map[string]string{
 				"APIModules": "required",
 			},
-		},
-		{
-			Name: "Validate that TorrentConfig.DataDir and TorrentConfig.TorrentDir can't be empty strings",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-        "TorrentConfig": {
-          "Enabled": true,
-          "Port": 9025,
-          "DataDir": "",
-          "TorrentDir": ""
-        }
-      }`,
-			Error: `TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be ""`,
 		},
 	}
 
