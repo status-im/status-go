@@ -189,7 +189,7 @@ func (api *API) GenerateAccount(
 		Path:      path,
 	}
 
-	err = api.db.SaveSetting(settings.LatestDerivedPath.GetReactName(), newDerivedPath)
+	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
 	if err != nil {
 		return err
 	}

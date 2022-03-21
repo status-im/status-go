@@ -30,7 +30,7 @@ func (api *API) recentStickers() ([]Sticker, error) {
 
 func (api *API) ClearRecent() error {
 	var recentStickersList []Sticker
-	return api.accountsDB.SaveSetting(settings.StickersRecentStickers.GetReactName(), recentStickersList)
+	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)
 }
 
 func (api *API) Recent() ([]Sticker, error) {
@@ -75,5 +75,5 @@ func (api *API) AddRecent(sticker Sticker) error {
 		recentStickersList = append([]Sticker{sticker}, recentStickersList...)
 	}
 
-	return api.accountsDB.SaveSetting(settings.StickersRecentStickers.GetReactName(), recentStickersList)
+	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)
 }

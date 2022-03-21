@@ -42,7 +42,7 @@ type API struct {
 
 func (api *API) SetTenorAPIKey(key string) (err error) {
 	log.Info("[GifAPI::SetTenorAPIKey]")
-	err = api.db.SaveSetting(settings.GifAPIKey.GetReactName(), key)
+	err = api.db.SaveSettingField(settings.GifAPIKey, key)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (api *API) UpdateRecentGifs(updatedGifs json.RawMessage) (err error) {
 	if err != nil {
 		return err
 	}
-	err = api.db.SaveSetting(settings.GifRecents.GetReactName(), recentGifsContainer.Items)
+	err = api.db.SaveSettingField(settings.GifRecents, recentGifsContainer.Items)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (api *API) UpdateFavoriteGifs(updatedGifs json.RawMessage) (err error) {
 	if err != nil {
 		return err
 	}
-	err = api.db.SaveSetting(settings.GifFavourites.GetReactName(), favsGifsContainer.Items)
+	err = api.db.SaveSettingField(settings.GifFavourites, favsGifsContainer.Items)
 	if err != nil {
 		return err
 	}

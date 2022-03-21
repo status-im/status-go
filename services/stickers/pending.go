@@ -30,7 +30,7 @@ func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
 
 	pendingPacks[uint(packID.Uint64())] = *stickerPack
 
-	return api.accountsDB.SaveSetting(settings.StickersPacksPending.GetReactName(), pendingPacks)
+	return api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingPacks)
 }
 
 func (api *API) pendingStickerPacks() (StickerPackCollection, error) {
@@ -98,5 +98,5 @@ func (api *API) RemovePending(packID *bigint.BigInt) error {
 
 	delete(pendingPacks, uint(packID.Uint64()))
 
-	return api.accountsDB.SaveSetting(settings.StickersPacksPending.GetReactName(), pendingPacks)
+	return api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingPacks)
 }

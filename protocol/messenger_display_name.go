@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/identity/alias"
 )
 
@@ -57,7 +58,7 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
-	err = m.settings.SaveSetting("display-name", displayName)
+	err = m.settings.SaveSettingField(settings.DisplayName, displayName)
 	if err != nil {
 		return err
 	}

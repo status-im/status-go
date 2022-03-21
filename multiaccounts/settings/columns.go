@@ -25,6 +25,11 @@ var (
 		dBColumnName:   "backup_enabled",
 		valueHandler:   BoolHandler,
 	}
+	BackupFetched = SettingField{
+		reactFieldName: "backup-fetched?",
+		dBColumnName:   "backup_fetched",
+		valueHandler:   BoolHandler,
+	}
 	ChaosMode = SettingField{
 		reactFieldName: "chaos-mode?",
 		dBColumnName:   "chaos_mode",
@@ -127,6 +132,10 @@ var (
 	KeycardPairing = SettingField{
 		reactFieldName: "keycard-pairing",
 		dBColumnName:   "keycard_pairing",
+	}
+	LastBackup = SettingField{
+		reactFieldName: "last-backup",
+		dBColumnName:   "last_backup",
 	}
 	LastUpdated = SettingField{
 		reactFieldName: "last-updated",
@@ -371,6 +380,7 @@ var (
 		Appearance,
 		AutoMessageEnabled,
 		BackupEnabled,
+		BackupFetched,
 		ChaosMode,
 		Currency,
 		CurrentUserStatus,
@@ -388,6 +398,7 @@ var (
 		KeycardInstanceUID,
 		KeycardPairedOn,
 		KeycardPairing,
+		LastBackup,
 		LastUpdated,
 		LatestDerivedPath,
 		LinkPreviewRequestEnabled,

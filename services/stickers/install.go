@@ -32,7 +32,7 @@ func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {
 
 	installedPacks[uint(packID.Uint64())] = *stickerPack
 
-	err = api.accountsDB.SaveSetting(settings.StickersPacksInstalled.GetReactName(), installedPacks)
+	err = api.accountsDB.SaveSettingField(settings.StickersPacksInstalled, installedPacks)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (api *API) Uninstall(packID *bigint.BigInt) error {
 
 	delete(installedPacks, uint(packID.Uint64()))
 
-	err = api.accountsDB.SaveSetting(settings.StickersPacksInstalled.GetReactName(), installedPacks)
+	err = api.accountsDB.SaveSettingField(settings.StickersPacksInstalled, installedPacks)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (api *API) Uninstall(packID *bigint.BigInt) error {
 		if idx != len(recentStickers)-1 {
 			newRecentStickers = append(newRecentStickers, recentStickers[idx+1:]...)
 		}
-		return api.accountsDB.SaveSetting(settings.StickersRecentStickers.GetReactName(), newRecentStickers)
+		return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, newRecentStickers)
 	}
 
 	return nil

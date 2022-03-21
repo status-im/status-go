@@ -144,10 +144,10 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 	err = m.settings.CreateSettings(setting, config)
 	s.Require().NoError(err)
 
-	err = m.settings.SaveSetting(settings.PreferredName.GetReactName(), &pf)
+	err = m.settings.SaveSettingField(settings.PreferredName, &pf)
 	s.Require().NoError(err)
 
-	err = m.settings.SaveSetting(settings.Currency.GetReactName(), "eth")
+	err = m.settings.SaveSettingField(settings.Currency, "eth")
 	s.Require().NoError(err)
 
 	return m
@@ -243,7 +243,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
 
 	// Update alice ProfilePicturesVisibility setting
-	err = s.alice.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesVisibilityEveryone)
+	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesVisibilityEveryone)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -267,7 +267,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().Equal(settings.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
 
 	// Alice 2 updated a setting which triggers the sync functionality
-	err = s.alice2.settings.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), settings.ProfilePicturesShowToEveryone)
+	err = s.alice2.settings.SaveSettingField(settings.ProfilePicturesShowTo, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -314,7 +314,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	err = json.Unmarshal(rawSticker, &stickerPacks)
 	s.Require().NoError(err)
 
-	err = s.alice.settings.SaveSetting(settings.StickersPacksInstalled.GetReactName(), stickerPacks)
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, stickerPacks)
 	s.Require().NoError(err)
 
 	as, err = s.alice.settings.GetSettings()
@@ -360,7 +360,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
 	s.pairTwoDevices(s.alice2, s.alice)
 
 	// Update Alice's PreferredName
-	err = s.alice.settings.SaveSetting(settings.PreferredName.GetReactName(), pf2)
+	err = s.alice.settings.SaveSettingField(settings.PreferredName, pf2)
 	s.Require().NoError(err)
 
 	apn, err := s.alice.settings.GetPreferredUsername()

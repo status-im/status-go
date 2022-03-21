@@ -69,7 +69,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().NoError(err)
 
 	// Set ENS name
-	err = theirMessenger.settings.SaveSetting(settings.PreferredName.GetReactName(), theirName)
+	err = theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
 	s.Require().NoError(err)
 
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))

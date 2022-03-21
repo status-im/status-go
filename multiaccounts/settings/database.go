@@ -148,9 +148,16 @@ func (db *Database) getSettingFieldFromReactName(reactName string) (SettingField
 	return SettingField{}, errors.ErrInvalidConfig
 }
 
+func (db *Database) makeSelectRow(setting SettingField) *sql.Row {
+	query := "SELECT %s FROM settings WHERE synthetic_id = 'id'"
+	query = fmt.Sprintf(query, setting.GetDBName())
+	return db.db.QueryRow(query)
+}
+
 func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
 	query = fmt.Sprintf(query, setting.GetDBName())
+
 	update, err := db.db.Prepare(query)
 	if err != nil {
 		return err
@@ -160,14 +167,7 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	return err
 }
 
-// SaveSetting stores data from any non-sync source
-// If the field requires syncing the field data is pushed on to the SyncQueue
-func (db *Database) SaveSetting(setting string, value interface{}) error {
-	sf, err := db.getSettingFieldFromReactName(setting)
-	if err != nil {
-		return err
-	}
-
+func (db *Database) parseSaveAndSyncSetting(sf SettingField, value interface{}) (err error) {
 	if sf.ValueHandler() != nil {
 		value, err = sf.ValueHandler()(value)
 		if err != nil {
@@ -194,7 +194,26 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	return nil
 }
 
-// SaveSyncSetting stores setting data from a sync protobuf source
+// SaveSetting stores data from any non-sync source
+// If the field requires syncing the field data is pushed on to the SyncQueue
+func (db *Database) SaveSetting(setting string, value interface{}) error {
+	sf, err := db.getSettingFieldFromReactName(setting)
+	if err != nil {
+		return err
+	}
+
+	return db.parseSaveAndSyncSetting(sf, value)
+}
+
+// SaveSettingField is identical in functionality to SaveSetting, except the setting parameter is a SettingField and
+// doesn't require any SettingFieldRegister lookup.
+// This func is useful if you already know the SettingField to save
+func (db *Database) SaveSettingField(sf SettingField, value interface{}) error {
+	return db.parseSaveAndSyncSetting(sf, value)
+}
+
+// SaveSyncSetting stores setting data from a sync protobuf source, note it does not call SettingField.ValueHandler()
+// nor does this function attempt to write to the Database.SyncQueue
 func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock uint64) error {
 	ls, err := db.GetSettingLastSynced(setting)
 	if err != nil {
@@ -284,18 +303,16 @@ func (db *Database) GetSettings() (Settings, error) {
 	return s, err
 }
 
-func (db *Database) GetNotificationsEnabled() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT notifications_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) GetNotificationsEnabled() (result bool, err error) {
+	err = db.makeSelectRow(NotificationsEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
 	return result, err
 }
 
-func (db *Database) GetProfilePicturesVisibility() (int, error) {
-	var result int
-	err := db.db.QueryRow("SELECT profile_pictures_visibility FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) GetProfilePicturesVisibility() (result int, err error) {
+	err = db.makeSelectRow(ProfilePicturesVisibility).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
@@ -303,7 +320,7 @@ func (db *Database) GetProfilePicturesVisibility() (int, error) {
 }
 
 func (db *Database) GetPublicKey() (rst string, err error) {
-	err = db.db.QueryRow("SELECT public_key FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(PublicKey).Scan(&rst)
 	if err == sql.ErrNoRows {
 		return rst, nil
 	}
@@ -319,7 +336,7 @@ func (db *Database) GetFleet() (rst string, err error) {
 }
 
 func (db *Database) GetDappsAddress() (rst types.Address, err error) {
-	err = db.db.QueryRow("SELECT dapps_address FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(DappsAddress).Scan(&rst)
 	if err == sql.ErrNoRows {
 		return rst, nil
 	}
@@ -341,59 +358,53 @@ func (db *Database) GetPinnedMailservers() (rst map[string]string, err error) {
 	return
 }
 
-func (db *Database) CanUseMailservers() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT use_mailservers FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) CanUseMailservers() (result bool, err error) {
+	err = db.makeSelectRow(UseMailservers).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
 	return result, err
 }
 
-func (db *Database) CanSyncOnMobileNetwork() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT syncing_on_mobile_network FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) CanSyncOnMobileNetwork() (result bool, err error) {
+	err = db.makeSelectRow(SyncingOnMobileNetwork).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
 	return result, err
 }
 
-func (db *Database) GetDefaultSyncPeriod() (uint32, error) {
-	var result uint32
-	err := db.db.QueryRow("SELECT default_sync_period FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) GetDefaultSyncPeriod() (result uint32, err error) {
+	err = db.makeSelectRow(DefaultSyncPeriod).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
 	return result, err
 }
 
-func (db *Database) GetMessagesFromContactsOnly() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT messages_from_contacts_only FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) GetMessagesFromContactsOnly() (result bool, err error) {
+	err = db.makeSelectRow(MessagesFromContactsOnly).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
 	return result, err
 }
 
-func (db *Database) GetLatestDerivedPath() (uint, error) {
-	var result uint
-	err := db.db.QueryRow("SELECT latest_derived_path FROM settings WHERE synthetic_id = 'id'").Scan(&result)
-	return result, err
+func (db *Database) GetLatestDerivedPath() (result uint, err error) {
+	err = db.makeSelectRow(LatestDerivedPath).Scan(&result)
+	return
 }
 
 func (db *Database) GetCurrentStatus(status interface{}) error {
-	err := db.db.QueryRow("SELECT current_user_status FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &status})
+	err := db.makeSelectRow(CurrentUserStatus).Scan(&sqlite.JSONBlob{Data: &status})
 	if err == sql.ErrNoRows {
 		return nil
 	}
 	return err
 }
 
-func (db *Database) ShouldBroadcastUserStatus() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT send_status_updates FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) ShouldBroadcastUserStatus() (result bool, err error) {
+	err = db.makeSelectRow(SendStatusUpdates).Scan(&result)
 	// If the `send_status_updates` value is nil the sql.ErrNoRows will be returned
 	// because this feature is opt out, `true` should be returned in the case where no value is found
 	if err == sql.ErrNoRows {
@@ -402,27 +413,24 @@ func (db *Database) ShouldBroadcastUserStatus() (bool, error) {
 	return result, err
 }
 
-func (db *Database) BackupEnabled() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT backup_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) BackupEnabled() (result bool, err error) {
+	err = db.makeSelectRow(BackupEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
 	return result, err
 }
 
-func (db *Database) AutoMessageEnabled() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT auto_message_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) AutoMessageEnabled() (result bool, err error) {
+	err = db.makeSelectRow(AutoMessageEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
 	return result, err
 }
 
-func (db *Database) LastBackup() (uint64, error) {
-	var result uint64
-	err := db.db.QueryRow("SELECT last_backup FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) LastBackup() (result uint64, err error) {
+	err = db.makeSelectRow(LastBackup).Scan(&result)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
@@ -430,18 +438,15 @@ func (db *Database) LastBackup() (uint64, error) {
 }
 
 func (db *Database) SetLastBackup(time uint64) error {
-	_, err := db.db.Exec("UPDATE settings SET last_backup = ?", time)
-	return err
+	return db.SaveSettingField(LastBackup, time)
 }
 
 func (db *Database) SetBackupFetched(fetched bool) error {
-	_, err := db.db.Exec("UPDATE settings SET backup_fetched = ?", fetched)
-	return err
+	return db.SaveSettingField(BackupFetched, fetched)
 }
 
-func (db *Database) BackupFetched() (bool, error) {
-	var result bool
-	err := db.db.QueryRow("SELECT backup_fetched FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+func (db *Database) BackupFetched() (result bool, err error) {
+	err = db.makeSelectRow(BackupFetched).Scan(&result)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
@@ -450,7 +455,7 @@ func (db *Database) BackupFetched() (bool, error) {
 
 func (db *Database) ENSName() (string, error) {
 	var result sql.NullString
-	err := db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	err := db.makeSelectRow(PreferredName).Scan(&result)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -462,7 +467,7 @@ func (db *Database) ENSName() (string, error) {
 
 func (db *Database) DisplayName() (string, error) {
 	var result sql.NullString
-	err := db.db.QueryRow("SELECT display_name FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	err := db.makeSelectRow(DisplayName).Scan(&result)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -474,7 +479,7 @@ func (db *Database) DisplayName() (string, error) {
 
 func (db *Database) GifAPIKey() (string, error) {
 	var result sql.NullString
-	err := db.db.QueryRow("SELECT gif_api_key FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	err := db.makeSelectRow(GifAPIKey).Scan(&result)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -485,7 +490,7 @@ func (db *Database) GifAPIKey() (string, error) {
 }
 
 func (db *Database) GifRecents() (recents json.RawMessage, err error) {
-	err = db.db.QueryRow("SELECT gif_recents FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &recents})
+	err = db.makeSelectRow(GifRecents).Scan(&sqlite.JSONBlob{Data: &recents})
 	if err == sql.ErrNoRows {
 		return nil, err
 	}
@@ -493,20 +498,18 @@ func (db *Database) GifRecents() (recents json.RawMessage, err error) {
 }
 
 func (db *Database) GifFavorites() (favorites json.RawMessage, err error) {
-	err = db.db.QueryRow("SELECT gif_favorites FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: &favorites})
+	err = db.makeSelectRow(GifFavourites).Scan(&sqlite.JSONBlob{Data: &favorites})
 	if err == sql.ErrNoRows {
 		return nil, err
 	}
 	return favorites, nil
 }
 
-func (db *Database) GetSettingLastSynced(setting SettingField) (uint64, error) {
-	var result uint64
-
+func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, err error) {
 	query := "SELECT %s FROM settings_sync_clock WHERE synthetic_id = 'id'"
 	query = fmt.Sprintf(query, setting.GetDBName())
 
-	err := db.db.QueryRow(query).Scan(&result)
+	err = db.db.QueryRow(query).Scan(&result)
 	if err != nil {
 		return 0, err
 	}
@@ -523,7 +526,7 @@ func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) err
 }
 
 func (db *Database) GetPreferredUsername() (rst string, err error) {
-	err = db.db.QueryRow("SELECT preferred_name FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(PreferredName).Scan(&rst)
 	if err == sql.ErrNoRows {
 		return rst, nil
 	}
@@ -531,17 +534,17 @@ func (db *Database) GetPreferredUsername() (rst string, err error) {
 }
 
 func (db *Database) GetInstalledStickerPacks() (rst *json.RawMessage, err error) {
-	err = db.db.QueryRow("SELECT stickers_packs_installed FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(StickersPacksInstalled).Scan(&rst)
 	return
 }
 
 func (db *Database) GetPendingStickerPacks() (rst *json.RawMessage, err error) {
-	err = db.db.QueryRow("SELECT stickers_packs_pending FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(StickersPacksPending).Scan(&rst)
 	return
 }
 
 func (db *Database) GetRecentStickers() (rst *json.RawMessage, err error) {
-	err = db.db.QueryRow("SELECT stickers_recent_stickers FROM settings WHERE synthetic_id = 'id'").Scan(&rst)
+	err = db.makeSelectRow(StickersRecentStickers).Scan(&rst)
 	return
 }
 
@@ -551,11 +554,9 @@ func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
 		return err
 	}
 
-	_, err = db.db.Exec("UPDATE settings SET pinned_mailservers = ? WHERE synthetic_id = 'id'", jsonString)
-	return err
+	return db.SaveSettingField(PinnedMailservers, jsonString)
 }
 
 func (db *Database) SetUseMailservers(value bool) error {
-	_, err := db.db.Exec("UPDATE settings SET use_mailservers = ?", value)
-	return err
+	return db.SaveSettingField(UseMailservers, value)
 }

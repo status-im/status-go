@@ -221,10 +221,10 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 
 func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided() {
 	s.setupTest()
-	err := s.bob.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesShowToEveryone)
+	err := s.bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	err = s.alice.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), settings.ProfilePicturesShowToEveryone)
+	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
 	bChat := CreateOneToOneChat(s.generateKeyUID(&s.aliceKey.PublicKey), &s.aliceKey.PublicKey, s.alice.transport)
@@ -312,7 +312,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("Setting up test criteria for Bob")
 
 						s.logger.Debug("Save bob profile-pictures-visibility setting before")
-						err = s.bob.settings.SaveSetting(settings.ProfilePicturesVisibility.GetReactName(), vs)
+						err = s.bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, vs)
 						s.Require().NoError(err)
 						s.logger.Debug("Save bob profile-pictures-visibility setting after")
 
@@ -359,7 +359,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("Setting up test criteria for Alice")
 
 						s.logger.Debug("Save alice profile-pictures-show-to setting before")
-						err = s.alice.settings.SaveSetting(settings.ProfilePicturesShowTo.GetReactName(), ss)
+						err = s.alice.settings.SaveSettingField(settings.ProfilePicturesShowTo, ss)
 						s.Require().NoError(err)
 						s.logger.Debug("Save alice profile-pictures-show-to setting after")
 
