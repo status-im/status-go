@@ -6,6 +6,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/nodecfg"
+	"github.com/status-im/status-go/params"
 )
 
 const (
@@ -213,4 +215,8 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
 	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM accounts WHERE address = ?)", address).Scan(&exists)
 	return exists, err
+}
+
+func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
+	return nodecfg.GetNodeConfig(db.db)
 }
