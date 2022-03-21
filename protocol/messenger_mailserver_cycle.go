@@ -486,6 +486,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 			if m.mailserverCycle.activeMailserver != nil && id == m.mailserverCycle.activeMailserver.ID {
 				m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
+				m.EmitMailserverAvailable()
 				signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
 			}
 			// Query mailserver
@@ -649,4 +650,19 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 	}
 
 	return nil, nil
+}
+
+func (m *Messenger) EmitMailserverAvailable() {
+	for _, s := range m.mailserverCycle.availabilitySubscriptions {
+		s <- struct{}{}
+		close(s)
+		l := len(m.mailserverCycle.availabilitySubscriptions)
+		m.mailserverCycle.availabilitySubscriptions = m.mailserverCycle.availabilitySubscriptions[:l-1]
+	}
+}
+
+func (m *Messenger) SubscribeMailserverAvailable() chan struct{} {
+	c := make(chan struct{})
+	m.mailserverCycle.availabilitySubscriptions = append(m.mailserverCycle.availabilitySubscriptions, c)
+	return c
 }

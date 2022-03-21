@@ -150,10 +150,11 @@ type peerStatus struct {
 }
 type mailserverCycle struct {
 	sync.RWMutex
-	activeMailserver *mailserversDB.Mailserver
-	peers            map[string]peerStatus
-	events           chan *p2p.PeerEvent
-	subscription     event.Subscription
+	activeMailserver          *mailserversDB.Mailserver
+	peers                     map[string]peerStatus
+	events                    chan *p2p.PeerEvent
+	subscription              event.Subscription
+	availabilitySubscriptions []chan struct{}
 }
 
 type dbConfig struct {
@@ -379,7 +380,7 @@ func NewMessenger(
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
-	communitiesManager, err := communities.NewManager(&identity.PublicKey, database, logger, ensVerifier)
+	communitiesManager, err := communities.NewManager(&identity.PublicKey, database, logger, ensVerifier, transp, c.torrentConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +426,8 @@ func NewMessenger(
 		peerStore:                  peerStore,
 		mailservers:                mailservers,
 		mailserverCycle: mailserverCycle{
-			peers: make(map[string]peerStatus),
+			peers:                     make(map[string]peerStatus),
+			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
 		mailserversDatabase:  c.mailserversDatabase,
 		account:              c.account,
@@ -628,6 +630,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
+	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
@@ -655,6 +658,17 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	err = m.StartMailserverCycle()
 	if err != nil {
 		return nil, err
+	}
+
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+		adminCommunities, err := m.communitiesManager.Created()
+		if err == nil && len(adminCommunities) > 0 {
+			available := m.SubscribeMailserverAvailable()
+			go func() {
+				<-available
+				m.InitHistoryArchiveTasks(adminCommunities)
+			}()
+		}
 	}
 
 	err = m.httpServer.Start()
