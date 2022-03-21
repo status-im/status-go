@@ -73,6 +73,12 @@ type MessengerSyncSettingsSuite struct {
 	// a single Waku service should be shared.
 	shh    types.Waku
 	logger *zap.Logger
+
+	ignoreStickerTests bool
+}
+
+func (s *MessengerSyncSettingsSuite) SetupSuite() {
+	s.ignoreStickerTests = true
 }
 
 func (s *MessengerSyncSettingsSuite) SetupTest() {
@@ -292,6 +298,11 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
+	if s.ignoreStickerTests {
+		s.T().Skip("Currently sticker pack syncing has been deactivated, testing to resume after sticker packs works correctly")
+		return
+	}
+
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
