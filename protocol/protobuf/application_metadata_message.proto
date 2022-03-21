@@ -56,5 +56,6 @@ message ApplicationMetadataMessage {
     SYNC_BOOKMARK = 40;
     SYNC_CLEAR_HISTORY = 41;
     SYNC_SETTING = 42;
+    COMMUNITY_ARCHIVE_MAGNETLINK = 43;
   }
 }

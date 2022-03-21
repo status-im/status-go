@@ -43,6 +43,7 @@ message CommunityDescription {
   map<string,CommunityChat> chats = 6;
   repeated string ban_list = 7;
   map<string,CommunityCategory> categories = 8;
+  uint64 archive_magnetlink_clock = 9;
 }
 
 message CommunityChat {
@@ -78,4 +79,43 @@ message CommunityRequestToJoinResponse {
   CommunityDescription community = 2;
   bool accepted = 3;
   bytes grant = 4;
+}
+
+message CommunityMessageArchiveMagnetlink {
+  uint64 clock = 1;
+  string magnet_uri = 2;
+}
+
+message WakuMessage {
+  bytes sig = 1;
+  uint64 timestamp = 2;
+  bytes topic = 3;
+  bytes payload = 4;
+  bytes padding = 5;
+  bytes hash = 6;
+}
+
+message WakuMessageArchiveMetadata {
+  uint32 version = 1;
+  uint64 from = 2;
+  uint64 to = 3;
+  repeated bytes contentTopic = 4;
+}
+
+message WakuMessageArchive {
+  uint32 version = 1;
+  WakuMessageArchiveMetadata metadata = 2;
+  repeated WakuMessage messages = 3;
+}
+
+message WakuMessageArchiveIndexMetadata {
+  uint32 version = 1;
+  WakuMessageArchiveMetadata metadata = 2;
+  uint64 offset = 3;
+  uint64 size = 4;
+  uint64 padding = 5;
+}
+
+message WakuMessageArchiveIndex {
+  map<string, WakuMessageArchiveIndexMetadata> archives = 1;
 }
