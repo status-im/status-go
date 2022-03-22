@@ -14,6 +14,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core"
 
 	"github.com/status-im/zxcvbn-go"
+	"github.com/status-im/zxcvbn-go/scoring"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
@@ -755,23 +756,53 @@ func ImageServerTLSCert() string {
 	return cert
 }
 
+type GetPasswordStrengthRequest struct {
+	Password   string   `json:"password"`
+	UserInputs []string `json:"userInputs"`
+}
+
+type PasswordScoreResponse struct {
+	Score int `json:"score"`
+}
+
 // GetPasswordStrength uses zxcvbn module and generates a JSON containing information about the quality of the given password
 // (Entropy, CrackTime, CrackTimeDisplay, Score, MatchSequence and CalcTime).
 // userInputs argument can be whatever list of strings like user's personal info or site-specific vocabulary that zxcvbn will
 // make use to determine the result.
 // For more details on usage see https://github.com/status-im/zxcvbn-go
 func GetPasswordStrength(paramsJSON string) string {
-	var params struct {
-		Password   string   `json:"password"`
-		UserInputs []string `json:"userInputs"`
-	}
+	var requestParams GetPasswordStrengthRequest
 
-	err := json.Unmarshal([]byte(paramsJSON), &params)
+	err := json.Unmarshal([]byte(paramsJSON), &requestParams)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	data, err := json.Marshal(zxcvbn.PasswordStrength(params.Password, params.UserInputs))
+	data, err := json.Marshal(zxcvbn.PasswordStrength(requestParams.Password, requestParams.UserInputs))
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
+	}
+	return string(data)
+}
+
+// GetPasswordStrengthScore uses zxcvbn module and gets the score information about the given password.
+// userInputs argument can be whatever list of strings like user's personal info or site-specific vocabulary that zxcvbn will
+// make use to determine the result.
+// For more details on usage see https://github.com/status-im/zxcvbn-go
+func GetPasswordStrengthScore(paramsJSON string) string {
+	var requestParams GetPasswordStrengthRequest
+	var quality scoring.MinEntropyMatch
+
+	err := json.Unmarshal([]byte(paramsJSON), &requestParams)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	quality = zxcvbn.PasswordStrength(requestParams.Password, requestParams.UserInputs)
+
+	data, err := json.Marshal(PasswordScoreResponse{
+		Score: quality.Score,
+	})
 	if err != nil {
 		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
 	}
