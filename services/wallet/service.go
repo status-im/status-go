@@ -17,7 +17,7 @@ func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, open
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
-	tokenManager := &TokenManager{db: db}
+	tokenManager := &TokenManager{db: db, RPCClient: rpcClient}
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db}
 	favouriteManager := &FavouriteManager{db: db}

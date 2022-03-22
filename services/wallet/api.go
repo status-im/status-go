@@ -95,7 +95,7 @@ func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
 
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
 	log.Debug("call to get discover token")
-	token, err := api.s.tokenManager.discoverToken(chainID, address)
+	token, err := api.s.tokenManager.discoverToken(ctx, chainID, address)
 	return token, err
 }
 
