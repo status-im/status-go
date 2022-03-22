@@ -6,12 +6,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"database/sql"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"time"
@@ -31,7 +27,6 @@ func generateTLSCert() error {
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
 	if err != nil {
 		return err
 	}
@@ -39,41 +34,17 @@ func generateTLSCert() error {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-
+	cert, err := GenerateX509Cert(notBefore, notAfter)
 	if err != nil {
 		return err
 	}
 
-	template := x509.Certificate{
-		SerialNumber:          serialNumber,
-		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		DNSNames:              []string{"localhost"},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return err
 	}
-
-	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-
-	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
-	if err != nil {
-		return err
-	}
-
-	keyPem := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 
 	finalCert, err := tls.X509KeyPair(certPem, keyPem)
-
 	if err != nil {
 		return err
 	}
