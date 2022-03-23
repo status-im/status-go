@@ -74,11 +74,11 @@ type MessengerSyncSettingsSuite struct {
 	shh    types.Waku
 	logger *zap.Logger
 
-	ignoreStickerTests bool
+	ignoreTests bool
 }
 
 func (s *MessengerSyncSettingsSuite) SetupSuite() {
-	s.ignoreStickerTests = true
+	s.ignoreTests = true
 }
 
 func (s *MessengerSyncSettingsSuite) SetupTest() {
@@ -298,7 +298,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
-	if s.ignoreStickerTests {
+	if s.ignoreTests {
 		s.T().Skip("Currently sticker pack syncing has been deactivated, testing to resume after sticker packs works correctly")
 		return
 	}
@@ -357,6 +357,11 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
+	if s.ignoreTests {
+		s.T().Skip("Currently preferred syncing has been deactivated, testing to resume after ens names also sync")
+		return
+	}
+
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)

@@ -1273,8 +1273,12 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 		return ErrDBNotAvailable
 	}
 
-	accountDB := accounts.NewDB(b.appDB)
-	err := accountDB.SaveSetting("fleet", fleet)
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSetting("fleet", fleet)
 	if err != nil {
 		return err
 	}

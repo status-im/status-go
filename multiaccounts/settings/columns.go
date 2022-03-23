@@ -214,7 +214,9 @@ var (
 	PreferredName = SettingField{
 		reactFieldName: "preferred-name",
 		dBColumnName:   "preferred_name",
+		// TODO resolve issue 9 https://github.com/status-im/status-react/pull/13053#issuecomment-1075336559
 		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     preferredNameProtobufFactory,
 			fromStruct:        preferredNameProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
@@ -292,7 +294,9 @@ var (
 		reactFieldName: "send-status-updates?",
 		dBColumnName:   "send_status_updates",
 		valueHandler:   BoolHandler,
+		// TODO resolve issue 10 https://github.com/status-im/status-react/pull/13053#issuecomment-1075352256
 		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // Remove after issue is resolved
 			fromInterface:     sendStatusUpdatesProtobufFactory,
 			fromStruct:        sendStatusUpdatesProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
