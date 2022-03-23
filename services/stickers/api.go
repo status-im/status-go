@@ -2,7 +2,6 @@ package stickers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"io/ioutil"
 	"math/big"
@@ -54,7 +53,7 @@ type API struct {
 }
 
 type Sticker struct {
-	PackID *bigint.BigInt `json:"packID"`
+	PackID *bigint.BigInt `json:"packID,omitempty"`
 	URL    string         `json:"url,omitempty"`
 	Hash   string         `json:"hash,omitempty"`
 }
@@ -63,14 +62,16 @@ type StickerPack struct {
 	ID        *bigint.BigInt `json:"id"`
 	Name      string         `json:"name"`
 	Author    string         `json:"author"`
-	Owner     common.Address `json:"owner"`
+	Owner     common.Address `json:"owner,omitempty"`
 	Price     *bigint.BigInt `json:"price"`
 	Preview   string         `json:"preview"`
 	Thumbnail string         `json:"thumbnail"`
 	Stickers  []Sticker      `json:"stickers"`
 
-	Status stickerStatus `json:"status"`
+	Status stickerStatus `json:"status,omitempty"`
 }
+
+type StickerPackCollection map[uint]StickerPack
 
 type ednSticker struct {
 	Hash string
@@ -87,13 +88,13 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, appDB *sql.DB, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *API {
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *API {
 	return &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
 		accountsManager: accountsManager,
-		accountsDB:      accounts.NewDB(appDB),
+		accountsDB:      acc,
 		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
 		ctx:             ctx,
@@ -105,7 +106,7 @@ func NewAPI(ctx context.Context, appDB *sql.DB, rpcClient *rpc.Client, accountsM
 
 func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 	// TODO: eventually this should be changed to include pagination
-	accounts, err := api.accountsDB.GetAccounts()
+	accs, err := api.accountsDB.GetAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 	purchasedPackChan := make(chan *big.Int)
 	errChan := make(chan error)
 	doneChan := make(chan struct{}, 1)
-	go api.getAccountsPurchasedPack(chainID, accounts, purchasedPackChan, errChan, doneChan)
+	go api.getAccountsPurchasedPack(chainID, accs, purchasedPackChan, errChan, doneChan)
 
 	for {
 		select {

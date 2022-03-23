@@ -1,8 +1,6 @@
 package chat
 
 import (
-	"database/sql"
-
 	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -10,9 +8,9 @@ import (
 	"github.com/status-im/status-go/protocol"
 )
 
-func NewService(appDB *sql.DB) *Service {
+func NewService(accountsDB *accounts.Database) *Service {
 	return &Service{
-		accountsDB: accounts.NewDB(appDB),
+		accountsDB: accountsDB,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 )
 
@@ -178,7 +179,7 @@ func (api *API) GenerateAccount(
 		return err
 	}
 
-	account := accounts.Account{
+	acc := accounts.Account{
 		Address:   types.Address(common.HexToAddress(infos[path].Address)),
 		PublicKey: types.HexBytes(infos[path].PublicKey),
 		Type:      "generated",
@@ -188,12 +189,12 @@ func (api *API) GenerateAccount(
 		Path:      path,
 	}
 
-	err = api.db.SaveSetting("latest-derived-path", newDerivedPath)
+	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
 	if err != nil {
 		return err
 	}
 
-	return api.SaveAccounts(ctx, []accounts.Account{account})
+	return api.SaveAccounts(ctx, []accounts.Account{acc})
 }
 
 func (api *API) verifyPassword(password string) error {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -124,7 +124,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap,
 		IsGroupConversation: true,
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.CanonicalName(),
-			Icon: n.Contact.CanonicalImage(accounts.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: n.Contact.CanonicalImage(settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
 		Timestamp:      n.Message.WhisperTimestamp,
@@ -144,7 +144,7 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 		Deeplink: n.Chat.DeepLink(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.CanonicalName(),
-			Icon: n.Contact.CanonicalImage(accounts.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: n.Contact.CanonicalImage(settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
 		Image: "",

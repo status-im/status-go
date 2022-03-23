@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -705,7 +705,7 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 // PushNotifications server endpoints
 
 func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
 	if err != nil {
 		return err
 	}
@@ -714,7 +714,7 @@ func (api *PublicAPI) StartPushNotificationsServer() error {
 }
 
 func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, false)
 	if err != nil {
 		return err
 	}
@@ -733,7 +733,7 @@ func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error
 }
 
 func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("send-push-notifications?", false)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, false)
 	if err != nil {
 		return err
 	}
@@ -742,7 +742,7 @@ func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("send-push-notifications?", true)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, true)
 	if err != nil {
 		return err
 	}
@@ -750,7 +750,7 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, true)
 	if err != nil {
 		return err
 	}
@@ -758,7 +758,7 @@ func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Contex
 }
 
 func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, false)
 	if err != nil {
 		return err
 	}
@@ -766,7 +766,7 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 }
 
 func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, true)
 	if err != nil {
 		return err
 	}
@@ -774,7 +774,7 @@ func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) 
 }
 
 func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, false)
 	if err != nil {
 		return err
 	}
@@ -952,8 +952,8 @@ func (api *PublicAPI) Peers() map[string][]string {
 	return api.service.messenger.Peers()
 }
 
-func (api *PublicAPI) ChangeIdentityImageShowTo(showTo accounts.ProfilePicturesShowToType) error {
-	err := api.service.accountsDB.SaveSetting("profile-pictures-show-to", showTo)
+func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
+	err := api.service.accountsDB.SaveSettingField(settings.ProfilePicturesShowTo, showTo)
 	if err != nil {
 		return err
 	}

@@ -64,7 +64,10 @@ func (b *Block) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) 
 }
 
 func (b *Block) setInitialBlocksRange(chainClient *chain.Client) error {
-	accountsDB := accounts.NewDB(b.db)
+	accountsDB, err := accounts.NewDB(b.db)
+	if err != nil {
+		return err
+	}
 	watchAddress, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err

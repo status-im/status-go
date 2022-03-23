@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/appdatabase/migrations"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
@@ -125,7 +126,7 @@ func WithToplevelDatabaseMigrations() Option {
 	}
 }
 
-func WithAppSettings(s accounts.Settings, nc params.NodeConfig) Option {
+func WithAppSettings(s settings.Settings, nc params.NodeConfig) Option {
 	return func(c *config) error {
 		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
 			if s.Networks == nil {
@@ -137,7 +138,10 @@ func WithAppSettings(s accounts.Settings, nc params.NodeConfig) Option {
 				s.Networks = networks
 			}
 
-			sDB := accounts.NewDB(c.db)
+			sDB, err := accounts.NewDB(c.db)
+			if err != nil {
+				return err
+			}
 			return sDB.CreateSettings(s, nc)
 		})
 		return nil

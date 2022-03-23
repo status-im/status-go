@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/status-im/status-go/appmetrics"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -33,6 +34,7 @@ type MessengerResponse struct {
 	AnonymousMetrics        []*appmetrics.AppMetric
 	Mailservers             []mailservers.Mailserver
 	Bookmarks               []*browsers.Bookmark
+	Settings                []*settings.SyncSettingField
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -74,6 +76,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		ActivityCenterNotifications []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
 		CurrentStatus               *UserStatus                        `json:"currentStatus,omitempty"`
 		StatusUpdates               []UserStatus                       `json:"statusUpdates,omitempty"`
+		Settings                    []*settings.SyncSettingField       `json:"settings,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -84,19 +87,20 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Mailservers:             r.Mailservers,
 		Bookmarks:               r.Bookmarks,
 		CurrentStatus:           r.currentStatus,
-	}
+		Settings:                r.Settings,
 
-	responseItem.Messages = r.Messages()
-	responseItem.Notifications = r.Notifications()
-	responseItem.Chats = r.Chats()
-	responseItem.Communities = r.Communities()
-	responseItem.CommunitiesSettings = r.CommunitiesSettings()
-	responseItem.RemovedChats = r.RemovedChats()
-	responseItem.RemovedMessages = r.RemovedMessages()
-	responseItem.ClearedHistories = r.ClearedHistories()
-	responseItem.ActivityCenterNotifications = r.ActivityCenterNotifications()
-	responseItem.PinMessages = r.PinMessages()
-	responseItem.StatusUpdates = r.StatusUpdates()
+		Messages:                    r.Messages(),
+		Notifications:               r.Notifications(),
+		Chats:                       r.Chats(),
+		Communities:                 r.Communities(),
+		CommunitiesSettings:         r.CommunitiesSettings(),
+		RemovedChats:                r.RemovedChats(),
+		RemovedMessages:             r.RemovedMessages(),
+		ClearedHistories:            r.ClearedHistories(),
+		ActivityCenterNotifications: r.ActivityCenterNotifications(),
+		PinMessages:                 r.PinMessages(),
+		StatusUpdates:               r.StatusUpdates(),
+	}
 
 	return json.Marshal(responseItem)
 }
@@ -181,6 +185,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Contacts)+
 		len(r.Bookmarks)+
 		len(r.clearedHistories)+
+		len(r.Settings)+
 		len(r.Installations)+
 		len(r.Invitations)+
 		len(r.EmojiReactions)+

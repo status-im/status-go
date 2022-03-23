@@ -55,5 +55,6 @@ message ApplicationMetadataMessage {
     SYNC_ACTIVITY_CENTER_DISMISSED = 39;
     SYNC_BOOKMARK = 40;
     SYNC_CLEAR_HISTORY = 41;
+    SYNC_SETTING = 42;
   }
 }

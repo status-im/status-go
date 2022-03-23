@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-
 	"strings"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -262,10 +262,10 @@ const pathDefaultWallet = pathWalletRoot + "/0"
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*accounts.Settings, error) {
+func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
-	settings := &accounts.Settings{}
+	settings := &settings.Settings{}
 	settings.KeyUID = generatedAccountInfo.KeyUID
 	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
 	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)

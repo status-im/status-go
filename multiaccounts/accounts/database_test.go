@@ -2,82 +2,31 @@ package accounts
 
 import (
 	"database/sql"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
-)
-
-var (
-	config = params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
-
-	networks = json.RawMessage("{}")
-	settings = Settings{
-		Address:                   types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
-		AnonMetricsShouldSend:     false,
-		CurrentNetwork:            "mainnet_rpc",
-		DappsAddress:              types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
-		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:                    "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
-		BackupEnabled:             true,
-		LatestDerivedPath:         0,
-		Name:                      "Jittery Cornflowerblue Kingbird",
-		Networks:                  &networks,
-		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:            false,
-		PublicKey:                 "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
-		SigningPhrase:             "yurt joey vibe",
-		SendPushNotifications:     true,
-		ProfilePicturesShowTo:     ProfilePicturesShowToContactsOnly,
-		ProfilePicturesVisibility: ProfilePicturesVisibilityContactsOnly,
-		DefaultSyncPeriod:         86400,
-		UseMailservers:            true,
-		LinkPreviewRequestEnabled: true,
-		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+	"github.com/status-im/status-go/multiaccounts/errors"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "settings-tests-")
-	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "settings-tests")
-	require.NoError(t, err)
-
-	return NewDB(db), func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
+	db, stop, err := appdatabase.SetupTestSQLDB("settings-tests-")
+	if err != nil {
+		require.NoError(t, stop())
 	}
-}
-
-func TestCreateSettings(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	require.NoError(t, db.CreateSettings(settings, config))
-
-	s, err := db.GetSettings()
 	require.NoError(t, err)
-	require.Equal(t, settings, s)
-}
 
-func TestSaveSetting(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	require.NoError(t, db.CreateSettings(settings, config))
-	require.NoError(t, db.SaveSetting("currency", "usd"))
-
-	_, err := db.GetSettings()
+	d, err := NewDB(db)
+	if err != nil {
+		require.NoError(t, stop())
+	}
 	require.NoError(t, err)
+
+	return d, func() {
+		require.NoError(t, stop())
+	}
 }
 
 func TestSaveAccounts(t *testing.T) {
@@ -100,7 +49,7 @@ func TestSaveAccounts(t *testing.T) {
 				{Address: types.Address{0x01}, Chat: true},
 				{Address: types.Address{0x02}, Chat: true},
 			},
-			err: ErrChatNotUnique,
+			err: errors.ErrChatNotUnique,
 		},
 		{
 			description: "UniqueWallet",
@@ -108,7 +57,7 @@ func TestSaveAccounts(t *testing.T) {
 				{Address: types.Address{0x01}, Wallet: true},
 				{Address: types.Address{0x02}, Wallet: true},
 			},
-			err: ErrWalletNotUnique,
+			err: errors.ErrWalletNotUnique,
 		},
 	} {
 		t.Run(tc.description, func(t *testing.T) {

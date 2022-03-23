@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
@@ -33,8 +33,8 @@ func (c *Contact) CanonicalName() string {
 	return c.Alias
 }
 
-func (c *Contact) CanonicalImage(profilePicturesVisibility accounts.ProfilePicturesVisibilityType) string {
-	if profilePicturesVisibility == accounts.ProfilePicturesVisibilityNone || (profilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly && !c.Added) {
+func (c *Contact) CanonicalImage(profilePicturesVisibility settings.ProfilePicturesVisibilityType) string {
+	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.Added) {
 		return c.Identicon
 	}
 

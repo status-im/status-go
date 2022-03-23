@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -26,7 +27,7 @@ func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interfa
 	return api.db.SaveSetting(typ, val)
 }
 
-func (api *SettingsAPI) GetSettings(ctx context.Context) (accounts.Settings, error) {
+func (api *SettingsAPI) GetSettings(ctx context.Context) (settings.Settings, error) {
 	return api.db.GetSettings()
 }
 

@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -130,7 +130,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
-		WithAppSettings(accounts.Settings{}, params.NodeConfig{}),
+		WithAppSettings(settings.Settings{}, params.NodeConfig{}),
 		WithBrowserDatabase(nil),
 	}
 

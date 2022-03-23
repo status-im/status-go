@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -294,7 +295,10 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	}
 
 	b.account = &acc
-	accountsDB := accounts.NewDB(b.appDB)
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
 	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
@@ -388,7 +392,10 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 	b.account = &acc
-	accountsDB := accounts.NewDB(b.appDB)
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return err
@@ -431,7 +438,10 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 		return err
 	}
 
-	accountDB := accounts.NewDB(b.appDB)
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
 	accounts, err := accountDB.GetAccounts()
 	if err != nil {
 		return err
@@ -535,7 +545,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, settings accounts.Settings, password string, newPassword string) error {
+func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account)
 	if err != nil {
 		return err
@@ -546,23 +556,26 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	accountDB := accounts.NewDB(b.appDB)
-	err = accountDB.SaveSetting("keycard-instance_uid", settings.KeycardInstanceUID)
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("keycard-paired_on", settings.KeycardPAiredOn)
+	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPAiredOn)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("keycard-pairing", settings.KeycardPairing)
+	err = accountDB.SaveSettingField(settings.KeycardPairing, s.KeycardPairing)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSetting("mnemonic", nil)
+	err = accountDB.SaveSettingField(settings.Mnemonic, nil)
 	if err != nil {
 		return err
 	}
@@ -592,7 +605,10 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	accountsDB := accounts.NewDB(b.appDB)
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
 	_, err = accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
@@ -606,7 +622,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
 		return err
@@ -628,7 +644,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	account multiaccounts.Account,
 	password string,
-	settings accounts.Settings,
+	settings settings.Settings,
 	nodecfg *params.NodeConfig,
 	subaccs []accounts.Account,
 ) error {
@@ -647,11 +663,14 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return b.StartNodeWithAccount(account, password, nil)
 }
 
-func (b *GethStatusBackend) saveAccountsAndSettings(settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
+func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	accdb := accounts.NewDB(b.appDB)
-	err := accdb.CreateSettings(settings, *nodecfg)
+	accdb, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	err = accdb.CreateSettings(settings, *nodecfg)
 	if err != nil {
 		return err
 	}
@@ -935,7 +954,11 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
 
-	db := accounts.NewDB(b.appDB)
+	db, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		b.log.Error("failed to create new *Database instance", "error", err)
+		return nil, err
+	}
 	exists, err := db.AddressExists(types.HexToAddress(address))
 	if err != nil {
 		b.log.Error("failed to query db for a given address", "address", address, "error", err)
@@ -1177,7 +1200,11 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		// Init public status api
 		b.statusNode.StatusPublicService().Init(messenger)
 		// Init chat service
-		b.statusNode.ChatService().Init(messenger)
+		accDB, err := accounts.NewDB(b.appDB)
+		if err != nil {
+			return err
+		}
+		b.statusNode.ChatService(accDB).Init(messenger)
 	}
 
 	return nil
@@ -1246,8 +1273,12 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 		return ErrDBNotAvailable
 	}
 
-	accountDB := accounts.NewDB(b.appDB)
-	err := accountDB.SaveSetting("fleet", fleet)
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSetting("fleet", fleet)
 	if err != nil {
 		return err
 	}

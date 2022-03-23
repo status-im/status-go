@@ -183,8 +183,8 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"000001_init.down.db.sql": _000001_initDownDbSql,
-	"000001_init.up.db.sql": _000001_initUpDbSql,
-	"doc.go": docGo,
+	"000001_init.up.db.sql":   _000001_initUpDbSql,
+	"doc.go":                  docGo,
 }
 
 // AssetDir returns the file names below a certain
@@ -226,10 +226,11 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"000001_init.down.db.sql": &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql": &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"000001_init.up.db.sql":   &bintree{_000001_initUpDbSql, map[string]*bintree{}},
+	"doc.go":                  &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory

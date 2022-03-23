@@ -2,22 +2,22 @@ package stickers
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/rpcfilters"
 )
 
 // NewService initializes service instance.
-func NewService(appDB *sql.DB, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *Service {
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
-		appDB:           appDB,
+		accountsDB:      acc,
 		rpcClient:       rpcClient,
 		accountsManager: accountsManager,
 		rpcFiltersSrvc:  rpcFiltersSrvc,
@@ -30,7 +30,7 @@ func NewService(appDB *sql.DB, rpcClient *rpc.Client, accountsManager *account.G
 
 // Service is a browsers service.
 type Service struct {
-	appDB           *sql.DB
+	accountsDB      *accounts.Database
 	rpcClient       *rpc.Client
 	accountsManager *account.GethManager
 	rpcFiltersSrvc  *rpcfilters.Service
@@ -57,7 +57,7 @@ func (s *Service) APIs() []ethRpc.API {
 		{
 			Namespace: "stickers",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.ctx, s.appDB, s.rpcClient, s.accountsManager, s.rpcFiltersSrvc, s.config),
+			Service:   NewAPI(s.ctx, s.accountsDB, s.rpcClient, s.accountsManager, s.rpcFiltersSrvc, s.config),
 		},
 	}
 }

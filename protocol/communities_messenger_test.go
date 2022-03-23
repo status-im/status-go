@@ -18,7 +18,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -86,7 +86,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 	}
 
 	networks := json.RawMessage("{}")
-	settings := accounts.Settings{
+	setting := settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
@@ -108,7 +108,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 
-	_ = m.settings.CreateSettings(settings, config)
+	_ = m.settings.CreateSettings(setting, config)
 
 	return m
 }

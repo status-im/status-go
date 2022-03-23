@@ -35,6 +35,7 @@ import (
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
@@ -382,7 +383,11 @@ func NewMessenger(
 	if err != nil {
 		return nil, err
 	}
-	settings := accounts.NewDB(database)
+
+	settings, err := accounts.NewDB(database)
+	if err != nil {
+		return nil, err
+	}
 
 	mailservers := mailserversDB.NewDB(database)
 	httpServer, err := server.NewServer(database, logger)
@@ -634,6 +639,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	m.startSyncSettingsLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
@@ -968,7 +974,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return err
 	}
 
-	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToNone {
+	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToNone {
 		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
 	}
@@ -1014,7 +1020,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
-	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToContactsOnly {
+	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToContactsOnly {
 		err := EncryptIdentityImagesWithContactPubKeys(ci.Images, m)
 		if err != nil {
 			return err
@@ -2607,6 +2613,11 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 	}
 
+	err = m.syncSettings()
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
@@ -3391,6 +3402,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handleActivityCenterDismissed(messageState, a)
 						if err != nil {
 							logger.Warn("failed to handle SyncActivityCenterDismissed", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncSetting:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						ss := msg.ParsedMessage.Interface().(protobuf.SyncSetting)
+						logger.Debug("Handling SyncSetting", zap.Any("message", ss))
+
+						err := m.handleSyncSetting(messageState.Response, &ss)
+						if err != nil {
+							logger.Warn("failed to handle SyncSetting", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -5280,8 +5307,11 @@ func (m *Messenger) BloomFilter() []byte {
 	return m.transport.BloomFilter()
 }
 
-func (m *Messenger) getSettings() (accounts.Settings, error) {
-	sDB := accounts.NewDB(m.database)
+func (m *Messenger) getSettings() (settings.Settings, error) {
+	sDB, err := accounts.NewDB(m.database)
+	if err != nil {
+		return settings.Settings{}, err
+	}
 	return sDB.GetSettings()
 }
 

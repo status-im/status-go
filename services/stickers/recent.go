@@ -2,6 +2,8 @@ package stickers
 
 import (
 	"encoding/json"
+
+	"github.com/status-im/status-go/multiaccounts/settings"
 )
 
 const maxNumberRecentStickers = 24
@@ -27,8 +29,8 @@ func (api *API) recentStickers() ([]Sticker, error) {
 }
 
 func (api *API) ClearRecent() error {
-	recentStickersList := []Sticker{}
-	return api.accountsDB.SaveSetting("stickers/recent-stickers", recentStickersList)
+	var recentStickersList []Sticker
+	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)
 }
 
 func (api *API) Recent() ([]Sticker, error) {
@@ -73,5 +75,5 @@ func (api *API) AddRecent(sticker Sticker) error {
 		recentStickersList = append([]Sticker{sticker}, recentStickersList...)
 	}
 
-	return api.accountsDB.SaveSetting("stickers/recent-stickers", recentStickersList)
+	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)
 }
