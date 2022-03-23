@@ -152,6 +152,8 @@ func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) er
 	// We connect first so dns4 addresses are resolved (NewStream does not do it)
 	err := wf.h.Connect(wf.ctx, wf.h.Peerstore().PeerInfo(subscriber.peer))
 	if err != nil {
+		wf.subscribers.FlagAsFailure(subscriber.peer)
+		wf.log.Error("failed to connect to peer", err)
 		return err
 	}
 

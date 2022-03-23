@@ -1,7 +1,8 @@
 package pb
 
 import (
-	gcrypto "github.com/ethereum/go-ethereum/crypto"
+	"crypto/sha256"
+
 	proto "github.com/golang/protobuf/proto"
 )
 
@@ -15,7 +16,8 @@ func (msg *WakuMessage) Hash() ([]byte, error) {
 	return Hash(out), nil
 }
 
-// Hash calculates a hash from a byte slice using keccak256 for the hashing algorithm
+// Hash calculates a hash from a byte slice using sha2-256 for the hashing algorithm
 func Hash(data []byte) []byte {
-	return gcrypto.Keccak256(data)
+	hash := sha256.Sum256(data)
+	return hash[:]
 }

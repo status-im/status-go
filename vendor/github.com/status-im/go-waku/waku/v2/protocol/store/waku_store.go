@@ -240,6 +240,15 @@ type WakuStore struct {
 	swap         *swap.WakuSwap
 }
 
+type Store interface {
+	Start(ctx context.Context)
+	Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error)
+	Next(ctx context.Context, r *Result) (*Result, error)
+	Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error)
+	MessageChannel() chan *protocol.Envelope
+	Stop()
+}
+
 // NewWakuStore creates a WakuStore using an specific MessageProvider for storing the messages
 func NewWakuStore(host host.Host, swap *swap.WakuSwap, p MessageProvider, maxNumberOfMessages int, maxRetentionDuration time.Duration, log *zap.SugaredLogger) *WakuStore {
 	wakuStore := new(WakuStore)
@@ -773,6 +782,10 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 	store.log.Info("Retrieved messages since the last online time: ", len(messages))
 
 	return msgCount, nil
+}
+
+func (store *WakuStore) MessageChannel() chan *protocol.Envelope {
+	return store.MsgC
 }
 
 // TODO: queryWithAccounting

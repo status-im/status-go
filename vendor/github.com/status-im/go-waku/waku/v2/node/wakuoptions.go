@@ -27,7 +27,7 @@ import (
 const clientId string = "Go Waku v2 node"
 
 // Default minRelayPeersToPublish
-const defaultMinRelayPeersToPublish = 1
+const defaultMinRelayPeersToPublish = 0
 
 type WakuNodeParameters struct {
 	hostAddr       *net.TCPAddr
@@ -74,6 +74,8 @@ type WakuNodeParameters struct {
 	enableLightPush bool
 
 	connStatusC chan ConnStatus
+
+	storeFactory storeFactory
 }
 
 type WakuNodeOption func(*WakuNodeParameters) error
@@ -241,6 +243,14 @@ func WithWakuStore(shouldStoreMessages bool, shouldResume bool) WakuNodeOption {
 		params.enableStore = true
 		params.storeMsgs = shouldStoreMessages
 		params.shouldResume = shouldResume
+		return nil
+	}
+}
+
+func WithWakuStoreFactory(factory storeFactory) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.storeFactory = factory
+
 		return nil
 	}
 }
