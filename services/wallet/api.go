@@ -266,3 +266,8 @@ func (api *API) FetchPrices(ctx context.Context, symbols []string, currency stri
 	log.Debug("call to FetchPrices")
 	return fetchCryptoComparePrices(symbols, currency)
 }
+
+func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
+	log.Debug("call to GetSuggestedFees")
+	return api.s.feesManager.suggestedFees(ctx, chainID)
+}
