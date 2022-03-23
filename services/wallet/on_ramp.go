@@ -130,7 +130,7 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "description": "The new standard for fiat to crypto",
     "fees": "1%%-4.5%%",
     "logoUrl": "%s",
-    "siteUrl": "https://buy.moonpay.com",
+    "siteUrl": "https://buy.moonpay.com/?apiKey=pk_live_YQC6CQPA5qqDu0unEwHJyAYQyeIqFGR",
     "hostname": "moonpay.com"
   },
   {
