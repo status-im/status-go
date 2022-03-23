@@ -525,12 +525,7 @@ func (db *Database) GetRecentStickers() (rst *json.RawMessage, err error) {
 }
 
 func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
-	jsonString, err := json.Marshal(mailservers)
-	if err != nil {
-		return err
-	}
-
-	return db.SaveSettingField(PinnedMailservers, jsonString)
+	return db.SaveSettingField(PinnedMailservers, mailservers)
 }
 
 func (db *Database) SetUseMailservers(value bool) error {
