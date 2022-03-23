@@ -285,6 +285,7 @@ func (d *DiscoveryV5) UpdateAddr(addr net.IP) error {
 	return nil
 }
 
+/*
 func isWakuNode(node *enode.Node) bool {
 	enrField := new(utils.WakuEnrBitfield)
 	if err := node.Record().Load(enr.WithEntry(utils.WakuENRField, &enrField)); err != nil {
@@ -300,6 +301,7 @@ func isWakuNode(node *enode.Node) bool {
 
 	return false
 }
+*/
 
 func hasTCPPort(node *enode.Node) bool {
 	enrTCP := new(enr.TCP)
@@ -318,7 +320,8 @@ func evaluateNode(node *enode.Node) bool {
 		return false
 	}
 
-	if !isWakuNode(node) || !hasTCPPort(node) {
+	//  TODO: consider node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
+	if /*!isWakuNode(node) ||*/ !hasTCPPort(node) {
 		return false
 	}
 
@@ -362,22 +365,25 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 			break
 		}
 
-		address, err := utils.EnodeToMultiAddr(iterator.Node())
+		addresses, err := utils.Multiaddress(iterator.Node())
 		if err != nil {
 			d.log.Error(err)
 			continue
 		}
 
-		peerInfo, err := peer.AddrInfoFromP2pAddr(address)
+		peerAddrs, err := peer.AddrInfosFromP2pAddrs(addresses...)
 		if err != nil {
 			d.log.Error(err)
 			continue
 		}
 
-		d.peerCache.recs[peerInfo.ID] = peerRecord{
-			expire: time.Now().Unix() + 3600, // Expires in 1hr
-			peer:   *peerInfo,
+		for _, p := range peerAddrs {
+			d.peerCache.recs[p.ID] = peerRecord{
+				expire: time.Now().Unix() + 3600, // Expires in 1hr
+				peer:   p,
+			}
 		}
+
 	}
 
 	close(doneCh)

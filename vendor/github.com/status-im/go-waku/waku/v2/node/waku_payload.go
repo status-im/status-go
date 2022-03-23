@@ -45,7 +45,6 @@ type KeyInfo struct {
 	SymKey  []byte            // If the encryption is Symmetric, a Symmetric key must be specified
 	PubKey  ecdsa.PublicKey   // If the encryption is Asymmetric, the public key of the message receptor must be specified
 	PrivKey *ecdsa.PrivateKey // Set a privkey if the message requires a signature
-
 }
 
 // Encode encodes a payload depending on the version parameter.

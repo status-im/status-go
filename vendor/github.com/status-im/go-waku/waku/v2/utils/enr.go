@@ -144,8 +144,13 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 
 	var multiaddrRaw []byte
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
-		if !enr.IsNotFound(err) {
-			Logger().Error("could not retrieve multiaddress field for node ", zap.Any("enode", node))
+		if enr.IsNotFound(err) {
+			Logger().Debug("Trying to convert enode to multiaddress, since I could not retrieve multiaddress field for node ", zap.Any("enode", node))
+			addr, err := EnodeToMultiAddr(node)
+			if err != nil {
+				return nil, err
+			}
+			return []ma.Multiaddr{addr}, nil
 		}
 		return nil, err
 	}

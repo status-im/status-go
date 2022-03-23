@@ -8,6 +8,9 @@ import (
 	"github.com/status-im/go-waku/waku/v2/utils"
 )
 
+// MaxTimeVariance is the maximum duration in the future allowed for a message timestamp
+const MaxTimeVariance = time.Duration(20) * time.Second
+
 type MessageQueue struct {
 	sync.RWMutex
 
@@ -21,6 +24,8 @@ type MessageQueue struct {
 }
 
 var ErrDuplicatedMessage = errors.New("duplicated message")
+var ErrFutureMessage = errors.New("message timestamp in the future")
+var ErrTooOld = errors.New("message is too old")
 
 func (self *MessageQueue) Push(msg IndexedWakuMessage) error {
 	self.Lock()
@@ -33,10 +38,20 @@ func (self *MessageQueue) Push(msg IndexedWakuMessage) error {
 		return ErrDuplicatedMessage
 	}
 
+	// Ensure that messages don't "jump" to the front of the queue with future timestamps
+	if msg.index.SenderTime-msg.index.ReceiverTime > int64(MaxTimeVariance) {
+		return ErrFutureMessage
+	}
+
 	self.seen[k] = struct{}{}
 	self.messages = append(self.messages, msg)
 
 	if self.maxMessages != 0 && len(self.messages) > self.maxMessages {
+
+		if indexComparison(msg.index, self.messages[0].index) < 0 {
+			return ErrTooOld // :(
+		}
+
 		numToPop := len(self.messages) - self.maxMessages
 		self.messages = self.messages[numToPop:len(self.messages)]
 	}

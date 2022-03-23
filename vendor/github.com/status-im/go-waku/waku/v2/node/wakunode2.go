@@ -44,6 +44,8 @@ type Peer struct {
 	Connected bool
 }
 
+type storeFactory func(w *WakuNode) store.Store
+
 type WakuNode struct {
 	host host.Host
 	opts *WakuNodeParameters
@@ -53,7 +55,7 @@ type WakuNode struct {
 	filter     *filter.WakuFilter
 	lightPush  *lightpush.WakuLightPush
 	rendezvous *rendezvous.RendezvousService
-	store      *store.WakuStore
+	store      store.Store
 	swap       *swap.WakuSwap
 	wakuFlag   utils.WakuEnrBitfield
 
@@ -79,6 +81,12 @@ type WakuNode struct {
 	// Channel passed to WakuNode constructor
 	// receiving connection status notifications
 	connStatusChan chan ConnStatus
+
+	storeFactory storeFactory
+}
+
+func defaultStoreFactory(w *WakuNode) store.Store {
+	return store.NewWakuStore(w.host, w.swap, w.opts.messageProvider, w.opts.maxMessages, w.opts.maxDuration, w.log)
 }
 
 func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
@@ -135,6 +143,12 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.addrChan = make(chan ma.Multiaddr, 1024)
 	w.keepAliveFails = make(map[peer.ID]int)
 	w.wakuFlag = utils.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilter, w.opts.enableStore, w.opts.enableRelay)
+
+	if params.storeFactory != nil {
+		w.storeFactory = params.storeFactory
+	} else {
+		w.storeFactory = defaultStoreFactory
+	}
 
 	if w.protocolEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerProtocolsUpdated)); err != nil {
 		return nil, err
@@ -247,7 +261,7 @@ func (w *WakuNode) Start() error {
 		swap.WithThreshold(w.opts.swapPaymentThreshold, w.opts.swapDisconnectThreshold),
 	}...)
 
-	w.store = store.NewWakuStore(w.host, w.swap, w.opts.messageProvider, w.opts.maxMessages, w.opts.maxDuration, w.log)
+	w.store = w.storeFactory(w)
 	if w.opts.enableStore {
 		w.startStore()
 	}
@@ -298,7 +312,7 @@ func (w *WakuNode) Start() error {
 	// Subscribe store to topic
 	if w.opts.storeMsgs {
 		w.log.Info("Subscribing store to broadcaster")
-		w.bcaster.Register(w.store.MsgC)
+		w.bcaster.Register(w.store.MessageChannel())
 	}
 
 	if w.filter != nil {
@@ -360,7 +374,7 @@ func (w *WakuNode) Relay() *relay.WakuRelay {
 	return w.relay
 }
 
-func (w *WakuNode) Store() *store.WakuStore {
+func (w *WakuNode) Store() store.Store {
 	return w.store
 }
 
@@ -431,6 +445,10 @@ func (w *WakuNode) mountDiscV5() error {
 		discv5.WithBootnodes(w.opts.discV5bootnodes),
 		discv5.WithUDPPort(w.opts.udpPort),
 		discv5.WithAutoUpdate(w.opts.discV5autoUpdate),
+	}
+
+	if w.opts.advertiseAddr != nil {
+		discV5Options = append(discV5Options, discv5.WithAdvertiseAddr(*w.opts.advertiseAddr))
 	}
 
 	addr := w.ListenAddresses()[0]
