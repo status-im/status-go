@@ -261,3 +261,8 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 	log.Debug("call to GetEthereumChains")
 	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }
+
+func (api *API) FetchPrices(ctx context.Context, symbols []string, currency string) (map[string]float64, error) {
+	log.Debug("call to FetchPrices")
+	return fetchCryptoComparePrices(symbols, currency)
+}
