@@ -419,6 +419,46 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	return nil
 }
 
+func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, message protobuf.SyncProfilePictures) error {
+	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
+	if err != nil {
+		return err
+	}
+	dbImageMap := make(map[string]*images.IdentityImage)
+	for _, img := range dbImages {
+		dbImageMap[img.Name] = img
+	}
+	idImages := make([]*images.IdentityImage, len(message.Pictures))
+	i := 0
+	for _, message := range message.Pictures {
+		dbImg := dbImageMap[message.Name]
+		if dbImg != nil && message.Clock <= dbImg.Clock {
+			continue
+		}
+		image := &images.IdentityImage{
+			Name:         message.Name,
+			Payload:      message.Payload,
+			Width:        int(message.Width),
+			Height:       int(message.Height),
+			FileSize:     int(message.FileSize),
+			ResizeTarget: int(message.ResizeTarget),
+			Clock:        message.Clock,
+		}
+		idImages[i] = image
+		i++
+	}
+
+	if i == 0 {
+		return nil
+	}
+
+	err = m.multiAccounts.StoreIdentityImages(message.KeyUid, idImages[:i], false)
+	if err == nil {
+		state.Response.IdentityImages = idImages[:i]
+	}
+	return err
+}
+
 func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) *Chat {
 	chatID := message.Id
 	existingChat, ok := state.AllChats.Load(chatID)

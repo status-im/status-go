@@ -49,7 +49,7 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 		return nil, err
 	}
 
-	err = api.db.StoreIdentityImages(keyUID, iis)
+	err = api.db.StoreIdentityImages(keyUID, iis, true)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]*i
 		return nil, err
 	}
 
-	err = api.db.StoreIdentityImages(keyUID, iis)
+	err = api.db.StoreIdentityImages(keyUID, iis, true)
 	if err != nil {
 		return nil, err
 	}

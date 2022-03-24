@@ -18,6 +18,7 @@ func SampleIdentityImages() []*IdentityImage {
 			Height:       80,
 			FileSize:     256,
 			ResizeTarget: 80,
+			Clock:        0,
 		},
 		{
 			Name:         LargeDimName,
@@ -26,6 +27,7 @@ func SampleIdentityImages() []*IdentityImage {
 			Height:       300,
 			FileSize:     1024,
 			ResizeTarget: 240,
+			Clock:        0,
 		},
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/status-im/status-go/appmetrics"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -35,6 +36,7 @@ type MessengerResponse struct {
 	Mailservers             []mailservers.Mailserver
 	Bookmarks               []*browsers.Bookmark
 	Settings                []*settings.SyncSettingField
+	IdentityImages          []*images.IdentityImage
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -77,18 +79,19 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CurrentStatus               *UserStatus                        `json:"currentStatus,omitempty"`
 		StatusUpdates               []UserStatus                       `json:"statusUpdates,omitempty"`
 		Settings                    []*settings.SyncSettingField       `json:"settings,omitempty"`
+		IdentityImages              []*images.IdentityImage            `json:"identityImages,omitempty"`
 	}{
-		Contacts:                r.Contacts,
-		Installations:           r.Installations,
-		EmojiReactions:          r.EmojiReactions,
-		Invitations:             r.Invitations,
-		CommunityChanges:        r.CommunityChanges,
-		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
-		Mailservers:             r.Mailservers,
-		Bookmarks:               r.Bookmarks,
-		CurrentStatus:           r.currentStatus,
-		Settings:                r.Settings,
-
+		Contacts:                    r.Contacts,
+		Installations:               r.Installations,
+		EmojiReactions:              r.EmojiReactions,
+		Invitations:                 r.Invitations,
+		CommunityChanges:            r.CommunityChanges,
+		RequestsToJoinCommunity:     r.RequestsToJoinCommunity,
+		Mailservers:                 r.Mailservers,
+		Bookmarks:                   r.Bookmarks,
+		CurrentStatus:               r.currentStatus,
+		Settings:                    r.Settings,
+		IdentityImages:              r.IdentityImages,
 		Messages:                    r.Messages(),
 		Notifications:               r.Notifications(),
 		Chats:                       r.Chats(),
@@ -194,6 +197,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedChats)+
 		len(r.removedMessages)+
 		len(r.Mailservers)+
+		len(r.IdentityImages)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
