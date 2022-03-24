@@ -72,7 +72,7 @@ var (
 
 func seedTestDBWithIdentityImages(t *testing.T, db *Database, keyUID string) {
 	iis := images.SampleIdentityImages()
-	require.NoError(t, db.StoreIdentityImages(keyUID, iis))
+	require.NoError(t, db.StoreIdentityImages(keyUID, iis, false))
 }
 
 func TestDatabase_GetIdentityImages(t *testing.T) {
@@ -80,7 +80,7 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 	defer stop()
 	seedTestDBWithIdentityImages(t, db, keyUID)
 
-	expected := `[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]`
+	expected := `[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`
 
 	oiis, err := db.GetIdentityImages(keyUID)
 	require.NoError(t, err)
@@ -108,12 +108,12 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 		{
 			keyUID,
 			images.SmallDimName,
-			`{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}`,
+			`{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}`,
 		},
 		{
 			keyUID,
 			images.LargeDimName,
-			`{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240}`,
+			`{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0}`,
 		},
 		{
 			keyUID2,
@@ -154,7 +154,7 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 		{Name: "string", KeyUID: keyUID2 + "2"},
 		{Name: "string", KeyUID: keyUID2 + "3"},
 	}
-	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]}]`
+	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]}]`
 
 	for _, a := range testAccs {
 		require.NoError(t, db.SaveAccount(a))

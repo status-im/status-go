@@ -1199,7 +1199,11 @@ func (m *Messenger) watchIdentityImageChanges() {
 		for {
 			select {
 			case <-channel:
-				err := m.PublishIdentityImage()
+				err := m.syncProfilePictures()
+				if err != nil {
+					m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
+				}
+				err = m.PublishIdentityImage()
 				if err != nil {
 					m.logger.Error("failed to publish identity image", zap.Error(err))
 				}
@@ -2562,6 +2566,61 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 	return response, nil
 }
 
+func (m *Messenger) syncProfilePictures() error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	keyUID := m.account.KeyUID
+	images, err := m.multiAccounts.GetIdentityImages(keyUID)
+	if err != nil {
+		return err
+	}
+
+	pictures := make([]*protobuf.SyncProfilePicture, len(images))
+	clock, chat := m.getLastClockWithRelatedChat()
+	for i, image := range images {
+		p := &protobuf.SyncProfilePicture{}
+		p.Name = image.Name
+		p.Payload = image.Payload
+		p.Width = uint32(image.Width)
+		p.Height = uint32(image.Height)
+		p.FileSize = uint32(image.FileSize)
+		p.ResizeTarget = uint32(image.ResizeTarget)
+		if image.Clock == 0 {
+			p.Clock = clock
+		} else {
+			p.Clock = image.Clock
+		}
+		pictures[i] = p
+	}
+
+	message := &protobuf.SyncProfilePictures{}
+	message.KeyUid = keyUID
+	message.Pictures = pictures
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
@@ -2650,6 +2709,11 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	}
 
 	err = m.syncSettings()
+	if err != nil {
+		return err
+	}
+
+	err = m.syncProfilePictures()
 	if err != nil {
 		return err
 	}
@@ -3295,6 +3359,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncProfilePictures:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncProfilePictures)
+						logger.Debug("Handling SyncProfilePicture", zap.Any("message", p))
+						err = m.HandleSyncProfilePictures(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncProfilePicture", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

@@ -1,0 +1,1 @@
+ALTER TABLE identity_images ADD COLUMN clock INT NOT NULL DEFAULT 0;

@@ -209,6 +209,9 @@ func (m *StatusMessage) HandleApplication() error {
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_ACCOUNT:
 		return m.unmarshalProtobufData(new(protobuf.SyncInstallationAccount))
 
+	case protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE:
+		return m.unmarshalProtobufData(new(protobuf.SyncProfilePictures))
+
 	case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
 		return m.unmarshalProtobufData(new(protobuf.PairInstallation))
 
