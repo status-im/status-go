@@ -171,7 +171,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		}
 
 		for _, chat := range channels {
-			if chat.CommunityID == community.IDString() {
+			if chat.CommunityID == community.IDString() && chat.Active {
 				c, err := api.toAPIChat(chat, community, pubKey)
 				if err != nil {
 					return nil, err
@@ -285,10 +285,6 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 	}
 	chat.Members = chatMembers
 
-	if chat.CommunityID == "" {
-		chat.CommunityID = pubKey
-	}
-
 	return chat, nil
 }
 
@@ -340,7 +336,8 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 
 	commChat, exists := community.Chats()[chat.ID]
 	if !exists {
-		return ErrChatNotFound
+		// Skip unknown community chats. They might be channels that were deleted
+		return nil
 	}
 
 	canPost, err := community.CanMemberIdentityPost(chat.ID)
@@ -353,7 +350,6 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	chat.Permissions = commChat.Permissions
 	chat.Emoji = commChat.Identity.Emoji
 	chat.Name = commChat.Identity.DisplayName
-	chat.Color = commChat.Identity.Color
 	chat.Description = commChat.Identity.Description
 	chat.CanPost = canPost
 
