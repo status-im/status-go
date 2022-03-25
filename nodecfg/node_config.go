@@ -325,8 +325,8 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
-	insertFNs := []insertFn{
+func nodeConfigUpgradeInserts() []insertFn {
+	return []insertFn{
 		insertNodeConfig,
 		insertHTTPConfig,
 		insertIPCConfig,
@@ -343,10 +343,11 @@ func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
 		insertShhExtConfig,
 		insertWakuConfig,
 		insertWakuV2Config,
-		insertTorrentConfig,
 	}
+}
 
-	for _, fn := range insertFNs {
+func execInsertFns(inFn []insertFn, tx *sql.Tx, c *params.NodeConfig) error {
+	for _, fn := range inFn {
 		err := fn(tx, c)
 		if err != nil {
 			return err
@@ -354,6 +355,18 @@ func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
 	}
 
 	return nil
+}
+
+func insertNodeConfigUpgrade(tx *sql.Tx, c *params.NodeConfig) error {
+	return execInsertFns(nodeConfigUpgradeInserts(), tx, c)
+}
+
+func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
+	insertFNs := append(nodeConfigUpgradeInserts(),
+		insertTorrentConfig,
+	)
+
+	return execInsertFns(insertFNs, tx, c)
 }
 
 func SaveNodeConfig(db *sql.DB, c *params.NodeConfig) error {
@@ -387,7 +400,7 @@ func migrateNodeConfig(tx *sql.Tx) error {
 		return nil
 	}
 
-	err = SaveConfigWithTx(tx, nodecfg)
+	err = insertNodeConfigUpgrade(tx, nodecfg)
 	if err != nil {
 		return err
 	}
