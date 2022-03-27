@@ -136,7 +136,7 @@ func TestInitProtocol(t *testing.T) {
 
 	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
-	err = service.InitProtocol("Test", privateKey, sqlDB, multiAccounts, acc, zap.NewNop())
+	err = service.InitProtocol("Test", privateKey, sqlDB, nil, multiAccounts, acc, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -201,7 +201,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 
 	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
-	err = service.InitProtocol("Test", privateKey, sqlDB, multiAccounts, acc, zap.NewNop())
+	err = service.InitProtocol("Test", privateKey, sqlDB, nil, multiAccounts, acc, zap.NewNop())
 	s.NoError(err)
 
 	stack.RegisterLifecycle(service)

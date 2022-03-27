@@ -313,6 +313,8 @@ type NodeConfig struct {
 	// NetworkID sets network to use for selecting peers to connect to
 	NetworkID uint64 `json:"NetworkId" validate:"required"`
 
+	RootDataDir string `json:"-"`
+
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string `validate:"required"`
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 
 	"go.uber.org/zap"
@@ -68,6 +69,7 @@ type config struct {
 	clusterConfig       params.ClusterConfig
 	browserDatabase     *browsers.Database
 	torrentConfig       *params.TorrentConfig
+	httpServer          *server.Server
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -272,6 +274,13 @@ func WithClusterConfig(cc params.ClusterConfig) Option {
 func WithTorrentConfig(tc *params.TorrentConfig) Option {
 	return func(c *config) error {
 		c.torrentConfig = tc
+		return nil
+	}
+}
+
+func WithHTTPServer(s *server.Server) Option {
+	return func(c *config) error {
+		c.httpServer = s
 		return nil
 	}
 }

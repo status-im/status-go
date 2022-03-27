@@ -137,6 +137,8 @@ type Message struct {
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
+	// StickerLocalURL is the local url of the sticker
+	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
@@ -176,12 +178,16 @@ func (m *Message) PrepareServerURLs(port int) {
 	if m.ContentType == protobuf.ChatMessage_AUDIO {
 		m.AudioLocalURL = fmt.Sprintf("https://localhost:%d/messages/audio?messageId=%s", port, m.ID)
 	}
+	if m.ContentType == protobuf.ChatMessage_STICKER {
+		m.StickerLocalURL = fmt.Sprintf("https://localhost:%d/ipfs?hash=%s", port, m.GetSticker().Hash)
+	}
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
 	type StickerAlias struct {
 		Hash string `json:"hash"`
 		Pack int32  `json:"pack"`
+		URL  string `json:"url"`
 	}
 	item := struct {
 		ID                string                           `json:"id"`
@@ -258,6 +264,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		item.Sticker = &StickerAlias{
 			Pack: sticker.Pack,
 			Hash: sticker.Hash,
+			URL:  m.StickerLocalURL,
 		}
 	}
 

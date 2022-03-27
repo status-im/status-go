@@ -40,10 +40,7 @@ func (api *API) Recent() ([]Sticker, error) {
 	}
 
 	for i, sticker := range recentStickersList {
-		sticker.URL, err = decodeStringHash(sticker.Hash)
-		if err != nil {
-			return nil, err
-		}
+		sticker.URL = api.hashToURL(sticker.Hash)
 		recentStickersList[i] = sticker
 	}
 

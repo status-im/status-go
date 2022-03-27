@@ -19,7 +19,7 @@ import (
 
 func (api *API) getSigner(chainID uint64, from types.Address, password string) bind.SignerFn {
 	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
-		selectedAccount, err := api.accountsManager.VerifyAccountPassword(api.config.KeyStoreDir, from.Hex(), password)
+		selectedAccount, err := api.accountsManager.VerifyAccountPassword(api.keyStoreDir, from.Hex(), password)
 		if err != nil {
 			return nil, err
 		}
