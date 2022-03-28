@@ -63,25 +63,39 @@ func NewDownloader(rootDir string) *Downloader {
 }
 
 func (d *Downloader) Stop() {
+	close(d.quit)
 	close(d.rateLimiterChan)
 	close(d.inputTaskChan)
 }
 
 func (d *Downloader) worker() {
-	for request := range d.rateLimiterChan {
-		resp, err := d.download(request.cid, request.download)
-		request.doneChan <- taskResponse{
-			err:      err,
-			response: resp,
+	for {
+		select {
+		case <-d.quit:
+			return
+		case request := <-d.rateLimiterChan:
+			resp, err := d.download(request.cid, request.download)
+			request.doneChan <- taskResponse{
+				err:      err,
+				response: resp,
+			}
 		}
 	}
 }
 
 func (d *Downloader) taskDispatcher() {
-	rate := time.Tick(time.Second / maxRequestsPerSecond)
-	for range rate {
-		request := <-d.inputTaskChan
-		d.rateLimiterChan <- request
+	ticker := time.NewTicker(time.Second / maxRequestsPerSecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-d.quit:
+			return
+		case <-ticker.C:
+			request := <-d.inputTaskChan
+			d.rateLimiterChan <- request
+
+		}
 	}
 }
 

@@ -665,9 +665,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	err = m.httpServer.Start()
-	if err != nil {
-		return nil, err
+	if m.httpServer != nil {
+		err = m.httpServer.Start()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return response, nil
@@ -4045,18 +4047,21 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		}
 
 	}
-	for idx := range msgs {
-		msgs[idx].PrepareServerURLs(m.httpServer.Port)
+	if m.httpServer != nil {
+		for idx := range msgs {
+			msgs[idx].PrepareServerURLs(m.httpServer.Port)
+		}
 	}
 
 	return msgs, nextCursor, nil
 }
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
-	for idx := range messages {
-		messages[idx].PrepareServerURLs(m.httpServer.Port)
+	if m.httpServer != nil {
+		for idx := range messages {
+			messages[idx].PrepareServerURLs(m.httpServer.Port)
+		}
 	}
-
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
