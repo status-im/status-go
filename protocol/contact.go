@@ -101,7 +101,6 @@ func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
 
 func (c *Contact) Block() {
 	c.Blocked = true
-	c.Added = false
 }
 
 func (c *Contact) Unblock() {

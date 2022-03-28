@@ -353,8 +353,6 @@ func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
 	for _, chat := range chats {
 		m.allChats.Store(chat.ID, chat)
 	}
-	m.allChats.Delete(contact.ID)
-	m.allChats.Delete(buildProfileChatID(contact.ID))
 
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {

@@ -1539,25 +1539,8 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 		_ = tx.Rollback()
 	}()
 
-	// Delete messages
-	_, err = tx.Exec(
-		`DELETE
-		 FROM user_messages
-		 WHERE source = ?`,
-		contact.ID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	// Update contact
 	err = db.SaveContact(contact, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Delete one-to-one chat
-	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", contact.ID)
 	if err != nil {
 		return nil, err
 	}
