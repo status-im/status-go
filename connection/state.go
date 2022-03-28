@@ -9,17 +9,17 @@ import (
 //
 // Zero value represents default assumption about network (online and unknown type).
 type State struct {
-	Offline   bool           `json:"offline"`
-	Type      connectionType `json:"type"`
-	Expensive bool           `json:"expensive"`
+	Offline   bool `json:"offline"`
+	Type      Type `json:"type"`
+	Expensive bool `json:"expensive"`
 }
 
-// connectionType represents description of available
+// Type represents description of available
 // connection types as reported by React Native (see
 // https://facebook.github.io/react-native/docs/netinfo.html)
 // We're interested mainly in 'wifi' and 'cellular', but
 // other types are also may be used.
-type connectionType byte
+type Type byte
 
 const (
 	Offline  = "offline"
@@ -29,8 +29,8 @@ const (
 	None     = "none"
 )
 
-// NewConnectionType creates new connectionType from string.
-func NewConnectionType(s string) connectionType {
+// NewType creates new Type from string.
+func NewType(s string) Type {
 	switch s {
 	case Cellular:
 		return connectionCellular
@@ -41,11 +41,11 @@ func NewConnectionType(s string) connectionType {
 	return connectionUnknown
 }
 
-// ConnectionType constants
+// Type constants
 const (
-	connectionUnknown  connectionType = iota
-	connectionCellular                // cellular, LTE, 4G, 3G, EDGE, etc.
-	connectionWifi                    // WIFI or iOS simulator
+	connectionUnknown  Type = iota
+	connectionCellular      // cellular, LTE, 4G, 3G, EDGE, etc.
+	connectionWifi          // WIFI or iOS simulator
 )
 
 func (c State) IsExpensive() bool {

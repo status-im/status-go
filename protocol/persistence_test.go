@@ -29,7 +29,7 @@ func TestTableUserMessagesAllFieldsCount(t *testing.T) {
 func TestSaveMessages(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	for i := 0; i < 10; i++ {
 		id := strconv.Itoa(i)
@@ -45,7 +45,7 @@ func TestSaveMessages(t *testing.T) {
 func TestMessagesByIDs(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	var ids []string
 	for i := 0; i < 10; i++ {
@@ -63,7 +63,7 @@ func TestMessagesByIDs(t *testing.T) {
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -77,7 +77,7 @@ func TestMessageByID(t *testing.T) {
 func TestMessagesExist(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	err = insertMinimalMessage(p, "1")
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestMessagesExist(t *testing.T) {
 func TestMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	chatID := testPublicChatID
 	count := 1000
 	pageSize := 50
@@ -308,7 +308,7 @@ func TestPinMessageByChatID(t *testing.T) {
 func TestMessageReplies(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	chatID := testPublicChatID
 	message1 := &common.Message{
 		ID:          "id-1",
@@ -363,7 +363,7 @@ func TestMessageReplies(t *testing.T) {
 func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	chatID := testPublicChatID
 	clockValues := []uint64{10, 10, 9, 9, 9, 11, 12, 11, 100000, 6, 4, 5, 5, 5, 5}
 	count := len(clockValues)
@@ -423,7 +423,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 func TestDeleteMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -443,7 +443,7 @@ func TestDeleteMessageByID(t *testing.T) {
 func TestDeleteMessagesByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	err = insertMinimalMessage(p, "1")
 	require.NoError(t, err)
@@ -468,7 +468,7 @@ func TestMarkMessageSeen(t *testing.T) {
 	chatID := "test-chat"
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -491,7 +491,7 @@ func TestMarkMessageSeen(t *testing.T) {
 func TestUpdateMessageOutgoingStatus(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -508,7 +508,7 @@ func TestUpdateMessageOutgoingStatus(t *testing.T) {
 func TestMessagesIDsByType(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	ids, err := p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 	require.NoError(t, err)
@@ -536,7 +536,7 @@ func TestMessagesIDsByType(t *testing.T) {
 func TestExpiredMessagesIDs(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	ids, err := p.ExpiredMessagesIDs(messageResendMaxCount)
 	require.NoError(t, err)
@@ -568,7 +568,7 @@ func TestExpiredMessagesIDs(t *testing.T) {
 func TestPersistenceEmojiReactions(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	// reverse order as we use DESC
 	id1 := "1"
 	id2 := "2"
@@ -695,7 +695,7 @@ func minimalRawMessage(id string, messageType protobuf.ApplicationMetadataMessag
 func TestMessagesAudioDurationMsNull(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	id := "message-id-1"
 
 	err = insertMinimalMessage(p, id)
@@ -716,7 +716,7 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 func TestSaveChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	chat.LastMessage = &common.Message{}
@@ -732,7 +732,7 @@ func TestSaveMentions(t *testing.T) {
 	chatID := testPublicChatID
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -760,7 +760,7 @@ func TestSaveMentions(t *testing.T) {
 func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	chatID := "0xabcd1234"
 	hash := []byte{0x1}
@@ -788,7 +788,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 func TestSaveContactIdentityImage(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -837,7 +837,7 @@ func TestSaveLinks(t *testing.T) {
 	chatID := testPublicChatID
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	require.NoError(t, err)
 
@@ -863,7 +863,7 @@ func TestSaveLinks(t *testing.T) {
 func TestHideMessage(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	chatID := testPublicChatID
 	message := &common.Message{
 		ID:          "id-1",
@@ -894,7 +894,7 @@ func TestHideMessage(t *testing.T) {
 func TestDeactivatePublicChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	publicChatID := "public-chat-id"
 	var currentClockValue uint64 = 10
 
@@ -962,7 +962,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 	var currentClockValue uint64 = 10
 
 	timesource := &testTimeSource{}
@@ -1038,7 +1038,7 @@ func TestConfirmations(t *testing.T) {
 
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	confirmation1 := &common.RawMessageConfirmation{
 		DataSyncID: dataSyncID1,
@@ -1101,7 +1101,7 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	confirmation1 := &common.RawMessageConfirmation{
 		DataSyncID: dataSyncID1,
@@ -1142,7 +1142,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	message := &common.Message{}
@@ -1279,7 +1279,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 func TestSaveCommunityChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	identity := &protobuf.ChatIdentity{
 		DisplayName: "community-chat-name",
@@ -1307,7 +1307,7 @@ func TestSaveCommunityChat(t *testing.T) {
 func TestHasPendingNotificationsForChatSanityCheck(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := NewSQLitePersistence(db)
+	p := newSQLitePersistence(db)
 
 	result, err := p.HasPendingNotificationsForChat("test-chat-id")
 	require.NoError(t, err)

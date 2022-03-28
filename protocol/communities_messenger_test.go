@@ -567,6 +567,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	}
 
 	response, err = s.bob.CreateCommunityCategory(category)
+	s.Require().NoError(err)
 	community = response.Communities()[0]
 
 	privateKey, err := s.bob.ExportCommunity(community.ID())

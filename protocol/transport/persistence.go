@@ -15,7 +15,8 @@ func newSQLitePersistence(db *sql.DB, tableName string) *SqlitePersistence {
 }
 
 func (s *SqlitePersistence) Add(chatID string, key []byte) error {
-	statement := fmt.Sprintf("INSERT INTO %s(chat_id, key) VALUES(?, ?)", s.tableName)
+	// tableName controlled by us
+	statement := fmt.Sprintf("INSERT INTO %s(chat_id, key) VALUES(?, ?)", s.tableName) // nolint:gosec
 	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return err
@@ -29,7 +30,8 @@ func (s *SqlitePersistence) Add(chatID string, key []byte) error {
 func (s *SqlitePersistence) All() (map[string][]byte, error) {
 	keys := make(map[string][]byte)
 
-	statement := fmt.Sprintf("SELECT chat_id, key FROM %s", s.tableName)
+	// tableName controlled by us
+	statement := fmt.Sprintf("SELECT chat_id, key FROM %s", s.tableName) // nolint: gosec
 
 	stmt, err := s.db.Prepare(statement)
 	if err != nil {

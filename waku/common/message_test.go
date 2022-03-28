@@ -444,7 +444,7 @@ func TestPaddingAppendedToSymMessagesWithSignature(t *testing.T) {
 	// Simulate a message with a payload just under 256 so that
 	// payload + flag + signature > 256. Check that the result
 	// is padded on the next 256 boundary.
-	msg := sentMessage{}
+	msg := SentMessage{}
 	const payloadSizeFieldMinSize = 1
 	msg.Raw = make([]byte, flagsLength+payloadSizeFieldMinSize+len(params.Payload))
 

@@ -100,7 +100,8 @@ func TestCommunitiesMigrationNotDirty(t *testing.T) {
 	require.Error(t, err)
 
 	// Set dirty to false
-	_, err = db.Exec(`UPDATE ` + migrationsTable + ` SET dirty = 0`)
+	// Disabling linter as migrationsTable is controlled by us
+	_, err = db.Exec(`UPDATE ` + migrationsTable + ` SET dirty = 0`) // nolint: gosec
 	require.NoError(t, err)
 
 	// Version and dirty should be true and set to communities migration

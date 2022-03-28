@@ -714,7 +714,8 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 
 	allFields := db.tableUserMessagesAllFieldsJoin()
 
-	finalQuery := fmt.Sprintf(`
+	finalQuery := fmt.Sprintf( // nolint: gosec
+		`
 		SELECT
 			%s,
 			substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor

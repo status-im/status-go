@@ -61,7 +61,7 @@ func (e *Envelope) rlpWithoutNonce() []byte {
 
 // NewEnvelope wraps a Waku message with expiration and destination data
 // included into an envelope for network forwarding.
-func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage, now time.Time) *Envelope {
+func NewEnvelope(ttl uint32, topic TopicType, msg *SentMessage, now time.Time) *Envelope {
 	env := Envelope{
 		Expiry: uint32(now.Add(time.Second * time.Duration(ttl)).Unix()),
 		TTL:    ttl,
