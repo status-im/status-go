@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/json"
 
 	"go.uber.org/zap"
 
@@ -87,6 +88,10 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *
 	}
 	if err != nil {
 		return err
+	}
+
+	if v, ok := value.([]byte); ok {
+		value = json.RawMessage(v)
 	}
 
 	response.Settings = append(response.Settings, &settings.SyncSettingField{SettingField: sf, Value: value})
