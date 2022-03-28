@@ -93,7 +93,8 @@ func CreateTable(db *sql.DB, tableName string) error {
 }
 
 func Clean(db *sql.DB, tableName string) error {
-	sqlStmt := fmt.Sprintf("DELETE FROM %s;", tableName)
+	// This is fully controlled by us
+	sqlStmt := fmt.Sprintf("DELETE FROM %s;", tableName) // nolint: gosec
 	_, err := db.Exec(sqlStmt)
 	if err != nil {
 		return err

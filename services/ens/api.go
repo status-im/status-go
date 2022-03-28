@@ -43,7 +43,7 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 	}
 }
 
-type uri struct {
+type URI struct {
 	Scheme string
 	Host   string
 	Path   string
@@ -450,7 +450,7 @@ func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs tr
 	return ethClient.EstimateGas(ctx, callMsg)
 }
 
-func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*uri, error) {
+func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*URI, error) {
 	scheme := "https"
 	contentHash, err := api.ContentHash(ctx, chainID, username)
 	if err != nil {
@@ -458,7 +458,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 	}
 
 	if len(contentHash) == 0 {
-		return &uri{}, nil
+		return &URI{}, nil
 	}
 
 	data, codec, err := multicodec.RemoveCodec(contentHash)
@@ -481,7 +481,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 			return nil, errors.Wrap(err, "failed to obtain base36 representation")
 		}
 		host := str + ".ipfs.infura-ipfs.io/"
-		return &uri{scheme, host, ""}, nil
+		return &URI{scheme, host, ""}, nil
 	case "ipns-ns":
 		id, offset := binary.Uvarint(data)
 		if id == 0 {
@@ -497,7 +497,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 			return nil, err
 		}
 
-		return &uri{scheme, string(decodedMHash.Digest), ""}, nil
+		return &URI{scheme, string(decodedMHash.Digest), ""}, nil
 	case "swarm-ns":
 		id, offset := binary.Uvarint(data)
 		if id == 0 {
@@ -512,7 +512,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 			return nil, err
 		}
 		path := "/bzz:/" + hex.EncodeToString(decodedMHash.Digest) + "/"
-		return &uri{scheme, "swarm-gateways.net", path}, nil
+		return &URI{scheme, "swarm-gateways.net", path}, nil
 	default:
 		return nil, fmt.Errorf("unknown codec name %s", codecName)
 	}

@@ -53,7 +53,7 @@ type MessageParams struct {
 // SentMessage represents an end-user data packet to transmit through the
 // Waku protocol. These are wrapped into Envelopes that need not be
 // understood by intermediate nodes, just forwarded.
-type sentMessage struct {
+type SentMessage struct {
 	Raw []byte
 }
 
@@ -148,9 +148,9 @@ func (msg *ReceivedMessage) isAsymmetricEncryption() bool {
 }
 
 // NewSentMessage creates and initializes a non-signed, non-encrypted Waku message.
-func NewSentMessage(params *MessageParams) (*sentMessage, error) {
+func NewSentMessage(params *MessageParams) (*SentMessage, error) {
 	const payloadSizeFieldMaxSize = 4
-	msg := sentMessage{}
+	msg := SentMessage{}
 	msg.Raw = make([]byte, 1,
 		flagsLength+payloadSizeFieldMaxSize+len(params.Payload)+len(params.Padding)+signatureLength+padSizeLimit)
 	msg.Raw[0] = 0 // set all the flags to zero
@@ -161,7 +161,7 @@ func NewSentMessage(params *MessageParams) (*sentMessage, error) {
 }
 
 // addPayloadSizeField appends the auxiliary field containing the size of payload
-func (msg *sentMessage) addPayloadSizeField(payload []byte) {
+func (msg *SentMessage) addPayloadSizeField(payload []byte) {
 	fieldSize := getSizeOfPayloadSizeField(payload)
 	field := make([]byte, 4)
 	binary.LittleEndian.PutUint32(field, uint32(len(payload)))
@@ -181,7 +181,7 @@ func getSizeOfPayloadSizeField(payload []byte) int {
 
 // appendPadding appends the padding specified in params.
 // If no padding is provided in params, then random padding is generated.
-func (msg *sentMessage) appendPadding(params *MessageParams) error {
+func (msg *SentMessage) appendPadding(params *MessageParams) error {
 	if len(params.Padding) != 0 {
 		// padding data was provided by the Dapp, just use it as is
 		msg.Raw = append(msg.Raw, params.Padding...)
@@ -208,7 +208,7 @@ func (msg *sentMessage) appendPadding(params *MessageParams) error {
 
 // sign calculates and sets the cryptographic signature for the message,
 // also setting the sign flag.
-func (msg *sentMessage) sign(key *ecdsa.PrivateKey) error {
+func (msg *SentMessage) sign(key *ecdsa.PrivateKey) error {
 	if IsMessageSigned(msg.Raw[0]) {
 		// this should not happen, but no reason to panic
 		log.Error("failed to sign the message: already signed")
@@ -227,7 +227,7 @@ func (msg *sentMessage) sign(key *ecdsa.PrivateKey) error {
 }
 
 // encryptAsymmetric encrypts a message with a public key.
-func (msg *sentMessage) encryptAsymmetric(key *ecdsa.PublicKey) error {
+func (msg *SentMessage) encryptAsymmetric(key *ecdsa.PublicKey) error {
 	if !ValidatePublicKey(key) {
 		return errors.New("invalid public key provided for asymmetric encryption")
 	}
@@ -240,7 +240,7 @@ func (msg *sentMessage) encryptAsymmetric(key *ecdsa.PublicKey) error {
 
 // encryptSymmetric encrypts a message with a topic key, using AES-GCM-256.
 // nonce size should be 12 bytes (see cipher.gcmStandardNonceSize).
-func (msg *sentMessage) encryptSymmetric(key []byte) (err error) {
+func (msg *SentMessage) encryptSymmetric(key []byte) (err error) {
 	if !ValidateDataIntegrity(key, AESKeyLength) {
 		return errors.New("invalid key provided for symmetric encryption, size: " + strconv.Itoa(len(key)))
 	}
@@ -262,7 +262,7 @@ func (msg *sentMessage) encryptSymmetric(key []byte) (err error) {
 }
 
 // Wrap bundles the message into an Envelope to transmit over the network.
-func (msg *sentMessage) Wrap(options *MessageParams, now time.Time) (envelope *Envelope, err error) {
+func (msg *SentMessage) Wrap(options *MessageParams, now time.Time) (envelope *Envelope, err error) {
 	if options.TTL == 0 {
 		options.TTL = DefaultTTL
 	}

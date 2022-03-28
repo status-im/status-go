@@ -88,7 +88,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
-			if accountKey == nil {
+			if accountKey == nil { // nolint: staticcheck
 				require.Fail(t, "no error reported, but account key is missing")
 			}
 			accountAddress := types.BytesToAddress(types.FromHex(testCase.address))

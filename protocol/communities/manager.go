@@ -913,7 +913,7 @@ func (m *Manager) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error {
 	return m.persistence.SetPrivateKey(id, privKey)
 }
 
-func (m *Manager) GetSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
+func (m *Manager) GetSyncedRawCommunity(id []byte) (*RawCommunityRow, error) {
 	return m.persistence.getSyncedRawCommunity(id)
 }
 

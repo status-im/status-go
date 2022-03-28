@@ -369,7 +369,7 @@ func NewMessenger(
 		pushNotificationClientConfig = &pushnotificationclient.Config{}
 	}
 
-	sqlitePersistence := NewSQLitePersistence(database)
+	sqlitePersistence := newSQLitePersistence(database)
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
 	pushNotificationClientConfig.Logger = logger

@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-type rawCommunityRow struct {
+type RawCommunityRow struct {
 	ID          []byte
 	PrivateKey  []byte
 	Description []byte
@@ -16,8 +16,8 @@ type rawCommunityRow struct {
 	Muted       bool
 }
 
-func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommunityRow {
-	return rawCommunityRow{
+func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommunityRow {
+	return RawCommunityRow{
 		ID:          syncCommProto.Id,
 		PrivateKey:  syncCommProto.PrivateKey,
 		Description: syncCommProto.Description,
@@ -28,8 +28,8 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) rawCommuni
 	}
 }
 
-func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (*rawCommunityRow, error) {
-	rcr := new(rawCommunityRow)
+func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (*RawCommunityRow, error) {
+	rcr := new(RawCommunityRow)
 	syncedAt := sql.NullTime{}
 
 	err := rowScan(
@@ -52,7 +52,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 	return rcr, nil
 }
 
-func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error) {
+func (p *Persistence) getAllCommunitiesRaw() (rcrs []*RawCommunityRow, err error) {
 	var rows *sql.Rows
 	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
 	rows, err = p.db.Query(`SELECT * FROM communities_communities`)
@@ -81,19 +81,19 @@ func (p *Persistence) getAllCommunitiesRaw() (rcrs []*rawCommunityRow, err error
 	return rcrs, nil
 }
 
-func (p *Persistence) getRawCommunityRow(id []byte) (*rawCommunityRow, error) {
+func (p *Persistence) getRawCommunityRow(id []byte) (*RawCommunityRow, error) {
 	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ?`, id)
 	return p.scanRowToStruct(qr.Scan)
 }
 
-func (p *Persistence) getSyncedRawCommunity(id []byte) (*rawCommunityRow, error) {
+func (p *Persistence) getSyncedRawCommunity(id []byte) (*RawCommunityRow, error) {
 	// Keep "*", if the db table is updated, syncing needs to match, this fail will force us to update syncing.
 	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > 0`, id)
 	return p.scanRowToStruct(qr.Scan)
 }
 
-func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
+func (p *Persistence) saveRawCommunityRow(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
 		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "synced_at", "muted") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,
@@ -107,7 +107,7 @@ func (p *Persistence) saveRawCommunityRow(rawCommRow rawCommunityRow) error {
 	return err
 }
 
-func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow rawCommunityRow) error {
+func (p *Persistence) saveRawCommunityRowWithoutSyncedAt(rawCommRow RawCommunityRow) error {
 	_, err := p.db.Exec(
 		`INSERT INTO communities_communities ("id", "private_key", "description", "joined", "verified", "muted") VALUES (?, ?, ?, ?, ?, ?)`,
 		rawCommRow.ID,

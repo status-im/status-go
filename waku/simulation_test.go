@@ -212,7 +212,7 @@ func initializeBloomFilterMode(t *testing.T) {
 			},
 		}
 
-		go startServer(t, node.server) // nolint: staticcheck
+		go startServer(t, node.server) // nolint: staticcheck, govet
 
 		nodes[i] = &node
 	}
@@ -232,7 +232,7 @@ func initializeBloomFilterMode(t *testing.T) {
 func startServer(t *testing.T, s *p2p.Server) {
 	err := s.Start()
 	if err != nil {
-		t.Fatalf("failed to start the first server. err: %v", err)
+		t.Fatalf("failed to start the first server. err: %v", err) // nolint: staticcheck
 	}
 
 	atomic.AddInt64(&result.started, 1)
