@@ -239,7 +239,7 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 	}
 	in = in[:len(in)-1] + ")"
 
-	update, err = tx.Prepare("UPDATE app_metrics SET processed = 1 WHERE id IN " + in)
+	update, err = tx.Prepare("UPDATE app_metrics SET processed = 1 WHERE id IN " + in) // nolint: gosec
 	if err != nil {
 		return err
 	}

@@ -44,9 +44,9 @@ func TestGetExistingHistory(t *testing.T) {
 func TestNewHistoryRequest(t *testing.T) {
 	store := createInMemStore(t)
 	id := types.Hash{1}
-	req, err := store.GetRequest(id)
+	_, err := store.GetRequest(id)
 	require.Error(t, err)
-	req = store.NewRequest()
+	req := store.NewRequest()
 	req.ID = id
 
 	th, err := store.GetHistory(types.TopicType{1}, time.Hour)

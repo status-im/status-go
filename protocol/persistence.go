@@ -28,7 +28,7 @@ type sqlitePersistence struct {
 	db *sql.DB
 }
 
-func NewSQLitePersistence(db *sql.DB) *sqlitePersistence {
+func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
 	return &sqlitePersistence{common.NewRawMessagesPersistence(db), db}
 }
 

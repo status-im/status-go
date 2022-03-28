@@ -1022,7 +1022,7 @@ func (b *GethStatusBackend) ConnectionChange(typ string, expensive bool) {
 	defer b.mu.Unlock()
 
 	state := connection.State{
-		Type:      connection.NewConnectionType(typ),
+		Type:      connection.NewType(typ),
 		Expensive: expensive,
 	}
 	if typ == connection.None {
