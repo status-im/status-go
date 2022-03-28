@@ -41,7 +41,7 @@ type Downloader struct {
 
 func NewDownloader(rootDir string) *Downloader {
 	ipfsDir := filepath.Clean(filepath.Join(rootDir, "./ipfs"))
-	if err := os.MkdirAll(ipfsDir, 0700); err != nil {
+	if err := os.MkdirAll(ipfsDir, 0600); err != nil {
 		panic("could not create IPFSDir")
 	}
 
@@ -197,7 +197,7 @@ func (d *Downloader) download(cid string, download bool) ([]byte, error) {
 	}
 
 	if download {
-		err = os.WriteFile(path, fileContent, 0700)
+		err = os.WriteFile(path, fileContent, 0600)
 		if err != nil {
 			return nil, err
 		}
