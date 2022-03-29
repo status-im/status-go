@@ -211,6 +211,7 @@ func (d *Downloader) download(cid string, download bool) ([]byte, error) {
 	}
 
 	if download {
+		// #nosec G306
 		err = os.WriteFile(path, fileContent, 0700)
 		if err != nil {
 			return nil, err
