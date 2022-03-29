@@ -32,6 +32,7 @@ func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, open
 		transferController:    transferController,
 		cryptoOnRampManager:   cryptoOnRampManager,
 		openseaAPIKey:         openseaAPIKey,
+		feesManager:           &FeeManager{rpcClient},
 	}
 }
 
@@ -44,6 +45,7 @@ type Service struct {
 	favouriteManager      *FavouriteManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
+	feesManager           *FeeManager
 	started               bool
 	openseaAPIKey         string
 }
