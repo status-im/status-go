@@ -567,10 +567,6 @@ func (b *StatusNode) Cleanup() error {
 		}
 	}
 
-	if err := b.httpServer.Stop(); err != nil {
-		return err
-	}
-
 	b.downloader.Stop()
 
 	return nil

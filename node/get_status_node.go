@@ -240,6 +240,11 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	if err != nil {
 		return err
 	}
+
+	if err := httpServer.Start(); err != nil {
+		return err
+	}
+
 	n.httpServer = httpServer
 
 	if err := n.initServices(config); err != nil {
@@ -418,6 +423,15 @@ func (n *StatusNode) stop() error {
 	// and may be completely different. Similarly with `config`.
 	n.gethNode = nil
 	n.config = nil
+
+	err := n.httpServer.Stop()
+	if err != nil {
+		return err
+	}
+	n.httpServer = nil
+
+	n.downloader.Stop()
+	n.downloader = nil
 
 	if n.db != nil {
 		err := n.db.Close()
