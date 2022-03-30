@@ -1214,8 +1214,8 @@ github.com/status-im/go-ethereum v1.10.4-status.4 h1:Cs0MoHEhF0LEwii2R8U8jMSEW/g
 github.com/status-im/go-ethereum v1.10.4-status.4/go.mod h1:GvIhpdCOgMHI6i5xVPEZOrv/qSMeOFHbZh77AoyZUoE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.1 h1:09v9n6426NAojNOvdgegqrAotgffWW/UPDwrpJ85DNE=
 github.com/status-im/go-multiaddr-ethv4 v1.2.1/go.mod h1:SlBebvQcSUM5+/R/YfpfMuu5WyraW47XFmIqLYBmlKU=
-github.com/status-im/go-waku v0.0.0-20220323131654-8468323cd349 h1:1aER9CYT/4SDbic0O+nFRhzh84ChTQA2wBYI2fa/pkQ=
-github.com/status-im/go-waku v0.0.0-20220323131654-8468323cd349/go.mod h1:brdbk2SAE5B5E7Av4RyxiKXLUbCKrJkIv0l32KtQUa4=
+github.com/status-im/go-waku v0.0.0-20220401012237-ce5d6ec38236 h1:rqFAobv30OTxOoQu4pOm/oRRuho1pRKQUWhrA2IiHVw=
+github.com/status-im/go-waku v0.0.0-20220401012237-ce5d6ec38236/go.mod h1:1LeilRpyb6PelO78PlnyBTa40T36/UUQYbIagd7IFks=
 github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432 h1:cbNFU38iimo9fY4B7CdF/fvIF6tNPJIZjBbpfmW2EY4=
 github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432/go.mod h1:A8t3i0CUGtXCA0aiLsP7iyikmk/KaD/2XVvNJqGCU20=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=

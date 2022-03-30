@@ -198,6 +198,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 
 	libp2pOpts := node.DefaultLibP2POptions
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
+	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
 
 	if cfg.PersistPeers {
 		if appDB == nil {
@@ -266,6 +267,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 
 	if err = waku.node.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start go-waku node: %v", err)
+	}
+
+	if cfg.EnableDiscV5 {
+		waku.node.DiscV5().Start()
 	}
 
 	go func() {

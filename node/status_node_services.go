@@ -285,6 +285,8 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			PersistPeers:         nodeConfig.WakuV2Config.PersistPeers,
 			DiscV5BootstrapNodes: nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
 			EnableDiscV5:         nodeConfig.WakuV2Config.EnableDiscV5,
+			UDPPort:              nodeConfig.WakuV2Config.UDPPort,
+			AutoUpdate:           nodeConfig.WakuV2Config.AutoUpdate,
 		}
 
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
