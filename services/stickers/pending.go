@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/zenthangplus/goccm"
 )
 
 func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
@@ -71,6 +73,54 @@ func (api *API) Pending() (StickerPackCollection, error) {
 	}
 
 	return stickerPacks, nil
+}
+
+func (api *API) ProcessPending(chainID uint64) (pendingChanged StickerPackCollection, err error) {
+	pendingStickerPacks, err := api.pendingStickerPacks()
+	if err != nil {
+		return nil, err
+	}
+
+	stickerType, err := api.contractMaker.NewStickerType(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	stickerChan := make(chan StickerPack, 10)
+	go func() {
+		c := goccm.New(maxConcurrentRequests)
+		for _, pendingStickerPack := range pendingStickerPacks {
+			c.Wait()
+			go func(pendingStickerPack StickerPack) {
+				defer c.Done()
+				stickerPack, err := api.fetchPackData(stickerType, pendingStickerPack.ID.Int, true)
+				if err != nil {
+					log.Warn("Could not retrieve stickerpack data", "packID", pendingStickerPack.ID.Int, "error", err)
+					return
+				}
+
+				if stickerPack.Status == statusPurchased {
+					stickerChan <- *stickerPack
+				}
+			}(pendingStickerPack)
+		}
+
+		c.WaitAllDone()
+		close(stickerChan)
+	}()
+
+	result := make(StickerPackCollection)
+	for stickerPack := range stickerChan {
+		packID := uint(stickerPack.ID.Uint64())
+		if _, exists := pendingStickerPacks[packID]; !exists {
+			continue
+		}
+		delete(pendingStickerPacks, packID)
+		result[packID] = stickerPack
+	}
+
+	err = api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingStickerPacks)
+	return result, err
 }
 
 func (api *API) RemovePending(packID *bigint.BigInt) error {
