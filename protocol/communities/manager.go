@@ -1576,25 +1576,14 @@ func (m *Manager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) boo
 	return ok && torrent.Seeding()
 }
 
-func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string) ([]string, error) {
-
-	id := communityID.String()
-	ml, _ := metainfo.ParseMagnetUri(magnetlink)
-
-	log.Println("Adding torrent from magnetlink for community: ", id)
-	torrent, err := m.torrentClient.AddMagnet(magnetlink)
-	if err != nil {
-		return nil, err
-	}
-	m.torrentTasks[id] = ml.InfoHash
-
-	<-torrent.GotInfo()
+func (m *Manager) performTorrentDownload(torrent *torrent.Torrent, communityID types.HexBytes) ([]string, error) {
 	files := torrent.Files()
 
 	i, ok := findIndexFile(files)
 	if !ok {
 		// We're dealing with a malformed torrent, so don't do anything
-		return nil, nil
+		log.Println("Torrent data seems to be malformed, stopping here.")
+		m.UnseedHistoryArchiveTorrent(communityID)
 	}
 
 	indexFile := files[i]
@@ -1629,7 +1618,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		endIndex := startIndex + int(metadata.Size)/pieceLength
 
 		log.Println("Downloading data for message archive: ", hash)
-		log.Println("Pieces (start, end): ", startIndex, "-", endIndex-1)
+		log.Println("Pieces (start, end): (", startIndex, ", ", endIndex-1, ")")
 		torrent.DownloadPieces(startIndex, endIndex)
 
 		psc := torrent.SubscribePieceStateChanges()
@@ -1657,12 +1646,70 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 			continue
 		}
 	}
-	m.publish(&Subscription{
-		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
-			CommunityID: communityID.String(),
-		},
-	})
 	return archiveIDs, nil
+}
+
+func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string) ([]string, error) {
+
+	id := communityID.String()
+	ml, _ := metainfo.ParseMagnetUri(magnetlink)
+
+	log.Println("Adding torrent from magnetlink for community: ", id)
+	torrent, err := m.torrentClient.AddMagnet(magnetlink)
+	if err != nil {
+		return nil, err
+	}
+	m.torrentTasks[id] = ml.InfoHash
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	downloading := false
+	var archiveIDs []string
+
+	for {
+		select {
+		case <-torrent.GotInfo():
+			downloading = true
+			archiveIDs, err = m.performTorrentDownload(torrent, communityID)
+			if err != nil {
+				return nil, err
+			}
+			m.publish(&Subscription{
+				HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+					CommunityID: communityID.String(),
+				},
+			})
+			return archiveIDs, nil
+		case <-ticker.C:
+			if downloading {
+				break
+			}
+
+			log.Println("No torrent info received. Trying again...")
+			m.UnseedHistoryArchiveTorrent(communityID)
+
+			torrent, err := m.torrentClient.AddMagnet(magnetlink)
+			if err != nil {
+				return nil, err
+			}
+			m.torrentTasks[id] = ml.InfoHash
+
+			<-torrent.GotInfo()
+
+			archiveIDs, err = m.performTorrentDownload(torrent, communityID)
+			if err != nil {
+				return nil, err
+			}
+
+			m.publish(&Subscription{
+				HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+					CommunityID: communityID.String(),
+				},
+			})
+			return archiveIDs, nil
+		}
+	}
 }
 
 func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes, archiveIDs []string) (map[transport.Filter][]*types.Message, error) {
