@@ -189,12 +189,29 @@ func (w *WakuNode) onAddrChange() {
 			w.log.Error(fmt.Sprintf("could not extract ip from ma %s: %s", m, err.Error()))
 			continue
 		}
-		ip := net.ParseIP(ipStr)
-		if !ip.IsLoopback() && !ip.IsUnspecified() {
+
+		portStr, err := m.ValueForProtocol(ma.P_TCP)
+		if err != nil {
+			w.log.Error(fmt.Sprintf("could not extract port from ma %s: %s", m, err.Error()))
+			continue
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			w.log.Error(fmt.Sprintf("could not convert port to int: %s", err.Error()))
+			continue
+		}
+
+		addr := &net.TCPAddr{
+			IP:   net.ParseIP(ipStr),
+			Port: port,
+		}
+
+		if !addr.IP.IsLoopback() && !addr.IP.IsUnspecified() {
 			if w.opts.enableDiscV5 {
-				err := w.discoveryV5.UpdateAddr(ip)
+				err := w.discoveryV5.UpdateAddr(addr)
 				if err != nil {
-					w.log.Error(fmt.Sprintf("could not update DiscV5 address with IP %s: %s", ip, err.Error()))
+					w.log.Error(fmt.Sprintf("could not update DiscV5 address with IP %s:%d %s", addr.IP, addr.Port, err.Error()))
 					continue
 				}
 			}
@@ -451,24 +468,8 @@ func (w *WakuNode) mountDiscV5() error {
 		discV5Options = append(discV5Options, discv5.WithAdvertiseAddr(*w.opts.advertiseAddr))
 	}
 
-	addr := w.ListenAddresses()[0]
-
-	ipStr, err := addr.ValueForProtocol(ma.P_IP4)
-	if err != nil {
-		return err
-	}
-
-	portStr, err := addr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		return err
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return err
-	}
-
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), net.ParseIP(ipStr), port, w.opts.privKey, w.wakuFlag, w.log, discV5Options...)
+	var err error
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.ListenAddresses(), w.opts.privKey, w.wakuFlag, w.log, discV5Options...)
 
 	return err
 }
