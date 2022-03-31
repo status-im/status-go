@@ -595,6 +595,72 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) UnreadContactRequests(currCursor string, limit int) ([]*common.Message, string, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
+	}
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	args := []interface{}{protobuf.ChatMessage_CONTACT_REQUEST}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+				%s,
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
+			WHERE
+				NOT(m1.hide) AND NOT(seen) AND content_type = ? %s
+			ORDER BY cursor DESC
+			LIMIT ?
+		`, allFields, cursorWhere),
+		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.Message
+		cursors []string
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, "", err
+		}
+		result = append(result, &message)
+		cursors = append(cursors, cursor)
+	}
+
+	var newCursor string
+	if len(result) > limit {
+		newCursor = cursors[limit]
+		result = result[:limit]
+	}
+	return result, newCursor, nil
+}
+
 // AllMessageByChatIDWhichMatchPattern returns all messages which match the search
 // term, for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.

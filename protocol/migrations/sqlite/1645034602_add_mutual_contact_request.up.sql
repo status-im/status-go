@@ -7,3 +7,6 @@ CREATE TABLE contact_requests (
 );
 
 ALTER TABLE contacts ADD COLUMN contact_message_id VARCHAR;
+ALTER TABLE user_messages ADD COLUMN contact_request_state INT;
+
+CREATE INDEX contact_request_state ON user_messages(contact_request_state);
