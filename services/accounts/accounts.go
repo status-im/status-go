@@ -32,6 +32,12 @@ type API struct {
 	feed    *event.Feed
 }
 
+type DerivedAddress struct {
+	Address     common.Address `json:"address"`
+	Path        string         `json:"path"`
+	HasActivity bool           `json:"hasActivity"`
+}
+
 func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
 	log.Info("[AccountsAPI::SaveAccounts]")
 	err := api.db.SaveAccounts(accounts)
@@ -69,41 +75,19 @@ func (api *API) AddAccountWithMnemonic(
 	color string,
 	emoji string,
 ) error {
-	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, pathWalletRoot)
+}
 
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
-
-	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
-	if err != nil {
-		return err
-	}
-
-	accountInfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{pathDefaultWallet})
-	if err != nil {
-		return err
-	}
-
-	addressExists, err := api.db.AddressExists(types.Address(common.HexToAddress(accountInfos[pathWalletRoot].Address)))
-	if err != nil {
-		return err
-	}
-	if addressExists {
-		return errors.New("account already exists")
-	}
-
-	account := accounts.Account{
-		Address:   types.Address(common.HexToAddress(accountInfos[pathDefaultWallet].Address)),
-		PublicKey: types.HexBytes(accountInfos[pathDefaultWallet].PublicKey),
-		Type:      "seed",
-		Name:      name,
-		Emoji:     emoji,
-		Color:     color,
-		Path:      pathDefaultWallet,
-	}
-	return api.SaveAccounts(ctx, []accounts.Account{account})
+func (api *API) AddAccountWithMnemonicAndPath(
+	ctx context.Context,
+	mnemonic string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+) error {
+	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, path)
 }
 
 func (api *API) AddAccountWithPrivateKey(
@@ -157,17 +141,8 @@ func (api *API) GenerateAccount(
 	color string,
 	emoji string,
 ) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
 
 	address, err := api.db.GetWalletRoodAddress()
-	if err != nil {
-		return err
-	}
-
-	info, err := api.manager.AccountsGenerator().LoadAccount(address.Hex(), password)
 	if err != nil {
 		return err
 	}
@@ -176,8 +151,156 @@ func (api *API) GenerateAccount(
 	if err != nil {
 		return err
 	}
+
 	newDerivedPath := latestDerivedPath + 1
-	path := fmt.Sprint("m/", newDerivedPath)
+	path := fmt.Sprint(pathWalletRoot, "/", newDerivedPath)
+
+	err = api.generateAccount(ctx, password, name, color, emoji, path, address.Hex())
+	if err != nil {
+		return err
+	}
+
+	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (api *API) GenerateAccountWithDerivedPath(
+	ctx context.Context,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+	derivedFrom string,
+) error {
+	return api.generateAccount(ctx, password, name, color, emoji, path, derivedFrom)
+}
+
+func (api *API) GetDerivedAddressesForPath(password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	info, err := api.manager.AccountsGenerator().LoadAccount(derivedFrom, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getDerivedAddresses(info.ID, path, pageSize, pageNumber)
+}
+
+func (api *API) GetDerivedAddressesForMenominicWithPath(mnemonic string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+
+	info, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getDerivedAddresses(info.ID, path, pageSize, pageNumber)
+}
+
+func (api *API) verifyPassword(password string) error {
+	address, err := api.db.GetChatAddress()
+	if err != nil {
+		return err
+	}
+	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
+	return err
+}
+
+func (api *API) getDerivedAddresses(id string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	derivedAddresses := make([]*DerivedAddress, 0)
+
+	if pageNumber <= 0 || pageSize <= 0 {
+		return nil, fmt.Errorf("pageSize and pageNumber should be greater than 0")
+	}
+
+	var startIndex = ((pageNumber - 1) * pageSize)
+	var endIndex = (pageNumber * pageSize)
+
+	for i := startIndex; i < endIndex; i++ {
+		derivedPath := fmt.Sprint(path, "/", i)
+
+		info, err := api.manager.AccountsGenerator().DeriveAddresses(id, []string{derivedPath})
+		if err != nil {
+			return nil, err
+		}
+
+		address := &DerivedAddress{
+			Address:     common.HexToAddress(info[derivedPath].Address),
+			Path:        derivedPath,
+			HasActivity: false,
+		}
+
+		derivedAddresses = append(derivedAddresses, address)
+	}
+	return derivedAddresses, nil
+}
+
+func (api *API) addAccountWithMnemonic(
+	ctx context.Context,
+	mnemonic string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+) error {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+
+	err := api.verifyPassword(password)
+	if err != nil {
+		return err
+	}
+
+	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return err
+	}
+
+	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	if err != nil {
+		return err
+	}
+
+	accountinfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{path})
+	if err != nil {
+		return err
+	}
+
+	account := accounts.Account{
+		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
+		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
+		Type:        "seed",
+		Name:        name,
+		Emoji:       emoji,
+		Color:       color,
+		Path:        path,
+		DerivedFrom: generatedAccountInfo.Address,
+	}
+	return api.SaveAccounts(ctx, []accounts.Account{account})
+}
+
+func (api *API) generateAccount(
+	ctx context.Context,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+	address string,
+) error {
+	err := api.verifyPassword(password)
+	if err != nil {
+		return err
+	}
+
+	info, err := api.manager.AccountsGenerator().LoadAccount(address, password)
+	if err != nil {
+		return err
+	}
+
 	infos, err := api.manager.AccountsGenerator().DeriveAddresses(info.ID, []string{path})
 	if err != nil {
 		return err
@@ -189,28 +312,15 @@ func (api *API) GenerateAccount(
 	}
 
 	acc := accounts.Account{
-		Address:   types.Address(common.HexToAddress(infos[path].Address)),
-		PublicKey: types.HexBytes(infos[path].PublicKey),
-		Type:      "generated",
-		Name:      name,
-		Emoji:     emoji,
-		Color:     color,
-		Path:      fmt.Sprint(pathWalletRoot, "/", newDerivedPath),
-	}
-
-	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
-	if err != nil {
-		return err
+		Address:     types.Address(common.HexToAddress(infos[path].Address)),
+		PublicKey:   types.HexBytes(infos[path].PublicKey),
+		Type:        "generated",
+		Name:        name,
+		Emoji:       emoji,
+		Color:       color,
+		Path:        path,
+		DerivedFrom: address,
 	}
 
 	return api.SaveAccounts(ctx, []accounts.Account{acc})
-}
-
-func (api *API) verifyPassword(password string) error {
-	address, err := api.db.GetChatAddress()
-	if err != nil {
-		return err
-	}
-	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
-	return err
 }
