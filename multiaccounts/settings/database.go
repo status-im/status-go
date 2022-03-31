@@ -510,6 +510,10 @@ func (db *Database) GetPreferredUsername() (string, error) {
 	return db.makeSelectString(PreferredName)
 }
 
+func (db *Database) GetCurrency() (string, error) {
+	return db.makeSelectString(Currency)
+}
+
 func (db *Database) GetInstalledStickerPacks() (rst *json.RawMessage, err error) {
 	err = db.makeSelectRow(StickersPacksInstalled).Scan(&rst)
 	return

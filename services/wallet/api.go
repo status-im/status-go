@@ -12,12 +12,22 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	return &API{s}
+	r := NewReader(s)
+	return &API{s, r}
 }
 
 // API is class with methods available over RPC.
 type API struct {
 	s *Service
+	r *Reader
+}
+
+func (api *API) StartWallet(ctx context.Context, chainIDs []uint64) error {
+	return api.r.Start(ctx, chainIDs)
+}
+
+func (api *API) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
+	return api.r.GetWallet(ctx, chainIDs)
 }
 
 // SetInitialBlocksRange sets initial blocks range
@@ -139,7 +149,7 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 	return err
 }
 
-func (api *API) GetSavedAddresses(ctx context.Context) ([]*SavedAddress, error) {
+func (api *API) GetSavedAddresses(ctx context.Context) ([]SavedAddress, error) {
 	log.Debug("call to get saved addresses")
 	rst, err := api.s.savedAddressesManager.GetSavedAddresses(api.s.rpcClient.UpstreamChainID)
 	log.Debug("result from database for saved addresses", "len", len(rst))
@@ -231,7 +241,7 @@ func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, t
 	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
 }
 
-func (api *API) GetFavourites(ctx context.Context) ([]*Favourite, error) {
+func (api *API) GetFavourites(ctx context.Context) ([]Favourite, error) {
 	log.Debug("call to get favourites")
 	rst, err := api.s.favouriteManager.GetFavourites()
 	log.Debug("result from database for favourites", "len", len(rst))
