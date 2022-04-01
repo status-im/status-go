@@ -33,7 +33,7 @@ func New(identity crypto.PrivKey) (c Client, err error) {
 	opts := []libp2p.Option{
 		libp2p.Identity(identity),
 	}
-	h, err := libp2p.New(context.Background(), opts...)
+	h, err := libp2p.New(opts...)
 	if err != nil {
 		return c, err
 	}

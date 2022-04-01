@@ -60,9 +60,9 @@ func (s *secureSession) runHandshake(ctx context.Context) error {
 		}
 	}
 
-	// We can re-use this buffer for all handshake messages as it's size
+	// We can re-use this buffer for all handshake messages as its size
 	// will be the size of the maximum handshake message for the Noise XX pattern.
-	// Also, since we prefix every noise handshake message with it's length, we need to account for
+	// Also, since we prefix every noise handshake message with its length, we need to account for
 	// it when we fetch the buffer from the pool
 	maxMsgSize := 2*noise.DH25519.DHLen() + len(payload) + 2*poly1305.TagSize
 	hbuf := pool.Get(maxMsgSize + LengthPrefixLength)
@@ -242,8 +242,10 @@ func (s *secureSession) handleRemoteHandshakePayload(payload []byte, remoteStati
 		return err
 	}
 
-	// if we know who we're trying to reach, make sure we have the right peer
-	if s.initiator && s.remoteID != id {
+	// check the peer ID for:
+	// * all outbound connection
+	// * inbound connections, if we know which peer we want to connect to (SecureInbound called with a peer ID)
+	if (s.initiator && s.remoteID != id) || (!s.initiator && s.remoteID != "" && s.remoteID != id) {
 		// use Pretty() as it produces the full b58-encoded string, rather than abbreviated forms.
 		return fmt.Errorf("peer id mismatch: expected %s, but remote key matches %s", s.remoteID.Pretty(), id.Pretty())
 	}

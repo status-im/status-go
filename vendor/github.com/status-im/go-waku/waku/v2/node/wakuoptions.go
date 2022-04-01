@@ -2,6 +2,7 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
@@ -11,8 +12,10 @@ import (
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	quic "github.com/libp2p/go-libp2p-quic-transport"
 	"github.com/libp2p/go-libp2p/config"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -36,6 +39,10 @@ type WakuNodeParameters struct {
 	addressFactory basichost.AddrsFactory
 	privKey        *ecdsa.PrivateKey
 	libP2POpts     []libp2p.Option
+
+	enableWS  bool
+	enableWSS bool
+	tlsConfig *tls.Config
 
 	logger *zap.SugaredLogger
 
@@ -123,7 +130,7 @@ func WithHostAddress(hostAddr *net.TCPAddr) WakuNodeOption {
 }
 
 // WithAdvertiseAddress is a WakuNodeOption that allows overriding the address used in the waku node with custom value
-func WithAdvertiseAddress(address *net.TCPAddr, enableWS bool, wsPort int) WakuNodeOption {
+func WithAdvertiseAddress(address *net.TCPAddr, enableWS bool, secure bool, wsPort int) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.advertiseAddr = &address.IP
 
@@ -135,9 +142,14 @@ func WithAdvertiseAddress(address *net.TCPAddr, enableWS bool, wsPort int) WakuN
 		params.addressFactory = func([]ma.Multiaddr) []ma.Multiaddr {
 			var result []multiaddr.Multiaddr
 			result = append(result, advertiseAddress)
-			if enableWS {
-				wsMa, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address, wsPort))
-				result = append(result, wsMa)
+			if enableWS || secure {
+				if secure {
+					wsMa, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/wss", address, wsPort))
+					result = append(result, wsMa)
+				} else {
+					wsMa, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address, wsPort))
+					result = append(result, wsMa)
+				}
 			}
 			return result
 		}
@@ -314,10 +326,57 @@ func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
 	}
 }
 
+func WithWebsockets(address string, port int) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableWS = true
+
+		wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/%s", address, port, "ws"))
+		if err != nil {
+			return err
+		}
+
+		params.multiAddr = append(params.multiAddr, wsMa)
+
+		return nil
+	}
+}
+
+func WithSecureWebsockets(address string, port int, certPath string, keyPath string) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableWSS = true
+
+		wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/%s", address, port, "wss"))
+		if err != nil {
+			return err
+		}
+		params.multiAddr = append(params.multiAddr, wsMa)
+
+		certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
+		if err != nil {
+			return err
+		}
+		params.tlsConfig = &tls.Config{
+			Certificates: []tls.Certificate{certificate},
+		}
+
+		return nil
+	}
+}
+
 // Default options used in the libp2p node
 var DefaultLibP2POptions = []libp2p.Option{
-	libp2p.DefaultTransports,
-	libp2p.UserAgent(clientId),
-	libp2p.EnableNATService(), // TODO: is this needed?)
-	libp2p.ConnectionManager(connmgr.NewConnManager(200, 300, 0)),
+	libp2p.ChainOptions(
+		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(quic.NewTransport),
+	), libp2p.UserAgent(clientId),
+	libp2p.EnableNATService(),
+	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
+}
+
+func newConnManager(lo int, hi int, opts ...connmgr.Option) *connmgr.BasicConnMgr {
+	mgr, err := connmgr.NewConnManager(lo, hi, opts...)
+	if err != nil {
+		panic("could not create ConnManager: " + err.Error())
+	}
+	return mgr
 }

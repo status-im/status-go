@@ -20,6 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	p2pproto "github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ws "github.com/libp2p/go-ws-transport"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
 
@@ -38,10 +39,10 @@ import (
 )
 
 type Peer struct {
-	ID        peer.ID
-	Protocols []string
-	Addrs     []ma.Multiaddr
-	Connected bool
+	ID        peer.ID        `json:"peerID"`
+	Protocols []string       `json:"protocols"`
+	Addrs     []ma.Multiaddr `json:"addrs"`
+	Connected bool           `json:"connected"`
 }
 
 type storeFactory func(w *WakuNode) store.Store
@@ -105,6 +106,12 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
+	if params.enableWSS {
+		params.libP2POpts = append(params.libP2POpts, libp2p.Transport(ws.New, ws.WithTLSConfig(params.tlsConfig)))
+	} else if params.enableWS {
+		params.libP2POpts = append(params.libP2POpts, libp2p.Transport(ws.New))
+	}
+
 	// Setting default host address if none was provided
 	if params.hostAddr == nil {
 		err := WithHostAddress(&net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: 0})(params)
@@ -125,7 +132,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		params.libP2POpts = append(params.libP2POpts, libp2p.AddrsFactory(params.addressFactory))
 	}
 
-	host, err := libp2p.New(ctx, params.libP2POpts...)
+	host, err := libp2p.New(params.libP2POpts...)
 	if err != nil {
 		cancel()
 		return nil, err

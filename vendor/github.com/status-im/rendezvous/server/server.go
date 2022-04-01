@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -113,7 +112,7 @@ func (srv *Server) startListener() error {
 		libp2p.ListenAddrStrings(srv.laddr.String()),
 		libp2p.Identity(srv.identity),
 	}
-	h, err := libp2p.New(context.Background(), opts...)
+	h, err := libp2p.New(opts...)
 	if err != nil {
 		return err
 	}

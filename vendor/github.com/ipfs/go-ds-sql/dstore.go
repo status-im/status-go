@@ -1,6 +1,7 @@
 package sqlds
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -38,8 +39,8 @@ func (d *Datastore) Close() error {
 }
 
 // Delete removes a row from the SQL database by the given key.
-func (d *Datastore) Delete(key ds.Key) error {
-	_, err := d.db.Exec(d.queries.Delete(), key.String())
+func (d *Datastore) Delete(ctx context.Context, key ds.Key) error {
+	_, err := d.db.ExecContext(ctx, d.queries.Delete(), key.String())
 	if err != nil {
 		return err
 	}
@@ -48,8 +49,8 @@ func (d *Datastore) Delete(key ds.Key) error {
 }
 
 // Get retrieves a value from the SQL database by the given key.
-func (d *Datastore) Get(key ds.Key) (value []byte, err error) {
-	row := d.db.QueryRow(d.queries.Get(), key.String())
+func (d *Datastore) Get(ctx context.Context, key ds.Key) (value []byte, err error) {
+	row := d.db.QueryRowContext(ctx, d.queries.Get(), key.String())
 	var out []byte
 
 	switch err := row.Scan(&out); err {
@@ -63,8 +64,8 @@ func (d *Datastore) Get(key ds.Key) (value []byte, err error) {
 }
 
 // Has determines if a value for the given key exists in the SQL database.
-func (d *Datastore) Has(key ds.Key) (exists bool, err error) {
-	row := d.db.QueryRow(d.queries.Exists(), key.String())
+func (d *Datastore) Has(ctx context.Context, key ds.Key) (exists bool, err error) {
+	row := d.db.QueryRowContext(ctx, d.queries.Exists(), key.String())
 
 	switch err := row.Scan(&exists); err {
 	case sql.ErrNoRows:
@@ -77,8 +78,8 @@ func (d *Datastore) Has(key ds.Key) (exists bool, err error) {
 }
 
 // Put "upserts" a row into the SQL database.
-func (d *Datastore) Put(key ds.Key, value []byte) error {
-	_, err := d.db.Exec(d.queries.Put(), key.String(), value)
+func (d *Datastore) Put(ctx context.Context, key ds.Key, value []byte) error {
+	_, err := d.db.ExecContext(ctx, d.queries.Put(), key.String(), value)
 	if err != nil {
 		return err
 	}
@@ -87,8 +88,8 @@ func (d *Datastore) Put(key ds.Key, value []byte) error {
 }
 
 // Query returns multiple rows from the SQL database based on the passed query parameters.
-func (d *Datastore) Query(q dsq.Query) (dsq.Results, error) {
-	raw, err := d.rawQuery(q)
+func (d *Datastore) Query(ctx context.Context, q dsq.Query) (dsq.Results, error) {
+	raw, err := d.rawQuery(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +113,11 @@ func (d *Datastore) Query(q dsq.Query) (dsq.Results, error) {
 	return raw, nil
 }
 
-func (d *Datastore) rawQuery(q dsq.Query) (dsq.Results, error) {
+func (d *Datastore) rawQuery(ctx context.Context, q dsq.Query) (dsq.Results, error) {
 	var rows *sql.Rows
 	var err error
 
-	rows, err = queryWithParams(d, q)
+	rows, err = queryWithParams(ctx, d, q)
 	if err != nil {
 		return nil, err
 	}
@@ -155,13 +156,13 @@ func (d *Datastore) rawQuery(q dsq.Query) (dsq.Results, error) {
 }
 
 // Sync is noop for SQL databases.
-func (d *Datastore) Sync(key ds.Key) error {
+func (d *Datastore) Sync(ctx context.Context, key ds.Key) error {
 	return nil
 }
 
 // GetSize determines the size in bytes of the value for a given key.
-func (d *Datastore) GetSize(key ds.Key) (int, error) {
-	row := d.db.QueryRow(d.queries.GetSize(), key.String())
+func (d *Datastore) GetSize(ctx context.Context, key ds.Key) (int, error) {
+	row := d.db.QueryRowContext(ctx, d.queries.GetSize(), key.String())
 	var size int
 
 	switch err := row.Scan(&size); err {
@@ -175,7 +176,7 @@ func (d *Datastore) GetSize(key ds.Key) (int, error) {
 }
 
 // queryWithParams applies prefix, limit, and offset params in pg query
-func queryWithParams(d *Datastore, q dsq.Query) (*sql.Rows, error) {
+func queryWithParams(ctx context.Context, d *Datastore, q dsq.Query) (*sql.Rows, error) {
 	var qNew = d.queries.Query()
 
 	if q.Prefix != "" {
@@ -196,7 +197,7 @@ func queryWithParams(d *Datastore, q dsq.Query) (*sql.Rows, error) {
 		}
 	}
 
-	return d.db.Query(qNew)
+	return d.db.QueryContext(ctx, qNew)
 
 }
 
