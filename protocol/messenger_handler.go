@@ -579,6 +579,54 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 	return nil
 }
 
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
+  // TODO: Handle missing contact request message
+  request, err := m.persistence.MessageByID(message.Id)
+  if err != nil {
+    return err
+  }
+
+  if request.LocalChatID != state.CurrentMessageState.Contact.ID {
+    return errors.New("can't accept contact request not sent to user")
+  }
+
+  request.ContactRequestState = common.ContactRequestStateAccepted
+
+  err = m.persistence.SetContactRequestState(request.ID, request.ContactRequestState)
+  if err != nil {
+    return err
+  }
+
+
+  state.Response.AddMessage(request)
+  return nil
+
+}
+
+func (m *Messenger) HandleDeclineContactRequest(state *ReceivedMessageState, message protobuf.DeclineContactRequest) error {
+  // TODO: Handle missing contact request message
+  request, err := m.persistence.MessageByID(message.Id)
+  if err != nil {
+    return err
+  }
+
+  if request.LocalChatID != state.CurrentMessageState.Contact.ID {
+    return errors.New("can't accept contact request not sent to user")
+  }
+
+  request.ContactRequestState = common.ContactRequestStateDeclined
+
+  err = m.persistence.SetContactRequestState(request.ID, request.ContactRequestState)
+  if err != nil {
+    return err
+  }
+
+
+  state.Response.AddMessage(request)
+  return nil
+
+}
+
 func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	contact := state.CurrentMessageState.Contact
@@ -958,7 +1006,9 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	}
 
-	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+        if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+          receivedMessage.ContactRequestState = common.ContactRequestStatePending
+        } else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
 	}
 

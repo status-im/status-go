@@ -51,6 +51,14 @@ const (
 	CommandStateTransactionSent
 )
 
+type ContactRequestState int
+
+const (
+  ContactRequestStatePending ContactRequestState = iota + 1
+  ContactRequestStateAccepted
+  ContactRequestStateDeclined
+)
+
 type CommandParameters struct {
 	// ID is the ID of the initial message
 	ID string `json:"id"`
@@ -162,6 +170,9 @@ type Message struct {
 
 	// Deleted indicates if a message was deleted
 	Deleted bool `json:"deleted"`
+
+	// ContactRequestState is the state of the contact request message
+	ContactRequestState ContactRequestState `json:"contactRequestState"`
 }
 
 func (m *Message) PrepareServerURLs(port int) {

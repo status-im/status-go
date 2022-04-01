@@ -3626,6 +3626,23 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+                                              case protobuf.AcceptContactRequest:
+						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
+						err = m.HandleAcceptContactRequest(messageState, message)
+						if err != nil {
+							logger.Warn("failed to handle AcceptContactRequest", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+                                       case protobuf.DeclineContactRequest:
+						message := msg.ParsedMessage.Interface().(protobuf.DeclineContactRequest)
+						err = m.HandleDeclineContactRequest(messageState, message)
+						if err != nil {
+							logger.Warn("failed to handle DeclineContactRequest", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.PushNotificationQuery:
 						logger.Debug("Received PushNotificationQuery")
 						if m.pushNotificationServer == nil {

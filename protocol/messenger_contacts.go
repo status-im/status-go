@@ -19,14 +19,12 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	chatID := request.ID.String()
+        contactRequest, err := m.persistence.MessageByID(request.ID.String())
+        if err != nil {
+          return nil, err
+        }
 
-	response, err := m.addContact(chatID, "", "", "")
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID)
 }
 
 func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*MessengerResponse, error) {
@@ -37,7 +35,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 	chatID := request.ID.String()
 
-	response, err := m.addContact(chatID, "", "", "")
+	response, err := m.addContact(chatID, "", "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +71,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	}
 	chatMessage.SentContactRequestSignature = &protobuf.ContactRequestSignature{Signature: signature, Timestamp: timestamp}
 	chatMessage.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
+	chatMessage.ContactRequestState = common.ContactRequestStatePending
 	messageResponse, err := m.sendChatMessage(ctx, chatMessage)
 	if err != nil {
 		return nil, err
@@ -118,7 +117,51 @@ func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) addContact(pubKey, ensName, nickname, displayName string) (*MessengerResponse, error) {
+func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests.DeclineContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+        contactRequest, err := m.persistence.MessageByID(request.ID.String())
+        if err != nil {
+          return nil, err
+        }
+
+          contactRequest.ContactRequestState = common.ContactRequestStateDeclined
+
+          err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
+          if err != nil {
+            return nil ,err
+          }
+
+          declineContactRequest := &protobuf.DeclineContactRequest{
+            Id:  contactRequest.ID,
+          }
+          encodedMessage, err := proto.Marshal(declineContactRequest)
+          if err != nil {
+            return nil, err
+          }
+
+          _, err = m.dispatchMessage(context.Background(), common.RawMessage{
+            LocalChatID:         contactRequest.LocalChatID,
+            Payload:             encodedMessage,
+            MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_REQUEST,
+            ResendAutomatically: true,
+          })
+          if err != nil {
+            return nil, err
+          }
+
+          response := &MessengerResponse{}
+
+          response.AddMessage(contactRequest)
+
+
+          return response,nil
+}
+
+func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string) (*MessengerResponse, error) {
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
@@ -220,6 +263,41 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName string) (*
 		return nil, err
 	}
 
+        if len(contactRequestID) != 0 {
+          contactRequest, err := m.persistence.MessageByID(contactRequestID)
+          if err != nil {
+            return nil, err
+          }
+
+          contactRequest.ContactRequestState = common.ContactRequestStateAccepted
+
+          err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
+          if err != nil {
+            return nil ,err
+          }
+
+          acceptContactRequest := &protobuf.AcceptContactRequest{
+            Id:  contactRequest.ID,
+          }
+          encodedMessage, err := proto.Marshal(acceptContactRequest)
+          if err != nil {
+            return nil, err
+          }
+
+          _, err = m.dispatchMessage(context.Background(), common.RawMessage{
+            LocalChatID:         pubKey,
+            Payload:             encodedMessage,
+            MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
+            ResendAutomatically: true,
+          })
+          if err != nil {
+            return nil, err
+          }
+
+
+          response.AddMessage(contactRequest)
+        }
+
 	// Send profile picture with contact request
 	chat, ok := m.allChats.Load(contact.ID)
 	if !ok {
@@ -256,7 +334,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
-	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName)
+	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName, "")
 }
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
@@ -646,5 +724,10 @@ func (m *Messenger) addENSNameToContact(contact *Contact) error {
 	contact.EnsName = ensRecord.Name
 	contact.ENSVerified = true
 
+
 	return nil
+}
+
+func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
+  return m.persistence.PendingContactRequests(cursor, limit)
 }

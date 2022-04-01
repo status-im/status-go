@@ -13,3 +13,11 @@ message ContactUpdate {
   ContactRequestSignature sent_contact_request_signature = 14;
   ContactRequestSignature received_contact_request_signature = 15;
 }
+
+message AcceptContactRequest {
+  string id = 1;
+}
+
+message DeclineContactRequest {
+  string id = 2;
+}
