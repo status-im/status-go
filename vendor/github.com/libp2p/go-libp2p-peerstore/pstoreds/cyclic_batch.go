@@ -1,6 +1,7 @@
 package pstoreds
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -23,7 +24,7 @@ type cyclicBatch struct {
 }
 
 func newCyclicBatch(ds ds.Batching, threshold int) (ds.Batch, error) {
-	batch, err := ds.Batch()
+	batch, err := ds.Batch(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -39,36 +40,36 @@ func (cb *cyclicBatch) cycle() (err error) {
 		return nil
 	}
 	// commit and renew the batch.
-	if err = cb.Batch.Commit(); err != nil {
+	if err = cb.Batch.Commit(context.TODO()); err != nil {
 		return fmt.Errorf("failed while committing cyclic batch: %w", err)
 	}
-	if cb.Batch, err = cb.ds.Batch(); err != nil {
+	if cb.Batch, err = cb.ds.Batch(context.TODO()); err != nil {
 		return fmt.Errorf("failed while renewing cyclic batch: %w", err)
 	}
 	return nil
 }
 
-func (cb *cyclicBatch) Put(key ds.Key, val []byte) error {
+func (cb *cyclicBatch) Put(ctx context.Context, key ds.Key, val []byte) error {
 	if err := cb.cycle(); err != nil {
 		return err
 	}
 	cb.pending++
-	return cb.Batch.Put(key, val)
+	return cb.Batch.Put(ctx, key, val)
 }
 
-func (cb *cyclicBatch) Delete(key ds.Key) error {
+func (cb *cyclicBatch) Delete(ctx context.Context, key ds.Key) error {
 	if err := cb.cycle(); err != nil {
 		return err
 	}
 	cb.pending++
-	return cb.Batch.Delete(key)
+	return cb.Batch.Delete(ctx, key)
 }
 
-func (cb *cyclicBatch) Commit() error {
+func (cb *cyclicBatch) Commit(ctx context.Context) error {
 	if cb.Batch == nil {
 		return errors.New("cyclic batch is closed")
 	}
-	if err := cb.Batch.Commit(); err != nil {
+	if err := cb.Batch.Commit(ctx); err != nil {
 		return err
 	}
 	cb.pending = 0

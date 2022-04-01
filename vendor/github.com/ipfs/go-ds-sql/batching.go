@@ -20,25 +20,25 @@ type batch struct {
 // Since SQL does not support a true batch of updates,
 // operations are buffered and then executed sequentially
 // over a single connection when Commit is called.
-func (d *Datastore) Batch() (ds.Batch, error) {
+func (d *Datastore) Batch(ctx context.Context) (ds.Batch, error) {
 	return &batch{
 		ds:  d,
 		ops: make(map[ds.Key]op),
 	}, nil
 }
 
-func (bt *batch) Put(key ds.Key, val []byte) error {
+func (bt *batch) Put(ctx context.Context, key ds.Key, val []byte) error {
 	bt.ops[key] = op{value: val}
 	return nil
 }
 
-func (bt *batch) Delete(key ds.Key) error {
+func (bt *batch) Delete(ctx context.Context, key ds.Key) error {
 	bt.ops[key] = op{delete: true}
 	return nil
 }
 
-func (bt *batch) Commit() error {
-	return bt.CommitContext(context.Background())
+func (bt *batch) Commit(ctx context.Context) error {
+	return bt.CommitContext(ctx)
 }
 
 func (bt *batch) CommitContext(ctx context.Context) error {

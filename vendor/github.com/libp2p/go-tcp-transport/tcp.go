@@ -6,22 +6,22 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"syscall"
 	"time"
 
-	logging "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/transport"
-	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+
 	rtpt "github.com/libp2p/go-reuseport-transport"
 
+	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-// DefaultConnectTimeout is the (default) maximum amount of time the TCP
-// transport will spend on the initial TCP connect before giving up.
-var DefaultConnectTimeout = 5 * time.Second
+const defaultConnectTimeout = 5 * time.Second
 
 var log = logging.Logger("tcp-tpt")
 
@@ -46,7 +46,7 @@ func tryKeepAlive(conn net.Conn, keepAlive bool) {
 		//
 		// But there's nothing we can do about invalid arguments, so we'll drop this to a
 		// debug.
-		if errors.Is(err, os.ErrInvalid) {
+		if errors.Is(err, os.ErrInvalid) || errors.Is(err, syscall.EINVAL) {
 			log.Debugw("failed to enable TCP keepalive", "error", err)
 		} else {
 			log.Errorw("failed to enable TCP keepalive", "error", err)
@@ -84,20 +84,42 @@ func (ll *tcpListener) Accept() (manet.Conn, error) {
 	}
 	tryLinger(c, ll.sec)
 	tryKeepAlive(c, true)
+	// We're not calling OpenConnection in the resource manager here,
+	// since the manet.Conn doesn't allow us to save the scope.
+	// It's the caller's (usually the go-libp2p-transport-upgrader) responsibility
+	// to call the resource manager.
 	return c, nil
+}
+
+type Option func(*TcpTransport) error
+
+func DisableReuseport() Option {
+	return func(tr *TcpTransport) error {
+		tr.disableReuseport = true
+		return nil
+	}
+}
+
+func WithConnectionTimeout(d time.Duration) Option {
+	return func(tr *TcpTransport) error {
+		tr.connectTimeout = d
+		return nil
+	}
 }
 
 // TcpTransport is the TCP transport.
 type TcpTransport struct {
 	// Connection upgrader for upgrading insecure stream connections to
 	// secure multiplex connections.
-	Upgrader *tptu.Upgrader
+	Upgrader transport.Upgrader
 
 	// Explicitly disable reuseport.
-	DisableReuseport bool
+	disableReuseport bool
 
 	// TCP connect timeout
-	ConnectTimeout time.Duration
+	connectTimeout time.Duration
+
+	rcmgr network.ResourceManager
 
 	reuse rtpt.Transport
 }
@@ -105,9 +127,22 @@ type TcpTransport struct {
 var _ transport.Transport = &TcpTransport{}
 
 // NewTCPTransport creates a tcp transport object that tracks dialers and listeners
-// created. It represents an entire tcp stack (though it might not necessarily be)
-func NewTCPTransport(upgrader *tptu.Upgrader) *TcpTransport {
-	return &TcpTransport{Upgrader: upgrader, ConnectTimeout: DefaultConnectTimeout}
+// created. It represents an entire TCP stack (though it might not necessarily be).
+func NewTCPTransport(upgrader transport.Upgrader, rcmgr network.ResourceManager, opts ...Option) (*TcpTransport, error) {
+	if rcmgr == nil {
+		rcmgr = network.NullResourceManager
+	}
+	tr := &TcpTransport{
+		Upgrader:       upgrader,
+		connectTimeout: defaultConnectTimeout, // can be set by using the WithConnectionTimeout option
+		rcmgr:          rcmgr,
+	}
+	for _, o := range opts {
+		if err := o(tr); err != nil {
+			return nil, err
+		}
+	}
+	return tr, nil
 }
 
 var dialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_TCP))
@@ -120,13 +155,10 @@ func (t *TcpTransport) CanDial(addr ma.Multiaddr) bool {
 
 func (t *TcpTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (manet.Conn, error) {
 	// Apply the deadline iff applicable
-	if t.ConnectTimeout > 0 {
-		deadline := time.Now().Add(t.ConnectTimeout)
-		if d, ok := ctx.Deadline(); !ok || deadline.Before(d) {
-			var cancel func()
-			ctx, cancel = context.WithDeadline(ctx, deadline)
-			defer cancel()
-		}
+	if t.connectTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t.connectTimeout)
+		defer cancel()
 	}
 
 	if t.UseReuseport() {
@@ -138,8 +170,19 @@ func (t *TcpTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (manet.Co
 
 // Dial dials the peer at the remote address.
 func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
+	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, true)
+	if err != nil {
+		log.Debugw("resource manager blocked outgoing connection", "peer", p, "addr", raddr, "error", err)
+		return nil, err
+	}
+	if err := connScope.SetPeer(p); err != nil {
+		log.Debugw("resource manager blocked outgoing connection for peer", "peer", p, "addr", raddr, "error", err)
+		connScope.Done()
+		return nil, err
+	}
 	conn, err := t.maDial(ctx, raddr)
 	if err != nil {
+		connScope.Done()
 		return nil, err
 	}
 	// Set linger to 0 so we never get stuck in the TIME-WAIT state. When
@@ -149,14 +192,19 @@ func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) 
 	tryKeepAlive(conn, true)
 	c, err := newTracingConn(conn, true)
 	if err != nil {
+		connScope.Done()
 		return nil, err
 	}
-	return t.Upgrader.UpgradeOutbound(ctx, t, c, p)
+	direction := network.DirOutbound
+	if ok, isClient, _ := network.GetSimultaneousConnect(ctx); ok && !isClient {
+		direction = network.DirInbound
+	}
+	return t.Upgrader.Upgrade(ctx, t, c, direction, p, connScope)
 }
 
 // UseReuseport returns true if reuseport is enabled and available.
 func (t *TcpTransport) UseReuseport() bool {
-	return !t.DisableReuseport && ReuseportIsAvailable()
+	return !t.disableReuseport && ReuseportIsAvailable()
 }
 
 func (t *TcpTransport) maListen(laddr ma.Multiaddr) (manet.Listener, error) {

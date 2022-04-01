@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	pool "github.com/libp2p/go-buffer-pool"
 	"go.uber.org/multierr"
 )
 
@@ -87,7 +86,7 @@ func (s *Stream) waitForData() error {
 
 func (s *Stream) returnBuffers() {
 	if s.exbuf != nil {
-		pool.Put(s.exbuf)
+		s.mp.putBufferInbound(s.exbuf)
 		s.exbuf = nil
 		s.extra = nil
 	}
@@ -100,7 +99,7 @@ func (s *Stream) returnBuffers() {
 			if read == nil {
 				continue
 			}
-			pool.Put(read)
+			s.mp.putBufferInbound(read)
 		default:
 			return
 		}
@@ -128,7 +127,7 @@ func (s *Stream) Read(b []byte) (int, error) {
 			s.extra = s.extra[read:]
 		} else {
 			if s.exbuf != nil {
-				pool.Put(s.exbuf)
+				s.mp.putBufferInbound(s.exbuf)
 			}
 			s.extra = nil
 			s.exbuf = nil
@@ -142,8 +141,8 @@ func (s *Stream) Write(b []byte) (int, error) {
 	var written int
 	for written < len(b) {
 		wl := len(b) - written
-		if wl > MaxMessageSize {
-			wl = MaxMessageSize
+		if wl > ChunkSize {
+			wl = ChunkSize
 		}
 
 		n, err := s.write(b[written : written+wl])

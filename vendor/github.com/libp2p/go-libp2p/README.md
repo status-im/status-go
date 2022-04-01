@@ -8,25 +8,14 @@
 <p align="center">
   <a href="http://protocol.ai"><img src="https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square" /></a>
   <a href="http://libp2p.io/"><img src="https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square" /></a>
-  <a href="http://webchat.freenode.net/?channels=%23libp2p"><img src="https://img.shields.io/badge/freenode-%23libp2p-yellow.svg?style=flat-square" /></a>
-  <a href="https://waffle.io/libp2p/libp2p"><img src="https://img.shields.io/badge/pm-waffle-yellow.svg?style=flat-square" /></a>
+  <a href="https://pkg.go.dev/github.com/libp2p/go-libp2p"><img src="https://pkg.go.dev/github.com/libp2p/go-libp2p?status.svg" /></a>
   <a href="https://discuss.libp2p.io"><img src="https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg"/></a>
-</p>
-
-<p align="center">
-  <a href="https://travis-ci.com/libp2p/go-libp2p"><img src="https://travis-ci.com/libp2p/go-libp2p.svg?branch=master" /></a>
-  <br>
-  <a href="https://github.com/RichardLitt/standard-readme"><img src="https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square" /></a>
-  <a href="https://godoc.org/github.com/libp2p/go-libp2p"><img src="https://godoc.org/github.com/libp2p/go-libp2p?status.svg" /></a>
-  <a href=""><img src="https://img.shields.io/badge/golang-%3E%3D1.8.0-orange.svg?style=flat-square" /></a>
-  <br>
 </p>
 
 # Table of Contents
 
 - [Background](#background)
 - [Usage](#usage)
-  - [API](#api)
   - [Examples](#examples)
 - [Development](#development)
   - [Using the go-libp2p Workspace](#using-the-go-libp2p-workspace)
@@ -40,15 +29,13 @@
 [libp2p](https://github.com/libp2p/specs) is a networking stack and library modularized out of [The IPFS Project](https://github.com/ipfs/ipfs), and bundled separately for other tools to use.
 >
 libp2p is the product of a long, and arduous quest of understanding -- a deep dive into the internet's network stack, and plentiful peer-to-peer protocols from the past. Building large-scale peer-to-peer systems has been complex and difficult in the last 15 years, and libp2p is a way to fix that. It is a "network stack" -- a protocol suite -- that cleanly separates concerns, and enables sophisticated applications to only use the protocols they absolutely need, without giving up interoperability and upgradeability. libp2p grew out of IPFS, but it is built so that lots of people can use it, for lots of different projects.
->
-> We will be writing a set of docs, posts, tutorials, and talks to explain what p2p is, why it is tremendously useful, and how it can help your existing and new projects. But in the meantime, check out
->
-> - [**Our developing collection of docs**](https://docs.libp2p.io)
-> - [**Our community discussion forums**](https://discuss.libp2p.io)
-> - [**The libp2p Specification**](https://github.com/libp2p/specs)
-> - [**go-libp2p implementation**](https://github.com/libp2p/go-libp2p)
-> - [**js-libp2p implementation**](https://github.com/libp2p/js-libp2p)
-> - [**rust-libp2p implementation**](https://github.com/libp2p/rust-libp2p)
+
+To learn more, check out the following resources:
+- [**Our documentation**](https://docs.libp2p.io)
+- [**Our community discussion forum**](https://discuss.libp2p.io)
+- [**The libp2p Specification**](https://github.com/libp2p/specs)
+- [**js-libp2p implementation**](https://github.com/libp2p/js-libp2p)
+- [**rust-libp2p implementation**](https://github.com/libp2p/rust-libp2p)
 
 ## Usage
 
@@ -59,20 +46,6 @@ You can start using go-libp2p in your Go application simply by adding imports fr
 ```go
 import "github.com/libp2p/go-libp2p"
 ```
-
-Run `go get` or `go build`, excluding the libp2p repos from Go modules proxy usage. You only need to do this the first time you import go-libp2p to make sure you latch onto the correct version lineage (see [golang/go#34189](https://github.com/golang/go/issues/34189) for context):
-
-```sh
-$ GOPRIVATE='github.com/libp2p/*' go get ./...
-```
-
-The Go build tools will look for [available releases](https://github.com/libp2p/go-libp2p/releases), and will pick the highest available one.
-
-As new releases of go-libp2p are made available, you can upgrade your application by manually editing your `go.mod` file, or using the [Go tools](https://golang.org/cmd/go/#hdr-Maintaining_module_requirements) to maintain module requirements.
-
-### API
-
-[![GoDoc](https://godoc.org/github.com/libp2p/go-libp2p?status.svg)](https://godoc.org/github.com/libp2p/go-libp2p)
 
 ### Examples
 
@@ -108,10 +81,6 @@ If you experience any issues migrating from gx to gomod, please [join the discus
 
 `go test ./...` will run all tests in the repo.
 
-### Releasing
-
-Please start a release by opening a new [Libp2p Release](https://github.com/libp2p/go-libp2p/issues/new?assignees=&labels=kind/tracking&template=release.md) issue.
-
 ### Packages
 
 > This table is generated using the module [`package-table`](https://github.com/ipfs-shipyard/package-table) with `package-table --data=package-list.json`.
@@ -136,7 +105,7 @@ List of packages currently in existence for libp2p:
 | [`go-libp2p-transport-upgrader`](//github.com/libp2p/go-libp2p-transport-upgrader) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader) | upgrades multiaddr-net connections into full libp2p transports |
 | [`go-libp2p-reuseport-transport`](//github.com/libp2p/go-libp2p-reuseport-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport) | partial transport for building transports that reuse ports |
 | **Encrypted Channels** |
-| [`go-libp2p-secio`](//github.com/libp2p/go-libp2p-secio) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-secio.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-secio) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-secio/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-secio) | SecIO crypto channel |
+| [`go-libp2p-noise`](//github.com/libp2p/go-libp2p-noise) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-noise.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-noise) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-noise/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-noise) | Noise crypto channel |
 | [`go-libp2p-tls`](//github.com/libp2p/go-libp2p-tls) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-tls.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-tls) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-tls/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-tls) | TLS 1.3+ crypto channel |
 | [`go-conn-security-multistream`](//github.com/libp2p/go-conn-security-multistream) | [![Travis CI](https://travis-ci.com/libp2p/go-conn-security-multistream.svg?branch=master)](https://travis-ci.com/libp2p/go-conn-security-multistream) | [![codecov](https://codecov.io/gh/libp2p/go-conn-security-multistream/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-conn-security-multistream) | multistream multiplexed meta crypto channel |
 | **Private Network** |
@@ -186,12 +155,9 @@ go-libp2p is part of [The IPFS Project](https://github.com/ipfs/ipfs), and is MI
 Guidelines:
 
 - read the [libp2p spec](https://github.com/libp2p/specs)
-- please make branches + pull-request, even if working on the main repository
-- ask questions or talk about things in [issues](https://github.com/libp2p/go-libp2p/issues), our [discussion forums](https://discuss.libp2p.io), or #libp2p or #ipfs on freenode.
+- ask questions or talk about things in  our [discussion forums](https://discuss.libp2p.io), or open an [issue](https://github.com/libp2p/go-libp2p/issues) for bug reports, or #libp2p on freenode.
 - ensure you are able to contribute (no legal issues please -- we use the DCO)
-- run `go fmt` before pushing any code
-- run `golint` and `go vet` too -- some things (like protobuf files) are expected to fail.
-- get in touch with @raulk and @mgoelzer about how best to contribute
+- get in touch with @marten-seemann about how best to contribute
 - have fun!
 
 There's a few things you can do right now to help out:
