@@ -270,7 +270,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 	}
 
 	if cfg.EnableDiscV5 {
-		waku.node.DiscV5().Start()
+		err := waku.node.DiscV5().Start()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go func() {
