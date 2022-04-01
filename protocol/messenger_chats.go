@@ -27,7 +27,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 	var chats []*ChatPreview
 
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
-		if chat.Active {
+		if chat.Active || chat.Muted {
 			chatPreview := &ChatPreview{
 				ID:                    chat.ID,
 				Name:                  chat.Name,
