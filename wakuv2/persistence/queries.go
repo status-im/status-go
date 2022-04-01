@@ -28,7 +28,7 @@ func NewQueries(tbl string, db *sql.DB) (*Queries, error) {
 		deleteQuery:  fmt.Sprintf("DELETE FROM %s WHERE key = $1", tbl),
 		existsQuery:  fmt.Sprintf("SELECT exists(SELECT 1 FROM %s WHERE key=$1)", tbl),
 		getQuery:     fmt.Sprintf("SELECT data FROM %s WHERE key = $1", tbl),
-		putQuery:     fmt.Sprintf("INSERT INTO %s (key, data) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET data = $2", tbl),
+		putQuery:     fmt.Sprintf("INSERT INTO %s (key, data) VALUES ($1, $2)", tbl),
 		queryQuery:   fmt.Sprintf("SELECT key, data FROM %s", tbl),
 		prefixQuery:  ` WHERE key LIKE '%s%%' ORDER BY key`,
 		limitQuery:   ` LIMIT %d`,
@@ -84,7 +84,7 @@ func (q Queries) GetSize() string {
 
 // CreateTable creates the table that will persist the peers
 func CreateTable(db *sql.DB, tableName string) error {
-	sqlStmt := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (key TEXT NOT NULL UNIQUE, data BYTEA);", tableName)
+	sqlStmt := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (key TEXT NOT NULL PRIMARY KEY ON CONFLICT REPLACE, data BYTEA);", tableName)
 	_, err := db.Exec(sqlStmt)
 	if err != nil {
 		return err
