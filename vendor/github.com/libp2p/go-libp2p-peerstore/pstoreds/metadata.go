@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/gob"
 
-	base32 "github.com/multiformats/go-base32"
+	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/libp2p/go-libp2p-core/peer"
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 
 	ds "github.com/ipfs/go-datastore"
-
-	pool "github.com/libp2p/go-buffer-pool"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	pstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/ipfs/go-datastore/query"
+	"github.com/multiformats/go-base32"
 )
 
 // Metadata is stored under the following db key pattern:
@@ -45,7 +45,7 @@ func (pm *dsPeerMetadata) Get(p peer.ID, key string) (interface{}, error) {
 		return nil, err
 	}
 	k := pmBase.ChildString(base32.RawStdEncoding.EncodeToString([]byte(p))).ChildString(key)
-	value, err := pm.ds.Get(k)
+	value, err := pm.ds.Get(context.TODO(), k)
 	if err != nil {
 		if err == ds.ErrNotFound {
 			err = pstore.ErrNotFound
@@ -69,5 +69,19 @@ func (pm *dsPeerMetadata) Put(p peer.ID, key string, val interface{}) error {
 	if err := gob.NewEncoder(&buf).Encode(&val); err != nil {
 		return err
 	}
-	return pm.ds.Put(k, buf.Bytes())
+	return pm.ds.Put(context.TODO(), k, buf.Bytes())
+}
+
+func (pm *dsPeerMetadata) RemovePeer(p peer.ID) {
+	result, err := pm.ds.Query(context.TODO(), query.Query{
+		Prefix:   pmBase.ChildString(base32.RawStdEncoding.EncodeToString([]byte(p))).String(),
+		KeysOnly: true,
+	})
+	if err != nil {
+		log.Warnw("querying datastore when removing peer failed", "peer", p, "error", err)
+		return
+	}
+	for entry := range result.Next() {
+		pm.ds.Delete(context.TODO(), ds.NewKey(entry.Key))
+	}
 }

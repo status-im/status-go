@@ -48,11 +48,6 @@ standard Go module which can be installed with:
 go get github.com/libp2p/go-libp2p-transport-upgrader
 ```
 
-This repo is [gomod](https://github.com/golang/go/wiki/Modules)-compatible, and users of
-go 1.11 and later with modules enabled will automatically pull the latest tagged release
-by referencing this package. Upgrades to future releases can be managed using `go get`,
-or by editing your `go.mod` file as [described by the gomod documentation](https://github.com/golang/go/wiki/Modules#how-to-upgrade-and-downgrade-dependencies).
-
 ## Usage
 
 To use, construct a new `Upgrader` with:

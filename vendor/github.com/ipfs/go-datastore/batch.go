@@ -1,5 +1,9 @@
 package datastore
 
+import (
+	"context"
+)
+
 type op struct {
 	delete bool
 	value  []byte
@@ -13,6 +17,8 @@ type basicBatch struct {
 	target Datastore
 }
 
+var _ Batch = (*basicBatch)(nil)
+
 func NewBasicBatch(ds Datastore) Batch {
 	return &basicBatch{
 		ops:    make(map[Key]op),
@@ -20,23 +26,23 @@ func NewBasicBatch(ds Datastore) Batch {
 	}
 }
 
-func (bt *basicBatch) Put(key Key, val []byte) error {
+func (bt *basicBatch) Put(ctx context.Context, key Key, val []byte) error {
 	bt.ops[key] = op{value: val}
 	return nil
 }
 
-func (bt *basicBatch) Delete(key Key) error {
+func (bt *basicBatch) Delete(ctx context.Context, key Key) error {
 	bt.ops[key] = op{delete: true}
 	return nil
 }
 
-func (bt *basicBatch) Commit() error {
+func (bt *basicBatch) Commit(ctx context.Context) error {
 	var err error
 	for k, op := range bt.ops {
 		if op.delete {
-			err = bt.target.Delete(k)
+			err = bt.target.Delete(ctx, k)
 		} else {
-			err = bt.target.Put(k, op.value)
+			err = bt.target.Put(ctx, k, op.value)
 		}
 		if err != nil {
 			break

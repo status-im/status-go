@@ -66,14 +66,18 @@ func (si InstrumentedStream) Protocol() protocol.ID {
 	return si.s.Protocol()
 }
 
-func (si InstrumentedStream) SetProtocol(pid protocol.ID) {
-	si.s.SetProtocol(pid)
+func (si InstrumentedStream) SetProtocol(pid protocol.ID) error {
+	return si.s.SetProtocol(pid)
 }
 
 func (si InstrumentedStream) Conn() network.Conn {
 	return si.s.Conn()
 }
 
-func (si InstrumentedStream) Stat() network.Stat {
+func (si InstrumentedStream) Stat() network.Stats {
 	return si.s.Stat()
+}
+
+func (si InstrumentedStream) Scope() network.StreamScope {
+	return si.s.Scope()
 }

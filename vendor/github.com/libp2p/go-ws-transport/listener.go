@@ -1,8 +1,7 @@
-// +build !js
-
 package websocket
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,8 +10,14 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
+var (
+	wsma  = ma.StringCast("/ws")
+	wssma = ma.StringCast("/wss")
+)
+
 type listener struct {
-	net.Listener
+	nl     net.Listener
+	server http.Server
 
 	laddr ma.Multiaddr
 
@@ -20,9 +25,56 @@ type listener struct {
 	incoming chan *Conn
 }
 
+// newListener creates a new listener from a raw net.Listener.
+// tlsConf may be nil (for unencrypted websockets).
+func newListener(a ma.Multiaddr, tlsConf *tls.Config) (*listener, error) {
+	// Only look at the _last_ component.
+	maddr, wscomponent := ma.SplitLast(a)
+	isWSS := wscomponent.Equal(wssma)
+	if isWSS && tlsConf == nil {
+		return nil, fmt.Errorf("cannot listen on wss address %s without a tls.Config", a)
+	}
+	lnet, lnaddr, err := manet.DialArgs(maddr)
+	if err != nil {
+		return nil, err
+	}
+	nl, err := net.Listen(lnet, lnaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	laddr, err := manet.FromNetAddr(nl.Addr())
+	if err != nil {
+		return nil, err
+	}
+	first, _ := ma.SplitFirst(a)
+	// Don't resolve dns addresses.
+	// We want to be able to announce domain names, so the peer can validate the TLS certificate.
+	if c := first.Protocol().Code; c == ma.P_DNS || c == ma.P_DNS4 || c == ma.P_DNS6 || c == ma.P_DNSADDR {
+		_, last := ma.SplitFirst(laddr)
+		laddr = first.Encapsulate(last)
+	}
+
+	ln := &listener{
+		nl:       nl,
+		laddr:    laddr.Encapsulate(wscomponent),
+		incoming: make(chan *Conn),
+		closed:   make(chan struct{}),
+	}
+	ln.server = http.Server{Handler: ln}
+	if isWSS {
+		ln.server.TLSConfig = tlsConf
+	}
+	return ln, nil
+}
+
 func (l *listener) serve() {
 	defer close(l.closed)
-	_ = http.Serve(l.Listener, l)
+	if l.server.TLSConfig == nil {
+		l.server.Serve(l.nl)
+	} else {
+		l.server.ServeTLS(l.nl, "", "")
+	}
 }
 
 func (l *listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +85,7 @@ func (l *listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	select {
-	case l.incoming <- NewConn(c):
+	case l.incoming <- NewConn(c, false):
 	case <-l.closed:
 		c.Close()
 	}
@@ -57,6 +109,17 @@ func (l *listener) Accept() (manet.Conn, error) {
 	case <-l.closed:
 		return nil, fmt.Errorf("listener is closed")
 	}
+}
+
+func (l *listener) Addr() net.Addr {
+	return l.nl.Addr()
+}
+
+func (l *listener) Close() error {
+	l.server.Close()
+	err := l.nl.Close()
+	<-l.closed
+	return err
 }
 
 func (l *listener) Multiaddr() ma.Multiaddr {

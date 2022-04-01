@@ -20,6 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	p2pproto "github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ws "github.com/libp2p/go-ws-transport"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
 
@@ -38,10 +39,10 @@ import (
 )
 
 type Peer struct {
-	ID        peer.ID
-	Protocols []string
-	Addrs     []ma.Multiaddr
-	Connected bool
+	ID        peer.ID        `json:"peerID"`
+	Protocols []string       `json:"protocols"`
+	Addrs     []ma.Multiaddr `json:"addrs"`
+	Connected bool           `json:"connected"`
 }
 
 type storeFactory func(w *WakuNode) store.Store
@@ -105,6 +106,12 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
+	if params.enableWSS {
+		params.libP2POpts = append(params.libP2POpts, libp2p.Transport(ws.New, ws.WithTLSConfig(params.tlsConfig)))
+	} else if params.enableWS {
+		params.libP2POpts = append(params.libP2POpts, libp2p.Transport(ws.New))
+	}
+
 	// Setting default host address if none was provided
 	if params.hostAddr == nil {
 		err := WithHostAddress(&net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: 0})(params)
@@ -125,7 +132,7 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		params.libP2POpts = append(params.libP2POpts, libp2p.AddrsFactory(params.addressFactory))
 	}
 
-	host, err := libp2p.New(ctx, params.libP2POpts...)
+	host, err := libp2p.New(params.libP2POpts...)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -189,12 +196,29 @@ func (w *WakuNode) onAddrChange() {
 			w.log.Error(fmt.Sprintf("could not extract ip from ma %s: %s", m, err.Error()))
 			continue
 		}
-		ip := net.ParseIP(ipStr)
-		if !ip.IsLoopback() && !ip.IsUnspecified() {
+
+		portStr, err := m.ValueForProtocol(ma.P_TCP)
+		if err != nil {
+			w.log.Error(fmt.Sprintf("could not extract port from ma %s: %s", m, err.Error()))
+			continue
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			w.log.Error(fmt.Sprintf("could not convert port to int: %s", err.Error()))
+			continue
+		}
+
+		addr := &net.TCPAddr{
+			IP:   net.ParseIP(ipStr),
+			Port: port,
+		}
+
+		if !addr.IP.IsLoopback() && !addr.IP.IsUnspecified() {
 			if w.opts.enableDiscV5 {
-				err := w.discoveryV5.UpdateAddr(ip)
+				err := w.discoveryV5.UpdateAddr(addr)
 				if err != nil {
-					w.log.Error(fmt.Sprintf("could not update DiscV5 address with IP %s: %s", ip, err.Error()))
+					w.log.Error(fmt.Sprintf("could not update DiscV5 address with IP %s:%d %s", addr.IP, addr.Port, err.Error()))
 					continue
 				}
 			}
@@ -451,24 +475,8 @@ func (w *WakuNode) mountDiscV5() error {
 		discV5Options = append(discV5Options, discv5.WithAdvertiseAddr(*w.opts.advertiseAddr))
 	}
 
-	addr := w.ListenAddresses()[0]
-
-	ipStr, err := addr.ValueForProtocol(ma.P_IP4)
-	if err != nil {
-		return err
-	}
-
-	portStr, err := addr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		return err
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return err
-	}
-
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), net.ParseIP(ipStr), port, w.opts.privKey, w.wakuFlag, w.log, discV5Options...)
+	var err error
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.ListenAddresses(), w.opts.privKey, w.wakuFlag, w.log, discV5Options...)
 
 	return err
 }

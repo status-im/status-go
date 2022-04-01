@@ -6,20 +6,22 @@ import (
 	"io"
 	"time"
 
-	base32 "github.com/multiformats/go-base32"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
 
 	ds "github.com/ipfs/go-datastore"
-	query "github.com/ipfs/go-datastore/query"
-
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/ipfs/go-datastore/query"
+	"github.com/multiformats/go-base32"
 )
 
 // Configuration object for the peerstore.
 type Options struct {
 	// The size of the in-memory cache. A value of 0 or lower disables the cache.
 	CacheSize uint
+
+	// MaxProtocols is the maximum number of protocols we store for one peer.
+	MaxProtocols int
 
 	// Sweep interval to purge expired addresses from the datastore. If this is a zero value, GC will not run
 	// automatically, but it'll be available on demand via explicit calls.
@@ -37,12 +39,14 @@ type Options struct {
 // DefaultOpts returns the default options for a persistent peerstore, with the full-purge GC algorithm:
 //
 // * Cache size: 1024.
+// * MaxProtocols: 1024.
 // * GC purge interval: 2 hours.
 // * GC lookahead interval: disabled.
 // * GC initial delay: 60 seconds.
 func DefaultOpts() Options {
 	return Options{
 		CacheSize:           1024,
+		MaxProtocols:        1024,
 		GCPurgeInterval:     2 * time.Hour,
 		GCLookaheadInterval: 0,
 		GCInitialDelay:      60 * time.Second,
@@ -58,7 +62,11 @@ type pstoreds struct {
 	*dsPeerMetadata
 }
 
+var _ peerstore.Peerstore = &pstoreds{}
+
 // NewPeerstore creates a peerstore backed by the provided persistent datastore.
+// It's the caller's responsibility to call RemovePeer to ensure
+// that memory consumption of the peerstore doesn't grow unboundedly.
 func NewPeerstore(ctx context.Context, store ds.Batching, opts Options) (*pstoreds, error) {
 	addrBook, err := NewAddrBook(ctx, store, opts)
 	if err != nil {
@@ -75,16 +83,18 @@ func NewPeerstore(ctx context.Context, store ds.Batching, opts Options) (*pstore
 		return nil, err
 	}
 
-	protoBook := NewProtoBook(peerMetadata)
+	protoBook, err := NewProtoBook(peerMetadata, WithMaxProtocols(opts.MaxProtocols))
+	if err != nil {
+		return nil, err
+	}
 
-	ps := &pstoreds{
+	return &pstoreds{
 		Metrics:        pstore.NewMetrics(),
 		dsKeyBook:      keyBook,
 		dsAddrBook:     addrBook,
 		dsPeerMetadata: peerMetadata,
 		dsProtoBook:    protoBook,
-	}
-	return ps, nil
+	}, nil
 }
 
 // uniquePeerIds extracts and returns unique peer IDs from database keys.
@@ -95,7 +105,7 @@ func uniquePeerIds(ds ds.Datastore, prefix ds.Key, extractor func(result query.R
 		err     error
 	)
 
-	if results, err = ds.Query(q); err != nil {
+	if results, err = ds.Query(context.TODO(), q); err != nil {
 		log.Error(err)
 		return nil, err
 	}
@@ -130,7 +140,6 @@ func (ps *pstoreds) Close() (err error) {
 			}
 		}
 	}
-
 	weakClose("keybook", ps.dsKeyBook)
 	weakClose("addressbook", ps.dsAddrBook)
 	weakClose("protobook", ps.dsProtoBook)
@@ -163,4 +172,17 @@ func (ps *pstoreds) PeerInfo(p peer.ID) peer.AddrInfo {
 		ID:    p,
 		Addrs: ps.dsAddrBook.Addrs(p),
 	}
+}
+
+// RemovePeer removes entries associated with a peer from:
+// * the KeyBook
+// * the ProtoBook
+// * the PeerMetadata
+// * the Metrics
+// It DOES NOT remove the peer from the AddrBook.
+func (ps *pstoreds) RemovePeer(p peer.ID) {
+	ps.dsKeyBook.RemovePeer(p)
+	ps.dsProtoBook.RemovePeer(p)
+	ps.dsPeerMetadata.RemovePeer(p)
+	ps.Metrics.RemovePeer(p)
 }

@@ -18,6 +18,8 @@ go get github.com/ipfs/go-ds-sql
 
 ## Usage
 
+### PostgreSQL
+
 Ensure a database is created and a table exists with `key` and `data` columns. For example, in PostgreSQL you can create a table with the following structure (replacing `table_name` with the name of the table the datastore will use - by default this is `blocks`):
 
 ```sql
@@ -46,6 +48,73 @@ mydb, _ := sql.Open("yourdb", "yourdbparameters")
 queries := pg.NewQueries("blocks")
 
 ds := sqlds.NewDatastore(mydb, queries)
+```
+
+### SQLite
+
+The [SQLite](https://sqlite.org) wrapper tries to create the table automatically
+
+Prefix scans are optimized by using GLOB
+
+Import and use in your application:
+
+```go
+package main
+
+import (
+	sqliteds "github.com/ipfs/go-ds-sql/sqlite"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+func main() {
+	opts := &sqliteds.Options{
+		DSN: "db.sqlite",
+	}
+
+	ds, err := opts.Create()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			panic(err)
+		}
+	}()
+}
+```
+
+If no `DSN` is specified, an unique in-memory database will be created
+
+### SQLCipher
+
+The SQLite wrapper also supports the [SQLCipher](https://www.zetetic.net/sqlcipher/) extension
+
+Import and use in your application:
+
+```go
+package main
+
+import (
+	sqliteds "github.com/ipfs/go-ds-sql/sqlite"
+	_ "github.com/mutecomm/go-sqlcipher/v4"
+)
+
+func main() {
+	opts := &sqliteds.Options{
+		DSN: "encdb.sqlite",
+		Key: ([]byte)("32_very_secure_bytes_0123456789a"),
+	}
+
+	ds, err := opts.Create()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			panic(err)
+		}
+	}()
+}
 ```
 
 ## API
