@@ -468,6 +468,11 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String())
+	if err != nil {
+		return nil, err
+	}
+
 	mr, err := m.leaveCommunity(communityID)
 	if err != nil {
 		return nil, err

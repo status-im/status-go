@@ -4080,6 +4080,11 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 }
 
 func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
+	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
+
 	chatIDs, err := m.persistence.AllChatIDsByCommunity(communityID)
 	if err != nil {
 		return nil, err

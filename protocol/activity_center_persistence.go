@@ -401,6 +401,30 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 
 }
 
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(communityID string) error {
+
+	chatIDs, err := db.AllChatIDsByCommunity(communityID)
+	if err != nil {
+		return err
+	}
+
+	chatIDsCount := len(chatIDs)
+	if chatIDsCount == 0 {
+		return nil
+	}
+
+	chatIDsArgs := make([]interface{}, 0, chatIDsCount)
+	for _, chatID := range chatIDs {
+		chatIDsArgs = append(chatIDsArgs, chatID)
+	}
+
+	inVector := strings.Repeat("?, ", chatIDsCount-1) + "?"
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE chat_id IN (" + inVector + ")" // nolint: gosec
+	_, err = db.db.Exec(query, chatIDsArgs...)
+	return err
+
+}
+
 func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
