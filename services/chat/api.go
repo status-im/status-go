@@ -154,6 +154,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Verified:       community.Verified(),
 			Description:    community.DescriptionText(),
 			Permissions:    community.Description().Permissions,
+			Members:        community.Description().Members,
 			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),
 			Muted:          community.Muted(),
 		}
