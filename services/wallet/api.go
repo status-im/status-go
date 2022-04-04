@@ -99,6 +99,22 @@ func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address commo
 	return token, err
 }
 
+func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*Token, error) {
+	log.Debug("call to get visible tokens")
+	rst, err := api.s.tokenManager.getVisible(chainIDs)
+	log.Debug("result from database for visible tokens", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) ToggleVisibleToken(ctx context.Context, chainID uint64, address common.Address) (bool, error) {
+	log.Debug("call to toggle visible tokens")
+	err := api.s.tokenManager.toggle(chainID, address)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (api *API) AddCustomToken(ctx context.Context, token Token) error {
 	log.Debug("call to create or edit custom token")
 	if token.ChainID == 0 {

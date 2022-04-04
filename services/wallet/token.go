@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 )
@@ -33,8 +34,24 @@ type Token struct {
 }
 
 type TokenManager struct {
-	db        *sql.DB
-	RPCClient *rpc.Client
+	db             *sql.DB
+	RPCClient      *rpc.Client
+	networkManager *network.Manager
+}
+
+func (tm *TokenManager) findSNT(chainID uint64) *Token {
+	tokensMap, ok := tokenStore[chainID]
+	if !ok {
+		return nil
+	}
+
+	for _, token := range tokensMap {
+		if token.Symbol == "SNT" || token.Symbol == "STT" {
+			return token
+		}
+	}
+
+	return nil
 }
 
 func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
@@ -109,6 +126,105 @@ func (tm *TokenManager) getCustoms() ([]*Token, error) {
 		rst = append(rst, token)
 	}
 
+	return rst, nil
+}
+
+func (tm *TokenManager) isTokenVisible(chainID uint64, address common.Address) (bool, error) {
+	rows, err := tm.db.Query("SELECT chain_id, address FROM visible_tokens WHERE chain_id = ? AND address = ?", chainID, address)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	return rows.Next(), nil
+}
+
+func (tm *TokenManager) toggle(chainID uint64, address common.Address) error {
+	isVisible, err := tm.isTokenVisible(chainID, address)
+	if err != nil {
+		return err
+	}
+
+	if isVisible {
+		_, err = tm.db.Exec(`DELETE FROM visible_tokens WHERE address = ? and chain_id = ?`, address, chainID)
+		return err
+	}
+
+	insert, err := tm.db.Prepare("INSERT OR REPLACE INTO visible_tokens (chain_id, address) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	defer insert.Close()
+
+	_, err = insert.Exec(chainID, address)
+	return err
+}
+
+func (tm *TokenManager) getVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
+	customTokens, err := tm.getCustoms()
+	if err != nil {
+		return nil, err
+	}
+
+	rst := make(map[uint64][]*Token)
+	for _, chainID := range chainIDs {
+		network := tm.networkManager.Find(chainID)
+		if network == nil {
+			continue
+		}
+
+		rst[chainID] = make([]*Token, 0)
+		rst[chainID] = append(rst[chainID], &Token{
+			Address:  common.HexToAddress("0x"),
+			Name:     network.NativeCurrencyName,
+			Symbol:   network.NativeCurrencySymbol,
+			Decimals: uint(network.NativeCurrencyDecimals),
+			ChainID:  chainID,
+		})
+	}
+	rows, err := tm.db.Query("SELECT chain_id, address FROM visible_tokens")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		address := common.HexToAddress("0x")
+		chainID := uint64(0)
+		err := rows.Scan(&chainID, &address)
+		if err != nil {
+			return nil, err
+		}
+
+		found := false
+		for _, token := range tokenStore[chainID] {
+			if token.Address == address {
+				rst[chainID] = append(rst[chainID], token)
+				found = true
+				break
+			}
+		}
+
+		if found {
+			continue
+		}
+
+		for _, token := range customTokens {
+			if token.Address == address {
+				rst[chainID] = append(rst[chainID], token)
+				break
+			}
+		}
+	}
+
+	for _, chainID := range chainIDs {
+		if len(rst[chainID]) == 1 {
+			token := tm.findSNT(chainID)
+			if token != nil {
+				rst[chainID] = append(rst[chainID], token)
+			}
+		}
+	}
 	return rst, nil
 }
 
