@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/ierc20"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 )
@@ -32,7 +33,8 @@ type Token struct {
 }
 
 type TokenManager struct {
-	db *sql.DB
+	db        *sql.DB
+	RPCClient *rpc.Client
 }
 
 func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
@@ -48,6 +50,45 @@ func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
 	}
 
 	return res, nil
+}
+
+func (tm *TokenManager) discoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
+	backend, err := tm.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	caller, err := ierc20.NewIERC20Caller(address, backend)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := caller.Name(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	symbol, err := caller.Symbol(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	decimal, err := caller.Decimals(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Token{
+		Address:  address,
+		Name:     name,
+		Symbol:   symbol,
+		Decimals: uint(decimal),
+	}, nil
 }
 
 func (tm *TokenManager) getCustoms() ([]*Token, error) {

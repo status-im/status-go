@@ -56,6 +56,10 @@ type API struct {
 	config          *params.NodeConfig
 }
 
+func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error) {
+	return registrar.ContractAddress(chainID)
+}
+
 func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
 	err := validateENSUsername(username)
 	if err != nil {

@@ -17,7 +17,7 @@ func setupTestTokenDB(t *testing.T) (*TokenManager, func()) {
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-token-tests")
 	require.NoError(t, err)
-	return &TokenManager{db}, func() {
+	return &TokenManager{db, nil}, func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
