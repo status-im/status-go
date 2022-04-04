@@ -3,11 +3,10 @@ package stickers
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/zenthangplus/goccm"
 )
 
 func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
@@ -81,46 +80,41 @@ func (api *API) ProcessPending(chainID uint64) (pendingChanged StickerPackCollec
 		return nil, err
 	}
 
-	stickerType, err := api.contractMaker.NewStickerType(chainID)
+	accs, err := api.accountsDB.GetAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	stickerChan := make(chan StickerPack, 10)
-	go func() {
-		c := goccm.New(maxConcurrentRequests)
-		for _, pendingStickerPack := range pendingStickerPacks {
-			c.Wait()
-			go func(pendingStickerPack StickerPack) {
-				defer c.Done()
-				stickerPack, err := api.fetchPackData(stickerType, pendingStickerPack.ID.Int, true)
-				if err != nil {
-					log.Warn("Could not retrieve stickerpack data", "packID", pendingStickerPack.ID.Int, "error", err)
-					return
+	purchasedPacks := make(map[uint]struct{})
+	purchasedPackChan := make(chan *big.Int)
+	errChan := make(chan error)
+	doneChan := make(chan struct{}, 1)
+	go api.getAccountsPurchasedPack(chainID, accs, purchasedPackChan, errChan, doneChan)
+	for {
+		select {
+		case err := <-errChan:
+			if err != nil {
+				return nil, err
+			}
+		case packID := <-purchasedPackChan:
+			if packID != nil {
+				purchasedPacks[uint(packID.Uint64())] = struct{}{}
+			}
+		case <-doneChan:
+			result := make(StickerPackCollection)
+			for _, stickerPack := range pendingStickerPacks {
+				packID := uint(stickerPack.ID.Uint64())
+				if _, exists := purchasedPacks[packID]; !exists {
+					continue
 				}
-
-				if stickerPack.Status == statusPurchased {
-					stickerChan <- *stickerPack
-				}
-			}(pendingStickerPack)
+				delete(pendingStickerPacks, packID)
+				stickerPack.Status = statusPurchased
+				result[packID] = stickerPack
+			}
+			err = api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingStickerPacks)
+			return result, err
 		}
-
-		c.WaitAllDone()
-		close(stickerChan)
-	}()
-
-	result := make(StickerPackCollection)
-	for stickerPack := range stickerChan {
-		packID := uint(stickerPack.ID.Uint64())
-		if _, exists := pendingStickerPacks[packID]; !exists {
-			continue
-		}
-		delete(pendingStickerPacks, packID)
-		result[packID] = stickerPack
 	}
-
-	err = api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingStickerPacks)
-	return result, err
 }
 
 func (api *API) RemovePending(packID *bigint.BigInt) error {
