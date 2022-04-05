@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"sort"
+	"log"
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
@@ -85,6 +87,25 @@ func NewManager(identity *ecdsa.PublicKey, db *sql.DB, logger *zap.Logger, verif
 	}
 
 	return manager, nil
+}
+
+type archiveMDSlice []*archiveMetadata
+
+type archiveMetadata struct {
+  hash string
+  from uint64
+}
+
+func (md archiveMDSlice) Len() int {
+  return len(md)
+}
+
+func (md archiveMDSlice) Swap(i, j int) {
+  md[i], md[j] = md[j], md[i]
+}
+
+func (md archiveMDSlice) Less(i, j int) bool {
+  return md[i].from > md[j].from
 }
 
 type Subscription struct {
@@ -1614,7 +1635,19 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 
 	var archiveIDs []string
 
-	for hash, metadata := range index.Archives {
+  archiveHashes := make(archiveMDSlice, 0, len(index.Archives))
+
+  for hash, metadata := range index.Archives {
+    archiveHashes = append(archiveHashes, &archiveMetadata{ hash: hash, from: metadata.Metadata.From })
+  }
+
+  sort.Sort(archiveHashes)
+
+  log.Println("HASHES: ", archiveHashes)
+
+	for _, hd := range archiveHashes {
+    hash := hd.hash
+    metadata := index.Archives[hash]
 		hasArchive, err := m.persistence.HasMessageArchiveID(communityID, hash)
 		if err != nil {
 			m.logger.Debug("Failed to check if has message archive id", zap.Error(err))
@@ -1654,6 +1687,13 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 			m.logger.Debug("Couldn't save message archive ID", zap.Error(err))
 			continue
 		}
+    m.publish(&Subscription{
+      HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
+        CommunityID: communityID.String(),
+        From: int(metadata.Metadata.From),
+        To: int(metadata.Metadata.To),
+      },
+    })
 	}
 	m.publish(&Subscription{
 		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{

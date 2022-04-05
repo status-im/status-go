@@ -19,7 +19,8 @@ import (
 )
 
 // 7 days interval
-var messageArchiveInterval = 7 * 24 * time.Hour
+// var messageArchiveInterval = 7 * 24 * time.Hour
+var messageArchiveInterval = 5 * time.Minute
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))

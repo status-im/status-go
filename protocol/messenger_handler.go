@@ -646,13 +646,14 @@ func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signe
 func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
 
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
-	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
-	if err != nil {
-		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
-		return err
-	}
+	// settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
+	// if err != nil {
+	// 	m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
+	// 	return err
+	// }
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && settings.HistoryArchiveSupportEnabled {
+	// if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && settings.HistoryArchiveSupportEnabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
 		signedByOwnedCommunity, err := m.communitiesManager.IsAdminCommunity(communityPubKey)
 		if err != nil {
 			return err
