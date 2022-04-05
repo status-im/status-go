@@ -567,10 +567,7 @@ func (b *StatusNode) Cleanup() error {
 		}
 	}
 
-	b.downloader.Stop()
-
 	return nil
-
 }
 
 type RPCCall struct {

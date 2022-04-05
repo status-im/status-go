@@ -98,7 +98,10 @@ func (d *Downloader) taskDispatcher() {
 		case <-d.quit:
 			return
 		case <-ticker.C:
-			request := <-d.inputTaskChan
+			request, ok := <-d.inputTaskChan
+			if !ok {
+				return
+			}
 			d.rateLimiterChan <- request
 
 		}
@@ -173,10 +176,10 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 		doneChan: doneChan,
 	}
 
-	d.wg.Done()
-
 	done := <-doneChan
 	close(doneChan)
+
+	d.wg.Done()
 
 	return done.response, done.err
 }
