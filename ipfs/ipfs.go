@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -32,6 +33,7 @@ type taskRequest struct {
 
 type Downloader struct {
 	ipfsDir         string
+	wg              sync.WaitGroup
 	rateLimiterChan chan taskRequest
 	inputTaskChan   chan taskRequest
 	client          *http.Client
@@ -49,6 +51,7 @@ func NewDownloader(rootDir string) *Downloader {
 		ipfsDir:         ipfsDir,
 		rateLimiterChan: make(chan taskRequest, maxRequestsPerSecond),
 		inputTaskChan:   make(chan taskRequest, 1000),
+		wg:              sync.WaitGroup{},
 		client: &http.Client{
 			Timeout: time.Second * 5,
 		},
@@ -64,6 +67,9 @@ func NewDownloader(rootDir string) *Downloader {
 
 func (d *Downloader) Stop() {
 	close(d.quit)
+
+	d.wg.Wait()
+
 	close(d.inputTaskChan)
 	close(d.rateLimiterChan)
 }
@@ -158,11 +164,16 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 	}
 
 	doneChan := make(chan taskResponse, 1)
+
+	d.wg.Add(1)
+
 	d.inputTaskChan <- taskRequest{
 		cid:      cid,
 		download: download,
 		doneChan: doneChan,
 	}
+
+	d.wg.Done()
 
 	done := <-doneChan
 	close(doneChan)
