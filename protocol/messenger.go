@@ -391,7 +391,8 @@ func NewMessenger(
 	}
 
 	mailservers := mailserversDB.NewDB(database)
-	httpServer, err := server.NewServer(database, logger)
+	mediaServer, err := server.NewServer(database, logger, nil)
+	mediaServer.LoadMediaHandlers()
 
 	if err != nil {
 		return nil, err
@@ -434,14 +435,14 @@ func NewMessenger(
 		quit:                 make(chan struct{}),
 		requestedCommunities: make(map[string]*transport.Filter),
 		browserDatabase:      c.browserDatabase,
-		httpServer:           httpServer,
+		httpServer:           mediaServer,
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
 			transp.ResetFilters,
-			httpServer.Stop,
+			mediaServer.Stop,
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
