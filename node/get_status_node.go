@@ -238,7 +238,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 
 	n.downloader = ipfs.NewDownloader(config.RootDataDir)
 
-	httpServer, err := server.NewServer(n.appDB, n.downloader)
+	httpServer, err := server.NewServer(n.appDB, n.downloader, nil)
 	if err != nil {
 		return err
 	}
@@ -246,6 +246,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	if err := httpServer.Start(); err != nil {
 		return err
 	}
+	httpServer.LoadMediaHandlers()
 
 	n.httpServer = httpServer
 
