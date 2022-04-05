@@ -64,8 +64,8 @@ func NewDownloader(rootDir string) *Downloader {
 
 func (d *Downloader) Stop() {
 	close(d.quit)
-	close(d.rateLimiterChan)
 	close(d.inputTaskChan)
+	close(d.rateLimiterChan)
 }
 
 func (d *Downloader) worker() {
