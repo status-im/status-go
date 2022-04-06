@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -824,4 +825,17 @@ func SwitchFleet(fleet string, configJSON string) string {
 	err := statusBackend.SwitchFleet(fleet, &conf)
 
 	return makeJSONResponse(err)
+}
+
+func GenerateImages(filepath string, aX, aY, bX, bY int) string {
+	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(iis)
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
+	}
+	return string(data)
 }
