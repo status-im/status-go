@@ -425,6 +425,11 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 
 }
 
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chatID string) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE NOT dismissed AND NOT accepted AND chat_id = ?`, chatID)
+	return err
+}
+
 func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error

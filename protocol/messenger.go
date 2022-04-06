@@ -2091,6 +2091,11 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 }
 
 func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
+	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
 	var response MessengerResponse
 	return m.leaveGroupChat(ctx, &response, chatID, remove, true)
 }
@@ -4070,6 +4075,11 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
+	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID)
+	if err != nil {
+		return err
+	}
+
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
