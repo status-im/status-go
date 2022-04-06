@@ -20,6 +20,7 @@ const (
 	ActivityCenterNotificationTypeNewPrivateGroupChat
 	ActivityCenterNotificationTypeMention
 	ActivityCenterNotificationTypeReply
+        ActivityCenterNotificationTypeContactRequest
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")

@@ -485,6 +485,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 			}
 
 			if m.mailserverCycle.activeMailserver != nil && id == m.mailserverCycle.activeMailserver.ID {
+			        m.mailserverCycle.activeMailserver.FailedRequests = 0
 				m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
 				m.EmitMailserverAvailable()
 				signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)

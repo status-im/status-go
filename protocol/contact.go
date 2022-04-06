@@ -11,6 +11,15 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
+type ContactState int
+
+const (
+  ContactStateMutual = iota + 1
+  ContactStateSentRequest
+  ContactStateReceivedRequest
+  ContactStateDismissedRequest
+)
+
 // ContactRequest is the signed contact request received from the user
 type ContactRequest struct {
 	// SigningKey is the key of the user who created the contact request
@@ -96,6 +105,8 @@ type Contact struct {
 	Added      bool `json:"added"`
 	Blocked    bool `json:"blocked"`
 	HasAddedUs bool `json:"hasAddedUs"`
+
+        ContactState ContactState `json:"contactState"`
 
 	IsSyncing bool
 	Removed   bool

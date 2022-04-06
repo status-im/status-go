@@ -225,6 +225,24 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 	}
 }
 
+func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message) {
+
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(contactRequest.ID),
+		Name:        contact.CanonicalName(),
+		Message:     contactRequest,
+		Type:        ActivityCenterNotificationTypeContactRequest,
+		Author:      messageState.CurrentMessageState.Contact.ID,
+		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
+		ChatID:      contact.ID,
+	}
+
+	err := m.addActivityCenterNotification(messageState, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
+	}
+}
+
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
 	message.ID = state.CurrentMessageState.MessageID
 	message.From = state.CurrentMessageState.Contact.ID
@@ -597,6 +615,8 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
     return err
   }
 
+
+   m.createContactRequestNotification(state.CurrentMessageState.Contact, state, request)
 
   state.Response.AddMessage(request)
   return nil
@@ -1042,7 +1062,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// If the chat is not active, create a notification in the center
 	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active {
+          if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+            m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
+          } else {
 		m.createMessageNotification(chat, state)
+              }
 	}
 
 	// Set in the modified maps chat
