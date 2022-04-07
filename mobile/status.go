@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
@@ -662,6 +663,10 @@ func EmojiHash(pk string) string {
 
 func ColorHash(pk string) string {
 	return prepareJSONResponse(colorhash.GenerateFor(pk))
+}
+
+func ColorID(pk string) string {
+	return prepareJSONResponse(identityUtils.ToColorID(pk))
 }
 
 func ValidateMnemonic(mnemonic string) string {
