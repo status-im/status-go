@@ -278,6 +278,18 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	for _, acc := range subaccs {
+		if acc.Chat {
+			colorHash, _ := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			colorID, _ := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			account.ColorHash = colorHash
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)

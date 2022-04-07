@@ -3,6 +3,7 @@ package multiaccounts
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
@@ -15,6 +16,8 @@ type Account struct {
 	Name           string                 `json:"name"`
 	Timestamp      int64                  `json:"timestamp"`
 	Identicon      string                 `json:"identicon"`
+	ColorHash      [][]int                `json:"colorHash"`
+	ColorID        int64                  `json:"colorId"`
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
 	Images         []images.IdentityImage `json:"images"`
@@ -47,7 +50,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() (rst []Account, err error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +62,8 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 		acc := Account{}
 		accLoginTimestamp := sql.NullInt64{}
 		accIdenticon := sql.NullString{}
+		accColorHash := sql.NullString{}
+		accColorID := sql.NullInt64{}
 		ii := &images.IdentityImage{}
 		iiName := sql.NullString{}
 		iiWidth := sql.NullInt64{}
@@ -70,6 +75,8 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 			&acc.Name,
 			&accLoginTimestamp,
 			&accIdenticon,
+			&accColorHash,
+			&accColorID,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
 			&iiName,
@@ -85,6 +92,11 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 
 		acc.Timestamp = accLoginTimestamp.Int64
 		acc.Identicon = accIdenticon.String
+		acc.ColorID = accColorID.Int64
+		err = json.Unmarshal([]byte(accColorHash.String), &acc.ColorHash)
+		if err != nil {
+			return nil, err
+		}
 
 		ii.KeyUID = acc.KeyUID
 		ii.Name = iiName.String
@@ -121,12 +133,20 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, keycardPairing, keyUid) VALUES (?, ?, ?, ?)", account.Name, account.Identicon, account.KeycardPairing, account.KeyUID)
+	colorHash, err := json.Marshal(account.ColorHash)
+	if err != nil {
+		return err
+	}
+	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
 func (db *Database) UpdateAccount(account Account) error {
-	_, err := db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.Identicon, account.KeycardPairing, account.KeyUID)
+	colorHash, err := json.Marshal(account.ColorHash)
+	if err != nil {
+		return err
+	}
+	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
