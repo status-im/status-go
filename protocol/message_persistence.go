@@ -1525,7 +1525,7 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 }
 
 // BlockContact updates a contact, deletes all the messages and 1-to-1 chat, updates the unread messages count and returns a map with the new count
-func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
+func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) ([]*Chat, error) {
 	var chats []*Chat
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -1540,15 +1540,17 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 		_ = tx.Rollback()
 	}()
 
-	// Delete messages
-	_, err = tx.Exec(
-		`DELETE
-		 FROM user_messages
-		 WHERE source = ?`,
-		contact.ID,
-	)
-	if err != nil {
-		return nil, err
+	if !isDesktopFunc {
+		// Delete messages
+		_, err = tx.Exec(
+			`DELETE
+			FROM user_messages
+			WHERE source = ?`,
+			contact.ID,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Update contact
@@ -1557,10 +1559,12 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 		return nil, err
 	}
 
-	// Delete one-to-one chat
-	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", contact.ID)
-	if err != nil {
-		return nil, err
+	if !isDesktopFunc {
+		// Delete one-to-one chat
+		_, err = tx.Exec("DELETE FROM chats WHERE id = ?", contact.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Recalculate denormalized fields

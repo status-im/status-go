@@ -331,7 +331,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
+func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat, error) {
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok {
 		var err error
@@ -341,10 +341,14 @@ func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
 		}
 
 	}
-	contact.Block()
+	if isDesktopFunc {
+		contact.BlockDesktop()
+	} else {
+		contact.Block()
+	}
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
-	chats, err := m.persistence.BlockContact(contact)
+	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -353,8 +357,11 @@ func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
 	for _, chat := range chats {
 		m.allChats.Store(chat.ID, chat)
 	}
-	m.allChats.Delete(contact.ID)
-	m.allChats.Delete(buildProfileChatID(contact.ID))
+
+	if !isDesktopFunc {
+		m.allChats.Delete(contact.ID)
+		m.allChats.Delete(buildProfileChatID(contact.ID))
+	}
 
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {
@@ -373,7 +380,30 @@ func (m *Messenger) blockContact(contactID string) ([]*Chat, error) {
 func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	chats, err := m.blockContact(contactID)
+	chats, err := m.blockContact(contactID, false)
+	if err != nil {
+		return nil, err
+	}
+	response.AddChats(chats)
+
+	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// The same function as the one above.
+func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	chats, err := m.blockContact(contactID, true)
 	if err != nil {
 		return nil, err
 	}
