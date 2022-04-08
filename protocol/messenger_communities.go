@@ -200,7 +200,7 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 
 	communitySettings := communities.CommunitySettings{
 		CommunityID:                  communityID.String(),
-		HistoryArchiveSupportEnabled: false,
+		HistoryArchiveSupportEnabled: true,
 	}
 
 	err = m.communitiesManager.SaveCommunitySettings(communitySettings)

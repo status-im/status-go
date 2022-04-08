@@ -1273,18 +1273,35 @@ func (m *Messenger) Init() error {
 			logger.Warn("failed to check if community settings exist", zap.Error(err))
 			continue
 		}
-		if exists {
+
+		if !exists {
+			communitySettings := communities.CommunitySettings{
+				CommunityID:                  org.IDString(),
+				HistoryArchiveSupportEnabled: true,
+			}
+
+			err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+			if err != nil {
+				logger.Warn("failed to save community settings", zap.Error(err))
+			}
 			continue
 		}
 
-		communitySettings := communities.CommunitySettings{
-			CommunityID:                  org.IDString(),
-			HistoryArchiveSupportEnabled: false,
-		}
-		err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+		// In case we do have settings, but the history archive support is disabled
+		// for this community, we enable it, as this should be the default for all
+		// non-admin communities
+		communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(org.ID())
 		if err != nil {
-			logger.Warn("failed to save community settings", zap.Error(err))
+			logger.Warn("failed to fetch community settings", zap.Error(err))
 			continue
+		}
+
+		if !org.IsAdmin() && !communitySettings.HistoryArchiveSupportEnabled {
+			communitySettings.HistoryArchiveSupportEnabled = true
+			err = m.communitiesManager.UpdateCommunitySettings(*communitySettings)
+			if err != nil {
+				logger.Warn("failed to update community settings", zap.Error(err))
+			}
 		}
 	}
 
