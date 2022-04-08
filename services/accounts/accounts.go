@@ -17,9 +17,7 @@ import (
 )
 
 const pathWalletRoot = "m/44'/60'/0'/0/0"
-const pathEIP1581 = "m/43'/60'/1581'"
 const pathDefaultWallet = pathWalletRoot + "/0"
-const pathWhisper = pathEIP1581 + "/0'/0"
 
 func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed) *API {
 	return &API{manager, config, db, feed}
@@ -82,20 +80,14 @@ func (api *API) AddAccountWithMnemonic(
 		return err
 	}
 
-	paths := []string{pathWalletRoot, pathEIP1581, pathWhisper, pathDefaultWallet}
-	infos, err := api.manager.AccountsGenerator().DeriveAddresses(generatedAccountInfo.ID, paths)
-	if err != nil {
-		return err
-	}
-
-	_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{pathDefaultWallet})
+	accountInfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{pathWalletRoot})
 	if err != nil {
 		return err
 	}
 
 	account := accounts.Account{
-		Address:   types.Address(common.HexToAddress(infos[pathWalletRoot].Address)),
-		PublicKey: types.HexBytes(infos[pathWalletRoot].PublicKey),
+		Address:   types.Address(common.HexToAddress(accountInfos[pathWalletRoot].Address)),
+		PublicKey: types.HexBytes(accountInfos[pathWalletRoot].PublicKey),
 		Type:      "seed",
 		Name:      name,
 		Emoji:     emoji,
