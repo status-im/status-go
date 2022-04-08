@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -85,6 +86,14 @@ func (api *API) AddAccountWithMnemonic(
 		return err
 	}
 
+	addressExists, err := api.db.AddressExists(types.Address(common.HexToAddress(accountInfos[pathWalletRoot].Address)))
+	if err != nil {
+		return err
+	}
+	if addressExists {
+		return errors.New("account already exists")
+	}
+
 	account := accounts.Account{
 		Address:   types.Address(common.HexToAddress(accountInfos[pathWalletRoot].Address)),
 		PublicKey: types.HexBytes(accountInfos[pathWalletRoot].PublicKey),
@@ -113,6 +122,14 @@ func (api *API) AddAccountWithPrivateKey(
 	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
 	if err != nil {
 		return err
+	}
+
+	addressExists, err := api.db.AddressExists(types.Address(common.HexToAddress(info.Address)))
+	if err != nil {
+		return err
+	}
+	if addressExists {
+		return errors.New("account already exists")
 	}
 
 	_, err = api.manager.AccountsGenerator().StoreAccount(info.ID, password)
