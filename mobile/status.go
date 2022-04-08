@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
@@ -277,6 +278,18 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	for _, acc := range subaccs {
+		if acc.Chat {
+			colorHash, _ := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			colorID, _ := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			account.ColorHash = colorHash
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
@@ -662,6 +675,10 @@ func EmojiHash(pk string) string {
 
 func ColorHash(pk string) string {
 	return prepareJSONResponse(colorhash.GenerateFor(pk))
+}
+
+func ColorID(pk string) string {
+	return prepareJSONResponse(identityUtils.ToColorID(pk))
 }
 
 func ValidateMnemonic(mnemonic string) string {

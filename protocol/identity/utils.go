@@ -9,6 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
+func ToColorID(pubkey string) (int64, error) {
+	const colorPalletLength = 12
+
+	pubkeyValue, ok := new(big.Int).SetString(pubkey, 0)
+	if !ok {
+		return 0, fmt.Errorf("invalid pubkey: %s", pubkey)
+	}
+
+	colorID := new(big.Int).Mod(pubkeyValue, new(big.Int).SetInt64(colorPalletLength-1)).Int64()
+
+	return colorID, nil
+}
+
 func ToBigBase(value *big.Int, base uint64) (res [](uint64)) {
 	toBigBaseImpl(value, base, &res)
 	return
