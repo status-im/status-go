@@ -104,6 +104,10 @@ func (c *Contact) Block() {
 	c.Added = false
 }
 
+func (c *Contact) BlockDesktop() {
+	c.Blocked = true
+}
+
 func (c *Contact) Unblock() {
 	c.Blocked = false
 }

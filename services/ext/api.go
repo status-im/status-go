@@ -299,6 +299,13 @@ func (api *PublicAPI) BlockContact(parent context.Context, contactID string) (*p
 	return api.service.messenger.BlockContact(contactID)
 }
 
+// This function is the same as the one above, but used only on the desktop side, since at the end it doesn't set
+// `Added` flag to `false`, but only `Blocked` to `true`
+func (api *PublicAPI) BlockContactDesktop(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
+	api.log.Info("blocking contact", "contact", contactID)
+	return api.service.messenger.BlockContactDesktop(contactID)
+}
+
 func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) error {
 	return api.service.messenger.UnblockContact(contactID)
 }
