@@ -21,6 +21,7 @@ const (
 	ActivityCenterNotificationTypeMention
 	ActivityCenterNotificationTypeReply
         ActivityCenterNotificationTypeContactRequest
+        ActivityCenterNotificationTypeContactRequestRetracted
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")

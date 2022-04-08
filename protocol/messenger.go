@@ -3634,11 +3634,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-                                       case protobuf.DeclineContactRequest:
-						message := msg.ParsedMessage.Interface().(protobuf.DeclineContactRequest)
-						err = m.HandleDeclineContactRequest(messageState, message)
+                                       case protobuf.RetractContactRequest:
+						message := msg.ParsedMessage.Interface().(protobuf.RetractContactRequest)
+						err = m.HandleRetractContactRequest(messageState, message)
 						if err != nil {
-							logger.Warn("failed to handle DeclineContactRequest", zap.Error(err))
+							logger.Warn("failed to handle RetractContactRequest", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

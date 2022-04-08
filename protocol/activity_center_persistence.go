@@ -116,6 +116,75 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 	return err
 }
 
+func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row) (*ActivityCenterNotification, error) {
+		var chatID sql.NullString
+		var lastMessageBytes []byte
+		var messageBytes []byte
+		var replyMessageBytes []byte
+		var name sql.NullString
+		var author sql.NullString
+		notification := &ActivityCenterNotification{}
+		err := row.Scan(
+			&notification.ID,
+			&notification.Timestamp,
+			&notification.Type,
+			&chatID,
+			&notification.Read,
+			&notification.Accepted,
+			&notification.Dismissed,
+			&messageBytes,
+			&lastMessageBytes,
+			&replyMessageBytes,
+			&name,
+			&author,)
+
+		if err != nil {
+			return nil, err
+		}
+		if chatID.Valid {
+			notification.ChatID = chatID.String
+
+		}
+
+		if name.Valid {
+			notification.Name = name.String
+		}
+
+		if author.Valid {
+			notification.Author = author.String
+		}
+
+		// Restore last message
+		if lastMessageBytes != nil {
+			lastMessage := &common.Message{}
+			if err = json.Unmarshal(lastMessageBytes, lastMessage); err != nil {
+				return nil, err
+			}
+			notification.LastMessage = lastMessage
+		}
+
+		// Restore message
+		if messageBytes != nil {
+			message := &common.Message{}
+			if err = json.Unmarshal(messageBytes, message); err != nil {
+				return nil, err
+			}
+			notification.Message = message
+		}
+
+		// Restore reply message
+		if replyMessageBytes != nil {
+			replyMessage := &common.Message{}
+			if err = json.Unmarshal(replyMessageBytes, replyMessage); err != nil {
+				return nil, err
+			}
+			notification.ReplyMessage = replyMessage
+		}
+
+                return notification, nil
+
+}
+
 func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Rows) (string, []*ActivityCenterNotification, error) {
 	var notifications []*ActivityCenterNotification
 	latestCursor := ""
@@ -345,6 +414,30 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 	return notifications, nil
 }
 
+func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes) (*ActivityCenterNotification, error) {
+	row := db.db.QueryRow(`
+  SELECT
+  a.id,
+  a.timestamp,
+  a.notification_type,
+  a.chat_id,
+  a.read,
+  a.accepted,
+  a.dismissed,
+  a.message,
+  c.last_message,
+  a.reply_message,
+  c.name,
+  a.author
+  FROM activity_center_notifications a
+  LEFT JOIN chats c
+  ON
+  c.id = a.chat_id
+  WHERE a.id = ?`, id)
+
+  return db.unmarshalActivityCenterNotificationRow(row)
+}
+
 func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
@@ -489,6 +582,17 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
+}
+
+func (db sqlitePersistence) UpdateActivityCenterNotificationMessage(id types.HexBytes, message *common.Message) error {
+  encodedMessage, err := json.Marshal(message)
+		if err != nil {
+			return err
+		}
+
+                _ , err   =           db.db.Exec(`UPDATE activity_center_notifications SET message = ? WHERE id = ?`, encodedMessage, id)
+  return err
+
 }
 
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {

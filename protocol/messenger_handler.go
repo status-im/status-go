@@ -623,28 +623,29 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 }
 
-func (m *Messenger) HandleDeclineContactRequest(state *ReceivedMessageState, message protobuf.DeclineContactRequest) error {
-  // TODO: Handle missing contact request message
-  request, err := m.persistence.MessageByID(message.Id)
-  if err != nil {
-    return err
-  }
+func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
+  contact := state.CurrentMessageState.Contact
 
-  if request.LocalChatID != state.CurrentMessageState.Contact.ID {
-    return errors.New("can't accept contact request not sent to user")
-  }
+  contact.Added = false
+  contact.HasAddedUs = false
+  state.ModifiedContacts.Store(contact.ID, true)
 
-  request.ContactRequestState = common.ContactRequestStateDeclined
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(state.CurrentMessageState.MessageID),
+		Name:        contact.CanonicalName(),
+		Type:        ActivityCenterNotificationTypeContactRequestRetracted,
+		Author:      state.CurrentMessageState.Contact.ID,
+		Timestamp:   state.CurrentMessageState.WhisperTimestamp,
+		ChatID:      contact.ID,
+	}
 
-  err = m.persistence.SetContactRequestState(request.ID, request.ContactRequestState)
-  if err != nil {
-    return err
-  }
+	err := m.addActivityCenterNotification(state, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
+	}
 
 
-  state.Response.AddMessage(request)
   return nil
-
 }
 
 func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {

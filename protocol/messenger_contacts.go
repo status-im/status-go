@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+        "errors"
 	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
@@ -9,6 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contactrequests"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 )
@@ -135,28 +137,24 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
             return nil ,err
           }
 
-          declineContactRequest := &protobuf.DeclineContactRequest{
-            Id:  contactRequest.ID,
-          }
-          encodedMessage, err := proto.Marshal(declineContactRequest)
-          if err != nil {
-            return nil, err
-          }
-
-          _, err = m.dispatchMessage(context.Background(), common.RawMessage{
-            LocalChatID:         contactRequest.LocalChatID,
-            Payload:             encodedMessage,
-            MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_REQUEST,
-            ResendAutomatically: true,
-          })
-          if err != nil {
-            return nil, err
-          }
-
           response := &MessengerResponse{}
 
-          response.AddMessage(contactRequest)
+          notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+          if err != nil {
+            return nil, err
+          }
 
+          if notification != nil {
+            err := m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, contactRequest)
+            if err != nil {
+              return nil, err
+            }
+            notification.Message = contactRequest
+
+            response.AddActivityCenterNotification(notification)
+          }
+
+          response.AddMessage(contactRequest)
 
           return response,nil
 }
@@ -276,8 +274,19 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
             return nil ,err
           }
 
+
+        chat, ok := m.allChats.Load(contact.ID)
+        if !ok {
+          chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+          chat.Active = false
+          if err := m.saveChat(chat); err != nil {
+            return nil, err
+          }
+        }
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
           acceptContactRequest := &protobuf.AcceptContactRequest{
             Id:  contactRequest.ID,
+            Clock: clock,
           }
           encodedMessage, err := proto.Marshal(acceptContactRequest)
           if err != nil {
@@ -294,6 +303,20 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
             return nil, err
           }
 
+          notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+          if err != nil {
+            return nil, err
+          }
+
+          if notification != nil {
+            err := m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, contactRequest)
+            if err != nil {
+              return nil, err
+            }
+            notification.Message = contactRequest
+
+            response.AddActivityCenterNotification(notification)
+          }
 
           response.AddMessage(contactRequest)
         }
@@ -390,6 +413,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 	response.Contacts = []*Contact{contact}
 	return nil
 }
+
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
 	response := new(MessengerResponse)
 
@@ -726,6 +750,58 @@ func (m *Messenger) addENSNameToContact(contact *Contact) error {
 
 
 	return nil
+}
+
+func (m *Messenger) RetractContactRequest(request *requests.RetractContactRequest) (*MessengerResponse, error) {
+  err := request.Validate()
+  if err != nil {
+    return nil, err
+  }
+  contact, ok := m.allContacts.Load(request.ContactID.String())
+  if !ok {
+    return nil, errors.New("contact not found")
+  }
+  contact.HasAddedUs = false
+  m.allContacts.Store(contact.ID, contact)
+  response := &MessengerResponse{}
+  err = m.removeContact(context.Background(), response, contact.ID)
+  if err != nil {
+    return nil, err
+  }
+  chat, ok := m.allChats.Load(contact.ID)
+  if !ok {
+    pubKey, err := contact.PublicKey()
+    if err != nil {
+      return nil, err
+    }
+
+    chat = OneToOneFromPublicKey(pubKey, m.getTimesource())
+    chat.Active = false
+    if err := m.saveChat(chat); err != nil {
+      return nil, err
+    }
+  }
+
+  clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+  retractContactRequest := &protobuf.RetractContactRequest{
+    Clock: clock,
+  }
+  encodedMessage, err := proto.Marshal(retractContactRequest)
+  if err != nil {
+    return nil, err
+  }
+
+  _, err = m.dispatchMessage(context.Background(), common.RawMessage{
+    LocalChatID:         contact.ID,
+    Payload:             encodedMessage,
+    MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
+    ResendAutomatically: true,
+  })
+  if err != nil {
+    return nil, err
+  }
+
+  return response, err
 }
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {

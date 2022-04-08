@@ -16,8 +16,10 @@ message ContactUpdate {
 
 message AcceptContactRequest {
   string id = 1;
+  uint64 clock = 2;
 }
 
-message DeclineContactRequest {
-  string id = 2;
+message RetractContactRequest {
+  string id = 1;
+  uint64 clock = 2;
 }

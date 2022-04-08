@@ -413,6 +413,18 @@ func (r *MessengerResponse) AddMessage(message *common.Message) {
 	r.messages[message.ID] = message
 }
 
+func (r *MessengerResponse) AddContact(c *Contact) {
+
+  for idx, c1 := range r.Contacts {
+    if c1.ID == c.ID {
+      r.Contacts[idx] = c
+      return
+    }
+  }
+
+  r.Contacts = append(r.Contacts, c)
+}
+
 func (r *MessengerResponse) SetMessages(messages []*common.Message) {
 	r.messages = make(map[string]*common.Message)
 	r.AddMessages(messages)

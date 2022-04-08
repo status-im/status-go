@@ -613,6 +613,10 @@ func (api *PublicAPI) AcceptContactRequest(ctx context.Context, request *request
 	return api.service.messenger.AcceptContactRequest(ctx, request)
 }
 
+func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *requests.RetractContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RetractContactRequest(request)
+}
+
 func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RejectContactRequest(ctx, request)
 }
