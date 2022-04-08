@@ -21,8 +21,7 @@ ifeq ($(detected_OS),Darwin)
     GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=amd64
   endif
 else ifeq ($(detected_OS),Windows)
- # on Windows need `--export-all-symbols` flag else expected symbols will not be found in libstatus.dll
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,--export-all-symbols"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
  GOBIN_SHARED_LIB_EXT := dll
 else
  GOBIN_SHARED_LIB_EXT := so
