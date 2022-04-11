@@ -532,3 +532,11 @@ func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
 func (db *Database) SetUseMailservers(value bool) error {
 	return db.SaveSettingField(UseMailservers, value)
 }
+
+func (db *Database) GetWalletRoodAddress() (rst types.Address, err error) {
+	err = db.makeSelectRow(WalletRootAddress).Scan(&rst)
+	if err == sql.ErrNoRows {
+		return rst, nil
+	}
+	return
+}

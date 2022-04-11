@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-const pathWalletRoot = "m/44'/60'/0'/0/0"
+const pathWalletRoot = "m/44'/60'/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 
 func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed) *API {
@@ -80,14 +80,14 @@ func (api *API) AddAccountWithMnemonic(
 		return err
 	}
 
-	accountInfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{pathWalletRoot})
+	accountInfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{pathDefaultWallet})
 	if err != nil {
 		return err
 	}
 
 	account := accounts.Account{
-		Address:   types.Address(common.HexToAddress(accountInfos[pathWalletRoot].Address)),
-		PublicKey: types.HexBytes(accountInfos[pathWalletRoot].PublicKey),
+		Address:   types.Address(common.HexToAddress(accountInfos[pathDefaultWallet].Address)),
+		PublicKey: types.HexBytes(accountInfos[pathDefaultWallet].PublicKey),
 		Type:      "seed",
 		Name:      name,
 		Emoji:     emoji,
@@ -145,7 +145,7 @@ func (api *API) GenerateAccount(
 		return err
 	}
 
-	address, err := api.db.GetWalletAddress()
+	address, err := api.db.GetWalletRoodAddress()
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (api *API) GenerateAccount(
 		Name:      name,
 		Emoji:     emoji,
 		Color:     color,
-		Path:      path,
+		Path:      fmt.Sprint(pathWalletRoot, "/", newDerivedPath),
 	}
 
 	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
