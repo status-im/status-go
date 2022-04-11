@@ -226,6 +226,10 @@ func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(m.identity)
 }
 
+func (m *Manager) DeletedCommunities() ([]*Community, error) {
+	return m.persistence.DeletedCommunities(m.identity)
+}
+
 func (m *Manager) Created() ([]*Community, error) {
 	return m.persistence.CreatedCommunities(m.identity)
 }

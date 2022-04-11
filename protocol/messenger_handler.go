@@ -309,6 +309,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 			return err
 		}
 	}
+
 	return nil
 }
 

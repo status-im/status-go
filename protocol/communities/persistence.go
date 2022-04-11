@@ -104,19 +104,7 @@ func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Com
 	return p.queryCommunities(memberIdentity, query)
 }
 
-func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
-	query := `SELECT
-c.id, c.private_key, c.description, c.joined, c.verified, c.muted,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state
-FROM communities_communities c
-LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
-WHERE c.Joined OR r.state = ?`
-
-	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *sql.Rows) (comms []*Community, err error) {
 	defer func() {
 		if err != nil {
 			// Don't shadow original error
@@ -159,6 +147,38 @@ WHERE c.Joined OR r.state = ?`
 	}
 
 	return comms, nil
+}
+
+func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
+	query := `SELECT
+c.id, c.private_key, c.description, c.joined, c.verified, c.muted,
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state
+FROM communities_communities c
+LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
+WHERE c.Joined OR r.state = ?`
+
+	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.rowsToCommunities(memberIdentity, rows)
+}
+
+func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
+	query := `SELECT
+c.id, c.private_key, c.description, c.joined, c.verified, c.muted,
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state
+FROM communities_communities c
+LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
+WHERE NOT c.Joined AND (r.community_id IS NULL or r.state != ?)`
+
+	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.rowsToCommunities(memberIdentity, rows)
 }
 
 func (p *Persistence) CreatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {

@@ -119,10 +119,17 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 
 	}
 
-	cs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
+	joinedCs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
 	if err != nil {
 		return 0, err
 	}
+
+	deletedCs, err := m.communitiesManager.DeletedCommunities()
+	if err != nil {
+		return 0, err
+	}
+
+	cs := append(joinedCs, deletedCs...)
 	for _, c := range cs {
 
 		syncMessage, err := c.ToSyncCommunityProtobuf(clock)
