@@ -386,6 +386,11 @@ var (
 		dBColumnName:   "webview_allow_permission_requests",
 		valueHandler:   BoolHandler,
 	}
+	WalletRootAddress = SettingField{
+		reactFieldName: "wallet-root-address",
+		dBColumnName:   "wallet_root_address",
+		valueHandler:   AddressHandler,
+	}
 
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
@@ -447,6 +452,7 @@ var (
 		UseMailservers,
 		Usernames,
 		WakuBloomFilterMode,
+		WalletRootAddress,
 		WalletSetUpPassed,
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
