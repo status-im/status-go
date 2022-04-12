@@ -55,7 +55,8 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 		return nil, err
 	}
 	defer func() {
-		err = rows.Close()
+		errClose := rows.Close()
+		err = valueOr(err, errClose)
 	}()
 
 	for rows.Next() {
@@ -175,7 +176,8 @@ func (db *Database) GetIdentityImages(keyUID string) (iis []*images.IdentityImag
 		return nil, err
 	}
 	defer func() {
-		err = rows.Close()
+		errClose := rows.Close()
+		err = valueOr(err, errClose)
 	}()
 
 	for rows.Next() {
@@ -213,8 +215,9 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityIma
 			err = tx.Commit()
 			return
 		}
-		// don't shadow original error
-		_ = tx.Rollback()
+
+		errRollback := tx.Rollback()
+		err = valueOr(err, errRollback)
 	}()
 
 	for _, ii := range iis {
@@ -263,4 +266,11 @@ func (db *Database) publishOnIdentityImageSubscriptions() {
 func (db *Database) DeleteIdentityImage(keyUID string) error {
 	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUID)
 	return err
+}
+
+func valueOr(value error, or error) error {
+	if value != nil {
+		return value
+	}
+	return or
 }
