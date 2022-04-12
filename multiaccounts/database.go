@@ -93,9 +93,11 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 		acc.Timestamp = accLoginTimestamp.Int64
 		acc.Identicon = accIdenticon.String
 		acc.ColorID = accColorID.Int64
-		err = json.Unmarshal([]byte(accColorHash.String), &acc.ColorHash)
-		if err != nil {
-			return nil, err
+		if len(accColorHash.String) != 0 {
+			err = json.Unmarshal([]byte(accColorHash.String), &acc.ColorHash)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		ii.KeyUID = acc.KeyUID
