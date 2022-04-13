@@ -275,8 +275,6 @@ func (g *Generator) store(acc *Account, password string) (AccountInfo, error) {
 		}
 	}
 
-	g.Reset()
-
 	return acc.ToAccountInfo(), nil
 }
 
