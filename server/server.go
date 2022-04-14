@@ -31,11 +31,12 @@ func generateTLSCert() error {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	cert, err := GenerateX509Cert(notBefore, notAfter)
+	sn, err := makeRandomSerialNumber()
 	if err != nil {
 		return err
 	}
 
+	cert := GenerateX509Cert(sn, notBefore, notAfter)
 	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return err
@@ -69,15 +70,25 @@ type Server struct {
 	cert   *tls.Certificate
 }
 
-type Config struct {
-	Cert *tls.Certificate
-	Port int
+type Option func(server *Server)
+
+func SetCert(cert *tls.Certificate) func(*Server){
+	return func(s *Server) {
+		s.cert = cert
+	}
 }
 
-func NewServer(db *sql.DB, logger *zap.Logger, config *Config) (*Server, error) {
+func SetPort(port int) func(*Server){
+	return func(s *Server){
+		s.Port = port
+	}
+}
+
+func NewServer(db *sql.DB, logger *zap.Logger, configs ...Option) (*Server, error) {
 	s := &Server{db: db, logger: logger}
 
-	if config == nil {
+	if len(configs) == 0 {
+		// default behaviour
 		err := generateTLSCert()
 		if err != nil {
 			return nil, err
@@ -86,8 +97,9 @@ func NewServer(db *sql.DB, logger *zap.Logger, config *Config) (*Server, error) 
 		s.cert = globalCertificate
 		s.Port = 0
 	} else {
-		s.cert = config.Cert
-		s.Port = config.Port
+		for _, cf := range configs {
+			cf(s)
+		}
 	}
 
 	return s, nil
@@ -156,22 +168,24 @@ func (s *Server) ToBackground() {
 	}
 }
 
-func (s *Server) LoadHandlers(handlers HandlerPatternMap) {
-	var hr *http.ServeMux
-	if s.server != nil && s.server.Handler != nil {
-		hr = s.server.Handler.(*http.ServeMux)
-	} else {
-		hr = http.NewServeMux()
+func (s *Server) WithHandlers(handlers HandlerPatternMap) {
+	switch {
+	case s.server != nil && s.server.Handler != nil:
+		break
+	case s.server != nil && s.server.Handler == nil:
+		s.server.Handler = http.NewServeMux()
+	default:
+		s.server = &http.Server{}
+		s.server.Handler = http.NewServeMux()
 	}
 
 	for p, h := range handlers {
-		hr.HandleFunc(p, h)
+		s.server.Handler.(*http.ServeMux).HandleFunc(p, h)
 	}
-	s.server = &http.Server{Handler: hr}
 }
 
-func (s *Server) LoadMediaHandlers() {
-	s.LoadHandlers(HandlerPatternMap{
+func (s *Server) WithMediaHandlers() {
+	s.WithHandlers(HandlerPatternMap{
 		"/messages/images": handleImage(s.db, s.logger),
 		"/messages/audio": handleAudio(s.db, s.logger),
 		"/messages/identicons": handleIdenticon(s.logger),
