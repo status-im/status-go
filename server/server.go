@@ -2,64 +2,14 @@ package server
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 )
-
-var globalCertificate *tls.Certificate = nil
-var globalPem string
-
-func generateTLSCert() error {
-	if globalCertificate != nil {
-		return nil
-	}
-
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return err
-	}
-
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
-	sn, err := makeRandomSerialNumber()
-	if err != nil {
-		return err
-	}
-
-	cert := GenerateX509Cert(sn, notBefore, notAfter)
-	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
-	if err != nil {
-		return err
-	}
-
-	finalCert, err := tls.X509KeyPair(certPem, keyPem)
-	if err != nil {
-		return err
-	}
-
-	globalCertificate = &finalCert
-	globalPem = string(certPem)
-	return nil
-}
-
-func PublicTLSCert() (string, error) {
-	err := generateTLSCert()
-	if err != nil {
-		return "", err
-	}
-
-	return globalPem, nil
-}
 
 type Server struct {
 	Port   int
