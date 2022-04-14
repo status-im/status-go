@@ -10,16 +10,14 @@ import (
 	"time"
 )
 
-func GenerateX509Cert(from, to time.Time) (*x509.Certificate, error) {
+func makeRandomSerialNumber() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	return rand.Int(rand.Reader, serialNumberLimit)
+}
 
-	if err != nil {
-		return nil, err
-	}
-
-	template := &x509.Certificate{
-		SerialNumber:          serialNumber,
+func GenerateX509Cert(sn *big.Int, from, to time.Time) *x509.Certificate {
+	return &x509.Certificate{
+		SerialNumber:          sn,
 		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             from,
 		NotAfter:              to,
@@ -29,8 +27,6 @@ func GenerateX509Cert(from, to time.Time) (*x509.Certificate, error) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
-
-	return template, nil
 }
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
