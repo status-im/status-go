@@ -4053,7 +4053,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	}
 	for idx := range msgs {
-		msgs[idx].PrepareServerURLs(m.httpServer.Port)
+		msgs[idx].PrepareServerURLs(m.httpServer)
 	}
 
 	return msgs, nextCursor, nil
@@ -4061,7 +4061,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 	for idx := range messages {
-		messages[idx].PrepareServerURLs(m.httpServer.Port)
+		messages[idx].PrepareServerURLs(m.httpServer)
 	}
 
 }

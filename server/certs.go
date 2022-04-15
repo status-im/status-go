@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"time"
 )
 
@@ -28,13 +29,13 @@ func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
 
-func GenerateX509Cert(sn *big.Int, from, to time.Time) *x509.Certificate {
+func GenerateX509Cert(sn *big.Int, from, to time.Time, ip net.IP) *x509.Certificate {
 	return &x509.Certificate{
 		SerialNumber:          sn,
 		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             from,
 		NotAfter:              to,
-		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{ip},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
@@ -76,7 +77,7 @@ func generateTLSCert() error {
 		return err
 	}
 
-	cert := GenerateX509Cert(sn, notBefore, notAfter)
+	cert := GenerateX509Cert(sn, notBefore, notAfter, defaultIp)
 	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return err
@@ -101,11 +102,11 @@ func PublicTLSCert() (string, error) {
 	return globalPem, nil
 }
 
-func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration) (tls.Certificate, error) {
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(ttl)
 
-	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter)
+	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, networkIP)
 	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, err
