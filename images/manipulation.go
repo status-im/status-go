@@ -3,6 +3,7 @@ package images
 import (
 	"fmt"
 	"image"
+	"math"
 
 	"github.com/nfnt/resize"
 	"github.com/oliamb/cutter"
@@ -25,6 +26,11 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 	log.Info("resizing", "size", size, "width", width, "height", height)
 
 	return resize.Resize(width, height, img, resize.Bilinear)
+}
+
+func ShrinkOnly(size ResizeDimension, img image.Image) image.Image {
+	finalSize := int(math.Min(float64(size), math.Min(float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))))
+	return Resize(ResizeDimension(finalSize), img)
 }
 
 func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {

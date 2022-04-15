@@ -28,6 +28,7 @@ type CreateCommunity struct {
 	ImageAy                      int                                  `json:"imageAy"`
 	ImageBx                      int                                  `json:"imageBx"`
 	ImageBy                      int                                  `json:"imageBy"`
+	Banner                       userimages.CroppedImage              `json:"banner"`
 	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
 	PinMessageAllMembersEnabled  bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
 }
@@ -68,14 +69,24 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		Description: c.Description,
 	}
 
-	if c.Image != "" {
-		log.Info("has-image", "image", c.Image)
+	if c.Image != "" || c.Banner.ImagePath != "" {
 		ciis := make(map[string]*protobuf.IdentityImage)
-		imgs, err := userimages.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
-		if err != nil {
-			return nil, err
+		if c.Image != "" {
+			log.Info("has-image", "image", c.Image)
+			imgs, err := userimages.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
+			if err != nil {
+				return nil, err
+			}
+			for _, img := range imgs {
+				ciis[img.Name] = adaptIdentityImageToProtobuf(img)
+			}
 		}
-		for _, img := range imgs {
+		if c.Banner.ImagePath != "" {
+			log.Info("has-banner", "image", c.Banner.ImagePath)
+			img, err := userimages.GenerateBannerImage(c.Banner.ImagePath, c.Banner.X, c.Banner.Y, c.Banner.X+c.Banner.Width, c.Banner.Y+c.Banner.Height)
+			if err != nil {
+				return nil, err
+			}
 			ciis[img.Name] = adaptIdentityImageToProtobuf(img)
 		}
 		ci.Images = ciis

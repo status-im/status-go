@@ -25,7 +25,7 @@ func renderJpeg(w io.Writer, m image.Image, config EncodeConfig) error {
 	return jpeg.Encode(w, m, o)
 }
 
-func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) error {
+func EncodeToLimits(bb *bytes.Buffer, img image.Image, bounds DimensionLimits) error {
 	q := MaxJpegQuality
 	for q > MinJpegQuality-1 {
 
@@ -34,17 +34,17 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 			return err
 		}
 
-		if DimensionSizeLimit[size].Ideal > bb.Len() {
+		if bounds.Ideal > bb.Len() {
 			return nil
 		}
 
 		if q == MinJpegQuality {
-			if DimensionSizeLimit[size].Max > bb.Len() {
+			if bounds.Max > bb.Len() {
 				return nil
 			}
 			return fmt.Errorf(
 				"image size after processing exceeds max, expect < '%d', received < '%d'",
-				DimensionSizeLimit[size].Max,
+				bounds.Max,
 				bb.Len(),
 			)
 		}
@@ -54,6 +54,10 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 	}
 
 	return nil
+}
+
+func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) error {
+	return EncodeToLimits(bb, img, DimensionSizeLimit[size])
 }
 
 func GetPayloadDataURI(payload []byte) (string, error) {

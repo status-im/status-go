@@ -303,7 +303,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community
 	return community, nil
 }
 
-// CreateCommunity takes a description, updates the community with the description,
+// EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
 	community, err := m.GetByID(request.CommunityID)
@@ -326,11 +326,18 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if newDescription.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
 		newDescription.Permissions.Access = community.config.CommunityDescription.Permissions.Access
 	}
-	// If the image wasn't edited, use the existing one
+	// Use existing images for the entries that were not updated
 	// NOTE: This will NOT allow deletion of the community image; it will need to
 	// be handled separately.
-	if request.Image == "" {
-		newDescription.Identity.Images = community.config.CommunityDescription.Identity.Images
+	for imageName := range community.config.CommunityDescription.Identity.Images {
+		_, exists := newDescription.Identity.Images[imageName]
+		if !exists {
+			// If no image was set in ToCommunityDescription then Images is nil.
+			if newDescription.Identity.Images == nil {
+				newDescription.Identity.Images = make(map[string]*protobuf.IdentityImage)
+			}
+			newDescription.Identity.Images[imageName] = community.config.CommunityDescription.Identity.Images[imageName]
+		}
 	}
 	// TODO: handle delete image (if needed)
 

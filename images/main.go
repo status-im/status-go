@@ -64,3 +64,41 @@ func GenerateIdentityImagesFromURL(url string) ([]*IdentityImage, error) {
 
 	return GenerateImageVariants(cImg)
 }
+
+func GenerateBannerImage(filepath string, aX, aY, bX, bY int) (*IdentityImage, error) {
+	img, err := Decode(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	cropRect := image.Rectangle{
+		Min: image.Point{X: aX, Y: aY},
+		Max: image.Point{X: bX, Y: bY},
+	}
+	croppedImg, err := Crop(img, cropRect)
+	if err != nil {
+		return nil, err
+	}
+
+	dimension := BannerDim
+	resizedImg := ShrinkOnly(dimension, croppedImg)
+
+	sizeLimits := GetBannerDimensionLimits()
+
+	bb := bytes.NewBuffer([]byte{})
+	err = EncodeToLimits(bb, resizedImg, sizeLimits)
+	if err != nil {
+		return nil, err
+	}
+
+	ii := &IdentityImage{
+		Name:         BannerIdentityName,
+		Payload:      bb.Bytes(),
+		Width:        resizedImg.Bounds().Dx(),
+		Height:       resizedImg.Bounds().Dy(),
+		FileSize:     bb.Len(),
+		ResizeTarget: int(dimension),
+	}
+
+	return ii, nil
+}

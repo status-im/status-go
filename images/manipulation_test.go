@@ -97,6 +97,22 @@ func TestResize(t *testing.T) {
 	}
 }
 
+// Requirement of ShrinkOnly
+func TestThatResizeResizesSmallerHeightByTheSmallestSide(t *testing.T) {
+	image := image.NewRGBA(image.Rect(0, 0, 4, 2))
+	resizedImage := Resize(ResizeDimension(1), image)
+	require.Exactly(t, 2, resizedImage.Bounds().Dx())
+	require.Exactly(t, 1, resizedImage.Bounds().Dy())
+}
+
+// Requirement of ShrinkOnly
+func TestThatResizeResizesSmallerWidthByTheSmallestSide(t *testing.T) {
+	image := image.NewRGBA(image.Rect(0, 0, 4, 8))
+	resizedImage := Resize(ResizeDimension(2), image)
+	require.Exactly(t, 2, resizedImage.Bounds().Dx())
+	require.Exactly(t, 4, resizedImage.Bounds().Dy())
+}
+
 func TestCrop(t *testing.T) {
 	type params struct {
 		Rectangle   image.Rectangle
