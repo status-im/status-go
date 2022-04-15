@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/http"
 
@@ -56,6 +57,8 @@ func NewServer(db *sql.DB, logger *zap.Logger, configs ...Option) (*Server, erro
 }
 
 func (s *Server) listenAndServe() {
+	spew.Dump("listenAndServe")
+
 	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost", MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
@@ -74,7 +77,11 @@ func (s *Server) listenAndServe() {
 
 	s.Port = listener.Addr().(*net.TCPAddr).Port
 	s.run = true
+
+	spew.Dump("pre : s.server.Serve(listener)", s)
 	err = s.server.Serve(listener)
+	spew.Dump("s.server.Serve(listener)", err)
+
 	if err != http.ErrServerClosed {
 		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
 		err = s.Start()
