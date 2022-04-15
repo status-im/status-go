@@ -127,5 +127,5 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.Res
 }
 
 func testHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello I like to be a tls server"))
+	w.Write([]byte("Hello I like to be a tls server. " + time.Now().String()))
 }

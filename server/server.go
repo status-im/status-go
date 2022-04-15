@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/http"
 
@@ -15,27 +14,38 @@ import (
 	"github.com/status-im/status-go/logutils"
 )
 
+var (
+	defaultIp = net.IP{127, 0, 0, 1}
+)
+
 type Server struct {
-	Port       int
+	port       int
 	run        bool
 	server     *http.Server
 	logger     *zap.Logger
 	db         *sql.DB
 	cert       *tls.Certificate
+	netIp      net.IP
 	downloader *ipfs.Downloader
 }
 
 type Option func(server *Server)
 
-func SetCert(cert *tls.Certificate) func(*Server){
+func SetCert(cert *tls.Certificate) func(*Server) {
 	return func(s *Server) {
 		s.cert = cert
 	}
 }
 
-func SetPort(port int) func(*Server){
-	return func(s *Server){
-		s.Port = port
+func SetNetIP(ip net.IP) func(*Server) {
+	return func(s *Server) {
+		s.netIp = ip
+	}
+}
+
+func SetPort(port int) func(*Server) {
+	return func(s *Server) {
+		s.port = port
 	}
 }
 
@@ -50,7 +60,8 @@ func NewServer(db *sql.DB, downloader *ipfs.Downloader, configs ...Option) (*Ser
 		}
 
 		s.cert = globalCertificate
-		s.Port = 0
+		s.netIp = defaultIp
+		s.port = 0
 	} else {
 		for _, cf := range configs {
 			cf(s)
@@ -61,17 +72,15 @@ func NewServer(db *sql.DB, downloader *ipfs.Downloader, configs ...Option) (*Ser
 }
 
 func (s *Server) listenAndServe() {
-	spew.Dump("listenAndServe")
-
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: "localhost", MinVersion: tls.VersionTLS12}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIp.String(), MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
-	addr := fmt.Sprintf("localhost:%d", s.Port)
+	addr := fmt.Sprintf("%s:%d", s.netIp, s.port)
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
-		s.Port = 0
+		s.port = 0 //TODO find out why the port is set to 0 here
 		err = s.Start()
 		if err != nil {
 			s.logger.Error("server start failed, giving up", zap.Error(err))
@@ -79,13 +88,10 @@ func (s *Server) listenAndServe() {
 		return
 	}
 
-	s.Port = listener.Addr().(*net.TCPAddr).Port
+	s.port = listener.Addr().(*net.TCPAddr).Port
 	s.run = true
 
-	spew.Dump("pre : s.server.Serve(listener)", s)
 	err = s.server.Serve(listener)
-	spew.Dump("s.server.Serve(listener)", err)
-
 	if err != http.ErrServerClosed {
 		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
 		err = s.Start()
@@ -147,9 +153,29 @@ func (s *Server) WithHandlers(handlers HandlerPatternMap) {
 
 func (s *Server) WithMediaHandlers() {
 	s.WithHandlers(HandlerPatternMap{
-		"/messages/images": handleImage(s.db, s.logger),
-		"/messages/audio": handleAudio(s.db, s.logger),
+		"/messages/images":     handleImage(s.db, s.logger),
+		"/messages/audio":      handleAudio(s.db, s.logger),
 		"/messages/identicons": handleIdenticon(s.logger),
-		"/ipfs": handleIPFS(s.downloader, s.logger),
+		"/ipfs":                handleIPFS(s.downloader, s.logger),
 	})
+}
+
+func (s *Server) MakeBaseURL() string {
+	return fmt.Sprintf("https://%s:%d", s.netIp, s.port)
+}
+
+func (s *Server) MakeImageServerURL() string {
+	return s.MakeBaseURL() + "/messages/"
+}
+
+func (s *Server) MakeIdenticonURL(from string) string {
+	return s.MakeBaseURL() + "/messages/identicons?publicKey=" + from
+}
+
+func (s *Server) MakeImageURL(id string) string {
+	return s.MakeBaseURL() + "/messages/images?messageId=" + id
+}
+
+func (s *Server) MakeAudioURL(id string) string {
+	return s.MakeBaseURL() + "/messages/audio?messageId=" + id
 }

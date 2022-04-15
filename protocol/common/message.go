@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/server"
 )
 
 // QuotedMessage contains the original text of the message replied to
@@ -33,10 +34,6 @@ type QuotedMessage struct {
 	ImageLocalURL string `json:"image,omitempty"`
 	// CommunityID is the id of the community advertised
 	CommunityID string `json:"communityId,omitempty"`
-}
-
-func (m *QuotedMessage) PrepareImageURL(port int) {
-	m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
 }
 
 type CommandState int
@@ -177,17 +174,17 @@ type Message struct {
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
 }
 
-func (m *Message) PrepareServerURLs(port int) {
-	m.Identicon = fmt.Sprintf("https://localhost:%d/messages/identicons?publicKey=%s", port, m.From)
+func (m *Message) PrepareServerURLs(s *server.Server) {
+	m.Identicon = s.MakeIdenticonURL(m.From)
 
 	if m.QuotedMessage != nil && m.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
-		m.QuotedMessage.PrepareImageURL(port)
+		m.QuotedMessage.ImageLocalURL = s.MakeImageURL(m.QuotedMessage.ID)
 	}
 	if m.ContentType == protobuf.ChatMessage_IMAGE {
-		m.ImageLocalURL = fmt.Sprintf("https://localhost:%d/messages/images?messageId=%s", port, m.ID)
+		m.ImageLocalURL = s.MakeImageURL(m.ID)
 	}
 	if m.ContentType == protobuf.ChatMessage_AUDIO {
-		m.AudioLocalURL = fmt.Sprintf("https://localhost:%d/messages/audio?messageId=%s", port, m.ID)
+		m.AudioLocalURL = s.MakeAudioURL(m.ID)
 	}
 	if m.ContentType == protobuf.ChatMessage_STICKER {
 		m.StickerLocalURL = fmt.Sprintf("https://localhost:%d/ipfs?hash=%s", port, m.GetSticker().Hash)
