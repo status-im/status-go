@@ -17,8 +17,12 @@ const (
 	SmallDim = ResizeDimension(80)
 	LargeDim = ResizeDimension(240)
 
+	BannerDim = ResizeDimension(800)
+
 	SmallDimName = "thumbnail"
 	LargeDimName = "large"
+
+	BannerIdentityName = "banner"
 )
 
 var (
@@ -58,3 +62,10 @@ type DimensionLimits struct {
 
 type ImageType uint
 type ResizeDimension uint
+
+func GetBannerDimensionLimits() DimensionLimits {
+	return DimensionLimits{
+		Ideal: 307200, // We want to save space and traffic but keep to maximum compression
+		Max:   460800, // Can't go bigger than 450 KB
+	}
+}

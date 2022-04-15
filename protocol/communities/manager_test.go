@@ -2,6 +2,8 @@ package communities
 
 import (
 	"bytes"
+	"image"
+	"image/png"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
+	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -74,6 +77,45 @@ func (s *ManagerSuite) TestCreateCommunity() {
 	s.Require().Equal(community.ID(), actualCommunity.ID())
 	s.Require().Equal(community.PrivateKey(), actualCommunity.PrivateKey())
 	s.Require().True(proto.Equal(community.config.CommunityDescription, actualCommunity.config.CommunityDescription))
+}
+
+func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
+	// Generate test image bigger than BannerDim
+	testImage := image.NewRGBA(image.Rect(0, 0, 20, 10))
+
+	tmpTestFilePath := s.T().TempDir() + "/test.png"
+	file, err := os.Create(tmpTestFilePath)
+	s.NoError(err)
+	defer file.Close()
+
+	err = png.Encode(file, testImage)
+	s.Require().NoError(err)
+
+	request := &requests.CreateCommunity{
+		Name:        "with_banner",
+		Description: "community with banner ",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Banner: userimages.CroppedImage{
+			ImagePath: tmpTestFilePath,
+			X:         1,
+			Y:         1,
+			Width:     10,
+			Height:    5,
+		},
+	}
+
+	community, err := s.manager.CreateCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	communities, err := s.manager.All()
+	s.Require().NoError(err)
+	// Consider status default community
+	s.Require().Len(communities, 2)
+	s.Require().Equal(len(community.config.CommunityDescription.Identity.Images), 1)
+	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[userimages.BannerIdentityName]
+	s.Require().True(isMapContainsKey)
+	s.Require().Positive(len(testIdentityImage.Payload))
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
