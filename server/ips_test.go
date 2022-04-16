@@ -23,7 +23,7 @@ func Test(t *testing.T) {
 	cert, err := GenerateCertFromKey(pk, time.Hour, ip)
 	require.NoError(t, err)
 
-	s, err := NewServer(nil, nil, SetCert(&cert), SetNetIP(ip), SetPort(8088))
+	s, err := NewServer(nil, nil, &Config{&cert, ip, 8088})
 	require.NoError(t, err)
 
 	s.WithHandlers(HandlerPatternMap{"/hello": testHandler})

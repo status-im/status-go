@@ -391,7 +391,7 @@ func NewMessenger(
 	}
 
 	mailservers := mailserversDB.NewDB(database)
-	mediaServer, err := server.NewServer(database, logger)
+	mediaServer, err := server.NewServer(database, logger, nil)
 	mediaServer.WithMediaHandlers()
 
 	if err != nil {
