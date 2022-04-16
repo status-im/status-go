@@ -7,8 +7,16 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 
 	"go.uber.org/zap"
+)
+
+const (
+	basePath       = "/messages"
+	identiconsPath = basePath + "/identicons"
+	imagesPath     = basePath + "/images"
+	audioPath      = basePath + "/audio"
 )
 
 var (
@@ -149,28 +157,48 @@ func (s *Server) WithHandlers(handlers HandlerPatternMap) {
 
 func (s *Server) WithMediaHandlers() {
 	s.WithHandlers(HandlerPatternMap{
-		"/messages/images":     handleImage(s.db, s.logger),
-		"/messages/audio":      handleAudio(s.db, s.logger),
-		"/messages/identicons": handleIdenticon(s.logger),
+		imagesPath:     handleImage(s.db, s.logger),
+		audioPath:      handleAudio(s.db, s.logger),
+		identiconsPath: handleIdenticon(s.logger),
 	})
 }
 
-func (s *Server) MakeBaseURL() string {
-	return fmt.Sprintf("https://%s:%d", s.netIp, s.port)
+func (s *Server) MakeBaseURL() *url.URL {
+	return &url.URL{
+		Scheme: "https",
+		Host: fmt.Sprintf("%s:%d", s.netIp, s.port),
+	}
 }
 
 func (s *Server) MakeImageServerURL() string {
-	return s.MakeBaseURL() + "/messages/"
+	u := s.MakeBaseURL()
+	u.Path = basePath + "/"
+	return u.String()
 }
 
 func (s *Server) MakeIdenticonURL(from string) string {
-	return s.MakeBaseURL() + "/messages/identicons?publicKey=" + from
+	u := s.MakeBaseURL()
+	u.Path = identiconsPath
+
+	q := url.Values{"publicKey": {from}}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func (s *Server) MakeImageURL(id string) string {
-	return s.MakeBaseURL() + "/messages/images?messageId=" + id
+	u := s.MakeBaseURL()
+	u.Path = imagesPath
+
+	q := url.Values{"messageId": {id}}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func (s *Server) MakeAudioURL(id string) string {
-	return s.MakeBaseURL() + "/messages/audio?messageId=" + id
+	u := s.MakeBaseURL()
+	u.Path = audioPath
+
+	q := url.Values{"messageId": {id}}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
