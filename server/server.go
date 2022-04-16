@@ -38,31 +38,18 @@ type Server struct {
 	downloader *ipfs.Downloader
 }
 
-type Option func(server *Server)
-
-func SetCert(cert *tls.Certificate) func(*Server) {
-	return func(s *Server) {
-		s.cert = cert
-	}
+type Config struct {
+	Cert *tls.Certificate
+	NetIp net.IP
+	Port int
 }
 
-func SetNetIP(ip net.IP) func(*Server) {
-	return func(s *Server) {
-		s.netIp = ip
-	}
-}
-
-func SetPort(port int) func(*Server) {
-	return func(s *Server) {
-		s.port = port
-	}
-}
-
-func NewServer(db *sql.DB, downloader *ipfs.Downloader, configs ...Option) (*Server, error) {
+// NewServer returns a *Server. If the config param is nil the default Server values are applied to the new Server
+// otherwise the config params are applied to the Server.
+func NewServer(db *sql.DB, downloader *ipfs.Downloader, config *Config) (*Server, error) {
 	s := &Server{db: db, logger: logutils.ZapLogger(), downloader: downloader}
 
-	if len(configs) == 0 {
-		// default behaviour
+	if config == nil {
 		err := generateTLSCert()
 		if err != nil {
 			return nil, err
@@ -72,9 +59,9 @@ func NewServer(db *sql.DB, downloader *ipfs.Downloader, configs ...Option) (*Ser
 		s.netIp = defaultIp
 		s.port = 0
 	} else {
-		for _, cf := range configs {
-			cf(s)
-		}
+		s.cert = config.Cert
+		s.netIp = config.NetIp
+		s.port = config.Port
 	}
 
 	return s, nil
@@ -185,26 +172,23 @@ func (s *Server) MakeImageServerURL() string {
 func (s *Server) MakeIdenticonURL(from string) string {
 	u := s.MakeBaseURL()
 	u.Path = identiconsPath
+	u.RawQuery = url.Values{"publicKey": {from}}.Encode()
 
-	q := url.Values{"publicKey": {from}}
-	u.RawQuery = q.Encode()
 	return u.String()
 }
 
 func (s *Server) MakeImageURL(id string) string {
 	u := s.MakeBaseURL()
 	u.Path = imagesPath
+	u.RawQuery = url.Values{"messageId": {id}}.Encode()
 
-	q := url.Values{"messageId": {id}}
-	u.RawQuery = q.Encode()
 	return u.String()
 }
 
 func (s *Server) MakeAudioURL(id string) string {
 	u := s.MakeBaseURL()
 	u.Path = audioPath
+	u.RawQuery = url.Values{"messageId": {id}}.Encode()
 
-	q := url.Values{"messageId": {id}}
-	u.RawQuery = q.Encode()
 	return u.String()
 }
