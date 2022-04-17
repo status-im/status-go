@@ -1,14 +1,15 @@
 package server
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
 	urlTestsServer = &Server{
-		port:   1337,
-		netIp:  defaultIp,
+		port:  1337,
+		netIP: defaultIP,
 	}
 )
 
