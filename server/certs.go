@@ -77,7 +77,7 @@ func generateTLSCert() error {
 		return err
 	}
 
-	cert := GenerateX509Cert(sn, notBefore, notAfter, defaultIp)
+	cert := GenerateX509Cert(sn, notBefore, notAfter, defaultIP)
 	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return err
@@ -102,15 +102,20 @@ func PublicTLSCert() (string, error) {
 	return globalPem, nil
 }
 
-func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, error) {
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, []byte, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(ttl)
 
 	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, networkIP)
 	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
 	if err != nil {
-		return tls.Certificate{}, err
+		return tls.Certificate{}, nil, err
 	}
 
-	return tls.X509KeyPair(certPem, keyPem)
+	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+
+	return tlsCert, certPem, nil
 }

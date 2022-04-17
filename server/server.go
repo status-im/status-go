@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	defaultIp = net.IP{127, 0, 0, 1}
+	defaultIP = net.IP{127, 0, 0, 1}
 )
 
 type Server struct {
@@ -30,13 +30,13 @@ type Server struct {
 	logger *zap.Logger
 	db     *sql.DB
 	cert   *tls.Certificate
-	netIp  net.IP
+	netIP  net.IP
 }
 
 type Config struct {
-	Cert *tls.Certificate
-	NetIp net.IP
-	Port int
+	Cert  *tls.Certificate
+	NetIP net.IP
+	Port  int
 }
 
 // NewServer returns a *Server. If the config param is nil the default Server values are applied to the new Server
@@ -51,11 +51,11 @@ func NewServer(db *sql.DB, logger *zap.Logger, config *Config) (*Server, error) 
 		}
 
 		s.cert = globalCertificate
-		s.netIp = defaultIp
+		s.netIP = defaultIP
 		s.port = 0
 	} else {
 		s.cert = config.Cert
-		s.netIp = config.NetIp
+		s.netIP = config.NetIP
 		s.port = config.Port
 	}
 
@@ -63,10 +63,10 @@ func NewServer(db *sql.DB, logger *zap.Logger, config *Config) (*Server, error) 
 }
 
 func (s *Server) listenAndServe() {
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIp.String(), MinVersion: tls.VersionTLS12}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIP.String(), MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
-	addr := fmt.Sprintf("%s:%d", s.netIp, s.port)
+	addr := fmt.Sprintf("%s:%d", s.netIP, s.port)
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
@@ -153,7 +153,7 @@ func (s *Server) WithMediaHandlers() {
 func (s *Server) MakeBaseURL() *url.URL {
 	return &url.URL{
 		Scheme: "https",
-		Host: fmt.Sprintf("%s:%d", s.netIp, s.port),
+		Host:   fmt.Sprintf("%s:%d", s.netIP, s.port),
 	}
 }
 

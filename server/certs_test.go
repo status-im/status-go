@@ -22,8 +22,8 @@ func Test_makeSerialNumberFromKey(t *testing.T) {
 	testPk := &ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{
 			Curve: elliptic.P256(),
-			X: x,
-			Y: y,
+			X:     x,
+			Y:     y,
 		},
 		D: d,
 	}
