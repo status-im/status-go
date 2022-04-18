@@ -758,6 +758,8 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return errors.New("chat not found")
 	}
 
+	unViewedCounts := chat.UnviewedMessagesCount
+
 	// Check edit is valid
 	if originalMessage.From != deleteMessage.From {
 		return errors.New("invalid delete, not the right author")
@@ -787,6 +789,12 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
+		}
+	}
+
+	if !originalMessage.Seen && originalMessage.Deleted {
+		if chat.UnviewedMentionsCount >= unViewedCounts {
+			m.decreamentUnviewedCounts(chat, originalMessage.Mentioned)
 		}
 	}
 
@@ -1603,5 +1611,12 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {
 	chat.UnviewedMessagesCount++
 	if mentioned {
 		chat.UnviewedMentionsCount++
+	}
+}
+
+func (m *Messenger) decreamentUnviewedCounts(chat *Chat, mentioned bool) {
+	chat.UnviewedMessagesCount--
+	if mentioned {
+		chat.UnviewedMentionsCount--
 	}
 }
