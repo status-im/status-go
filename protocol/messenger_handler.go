@@ -618,6 +618,8 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
    m.createContactRequestNotification(state.CurrentMessageState.Contact, state, request)
 
+  state.CurrentMessageState.Contact.ContactRequestAccepted()
+
   state.Response.AddMessage(request)
   return nil
 
@@ -628,7 +630,10 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 
   contact.Added = false
   contact.HasAddedUs = false
+  contact.ContactRequestRetracted()
   state.ModifiedContacts.Store(contact.ID, true)
+
+		state.AllContacts.Store(contact.ID, contact)
 
 	notification := &ActivityCenterNotification{
 		ID:          types.FromHex(state.CurrentMessageState.MessageID),
@@ -1027,8 +1032,14 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	}
 
+	contact := state.CurrentMessageState.Contact
+
         if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
           receivedMessage.ContactRequestState = common.ContactRequestStatePending
+          contact.ContactRequestReceived()
+          state.ModifiedContacts.Store(contact.ID, true)
+          state.AllContacts.Store(contact.ID, contact)
+
         } else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
 	}
@@ -1075,7 +1086,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 
-	contact := state.CurrentMessageState.Contact
 	if receivedMessage.EnsName != "" {
 		oldRecord, err := m.ensVerifier.Add(contact.ID, receivedMessage.EnsName, receivedMessage.Clock)
 		if err != nil {

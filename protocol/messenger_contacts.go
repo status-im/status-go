@@ -119,7 +119,7 @@ func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests.DeclineContactRequest) (*MessengerResponse, error) {
+func (m *Messenger) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
 		return nil, err
@@ -130,14 +130,32 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
           return nil, err
         }
 
-          contactRequest.ContactRequestState = common.ContactRequestStateDeclined
+	contact, ok := m.allContacts.Load(contactRequest.From)
+	if !ok {
+		var err error
+		contact, err = buildContactFromPkString(contactRequest.From)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+        contact.DismissContactRequest()
+        err = m.persistence.SaveContact(contact, nil)
+        if err != nil {
+          return nil, err
+        }
+
+        response := &MessengerResponse{}
+        response.AddContact(contact)
+
+
+          contactRequest.ContactRequestState = common.ContactRequestStateDismissed
 
           err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
           if err != nil {
             return nil ,err
           }
 
-          response := &MessengerResponse{}
 
           notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
           if err != nil {
@@ -193,6 +211,8 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		contact.Add()
 	}
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+
+        contact.ContactRequestSent()
 
 	// We sync the contact with the other devices
 	err := m.syncContact(context.Background(), contact)
@@ -274,6 +294,8 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
             return nil ,err
           }
 
+          contact.AcceptContactRequest()
+
 
         chat, ok := m.allChats.Load(contact.ID)
         if !ok {
@@ -349,6 +371,8 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		return nil, err
 	}
 
+        response.AddContact(contact)
+
 	return response, nil
 }
 func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
@@ -373,6 +397,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return ErrContactNotFound
 	}
 
+        contact.RetractContactRequest()
 	contact.Remove()
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 

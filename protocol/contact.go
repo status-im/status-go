@@ -11,13 +11,14 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
-type ContactState int
+type ContactRequestState int
 
 const (
-  ContactStateMutual = iota + 1
-  ContactStateSentRequest
-  ContactStateReceivedRequest
-  ContactStateDismissedRequest
+  ContactRequestStateNone ContactRequestState = iota
+  ContactRequestStateMutual
+  ContactRequestStateSent
+  ContactRequestStateReceived
+  ContactRequestStateDismissed
 )
 
 // ContactRequest is the signed contact request received from the user
@@ -106,7 +107,7 @@ type Contact struct {
 	Blocked    bool `json:"blocked"`
 	HasAddedUs bool `json:"hasAddedUs"`
 
-        ContactState ContactState `json:"contactState"`
+        ContactRequestState ContactRequestState `json:"contactRequestState"`
 
 	IsSyncing bool
 	Removed   bool
@@ -139,8 +140,53 @@ func (c *Contact) Remove() {
 }
 
 func (c *Contact) Add() {
-	c.Added = true
-	c.Removed = false
+  c.Added = true
+  c.Removed = false
+}
+
+func (c *Contact) ContactRequestSent() {
+  switch c.ContactRequestState {
+  case ContactRequestStateNone, ContactRequestStateDismissed:
+    c.ContactRequestState = ContactRequestStateSent
+  case ContactRequestStateReceived:
+    c.ContactRequestState = ContactRequestStateMutual
+  }
+}
+
+func (c *Contact) ContactRequestReceived() {
+  switch c.ContactRequestState {
+  case ContactRequestStateNone:
+    c.ContactRequestState = ContactRequestStateReceived
+  case ContactRequestStateSent:
+    c.ContactRequestState = ContactRequestStateMutual
+  }
+}
+
+func (c *Contact) ContactRequestAccepted() {
+  switch c.ContactRequestState {
+  case ContactRequestStateSent:
+    c.ContactRequestState = ContactRequestStateMutual
+  }
+}
+
+func (c *Contact) AcceptContactRequest() {
+  switch c.ContactRequestState {
+  case ContactRequestStateReceived, ContactRequestStateDismissed:
+    c.ContactRequestState = ContactRequestStateMutual
+  }
+}
+
+func (c *Contact) RetractContactRequest() {
+  c.ContactRequestState = ContactRequestStateNone
+}
+
+func (c *Contact) ContactRequestRetracted() {
+  c.ContactRequestState = ContactRequestStateNone
+}
+
+func (c *Contact) DismissContactRequest() {
+    c.ContactRequestState = ContactRequestStateDismissed
+>>>>>>> 9a75d5a3 (Add contact request state)
 }
 
 func buildContactFromPkString(pkString string) (*Contact, error) {

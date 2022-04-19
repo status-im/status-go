@@ -90,11 +90,12 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
         // Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
+        s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 },
 		"no messages",
 	)
 
@@ -109,6 +110,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
         s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
         s.Require().Equal(common.ContactRequestStatePending,resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
 
         // Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -131,6 +136,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
         s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+
         // Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
 	s.Require().Len(contacts, 1)
@@ -142,7 +151,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 },
 		"no messages",
 	)
 
@@ -151,7 +160,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
         s.Require().Equal(common.ContactRequestStateAccepted,resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
-        // Make sure the message is updated, sender side
+        // Make sure the message is updated, sender s2de
         s.Require().NotNil(resp)
         s.Require().Len(resp.Messages(), 1)
         s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
@@ -160,9 +169,13 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
         // Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
 }
 
-func (s *MessengerContactRequestSuite) TestReceiveAndDeclineContactRequest() {
+func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	messageText := "hello!"
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
@@ -185,6 +198,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDeclineContactRequest() {
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestState)
+
 	// Make sure it's not returned as coming from us
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
 	s.Require().NoError(err)
@@ -197,7 +214,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDeclineContactRequest() {
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && len(r.ActivityCenterNotifications()) > 0 },
 		"no messages",
 	)
         s.Require().NoError(err)
@@ -206,6 +223,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDeclineContactRequest() {
         s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
         s.Require().Equal(common.ContactRequestStatePending,resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
 
         // Check contact request has been received
 	s.Require().NoError(err)
@@ -219,20 +240,24 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDeclineContactRequest() {
 	s.Require().Len(contactRequests, 1)
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
-        // Decline contact request, receiver side
-	resp, err = theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
+        // Dismiss contact request, receiver side
+	resp, err = theirMessenger.DismissContactRequest(context.Background(), &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
 	s.Require().NoError(err)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateDismissed, resp.Contacts[0].ContactRequestState)
 
         // Make sure the message is updated
         s.Require().NotNil(resp)
         s.Require().Len(resp.Messages(), 1)
         s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-        s.Require().Equal(common.ContactRequestStateDeclined, resp.Messages()[0].ContactRequestState)
+        s.Require().Equal(common.ContactRequestStateDismissed, resp.Messages()[0].ContactRequestState)
 
         s.Require().Len(resp.ActivityCenterNotifications(), 1)
         s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequests[0].ID)
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
-        s.Require().Equal(common.ContactRequestStateDeclined, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+        s.Require().Equal(common.ContactRequestStateDismissed, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
         // Make sure the sender is not added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -258,6 +283,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	resp, err := s.m.SendContactRequest(context.Background(), request)
 	s.Require().NoError(err)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestState)
+
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
@@ -284,6 +313,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().NoError(err)
 	s.Require().NotNil(contactRequest)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+
         // Check activity center notification is of the right type
         s.Require().Len(resp.ActivityCenterNotifications(), 1)
         s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
@@ -306,6 +339,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
         s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
         s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+
         s.Require().Len(resp.ActivityCenterNotifications(), 1)
         s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequests[0].ID)
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
@@ -322,7 +359,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 && len(r.Contacts) > 0},
 		"no messages",
 	)
 
@@ -330,6 +367,10 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
         s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
         s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
         s.Require().Equal(common.ContactRequestStateAccepted,resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
 
         // Make sure the message is updated, sender side
         s.Require().NotNil(resp)
@@ -349,11 +390,15 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
         s.Require().False(resp.Contacts[0].HasAddedUs)
         s.Require().False(resp.Contacts[0].Added)
 
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
+
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && len(r.ActivityCenterNotifications()) > 0 },
 		"no messages",
 	)
         s.Require().NoError(err)
@@ -364,4 +409,8 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
         s.Require().Equal(myID, resp.Contacts[0].ID)
         s.Require().False(resp.Contacts[0].Added)
         s.Require().False(resp.Contacts[0].HasAddedUs)
+
+        // Check the contact state is correctly set
+        s.Require().Len(resp.Contacts, 1)
+        s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
 }

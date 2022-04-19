@@ -56,7 +56,7 @@ type ContactRequestState int
 const (
   ContactRequestStatePending ContactRequestState = iota + 1
   ContactRequestStateAccepted
-  ContactRequestStateDeclined
+  ContactRequestStateDismissed
 )
 
 type CommandParameters struct {
