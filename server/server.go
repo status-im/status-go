@@ -23,25 +23,20 @@ const (
 	ipfsPath       = "/ipfs"
 )
 
-var (
-	defaultIP = net.IP{127, 0, 0, 1}
-)
-
 type Server struct {
-	port       int
 	run        bool
 	server     *http.Server
 	logger     *zap.Logger
 	db         *sql.DB
 	cert       *tls.Certificate
 	netIP      net.IP
+	listener net.Listener
 	downloader *ipfs.Downloader
 }
 
 type Config struct {
 	Cert  *tls.Certificate
 	NetIP net.IP
-	Port  int
 }
 
 // NewServer returns a *Server. If the config param is nil the default Server values are applied to the new Server
@@ -57,26 +52,42 @@ func NewServer(db *sql.DB, downloader *ipfs.Downloader, config *Config) (*Server
 
 		s.cert = globalCertificate
 		s.netIP = defaultIP
-		s.port = 0
 	} else {
 		s.cert = config.Cert
 		s.netIP = config.NetIP
-		s.port = config.Port
 	}
 
 	return s, nil
+}
+
+func (s *Server) setListener(l net.Listener) {
+	s.listener = l
+}
+
+func (s *Server) resetListener() {
+	s.listener = nil
+}
+
+// getPort depends on the Server.listener to provide a port number, net.Listener should determine the port.
+// This is because there is no way to know what ports are available on the host device in advance
+func (s *Server) getPort() int {
+	if s.listener == nil {
+		return 0
+	}
+
+	return s.listener.Addr().(*net.TCPAddr).Port
 }
 
 func (s *Server) listenAndServe() {
 	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIP.String(), MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
-	addr := fmt.Sprintf("%s:%d", s.netIP, s.port)
+	addr := fmt.Sprintf("%s:%d", s.netIP, s.getPort())
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
-		s.port = 0 //TODO find out why the port is set to 0 here
+		s.resetListener()
 		err = s.Start()
 		if err != nil {
 			s.logger.Error("server start failed, giving up", zap.Error(err))
@@ -84,7 +95,7 @@ func (s *Server) listenAndServe() {
 		return
 	}
 
-	s.port = listener.Addr().(*net.TCPAddr).Port
+	s.setListener(listener)
 	s.run = true
 
 	err = s.server.Serve(listener)
@@ -157,9 +168,10 @@ func (s *Server) WithMediaHandlers() {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
+	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
 	return &url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", s.netIP, s.port),
+		Host:   fmt.Sprintf("%s:%d", s.netIP, s.getPort()),
 	}
 }
 

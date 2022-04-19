@@ -34,17 +34,21 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	require.NoError(t, err)
 
 	ip, _ := GetOutboundIP()
-	spew.Dump(ip.String())
 
 	cert, certPem, err := GenerateCertFromKey(pk, time.Hour, ip)
 	require.NoError(t, err)
 
-	s, err := NewServer(nil, nil, &Config{&cert, ip, 8088})
+	s, err := NewServer(nil, nil, &Config{&cert, ip})
 	require.NoError(t, err)
 
 	s.WithHandlers(HandlerPatternMap{"/hello": testHandler})
 
-	go s.listenAndServe()
+	err = s.Start()
+	require.NoError(t, err)
+
+	// Give time for the sever to be ready, hacky I know
+	time.Sleep(100 * time.Millisecond)
+	spew.Dump(s.MakeBaseURL().String())
 
 	rootCAs, err := x509.SystemCertPool()
 	require.NoError(t, err)
