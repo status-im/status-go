@@ -1,34 +1,73 @@
 package server
 
 import (
+	"net"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 var (
-	urlTestsServer = &Server{
-		port:  1337,
-		netIP: defaultIP,
-	}
+	baseRegex = "https:\\/\\/127\\.0\\.0\\.1:[0-9]{2,5}"
 )
 
-func TestServer_MakeBaseURL(t *testing.T) {
-	require.Equal(t, "https://127.0.0.1:1337", urlTestsServer.MakeBaseURL().String())
+func TestServerURLSuite(t *testing.T) {
+	suite.Run(t, new(ServerURLSuite))
 }
 
-func TestServer_MakeImageServerURL(t *testing.T) {
-	require.Equal(t, "https://127.0.0.1:1337/messages/", urlTestsServer.MakeImageServerURL())
+type ServerURLSuite struct {
+	suite.Suite
+
+	server           *Server
+	serverNoListener *Server
 }
 
-func TestServer_MakeIdenticonURL(t *testing.T) {
-	require.Equal(t, "https://127.0.0.1:1337/messages/identicons?publicKey=0xdaff0d11decade", urlTestsServer.MakeIdenticonURL("0xdaff0d11decade"))
+func (s *ServerURLSuite) SetupSuite() {
+	l, err := net.Listen("tcp", defaultIP.String()+":0")
+	s.Require().NoError(err)
+
+	s.server = &Server{
+		netIP:    defaultIP,
+		listener: l,
+	}
+	s.serverNoListener = &Server{
+		netIP: defaultIP,
+	}
 }
 
-func TestServer_MakeImageURL(t *testing.T) {
-	require.Equal(t, "https://127.0.0.1:1337/messages/images?messageId=0x10aded70ffee", urlTestsServer.MakeImageURL("0x10aded70ffee"))
+func (s *ServerURLSuite) TestServer_MakeBaseURL() {
+	s.Require().Regexp(baseRegex, s.server.MakeBaseURL().String())
+	s.Require().Equal("https://127.0.0.1:0", s.serverNoListener.MakeBaseURL().String())
 }
 
-func TestServer_MakeAudioURL(t *testing.T) {
-	require.Equal(t, "https://127.0.0.1:1337/messages/audio?messageId=0xde1e7ebee71e", urlTestsServer.MakeAudioURL("0xde1e7ebee71e"))
+func (s *ServerURLSuite) TestServer_MakeImageServerURL() {
+	s.Require().Regexp(baseRegex+"\\/messages\\/", s.server.MakeImageServerURL())
+	s.Require().Equal("https://127.0.0.1:0/messages/", s.serverNoListener.MakeImageServerURL())
+}
+
+func (s *ServerURLSuite) TestServer_MakeIdenticonURL() {
+	s.Require().Regexp(
+		baseRegex+"\\/messages\\/identicons\\?publicKey=0xdaff0d11decade",
+		s.server.MakeIdenticonURL("0xdaff0d11decade"))
+	s.Require().Equal(
+		"https://127.0.0.1:0/messages/identicons?publicKey=0xdaff0d11decade",
+		s.serverNoListener.MakeIdenticonURL("0xdaff0d11decade"))
+}
+
+func (s *ServerURLSuite) TestServer_MakeImageURL() {
+	s.Require().Regexp(
+		baseRegex+"\\/messages\\/images\\?messageId=0x10aded70ffee",
+		s.server.MakeImageURL("0x10aded70ffee"))
+	s.Require().Equal(
+		"https://127.0.0.1:0/messages/images?messageId=0x10aded70ffee",
+		s.serverNoListener.MakeImageURL("0x10aded70ffee"))
+}
+
+func (s *ServerURLSuite) TestServer_MakeAudioURL() {
+	s.Require().Regexp(
+		baseRegex+"\\/messages\\/audio\\?messageId=0xde1e7ebee71e",
+		s.server.MakeAudioURL("0xde1e7ebee71e"))
+	s.Require().Equal(
+		"https://127.0.0.1:0/messages/audio?messageId=0xde1e7ebee71e",
+		s.serverNoListener.MakeAudioURL("0xde1e7ebee71e"))
 }
