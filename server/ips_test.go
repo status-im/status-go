@@ -16,16 +16,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	say, ok := r.URL.Query()["say"]
-	if !ok || len(say) == 0 {
-		say = append(say, "nothing")
-	}
+func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		say, ok := r.URL.Query()["say"]
+		if !ok || len(say) == 0 {
+			say = append(say, "nothing")
+		}
 
-	_, err := w.Write([]byte("Hello I like to be a tls server. You said: `" + say[0] + "` " + time.Now().String()))
-	if err != nil {
-		// Dump err this is only a testHandler
-		spew.Dump(err)
+		_, err := w.Write([]byte("Hello I like to be a tls server. You said: `" + say[0] + "` " + time.Now().String()))
+		if err != nil {
+			require.NoError(t, err)
+		}
 	}
 }
 
@@ -41,7 +42,7 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	s, err := NewServer(nil, nil, &Config{&cert, ip})
 	require.NoError(t, err)
 
-	s.WithHandlers(HandlerPatternMap{"/hello": testHandler})
+	s.WithHandlers(HandlerPatternMap{"/hello": testHandler(t)})
 
 	err = s.Start()
 	require.NoError(t, err)
