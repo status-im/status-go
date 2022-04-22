@@ -149,6 +149,10 @@ func (t *Transport) FilterByChatID(chatID string) *Filter {
 	return t.filters.FilterByChatID(chatID)
 }
 
+func (t *Transport) FilterByTopic(topic []byte) *Filter {
+	return t.filters.FilterByTopic(topic)
+}
+
 func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
 	return t.filters.FiltersByIdentities(identities)
 }
