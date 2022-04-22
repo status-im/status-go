@@ -89,49 +89,51 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	node                       types.Node
-	server                     *p2p.Server
-	peerStore                  *mailservers.PeerStore
-	config                     *config
-	identity                   *ecdsa.PrivateKey
-	persistence                *sqlitePersistence
-	transport                  *transport.Transport
-	encryptor                  *encryption.Protocol
-	sender                     *common.MessageSender
-	ensVerifier                *ens.Verifier
-	anonMetricsClient          *anonmetrics.Client
-	anonMetricsServer          *anonmetrics.Server
-	pushNotificationClient     *pushnotificationclient.Client
-	pushNotificationServer     *pushnotificationserver.Server
-	communitiesManager         *communities.Manager
-	logger                     *zap.Logger
-	verifyTransactionClient    EthClient
-	featureFlags               common.FeatureFlags
-	shutdownTasks              []func() error
-	shouldPublishContactCode   bool
-	systemMessagesTranslations *systemMessageTranslationsMap
-	allChats                   *chatMap
-	allContacts                *contactMap
-	allInstallations           *installationMap
-	modifiedInstallations      *stringBoolMap
-	installationID             string
-	mailserverCycle            mailserverCycle
-	database                   *sql.DB
-	multiAccounts              *multiaccounts.Database
-	mailservers                *mailserversDB.Database
-	settings                   *accounts.Database
-	account                    *multiaccounts.Account
-	mailserversDatabase        *mailserversDB.Database
-	browserDatabase            *browsers.Database
-	httpServer                 *server.Server
-	quit                       chan struct{}
-	requestedCommunities       map[string]*transport.Filter
-	connectionState            connection.State
-	telemetryClient            *telemetry.Client
+	node                                 types.Node
+	server                               *p2p.Server
+	peerStore                            *mailservers.PeerStore
+	config                               *config
+	identity                             *ecdsa.PrivateKey
+	persistence                          *sqlitePersistence
+	transport                            *transport.Transport
+	encryptor                            *encryption.Protocol
+	sender                               *common.MessageSender
+	ensVerifier                          *ens.Verifier
+	anonMetricsClient                    *anonmetrics.Client
+	anonMetricsServer                    *anonmetrics.Server
+	pushNotificationClient               *pushnotificationclient.Client
+	pushNotificationServer               *pushnotificationserver.Server
+	communitiesManager                   *communities.Manager
+	logger                               *zap.Logger
+	verifyTransactionClient              EthClient
+	featureFlags                         common.FeatureFlags
+	shutdownTasks                        []func() error
+	shouldPublishContactCode             bool
+	systemMessagesTranslations           *systemMessageTranslationsMap
+	allChats                             *chatMap
+	allContacts                          *contactMap
+	allInstallations                     *installationMap
+	modifiedInstallations                *stringBoolMap
+	installationID                       string
+	mailserverCycle                      mailserverCycle
+	database                             *sql.DB
+	multiAccounts                        *multiaccounts.Database
+	mailservers                          *mailserversDB.Database
+	settings                             *accounts.Database
+	account                              *multiaccounts.Account
+	mailserversDatabase                  *mailserversDB.Database
+	browserDatabase                      *browsers.Database
+	httpServer                           *server.Server
+	quit                                 chan struct{}
+	requestedCommunities                 map[string]*transport.Filter
+	connectionState                      connection.State
+	telemetryClient                      *telemetry.Client
+	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
-	mutex          sync.Mutex
-	mailPeersMutex sync.Mutex
+	mutex               sync.Mutex
+	mailPeersMutex      sync.Mutex
+	handleMessagesMutex sync.Mutex
 }
 
 type connStatus int
@@ -1408,7 +1410,7 @@ func (m *Messenger) Init() error {
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
-
+	m.downloadHistoryArchiveTasksWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -2999,7 +3001,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	return m.handleRetrievedMessages(chatWithMessages)
+	return m.handleRetrievedMessages(chatWithMessages, true)
 }
 
 func (m *Messenger) GetStats() types.StatsSummary {
@@ -3148,7 +3150,11 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
+
+	m.handleMessagesMutex.Lock()
+	defer m.handleMessagesMutex.Unlock()
+
 	response := &MessengerResponse{}
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
@@ -3178,7 +3184,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if adminCommunitiesChatIDs[filter.ChatID] {
+			if adminCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
@@ -3766,6 +3772,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
+							continue
+						}
+
+					case protobuf.CommunityMessageArchiveMagnetlink:
+						logger.Debug("Handling CommunityMessageArchiveMagnetlink")
+						magnetlinkMessage := msg.ParsedMessage.Interface().(protobuf.CommunityMessageArchiveMagnetlink)
+						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
+						if err != nil {
+							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
+							allMessagesProcessed = false
 							continue
 						}
 

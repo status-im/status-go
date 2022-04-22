@@ -272,6 +272,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncClearHistory))
 	case protobuf.ApplicationMetadataMessage_SYNC_SETTING:
 		return m.unmarshalProtobufData(new(protobuf.SyncSetting))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_ARCHIVE_MAGNETLINK:
+		return m.unmarshalProtobufData(new(protobuf.CommunityMessageArchiveMagnetlink))
 	}
 	return nil
 }
