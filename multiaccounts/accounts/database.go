@@ -219,5 +219,5 @@ func (db *Database) AddressExists(address types.Address) (exists bool, err error
 }
 
 func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
-	return nodecfg.GetNodeConfig(db.db)
+	return nodecfg.GetNodeConfigFromDB(db.db)
 }
