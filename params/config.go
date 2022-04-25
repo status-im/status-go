@@ -539,6 +539,24 @@ type BridgeConfig struct {
 	Enabled bool
 }
 
+type PushNotificationServer struct {
+	*ecdsa.PublicKey
+}
+
+func (p *PushNotificationServer) MarshalText() ([]byte, error) {
+	return []byte(hex.EncodeToString(crypto.FromECDSAPub(p.PublicKey))), nil
+}
+
+func (p *PushNotificationServer) UnmarshalText(data []byte) error {
+	pk, err := crypto.UnmarshalPubkey(data)
+	if err != nil {
+		return err
+	}
+
+	p.PublicKey = pk
+	return nil
+}
+
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
 	PFSEnabled bool
@@ -590,7 +608,7 @@ type ShhextConfig struct {
 	VerifyTransactionChainID int64
 
 	// DefaultPushNotificationsServers is the default-status run push notification servers
-	DefaultPushNotificationsServers []*ecdsa.PublicKey
+	DefaultPushNotificationsServers []*PushNotificationServer
 
 	// AnonMetricsSendID is the public key used by a metrics node to decrypt metrics protobufs
 	AnonMetricsSendID string
@@ -722,7 +740,7 @@ func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 			if err != nil {
 				return err
 			}
-			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, key)
+			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, &PushNotificationServer{PublicKey: key})
 		}
 	}
 	return nil

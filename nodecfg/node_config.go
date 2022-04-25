@@ -207,8 +207,8 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		return err
 	}
 
-	for _, pubKey := range c.ShhextConfig.DefaultPushNotificationsServers {
-		hexpubk := hexutil.Encode(crypto.FromECDSAPub(pubKey))
+	for _, pushNotifServ := range c.ShhextConfig.DefaultPushNotificationsServers {
+		hexpubk := hexutil.Encode(crypto.FromECDSAPub(pushNotifServ.PublicKey))
 		_, err := tx.Exec(`INSERT OR REPLACE INTO shhext_default_push_notification_servers (public_key, synthetic_id) VALUES (?, 'id')`, hexpubk)
 		if err != nil {
 			return err
@@ -637,7 +637,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 			if err != nil {
 				return nil, err
 			}
-			nodecfg.ShhextConfig.DefaultPushNotificationsServers = append(nodecfg.ShhextConfig.DefaultPushNotificationsServers, pubKey)
+			nodecfg.ShhextConfig.DefaultPushNotificationsServers = append(nodecfg.ShhextConfig.DefaultPushNotificationsServers, &params.PushNotificationServer{PublicKey: pubKey})
 		}
 	}
 
