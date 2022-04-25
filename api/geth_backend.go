@@ -710,8 +710,6 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 }
 
 func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	err := nodecfg.SaveNodeConfig(b.appDB, n)
 	if err != nil {
 		return err
