@@ -84,7 +84,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	}
 
 	if !contact.Added {
-		contact.Added = true
+		contact.Add()
 	}
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 

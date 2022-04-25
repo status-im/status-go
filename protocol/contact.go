@@ -117,6 +117,11 @@ func (c *Contact) Remove() {
 	c.Removed = true
 }
 
+func (c *Contact) Add() {
+	c.Added = true
+	c.Removed = false
+}
+
 func buildContactFromPkString(pkString string) (*Contact, error) {
 	publicKeyBytes, err := types.DecodeHex(pkString)
 	if err != nil {
