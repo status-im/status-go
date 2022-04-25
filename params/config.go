@@ -548,7 +548,12 @@ func (p *PushNotificationServer) MarshalText() ([]byte, error) {
 }
 
 func (p *PushNotificationServer) UnmarshalText(data []byte) error {
-	pk, err := crypto.UnmarshalPubkey(data)
+	pubKeyBytes, err := hex.DecodeString(string(data))
+	if err != nil {
+		return err
+	}
+
+	pk, err := crypto.UnmarshalPubkey(pubKeyBytes)
 	if err != nil {
 		return err
 	}
