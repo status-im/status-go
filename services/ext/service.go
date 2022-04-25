@@ -464,8 +464,13 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}
 
+	var pushNotifServKey []*ecdsa.PublicKey
+	for _, d := range config.ShhextConfig.DefaultPushNotificationsServers {
+		pushNotifServKey = append(pushNotifServKey, d.PublicKey)
+	}
+
 	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
-		DefaultServers:             config.ShhextConfig.DefaultPushNotificationsServers,
+		DefaultServers:             pushNotifServKey,
 		BlockMentions:              settings.PushNotificationsBlockMentions,
 		SendEnabled:                settings.SendPushNotifications,
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
