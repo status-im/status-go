@@ -103,6 +103,8 @@ func PublicTLSCert() (string, error) {
 }
 
 func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, []byte, error) {
+	// TODO fix, this isn't deterministic,
+
 	notBefore := time.Now()
 	notAfter := notBefore.Add(ttl)
 
@@ -118,4 +120,15 @@ func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.
 	}
 
 	return tlsCert, certPem, nil
+}
+
+// ToECDSA takes a []byte of D and uses it to create an ecdsa.PublicKey on the elliptic.P256 curve
+// this function is basically a P256 curve version of eth-node/crypto.ToECDSA without all the nice validation
+func ToECDSA(d []byte) *ecdsa.PrivateKey {
+	k := new(ecdsa.PrivateKey)
+	k.D = new(big.Int).SetBytes(d)
+	k.PublicKey.Curve = elliptic.P256()
+
+	k.PublicKey.X, k.PublicKey.Y = k.PublicKey.Curve.ScalarBaseMult(d)
+	return k
 }
