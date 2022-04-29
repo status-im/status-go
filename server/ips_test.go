@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,15 +30,22 @@ func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
+	// Get 3 key components for tls.cert generation
+	// 1) Ephemeral private key
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
+	// 2) Device outbound IP address
 	ip, _ := GetOutboundIP()
 
-	cert, certPem, err := GenerateCertFromKey(pk, time.Hour, ip)
+	// 3) NotBefore time
+	certTime := time.Now()
+
+	// Generate tls.Certificate and Server
+	cert, _, err := GenerateCertFromKey(pk, certTime, ip)
 	require.NoError(t, err)
 
-	s, err := NewServer(nil, nil, &Config{&cert, ip})
+	s, err := NewServer(nil, nil, &Config{pk, &cert, ip})
 	require.NoError(t, err)
 
 	s.WithHandlers(HandlerPatternMap{"/hello": testHandler(t)})
@@ -47,9 +53,15 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	err = s.Start()
 	require.NoError(t, err)
 
-	// Give time for the sever to be ready, hacky I know
+	// Give time for the sever to be ready, hacky I know, I'll iron this out
 	time.Sleep(100 * time.Millisecond)
-	spew.Dump(s.MakeBaseURL().String())
+
+	// Server generates a QR code connection string
+	qr, err := s.MakeQRData()
+	require.NoError(t, err)
+
+	// Client reads QR code and parses the connection string
+	u, certPem, err := ParseQRData(qr)
 
 	rootCAs, err := x509.SystemCertPool()
 	require.NoError(t, err)
@@ -71,7 +83,7 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	require.NoError(t, err)
 	thing := hex.EncodeToString(b)
 
-	response, err := client.Get(s.MakeBaseURL().String() + "/hello?say=" + thing)
+	response, err := client.Get(u.String() + "/hello?say=" + thing)
 	require.NoError(t, err)
 
 	defer response.Body.Close()

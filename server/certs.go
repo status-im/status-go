@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"time"
@@ -102,13 +103,8 @@ func PublicTLSCert() (string, error) {
 	return globalPem, nil
 }
 
-func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, []byte, error) {
-	// TODO fix, this isn't deterministic,
-
-	notBefore := time.Now()
-	notAfter := notBefore.Add(ttl)
-
-	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, networkIP)
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, from time.Time, networkIP net.IP) (tls.Certificate, []byte, error) {
+	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), networkIP)
 	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, nil, err
@@ -118,6 +114,16 @@ func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
+
+	block, _ := pem.Decode(certPem)
+	if block == nil {
+		return tls.Certificate{}, nil, fmt.Errorf("failed to decode certPem")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+	tlsCert.Leaf = leaf
 
 	return tlsCert, certPem, nil
 }
