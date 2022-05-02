@@ -57,11 +57,19 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Server generates a QR code connection string
-	qr, err := s.MakeQRData()
+	cp, err := s.MakeConnectionParams()
+	require.NoError(t, err)
+
+	qr, err := cp.ToString()
 	require.NoError(t, err)
 
 	// Client reads QR code and parses the connection string
-	u, certPem, err := ParseQRData(qr)
+	ccp := new(ConnectionParams)
+	err = ccp.FromString(qr)
+	require.NoError(t, err)
+
+	u, certPem, err := ccp.Generate()
+	require.NoError(t, err)
 
 	rootCAs, err := x509.SystemCertPool()
 	require.NoError(t, err)
