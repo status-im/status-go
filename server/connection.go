@@ -157,6 +157,11 @@ func (cp *ConnectionParams) validateNotBefore() error {
 
 // Generate returns a *url.URL and encoded pem.Block generated from ConnectionParams set fields
 func (cp *ConnectionParams) Generate() (*url.URL, []byte, error) {
+	err := cp.validate()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	u := &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", cp.netIP, cp.port),
