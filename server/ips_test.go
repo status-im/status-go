@@ -34,7 +34,8 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
-	ip, _ := GetOutboundIP()
+	ip, err := GetOutboundIP()
+	require.NoError(t, err)
 
 	cert, certPem, err := GenerateCertFromKey(pk, time.Hour, ip)
 	require.NoError(t, err)
