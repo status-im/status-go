@@ -33,9 +33,10 @@ type API struct {
 }
 
 type DerivedAddress struct {
-	Address     common.Address `json:"address"`
-	Path        string         `json:"path"`
-	HasActivity bool           `json:"hasActivity"`
+	Address        common.Address `json:"address"`
+	Path           string         `json:"path"`
+	HasActivity    bool           `json:"hasActivity"`
+	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
 func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
@@ -210,6 +211,11 @@ func (api *API) verifyPassword(password string) error {
 }
 
 func (api *API) getDerivedAddresses(id string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	addedAccounts, err := api.db.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
 	derivedAddresses := make([]*DerivedAddress, 0)
 
 	if pageNumber <= 0 || pageSize <= 0 {
@@ -227,10 +233,19 @@ func (api *API) getDerivedAddresses(id string, path string, pageSize int, pageNu
 			return nil, err
 		}
 
+		alreadyExists := false
+		for _, account := range addedAccounts {
+			if types.Address(common.HexToAddress(info[derivedPath].Address)) == account.Address {
+				alreadyExists = true
+				break
+			}
+		}
+
 		address := &DerivedAddress{
-			Address:     common.HexToAddress(info[derivedPath].Address),
-			Path:        derivedPath,
-			HasActivity: false,
+			Address:        common.HexToAddress(info[derivedPath].Address),
+			Path:           derivedPath,
+			HasActivity:    false,
+			AlreadyCreated: alreadyExists,
 		}
 
 		derivedAddresses = append(derivedAddresses, address)
