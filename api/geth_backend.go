@@ -718,10 +718,7 @@ func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
 }
 
 func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
-	if b.config == nil {
-		return nil, ErrConfigNotAvailable
-	}
-	return b.config, nil
+	return nodecfg.GetNodeConfigFromDB(b.appDB)
 }
 
 func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
