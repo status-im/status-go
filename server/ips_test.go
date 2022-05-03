@@ -4,8 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"io/ioutil"
 	"net/http"
@@ -27,6 +25,16 @@ func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func makeThingToSay() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(b), nil
 }
 
 func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
@@ -68,30 +76,13 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	err = ccp.FromString(qr)
 	require.NoError(t, err)
 
-	u, certPem, err := ccp.Generate()
+	c, err := NewClient(ccp)
 	require.NoError(t, err)
 
-	rootCAs, err := x509.SystemCertPool()
+	thing, err := makeThingToSay()
 	require.NoError(t, err)
 
-	ok := rootCAs.AppendCertsFromPEM(certPem)
-	require.True(t, ok)
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: false, // MUST BE FALSE, or the test is meaningless
-			RootCAs:            rootCAs,
-		},
-	}
-	client := &http.Client{Transport: tr}
-
-	b := make([]byte, 32)
-	_, err = rand.Read(b)
-	require.NoError(t, err)
-	thing := hex.EncodeToString(b)
-
-	response, err := client.Get(u.String() + "/hello?say=" + thing)
+	response, err := c.Get(c.baseAddress.String() + "/hello?say=" + thing)
 	require.NoError(t, err)
 
 	defer response.Body.Close()
