@@ -621,8 +621,8 @@ func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *request
 	return api.service.messenger.RejectContactRequest(ctx, request)
 }
 
-func (api *PublicAPI) DeclineContactRequest(ctx context.Context, request *requests.DeclineContactRequest) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeclineContactRequest(ctx, request)
+func (api *PublicAPI) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DismissContactRequest(ctx, request)
 }
 
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {

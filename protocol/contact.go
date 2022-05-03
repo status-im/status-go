@@ -186,7 +186,6 @@ func (c *Contact) ContactRequestRetracted() {
 
 func (c *Contact) DismissContactRequest() {
     c.ContactRequestState = ContactRequestStateDismissed
->>>>>>> 9a75d5a3 (Add contact request state)
 }
 
 func buildContactFromPkString(pkString string) (*Contact, error) {
