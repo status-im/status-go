@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+var (
+	connectionString = "2:4FHRnp:Q4:6jpbvo2ucrtrnpXXF4DQYuysh697isH9ppd2aT8uSRDh:eQUriVtGtkWhPJFeLZjF:3"
+)
+
 func TestConnectionParamsSuite(t *testing.T) {
 	suite.Run(t, new(ConnectionParamsSuite))
 }
@@ -18,7 +22,7 @@ type ConnectionParamsSuite struct {
 	TestKeyComponents
 	TestCertComponents
 
-	server           *PairingServer
+	server *PairingServer
 }
 
 func (s *ConnectionParamsSuite) SetupSuite() {
@@ -28,9 +32,13 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, defaultIP.String())
 	s.Require().NoError(err)
 
+	bs := NewServer(&cert, defaultIP.String())
+	bs.port = 1337
+
 	s.server = &PairingServer{
-		Server: NewServer(&cert, defaultIP.String()),
-		pk:       s.PK,
+		Server: bs,
+		pk:     s.PK,
+		mode:   Sending,
 	}
 }
 
@@ -41,21 +49,22 @@ func (s *ConnectionParamsSuite) TestConnectionParams_ToString() {
 	cps, err := cp.ToString()
 	s.Require().NoError(err)
 
-	s.Require().Regexp(
-		"^2:4FHRnp:[1-9|A-Z|a-z]{1,4}:6jpbvo2ucrtrnpXXF4DQYuysh697isH9ppd2aT8uSRDh:eQUriVtGtkWhPJFeLZjF$",
-		cps)
+	s.Require().Equal(connectionString, cps)
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 	cp := new(ConnectionParams)
-	err := cp.FromString("2:4FHRnp:H6G:6jpbvo2ucrtrnpXXF4DQYuysh697isH9ppd2aT8uSRDh:eQUriVtGtkWhPJFeLZjF")
+	err := cp.FromString(connectionString)
 	s.Require().NoError(err)
 
-	u, c, err := cp.Generate()
+	s.Require().Exactly(Sending, cp.serverMode)
 
-	s.Require().Equal("https://127.0.0.1:54129", u.String())
+	u, c, err := cp.Generate()
+	s.Require().NoError(err)
+
+	s.Require().Equal("https://127.0.0.1:1337", u.String())
 	s.Require().Equal(defaultIP.String(), u.Hostname())
-	s.Require().Equal("54129", u.Port())
+	s.Require().Equal("1337", u.Port())
 
 	// Parse cert PEM into x509 cert
 	block, _ := pem.Decode(c)

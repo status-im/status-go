@@ -117,29 +117,6 @@ func (s *Server) SetHandlers(handlers HandlerPatternMap) {
 	s.handlers = handlers
 }
 
-// MakeConnectionParams generates a *ConnectionParams based on the Server's current state
-func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
-	switch {
-	case s.cert == nil:
-		return nil, fmt.Errorf("server has no cert set")
-	case s.cert.Leaf == nil:
-		return nil, fmt.Errorf("server cert has no Leaf set")
-	case s.cert.Leaf.NotBefore.IsZero():
-		return nil, fmt.Errorf("server cert Leaf has a zero value NotBefore")
-	}
-
-	netIP := net.ParseIP(s.hostname)
-	if netIP == nil {
-		return nil, fmt.Errorf("invalid ip address given '%s'", s.hostname)
-	}
-
-	if s.port == 0 {
-		return nil, fmt.Errorf("port is 0, listener is not yet set")
-	}
-
-	return NewConnectionParams(netIP, s.port, s.pk, s.cert.Leaf.NotBefore), nil
-}
-
 func (s *Server) MakeBaseURL() *url.URL {
 	return &url.URL{
 		Scheme: "https",

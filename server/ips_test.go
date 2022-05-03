@@ -46,7 +46,7 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	cert, _, err := GenerateCertFromKey(pk, certTime, ip.String())
 	require.NoError(t, err)
 
-	s := NewPairingServer(&Config{pk, &cert, ip.String()})
+	s := NewPairingServer(&Config{pk, &cert, ip.String(), Sending})
 
 	s.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
 
