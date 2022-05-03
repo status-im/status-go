@@ -239,7 +239,7 @@ install-mock: ##@install Install Module Mocking Tools
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
 
 install-modvendor: ##@install Install Module Vendoring Tool
-	GO111MODULE=on go install github.com/goware/modvendor@v0.4.0
+	GO111MODULE=on go install github.com/goware/modvendor@v0.5.0
 
 install-protobuf: ##@install Install Protobuf Generation Tools
 	GO111MODULE=on go install github.com/kevinburke/go-bindata/go-bindata@v3.13.0
