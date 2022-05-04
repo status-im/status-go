@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -1012,16 +1014,45 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	return response, nil
 }
 
+func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Community, error) {
+	id, err := hexutil.Decode(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	var community *communities.Community
+	community, err = m.GetCommunityByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return community, nil
+}
+
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. It waits until it  has the community before returning it
 func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
+	community, err := m.findCommunityInfoFromDB(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community != nil {
+		return community, nil
+	}
 	return m.requestCommunityInfoFromMailserver(communityID, true)
 }
 
 // RequestCommunityInfoFromMailserverAsync installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) RequestCommunityInfoFromMailserverAsync(communityID string) error {
-	_, err := m.requestCommunityInfoFromMailserver(communityID, false)
+	community, err := m.findCommunityInfoFromDB(communityID)
+	if err != nil {
+		return err
+	}
+	if community != nil {
+		m.config.messengerSignalsHandler.CommunityInfoFound(community)
+		return nil
+	}
+	_, err = m.requestCommunityInfoFromMailserver(communityID, false)
 	return err
 }
 
