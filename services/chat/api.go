@@ -360,6 +360,8 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, chatID string) (*protocol.Chat, *communities.Community, error) {
 	fullChatID := chatID
 
+	// THIS IS A TEST
+
 	if string(communityID.Bytes()) == pubKey { // Obtaining chats from personal
 		communityID = []byte{}
 	}
