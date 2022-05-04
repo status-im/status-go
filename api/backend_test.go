@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -677,4 +678,87 @@ func TestConvertAccount(t *testing.T) {
 
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
+}
+
+func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
+	data, err := ioutil.ReadFile(path.Join(srcFolder, fileName))
+	if err != nil {
+		t.Fail()
+	}
+
+	err = ioutil.WriteFile(path.Join(dstFolder, fileName), data, 0600)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func copyDir(srcFolder string, dstFolder string, t *testing.T) {
+	files, err := ioutil.ReadDir(srcFolder)
+	require.NoError(t, err)
+	for _, file := range files {
+		if !file.IsDir() {
+			copyFile(srcFolder, dstFolder, file.Name(), t)
+		} else {
+			childFolder := path.Join(srcFolder, file.Name())
+			newFolder := path.Join(dstFolder, file.Name())
+			err = os.MkdirAll(newFolder, os.ModePerm)
+			require.NoError(t, err)
+			copyDir(childFolder, newFolder, t)
+		}
+	}
+}
+
+func login(t *testing.T, conf *params.NodeConfig) {
+	// The following passwords and DB used in this test unit are only
+	// used to determine if login process works correctly after a migration
+
+	// Expected account data:
+	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
+	username := "TestUser"
+	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
+
+	b := NewGethStatusBackend()
+
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+
+	require.NoError(t, b.OpenAccounts())
+
+	accounts, err := b.GetAccounts()
+	require.NoError(t, err)
+
+	require.Len(t, accounts, 1)
+	require.Equal(t, username, accounts[0].Name)
+	require.Equal(t, keyUID, accounts[0].KeyUID)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := b.StartNodeWithAccount(accounts[0], passwd, conf)
+		require.NoError(t, err)
+	}()
+
+	wg.Wait()
+	require.NoError(t, b.Logout())
+	require.NoError(t, b.StopNode())
+
+}
+
+func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
+	utils.Init()
+
+	srcFolder := "../static/test-0.97.3-account/"
+
+	tmpdir, err := ioutil.TempDir("", "login-and-migrations-with-existing-users")
+	require.NoError(t, err)
+	defer os.Remove(tmpdir)
+
+	copyDir(srcFolder, tmpdir, t)
+
+	conf, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+
+	login(t, conf)
+	login(t, conf) // Login twice to catch weird errors that only appear after logout
 }
