@@ -32,13 +32,6 @@ type API struct {
 	feed    *event.Feed
 }
 
-type DerivedAddress struct {
-	Address        common.Address `json:"address"`
-	Path           string         `json:"path"`
-	HasActivity    bool           `json:"hasActivity"`
-	AlreadyCreated bool           `json:"alreadyCreated"`
-}
-
 func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
 	log.Info("[AccountsAPI::SaveAccounts]")
 	err := api.db.SaveAccounts(accounts)
@@ -201,26 +194,6 @@ func (api *API) GenerateAccountWithDerivedPath(
 	return api.generateAccount(ctx, password, name, color, emoji, path, derivedFrom)
 }
 
-func (api *API) GetDerivedAddressesForPath(password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
-	info, err := api.manager.AccountsGenerator().LoadAccount(derivedFrom, password)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.getDerivedAddresses(info.ID, path, pageSize, pageNumber)
-}
-
-func (api *API) GetDerivedAddressesForMenominicWithPath(mnemonic string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
-	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
-
-	info, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
-	if err != nil {
-		return nil, err
-	}
-
-	return api.getDerivedAddresses(info.ID, path, pageSize, pageNumber)
-}
-
 func (api *API) verifyPassword(password string) error {
 	address, err := api.db.GetChatAddress()
 	if err != nil {
@@ -228,49 +201,6 @@ func (api *API) verifyPassword(password string) error {
 	}
 	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
 	return err
-}
-
-func (api *API) getDerivedAddresses(id string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
-	addedAccounts, err := api.db.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
-
-	derivedAddresses := make([]*DerivedAddress, 0)
-
-	if pageNumber <= 0 || pageSize <= 0 {
-		return nil, fmt.Errorf("pageSize and pageNumber should be greater than 0")
-	}
-
-	var startIndex = ((pageNumber - 1) * pageSize)
-	var endIndex = (pageNumber * pageSize)
-
-	for i := startIndex; i < endIndex; i++ {
-		derivedPath := fmt.Sprint(path, "/", i)
-
-		info, err := api.manager.AccountsGenerator().DeriveAddresses(id, []string{derivedPath})
-		if err != nil {
-			return nil, err
-		}
-
-		alreadyExists := false
-		for _, account := range addedAccounts {
-			if types.Address(common.HexToAddress(info[derivedPath].Address)) == account.Address {
-				alreadyExists = true
-				break
-			}
-		}
-
-		address := &DerivedAddress{
-			Address:        common.HexToAddress(info[derivedPath].Address),
-			Path:           derivedPath,
-			HasActivity:    false,
-			AlreadyCreated: alreadyExists,
-		}
-
-		derivedAddresses = append(derivedAddresses, address)
-	}
-	return derivedAddresses, nil
 }
 
 func (api *API) addAccountWithMnemonic(
