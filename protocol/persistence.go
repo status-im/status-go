@@ -492,6 +492,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.has_added_us,
 			c.local_nickname,
                         c.contact_request_state,
+                        c.contact_request_clock,
 			i.image_type,
 			i.payload
 		FROM contacts c 
@@ -509,6 +510,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact            Contact
 			nickname           sql.NullString
                         contactRequestState sql.NullInt64
+                        contactRequestClock sql.NullInt64
 			displayName        sql.NullString
 			imageType          sql.NullString
 			ensName            sql.NullString
@@ -539,6 +541,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&hasAddedUs,
 			&nickname,
                         &contactRequestState,
+                        &contactRequestClock,
 			&imageType,
 			&imagePayload,
 		)
@@ -552,6 +555,10 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if contactRequestState.Valid {
 			contact.ContactRequestState = ContactRequestState(contactRequestState.Int64)
+		}
+
+		if contactRequestClock.Valid {
+			contact.ContactRequestClock = uint64(contactRequestClock.Int64)
 		}
 
 		if displayName.Valid {
@@ -730,6 +737,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			last_updated_locally,
 			local_nickname,
                         contact_request_state,
+                        contact_request_clock,
 			added,
 			blocked,
 			removed,
@@ -737,7 +745,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -754,6 +762,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.LastUpdatedLocally,
 		contact.LocalNickname,
                 contact.ContactRequestState,
+                contact.ContactRequestClock,
 		contact.Added,
 		contact.Blocked,
 		contact.Removed,

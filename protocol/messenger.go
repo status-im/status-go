@@ -3153,9 +3153,8 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
-	response := &MessengerResponse{}
-	messageState := &ReceivedMessageState{
+func (m *Messenger) buildMessageState() *ReceivedMessageState{
+	return &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
 		ModifiedContacts:      new(stringBoolMap),
@@ -3164,10 +3163,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
-		Response:              response,
+		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 		AllBookmarks:          make(map[string]*browsers.Bookmark),
 	}
+      }
+
+
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
+	messageState := m.buildMessageState()
+        response := messageState.Response
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 

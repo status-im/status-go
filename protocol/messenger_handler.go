@@ -226,6 +226,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 }
 
 func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message) {
+  m.logger.Info("IID", zap.Any("ID", contactRequest.ID))
 
 	notification := &ActivityCenterNotification{
 		ID:          types.FromHex(contactRequest.ID),
@@ -598,6 +599,12 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 }
 
 func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
+  contact := state.CurrentMessageState.Contact
+
+  if contact.ContactRequestClock > message.Clock {
+    return nil
+  }
+
   // TODO: Handle missing contact request message
   request, err := m.persistence.MessageByID(message.Id)
   if err != nil {
@@ -607,6 +614,11 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
   if request.LocalChatID != state.CurrentMessageState.Contact.ID {
     return errors.New("can't accept contact request not sent to user")
   }
+
+  contact.ContactRequestClock = message.Clock
+
+  state.ModifiedContacts.Store(contact.ID, true)
+  state.AllContacts.Store(contact.ID, contact)
 
   request.ContactRequestState = common.ContactRequestStateAccepted
 
@@ -627,9 +639,13 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
   contact := state.CurrentMessageState.Contact
+  if contact.ContactRequestClock > message.Clock {
+    return nil
+  }
 
   contact.Added = false
   contact.HasAddedUs = false
+  contact.ContactRequestClock = message.Clock
   contact.ContactRequestRetracted()
   state.ModifiedContacts.Store(contact.ID, true)
 
@@ -1035,7 +1051,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	contact := state.CurrentMessageState.Contact
 
         if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+          if contact.ContactRequestClock > receivedMessage.Clock {
+            return nil
+          }
           receivedMessage.ContactRequestState = common.ContactRequestStatePending
+          contact.ContactRequestClock = receivedMessage.Clock
           contact.ContactRequestReceived()
           state.ModifiedContacts.Store(contact.ID, true)
           state.AllContacts.Store(contact.ID, contact)

@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
@@ -108,6 +109,7 @@ type Contact struct {
 	HasAddedUs bool `json:"hasAddedUs"`
 
         ContactRequestState ContactRequestState `json:"contactRequestState"`
+        ContactRequestClock uint64 `json:"contactRequestClock"`
 
 	IsSyncing bool
 	Removed   bool
@@ -203,7 +205,7 @@ func buildContactFromPkString(pkString string) (*Contact, error) {
 }
 
 func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
-	id := types.EncodeHex(crypto.FromECDSAPub(publicKey))
+        id := common.PubkeyToHex(publicKey)
 	return buildContact(id, publicKey)
 }
 

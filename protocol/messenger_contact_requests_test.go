@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -413,4 +414,52 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
         // Check the contact state is correctly set
         s.Require().Len(resp.Contacts, 1)
         s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
+}
+
+
+func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequestOutOfOrder() {
+  message := protobuf.ChatMessage{
+    Clock: 4,
+    Timestamp: 1,
+    Text: "some text",
+    ChatId: common.PubkeyToHex(&s.m.identity.PublicKey),
+    MessageType: protobuf.MessageType_ONE_TO_ONE,
+    ContentType: protobuf.ChatMessage_CONTACT_REQUEST,
+  }
+
+  contactKey, err := crypto.GenerateKey()
+  s.Require().NoError(err)
+
+  contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
+  s.Require().NoError(err)
+
+  state := s.m.buildMessageState()
+
+   state.CurrentMessageState = &CurrentMessageState{
+      PublicKey: &contactKey.PublicKey,
+      MessageID: "0xa",
+      Message: message,
+      Contact: contact,
+      WhisperTimestamp: 1,
+    }
+
+
+  response := state.Response
+  err = s.m.HandleChatMessage(state)
+  s.Require().NoError(err)
+  s.Require().Len(response.ActivityCenterNotifications(), 1)
+  contacts := s.m.Contacts()
+  s.Require().Len(contacts, 1)
+  s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestState)
+
+  retract := protobuf.RetractContactRequest{
+    Clock: 2,
+  }
+  err = s.m.HandleRetractContactRequest(state, retract)
+  s.Require().NoError(err)
+
+  // Nothing should have changed
+  contacts = s.m.Contacts()
+  s.Require().Len(contacts, 1)
+  s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestState)
 }
