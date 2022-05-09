@@ -1059,6 +1059,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
           contact.ContactRequestReceived()
           state.ModifiedContacts.Store(contact.ID, true)
           state.AllContacts.Store(contact.ID, contact)
+          m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
 
         } else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
@@ -1092,14 +1093,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		}
 	}
 
-	// If the chat is not active, create a notification in the center
-	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active {
-          if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
-            m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
-          } else {
-		m.createMessageNotification(chat, state)
-              }
-	}
+        // If the chat is not active, create a notification in the center
+        if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active && receivedMessage.ContentType != protobuf.ChatMessage_CONTACT_REQUEST {
+          m.createMessageNotification(chat, state)
+        }
 
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
