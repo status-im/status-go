@@ -649,22 +649,7 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
   contact.ContactRequestRetracted()
   state.ModifiedContacts.Store(contact.ID, true)
 
-		state.AllContacts.Store(contact.ID, contact)
-
-	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(state.CurrentMessageState.MessageID),
-		Name:        contact.CanonicalName(),
-		Type:        ActivityCenterNotificationTypeContactRequestRetracted,
-		Author:      state.CurrentMessageState.Contact.ID,
-		Timestamp:   state.CurrentMessageState.WhisperTimestamp,
-		ChatID:      contact.ID,
-	}
-
-	err := m.addActivityCenterNotification(state, notification)
-	if err != nil {
-		m.logger.Warn("failed to create activity center notification", zap.Error(err))
-	}
-
+  state.AllContacts.Store(contact.ID, contact)
 
   return nil
 }
