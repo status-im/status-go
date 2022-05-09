@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/contactrequests"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -959,6 +958,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+        /*
 	// Save ContactRequest if any
 	rawContactRequest := state.CurrentMessageState.Message.SentContactRequestSignature
 	if rawContactRequest != nil {
@@ -979,7 +979,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			return err
 		}
 
-	}
+	}*/
 
 	if chat.ReadMessagesAtClockValue > state.CurrentMessageState.WhisperTimestamp {
 		receivedMessage.Seen = true
