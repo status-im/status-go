@@ -25,10 +25,12 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
@@ -77,6 +79,9 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	gethNode  *node.Node         // reference to Geth P2P stack/node
 	rpcClient *rpc.Client        // reference to an RPC client
+
+	downloader *ipfs.Downloader
+	httpServer *server.Server
 
 	discovery discovery.Discovery
 	register  *peers.Register
@@ -143,6 +148,13 @@ func (n *StatusNode) GethNode() *node.Node {
 	defer n.mu.RUnlock()
 
 	return n.gethNode
+}
+
+func (n *StatusNode) HTTPServer() *server.Server {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.httpServer
 }
 
 // Server retrieves the currently running P2P network layer.
@@ -221,6 +233,19 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	if err := n.setupRPCClient(); err != nil {
 		return err
 	}
+
+	n.downloader = ipfs.NewDownloader(config.RootDataDir)
+
+	httpServer, err := server.NewServer(n.appDB, n.downloader)
+	if err != nil {
+		return err
+	}
+
+	if err := httpServer.Start(); err != nil {
+		return err
+	}
+
+	n.httpServer = httpServer
 
 	if err := n.initServices(config); err != nil {
 		return err
@@ -398,6 +423,15 @@ func (n *StatusNode) stop() error {
 	// and may be completely different. Similarly with `config`.
 	n.gethNode = nil
 	n.config = nil
+
+	err := n.httpServer.Stop()
+	if err != nil {
+		return err
+	}
+	n.httpServer = nil
+
+	n.downloader.Stop()
+	n.downloader = nil
 
 	if n.db != nil {
 		err := n.db.Close()

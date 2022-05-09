@@ -2,15 +2,9 @@ package stickers
 
 import (
 	"context"
-	"errors"
-	"io/ioutil"
+	"fmt"
 	"math/big"
-	"net/http"
-	"time"
 
-	"github.com/ipfs/go-cid"
-	"github.com/multiformats/go-multibase"
-	"github.com/wealdtech/go-multicodec"
 	"github.com/zenthangplus/goccm"
 	"olympos.io/encoding/edn"
 
@@ -22,14 +16,14 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const ipfsGateway = ".ipfs.infura-ipfs.io/"
 const maxConcurrentRequests = 3
 
 // ConnectionType constants
@@ -47,9 +41,12 @@ type API struct {
 	accountsManager *account.GethManager
 	accountsDB      *accounts.Database
 	rpcFiltersSrvc  *rpcfilters.Service
-	config          *params.NodeConfig
-	ctx             context.Context
-	client          *http.Client
+
+	keyStoreDir string
+	downloader  *ipfs.Downloader
+	httpServer  *server.Server
+
+	ctx context.Context
 }
 
 type Sticker struct {
@@ -68,7 +65,7 @@ type StickerPack struct {
 	Thumbnail string         `json:"thumbnail"`
 	Stickers  []Sticker      `json:"stickers"`
 
-	Status stickerStatus `json:"status,omitempty"`
+	Status stickerStatus `json:"status"`
 }
 
 type StickerPackCollection map[uint]StickerPack
@@ -88,20 +85,21 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *API {
-	return &API{
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.Server) *API {
+	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
 		accountsManager: accountsManager,
 		accountsDB:      acc,
 		rpcFiltersSrvc:  rpcFiltersSrvc,
-		config:          config,
+		keyStoreDir:     keyStoreDir,
+		downloader:      downloader,
 		ctx:             ctx,
-		client: &http.Client{
-			Timeout: time.Second * 5,
-		},
+		httpServer:      httpServer,
 	}
+
+	return result
 }
 
 func (api *API) Market(chainID uint64) ([]StickerPack, error) {
@@ -232,39 +230,6 @@ func (api *API) getPurchasedPackIDs(chainID uint64, account types.Address) ([]*b
 	return api.getTokenPackIDs(chainID, tokenIDs)
 }
 
-func hashToURL(hash []byte) (string, error) {
-	// contract response includes a contenthash, which needs to be decoded to reveal
-	// an IPFS identifier. Once decoded, download the content from IPFS. This content
-	// is in EDN format, ie https://ipfs.infura.io/ipfs/QmWVVLwVKCwkVNjYJrRzQWREVvEk917PhbHYAUhA1gECTM
-	// and it also needs to be decoded in to a nim type
-
-	data, codec, err := multicodec.RemoveCodec(hash)
-	if err != nil {
-		return "", err
-	}
-
-	codecName, err := multicodec.Name(codec)
-	if err != nil {
-		return "", err
-	}
-
-	if codecName != "ipfs-ns" {
-		return "", errors.New("codecName is not ipfs-ns")
-	}
-
-	thisCID, err := cid.Parse(data)
-	if err != nil {
-		return "", err
-	}
-
-	str, err := thisCID.StringOfBase(multibase.Base32)
-	if err != nil {
-		return "", err
-	}
-
-	return "https://" + str + ipfsGateway, nil
-}
-
 func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack, errChan chan<- error, doneChan chan<- struct{}) {
 	defer close(doneChan)
 	defer close(errChan)
@@ -339,18 +304,13 @@ func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int
 		return nil, err
 	}
 
-	packDetailsURL, err := hashToURL(packData.Contenthash)
-	if err != nil {
-		return nil, err
-	}
-
 	stickerPack := &StickerPack{
 		ID:    &bigint.BigInt{Int: packID},
 		Owner: packData.Owner,
 		Price: &bigint.BigInt{Int: packData.Price},
 	}
 
-	err = api.downloadIPFSData(stickerPack, packDetailsURL, translateHashes)
+	err = api.downloadPackData(stickerPack, packData.Contenthash, translateHashes)
 	if err != nil {
 		return nil, err
 	}
@@ -358,34 +318,19 @@ func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int
 	return stickerPack, nil
 }
 
-func (api *API) downloadIPFSData(stickerPack *StickerPack, packDetailsURL string, translateHashes bool) error {
-	// This can be improved by adding a cache using packDetailsURL as key
-
-	req, err := http.NewRequest(http.MethodGet, packDetailsURL, nil)
+func (api *API) downloadPackData(stickerPack *StickerPack, contentHash []byte, translateHashes bool) error {
+	fileContent, err := api.downloader.Get(hexutil.Encode(contentHash)[2:], true)
 	if err != nil {
 		return err
 	}
-
-	resp, err := api.client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Error("failed to close the stickerpack request body", "err", err)
-		}
-	}()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return populateStickerPackAttributes(stickerPack, body, translateHashes)
+	return api.populateStickerPackAttributes(stickerPack, fileContent, translateHashes)
 }
 
-func populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, translateHashes bool) error {
+func (api *API) hashToURL(hash string) string {
+	return fmt.Sprintf("https://localhost:%d/ipfs?hash=%s", api.httpServer.Port, hash)
+}
+
+func (api *API) populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, translateHashes bool) error {
 	var stickerpackIPFSInfo ednStickerPackInfo
 	err := edn.Unmarshal(ednSource, &stickerpackIPFSInfo)
 	if err != nil {
@@ -396,15 +341,8 @@ func populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, t
 	stickerPack.Name = stickerpackIPFSInfo.Meta.Name
 
 	if translateHashes {
-		stickerPack.Preview, err = decodeStringHash(stickerpackIPFSInfo.Meta.Preview)
-		if err != nil {
-			return err
-		}
-
-		stickerPack.Thumbnail, err = decodeStringHash(stickerpackIPFSInfo.Meta.Thumbnail)
-		if err != nil {
-			return err
-		}
+		stickerPack.Preview = api.hashToURL(stickerpackIPFSInfo.Meta.Preview)
+		stickerPack.Thumbnail = api.hashToURL(stickerpackIPFSInfo.Meta.Thumbnail)
 	} else {
 		stickerPack.Preview = stickerpackIPFSInfo.Meta.Preview
 		stickerPack.Thumbnail = stickerpackIPFSInfo.Meta.Thumbnail
@@ -413,15 +351,7 @@ func populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, t
 	for _, s := range stickerpackIPFSInfo.Meta.Stickers {
 		url := ""
 		if translateHashes {
-			hash, err := hexutil.Decode("0x" + s.Hash)
-			if err != nil {
-				return err
-			}
-
-			url, err = hashToURL(hash)
-			if err != nil {
-				return err
-			}
+			url = api.hashToURL(s.Hash)
 		}
 
 		stickerPack.Stickers = append(stickerPack.Stickers, Sticker{
@@ -432,20 +362,6 @@ func populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, t
 	}
 
 	return nil
-}
-
-func decodeStringHash(input string) (string, error) {
-	hash, err := hexutil.Decode("0x" + input)
-	if err != nil {
-		return "", err
-	}
-
-	url, err := hashToURL(hash)
-	if err != nil {
-		return "", err
-	}
-
-	return url, nil
 }
 
 func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const maxNumberRecentStickers = 24
@@ -40,17 +41,19 @@ func (api *API) Recent() ([]Sticker, error) {
 	}
 
 	for i, sticker := range recentStickersList {
-		sticker.URL, err = decodeStringHash(sticker.Hash)
-		if err != nil {
-			return nil, err
-		}
+		sticker.URL = api.hashToURL(sticker.Hash)
 		recentStickersList[i] = sticker
 	}
 
 	return recentStickersList, nil
 }
 
-func (api *API) AddRecent(sticker Sticker) error {
+func (api *API) AddRecent(packID *bigint.BigInt, hash string) error {
+	sticker := Sticker{
+		PackID: packID,
+		Hash:   hash,
+	}
+
 	recentStickersList, err := api.recentStickers()
 	if err != nil {
 		return err

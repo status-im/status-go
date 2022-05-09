@@ -12,7 +12,7 @@ import (
 func fetchCryptoComparePrices(symbols []string, currency string) (map[string]float64, error) {
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("https://min-api.cryptocompare.com/data/pricemulti?fsyms=%s&tsyms=%s", strings.Join(symbols, ","), currency)
+	url := fmt.Sprintf("https://min-api.cryptocompare.com/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", strings.Join(symbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err

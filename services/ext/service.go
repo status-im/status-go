@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -104,7 +105,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.Server, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -143,7 +144,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -389,6 +390,7 @@ func buildMessengerOptions(
 	config params.NodeConfig,
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
+	httpServer *server.Server,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
@@ -409,6 +411,7 @@ func buildMessengerOptions(
 		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
+		protocol.WithHTTPServer(httpServer),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

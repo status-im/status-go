@@ -392,7 +392,7 @@ func (b *StatusNode) ensService() *ens.Service {
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.downloader, b.httpServer)
 	}
 	return b.stickersSrvc
 }
@@ -566,8 +566,8 @@ func (b *StatusNode) Cleanup() error {
 			}
 		}
 	}
-	return nil
 
+	return nil
 }
 
 type RPCCall struct {

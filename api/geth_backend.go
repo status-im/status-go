@@ -690,11 +690,11 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	// Start WakuV1 if WakuV2 is not enabled
 	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
-
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version
+	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
 	if len(conf.LogDir) == 0 {
@@ -1193,7 +1193,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 	}
 
 	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
 		// Set initial connection state

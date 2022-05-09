@@ -325,6 +325,8 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
+// List of inserts to be executed when upgrading a node
+// These INSERT queries should not be modified
 func nodeConfigUpgradeInserts() []insertFn {
 	return []insertFn{
 		insertNodeConfig,
@@ -346,6 +348,32 @@ func nodeConfigUpgradeInserts() []insertFn {
 	}
 }
 
+func nodeConfigNormalInserts() []insertFn {
+	// WARNING: if you are modifying one of the node config tables
+	// you need to edit `nodeConfigUpgradeInserts` to guarantee that
+	// the selects being used there are not affected.
+
+	return []insertFn{
+		insertNodeConfig,
+		insertHTTPConfig,
+		insertIPCConfig,
+		insertLogConfig,
+		insertUpstreamConfig,
+		insertNetworkConfig,
+		insertClusterConfig,
+		insertClusterConfigNodes,
+		insertLightETHConfig,
+		insertLightETHConfigTrustedNodes,
+		insertRegisterTopics,
+		insertRequireTopics,
+		insertPushNotificationsServerConfig,
+		insertShhExtConfig,
+		insertWakuConfig,
+		insertWakuV2Config,
+		insertTorrentConfig,
+	}
+}
+
 func execInsertFns(inFn []insertFn, tx *sql.Tx, c *params.NodeConfig) error {
 	for _, fn := range inFn {
 		err := fn(tx, c)
@@ -362,10 +390,7 @@ func insertNodeConfigUpgrade(tx *sql.Tx, c *params.NodeConfig) error {
 }
 
 func SaveConfigWithTx(tx *sql.Tx, c *params.NodeConfig) error {
-	insertFNs := append(nodeConfigUpgradeInserts(),
-		insertTorrentConfig,
-	)
-
+	insertFNs := nodeConfigNormalInserts()
 	return execInsertFns(insertFNs, tx, c)
 }
 

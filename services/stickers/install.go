@@ -68,25 +68,15 @@ func (api *API) Installed() (StickerPackCollection, error) {
 
 	for packID, stickerPack := range stickerPacks {
 		stickerPack.Status = statusInstalled
-
-		stickerPack.Preview, err = decodeStringHash(stickerPack.Preview)
-		if err != nil {
-			return nil, err
-		}
-
-		stickerPack.Thumbnail, err = decodeStringHash(stickerPack.Thumbnail)
-		if err != nil {
-			return nil, err
-		}
-
+		stickerPack.Preview = api.hashToURL(stickerPack.Preview)
+		stickerPack.Thumbnail = api.hashToURL(stickerPack.Thumbnail)
 		for i, sticker := range stickerPack.Stickers {
-			sticker.URL, err = decodeStringHash(sticker.Hash)
+			sticker.URL = api.hashToURL(sticker.Hash)
 			if err != nil {
 				return nil, err
 			}
 			stickerPack.Stickers[i] = sticker
 		}
-
 		stickerPacks[packID] = stickerPack
 	}
 

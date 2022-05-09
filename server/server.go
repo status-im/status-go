@@ -14,6 +14,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 )
@@ -76,6 +78,11 @@ type audioHandler struct {
 
 type identiconHandler struct {
 	logger *zap.Logger
+}
+
+type ipfsHandler struct {
+	logger     *zap.Logger
+	downloader *ipfs.Downloader
 }
 
 func (s *identiconHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -160,23 +167,48 @@ func (s *audioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type Server struct {
-	Port   int
-	run    bool
-	server *http.Server
-	logger *zap.Logger
-	db     *sql.DB
-	cert   *tls.Certificate
+func (s *ipfsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	hashes, ok := r.URL.Query()["hash"]
+	if !ok || len(hashes) == 0 {
+		s.logger.Error("no hash")
+		return
+	}
+
+	_, download := r.URL.Query()["download"]
+
+	content, err := s.downloader.Get(hashes[0], download)
+	if err != nil {
+		s.logger.Error("could not download hash", zap.Error(err))
+		return
+	}
+
+	w.Header().Set("Cache-Control", "max-age:290304000, public")
+	w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
+
+	_, err = w.Write(content)
+	if err != nil {
+		s.logger.Error("failed to write ipfs resource", zap.Error(err))
+	}
 }
 
-func NewServer(db *sql.DB, logger *zap.Logger) (*Server, error) {
+type Server struct {
+	Port       int
+	run        bool
+	server     *http.Server
+	logger     *zap.Logger
+	db         *sql.DB
+	cert       *tls.Certificate
+	downloader *ipfs.Downloader
+}
+
+func NewServer(db *sql.DB, downloader *ipfs.Downloader) (*Server, error) {
 	err := generateTLSCert()
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &Server{db: db, logger: logger, cert: globalCertificate, Port: 0}, nil
+	return &Server{db: db, logger: logutils.ZapLogger(), cert: globalCertificate, Port: 0, downloader: downloader}, nil
 }
 
 func (s *Server) listenAndServe() {
@@ -216,6 +248,8 @@ func (s *Server) Start() error {
 	handler.Handle("/messages/images", &imageHandler{db: s.db, logger: s.logger})
 	handler.Handle("/messages/audio", &audioHandler{db: s.db, logger: s.logger})
 	handler.Handle("/messages/identicons", &identiconHandler{logger: s.logger})
+	handler.Handle("/ipfs", &ipfsHandler{logger: s.logger, downloader: s.downloader})
+
 	s.server = &http.Server{Handler: handler}
 
 	go s.listenAndServe()

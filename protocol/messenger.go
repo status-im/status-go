@@ -391,11 +391,6 @@ func NewMessenger(
 	}
 
 	mailservers := mailserversDB.NewDB(database)
-	httpServer, err := server.NewServer(database, logger)
-
-	if err != nil {
-		return nil, err
-	}
 
 	messenger = &Messenger{
 		config:                     &c,
@@ -434,14 +429,13 @@ func NewMessenger(
 		quit:                 make(chan struct{}),
 		requestedCommunities: make(map[string]*transport.Filter),
 		browserDatabase:      c.browserDatabase,
-		httpServer:           httpServer,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
 			transp.ResetFilters,
-			httpServer.Stop,
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
@@ -671,9 +665,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	err = m.httpServer.Start()
-	if err != nil {
-		return nil, err
+	if m.httpServer != nil {
+		err = m.httpServer.Start()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return response, nil
@@ -4051,18 +4047,21 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		}
 
 	}
-	for idx := range msgs {
-		msgs[idx].PrepareServerURLs(m.httpServer.Port)
+	if m.httpServer != nil {
+		for idx := range msgs {
+			msgs[idx].PrepareServerURLs(m.httpServer.Port)
+		}
 	}
 
 	return msgs, nextCursor, nil
 }
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
-	for idx := range messages {
-		messages[idx].PrepareServerURLs(m.httpServer.Port)
+	if m.httpServer != nil {
+		for idx := range messages {
+			messages[idx].PrepareServerURLs(m.httpServer.Port)
+		}
 	}
-
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
