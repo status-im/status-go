@@ -1,11 +1,14 @@
 package server
 
 import (
+	"crypto/rand"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/common"
 )
 
 func TestCerts(t *testing.T) {
@@ -52,4 +55,16 @@ func (s *CertsSuite) TestGenerateX509Cert() {
 	s.Require().Len(c2.IPAddresses, 1)
 	s.Require().Equal(defaultIP.String(), c2.IPAddresses[0].String())
 	s.Require().Nil(c2.DNSNames)
+}
+
+func (s *CertsSuite) Test() {
+	text := []byte("I am a test")
+
+	cypher, err := common.Encrypt(text, s.PK.D.Bytes(), rand.Reader)
+	s.Require().NoError(err)
+	s.Require().NotEqual(text, cypher)
+
+	out, err := common.Decrypt(cypher, s.PK.D.Bytes())
+	s.Require().NoError(err)
+	s.Require().Equal(text, out)
 }

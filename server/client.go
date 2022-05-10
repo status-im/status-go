@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -12,7 +13,8 @@ type Client struct {
 	*http.Client
 
 	baseAddress *url.URL
-	certPEM []byte
+	certPEM     []byte
+	privateKey  *ecdsa.PrivateKey
 }
 
 func NewClient(c *ConnectionParams) (*Client, error) {
@@ -42,5 +44,6 @@ func NewClient(c *ConnectionParams) (*Client, error) {
 		Client:      &http.Client{Transport: tr},
 		baseAddress: u,
 		certPEM:     certPem,
+		privateKey:  c.privateKey,
 	}, nil
 }
