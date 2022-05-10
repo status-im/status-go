@@ -8,12 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, openseaAPIKey string) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, openseaAPIKey string) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
@@ -24,6 +25,8 @@ func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, open
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
 
 	return &Service{
+		db:                    db,
+		accountsDB:            accountsDB,
 		rpcClient:             rpcClient,
 		favouriteManager:      favouriteManager,
 		tokenManager:          tokenManager,
@@ -38,6 +41,8 @@ func NewService(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, open
 
 // Service is a wallet service.
 type Service struct {
+	db                    *sql.DB
+	accountsDB            *accounts.Database
 	rpcClient             *rpc.Client
 	savedAddressesManager *SavedAddressesManager
 	tokenManager          *TokenManager

@@ -242,6 +242,21 @@ func (tm *TokenManager) deleteCustom(chainID uint64, address common.Address) err
 	return err
 }
 
+func (tm *TokenManager) getTokenBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+	caller, err := ierc20.NewIERC20Caller(token, client)
+	if err != nil {
+		return nil, err
+	}
+
+	return caller.BalanceOf(&bind.CallOpts{
+		Context: ctx,
+	}, account)
+}
+
+func (tm *TokenManager) getChainBalance(ctx context.Context, client *chain.Client, account common.Address) (*big.Int, error) {
+	return client.BalanceAt(ctx, account, nil)
+}
+
 func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
@@ -250,10 +265,6 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 	)
 	for _, client := range clients {
 		for tokenIdx := range tokens {
-			caller, err := ierc20.NewIERC20Caller(tokens[tokenIdx], client)
-			if err != nil {
-				return nil, err
-			}
 			for accountIdx := range accounts {
 				// Below, we set account and token from idx on purpose to avoid override
 				account := accounts[accountIdx]
@@ -261,9 +272,14 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-					balance, err := caller.BalanceOf(&bind.CallOpts{
-						Context: ctx,
-					}, account)
+					var balance *big.Int
+					var err error
+					if token == common.HexToAddress("0x") {
+						balance, err = tm.getChainBalance(ctx, client, account)
+					} else {
+						balance, err = tm.getTokenBalance(ctx, client, account, token)
+					}
+
 					// We don't want to return an error here and prevent
 					// the rest from completing
 					if err != nil {

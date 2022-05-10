@@ -43,7 +43,7 @@ func TestSavedAddresses(t *testing.T) {
 	rst, err = manager.GetSavedAddresses(777)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
-	require.Equal(t, sa, *rst[0])
+	require.Equal(t, sa, rst[0])
 
 	err = manager.DeleteSavedAddress(777, sa.Address)
 	require.NoError(t, err)

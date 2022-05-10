@@ -15,16 +15,16 @@ type FavouriteManager struct {
 	db *sql.DB
 }
 
-func (fm *FavouriteManager) GetFavourites() ([]*Favourite, error) {
+func (fm *FavouriteManager) GetFavourites() ([]Favourite, error) {
 	rows, err := fm.db.Query(`SELECT address, name FROM favourites`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var rst []*Favourite
+	var rst []Favourite
 	for rows.Next() {
-		favourite := &Favourite{}
+		favourite := Favourite{}
 		err := rows.Scan(&favourite.Address, &favourite.Name)
 		if err != nil {
 			return nil, err

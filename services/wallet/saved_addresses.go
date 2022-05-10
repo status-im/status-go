@@ -18,16 +18,16 @@ type SavedAddressesManager struct {
 	db *sql.DB
 }
 
-func (sam *SavedAddressesManager) GetSavedAddresses(chainID uint64) ([]*SavedAddress, error) {
+func (sam *SavedAddressesManager) GetSavedAddresses(chainID uint64) ([]SavedAddress, error) {
 	rows, err := sam.db.Query("SELECT address, name, network_id FROM saved_addresses WHERE network_id = ?", chainID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var rst []*SavedAddress
+	var rst []SavedAddress
 	for rows.Next() {
-		sa := &SavedAddress{}
+		sa := SavedAddress{}
 		err := rows.Scan(&sa.Address, &sa.Name, &sa.ChainID)
 		if err != nil {
 			return nil, err
