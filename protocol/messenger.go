@@ -4252,7 +4252,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	}
 	if m.httpServer != nil {
 		for idx := range msgs {
-			msgs[idx].PrepareServerURLs(m.httpServer)
+			m.prepareMessage(msgs[idx], m.httpServer)
 		}
 	}
 
@@ -4262,8 +4262,25 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 	if m.httpServer != nil {
 		for idx := range messages {
-			messages[idx].PrepareServerURLs(m.httpServer)
+			m.prepareMessage(messages[idx], m.httpServer)
 		}
+	}
+}
+
+func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
+	msg.Identicon = s.MakeIdenticonURL(msg.From)
+
+	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
+		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
+	}
+	if msg.ContentType == protobuf.ChatMessage_IMAGE {
+		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
+	}
+	if msg.ContentType == protobuf.ChatMessage_AUDIO {
+		msg.AudioLocalURL = s.MakeAudioURL(msg.ID)
+	}
+	if msg.ContentType == protobuf.ChatMessage_STICKER {
+		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
 	}
 }
 

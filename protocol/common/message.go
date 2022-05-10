@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/server"
 )
 
 // QuotedMessage contains the original text of the message replied to
@@ -172,23 +171,6 @@ type Message struct {
 
 	// ContactRequestState is the state of the contact request message
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
-}
-
-func (m *Message) PrepareServerURLs(s *server.MediaServer) {
-	m.Identicon = s.MakeIdenticonURL(m.From)
-
-	if m.QuotedMessage != nil && m.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
-		m.QuotedMessage.ImageLocalURL = s.MakeImageURL(m.QuotedMessage.ID)
-	}
-	if m.ContentType == protobuf.ChatMessage_IMAGE {
-		m.ImageLocalURL = s.MakeImageURL(m.ID)
-	}
-	if m.ContentType == protobuf.ChatMessage_AUDIO {
-		m.AudioLocalURL = s.MakeAudioURL(m.ID)
-	}
-	if m.ContentType == protobuf.ChatMessage_STICKER {
-		m.StickerLocalURL = s.MakeStickerURL(m.GetSticker().Hash)
-	}
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
