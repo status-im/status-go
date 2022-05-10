@@ -60,6 +60,10 @@ func New(config Config) (*Community, error) {
 	return community, nil
 }
 
+type CommunityAdminSettings struct {
+	PinMessageAllMembersEnabled bool `json:"pinMessageAllMembersEnabled"`
+}
+
 type CommunityChat struct {
 	ID          string                               `json:"id"`
 	Name        string                               `json:"name"`
@@ -84,17 +88,18 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID           types.HexBytes                  `json:"id"`
-		Verified     bool                            `json:"verified"`
-		Chats        map[string]CommunityChat        `json:"chats"`
-		Categories   map[string]CommunityCategory    `json:"categories"`
-		Name         string                          `json:"name"`
-		Description  string                          `json:"description"`
-		Images       map[string]images.IdentityImage `json:"images"`
-		Color        string                          `json:"color"`
-		MembersCount int                             `json:"membersCount"`
-		EnsName      string                          `json:"ensName"`
-		Link         string                          `json:"link"`
+		ID                     types.HexBytes                  `json:"id"`
+		Verified               bool                            `json:"verified"`
+		Chats                  map[string]CommunityChat        `json:"chats"`
+		Categories             map[string]CommunityCategory    `json:"categories"`
+		Name                   string                          `json:"name"`
+		Description            string                          `json:"description"`
+		Images                 map[string]images.IdentityImage `json:"images"`
+		Color                  string                          `json:"color"`
+		MembersCount           int                             `json:"membersCount"`
+		EnsName                string                          `json:"ensName"`
+		Link                   string                          `json:"link"`
+		CommunityAdminSettings CommunityAdminSettings          `json:"adminSettings"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -144,6 +149,13 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			}
 		}
 
+		communityItem.CommunityAdminSettings = CommunityAdminSettings{
+			PinMessageAllMembersEnabled: false,
+		}
+
+		if o.config.CommunityDescription.AdminSettings != nil {
+			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
+		}
 	}
 	return json.Marshal(communityItem)
 }
@@ -153,25 +165,26 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                types.HexBytes                       `json:"id"`
-		Admin             bool                                 `json:"admin"`
-		Verified          bool                                 `json:"verified"`
-		Joined            bool                                 `json:"joined"`
-		RequestedAccessAt int                                  `json:"requestedAccessAt"`
-		Name              string                               `json:"name"`
-		Description       string                               `json:"description"`
-		Chats             map[string]CommunityChat             `json:"chats"`
-		Categories        map[string]CommunityCategory         `json:"categories"`
-		Images            map[string]images.IdentityImage      `json:"images"`
-		Permissions       *protobuf.CommunityPermissions       `json:"permissions"`
-		Members           map[string]*protobuf.CommunityMember `json:"members"`
-		CanRequestAccess  bool                                 `json:"canRequestAccess"`
-		CanManageUsers    bool                                 `json:"canManageUsers"`
-		CanJoin           bool                                 `json:"canJoin"`
-		Color             string                               `json:"color"`
-		RequestedToJoinAt uint64                               `json:"requestedToJoinAt,omitempty"`
-		IsMember          bool                                 `json:"isMember"`
-		Muted             bool                                 `json:"muted"`
+		ID                     types.HexBytes                       `json:"id"`
+		Admin                  bool                                 `json:"admin"`
+		Verified               bool                                 `json:"verified"`
+		Joined                 bool                                 `json:"joined"`
+		RequestedAccessAt      int                                  `json:"requestedAccessAt"`
+		Name                   string                               `json:"name"`
+		Description            string                               `json:"description"`
+		Chats                  map[string]CommunityChat             `json:"chats"`
+		Categories             map[string]CommunityCategory         `json:"categories"`
+		Images                 map[string]images.IdentityImage      `json:"images"`
+		Permissions            *protobuf.CommunityPermissions       `json:"permissions"`
+		Members                map[string]*protobuf.CommunityMember `json:"members"`
+		CanRequestAccess       bool                                 `json:"canRequestAccess"`
+		CanManageUsers         bool                                 `json:"canManageUsers"`
+		CanJoin                bool                                 `json:"canJoin"`
+		Color                  string                               `json:"color"`
+		RequestedToJoinAt      uint64                               `json:"requestedToJoinAt,omitempty"`
+		IsMember               bool                                 `json:"isMember"`
+		Muted                  bool                                 `json:"muted"`
+		CommunityAdminSettings CommunityAdminSettings               `json:"adminSettings"`
 	}{
 		ID:                o.ID(),
 		Admin:             o.IsAdmin(),
@@ -229,6 +242,13 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			}
 		}
 
+		communityItem.CommunityAdminSettings = CommunityAdminSettings{
+			PinMessageAllMembersEnabled: false,
+		}
+
+		if o.config.CommunityDescription.AdminSettings != nil {
+			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
+		}
 	}
 	return json.Marshal(communityItem)
 }
@@ -664,6 +684,10 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.Identity.Color = description.Identity.Color
 	o.config.CommunityDescription.Identity.Emoji = description.Identity.Emoji
 	o.config.CommunityDescription.Identity.Images = description.Identity.Images
+	if o.config.CommunityDescription.AdminSettings == nil {
+		o.config.CommunityDescription.AdminSettings = &protobuf.CommunityAdminSettings{}
+	}
+	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
 	o.increaseClock()
 }
 
@@ -1295,6 +1319,10 @@ func (o *Community) ChatIDs() (chatIDs []string) {
 		chatIDs = append(chatIDs, o.IDString()+id)
 	}
 	return chatIDs
+}
+
+func (o *Community) AllowsAllMembersToPinMessage() bool {
+	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
 func emptyCommunityChanges() *CommunityChanges {
