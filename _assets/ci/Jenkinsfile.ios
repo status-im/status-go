@@ -1,7 +1,7 @@
 library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
-  agent { label 'macos && x86_64' }
+  agent { label 'maci7-01 && x86_64' }
 
   parameters {
     string(

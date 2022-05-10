@@ -1,7 +1,7 @@
 library 'status-jenkins-lib@v1.3.3'
 
 pipeline {
-  agent { label 'linux' }
+  agent { label 'linux-01' }
 
   parameters {
     string(
