@@ -659,9 +659,24 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
+	chatResponse, err := m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "general",
+			Description: "General channel for the community",
+			Color:       community.Description().Identity.Color,
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)
+	response.AddChat(chatResponse.Chats()[0])
 	err = m.syncCommunity(context.Background(), community)
 	if err != nil {
 		return nil, err

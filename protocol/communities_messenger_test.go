@@ -147,6 +147,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
+	s.Require().Len(response.Chats(), 1)
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -244,7 +245,6 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	for k := range community.Chats() {
 		chatIds = append(chatIds, k)
 	}
-
 	category := &requests.CreateCommunityCategory{
 		CommunityID:  community.ID(),
 		CategoryName: "category-name",
@@ -260,7 +260,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	// Make sure the changes are reflect in the community
 	community = response.Communities()[0]
 	chats := community.Chats()
-	s.Require().Len(chats, 1)
+	s.Require().Len(chats, 2)
 
 	// Send an community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
@@ -301,7 +301,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Chats(), 2)
 	s.Require().Len(response.Communities()[0].Categories(), 1)
 
 	var categoryID string
@@ -310,7 +310,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	}
 
 	// The chat should be created
-	createdChat = response.Chats()[0]
+	createdChat = response.Chats()[1]
 	s.Require().Equal(community.IDString(), createdChat.CommunityID)
 	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
 	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
@@ -364,7 +364,6 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(communities, 2)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().NotNil(actualChat)
-
 	s.Require().Equal(community.IDString(), actualChat.CommunityID)
 	s.Require().Equal(orgChat.Identity.DisplayName, actualChat.Name)
 	s.Require().Equal(orgChat.Identity.Emoji, actualChat.Emoji)
@@ -380,7 +379,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().False(response.Communities()[0].Joined())
-	s.Require().Len(response.RemovedChats(), 2)
+	s.Require().Len(response.RemovedChats(), 3)
 }
 
 func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
@@ -508,9 +507,9 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Chats(), 2)
 
-	chatID := response.Chats()[0].ID
+	chatID := response.Chats()[1].ID
 	inputMessage := &common.Message{}
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
@@ -1539,7 +1538,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Check that the joined community has the correct values
 	s.Equal(community.ID(), aCom.ID())
-	s.Equal(community.Clock(), aCom.Clock())
+	s.Equal(uint64(0x2), aCom.Clock())
 	s.Equal(community.PublicKey(), aCom.PublicKey())
 
 	// Check alicesOtherDevice receives the sync join message
