@@ -44,6 +44,11 @@ message CommunityDescription {
   repeated string ban_list = 7;
   map<string,CommunityCategory> categories = 8;
   uint64 archive_magnetlink_clock = 9;
+  CommunityAdminSettings admin_settings = 10;
+}
+
+message CommunityAdminSettings {
+  bool pin_message_all_members_enabled = 1;
 }
 
 message CommunityChat {

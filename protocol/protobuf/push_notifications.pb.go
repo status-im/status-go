@@ -831,9 +831,7 @@ func init() {
 	proto.RegisterType((*PushNotificationResponse)(nil), "protobuf.PushNotificationResponse")
 }
 
-func init() {
-	proto.RegisterFile("push_notifications.proto", fileDescriptor_200acd86044eaa5d)
-}
+func init() { proto.RegisterFile("push_notifications.proto", fileDescriptor_200acd86044eaa5d) }
 
 var fileDescriptor_200acd86044eaa5d = []byte{
 	// 1072 bytes of a gzipped FileDescriptorProto

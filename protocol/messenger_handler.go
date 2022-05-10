@@ -1369,17 +1369,29 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 		}
 
 		var emojiReaction bool
+		var pinMessage bool
 		// We allow emoji reactions from anyone
 		switch chatEntity.(type) {
 		case *EmojiReaction:
 			emojiReaction = true
+		case *common.PinMessage:
+			pinMessage = true
 		}
 
 		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), chatEntity.GetGrant())
 		if err != nil {
 			return nil, err
 		}
-		if !emojiReaction && !canPost {
+
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+
+		isMemberAdmin := community.IsMemberAdmin(chatEntity.GetSigPubKey())
+		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
+
+		if (pinMessage && !isMemberAdmin && !pinMessageAllowed) || (!emojiReaction && !canPost) {
 			return nil, errors.New("user can't post")
 		}
 

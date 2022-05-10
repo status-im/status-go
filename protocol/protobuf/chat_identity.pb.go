@@ -232,9 +232,7 @@ func init() {
 	proto.RegisterType((*IdentityImage)(nil), "protobuf.IdentityImage")
 }
 
-func init() {
-	proto.RegisterFile("chat_identity.proto", fileDescriptor_7a652489000a5879)
-}
+func init() { proto.RegisterFile("chat_identity.proto", fileDescriptor_7a652489000a5879) }
 
 var fileDescriptor_7a652489000a5879 = []byte{
 	// 435 bytes of a gzipped FileDescriptorProto

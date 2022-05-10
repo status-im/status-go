@@ -30,6 +30,19 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, errors.New("chat not found")
 	}
 
+	if chat.CommunityChat() {
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+		isMemberAdmin := community.IsMemberAdmin(&m.identity.PublicKey)
+		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
+
+		if !pinMessageAllowed && !isMemberAdmin {
+			return nil, errors.New("member can't pin message")
+		}
+	}
+
 	err := m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
