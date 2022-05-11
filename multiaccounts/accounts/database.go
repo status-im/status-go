@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"database/sql"
+	"encoding/json"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
@@ -16,18 +17,18 @@ const (
 )
 
 type Account struct {
-	Address     types.Address  `json:"address"`
-	Wallet      bool           `json:"wallet"`
-	Chat        bool           `json:"chat"`
-	Type        string         `json:"type,omitempty"`
-	Storage     string         `json:"storage,omitempty"`
-	Path        string         `json:"path,omitempty"`
-	PublicKey   types.HexBytes `json:"public-key,omitempty"`
-	Name        string         `json:"name"`
-	Emoji       string         `json:"emoji"`
-	Color       string         `json:"color"`
-	Hidden      bool           `json:"hidden"`
-	DerivedFrom string         `json:"derived-from,omitempty"`
+	Address     types.Address
+	Wallet      bool
+	Chat        bool
+	Type        string
+	Storage     string
+	Path        string
+	PublicKey   types.HexBytes
+	Name        string
+	Emoji       string
+	Color       string
+	Hidden      bool
+	DerivedFrom string
 }
 
 const (
@@ -42,6 +43,40 @@ const (
 // Wallet
 func (a *Account) IsOwnAccount() bool {
 	return a.Wallet || a.Type == accountTypeSeed || a.Type == accountTypeGenerated || a.Type == accountTypeKey
+}
+
+func (a *Account) MarshalJSON() ([]byte, error) {
+	item := struct {
+		Address          types.Address  `json:"address"`
+		MixedcaseAddress string         `json:"mixedcase-address"`
+		Wallet           bool           `json:"wallet"`
+		Chat             bool           `json:"chat"`
+		Type             string         `json:"type,omitempty"`
+		Storage          string         `json:"storage,omitempty"`
+		Path             string         `json:"path,omitempty"`
+		PublicKey        types.HexBytes `json:"public-key,omitempty"`
+		Name             string         `json:"name"`
+		Emoji            string         `json:"emoji"`
+		Color            string         `json:"color"`
+		Hidden           bool           `json:"hidden"`
+		DerivedFrom      string         `json:"derived-from,omitempty"`
+	}{
+		Address:          a.Address,
+		MixedcaseAddress: a.Address.Hex(),
+		Wallet:           a.Wallet,
+		Chat:             a.Chat,
+		Type:             a.Type,
+		Storage:          a.Storage,
+		Path:             a.Path,
+		PublicKey:        a.PublicKey,
+		Name:             a.Name,
+		Emoji:            a.Emoji,
+		Color:            a.Color,
+		Hidden:           a.Hidden,
+		DerivedFrom:      a.DerivedFrom,
+	}
+
+	return json.Marshal(item)
 }
 
 // Database sql wrapper for operations with browser objects.
