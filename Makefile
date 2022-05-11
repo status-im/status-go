@@ -219,7 +219,7 @@ setup: setup-check setup-build setup-dev tidy
 
 setup-check: ##@setup Check if Go compiler is installed.
 ifeq (, $(shell which go))
-	$(error "No Go compiler found! Make sure to install 1.17.0 or newer.")
+	$(error "No Go compiler found! Make sure to install 1.18.0 or newer.")
 endif
 
 setup-dev: ##@setup Install all necessary tools for development
@@ -244,7 +244,7 @@ install-mock: ##@install Install Module Mocking Tools
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
 
 install-modvendor: ##@install Install Module Vendoring Tool
-	GO111MODULE=on go install github.com/goware/modvendor@v0.4.0
+	GO111MODULE=on go install github.com/goware/modvendor@v0.5.0
 
 install-protobuf: ##@install Install Protobuf Generation Tools
 	GO111MODULE=on go install github.com/kevinburke/go-bindata/go-bindata@v3.13.0
