@@ -70,6 +70,11 @@ func (api *API) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
 }
 
 func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
+	err := api.manager.DeleteAccount(api.config.KeyStoreDir, address)
+	if err != nil {
+		return err
+	}
+
 	return api.db.DeleteAccount(address)
 }
 
