@@ -1,11 +1,13 @@
 
 # Status usage data
+
+_______
+ℹ️: **The release and develop (nightly) version of Status DO NOT collect in-app usage data. A service to do so has been developed and might be used in experimental builds of the app, for testing purposes and with double opt-in only. Any information in this document about data (not) collected and how the service works, only applies if you've deliberately installed an experimental build**. 
 _______
 :warning: **We cannot guarantee that there are no ways to de-anonymous usage data you share. If you find yourself at risk if your identity were to be uncovered: don't enable sharing data!**
-
 _______
 
-Starting release 1.14, the Status mobile app asks to share data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared over Status' peer-to-peer network (Waku), just like a 1:1 message.
+Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared over Status' peer-to-peer network (Waku), just like a 1:1 message.
 
 Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
 
