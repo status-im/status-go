@@ -310,19 +310,23 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	}
 
 	// The chat should be created
-	createdChat = response.Chats()[1]
-	if response.Chats()[0].Name == orgChat.Identity.DisplayName {
-		createdChat = response.Chats()[0]
+
+	found := false
+	for _, createdChat := range response.Chats() {
+		if orgChat.Identity.DisplayName == createdChat.Name {
+			found = true
+			s.Require().Equal(community.IDString(), createdChat.CommunityID)
+			s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
+			s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
+			s.Require().NotEmpty(createdChat.ID)
+			s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
+			s.Require().Equal(categoryID, createdChat.CategoryID)
+			s.Require().True(createdChat.Active)
+			s.Require().NotEmpty(createdChat.Timestamp)
+			s.Require().True(strings.HasPrefix(createdChat.ID, community.IDString()))
+		}
 	}
-	s.Require().Equal(community.IDString(), createdChat.CommunityID)
-	s.Require().Equal(orgChat.Identity.DisplayName, createdChat.Name)
-	s.Require().Equal(orgChat.Identity.Emoji, createdChat.Emoji)
-	s.Require().NotEmpty(createdChat.ID)
-	s.Require().Equal(ChatTypeCommunityChat, createdChat.ChatType)
-	s.Require().Equal(categoryID, createdChat.CategoryID)
-	s.Require().True(createdChat.Active)
-	s.Require().NotEmpty(createdChat.Timestamp)
-	s.Require().True(strings.HasPrefix(createdChat.ID, community.IDString()))
+	s.Require().True(found)
 
 	// Create another org chat
 	orgChat = &protobuf.CommunityChat{
