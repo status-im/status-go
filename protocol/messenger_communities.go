@@ -673,6 +673,9 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
+	// updating community so it contains the general chat
+	community = chatResponse.Communities()[0]
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)

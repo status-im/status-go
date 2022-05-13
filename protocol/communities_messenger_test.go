@@ -451,6 +451,8 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 1)
+	s.Require().Len(response.Chats(), 1)
 
 	community := response.Communities()[0]
 
@@ -469,6 +471,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 2)
 	s.Require().Len(response.Chats(), 1)
 
 	response, err = s.bob.InviteUsersToCommunity(
@@ -509,6 +512,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 2)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().Len(response.Chats(), 2)
 
@@ -535,11 +539,19 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
-	// If 1 is set we get an error "should have 1 item(s), but has 2",
-	// after setting it to 2, we get "should have 2 item(s), but has 1"
-	// because of that commenting out the next line
-	//s.Require().Len(response.Chats(), 2)
-	s.Require().Equal(chatID, response.Chats()[1].ID)
+
+	// check if response contains the chat we're interested in
+	// we use this instead of checking just the length of the chat because
+	// a CommunityDescription message might be received in the meantime due to syncing
+	// hence response.Chats() might contain the general chat, and the new chat;
+	// or only the new chat if the CommunityDescription message has not arrived
+	found := false
+	for _, chat := range response.Chats() {
+		if chat.ID == chatID {
+			found = true
+		}
+	}
+	s.Require().True(found)
 }
 
 func (s *MessengerCommunitiesSuite) TestImportCommunity() {
