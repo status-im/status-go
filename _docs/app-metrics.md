@@ -87,3 +87,16 @@ Transmission happens over Waku, and as of now, all data is deleted locally after
 |-----------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | navigate-to           | {:view_id: "", :params {:screen ""}} | The user navigated to one of the screens. If the `view_id` has a `_stack` suffix, it could signify a top level tab. |
 | screens/on-will-focus | {:view_id: "", :params {:screen ""}} | The user navigated to a top level tab.                                                                              |
+
+## Related PRs
+
+### `status-go`
+- [#2170 - 🎭 📊 Anonymous Metrics V0](https://github.com/status-im/status-go/pull/2170)
+- [#2195 - Added Anonymous Metrics Send Opt-In Setting](https://github.com/status-im/status-go/pull/2195)
+- [#2198 - Anon Metrics Broadcast](https://github.com/status-im/status-go/pull/2198)
+
+### `status-react`
+- [#11901 - Feature/anon metrics](https://github.com/status-im/status-react/pull/11901)
+- [#11941 - Feature/anon metrics](https://github.com/status-im/status-react/pull/11941)
+- [#11963 - 🗂️ Anon metrics batching](https://github.com/status-im/status-react/pull/11963)
+- [#12024 - 🔘 Anon metrics opt-in UI (disabled using feature flags)](https://github.com/status-im/status-react/pull/12024)
