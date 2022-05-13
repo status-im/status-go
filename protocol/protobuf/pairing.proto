@@ -41,6 +41,8 @@ message SyncInstallationContactV2 {
   bool muted = 11;
   bool removed = 12;
   bool has_added_us = 13;
+  int64 verification_status = 14;
+  int64 trust_status = 15;
 }
 
 message SyncInstallationAccount {
@@ -161,4 +163,35 @@ message SyncCommunitySettings {
   uint64 clock = 1;
   string community_id = 2;
   bool history_archive_support_enabled = 3;
+}
+
+message SyncTrustedUser {
+  uint64 clock = 1;
+  string id = 2;
+  TrustStatus status = 3;
+
+  enum TrustStatus {
+    UNKNOWN = 0;
+    TRUSTED = 1;
+    UNTRUSTWORTHY = 2;
+  }
+}
+
+message SyncVerificationRequest {
+  uint64 clock = 1;
+  string from = 2;
+  string to = 3;
+  string challenge = 4;
+  uint64 requested_at = 5;
+  string response = 6;
+  uint64 replied_at = 7;
+  VerificationStatus verification_status = 8;
+
+  enum VerificationStatus {
+    UNKNOWN = 0;
+    PENDING = 1;
+    ACCEPTED = 2;
+    DECLINED = 3;
+    CANCELED = 4;
+  }
 }

@@ -209,5 +209,7 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 		Muted:              muted,
 		HasAddedUs:         contact.HasAddedUs,
 		Removed:            contact.Removed,
+		VerificationStatus: int64(contact.VerificationStatus),
+		TrustStatus:        int64(contact.TrustStatus),
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -39,6 +40,7 @@ type MessengerResponse struct {
 	Settings                []*settings.SyncSettingField
 	IdentityImages          []*images.IdentityImage
 	Accounts                []*accounts.Account
+	VerificationRequests    []*verification.Request
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -54,24 +56,27 @@ type MessengerResponse struct {
 	currentStatus               *UserStatus
 	statusUpdates               map[string]UserStatus
 	clearedHistories            map[string]*ClearedHistory
+	trustStatus                 map[string]verification.TrustStatus
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
-		Chats                   []*Chat                         `json:"chats,omitempty"`
-		RemovedChats            []string                        `json:"removedChats,omitempty"`
-		RemovedMessages         []*RemovedMessage               `json:"removedMessages,omitempty"`
-		Messages                []*common.Message               `json:"messages,omitempty"`
-		Contacts                []*Contact                      `json:"contacts,omitempty"`
-		Installations           []*multidevice.Installation     `json:"installations,omitempty"`
-		PinMessages             []*common.PinMessage            `json:"pinMessages,omitempty"`
-		EmojiReactions          []*EmojiReaction                `json:"emojiReactions,omitempty"`
-		Invitations             []*GroupChatInvitation          `json:"invitations,omitempty"`
-		CommunityChanges        []*communities.CommunityChanges `json:"communityChanges,omitempty"`
-		RequestsToJoinCommunity []*communities.RequestToJoin    `json:"requestsToJoinCommunity,omitempty"`
-		Mailservers             []mailservers.Mailserver        `json:"mailservers,omitempty"`
-		Bookmarks               []*browsers.Bookmark            `json:"bookmarks,omitempty"`
-		ClearedHistories        []*ClearedHistory               `json:"clearedHistories,omitempty"`
+		Chats                   []*Chat                             `json:"chats,omitempty"`
+		RemovedChats            []string                            `json:"removedChats,omitempty"`
+		RemovedMessages         []*RemovedMessage                   `json:"removedMessages,omitempty"`
+		Messages                []*common.Message                   `json:"messages,omitempty"`
+		Contacts                []*Contact                          `json:"contacts,omitempty"`
+		Installations           []*multidevice.Installation         `json:"installations,omitempty"`
+		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
+		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
+		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
+		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
+		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
+		Mailservers             []mailservers.Mailserver            `json:"mailservers,omitempty"`
+		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
+		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
+		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
+		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
 		Notifications               []*localnotifications.Notification `json:"notifications"`
@@ -84,18 +89,20 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		IdentityImages              []*images.IdentityImage            `json:"identityImages,omitempty"`
 		Accounts                    []*accounts.Account                `json:"accounts,omitempty"`
 	}{
-		Contacts:                    r.Contacts,
-		Installations:               r.Installations,
-		EmojiReactions:              r.EmojiReactions,
-		Invitations:                 r.Invitations,
-		CommunityChanges:            r.CommunityChanges,
-		RequestsToJoinCommunity:     r.RequestsToJoinCommunity,
-		Mailservers:                 r.Mailservers,
-		Bookmarks:                   r.Bookmarks,
-		CurrentStatus:               r.currentStatus,
-		Settings:                    r.Settings,
-		IdentityImages:              r.IdentityImages,
-		Accounts:                    r.Accounts,
+		Contacts:                r.Contacts,
+		Installations:           r.Installations,
+		EmojiReactions:          r.EmojiReactions,
+		Invitations:             r.Invitations,
+		CommunityChanges:        r.CommunityChanges,
+		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
+		Mailservers:             r.Mailservers,
+		Bookmarks:               r.Bookmarks,
+		CurrentStatus:           r.currentStatus,
+		Settings:                r.Settings,
+		IdentityImages:          r.IdentityImages,
+		Accounts:                r.Accounts,
+		VerificationRequests:    r.VerificationRequests,
+
 		Messages:                    r.Messages(),
 		Notifications:               r.Notifications(),
 		Chats:                       r.Chats(),
@@ -109,6 +116,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		StatusUpdates:               r.StatusUpdates(),
 	}
 
+	responseItem.TrustStatus = r.TrustStatus()
 	return json.Marshal(responseItem)
 }
 
@@ -176,6 +184,18 @@ func (r *MessengerResponse) PinMessages() []*common.PinMessage {
 	return pinMessages
 }
 
+func (r *MessengerResponse) TrustStatus() map[string]verification.TrustStatus {
+	if len(r.trustStatus) == 0 {
+		return nil
+	}
+
+	result := make(map[string]verification.TrustStatus)
+	for contactID, trustStatus := range r.trustStatus {
+		result[contactID] = trustStatus
+	}
+	return result
+}
+
 func (r *MessengerResponse) StatusUpdates() []UserStatus {
 	var userStatus []UserStatus
 	for pk, s := range r.statusUpdates {
@@ -206,6 +226,8 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
+		len(r.trustStatus)+
+		len(r.VerificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
 		r.currentStatus == nil
 }
@@ -222,6 +244,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.EmojiReactions)+
 		len(response.Bookmarks)+
 		len(response.clearedHistories)+
+		len(response.VerificationRequests)+
+		len(response.trustStatus)+
 		len(response.CommunityChanges) != 0 {
 		return ErrNotImplemented
 	}
@@ -233,6 +257,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddMessages(response.Messages())
 	r.AddCommunities(response.Communities())
 	r.AddPinMessages(response.PinMessages())
+	r.AddVerificationRequests(response.VerificationRequests)
+	r.AddTrustStatuses(response.trustStatus)
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
 
 	return nil
@@ -267,6 +293,34 @@ func (r *MessengerResponse) AddBookmark(bookmark *browsers.Bookmark) {
 func (r *MessengerResponse) AddBookmarks(bookmarks []*browsers.Bookmark) {
 	for _, b := range bookmarks {
 		r.AddBookmark(b)
+	}
+}
+
+func (r *MessengerResponse) AddVerificationRequest(vr *verification.Request) {
+	r.VerificationRequests = append(r.VerificationRequests, vr)
+}
+
+func (r *MessengerResponse) AddVerificationRequests(vrs []*verification.Request) {
+	for _, vr := range vrs {
+		r.AddVerificationRequest(vr)
+	}
+}
+
+func (r *MessengerResponse) AddTrustStatus(contactID string, trustStatus verification.TrustStatus) {
+	if r.trustStatus == nil {
+		r.trustStatus = make(map[string]verification.TrustStatus)
+	}
+
+	r.trustStatus[contactID] = trustStatus
+}
+
+func (r *MessengerResponse) AddTrustStatuses(ts map[string]verification.TrustStatus) {
+	if r.trustStatus == nil {
+		r.trustStatus = make(map[string]verification.TrustStatus)
+	}
+
+	for k, v := range ts {
+		r.trustStatus[k] = v
 	}
 }
 
