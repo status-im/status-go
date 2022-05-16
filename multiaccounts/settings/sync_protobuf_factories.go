@@ -409,6 +409,10 @@ func extractJSONBlob(jb *sqlite.JSONBlob) ([]byte, error) {
 		return nil, err
 	}
 
+	if value == nil {
+		return nil, nil
+	}
+
 	return value.([]byte), nil
 }
 
