@@ -317,9 +317,7 @@ var (
 		reactFieldName: "stickers/packs-pending",
 		dBColumnName:   "stickers_packs_pending",
 		valueHandler:   JSONBlobHandler,
-		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
-			inactive:          true, // Remove after issue is resolved
 			fromInterface:     stickersPacksPendingProtobufFactory,
 			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
@@ -330,9 +328,7 @@ var (
 		reactFieldName: "stickers/recent-stickers",
 		dBColumnName:   "stickers_recent_stickers",
 		valueHandler:   JSONBlobHandler,
-		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
-			inactive:          true, // Remove after issue is resolved
 			fromInterface:     stickersRecentStickersProtobufFactory,
 			fromStruct:        stickersRecentStickersProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
