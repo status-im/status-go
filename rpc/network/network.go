@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 
 	"github.com/status-im/status-go/params"
 )
@@ -78,21 +79,61 @@ func NewManager(db *sql.DB) *Manager {
 	}
 }
 
+func find(chainID uint64, networks []params.Network) int {
+	for i := range networks {
+		if networks[i].ChainID == chainID {
+			return i
+		}
+	}
+	return -1
+}
+
 func (nm *Manager) Init(networks []params.Network) error {
 	if networks == nil {
 		return nil
 	}
 
+	var errors string
 	currentNetworks, _ := nm.Get(false)
-	if len(currentNetworks) > 0 {
-		return nil
+
+	// Delete networks which are not supported any more
+	for i := range currentNetworks {
+		if find(currentNetworks[i].ChainID, networks) == -1 {
+			err := nm.Delete(currentNetworks[i].ChainID)
+			if err != nil {
+				errors += fmt.Sprintf("error deleting network with ChainID: %d, %s", currentNetworks[i].ChainID, err.Error())
+			}
+		}
 	}
 
+	// Add new networks and update rpc url for the old ones
 	for i := range networks {
-		err := nm.Upsert(&networks[i])
-		if err != nil {
-			return err
+		found := false
+		for j := range currentNetworks {
+			if currentNetworks[j].ChainID == networks[i].ChainID {
+				found = true
+				if currentNetworks[j].RPCURL != networks[i].RPCURL {
+					// Update rpc_url if it's different
+					err := nm.UpdateRPCURL(currentNetworks[j].ChainID, networks[i].RPCURL)
+					if err != nil {
+						errors += fmt.Sprintf("error updating network rpc_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+					}
+				}
+				break
+			}
 		}
+
+		if !found {
+			// Add network if doesn't exist
+			err := nm.Upsert(&networks[i])
+			if err != nil {
+				errors += fmt.Sprintf("error inserting network with ChainID: %d, %s", networks[i].ChainID, err.Error())
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf(errors)
 	}
 
 	return nil
@@ -110,6 +151,11 @@ func (nm *Manager) Upsert(network *params.Network) error {
 
 func (nm *Manager) Delete(chainID uint64) error {
 	_, err := nm.db.Exec("DELETE FROM networks WHERE chain_id = ?", chainID)
+	return err
+}
+
+func (nm *Manager) UpdateRPCURL(chainID uint64, rpcURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ? WHERE chain_id = ?`, rpcURL, chainID)
 	return err
 }
 

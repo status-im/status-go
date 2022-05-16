@@ -362,6 +362,8 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 		return nil, err
 	}
 
+	conf.Networks = n.Networks
+
 	if err := b.saveNodeConfig(conf); err != nil {
 		return nil, err
 	}
