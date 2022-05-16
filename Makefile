@@ -16,9 +16,10 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
+  # Building on M1 is still not supported, so in the meantime we crosscompile by default to amd64
   ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
-    # Building on M1 is still not supported, so in the meantime we crosscompile to amd64
-    GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=amd64
+    FORCE_ARCH ?= amd64
+    GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=$(FORCE_ARCH)
   endif
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
