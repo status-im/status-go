@@ -120,9 +120,24 @@ func MultiAddressToAddress(multiAddr string) (string, error) {
 		return "", err
 	}
 
-	ip4, err := ma.ValueForProtocol(multiaddr.P_IP4)
-	if err != nil {
+	dns4, err := ma.ValueForProtocol(multiaddr.P_DNS4)
+	if err != nil && err != multiaddr.ErrProtocolNotFound {
 		return "", err
+	}
+
+	ip4 := ""
+	if dns4 != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		ip4, err = net.DefaultResolver.LookupCNAME(ctx, dns4)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		ip4, err = ma.ValueForProtocol(multiaddr.P_IP4)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	tcp, err := ma.ValueForProtocol(multiaddr.P_TCP)
