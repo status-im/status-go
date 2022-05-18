@@ -76,7 +76,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		Networks:     &networks,
 	}
 
-	accounts := []accounts.Account{
+	accounts := []*accounts.Account{
 		{Address: types.HexToAddress(utils.TestConfig.Account1.WalletAddress), Chat: true, Wallet: true},
 	}
 	require.NoError(t, service.accountsDB.SaveAccounts(accounts))

@@ -274,7 +274,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var subaccs []accounts.Account
+	var subaccs []*accounts.Account
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -347,7 +347,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var subaccs []accounts.Account
+	var subaccs []*accounts.Account
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
 		return makeJSONResponse(err)

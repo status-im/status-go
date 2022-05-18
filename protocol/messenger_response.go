@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -37,6 +38,7 @@ type MessengerResponse struct {
 	Bookmarks               []*browsers.Bookmark
 	Settings                []*settings.SyncSettingField
 	IdentityImages          []*images.IdentityImage
+	Accounts                []*accounts.Account
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -80,6 +82,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		StatusUpdates               []UserStatus                       `json:"statusUpdates,omitempty"`
 		Settings                    []*settings.SyncSettingField       `json:"settings,omitempty"`
 		IdentityImages              []*images.IdentityImage            `json:"identityImages,omitempty"`
+		Accounts                    []*accounts.Account                `json:"accounts,omitempty"`
 	}{
 		Contacts:                    r.Contacts,
 		Installations:               r.Installations,
@@ -92,6 +95,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CurrentStatus:               r.currentStatus,
 		Settings:                    r.Settings,
 		IdentityImages:              r.IdentityImages,
+		Accounts:                    r.Accounts,
 		Messages:                    r.Messages(),
 		Notifications:               r.Notifications(),
 		Chats:                       r.Chats(),
@@ -198,6 +202,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedMessages)+
 		len(r.Mailservers)+
 		len(r.IdentityImages)+
+		len(r.Accounts)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+

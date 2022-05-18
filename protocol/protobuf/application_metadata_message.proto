@@ -58,5 +58,6 @@ message ApplicationMetadataMessage {
     SYNC_SETTING = 42;
     COMMUNITY_ARCHIVE_MAGNETLINK = 43;
     SYNC_PROFILE_PICTURE = 44;
+    SYNC_WALLET_ACCOUNT = 45;
   }
 }

@@ -134,3 +134,22 @@ message SyncProfilePictures {
   string key_uid = 1;
   repeated SyncProfilePicture pictures = 2;
 }
+
+message SyncWalletAccount {
+  uint64 clock = 1;
+	bytes address = 2;
+	bool wallet = 3;
+	bool chat = 4;
+	string type = 5;
+	string storage = 6;
+	string path = 7;
+	bytes publicKey = 8;
+	string name = 9;
+	string color = 10;
+	bool hidden = 11;
+  bool removed = 12;
+}
+
+message SyncWalletAccounts {
+  repeated SyncWalletAccount accounts = 1;
+}

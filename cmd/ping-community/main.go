@@ -408,7 +408,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
-	walletAccount := accounts.Account{
+	walletAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
 		Color:     "",
@@ -418,7 +418,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 
 	chatDerivedAccount := derivedAddresses[pathDefaultChat]
-	chatAccount := accounts.Account{
+	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      settings.Name,
@@ -427,7 +427,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 
 	fmt.Println(nodeConfig)
-	accounts := []accounts.Account{walletAccount, chatAccount}
+	accounts := []*accounts.Account{walletAccount, chatAccount}
 	err = backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
 	if err != nil {
 		logger.Error("start node", err)

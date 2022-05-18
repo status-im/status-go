@@ -32,9 +32,16 @@ type API struct {
 	feed    *event.Feed
 }
 
-func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
+type DerivedAddress struct {
+	Address        common.Address `json:"address"`
+	Path           string         `json:"path"`
+	HasActivity    bool           `json:"hasActivity"`
+	AlreadyCreated bool           `json:"alreadyCreated"`
+}
+
+func (api *API) SaveAccounts(ctx context.Context, accounts []*accounts.Account) error {
 	log.Info("[AccountsAPI::SaveAccounts]")
-	err := api.db.SaveAccounts(accounts)
+	err := api.db.SaveAccountsAndPublish(accounts)
 	if err != nil {
 		return err
 	}
@@ -42,14 +49,14 @@ func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) e
 	return nil
 }
 
-func (api *API) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
+func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 	accounts, err := api.db.GetAccounts()
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range accounts {
-		account := &accounts[i]
+		account := accounts[i]
 		if account.Wallet && account.DerivedFrom == "" {
 			address, err := api.db.GetWalletRootAddress()
 			if err != nil {
@@ -63,23 +70,29 @@ func (api *API) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
 }
 
 func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
-	err := api.manager.DeleteAccount(api.config.KeyStoreDir, address)
+	acc, err := api.db.GetAccountByAddress(address)
 	if err != nil {
 		return err
 	}
+	if acc.Type != accounts.AccountTypeWatch {
+		err = api.manager.DeleteAccount(api.config.KeyStoreDir, address)
+		if err != nil {
+			return err
+		}
+	}
 
-	return api.db.DeleteAccount(address)
+	return api.db.DeleteAccountAndPublish(address)
 }
 
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
-	account := accounts.Account{
+	account := &accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
 		Type:    "watch",
 		Name:    name,
 		Emoji:   emoji,
 		Color:   color,
 	}
-	return api.SaveAccounts(ctx, []accounts.Account{account})
+	return api.SaveAccounts(ctx, []*accounts.Account{account})
 }
 
 func (api *API) AddAccountWithMnemonic(
@@ -136,7 +149,7 @@ func (api *API) AddAccountWithPrivateKey(
 		return err
 	}
 
-	account := accounts.Account{
+	account := &accounts.Account{
 		Address:   types.Address(common.HexToAddress(info.Address)),
 		PublicKey: types.HexBytes(info.PublicKey),
 		Type:      "key",
@@ -146,7 +159,7 @@ func (api *API) AddAccountWithPrivateKey(
 		Path:      pathDefaultWallet,
 	}
 
-	return api.SaveAccounts(ctx, []accounts.Account{account})
+	return api.SaveAccounts(ctx, []*accounts.Account{account})
 }
 
 func (api *API) GenerateAccount(
@@ -234,7 +247,7 @@ func (api *API) addAccountWithMnemonic(
 		return err
 	}
 
-	account := accounts.Account{
+	account := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
 		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
 		Type:        "seed",
@@ -244,7 +257,7 @@ func (api *API) addAccountWithMnemonic(
 		Path:        path,
 		DerivedFrom: generatedAccountInfo.Address,
 	}
-	return api.SaveAccounts(ctx, []accounts.Account{account})
+	return api.SaveAccounts(ctx, []*accounts.Account{account})
 }
 
 func (api *API) generateAccount(
@@ -276,7 +289,7 @@ func (api *API) generateAccount(
 		return err
 	}
 
-	acc := accounts.Account{
+	acc := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(infos[path].Address)),
 		PublicKey:   types.HexBytes(infos[path].PublicKey),
 		Type:        "generated",
@@ -287,5 +300,5 @@ func (api *API) generateAccount(
 		DerivedFrom: address,
 	}
 
-	return api.SaveAccounts(ctx, []accounts.Account{acc})
+	return api.SaveAccounts(ctx, []*accounts.Account{acc})
 }

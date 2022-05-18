@@ -26,7 +26,7 @@ func TestIsOwnAccount(t *testing.T) {
 	require.True(t, account.IsOwnAccount())
 
 	account = Account{
-		Type: accountTypeWatch,
+		Type: AccountTypeWatch,
 	}
 	require.False(t, account.IsOwnAccount())
 
