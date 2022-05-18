@@ -2,11 +2,16 @@ package wallet
 
 import (
 	"context"
+	"fmt"
+	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -28,6 +33,13 @@ func (api *API) StartWallet(ctx context.Context, chainIDs []uint64) error {
 
 func (api *API) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
 	return api.r.GetWallet(ctx, chainIDs)
+}
+
+type DerivedAddress struct {
+	Address        common.Address `json:"address"`
+	Path           string         `json:"path"`
+	HasActivity    bool           `json:"hasActivity"`
+	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
 // SetInitialBlocksRange sets initial blocks range
@@ -302,4 +314,145 @@ func (api *API) FetchPrices(ctx context.Context, symbols []string, currency stri
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	log.Debug("call to GetSuggestedFees")
 	return api.s.feesManager.suggestedFees(ctx, chainID)
+}
+
+func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getDerivedAddresses(ctx, info.ID, path, pageSize, pageNumber)
+}
+
+func (api *API) GetDerivedAddressesForMenominicWithPath(ctx context.Context, mnemonic string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+
+	info, err := api.s.gethManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getDerivedAddresses(ctx, info.ID, path, pageSize, pageNumber)
+}
+
+func (api *API) GetDerivedAddressForPrivateKey(ctx context.Context, privateKey string) ([]*DerivedAddress, error) {
+	var derivedAddresses = make([]*DerivedAddress, 0)
+	info, err := api.s.gethManager.AccountsGenerator().ImportPrivateKey(privateKey)
+	if err != nil {
+		return derivedAddresses, err
+	}
+
+	addressExists, err := api.s.accountsDB.AddressExists(types.Address(common.HexToAddress(info.Address)))
+	if err != nil {
+		return derivedAddresses, err
+	}
+	if addressExists {
+		return derivedAddresses, fmt.Errorf("account already exists")
+	}
+
+	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, common.HexToAddress(info.Address), nil, (*hexutil.Big)(big.NewInt(1)), false)
+
+	if err != nil {
+		return derivedAddresses, err
+	}
+
+	hasActivity := int64(len(transactions)) > 0
+
+	derivedAddress := &DerivedAddress{
+		Address:        common.HexToAddress(info.Address),
+		Path:           "",
+		HasActivity:    hasActivity,
+		AlreadyCreated: addressExists,
+	}
+	derivedAddresses = append(derivedAddresses, derivedAddress)
+
+	return derivedAddresses, nil
+}
+
+func (api *API) getDerivedAddresses(ctx context.Context, id string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+	var (
+		group                     = async.NewAtomicGroup(ctx)
+		derivedAddresses          = make([]*DerivedAddress, 0)
+		unorderedDerivedAddresses = map[int]*DerivedAddress{}
+		err                       error
+	)
+
+	splitPathValues := strings.Split(path, "/")
+	if len(splitPathValues) == 6 {
+		derivedAddress, err := api.getDerivedAddress(id, path)
+		if err != nil {
+			return nil, err
+		}
+		derivedAddresses = append(derivedAddresses, derivedAddress)
+	} else {
+
+		if pageNumber <= 0 || pageSize <= 0 {
+			return nil, fmt.Errorf("pageSize and pageNumber should be greater than 0")
+		}
+
+		var startIndex = ((pageNumber - 1) * pageSize)
+		var endIndex = (pageNumber * pageSize)
+
+		for i := startIndex; i < endIndex; i++ {
+			derivedPath := fmt.Sprint(path, "/", i)
+			index := i
+			group.Add(func(parent context.Context) error {
+				derivedAddress, err := api.getDerivedAddress(id, derivedPath)
+				if err != nil {
+					return err
+				}
+				unorderedDerivedAddresses[index] = derivedAddress
+				return nil
+			})
+		}
+		select {
+		case <-group.WaitAsync():
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		for i := startIndex; i < endIndex; i++ {
+			derivedAddresses = append(derivedAddresses, unorderedDerivedAddresses[i])
+		}
+		err = group.Error()
+	}
+	return derivedAddresses, err
+}
+
+func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddress, error) {
+	addedAccounts, err := api.s.accountsDB.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := api.s.gethManager.AccountsGenerator().DeriveAddresses(id, []string{derivedPath})
+	if err != nil {
+		return nil, err
+	}
+
+	alreadyExists := false
+	for _, account := range addedAccounts {
+		if types.Address(common.HexToAddress(info[derivedPath].Address)) == account.Address {
+			alreadyExists = true
+			break
+		}
+	}
+
+	var ctx context.Context
+	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, common.HexToAddress(info[derivedPath].Address), nil, (*hexutil.Big)(big.NewInt(1)), false)
+
+	if err != nil {
+		return nil, err
+	}
+
+	hasActivity := int64(len(transactions)) > 0
+
+	address := &DerivedAddress{
+		Address:        common.HexToAddress(info[derivedPath].Address),
+		Path:           derivedPath,
+		HasActivity:    hasActivity,
+		AlreadyCreated: alreadyExists,
+	}
+
+	return address, nil
 }
