@@ -12,6 +12,14 @@ import (
 	"github.com/status-im/status-go/protocol/images"
 )
 
+const (
+	basePath       = "/messages"
+	identiconsPath = basePath + "/identicons"
+	imagesPath     = basePath + "/images"
+	audioPath      = basePath + "/audio"
+	ipfsPath       = "/ipfs"
+)
+
 type HandlerPatternMap map[string]http.HandlerFunc
 
 func handleIdenticon(logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
@@ -124,8 +132,4 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.Res
 			logger.Error("failed to write ipfs resource", zap.Error(err))
 		}
 	}
-}
-
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello I like to be a tls server. " + time.Now().String()))
 }

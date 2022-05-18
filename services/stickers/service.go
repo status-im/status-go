@@ -15,7 +15,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.Server) *Service {
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
@@ -39,7 +39,7 @@ type Service struct {
 	rpcFiltersSrvc  *rpcfilters.Service
 	downloader      *ipfs.Downloader
 	keyStoreDir     string
-	httpServer      *server.Server
+	httpServer      *server.MediaServer
 	ctx             context.Context
 	cancel          context.CancelFunc
 }

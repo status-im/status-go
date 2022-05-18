@@ -174,7 +174,7 @@ type Message struct {
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
 }
 
-func (m *Message) PrepareServerURLs(s *server.Server) {
+func (m *Message) PrepareServerURLs(s *server.MediaServer) {
 	m.Identicon = s.MakeIdenticonURL(m.From)
 
 	if m.QuotedMessage != nil && m.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
@@ -187,7 +187,7 @@ func (m *Message) PrepareServerURLs(s *server.Server) {
 		m.AudioLocalURL = s.MakeAudioURL(m.ID)
 	}
 	if m.ContentType == protobuf.ChatMessage_STICKER {
-		m.StickerLocalURL = fmt.Sprintf("https://localhost:%d/ipfs?hash=%s", port, m.GetSticker().Hash)
+		m.StickerLocalURL = s.MakeStickerURL(m.GetSticker().Hash)
 	}
 }
 

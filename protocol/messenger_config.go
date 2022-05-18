@@ -70,7 +70,7 @@ type config struct {
 	clusterConfig       params.ClusterConfig
 	browserDatabase     *browsers.Database
 	torrentConfig       *params.TorrentConfig
-	httpServer          *server.Server
+	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
 
 	verifyTransactionClient  EthClient
@@ -280,7 +280,7 @@ func WithTorrentConfig(tc *params.TorrentConfig) Option {
 	}
 }
 
-func WithHTTPServer(s *server.Server) Option {
+func WithHTTPServer(s *server.MediaServer) Option {
 	return func(c *config) error {
 		c.httpServer = s
 		return nil

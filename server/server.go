@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,53 +10,20 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 )
 
-const (
-	basePath       = "/messages"
-	identiconsPath = basePath + "/identicons"
-	imagesPath     = basePath + "/images"
-	audioPath      = basePath + "/audio"
-	ipfsPath       = "/ipfs"
-)
-
 type Server struct {
-	run        bool
-	server     *http.Server
-	logger     *zap.Logger
-	db         *sql.DB
-	cert       *tls.Certificate
-	netIP      net.IP
+	run      bool
+	server   *http.Server
+	logger   *zap.Logger
+	cert     *tls.Certificate
+	netIP    net.IP
 	listener net.Listener
-	downloader *ipfs.Downloader
 }
 
-type Config struct {
-	Cert  *tls.Certificate
-	NetIP net.IP
-}
-
-// NewServer returns a *Server. If the config param is nil the default Server values are applied to the new Server
-// otherwise the config params are applied to the Server.
-func NewServer(db *sql.DB, downloader *ipfs.Downloader, config *Config) (*Server, error) {
-	s := &Server{db: db, logger: logutils.ZapLogger(), downloader: downloader}
-
-	if config == nil {
-		err := generateTLSCert()
-		if err != nil {
-			return nil, err
-		}
-
-		s.cert = globalCertificate
-		s.netIP = defaultIP
-	} else {
-		s.cert = config.Cert
-		s.netIP = config.NetIP
-	}
-
-	return s, nil
+func NewServer(cert *tls.Certificate, ip net.IP) Server {
+	return Server{logger: logutils.ZapLogger(), cert: cert, netIP: ip}
 }
 
 func (s *Server) setListener(l net.Listener) {
@@ -158,49 +124,10 @@ func (s *Server) WithHandlers(handlers HandlerPatternMap) {
 	}
 }
 
-func (s *Server) WithMediaHandlers() {
-	s.WithHandlers(HandlerPatternMap{
-		imagesPath:     handleImage(s.db, s.logger),
-		audioPath:      handleAudio(s.db, s.logger),
-		identiconsPath: handleIdenticon(s.logger),
-		ipfsPath:       handleIPFS(s.downloader, s.logger),
-	})
-}
-
 func (s *Server) MakeBaseURL() *url.URL {
 	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
 	return &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", s.netIP, s.getPort()),
 	}
-}
-
-func (s *Server) MakeImageServerURL() string {
-	u := s.MakeBaseURL()
-	u.Path = basePath + "/"
-	return u.String()
-}
-
-func (s *Server) MakeIdenticonURL(from string) string {
-	u := s.MakeBaseURL()
-	u.Path = identiconsPath
-	u.RawQuery = url.Values{"publicKey": {from}}.Encode()
-
-	return u.String()
-}
-
-func (s *Server) MakeImageURL(id string) string {
-	u := s.MakeBaseURL()
-	u.Path = imagesPath
-	u.RawQuery = url.Values{"messageId": {id}}.Encode()
-
-	return u.String()
-}
-
-func (s *Server) MakeAudioURL(id string) string {
-	u := s.MakeBaseURL()
-	u.Path = audioPath
-	u.RawQuery = url.Values{"messageId": {id}}.Encode()
-
-	return u.String()
 }

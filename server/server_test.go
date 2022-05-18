@@ -18,21 +18,21 @@ func TestServerURLSuite(t *testing.T) {
 type ServerURLSuite struct {
 	suite.Suite
 
-	server           *Server
-	serverNoListener *Server
+	server           *MediaServer
+	serverNoListener *MediaServer
 }
 
 func (s *ServerURLSuite) SetupSuite() {
 	l, err := net.Listen("tcp", defaultIP.String()+":0")
 	s.Require().NoError(err)
 
-	s.server = &Server{
+	s.server = &MediaServer{Server: Server{
 		netIP:    defaultIP,
 		listener: l,
-	}
-	s.serverNoListener = &Server{
+	}}
+	s.serverNoListener = &MediaServer{Server: Server{
 		netIP: defaultIP,
-	}
+	}}
 }
 
 func (s *ServerURLSuite) TestServer_MakeBaseURL() {
@@ -70,4 +70,13 @@ func (s *ServerURLSuite) TestServer_MakeAudioURL() {
 	s.Require().Equal(
 		"https://127.0.0.1:0/messages/audio?messageId=0xde1e7ebee71e",
 		s.serverNoListener.MakeAudioURL("0xde1e7ebee71e"))
+}
+
+func (s *ServerURLSuite) TestServer_MakeStickerURL() {
+	s.Require().Regexp(
+		baseRegex+"\\/ipfs\\?hash=0xdeadbeef4ac0",
+		s.server.MakeStickerURL("0xdeadbeef4ac0"))
+	s.Require().Equal(
+		"https://127.0.0.1:0/ipfs?hash=0xdeadbeef4ac0",
+		s.serverNoListener.MakeStickerURL("0xdeadbeef4ac0"))
 }
