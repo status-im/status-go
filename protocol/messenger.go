@@ -129,7 +129,6 @@ type Messenger struct {
 	connectionState                      connection.State
 	telemetryClient                      *telemetry.Client
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
-
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex               sync.Mutex
 	mailPeersMutex      sync.Mutex
@@ -632,6 +631,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
+	m.watchAccountListChanges()
 	m.broadcastLatestUserStatus()
 	m.startBackupLoop()
 	err = m.startAutoMessageLoop()
@@ -2569,14 +2569,14 @@ func (m *Messenger) syncProfilePictures() error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	keyUID := m.account.KeyUID
 	images, err := m.multiAccounts.GetIdentityImages(keyUID)
 	if err != nil {
 		return err
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	pictures := make([]*protobuf.SyncProfilePicture, len(images))
 	clock, chat := m.getLastClockWithRelatedChat()
@@ -2716,7 +2716,96 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 
-	return err
+	accounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return err
+	}
+	return m.syncWallets(accounts)
+}
+
+// Sync wallets in case of account changes
+func (m *Messenger) watchAccountListChanges() {
+	m.logger.Debug("watching account changes")
+
+	channel := m.settings.SubscribeToAccountChanges()
+
+	go func() {
+		for {
+			select {
+			case accounts := <-channel:
+				err := m.syncWallets(accounts)
+				if err != nil {
+					m.logger.Error("failed to sync wallet accounts to paired devices", zap.Error(err))
+				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+// syncWallets syncs all wallets with paired devices
+func (m *Messenger) syncWallets(accs []*accounts.Account) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
+	for _, acc := range accs {
+		// Only sync watch type accounts
+		if acc.Type != accounts.AccountTypeWatch {
+			continue
+		}
+
+		var accountClock uint64
+		if acc.Clock == 0 {
+			accountClock = clock
+		} else {
+			accountClock = acc.Clock
+		}
+		syncMessage := &protobuf.SyncWalletAccount{
+			Clock:     accountClock,
+			Address:   acc.Address.Bytes(),
+			Wallet:    acc.Wallet,
+			Chat:      acc.Chat,
+			Type:      acc.Type,
+			Storage:   acc.Storage,
+			Path:      acc.Path,
+			PublicKey: acc.PublicKey,
+			Name:      acc.Name,
+			Color:     acc.Color,
+			Hidden:    acc.Hidden,
+			Removed:   acc.Removed,
+		}
+		accountMessages = append(accountMessages, syncMessage)
+	}
+
+	message := &protobuf.SyncWalletAccounts{
+		Accounts: accountMessages,
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
 }
 
 func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
@@ -3799,6 +3888,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
 
+					case protobuf.SyncWalletAccounts:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccounts)
+						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
+						err = m.HandleSyncWalletAccount(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {

@@ -418,7 +418,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
-		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
+		require.NoError(t, db.SaveAccounts([]*accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
 		require.EqualError(t, err, "could not decrypt key with given password")
 		require.Nil(t, key)
@@ -432,7 +432,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
-		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
+		require.NoError(t, db.SaveAccounts([]*accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), password)
 		require.NoError(t, err)
 		require.Equal(t, address, key.Address)
@@ -464,7 +464,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []*accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -507,7 +507,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []*accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 

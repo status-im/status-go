@@ -389,7 +389,7 @@ func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {
 	}
 }
 
-func (api *API) getAccountsPurchasedPack(chainID uint64, accs []accounts.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
+func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -401,7 +401,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []accounts.Account
 	c := goccm.New(maxConcurrentRequests)
 	for _, account := range accs {
 		c.Wait()
-		go func(acc accounts.Account) {
+		go func(acc *accounts.Account) {
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {

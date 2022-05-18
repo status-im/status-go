@@ -48,7 +48,7 @@ type Wallet struct {
 	Currency    string     `json:"currency"`
 }
 
-func getAddresses(accounts []accounts.Account) []common.Address {
+func getAddresses(accounts []*accounts.Account) []common.Address {
 	addresses := make([]common.Address, len(accounts))
 	for _, account := range accounts {
 		addresses = append(addresses, common.Address(account.Address))
@@ -59,7 +59,7 @@ func getAddresses(accounts []accounts.Account) []common.Address {
 func (r *Reader) buildReaderAccount(
 	ctx context.Context,
 	chainIDs []uint64,
-	account accounts.Account,
+	account *accounts.Account,
 	visibleTokens map[uint64][]*Token,
 	prices map[string]float64,
 	balances map[common.Address]*hexutil.Big,
@@ -96,7 +96,7 @@ func (r *Reader) buildReaderAccount(
 		}
 	}
 	return ReaderAccount{
-		Account:      &account,
+		Account:      account,
 		Collections:  collections,
 		Tokens:       tokens,
 		Transactions: transactions,

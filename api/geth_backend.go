@@ -617,7 +617,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
 		return err
@@ -641,7 +641,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	password string,
 	settings settings.Settings,
 	nodecfg *params.NodeConfig,
-	subaccs []accounts.Account,
+	subaccs []*accounts.Account,
 ) error {
 	err := b.SaveAccount(account)
 	if err != nil {
@@ -658,7 +658,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return b.StartNodeWithAccount(account, password, nil)
 }
 
-func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
+func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accdb, err := accounts.NewDB(b.appDB)
@@ -669,7 +669,7 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 	if err != nil {
 		return err
 	}
-	return accdb.SaveAccounts(subaccs)
+	return accdb.SaveAccountsAndPublish(subaccs)
 }
 
 func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -29,13 +30,15 @@ type Account struct {
 	Color       string
 	Hidden      bool
 	DerivedFrom string
+	Clock       uint64
+	Removed     bool
 }
 
 const (
 	accountTypeGenerated = "generated"
 	accountTypeKey       = "key"
 	accountTypeSeed      = "seed"
-	accountTypeWatch     = "watch"
+	AccountTypeWatch     = "watch"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -60,6 +63,8 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		Color            string         `json:"color"`
 		Hidden           bool           `json:"hidden"`
 		DerivedFrom      string         `json:"derived-from,omitempty"`
+		Clock            uint64         `json:"clock"`
+		Removed          bool           `json:"removed"`
 	}{
 		Address:          a.Address,
 		MixedcaseAddress: a.Address.Hex(),
@@ -74,10 +79,14 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		Color:            a.Color,
 		Hidden:           a.Hidden,
 		DerivedFrom:      a.DerivedFrom,
+		Clock:            a.Clock,
+		Removed:          a.Removed,
 	}
 
 	return json.Marshal(item)
 }
+
+var accountSubscriptions []chan []*Account
 
 // Database sql wrapper for operations with browser objects.
 type Database struct {
@@ -105,20 +114,23 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
-func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from FROM accounts ORDER BY created_at")
+func (db *Database) GetAccounts() ([]*Account, error) {
+	log.Info("### GetAccounts 1")
+	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock FROM accounts ORDER BY created_at")
 	if err != nil {
+		log.Info("### GetAccounts err", "err", err)
 		return nil, err
 	}
 	defer rows.Close()
-	accounts := []Account{}
+	accounts := []*Account{}
 	pubkey := []byte{}
 	for rows.Next() {
-		acc := Account{}
+		acc := &Account{}
 		err := rows.Scan(
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom)
+			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock)
 		if err != nil {
+			log.Info("### GetAccounts for loop err", "err", err)
 			return nil, err
 		}
 		if lth := len(pubkey); lth > 0 {
@@ -131,13 +143,13 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, err error) {
-	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from FROM accounts  WHERE address = ? COLLATE NOCASE", address)
+	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock FROM accounts  WHERE address = ? COLLATE NOCASE", address)
 
 	acc := &Account{}
 	pubkey := []byte{}
 	err = row.Scan(
 		&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-		&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom)
+		&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock)
 
 	if err != nil {
 		return nil, err
@@ -146,10 +158,11 @@ func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, er
 	return acc, nil
 }
 
-func (db *Database) SaveAccounts(accounts []Account) (err error) {
+func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
+		delete *sql.Stmt
 		update *sql.Stmt
 	)
 	tx, err = db.db.Begin()
@@ -169,17 +182,25 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	if err != nil {
 		return err
 	}
-	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?,  emoji = ?, color = ?, hidden = ?, derived_from = ?, updated_at = datetime('now') WHERE address = ?")
+	delete, err = tx.Prepare("DELETE FROM accounts WHERE address = ?")
+	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?,  emoji = ?, color = ?, hidden = ?, derived_from = ?, updated_at = datetime('now'), clock = ? WHERE address = ?")
 	if err != nil {
 		return err
 	}
 	for i := range accounts {
-		acc := &accounts[i]
+		acc := accounts[i]
+		if acc.Removed {
+			_, err = delete.Exec(acc.Address)
+			if err != nil {
+				return
+			}
+			continue
+		}
 		_, err = insert.Exec(acc.Address)
 		if err != nil {
 			return
 		}
-		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color, acc.Hidden, acc.DerivedFrom, acc.Address)
+		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color, acc.Hidden, acc.DerivedFrom, acc.Clock, acc.Address)
 		if err != nil {
 			switch err.Error() {
 			case uniqueChatConstraint:
@@ -193,9 +214,51 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	return
 }
 
+func (db *Database) SaveAccountsAndPublish(accounts []*Account) (err error) {
+	err = db.SaveAccounts(accounts)
+	if err == nil {
+		db.publishOnAccountSubscriptions(accounts)
+	}
+	return err
+}
+
+func (db *Database) SubscribeToAccountChanges() chan []*Account {
+	s := make(chan []*Account, 100)
+	accountSubscriptions = append(accountSubscriptions, s)
+	return s
+}
+
+func (db *Database) publishOnAccountSubscriptions(accounts []*Account) {
+	// Publish on channels, drop if buffer is full
+
+	for _, s := range accountSubscriptions {
+		select {
+		case s <- accounts:
+		default:
+			log.Warn("subscription channel full, dropping message")
+		}
+	}
+}
+
 func (db *Database) DeleteAccount(address types.Address) error {
 	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
 	return err
+}
+
+func (db *Database) DeleteAccountAndPublish(address types.Address) error {
+	acc, err := db.GetAccountByAddress(address)
+	if err != nil {
+		return err
+	}
+	err = db.DeleteAccount(address)
+
+	if err != nil {
+		return err
+	}
+	acc.Removed = true
+	db.publishOnAccountSubscriptions([]*Account{acc})
+
+	return nil
 }
 
 func (db *Database) DeleteSeedAndKeyAccounts() error {
