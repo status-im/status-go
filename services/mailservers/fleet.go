@@ -131,5 +131,60 @@ func DefaultMailservers() []Mailserver {
 			Fleet:   params.FleetWakuV2Test,
 			Version: 2,
 		},
+		Mailserver{
+			ID:      "node-01.ac-cn-hongkong-c.status.prod",
+			Address: "/dns4/node-01.ac-cn-hongkong-c.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAkvEZgh3KLwhLwXg95e5ojM8XykJ4Kxi2T7hk22rnA7pJC",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-01.do-ams3.status.prod",
+			Address: "/dns4/node-01.do-ams3.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAm6HZZr7aToTvEBPpiys4UxajCTU97zj5v7RNR2gbniy1D",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-01.gc-us-central1-a.status.prod",
+			Address: "/dns4/node-01.gc-us-central1-a.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAkwBp8T6G77kQXSNMnxgaMky1JeyML5yqoTHRM8dbeCBNb",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-02.ac-cn-hongkong-c.status.prod",
+			Address: "/dns4/node-02.ac-cn-hongkong-c.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAmFy8BrJhCEmCYrUfBdSNkrPw6VHExtv4rRp1DSBnCPgx8",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-02.do-ams3.status.prod",
+			Address: "/dns4/node-02.do-ams3.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAmSve7tR5YZugpskMv2dmJAsMUKmfWYEKRXNUxRaTCnsXV",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-02.gc-us-central1-a.status.prod",
+			Address: "/dns4/node-02.gc-us-central1-a.status.prod.statusim.net/tcp/30303/p2p/16Uiu2HAmDQugwDHM3YeUp86iGjrUvbdw3JPRgikC7YoGBsT2ymMg",
+			Fleet:   params.FleetStatusProd,
+			Version: 2,
+		},
+
+		Mailserver{
+			ID:      "node-01.ac-cn-hongkong-c.status.test",
+			Address: "/dns4/node-01.ac-cn-hongkong-c.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi",
+			Fleet:   params.FleetStatusTest,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-01.do-ams3.status.test",
+			Address: "/dns4/node-01.do-ams3.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
+			Fleet:   params.FleetStatusTest,
+			Version: 2,
+		},
+		Mailserver{
+			ID:      "node-01.gc-us-central1-a.status.test",
+			Address: "/dns4/node-01.gc-us-central1-a.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76",
+			Fleet:   params.FleetStatusTest,
+			Version: 2,
+		},
 	}
 }
