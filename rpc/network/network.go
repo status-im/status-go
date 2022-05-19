@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-const baseQuery = "SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled FROM networks"
+const baseQuery = "SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks"
 
 func newNetworksQuery() *networksQuery {
 	buf := bytes.NewBuffer(nil)
@@ -57,8 +57,8 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 		network := params.Network{}
 		err := rows.Scan(
 			&network.ChainID, &network.ChainName, &network.RPCURL, &network.BlockExplorerURL, &network.IconURL,
-			&network.NativeCurrencyName, &network.NativeCurrencySymbol, &network.NativeCurrencyDecimals,
-			&network.IsTest, &network.Layer, &network.Enabled,
+			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
+			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
 		)
 		if err != nil {
 			return nil, err
@@ -141,10 +141,10 @@ func (nm *Manager) Init(networks []params.Network) error {
 
 func (nm *Manager) Upsert(network *params.Network) error {
 	_, err := nm.db.Exec(
-		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
 		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
-		network.IsTest, network.Layer, network.Enabled,
+		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
 	)
 	return err
 }

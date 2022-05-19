@@ -503,6 +503,8 @@ type Network struct {
 	IsTest                 bool   `json:"isTest"`
 	Layer                  uint64 `json:"layer"`
 	Enabled                bool   `json:"enabled"`
+	ChainColor             string `json:"chainColor"`
+	ShortName              string `json:"shortName"`
 }
 
 // WalletConfig extra configuration for wallet.Service.
