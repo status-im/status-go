@@ -16,3 +16,4 @@
 # License
 
 [Mozilla Public License 2.0](https://github.com/status-im/status-go/blob/develop/LICENSE.md)
+Just to check
