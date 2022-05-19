@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/tls"
-	"net"
 )
 
 type PairingServer struct {
@@ -10,14 +9,14 @@ type PairingServer struct {
 }
 
 type Config struct {
-	Cert  *tls.Certificate
-	NetIP net.IP
+	Cert     *tls.Certificate
+	Hostname string
 }
 
 // NewPairingServer returns a *NewPairingServer init from the given *Config
 func NewPairingServer(config *Config) *PairingServer {
 	return &PairingServer{Server: NewServer(
 		config.Cert,
-		config.NetIP,
+		config.Hostname,
 	)}
 }

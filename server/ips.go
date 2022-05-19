@@ -6,6 +6,7 @@ import (
 
 var (
 	defaultIP = net.IP{127, 0, 0, 1}
+	localhost = "localhost"
 )
 
 func GetOutboundIP() (net.IP, error) {

@@ -29,19 +29,26 @@ func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
 
-func GenerateX509Cert(sn *big.Int, from, to time.Time, ip net.IP) *x509.Certificate {
-	return &x509.Certificate{
+func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
+	c := &x509.Certificate{
 		SerialNumber:          sn,
 		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             from,
 		NotAfter:              to,
-		DNSNames:              []string{"localhost"},
-		//IPAddresses:           []net.IP{ip},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
+
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		c.IPAddresses = []net.IP{ip}
+	} else {
+		c.DNSNames = []string{hostname}
+	}
+
+	return c
 }
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
@@ -78,7 +85,7 @@ func generateTLSCert() error {
 		return err
 	}
 
-	cert := GenerateX509Cert(sn, notBefore, notAfter, defaultIP)
+	cert := GenerateX509Cert(sn, notBefore, notAfter, localhost)
 	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return err
@@ -103,13 +110,13 @@ func PublicTLSCert() (string, error) {
 	return globalPem, nil
 }
 
-func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, networkIP net.IP) (tls.Certificate, []byte, error) {
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, hostname string) (tls.Certificate, []byte, error) {
 	// TODO fix, this isn't deterministic,
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(ttl)
 
-	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, networkIP)
+	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, hostname)
 	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, nil, err

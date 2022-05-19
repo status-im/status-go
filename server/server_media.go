@@ -22,7 +22,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader) (*MediaServer, erro
 	}
 
 	s := &MediaServer{
-		Server:     NewServer(globalCertificate, defaultIP),
+		Server:     NewServer(globalCertificate, localhost),
 		db:         db,
 		downloader: downloader,
 	}

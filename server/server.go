@@ -18,12 +18,12 @@ type Server struct {
 	server   *http.Server
 	logger   *zap.Logger
 	cert     *tls.Certificate
-	netIP    net.IP
+	hostname string
 	listener net.Listener
 }
 
-func NewServer(cert *tls.Certificate, ip net.IP) Server {
-	return Server{logger: logutils.ZapLogger(), cert: cert, netIP: ip}
+func NewServer(cert *tls.Certificate, hostname string) Server {
+	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname}
 }
 
 func (s *Server) setListener(l net.Listener) {
@@ -44,11 +44,16 @@ func (s *Server) getPort() int {
 	return s.listener.Addr().(*net.TCPAddr).Port
 }
 
+func (s *Server) getHost() string {
+	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
+	return fmt.Sprintf("%s:%d", s.hostname, s.getPort())
+}
+
 func (s *Server) listenAndServe() {
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIP.String(), MinVersion: tls.VersionTLS12}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.hostname, MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
-	addr := fmt.Sprintf("%s:%d", "localhost", s.getPort())
+	addr := s.getHost()
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
@@ -125,9 +130,8 @@ func (s *Server) WithHandlers(handlers HandlerPatternMap) {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
-	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
 	return &url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", "localhost", s.getPort()),
+		Host:   s.getHost(),
 	}
 }
