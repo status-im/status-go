@@ -48,7 +48,7 @@ func (s *Server) listenAndServe() {
 	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.netIP.String(), MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links
-	addr := fmt.Sprintf("%s:%d", s.netIP, s.getPort())
+	addr := fmt.Sprintf("%s:%d", "localhost", s.getPort())
 
 	listener, err := tls.Listen("tcp", addr, cfg)
 	if err != nil {
@@ -128,6 +128,6 @@ func (s *Server) MakeBaseURL() *url.URL {
 	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
 	return &url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", s.netIP, s.getPort()),
+		Host:   fmt.Sprintf("%s:%d", "localhost", s.getPort()),
 	}
 }
