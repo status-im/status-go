@@ -17,22 +17,24 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	r := NewReader(s)
-	return &API{s, r}
+	reader := NewReader(s)
+	router := NewRouter(s)
+	return &API{s, reader, router}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	s *Service
-	r *Reader
+	s      *Service
+	reader *Reader
+	router *Router
 }
 
 func (api *API) StartWallet(ctx context.Context, chainIDs []uint64) error {
-	return api.r.Start(ctx, chainIDs)
+	return api.reader.Start(ctx, chainIDs)
 }
 
 func (api *API) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
-	return api.r.GetWallet(ctx, chainIDs)
+	return api.reader.GetWallet(ctx, chainIDs)
 }
 
 type DerivedAddress struct {
@@ -314,6 +316,11 @@ func (api *API) FetchPrices(ctx context.Context, symbols []string, currency stri
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	log.Debug("call to GetSuggestedFees")
 	return api.s.feesManager.suggestedFees(ctx, chainID)
+}
+
+func (api *API) GetSuggestedRoutes(ctx context.Context, account common.Address, amount float64, tokenSymbol string) (*SuggestedRoutes, error) {
+	log.Debug("call to GetSuggestedRoutes")
+	return api.router.suggestedRoutes(ctx, account, amount, tokenSymbol)
 }
 
 func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {

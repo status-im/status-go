@@ -875,6 +875,22 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 	return
 }
 
+func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
+	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
+	if err != nil {
+		return hash, err
+	}
+
+	hash, err = b.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
+	if err != nil {
+		return
+	}
+
+	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(hash)
+
+	return
+}
+
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	hash, err = b.transactor.SendTransactionWithSignature(sendArgs, sig)
 	if err != nil {

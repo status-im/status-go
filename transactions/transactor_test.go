@@ -50,6 +50,7 @@ func (s *TransactorSuite) SetupTest() {
 	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
 	rpcClient, _ := rpc.NewClient(s.client, 1, params.UpstreamRPCConfig{}, nil, nil)
+	rpcClient.UpstreamChainID = 1
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
@@ -128,7 +129,8 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 	}
 
 	newTx := gethtypes.NewTx(txData)
-	chainID := big.NewInt(int64(config.NetworkID))
+	chainID := big.NewInt(int64(1))
+
 	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.AccountKey.PrivateKey)
 	s.NoError(err)
 	data, err := signedTx.MarshalBinary()

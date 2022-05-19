@@ -41,6 +41,7 @@ type StatusBackend interface {
 	HashTypedDataV4(typed signercore.TypedData) (types.Hash, error)
 	ResetChainData() error
 	SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error)
+	SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error)
 	SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error)
 	SignHash(hexEncodedHash string) (string, error)
 	SignMessage(rpcParams personal.SignParams) (types.HexBytes, error)

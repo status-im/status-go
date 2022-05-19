@@ -129,6 +129,27 @@ func (tm *TokenManager) getCustoms() ([]*Token, error) {
 	return rst, nil
 }
 
+func (tm *TokenManager) getCustomsByChainID(chainID uint64) ([]*Token, error) {
+	rows, err := tm.db.Query("SELECT address, name, symbol, decimals, color, network_id FROM tokens where network_id=?", chainID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*Token
+	for rows.Next() {
+		token := &Token{}
+		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color, &token.ChainID)
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, token)
+	}
+
+	return rst, nil
+}
+
 func (tm *TokenManager) isTokenVisible(chainID uint64, address common.Address) (bool, error) {
 	rows, err := tm.db.Query("SELECT chain_id, address FROM visible_tokens WHERE chain_id = ? AND address = ?", chainID, address)
 	if err != nil {
@@ -257,6 +278,14 @@ func (tm *TokenManager) getChainBalance(ctx context.Context, client *chain.Clien
 	return client.BalanceAt(ctx, account, nil)
 }
 
+func (tm *TokenManager) getBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+	if token == common.HexToAddress("0x") {
+		return tm.getChainBalance(ctx, client, account)
+	}
+
+	return tm.getTokenBalance(ctx, client, account, token)
+}
+
 func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
@@ -273,13 +302,7 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-					var balance *big.Int
-					var err error
-					if token == common.HexToAddress("0x") {
-						balance, err = tm.getChainBalance(ctx, client, account)
-					} else {
-						balance, err = tm.getTokenBalance(ctx, client, account, token)
-					}
+					balance, err := tm.getBalance(ctx, client, account, token)
 
 					// We don't want to return an error here and prevent
 					// the rest from completing
