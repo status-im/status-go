@@ -1240,19 +1240,16 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		Timestamp: 10,
 		Members: []ChatMember{
 			{
-				ID:     member1ID,
-				Admin:  false,
-				Joined: true,
+				ID:    member1ID,
+				Admin: false,
 			},
 			{
-				ID:     member2ID,
-				Admin:  true,
-				Joined: false,
+				ID:    member2ID,
+				Admin: true,
 			},
 			{
-				ID:     member3ID,
-				Admin:  true,
-				Joined: true,
+				ID:    member3ID,
+				Admin: true,
 			},
 		},
 		MembershipUpdates: []v1protocol.MembershipUpdateEvent{

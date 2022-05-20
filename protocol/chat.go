@@ -239,16 +239,6 @@ func (c *Chat) MembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
 	return stringSliceToPublicKeys(publicKeys)
 }
 
-func (c *Chat) JoinedMembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
-	var publicKeys []string
-	for _, member := range c.Members {
-		if member.Joined {
-			publicKeys = append(publicKeys, member.ID)
-		}
-	}
-	return stringSliceToPublicKeys(publicKeys)
-}
-
 func (c *Chat) HasMember(memberID string) bool {
 	for _, member := range c.Members {
 		if memberID == member.ID {
@@ -259,14 +249,14 @@ func (c *Chat) HasMember(memberID string) bool {
 	return false
 }
 
-func (c *Chat) HasJoinedMember(memberID string) bool {
-	for _, member := range c.Members {
-		if member.Joined && memberID == member.ID {
-			return true
+func (c *Chat) RemoveMember(memberID string) {
+	members := c.Members
+	c.Members = []ChatMember{}
+	for _, member := range members {
+		if memberID != member.ID {
+			c.Members = append(c.Members, member)
 		}
 	}
-
-	return false
 }
 
 func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
@@ -280,7 +270,6 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 	// Members
 	members := g.Members()
 	admins := g.Admins()
-	joined := g.Joined()
 	chatMembers := make([]ChatMember, 0, len(members))
 	for _, m := range members {
 
@@ -288,7 +277,6 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 			ID: m,
 		}
 		chatMember.Admin = stringSliceContains(admins, m)
-		chatMember.Joined = stringSliceContains(joined, m)
 		chatMembers = append(chatMembers, chatMember)
 	}
 	c.Members = chatMembers
@@ -350,8 +338,6 @@ type ChatMember struct {
 	ID string `json:"id"`
 	// Admin indicates if the member is an admin of the group chat
 	Admin bool `json:"admin"`
-	// Joined indicates if the member has joined the group chat
-	Joined bool `json:"joined"`
 }
 
 func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {

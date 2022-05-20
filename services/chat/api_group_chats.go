@@ -119,16 +119,6 @@ func (api *API) MakeAdmin(ctx context.Context, communityID types.HexBytes, chatI
 	})
 }
 
-func (api *API) ConfirmJoiningGroup(ctx context.Context, communityID types.HexBytes, chatID string) (*GroupChatResponse, error) {
-	if len(communityID) != 0 {
-		return nil, ErrCommunitiesNotSupported
-	}
-
-	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
-		return api.s.messenger.ConfirmJoiningGroup(ctx, chatID)
-	})
-}
-
 func (api *API) RenameChat(ctx context.Context, communityID types.HexBytes, chatID string, name string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
