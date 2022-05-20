@@ -301,7 +301,7 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 		for _, m := range sourceChat.Members {
 			result[m.ID] = Member{
 				Admin:  m.Admin,
-				Joined: m.Joined,
+				Joined: true,
 			}
 		}
 		return result, nil

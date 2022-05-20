@@ -143,7 +143,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		chat.updateChatFromGroupMembershipChanges(group)
 
 		wasUserAdded = !existingGroup.IsMember(ourKey) &&
-			updateGroup.IsMember(ourKey)
+			group.IsMember(ourKey)
 
 		// Reactivate deleted group chat on re-invite from contact
 		chat.Active = chat.Active || (isActive && wasUserAdded)
@@ -187,7 +187,10 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	// Store in chats map as it might be a new one
 	messageState.AllChats.Store(chat.ID, chat)
 
-	if waitingForApproval {
+	// explicit join has been removed, mimic auto-join for backward compatibility
+	// no all cases are covered, e.g. if added to a group by non-contact
+	autoJoin := chat.Active && wasUserAdded
+	if autoJoin || waitingForApproval {
 		_, err = m.ConfirmJoiningGroup(context.Background(), chat.ID)
 		if err != nil {
 			return err
@@ -1536,22 +1539,20 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, errors.New("received group chat chatEntity for non-existing chat")
 		}
 
-		theirKeyHex := contactIDFromPublicKey(chatEntity.GetSigPubKey())
+		senderKeyHex := contactIDFromPublicKey(chatEntity.GetSigPubKey())
 		myKeyHex := contactIDFromPublicKey(&m.identity.PublicKey)
-		var theyJoined bool
-		var iJoined bool
+		senderIsMember := false
+		iAmMember := false
 		for _, member := range chat.Members {
-			if member.ID == theirKeyHex && member.Joined {
-				theyJoined = true
+			if member.ID == senderKeyHex {
+				senderIsMember = true
 			}
-		}
-		for _, member := range chat.Members {
-			if member.ID == myKeyHex && member.Joined {
-				iJoined = true
+			if member.ID == myKeyHex {
+				iAmMember = true
 			}
 		}
 
-		if theyJoined && iJoined {
+		if senderIsMember && iAmMember {
 			return chat, nil
 		}
 
