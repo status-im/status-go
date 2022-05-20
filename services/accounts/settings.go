@@ -41,3 +41,118 @@ func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, err
 func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
 	return nodecfg.SaveNodeConfig(api.db.DB(), n)
 }
+
+// Notifications Settings
+func (api *SettingsAPI) NotificationsGetAllowNotifications() (bool, error) {
+	return api.db.GetAllowNotifications()
+}
+
+func (api *SettingsAPI) NotificationsSetAllowNotifications(value bool) error {
+	return api.db.SetAllowNotifications(value)
+}
+
+func (api *SettingsAPI) NotificationsGetOneToOneChats() (string, error) {
+	return api.db.GetOneToOneChats()
+}
+
+func (api *SettingsAPI) NotificationsSetOneToOneChats(value string) error {
+	return api.db.SetOneToOneChats(value)
+}
+
+func (api *SettingsAPI) NotificationsGetGroupChats() (string, error) {
+	return api.db.GetGroupChats()
+}
+
+func (api *SettingsAPI) NotificationsSetGroupChats(value string) error {
+	return api.db.SetGroupChats(value)
+}
+
+func (api *SettingsAPI) NotificationsGetPersonalMentions() (string, error) {
+	return api.db.GetPersonalMentions()
+}
+
+func (api *SettingsAPI) NotificationsSetPersonalMentions(value string) error {
+	return api.db.SetPersonalMentions(value)
+}
+
+func (api *SettingsAPI) NotificationsGetGlobalMentions() (string, error) {
+	return api.db.GetGlobalMentions()
+}
+
+func (api *SettingsAPI) NotificationsSetGlobalMentions(value string) error {
+	return api.db.SetGlobalMentions(value)
+}
+
+func (api *SettingsAPI) NotificationsGetAllMessages() (string, error) {
+	return api.db.GetAllMessages()
+}
+
+func (api *SettingsAPI) NotificationsSetAllMessages(value string) error {
+	return api.db.SetAllMessages(value)
+}
+
+func (api *SettingsAPI) NotificationsGetContactRequests() (string, error) {
+	return api.db.GetContactRequests()
+}
+
+func (api *SettingsAPI) NotificationsSetContactRequests(value string) error {
+	return api.db.SetContactRequests(value)
+}
+
+func (api *SettingsAPI) NotificationsGetIdentityVerificationRequests() (string, error) {
+	return api.db.GetIdentityVerificationRequests()
+}
+
+func (api *SettingsAPI) NotificationsSetIdentityVerificationRequests(value string) error {
+	return api.db.SetIdentityVerificationRequests(value)
+}
+
+func (api *SettingsAPI) NotificationsGetSoundEnabled() (bool, error) {
+	return api.db.GetSoundEnabled()
+}
+
+func (api *SettingsAPI) NotificationsSetSoundEnabled(value bool) error {
+	return api.db.SetSoundEnabled(value)
+}
+
+func (api *SettingsAPI) NotificationsGetVolume() (int, error) {
+	return api.db.GetVolume()
+}
+
+func (api *SettingsAPI) NotificationsSetVolume(value int) error {
+	return api.db.SetVolume(value)
+}
+
+func (api *SettingsAPI) NotificationsGetMessagePreview() (int, error) {
+	return api.db.GetMessagePreview()
+}
+
+func (api *SettingsAPI) NotificationsSetMessagePreview(value int) error {
+	return api.db.SetMessagePreview(value)
+}
+
+// Notifications Settings - Exemption settings
+func (api *SettingsAPI) NotificationsGetExMuteAllMessages(id string) (bool, error) {
+	return api.db.GetExMuteAllMessages(id)
+}
+
+func (api *SettingsAPI) NotificationsGetExPersonalMentions(id string) (string, error) {
+	return api.db.GetExPersonalMentions(id)
+}
+
+func (api *SettingsAPI) NotificationsGetExGlobalMentions(id string) (string, error) {
+	return api.db.GetExGlobalMentions(id)
+}
+
+func (api *SettingsAPI) NotificationsGetExOtherMessages(id string) (string, error) {
+	return api.db.GetExOtherMessages(id)
+}
+
+func (api *SettingsAPI) NotificationsSetExemptions(id string, muteAllMessages bool, personalMentions string,
+	globalMentions string, otherMessages string) error {
+	return api.db.SetExemptions(id, muteAllMessages, personalMentions, globalMentions, otherMessages)
+}
+
+func (api *SettingsAPI) DeleteExemptions(id string) error {
+	return api.db.DeleteExemptions(id)
+}
