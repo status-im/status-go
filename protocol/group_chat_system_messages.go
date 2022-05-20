@@ -17,8 +17,7 @@ func init() {
 	defaultSystemMessagesTranslationSet := map[protobuf.MembershipUpdateEvent_EventType]string{
 		protobuf.MembershipUpdateEvent_CHAT_CREATED:   "{{from}} created the group {{name}}",
 		protobuf.MembershipUpdateEvent_NAME_CHANGED:   "{{from}} changed the group's name to {{name}}",
-		protobuf.MembershipUpdateEvent_MEMBERS_ADDED:  "{{from}} has invited {{members}}",
-		protobuf.MembershipUpdateEvent_MEMBER_JOINED:  "{{from}} joined the group",
+		protobuf.MembershipUpdateEvent_MEMBERS_ADDED:  "{{from}} has added {{members}}",
 		protobuf.MembershipUpdateEvent_ADMINS_ADDED:   "{{from}} has made {{members}} admin",
 		protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} left the group",
 		protobuf.MembershipUpdateEvent_ADMIN_REMOVED:  "{{member}} is not admin anymore",
@@ -50,9 +49,6 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *syst
 		}
 		message, _ := translations.Load(protobuf.MembershipUpdateEvent_MEMBERS_ADDED)
 		text = tsprintf(message, map[string]string{"from": "@" + e.From, "members": strings.Join(memberMentions, ", ")})
-	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
-		message, _ := translations.Load(protobuf.MembershipUpdateEvent_MEMBER_JOINED)
-		text = tsprintf(message, map[string]string{"from": "@" + e.From})
 	case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
 		var memberMentions []string
 		for _, s := range e.Members {
@@ -93,8 +89,12 @@ func buildSystemMessages(events []v1protocol.MembershipUpdateEvent, translations
 	var messages []*common.Message
 
 	for _, e := range events {
-		messages = append(messages, eventToSystemMessage(e, translations))
+		if e.Type == protobuf.MembershipUpdateEvent_MEMBER_JOINED {
+			// explicit join has been removed, ignore this event
+			continue
+		}
 
+		messages = append(messages, eventToSystemMessage(e, translations))
 	}
 
 	return messages

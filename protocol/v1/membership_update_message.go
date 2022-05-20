@@ -237,7 +237,6 @@ type Group struct {
 	events  []MembershipUpdateEvent
 	admins  *stringSet
 	members *stringSet
-	joined  *stringSet
 }
 
 func groupChatID(creator *ecdsa.PublicKey) string {
@@ -265,7 +264,6 @@ func newGroup(chatID string, events []MembershipUpdateEvent) (*Group, error) {
 		events:  events,
 		admins:  newStringSet(),
 		members: newStringSet(),
-		joined:  newStringSet(),
 	}
 	if err := g.init(); err != nil {
 		return nil, err
@@ -394,10 +392,6 @@ func (g Group) Admins() []string {
 	return g.admins.List()
 }
 
-func (g Group) Joined() []string {
-	return g.joined.List()
-}
-
 func (g *Group) ProcessEvents(events []MembershipUpdateEvent) error {
 	for _, event := range events {
 		err := g.ProcessEvent(event)
@@ -481,7 +475,6 @@ func (g *Group) processEvent(event MembershipUpdateEvent) {
 	case protobuf.MembershipUpdateEvent_CHAT_CREATED:
 		g.name = event.Name
 		g.members.Add(event.From)
-		g.joined.Add(event.From)
 		g.admins.Add(event.From)
 	case protobuf.MembershipUpdateEvent_NAME_CHANGED:
 		g.name = event.Name
@@ -493,10 +486,7 @@ func (g *Group) processEvent(event MembershipUpdateEvent) {
 		g.members.Add(event.Members...)
 	case protobuf.MembershipUpdateEvent_MEMBER_REMOVED:
 		g.admins.Remove(event.Members[0])
-		g.joined.Remove(event.Members[0])
 		g.members.Remove(event.Members[0])
-	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
-		g.joined.Add(event.From)
 	}
 }
 

@@ -81,13 +81,13 @@ func (s *EventToSystemMessageSuite) TestRun() {
 			Name:     "members added event",
 			Event:    v1protocol.NewMembersAddedEvent([]string{"a", "b", "c"}, 12),
 			From:     "admin",
-			Expected: "@admin has invited @a, @b, @c",
+			Expected: "@admin has added @a, @b, @c",
 		},
 		{
 			Name:     "member joined event",
 			Event:    v1protocol.NewMemberJoinedEvent(12),
 			From:     "admin",
-			Expected: "@admin joined the group",
+			Expected: "", // joined events are deprecated
 		},
 		{
 			Name:     "admins added event",

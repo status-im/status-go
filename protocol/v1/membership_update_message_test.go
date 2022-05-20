@@ -77,7 +77,6 @@ func TestGroupProcessEvent(t *testing.T) {
 		return Group{
 			name:    name,
 			admins:  newStringSetFromSlice(admins),
-			joined:  newStringSetFromSlice(joined),
 			members: newStringSetFromSlice(members),
 		}
 	}
