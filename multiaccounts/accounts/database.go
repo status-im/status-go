@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -91,6 +92,7 @@ var accountSubscriptions []chan []*Account
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	*settings.Database
+	*notificationssettings.NotificationsSettings
 	db *sql.DB
 }
 
@@ -100,8 +102,9 @@ func NewDB(db *sql.DB) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	sn := notificationssettings.NewNotificationsSettings(db)
 
-	return &Database{sDB, db}, nil
+	return &Database{sDB, sn, db}, nil
 }
 
 // DB Gets db sql.DB

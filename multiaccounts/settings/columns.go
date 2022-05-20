@@ -190,6 +190,7 @@ var (
 		dBColumnName:   "node_config",
 		valueHandler:   NodeConfigHandler,
 	}
+	// NotificationsEnabled - we should remove this and realated things once mobile team starts usign `settings_notifications` package
 	NotificationsEnabled = SettingField{
 		reactFieldName: "notifications-enabled?",
 		dBColumnName:   "notifications_enabled",

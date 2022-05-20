@@ -336,6 +336,7 @@ func (db *Database) GetSettings() (Settings, error) {
 	return s, err
 }
 
+// We should remove this and realated things once mobile team starts usign `settings_notifications` package
 func (db *Database) GetNotificationsEnabled() (result bool, err error) {
 	err = db.makeSelectRow(NotificationsEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
