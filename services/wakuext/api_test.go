@@ -61,7 +61,7 @@ func TestRequestMessagesErrors(t *testing.T) {
 		},
 	}
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
-	service := New(config, nodeWrapper, handler, nil)
+	service := New(config, nodeWrapper, nil, handler, nil)
 	api := NewPublicAPI(service)
 
 	const mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
@@ -121,7 +121,7 @@ func TestInitProtocol(t *testing.T) {
 	require.NoError(t, err)
 
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
-	service := New(config, nodeWrapper, nil, db)
+	service := New(config, nodeWrapper, nil, nil, db)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
 	nodeWrapper := ext.NewTestNodeWrapper(nil, gethbridge.NewGethWakuWrapper(w))
-	service := New(config, nodeWrapper, nil, db)
+	service := New(config, nodeWrapper, nil, nil, db)
 	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
 	s.Require().NoError(err)
 

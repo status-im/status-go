@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 
@@ -70,6 +71,7 @@ type config struct {
 	browserDatabase     *browsers.Database
 	torrentConfig       *params.TorrentConfig
 	httpServer          *server.Server
+	rpcClient           *rpc.Client
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -281,6 +283,13 @@ func WithTorrentConfig(tc *params.TorrentConfig) Option {
 func WithHTTPServer(s *server.Server) Option {
 	return func(c *config) error {
 		c.httpServer = s
+		return nil
+	}
+}
+
+func WithRPCClient(r *rpc.Client) Option {
+	return func(c *config) error {
+		c.rpcClient = r
 		return nil
 	}
 }
