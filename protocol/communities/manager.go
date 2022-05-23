@@ -239,14 +239,14 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type KnownCommunitiesResponse struct {
-	ContractCommunities []string                                  `json:"contractCommunities"`
-	Descriptions        map[string]*protobuf.CommunityDescription `json:"descriptions"`
-	UnknownCommunities  []string                                  `json:"unknownCommunities"`
+	ContractCommunities []string              `json:"contractCommunities"`
+	Descriptions        map[string]*Community `json:"communities"`
+	UnknownCommunities  []string              `json:"unknownCommunities"`
 }
 
 func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
 	response = &KnownCommunitiesResponse{
-		Descriptions: make(map[string]*protobuf.CommunityDescription),
+		Descriptions: make(map[string]*Community),
 	}
 
 	for i := range communityIDs {
@@ -260,7 +260,7 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 		response.ContractCommunities = append(response.ContractCommunities, communityID)
 
 		if community != nil {
-			response.Descriptions[community.IDString()] = community.Description()
+			response.Descriptions[community.IDString()] = community
 		} else {
 			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
 		}
