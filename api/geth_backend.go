@@ -358,8 +358,7 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 }
 
 func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
-	// Overwrite db configuration (only adds new values)
-	if err := mergo.Merge(conf, n); err != nil {
+	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
 		return nil, err
 	}
 
