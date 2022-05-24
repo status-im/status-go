@@ -45,6 +45,8 @@ message CommunityDescription {
   map<string,CommunityCategory> categories = 8;
   uint64 archive_magnetlink_clock = 9;
   CommunityAdminSettings admin_settings = 10;
+  string intro_message = 11;
+  string outro_message = 12;
 }
 
 message CommunityAdminSettings {

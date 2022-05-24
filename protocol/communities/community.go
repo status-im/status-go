@@ -94,6 +94,8 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Categories             map[string]CommunityCategory    `json:"categories"`
 		Name                   string                          `json:"name"`
 		Description            string                          `json:"description"`
+		IntroMessage           string                          `json:"introMessage"`
+		OutroMessage           string                          `json:"outroMessage"`
 		Images                 map[string]images.IdentityImage `json:"images"`
 		Color                  string                          `json:"color"`
 		MembersCount           int                             `json:"membersCount"`
@@ -136,6 +138,9 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		}
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
+		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
+		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
+
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
 			communityItem.Color = o.config.CommunityDescription.Identity.Color
@@ -172,6 +177,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		RequestedAccessAt      int                                  `json:"requestedAccessAt"`
 		Name                   string                               `json:"name"`
 		Description            string                               `json:"description"`
+		IntroMessage           string                               `json:"introMessage"`
+		OutroMessage           string                               `json:"outroMessage"`
 		Chats                  map[string]CommunityChat             `json:"chats"`
 		Categories             map[string]CommunityCategory         `json:"categories"`
 		Images                 map[string]images.IdentityImage      `json:"images"`
@@ -229,6 +236,9 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		}
 		communityItem.Members = o.config.CommunityDescription.Members
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
+		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
+		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
+
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
 			communityItem.Color = o.config.CommunityDescription.Identity.Color
@@ -269,6 +279,24 @@ func (o *Community) DescriptionText() string {
 		o.config.CommunityDescription != nil &&
 		o.config.CommunityDescription.Identity != nil {
 		return o.config.CommunityDescription.Identity.Description
+	}
+	return ""
+}
+
+func (o *Community) IntroMessage() string {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		return o.config.CommunityDescription.IntroMessage
+	}
+	return ""
+}
+
+func (o *Community) OutroMessage() string {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		return o.config.CommunityDescription.OutroMessage
 	}
 	return ""
 }
@@ -684,6 +712,8 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.Identity.Color = description.Identity.Color
 	o.config.CommunityDescription.Identity.Emoji = description.Identity.Emoji
 	o.config.CommunityDescription.Identity.Images = description.Identity.Images
+	o.config.CommunityDescription.IntroMessage = description.IntroMessage
+	o.config.CommunityDescription.OutroMessage = description.OutroMessage
 	if o.config.CommunityDescription.AdminSettings == nil {
 		o.config.CommunityDescription.AdminSettings = &protobuf.CommunityAdminSettings{}
 	}
