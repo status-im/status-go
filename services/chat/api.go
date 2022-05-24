@@ -87,6 +87,8 @@ type ChannelGroup struct {
 	Admin          bool                                     `json:"admin"`
 	Verified       bool                                     `json:"verified"`
 	Description    string                                   `json:"description"`
+	IntroMessage   string                                   `json:"introMessage"`
+	OutroMessage   string                                   `json:"outroMessage"`
 	Permissions    *protobuf.CommunityPermissions           `json:"permissions"`
 	Members        map[string]*protobuf.CommunityMember     `json:"members"`
 	CanManageUsers bool                                     `json:"canManageUsers"`
@@ -116,18 +118,20 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 	result := make(map[string]ChannelGroup)
 
 	result[pubKey] = ChannelGroup{
-		Type:        Personal,
-		Name:        "",
-		Images:      make(map[string]images.IdentityImage),
-		Color:       "",
-		Chats:       make(map[string]*Chat),
-		Categories:  make(map[string]communities.CommunityCategory),
-		EnsName:     "", // Not implemented yet in communities
-		Admin:       true,
-		Verified:    true,
-		Description: "",
-		Permissions: &protobuf.CommunityPermissions{},
-		Muted:       false,
+		Type:         Personal,
+		Name:         "",
+		Images:       make(map[string]images.IdentityImage),
+		Color:        "",
+		Chats:        make(map[string]*Chat),
+		Categories:   make(map[string]communities.CommunityCategory),
+		EnsName:      "", // Not implemented yet in communities
+		Admin:        true,
+		Verified:     true,
+		Description:  "",
+		IntroMessage: "",
+		OutroMessage: "",
+		Permissions:  &protobuf.CommunityPermissions{},
+		Muted:        false,
 	}
 
 	for _, chat := range channels {
@@ -153,6 +157,8 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Admin:          community.IsAdmin(),
 			Verified:       community.Verified(),
 			Description:    community.DescriptionText(),
+			IntroMessage:   community.IntroMessage(),
+			OutroMessage:   community.OutroMessage(),
 			Permissions:    community.Description().Permissions,
 			Members:        community.Description().Members,
 			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),

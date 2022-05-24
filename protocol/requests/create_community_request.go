@@ -10,15 +10,26 @@ import (
 )
 
 var (
-	ErrCreateCommunityInvalidName        = errors.New("create-community: invalid name")
-	ErrCreateCommunityInvalidColor       = errors.New("create-community: invalid color")
-	ErrCreateCommunityInvalidDescription = errors.New("create-community: invalid description")
-	ErrCreateCommunityInvalidMembership  = errors.New("create-community: invalid membership")
+	ErrCreateCommunityInvalidName         = errors.New("create-community: invalid name")
+	ErrCreateCommunityInvalidColor        = errors.New("create-community: invalid color")
+	ErrCreateCommunityInvalidDescription  = errors.New("create-community: invalid description")
+	ErrCreateCommunityInvalidIntroMessage = errors.New("create-community: invalid intro message")
+	ErrCreateCommunityInvalidOutroMessage = errors.New("create-community: invalid outro message")
+	ErrCreateCommunityInvalidMembership   = errors.New("create-community: invalid membership")
+)
+
+const (
+	maxNameLength         = 30
+	maxDescriptionLength  = 140
+	maxIntroMessageLength = 1400
+	maxOutroMessageLength = 80
 )
 
 type CreateCommunity struct {
 	Name                         string                               `json:"name"`
 	Description                  string                               `json:"description"`
+	IntroMessage                 string                               `json:"introMessage,omitempty"`
+	OutroMessage                 string                               `json:"outroMessage,omitempty"`
 	Color                        string                               `json:"color"`
 	Emoji                        string                               `json:"emoji"`
 	Membership                   protobuf.CommunityPermissions_Access `json:"membership"`
@@ -42,12 +53,20 @@ func adaptIdentityImageToProtobuf(img *userimages.IdentityImage) *protobuf.Ident
 }
 
 func (c *CreateCommunity) Validate() error {
-	if c.Name == "" {
+	if c.Name == "" || len(c.Name) > maxNameLength {
 		return ErrCreateCommunityInvalidName
 	}
 
-	if c.Description == "" {
+	if c.Description == "" || len(c.Description) > maxDescriptionLength {
 		return ErrCreateCommunityInvalidDescription
+	}
+
+	if len(c.IntroMessage) > maxIntroMessageLength {
+		return ErrCreateCommunityInvalidIntroMessage
+	}
+
+	if len(c.OutroMessage) > maxOutroMessageLength {
+		return ErrCreateCommunityInvalidOutroMessage
 	}
 
 	if c.Membership == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
@@ -102,6 +121,8 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		AdminSettings: &protobuf.CommunityAdminSettings{
 			PinMessageAllMembersEnabled: c.PinMessageAllMembersEnabled,
 		},
+		IntroMessage: c.IntroMessage,
+		OutroMessage: c.OutroMessage,
 	}
 	return description, nil
 }
