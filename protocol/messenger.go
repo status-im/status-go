@@ -4256,7 +4256,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 		return errors.New("chat not found")
 	}
 
-	seen, mentioned, err := m.persistence.MarkAllRead(chatID, clock)
+	err := m.persistence.MarkAllRead(chatID)
 	if err != nil {
 		return err
 	}
@@ -4270,18 +4270,8 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 
 	chat.ReadMessagesAtClockValue = clock
 	chat.Highlight = false
-
-	if chat.UnviewedMessagesCount >= uint(seen) {
-		chat.UnviewedMessagesCount -= uint(seen)
-	} else {
-		chat.UnviewedMessagesCount = 0
-	}
-
-	if chat.UnviewedMentionsCount >= uint(mentioned) {
-		chat.UnviewedMentionsCount -= uint(mentioned)
-	} else {
-		chat.UnviewedMentionsCount = 0
-	}
+	chat.UnviewedMessagesCount = 0
+	chat.UnviewedMentionsCount = 0
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
