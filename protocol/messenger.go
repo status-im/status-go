@@ -4256,7 +4256,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 		return errors.New("chat not found")
 	}
 
-	err := m.persistence.MarkAllRead(chatID)
+	err := m.persistence.MarkAllRead(chatID, clock)
 	if err != nil {
 		return err
 	}

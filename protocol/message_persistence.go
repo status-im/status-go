@@ -1367,7 +1367,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 	return
 }
 
-func (db sqlitePersistence) MarkAllRead(chatID string) error {
+func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1381,7 +1381,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0`, chatID)
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ?`, chatID, clock)
 	if err != nil {
 		return err
 	}
