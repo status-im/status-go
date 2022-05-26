@@ -26,17 +26,14 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader) (*MediaServer, erro
 		db:         db,
 		downloader: downloader,
 	}
-
-	return s, nil
-}
-
-func (s *MediaServer) WithMediaHandlers() {
-	s.WithHandlers(HandlerPatternMap{
+	s.SetHandlers(HandlerPatternMap{
 		imagesPath:     handleImage(s.db, s.logger),
 		audioPath:      handleAudio(s.db, s.logger),
 		identiconsPath: handleIdenticon(s.logger),
 		ipfsPath:       handleIPFS(s.downloader, s.logger),
 	})
+
+	return s, nil
 }
 
 func (s *MediaServer) MakeImageServerURL() string {

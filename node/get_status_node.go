@@ -246,7 +246,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	if err := httpServer.Start(); err != nil {
 		return err
 	}
-	httpServer.WithMediaHandlers()
 
 	n.httpServer = httpServer
 
