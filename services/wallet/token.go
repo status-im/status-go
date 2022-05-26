@@ -263,12 +263,13 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 		mu       sync.Mutex
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)
-	for _, client := range clients {
+	for clientIdx := range clients {
 		for tokenIdx := range tokens {
 			for accountIdx := range accounts {
-				// Below, we set account and token from idx on purpose to avoid override
+				// Below, we set account, token and client from idx on purpose to avoid override
 				account := accounts[accountIdx]
 				token := tokens[tokenIdx]
+				client := clients[clientIdx]
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
