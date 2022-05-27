@@ -47,10 +47,10 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	}
 
 	// A valid added chat is required.
-	chat, ok := m.allChats.Load(chatID)
+	_, ok := m.allChats.Load(chatID)
 	if !ok {
 		// Create a one to one chat and set active to false
-		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
+		chat := CreateOneToOneChat(chatID, publicKey, m.getTimesource())
 		chat.Active = false
 		err = m.initChatSyncFields(chat)
 		if err != nil {

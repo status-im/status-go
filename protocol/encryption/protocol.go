@@ -228,12 +228,15 @@ func (p *Protocol) BuildEncryptedMessage(myIdentityKey *ecdsa.PrivateKey, public
 	return spec, nil
 }
 
+func (p *Protocol) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
+	return p.encryptor.GenerateHashRatchetKey(groupID)
+}
+
 // BuildHashRatchetKeyExchangeMessage builds a 1:1 message
 // containing newly generated hash ratchet key
-func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID string, keyID uint32) (*ProtocolMessageSpec, error) {
+func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, keyID uint32) (*ProtocolMessageSpec, error) {
 
-	logger := p.logger.With(zap.String("site", "BuildHashRatchetKeyExchangeMessage"))
-	keyData, err := p.encryptor.persistence.GetHashRatchetKeyByID([]byte(groupID), keyID, 0)
+	keyData, err := p.encryptor.persistence.GetHashRatchetKeyByID(groupID, keyID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -254,14 +257,18 @@ func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.Priva
 
 	}
 
-	logger.Info("Key saved", zap.Any("err", err))
 	return response, err
+}
+
+func (p *Protocol) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+	return p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
+
 }
 
 // BuildHashRatchetMessage returns a hash ratchet chat message
 func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*ProtocolMessageSpec, error) {
 
-	keyID, err := p.encryptor.persistence.GetCurrentKeyForGroup(string(groupID))
+	keyID, err := p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -282,6 +289,34 @@ func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*Pro
 		Message: message,
 	}
 	return spec, nil
+}
+
+func (p *Protocol) GetKeyExMessageSpecs(communityID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {
+	var communityKeyID uint32
+	var err error
+	if !forceRekey {
+		communityKeyID, err = p.GetCurrentKeyForGroup(communityID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if communityKeyID == 0 || forceRekey {
+		communityKeyID, err = p.GenerateHashRatchetKey(communityID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	specs := make([]*ProtocolMessageSpec, len(recipients))
+	for i, recipient := range recipients {
+		keyExMsg, err := p.BuildHashRatchetKeyExchangeMessage(identity, recipient, communityID, communityKeyID)
+		if err != nil {
+			return nil, err
+		}
+		specs[i] = keyExMsg
+
+	}
+
+	return specs, nil
 }
 
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.

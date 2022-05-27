@@ -376,10 +376,11 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	rawMessage := common.RawMessage{
 		Payload:        payload,
+		CommunityID:    community.ID(),
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 	}
-	_, err = m.sender.SendCommunityMessage(context.Background(), community.PublicKey(), rawMessage)
+	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -715,6 +716,15 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 	// updating community so it contains the general chat
 	community = chatResponse.Communities()[0]
 
+	if request.Encrypted {
+		// Init hash ratchet for community
+		_, err = m.encryptor.GenerateHashRatchetKey(community.ID())
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)
@@ -789,6 +799,13 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
+	// TODO Init hash ratchet for community
+	_, err = m.encryptor.GenerateHashRatchetKey(community.ID())
+
+	if err != nil {
+		return nil, err
+	}
+
 	//request info already stored on mailserver, but its success is not crucial
 	// for import
 	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString())
@@ -822,9 +839,11 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 
 	var publicKeys []*ecdsa.PublicKey
 	community, err := m.communitiesManager.GetByID(request.CommunityID)
+
 	if err != nil {
 		return nil, err
 	}
+
 	for _, pkBytes := range request.Users {
 		publicKey, err := common.HexToPubkey(pkBytes.String())
 		if err != nil {
@@ -845,6 +864,11 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 		if err := response.Merge(r); err != nil {
 			return nil, err
 		}
+	}
+
+	err = m.SendKeyExchangeMessage(community.ID(), publicKeys, common.KeyExMsgReuse)
+	if err != nil {
+		return nil, err
 	}
 
 	community, err = m.communitiesManager.InviteUsersToCommunity(request.CommunityID, publicKeys)
@@ -932,8 +956,31 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	return response, nil
 }
 
+// TODO
+func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
+	rawMessage := common.RawMessage{
+		SkipEncryption:        false,
+		CommunityID:           communityID,
+		CommunityKeyExMsgType: msgType,
+		Recipients:            pubkeys,
+		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+	}
+	_, err := m.sender.SendCommunityMessage(context.Background(), rawMessage)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.BanUserFromCommunity(request)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO generate new encryption key
+	err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgRekey)
 	if err != nil {
 		return nil, err
 	}

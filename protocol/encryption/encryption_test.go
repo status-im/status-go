@@ -99,12 +99,12 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	bobKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	communityID := "test_community_id"
+	communityID := []byte("test_community_id")
 	s.Require().NotNil(aliceKey)
 	s.Require().NotNil(bobKey)
 
 	s.logger.Info("Hash ratchet key exchange 1")
-	keyID1, _ := s.alice.encryptor.GenerateHashRatchetKey([]byte(communityID))
+	keyID1, _ := s.alice.encryptor.GenerateHashRatchetKey(communityID)
 	hashRatchetKeyExMsg1, _ := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, communityID, keyID1)
 
 	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
@@ -120,7 +120,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	//s.Equal(decryptedHashRatchetKey1, decryptedHashRatchetKeyBytes1)
 
 	payload1 := []byte("community msg 1")
-	hashRatchetMsg1, err := s.bob.BuildHashRatchetMessage([]byte(communityID), payload1)
+	hashRatchetMsg1, err := s.bob.BuildHashRatchetMessage(communityID, payload1)
 	s.logger.Info("BuildHashRatchetMessage 1", zap.Any("err", err))
 	s.Require().NotNil(hashRatchetMsg1)
 	s.Require().NotNil(hashRatchetMsg1.Message)
@@ -132,7 +132,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Equal(payload1, decryptedResponse2.DecryptedMessage)
 
 	payload2 := []byte("community msg 2")
-	hashRatchetMsg2, err := s.alice.BuildHashRatchetMessage([]byte(communityID), payload2)
+	hashRatchetMsg2, err := s.alice.BuildHashRatchetMessage(communityID, payload2)
 	s.logger.Info("BuildHashRatchetMessage 2", zap.Any("err", err))
 	s.Require().NotNil(hashRatchetMsg2)
 	s.Require().NotNil(hashRatchetMsg2.Message)
@@ -145,7 +145,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 
 	// Re-generate hash ratchet key. Bob generates a new key and sends it to Alice
 
-	keyID2, _ := s.bob.encryptor.GenerateHashRatchetKey([]byte(communityID))
+	keyID2, _ := s.bob.encryptor.GenerateHashRatchetKey(communityID)
 	hashRatchetKeyExMsg2, _ := s.bob.BuildHashRatchetKeyExchangeMessage(bobKey, &aliceKey.PublicKey, communityID, keyID2)
 
 	s.logger.Info("Hash ratchet key exchange 2", zap.Any("msg", hashRatchetKeyExMsg2.Message))
@@ -160,7 +160,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Require().NotNil(decryptedHashRatchetKeyBytes2)
 
 	payload3 := []byte("community msg 3")
-	hashRatchetMsg3, err := s.alice.BuildHashRatchetMessage([]byte(communityID), payload3)
+	hashRatchetMsg3, err := s.alice.BuildHashRatchetMessage(communityID, payload3)
 
 	s.logger.Info("BuildHashRatchetMessage err", zap.Any("err", err))
 	s.Require().NotNil(hashRatchetMsg3)
@@ -177,9 +177,9 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	payload4 := []byte("community msg 4")
 	payload5 := []byte("community msg 5")
 	payload6 := []byte("community msg 6")
-	hashRatchetMsg4, _ := s.alice.BuildHashRatchetMessage([]byte(communityID), payload4) // seqNo=2
-	hashRatchetMsg5, _ := s.alice.BuildHashRatchetMessage([]byte(communityID), payload5) // seqNo=3
-	hashRatchetMsg6, _ := s.alice.BuildHashRatchetMessage([]byte(communityID), payload6) // seqNo=3
+	hashRatchetMsg4, _ := s.alice.BuildHashRatchetMessage(communityID, payload4) // seqNo=2
+	hashRatchetMsg5, _ := s.alice.BuildHashRatchetMessage(communityID, payload5) // seqNo=3
+	hashRatchetMsg6, _ := s.alice.BuildHashRatchetMessage(communityID, payload6) // seqNo=3
 
 	// Handle them out of order plus an older one we've received earlier with seqNo=1
 

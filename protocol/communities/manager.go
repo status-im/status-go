@@ -1095,6 +1095,15 @@ func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string
 	return community.CanPost(pk, chatID, grant)
 }
 
+func (m *Manager) IsEncrypted(communityID string) (bool, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return false, err
+	}
+
+	return community.Encrypted(), nil
+
+}
 func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	return m.persistence.ShouldHandleSyncCommunity(community)
 }

@@ -1359,6 +1359,7 @@ func (m *Messenger) Init() error {
 		case ChatTypePublic, ChatTypeProfile:
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeCommunityChat:
+			// TODO not public chat now
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
@@ -2257,70 +2258,82 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	return id, nil
 }
 
-func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage) (common.RawMessage, error) {
+func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
 	var err error
 	var id []byte
-	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", spec.LocalChatID))
-	chat, ok := m.allChats.Load(spec.LocalChatID)
+	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", rawMessage.LocalChatID))
+	chat, ok := m.allChats.Load(rawMessage.LocalChatID)
 	if !ok {
-		return spec, errors.New("no chat found")
+		return rawMessage, errors.New("no chat found")
 	}
 
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
 		publicKey, err := chat.PublicKey()
 		if err != nil {
-			return spec, err
+			return rawMessage, err
 		}
 
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
-		specCopyForPairedDevices := spec
-		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || spec.SkipEncryption {
-			id, err = m.sender.SendPrivate(ctx, publicKey, &spec)
+		specCopyForPairedDevices := rawMessage
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryption {
+			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
 
 			if err != nil {
-				return spec, err
+				return rawMessage, err
 			}
 		}
 
 		err = m.sendToPairedDevices(ctx, specCopyForPairedDevices)
 
 		if err != nil {
-			return spec, err
+			return rawMessage, err
 		}
 
 	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err = m.sender.SendPublic(ctx, chat.ID, spec)
+		id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
 		if err != nil {
-			return spec, err
+			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
 		if err != nil {
-			return spec, err
+			return rawMessage, err
 		}
 
 		// We allow emoji reactions by anyone
-		if spec.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION && !canPost {
+		if rawMessage.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION && !canPost {
 			m.logger.Error("can't post on chat", zap.String("chat-id", chat.ID), zap.String("chat-name", chat.Name))
 
-			return spec, errors.New("can't post on chat")
+			return rawMessage, errors.New("can't post on chat")
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
-		id, err = m.sender.SendPublic(ctx, chat.ID, spec)
+		isEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
 		if err != nil {
-			return spec, err
+			return rawMessage, err
+		}
+		if !isEncrypted {
+			id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+		} else {
+			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
+
+			if err == nil {
+				_, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+			}
+		}
+		if err != nil {
+			return rawMessage, err
 		}
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
-		if spec.Recipients == nil {
-			spec.Recipients, err = chat.MembersAsPublicKeys()
+		if rawMessage.Recipients == nil {
+			rawMessage.Recipients, err = chat.MembersAsPublicKeys()
 			if err != nil {
-				return spec, err
+				return rawMessage, err
 			}
 		}
 
@@ -2330,42 +2343,42 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 
 			// Filter out my key from the recipients
 			n := 0
-			for _, recipient := range spec.Recipients {
+			for _, recipient := range rawMessage.Recipients {
 				if !common.IsPubKeyEqual(recipient, &m.identity.PublicKey) {
-					spec.Recipients[n] = recipient
+					rawMessage.Recipients[n] = recipient
 					n++
 				}
 			}
-			spec.Recipients = spec.Recipients[:n]
+			rawMessage.Recipients = rawMessage.Recipients[:n]
 		}
 
 		// We won't really send the message out if there's no recipients
-		if len(spec.Recipients) == 0 {
-			spec.Sent = true
+		if len(rawMessage.Recipients) == 0 {
+			rawMessage.Sent = true
 		}
 
 		// We skip wrapping in some cases (emoji reactions for example)
-		if !spec.SkipGroupMessageWrap {
-			spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
+		if !rawMessage.SkipGroupMessageWrap {
+			rawMessage.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
 		}
 
-		id, err = m.sender.SendGroup(ctx, spec.Recipients, spec)
+		id, err = m.sender.SendGroup(ctx, rawMessage.Recipients, rawMessage)
 		if err != nil {
-			return spec, err
+			return rawMessage, err
 		}
 
 	default:
-		return spec, errors.New("chat type not supported")
+		return rawMessage, errors.New("chat type not supported")
 	}
-	spec.ID = types.EncodeHex(id)
-	spec.SendCount++
-	spec.LastSent = m.getTimesource().GetCurrentTime()
-	err = m.persistence.SaveRawMessage(&spec)
+	rawMessage.ID = types.EncodeHex(id)
+	rawMessage.SendCount++
+	rawMessage.LastSent = m.getTimesource().GetCurrentTime()
+	err = m.persistence.SaveRawMessage(&rawMessage)
 	if err != nil {
-		return spec, err
+		return rawMessage, err
 	}
 
-	return spec, nil
+	return rawMessage, nil
 }
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
@@ -2456,7 +2469,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		message.Payload = &protobuf.ChatMessage_Community{Community: wrappedCommunity}
 
 		message.ContentType = protobuf.ChatMessage_COMMUNITY
-
 	} else if len(message.AudioPath) != 0 {
 		file, err := os.Open(message.AudioPath)
 		if err != nil {
@@ -2512,6 +2524,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		ResendAutomatically:  true,
 	}
+
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
 		return nil, err

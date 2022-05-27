@@ -61,7 +61,7 @@ message HRHeader {
   // Community message number for this key_id
   uint32 seq_no = 2;
   // Community ID
-  string group_id = 3;
+  bytes group_id = 3;
 }
 
 // Direct message value
