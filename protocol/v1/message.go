@@ -44,7 +44,6 @@ func WrapMessageV1(payload []byte, messageType protobuf.ApplicationMetadataMessa
 	message := &protobuf.ApplicationMetadataMessage{
 		Signature: signature,
 		Type:      messageType,
-		Payload:   payload,
-	}
+		Payload:   payload}
 	return proto.Marshal(message)
 }

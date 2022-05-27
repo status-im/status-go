@@ -174,17 +174,16 @@ func (s *MessageSender) SendPrivate(
 // using the community topic and their key
 func (s *MessageSender) SendCommunityMessage(
 	ctx context.Context,
-	recipient *ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
 	s.logger.Debug(
 		"sending a community message",
-		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
-		zap.String("site", "SendPrivate"),
+		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.String("site", "SendCommunityMessage"),
 	)
 	rawMessage.Sender = s.identity
 
-	return s.sendCommunity(ctx, recipient, &rawMessage)
+	return s.sendCommunity(ctx, &rawMessage)
 }
 
 // SendGroup takes encoded data, encrypts it and sends through the wire,
@@ -221,37 +220,83 @@ func (s *MessageSender) SendGroup(
 	return messageID, nil
 }
 
-// sendCommunity sends data to the recipient identifying with a given public key.
-func (s *MessageSender) sendCommunity(
-	ctx context.Context,
-	recipient *ecdsa.PublicKey,
-	rawMessage *RawMessage,
-) ([]byte, error) {
-	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
-
+func (s *MessageSender) getMessageID(rawMessage *RawMessage) (types.HexBytes, error) {
 	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+
+	return messageID, nil
+}
+
+// sendCommunity sends data to the recipient identifying with a given public key.
+func (s *MessageSender) sendCommunity(
+	ctx context.Context,
+	rawMessage *RawMessage,
+) ([]byte, error) {
+	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+
+	messageID, err := s.getMessageID(rawMessage)
+	if err != nil {
+		return nil, err
+	}
 	rawMessage.ID = types.EncodeHex(messageID)
+	messageIDs := [][]byte{messageID}
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
 	s.notifyOnScheduledMessage(rawMessage)
 
-	messageIDs := [][]byte{messageID}
-	hash, newMessage, err := s.sendCommunityRawMessage(ctx, recipient, wrappedMessage, messageIDs)
-	if err != nil {
-		s.logger.Error("failed to send a community message", zap.Error(err))
-		return nil, errors.Wrap(err, "failed to send a message spec")
+	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
+		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.CommunityID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, spec := range keyExMessageSpecs {
+			recipient := rawMessage.Recipients[i]
+			_, _, err = s.sendMessageSpec(ctx, recipient, spec, messageIDs)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		wrappedMessage, err := s.wrapMessageV1(rawMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		var payload []byte
+		if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+			messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
+			if err != nil {
+				return nil, err
+			}
+
+			payload, err = proto.Marshal(messageSpec.Message)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to marshal")
+			}
+		} else {
+			payload = wrappedMessage
+		}
+
+		pubkey, err := crypto.DecompressPubkey(rawMessage.CommunityID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decompress pubkey")
+		}
+		hash, newMessage, err := s.sendCommunityRawMessage(ctx, pubkey, payload, messageIDs)
+		if err != nil {
+			s.logger.Error("failed to send a community message", zap.Error(err))
+			return nil, errors.Wrap(err, "failed to send a message spec")
+		}
+
+		s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+
+		s.transport.Track(messageIDs, hash, newMessage)
 	}
-
-	s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
-
-	s.transport.Track(messageIDs, hash, newMessage)
-
 	return messageID, nil
 }
 

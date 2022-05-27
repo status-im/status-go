@@ -64,6 +64,7 @@ message SyncCommunity {
   bool muted = 7;
   repeated SyncCommunityRequestsToJoin requests_to_join = 8;
   SyncCommunitySettings settings = 9;
+  bool encrypted = 10;
 }
 
 message SyncCommunityRequestsToJoin {

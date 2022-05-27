@@ -330,7 +330,10 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 	// Try Hash Ratchet
 	if header := msg.GetHRHeader(); header != nil {
-		return s.decryptWithHR([]byte(header.GroupId), header.KeyId, header.SeqNo, payload)
+
+		decryptedPayload, err := s.decryptWithHR(header.GroupId, header.KeyId, header.SeqNo, payload)
+
+		return decryptedPayload, err
 	}
 	return nil, errors.New("no key specified")
 }
@@ -600,7 +603,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	return response, targetedInstallations, nil
 }
 
-func (s *encryptor) getNextHashRatchetKeyID(groupID string) (uint32, error) {
+func (s *encryptor) getNextHashRatchetKeyID(groupID []byte) (uint32, error) {
 	latestKeyID, err := s.persistence.GetCurrentKeyForGroup(groupID)
 	if err != nil {
 		return 0, err
@@ -624,12 +627,12 @@ func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
 	}
 	hrKeyBytes := crypto.FromECDSA(hrKey)
 
-	keyID, err := s.getNextHashRatchetKeyID(string(groupID))
+	keyID, err := s.getNextHashRatchetKeyID(groupID)
 	if err != nil {
 		return 0, err
 	}
 
-	err = s.persistence.SaveHashRatchetKey(string(groupID), keyID, hrKeyBytes)
+	err = s.persistence.SaveHashRatchetKey(groupID, keyID, hrKeyBytes)
 
 	return keyID, err
 }
@@ -681,7 +684,7 @@ func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) 
 	}
 	dmp := &EncryptedMessageProtocol{
 		HRHeader: &HRHeader{
-			GroupId: string(groupID),
+			GroupId: groupID,
 			KeyId:   keyID,
 			SeqNo:   newSeqNo,
 		},
@@ -691,7 +694,6 @@ func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) 
 }
 
 func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, payload []byte) ([]byte, error) {
-
 	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, seqNo)
 	if err != nil {
 		return nil, err
