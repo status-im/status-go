@@ -38,7 +38,7 @@ import (
 type testTimeSource struct{}
 
 func (t *testTimeSource) GetCurrentTime() uint64 {
-	return uint64(time.Now().Unix())
+	return uint64(time.Now().Unix()) * 1000
 }
 
 const (
@@ -379,7 +379,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.Name = "StatusIM"
-	nodeConfig.Rendezvous = true
+	nodeConfig.Rendezvous = false
 	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
 	if err != nil {
 		return nil, err
@@ -496,6 +496,7 @@ func buildMessage(chat *protocol.Chat, count int) *common.Message {
 	}
 
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	clock += uint64(count)
 	message := &common.Message{}
 	message.Text = fmt.Sprintf("test message %d", count)
 	message.ChatId = chat.ID
