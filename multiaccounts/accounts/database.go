@@ -19,20 +19,20 @@ const (
 )
 
 type Account struct {
-	Address     types.Address
-	Wallet      bool
-	Chat        bool
-	Type        string
-	Storage     string
-	Path        string
-	PublicKey   types.HexBytes
-	Name        string
-	Emoji       string
-	Color       string
-	Hidden      bool
-	DerivedFrom string
-	Clock       uint64
-	Removed     bool
+	Address     types.Address  `json:"address"`
+	Wallet      bool           `json:"wallet"`
+	Chat        bool           `json:"chat"`
+	Type        string         `json:"type,omitempty"`
+	Storage     string         `json:"storage,omitempty"`
+	Path        string         `json:"path,omitempty"`
+	PublicKey   types.HexBytes `json:"public-key,omitempty"`
+	Name        string         `json:"name"`
+	Emoji       string         `json:"emoji"`
+	Color       string         `json:"color"`
+	Hidden      bool           `json:"hidden"`
+	DerivedFrom string         `json:"derived-from,omitempty"`
+	Clock       uint64         `json:"clock,omitempty"`
+	Removed     bool           `json:"removed,omitempty"`
 }
 
 const (
