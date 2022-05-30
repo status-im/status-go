@@ -282,9 +282,16 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 
 	for _, acc := range subaccs {
 		if acc.Chat {
-			colorHash, _ := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
-			colorID, _ := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
 			account.ColorHash = colorHash
+
+			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
 			account.ColorID = colorID
 
 			break
