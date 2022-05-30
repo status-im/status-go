@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/golang/protobuf/proto"
-
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -99,6 +99,16 @@ func (m *Messenger) processActivityCenterNotifications(notifications []*Activity
 				continue
 			}
 			chat.Active = true
+
+                        if chat.PrivateGroupChat() {
+                          // Send Joined message for backward compatibility
+                          _, err := m.ConfirmJoiningGroup(context.Background(), chat.ID)
+                          if err != nil {
+                            m.logger.Error("failed to join group", zap.Error(err))
+                            return nil, err
+                          }
+                        }
+
 
 			chats = append(chats, chat)
 			response.AddChat(chat)
@@ -235,7 +245,6 @@ func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*A
 }
 
 func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
-	m.logger.Info("HANDLING SYNC ACTIVITY CENTER READ")
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {
@@ -246,7 +255,6 @@ func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, messag
 }
 
 func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, message protobuf.SyncActivityCenterAccepted) error {
-	m.logger.Info("HANDLING SYNC ACTIVITY CENTER ACCEPTED")
 	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {
@@ -257,7 +265,6 @@ func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, me
 }
 
 func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, message protobuf.SyncActivityCenterDismissed) error {
-	m.logger.Info("HANDLING SYNC ACTIVITY CENTER DISMISS")
 	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {
