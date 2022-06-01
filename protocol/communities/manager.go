@@ -1099,6 +1099,42 @@ func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (
 	return m.persistence.ShouldHandleSyncCommunity(community)
 }
 
+func (m *Manager) ShouldHandleSyncCommunitySettings(communitySettings *protobuf.SyncCommunitySettings) (bool, error) {
+	return m.persistence.ShouldHandleSyncCommunitySettings(communitySettings)
+}
+
+func (m *Manager) HandleSyncCommunitySettings(syncCommunitySettings *protobuf.SyncCommunitySettings) (*CommunitySettings, error) {
+	id, err := types.DecodeHex(syncCommunitySettings.CommunityId)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := m.persistence.GetCommunitySettingsByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if settings == nil {
+		settings = &CommunitySettings{
+			CommunityID:                  syncCommunitySettings.CommunityId,
+			HistoryArchiveSupportEnabled: syncCommunitySettings.HistoryArchiveSupportEnabled,
+			Clock:                        syncCommunitySettings.Clock,
+		}
+	}
+
+	if syncCommunitySettings.Clock > settings.Clock {
+		settings.CommunityID = syncCommunitySettings.CommunityId
+		settings.HistoryArchiveSupportEnabled = syncCommunitySettings.HistoryArchiveSupportEnabled
+		settings.Clock = syncCommunitySettings.Clock
+	}
+
+	err = m.persistence.SaveCommunitySettings(*settings)
+	if err != nil {
+		return nil, err
+	}
+	return settings, nil
+}
+
 func (m *Manager) SetSyncClock(id []byte, clock uint64) error {
 	return m.persistence.SetSyncClock(id, clock)
 }

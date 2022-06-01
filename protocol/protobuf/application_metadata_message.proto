@@ -61,5 +61,6 @@ message ApplicationMetadataMessage {
     SYNC_WALLET_ACCOUNT = 45;
     ACCEPT_CONTACT_REQUEST = 46;
     RETRACT_CONTACT_REQUEST = 47;
+    SYNC_COMMUNITY_SETTINGS = 49;
   }
 }

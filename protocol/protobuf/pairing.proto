@@ -63,6 +63,7 @@ message SyncCommunity {
   bool verified = 6;
   bool muted = 7;
   repeated SyncCommunityRequestsToJoin requests_to_join = 8;
+  SyncCommunitySettings settings = 9;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -152,4 +153,10 @@ message SyncWalletAccount {
 
 message SyncWalletAccounts {
   repeated SyncWalletAccount accounts = 1;
+}
+
+message SyncCommunitySettings {
+  uint64 clock = 1;
+  string community_id = 2;
+  bool history_archive_support_enabled = 3;
 }

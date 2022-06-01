@@ -1090,9 +1090,7 @@ func init() {
 	proto.RegisterMapType((map[string]*WakuMessageArchiveIndexMetadata)(nil), "protobuf.WakuMessageArchiveIndex.ArchivesEntry")
 }
 
-func init() {
-	proto.RegisterFile("communities.proto", fileDescriptor_f937943d74c1cd8b)
-}
+func init() { proto.RegisterFile("communities.proto", fileDescriptor_f937943d74c1cd8b) }
 
 var fileDescriptor_f937943d74c1cd8b = []byte{
 	// 1288 bytes of a gzipped FileDescriptorProto

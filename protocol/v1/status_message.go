@@ -280,6 +280,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.AcceptContactRequest))
 	case protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST:
 		return m.unmarshalProtobufData(new(protobuf.RetractContactRequest))
+	case protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_SETTINGS:
+		return m.unmarshalProtobufData(new(protobuf.SyncCommunitySettings))
 	}
 	return nil
 }

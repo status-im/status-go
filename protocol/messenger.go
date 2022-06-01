@@ -3049,7 +3049,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	syncMessage, err := community.ToSyncCommunityProtobuf(clock)
+	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(community.ID())
+	if err != nil {
+		return err
+	}
+
+	syncMessage, err := community.ToSyncCommunityProtobuf(clock, communitySettings)
 	if err != nil {
 		return err
 	}
@@ -3526,7 +3531,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-
+					case protobuf.SyncCommunitySettings:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+						p := msg.ParsedMessage.Interface().(protobuf.SyncCommunitySettings)
+						logger.Debug("Handling SyncCommunitySettings", zap.Any("message", p))
+						err = m.handleSyncCommunitySettings(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncCommunitySettings", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 					case protobuf.Backup:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")

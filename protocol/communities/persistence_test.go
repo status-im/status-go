@@ -166,7 +166,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	// Add a new community that we have joined
 	com := s.makeNewCommunity(identity)
 	com.Join()
-	sc, err := com.ToSyncCommunityProtobuf(clock)
+	sc, err := com.ToSyncCommunityProtobuf(clock, nil)
 	s.NoError(err, "Community.ToSyncCommunityProtobuf shouldn't give any error")
 	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
 	s.NoError(err, "saveRawCommunityRow")

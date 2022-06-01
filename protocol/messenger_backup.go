@@ -132,7 +132,12 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	cs := append(joinedCs, deletedCs...)
 	for _, c := range cs {
 
-		syncMessage, err := c.ToSyncCommunityProtobuf(clock)
+		settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
+		if err != nil {
+			return 0, err
+		}
+
+		syncMessage, err := c.ToSyncCommunityProtobuf(clock, settings)
 		if err != nil {
 			return 0, err
 		}
