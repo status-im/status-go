@@ -330,6 +330,7 @@ func (o *Community) initialize() {
 type CommunitySettings struct {
 	CommunityID                  string `json:"communityId"`
 	HistoryArchiveSupportEnabled bool   `json:"historyArchiveSupportEnabled"`
+	Clock                        uint64 `json:"clock"`
 }
 
 type CommunityChatChanges struct {

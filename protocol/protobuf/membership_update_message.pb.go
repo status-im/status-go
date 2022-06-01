@@ -240,9 +240,7 @@ func init() {
 	proto.RegisterType((*MembershipUpdateMessage)(nil), "protobuf.MembershipUpdateMessage")
 }
 
-func init() {
-	proto.RegisterFile("membership_update_message.proto", fileDescriptor_8d37dd0dc857a6be)
-}
+func init() { proto.RegisterFile("membership_update_message.proto", fileDescriptor_8d37dd0dc857a6be) }
 
 var fileDescriptor_8d37dd0dc857a6be = []byte{
 	// 405 bytes of a gzipped FileDescriptorProto

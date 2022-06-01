@@ -199,9 +199,7 @@ func init() {
 	proto.RegisterType((*RetractContactRequest)(nil), "protobuf.RetractContactRequest")
 }
 
-func init() {
-	proto.RegisterFile("contact.proto", fileDescriptor_a5036fff2565fb15)
-}
+func init() { proto.RegisterFile("contact.proto", fileDescriptor_a5036fff2565fb15) }
 
 var fileDescriptor_a5036fff2565fb15 = []byte{
 	// 294 bytes of a gzipped FileDescriptorProto

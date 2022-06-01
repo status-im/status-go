@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -1138,6 +1139,163 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
+	// Create new device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	// Pair devices
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+
+	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	// Check that Alice has community settings
+	cs, err := s.alice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+	s.Require().NoError(err, "communitiesManager.GetCommunitySettingsByID")
+	s.NotNil(cs, "Must have community settings")
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		// Do we have new synced community settings?
+		syncedSettings, err := alicesOtherDevice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+		if err != nil || syncedSettings == nil {
+			return fmt.Errorf("community with sync not received %w", err)
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	tcs, err := alicesOtherDevice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+	s.Require().NoError(err)
+
+	// Check the community settings on their device matched the community settings on Alice's device
+	s.Equal(cs.CommunityID, tcs.CommunityID)
+	s.Equal(cs.HistoryArchiveSupportEnabled, tcs.HistoryArchiveSupportEnabled)
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
+	// Create new device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	// Pair devices
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+
+	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	// Check that Alice has community settings
+	cs, err := s.alice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+	s.Require().NoError(err, "communitiesManager.GetCommunitySettingsByID")
+	s.NotNil(cs, "Must have community settings")
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		// Do we have new synced community settings?
+		syncedSettings, err := alicesOtherDevice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+		if err != nil || syncedSettings == nil {
+			return fmt.Errorf("community settings with sync not received %w", err)
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	tcs, err := alicesOtherDevice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+	s.Require().NoError(err)
+
+	// Check the community settings on their device matched the community settings on Alice's device
+	s.Equal(cs.CommunityID, tcs.CommunityID)
+	s.Equal(cs.HistoryArchiveSupportEnabled, tcs.HistoryArchiveSupportEnabled)
+
+	req := createCommunityReq
+	req.HistoryArchiveSupportEnabled = true
+	editCommunityReq := &requests.EditCommunity{
+		CommunityID:     newCommunity.ID(),
+		CreateCommunity: *req,
+	}
+
+	mr, err = s.alice.EditCommunity(editCommunityReq)
+	s.Require().NoError(err, "s.alice.EditCommunity")
+	var editedCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			editedCommunity = com
+		}
+	}
+	s.Require().NotNil(editedCommunity)
+
+	// Wait a bit for sync messages to reach destination
+	time.Sleep(1 * time.Second)
+	err = tt.RetryWithBackOff(func() error {
+		_, err = alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	tcs, err = alicesOtherDevice.communitiesManager.GetCommunitySettingsByID(newCommunity.ID())
+	s.Require().NoError(err)
+
+	// Check the community settings on their device matched the community settings on Alice's device
+	s.Equal(cs.CommunityID, tcs.CommunityID)
+	s.Equal(req.HistoryArchiveSupportEnabled, tcs.HistoryArchiveSupportEnabled)
 }
 
 // TestSyncCommunity tests basic sync functionality between 2 Messengers
