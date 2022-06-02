@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
@@ -116,6 +117,23 @@ func (c *ContractMaker) NewStickerPack(chainID uint64) (*stickers.StickerPack, e
 	}
 
 	return stickers.NewStickerPack(
+		contractAddr,
+		backend,
+	)
+}
+
+func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, error) {
+	contractAddr, err := directory.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return directory.NewDirectory(
 		contractAddr,
 		backend,
 	)

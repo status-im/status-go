@@ -23,7 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rpc"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
@@ -61,6 +62,7 @@ type Service struct {
 	cancelMessenger chan struct{}
 	storage         db.TransactionalStorage
 	n               types.Node
+	rpcClient       *rpc.Client
 	config          params.NodeConfig
 	mailMonitor     *MailRequestMonitor
 	server          *p2p.Server
@@ -76,6 +78,7 @@ var _ node.Lifecycle = (*Service)(nil)
 func New(
 	config params.NodeConfig,
 	n types.Node,
+	rpcClient *rpc.Client,
 	ldb *leveldb.DB,
 	mailMonitor *MailRequestMonitor,
 	eventSub mailservers.EnvelopeEventSubscriber,
@@ -85,6 +88,7 @@ func New(
 	return &Service{
 		storage:     db.NewLevelDBStorage(ldb),
 		n:           n,
+		rpcClient:   rpcClient,
 		config:      config,
 		mailMonitor: mailMonitor,
 		peerStore:   peerStore,
@@ -144,7 +148,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -348,7 +352,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 }
 
 // APIs returns a list of new APIs.
-func (s *Service) APIs() []rpc.API {
+func (s *Service) APIs() []gethrpc.API {
 	panic("this is abstract service, use shhext or wakuext implementation")
 }
 
@@ -391,6 +395,7 @@ func buildMessengerOptions(
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	httpServer *server.Server,
+	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
@@ -412,6 +417,7 @@ func buildMessengerOptions(
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithHTTPServer(httpServer),
+		protocol.WithRPCClient(rpcClient),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

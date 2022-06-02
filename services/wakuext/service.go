@@ -3,7 +3,8 @@ package wakuext
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/ethereum/go-ethereum/rpc"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -15,7 +16,7 @@ type Service struct {
 	w types.Waku
 }
 
-func New(config params.NodeConfig, n types.Node, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
+func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
 	w, err := n.GetWaku(nil)
 	if err != nil {
 		panic(err)
@@ -27,7 +28,7 @@ func New(config params.NodeConfig, n types.Node, handler ext.EnvelopeEventsHandl
 	requestsRegistry := ext.NewRequestsRegistry(delay)
 	mailMonitor := ext.NewMailRequestMonitor(w, handler, requestsRegistry)
 	return &Service{
-		Service: ext.New(config, n, ldb, mailMonitor, w),
+		Service: ext.New(config, n, rpcClient, ldb, mailMonitor, w),
 		w:       w,
 	}
 }
@@ -37,8 +38,8 @@ func (s *Service) PublicWakuAPI() types.PublicWakuAPI {
 }
 
 // APIs returns a list of new APIs.
-func (s *Service) APIs() []rpc.API {
-	apis := []rpc.API{
+func (s *Service) APIs() []gethrpc.API {
+	apis := []gethrpc.API{
 		{
 			Namespace: "wakuext",
 			Version:   "1.0",

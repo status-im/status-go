@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/pkg/errors"
@@ -89,45 +90,49 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	node                                 types.Node
-	server                               *p2p.Server
-	peerStore                            *mailservers.PeerStore
-	config                               *config
-	identity                             *ecdsa.PrivateKey
-	persistence                          *sqlitePersistence
-	transport                            *transport.Transport
-	encryptor                            *encryption.Protocol
-	sender                               *common.MessageSender
-	ensVerifier                          *ens.Verifier
-	anonMetricsClient                    *anonmetrics.Client
-	anonMetricsServer                    *anonmetrics.Server
-	pushNotificationClient               *pushnotificationclient.Client
-	pushNotificationServer               *pushnotificationserver.Server
-	communitiesManager                   *communities.Manager
-	logger                               *zap.Logger
-	verifyTransactionClient              EthClient
-	featureFlags                         common.FeatureFlags
-	shutdownTasks                        []func() error
-	shouldPublishContactCode             bool
-	systemMessagesTranslations           *systemMessageTranslationsMap
-	allChats                             *chatMap
-	allContacts                          *contactMap
-	allInstallations                     *installationMap
-	modifiedInstallations                *stringBoolMap
-	installationID                       string
-	mailserverCycle                      mailserverCycle
-	database                             *sql.DB
-	multiAccounts                        *multiaccounts.Database
-	mailservers                          *mailserversDB.Database
-	settings                             *accounts.Database
-	account                              *multiaccounts.Account
-	mailserversDatabase                  *mailserversDB.Database
-	browserDatabase                      *browsers.Database
-	httpServer                           *server.Server
-	quit                                 chan struct{}
-	requestedCommunities                 map[string]*transport.Filter
+	node                       types.Node
+	server                     *p2p.Server
+	peerStore                  *mailservers.PeerStore
+	config                     *config
+	identity                   *ecdsa.PrivateKey
+	persistence                *sqlitePersistence
+	transport                  *transport.Transport
+	encryptor                  *encryption.Protocol
+	sender                     *common.MessageSender
+	ensVerifier                *ens.Verifier
+	anonMetricsClient          *anonmetrics.Client
+	anonMetricsServer          *anonmetrics.Server
+	pushNotificationClient     *pushnotificationclient.Client
+	pushNotificationServer     *pushnotificationserver.Server
+	communitiesManager         *communities.Manager
+	logger                     *zap.Logger
+	verifyTransactionClient    EthClient
+	featureFlags               common.FeatureFlags
+	shutdownTasks              []func() error
+	shouldPublishContactCode   bool
+	systemMessagesTranslations *systemMessageTranslationsMap
+	allChats                   *chatMap
+	allContacts                *contactMap
+	allInstallations           *installationMap
+	modifiedInstallations      *stringBoolMap
+	installationID             string
+	mailserverCycle            mailserverCycle
+	database                   *sql.DB
+	multiAccounts              *multiaccounts.Database
+	mailservers                *mailserversDB.Database
+	settings                   *accounts.Database
+	account                    *multiaccounts.Account
+	mailserversDatabase        *mailserversDB.Database
+	browserDatabase            *browsers.Database
+	httpServer                 *server.Server
+	quit                       chan struct{}
+
+	requestedCommunitiesLock sync.RWMutex
+	requestedCommunities     map[string]*transport.Filter
+
 	connectionState                      connection.State
 	telemetryClient                      *telemetry.Client
+	contractMaker                        *contracts.ContractMaker
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex               sync.Mutex
@@ -425,12 +430,16 @@ func NewMessenger(
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
-		mailserversDatabase:  c.mailserversDatabase,
-		account:              c.account,
-		quit:                 make(chan struct{}),
-		requestedCommunities: make(map[string]*transport.Filter),
-		browserDatabase:      c.browserDatabase,
-		httpServer:           c.httpServer,
+		mailserversDatabase:      c.mailserversDatabase,
+		account:                  c.account,
+		quit:                     make(chan struct{}),
+		requestedCommunitiesLock: sync.RWMutex{},
+		requestedCommunities:     make(map[string]*transport.Filter),
+		browserDatabase:          c.browserDatabase,
+		httpServer:               c.httpServer,
+		contractMaker: &contracts.ContractMaker{
+			RPCClient: c.rpcClient,
+		},
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,

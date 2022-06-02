@@ -238,6 +238,37 @@ func (m *Manager) All() ([]*Community, error) {
 	return m.persistence.AllCommunities(m.identity)
 }
 
+type KnownCommunitiesResponse struct {
+	ContractCommunities []string              `json:"contractCommunities"`
+	Descriptions        map[string]*Community `json:"communities"`
+	UnknownCommunities  []string              `json:"unknownCommunities"`
+}
+
+func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
+	response = &KnownCommunitiesResponse{
+		Descriptions: make(map[string]*Community),
+	}
+
+	for i := range communityIDs {
+		communityID := communityIDs[i].String()
+		var community *Community
+		community, err = m.GetByID(communityIDs[i])
+		if err != nil {
+			return
+		}
+
+		response.ContractCommunities = append(response.ContractCommunities, communityID)
+
+		if community != nil {
+			response.Descriptions[community.IDString()] = community
+		} else {
+			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
+		}
+	}
+
+	return
+}
+
 func (m *Manager) Joined() ([]*Community, error) {
 	return m.persistence.JoinedCommunities(m.identity)
 }

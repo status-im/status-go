@@ -9,6 +9,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -197,6 +199,43 @@ func (m *Messenger) Communities() ([]*communities.Community, error) {
 
 func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
+}
+
+func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+	testNetworksEnabled, err := m.settings.TestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	chainID := uint64(10) // Optimism (mainnet)
+	if testNetworksEnabled {
+		chainID = 69 // Optimism (kovan)
+	}
+
+	directory, err := m.contractMaker.NewDirectory(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
+
+	communities, err := directory.GetCommunities(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var communityIDs []types.HexBytes
+	for _, c := range communities {
+		communityIDs = append(communityIDs, c)
+	}
+
+	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(communityIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
+
+	return response, nil
 }
 
 func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
@@ -921,6 +960,9 @@ func (m *Messenger) RequestCommunityInfoFromMailserverAsync(communityID string) 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitForResponse bool) (*communities.Community, error) {
+	m.requestedCommunitiesLock.Lock()
+	defer m.requestedCommunitiesLock.Unlock()
+
 	if _, ok := m.requestedCommunities[communityID]; ok {
 		return nil, nil
 	}
@@ -998,6 +1040,92 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 	m.forgetCommunityRequest(communityID)
 
 	return community, nil
+}
+
+// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// from mailserver. When response received it will be passed through signals handler
+func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
+	m.requestedCommunitiesLock.Lock()
+	defer m.requestedCommunitiesLock.Unlock()
+
+	var topics []types.TopicType
+	for _, communityID := range communityIDs {
+		if _, ok := m.requestedCommunities[communityID]; ok {
+			continue
+		}
+
+		//If filter wasn't installed we create it and remember for deinstalling after
+		//response received
+		filter := m.transport.FilterByChatID(communityID)
+		if filter == nil {
+			filters, err := m.transport.InitPublicFilters([]string{communityID})
+			if err != nil {
+				m.logger.Error("Can't install filter for community", zap.Error(err))
+				continue
+			}
+			if len(filters) != 1 {
+				m.logger.Error("Unexpected amount of filters created")
+				continue
+			}
+			filter = filters[0]
+			m.requestedCommunities[communityID] = filter
+		} else {
+			//we don't remember filter id associated with community because it was already installed
+			m.requestedCommunities[communityID] = nil
+		}
+		topics = append(topics, filter.Topic)
+	}
+
+	to := uint32(m.transport.GetCurrentTime() / 1000)
+	from := to - oneMonthInSeconds
+
+	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+		batch := MailserverBatch{From: from, To: to, Topics: topics}
+		m.logger.Info("Requesting historic")
+		err := m.processMailserverBatch(batch)
+		return nil, err
+	})
+
+	if err != nil {
+		m.logger.Error("Err performing mailserver request", zap.Error(err))
+		return
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	fetching := true
+	for fetching {
+		select {
+		case <-time.After(200 * time.Millisecond):
+			allLoaded := true
+			for _, c := range communityIDs {
+				community, err := m.communitiesManager.GetByIDString(c)
+				if err != nil {
+					m.logger.Error("Error loading community", zap.Error(err))
+					break
+				}
+
+				if community == nil || community.Name() == "" || community.DescriptionText() == "" {
+					allLoaded = false
+					break
+				}
+			}
+
+			if allLoaded {
+				fetching = false
+			}
+
+		case <-ctx.Done():
+			fetching = false
+		}
+	}
+
+	for _, c := range communityIDs {
+		m.forgetCommunityRequest(c)
+	}
+
 }
 
 // forgetCommunityRequest removes community from requested ones and removes filter
