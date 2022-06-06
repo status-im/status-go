@@ -670,6 +670,25 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID string) (string, error) {
+	var id string
+	err := db.db.QueryRow(
+		`
+			SELECT
+                                id
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ? AND m1.content_type = ?
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id DESC
+			LIMIT 1
+		`, contactID, protobuf.ChatMessage_CONTACT_REQUEST).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // AllMessageByChatIDWhichMatchPattern returns all messages which match the search
 // term, for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
