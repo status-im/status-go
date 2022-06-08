@@ -74,7 +74,7 @@ func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, 
 }
 
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
-	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainID] get transfers for an address", "address", address)
+	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainIDs] get transfers for an address", "address", address)
 	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, toBlock, limit, fetchMore)
 }
 
@@ -189,28 +189,28 @@ func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address) 
 
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
-	rst, err := api.s.transactionManager.getAllPendings(api.s.rpcClient.UpstreamChainID)
+	rst, err := api.s.transactionManager.getAllPendings([]uint64{api.s.rpcClient.UpstreamChainID})
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
 }
 
-func (api *API) GetPendingTransactionsByChainID(ctx context.Context, chainID uint64) ([]*PendingTransaction, error) {
+func (api *API) GetPendingTransactionsByChainIDs(ctx context.Context, chainIDs []uint64) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
-	rst, err := api.s.transactionManager.getAllPendings(chainID)
+	rst, err := api.s.transactionManager.getAllPendings(chainIDs)
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending outbound transactions by address")
-	rst, err := api.s.transactionManager.getPendingByAddress(api.s.rpcClient.UpstreamChainID, address)
+	rst, err := api.s.transactionManager.getPendingByAddress([]uint64{api.s.rpcClient.UpstreamChainID}, address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }
 
-func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address) ([]*PendingTransaction, error) {
+func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Context, chainIDs []uint64, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending outbound transactions by address")
-	rst, err := api.s.transactionManager.getPendingByAddress(chainID, address)
+	rst, err := api.s.transactionManager.getPendingByAddress(chainIDs, address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }

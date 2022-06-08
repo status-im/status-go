@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,12 +45,21 @@ type PendingTransaction struct {
 	ChainID        uint64         `json:"network_id"`
 }
 
-func (tm *TransactionManager) getAllPendings(chainID uint64) ([]*PendingTransaction, error) {
+func arrayToString(a []uint64, delim string) string {
+	res := make([]string, len(a))
+	for i, v := range a {
+		res[i] = fmt.Sprint(v)
+	}
+
+	return strings.Join(res, ",")
+}
+
+func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTransaction, error) {
 	rows, err := tm.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
                                          symbol, gas_price, gas_limit, type, additional_data,
 										 network_id
                                   FROM pending_transactions
-                                  WHERE network_id = ?`, chainID)
+                                  WHERE network_id in (?)`, arrayToString(chainIDs, ","))
 	if err != nil {
 		return nil, err
 	}
@@ -84,12 +95,12 @@ func (tm *TransactionManager) getAllPendings(chainID uint64) ([]*PendingTransact
 	return transactions, nil
 }
 
-func (tm *TransactionManager) getPendingByAddress(chainID uint64, address common.Address) ([]*PendingTransaction, error) {
+func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address common.Address) ([]*PendingTransaction, error) {
 	rows, err := tm.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
                                          symbol, gas_price, gas_limit, type, additional_data,
 										 network_id
                                   FROM pending_transactions
-                                  WHERE network_id = ? AND from_address = ?`, chainID, address)
+                                  WHERE network_id in (?) AND from_address = ?`, arrayToString(chainIDs, ","), address)
 	if err != nil {
 		return nil, err
 	}

@@ -71,13 +71,13 @@ func (api *API) signTypedDataV4(typed signercore.TypedData, address string, pass
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (api *API) sendTransaction(sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
+func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
 	verifiedAccount, err := api.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
 	}
 
-	hash, err = api.s.transactor.SendTransaction(sendArgs, verifiedAccount)
+	hash, err = api.s.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
 	if err != nil {
 		return
 	}
