@@ -679,7 +679,15 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 		return nil
 	}
 
-	contact.Added = false
+	mutualContactEnabled, err := m.settings.MutualContactEnabled()
+	if err != nil {
+		m.logger.Error("FAILED", zap.Error(err))
+		return err
+	}
+	// We remove from our old contacts only if mutual contacts are enabled
+	if mutualContactEnabled {
+		contact.Added = false
+	}
 	contact.HasAddedUs = false
 	contact.ContactRequestClock = message.Clock
 	contact.ContactRequestRetracted()

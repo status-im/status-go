@@ -1137,7 +1137,7 @@ func _1645034602_add_mutual_contact_requestUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1645034602_add_mutual_contact_request.up.sql", size: 454, mode: os.FileMode(0644), modTime: time.Unix(1653980143, 0)}
+	info := bindataFileInfo{name: "1645034602_add_mutual_contact_request.up.sql", size: 454, mode: os.FileMode(0644), modTime: time.Unix(1654616593, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1a, 0xe0, 0x5d, 0x68, 0xb8, 0x50, 0xa4, 0xbb, 0x3e, 0x4f, 0x2, 0x87, 0xad, 0x87, 0x6e, 0x38, 0xdf, 0xc8, 0x4c, 0xe2, 0x5f, 0xd1, 0x6, 0xdc, 0xe7, 0xbd, 0x4a, 0x9c, 0xf3, 0x91, 0xa1, 0x51}}
 	return a, nil
 }
@@ -1157,7 +1157,7 @@ func _1650373957_add_contact_request_stateUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1650373957_add_contact_request_state.up.sql", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1653980143, 0)}
+	info := bindataFileInfo{name: "1650373957_add_contact_request_state.up.sql", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1654616593, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5e, 0xc1, 0x3f, 0x29, 0xe, 0x19, 0x86, 0x1a, 0x4c, 0x6c, 0x2a, 0x90, 0x9d, 0xdf, 0xb1, 0xb, 0x72, 0x25, 0xcd, 0x6c, 0x5f, 0xd, 0x51, 0x9e, 0x85, 0xc0, 0x9, 0xb7, 0xbc, 0x87, 0x23, 0xec}}
 	return a, nil
 }
