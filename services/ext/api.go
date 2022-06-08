@@ -724,8 +724,16 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture)
 }
 
-func (api *PublicAPI) SyncBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
-	return api.service.messenger.SyncBookmark(ctx, &bookmark)
+func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
+	return api.service.messenger.AddBookmark(ctx, bookmark)
+}
+
+func (api *PublicAPI) RemoveBookmark(ctx context.Context, url string) error {
+	return api.service.messenger.RemoveBookmark(ctx, url)
+}
+
+func (api *PublicAPI) UpdateBookmark(ctx context.Context, oldURL string, bookmark browsers.Bookmark) error {
+	return api.service.messenger.UpdateBookmark(ctx, oldURL, bookmark)
 }
 
 func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string) (types.HexBytes, error) {

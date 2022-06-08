@@ -3087,11 +3087,12 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncBookmark{
-		Clock:    clock,
-		Url:      bookmark.URL,
-		Name:     bookmark.Name,
-		ImageUrl: bookmark.ImageURL,
-		Removed:  bookmark.Removed,
+		Clock:     clock,
+		Url:       bookmark.URL,
+		Name:      bookmark.Name,
+		ImageUrl:  bookmark.ImageURL,
+		Removed:   bookmark.Removed,
+		DeletedAt: bookmark.DeletedAt,
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {

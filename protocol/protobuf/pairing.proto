@@ -114,6 +114,7 @@ message SyncBookmark {
   string name = 3;
   string image_url = 4;
   bool   removed = 5;
+  uint64 deleted_at = 6;
 }
 
 message SyncClearHistory {
