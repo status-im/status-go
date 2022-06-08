@@ -131,15 +131,16 @@ func (db *Database) DeleteBrowser(id string) error {
 type BookmarksType string
 
 type Bookmark struct {
-	URL      string `json:"url"`
-	Name     string `json:"name"`
-	ImageURL string `json:"imageUrl"`
-	Removed  bool   `json:"removed"`
-	Clock    uint64 `json:"-"` //used to sync
+	URL       string `json:"url"`
+	Name      string `json:"name"`
+	ImageURL  string `json:"imageUrl"`
+	Removed   bool   `json:"removed"`
+	Clock     uint64 `json:"-"` //used to sync
+	DeletedAt uint64 `json:"deletedAt"`
 }
 
 func (db *Database) GetBookmarks() ([]*Bookmark, error) {
-	rows, err := db.db.Query(`SELECT url, name, image_url, removed FROM bookmarks`)
+	rows, err := db.db.Query(`SELECT url, name, image_url, removed, deleted_at FROM bookmarks`)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (db *Database) GetBookmarks() ([]*Bookmark, error) {
 	var rst []*Bookmark
 	for rows.Next() {
 		bookmark := &Bookmark{}
-		err := rows.Scan(&bookmark.URL, &bookmark.Name, &bookmark.ImageURL, &bookmark.Removed)
+		err := rows.Scan(&bookmark.URL, &bookmark.Name, &bookmark.ImageURL, &bookmark.Removed, &bookmark.DeletedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -277,11 +278,11 @@ func (db *Database) shouldSyncBookmark(bookmark *Bookmark, tx *sql.Tx) (shouldSy
 }
 
 func (db *Database) UpdateBookmark(originalURL string, bookmark Bookmark) error {
-	insert, err := db.db.Prepare("UPDATE bookmarks SET url = ?, name = ?, image_url = ?, removed = ?, clock = ? WHERE url = ?")
+	insert, err := db.db.Prepare("UPDATE bookmarks SET url = ?, name = ?, image_url = ?, removed = ?, clock = ?, deleted_at = ? WHERE url = ?")
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, originalURL)
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, originalURL)
 	return err
 }
 

@@ -10,10 +10,15 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/mat/besticon/besticon"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/services/browsers"
 )
 
 var (
@@ -991,4 +996,88 @@ func (db sqlitePersistence) StatusUpdates() (statusUpdates []UserStatus, err err
 	}
 
 	return
+}
+
+func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.Bookmark, error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return bookmark, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+	insert, err := tx.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url, removed, clock) VALUES (?, ?, ?, ?, ?)")
+
+	if err != nil {
+		return bookmark, err
+	}
+
+	// Get the right icon
+	finder := besticon.IconFinder{}
+	icons, iconError := finder.FetchIcons(bookmark.URL)
+
+	if iconError == nil && len(icons) > 0 {
+		icon := finder.IconInSizeRange(besticon.SizeRange{48, 48, 100})
+		if icon != nil {
+			bookmark.ImageURL = icon.URL
+		} else {
+			bookmark.ImageURL = icons[0].URL
+		}
+	} else {
+		log.Error("error getting the bookmark icon", "iconError", iconError)
+	}
+
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock)
+	return bookmark, err
+}
+
+func (db *sqlitePersistence) RemoveBookmark(url string, deletedAt uint64) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec(`UPDATE bookmarks SET removed = 1, deleted_at = ? WHERE url = ?`, deletedAt, url)
+	return err
+}
+
+func (db *sqlitePersistence) GetBookmarkByURL(url string) (*browsers.Bookmark, error) {
+	bookmark := browsers.Bookmark{}
+	err := db.db.QueryRow(`SELECT url, name, image_url, removed, clock, deleted_at FROM bookmarks WHERE url = ?`, url).Scan(&bookmark.URL, &bookmark.Name, &bookmark.ImageURL, &bookmark.Removed, &bookmark.Clock, &bookmark.DeletedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &bookmark, nil
+}
+
+func (db *sqlitePersistence) UpdateBookmark(oldURL string, bookmark browsers.Bookmark) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	insert, err := tx.Prepare("UPDATE bookmarks SET url = ?, name = ?, image_url = ?, removed = ?, clock = ?, deleted_at = ? WHERE url = ?")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, oldURL)
+	return err
 }
