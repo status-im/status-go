@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
 )
 
@@ -83,6 +84,11 @@ type CommunityCategory struct {
 	Position int    `json:"position"` // Position is used to sort the categories
 }
 
+type CommunityTag struct {
+	Name  string `json:"name"`
+	Emoji string `json:"emoji"`
+}
+
 func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 	if o.config.MemberIdentity == nil {
 		return nil, errors.New("member identity not set")
@@ -96,6 +102,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Description            string                          `json:"description"`
 		IntroMessage           string                          `json:"introMessage"`
 		OutroMessage           string                          `json:"outroMessage"`
+		Tags                   []CommunityTag                  `json:"tags"`
 		Images                 map[string]images.IdentityImage `json:"images"`
 		Color                  string                          `json:"color"`
 		MembersCount           int                             `json:"membersCount"`
@@ -108,6 +115,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Verified:   o.config.Verified,
 		Chats:      make(map[string]CommunityChat),
 		Categories: make(map[string]CommunityCategory),
+		Tags:       o.Tags(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -181,6 +189,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Description            string                               `json:"description"`
 		IntroMessage           string                               `json:"introMessage"`
 		OutroMessage           string                               `json:"outroMessage"`
+		Tags                   []CommunityTag                       `json:"tags"`
 		Chats                  map[string]CommunityChat             `json:"chats"`
 		Categories             map[string]CommunityCategory         `json:"categories"`
 		Images                 map[string]images.IdentityImage      `json:"images"`
@@ -208,6 +217,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		RequestedToJoinAt: o.RequestedToJoinAt(),
 		IsMember:          o.isMember(),
 		Muted:             o.config.Muted,
+		Tags:              o.Tags(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -294,6 +304,22 @@ func (o *Community) IntroMessage() string {
 		return o.config.CommunityDescription.IntroMessage
 	}
 	return ""
+}
+
+func (o *Community) Tags() []CommunityTag {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		var result []CommunityTag
+		for _, t := range o.config.CommunityDescription.Tags {
+			result = append(result, CommunityTag{
+				Name:  t,
+				Emoji: requests.TagsEmojies[t],
+			})
+		}
+		return result
+	}
+	return nil
 }
 
 func (o *Community) OutroMessage() string {
@@ -791,6 +817,9 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 	if !common.IsPubKeyEqual(o.config.ID, signer) {
 		return nil, ErrNotAuthorized
 	}
+
+	// This is done in case tags are updated and a client sends unknown tags
+	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
 
 	err := ValidateCommunityDescription(description)
 	if err != nil {

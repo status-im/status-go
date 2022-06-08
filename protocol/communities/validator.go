@@ -2,6 +2,7 @@ package communities
 
 import (
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.CommunityChat) error {
@@ -59,6 +60,11 @@ func ValidateCommunityDescription(desc *protobuf.CommunityDescription) error {
 	}
 	if desc.Permissions.Access == protobuf.CommunityPermissions_UNKNOWN_ACCESS {
 		return ErrInvalidCommunityDescriptionUnknownOrgAccess
+	}
+
+	valid := requests.ValidateTags(desc.Tags)
+	if !valid {
+		return ErrInvalidCommunityTags
 	}
 
 	for _, category := range desc.Categories {

@@ -16,6 +16,7 @@ var (
 	ErrCreateCommunityInvalidIntroMessage = errors.New("create-community: invalid intro message")
 	ErrCreateCommunityInvalidOutroMessage = errors.New("create-community: invalid outro message")
 	ErrCreateCommunityInvalidMembership   = errors.New("create-community: invalid membership")
+	ErrCreateCommunityInvalidTags         = errors.New("create-community: invalid tags")
 )
 
 const (
@@ -43,6 +44,7 @@ type CreateCommunity struct {
 	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
 	PinMessageAllMembersEnabled  bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
 	Encrypted                    bool                                 `json:"encrypted,omitempty"`
+	Tags                         []string                             `json:"tags,omitempty"`
 }
 
 func adaptIdentityImageToProtobuf(img *userimages.IdentityImage) *protobuf.IdentityImage {
@@ -76,6 +78,10 @@ func (c *CreateCommunity) Validate() error {
 
 	if c.Color == "" {
 		return ErrCreateCommunityInvalidColor
+	}
+
+	if !ValidateTags(c.Tags) {
+		return ErrCreateCommunityInvalidTags
 	}
 
 	return nil
@@ -125,6 +131,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		IntroMessage: c.IntroMessage,
 		OutroMessage: c.OutroMessage,
 		Encrypted:    c.Encrypted,
+		Tags:         c.Tags,
 	}
 	return description, nil
 }

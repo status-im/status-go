@@ -250,6 +250,7 @@ type CommunityDescription struct {
 	IntroMessage           string                        `protobuf:"bytes,11,opt,name=intro_message,json=introMessage,proto3" json:"intro_message,omitempty"`
 	OutroMessage           string                        `protobuf:"bytes,12,opt,name=outro_message,json=outroMessage,proto3" json:"outro_message,omitempty"`
 	Encrypted              bool                          `protobuf:"varint,13,opt,name=encrypted,proto3" json:"encrypted,omitempty"`
+	Tags                   []string                      `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
 	XXX_NoUnkeyedLiteral   struct{}                      `json:"-"`
 	XXX_unrecognized       []byte                        `json:"-"`
 	XXX_sizecache          int32                         `json:"-"`
@@ -362,6 +363,13 @@ func (m *CommunityDescription) GetEncrypted() bool {
 		return m.Encrypted
 	}
 	return false
+}
+
+func (m *CommunityDescription) GetTags() []string {
+	if m != nil {
+		return m.Tags
+	}
+	return nil
 }
 
 type CommunityAdminSettings struct {
