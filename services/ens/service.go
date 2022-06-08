@@ -11,7 +11,13 @@ import (
 
 // NewService initializes service instance.
 func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *Service {
-	return &Service{rpcClient, accountsManager, rpcFiltersSrvc, config}
+	return &Service{
+		rpcClient,
+		accountsManager,
+		rpcFiltersSrvc,
+		config,
+		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config),
+	}
 }
 
 // Service is a browsers service.
@@ -20,6 +26,7 @@ type Service struct {
 	accountsManager *account.GethManager
 	rpcFiltersSrvc  *rpcfilters.Service
 	config          *params.NodeConfig
+	api             *API
 }
 
 // Start a service.
@@ -32,13 +39,17 @@ func (s *Service) Stop() error {
 	return nil
 }
 
+func (s *Service) API() *API {
+	return s.api
+}
+
 // APIs returns list of available RPC APIs.
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{
 		{
 			Namespace: "ens",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.rpcClient, s.accountsManager, s.rpcFiltersSrvc, s.config),
+			Service:   s.api,
 		},
 	}
 }

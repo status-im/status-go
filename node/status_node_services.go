@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
+	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -75,6 +76,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = append(services, b.statusPublicService())
 	services = append(services, b.ensService())
 	services = append(services, b.stickersService(accDB))
+	services = append(services, b.updatesService())
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
@@ -395,6 +397,14 @@ func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Ser
 		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.downloader, b.httpServer)
 	}
 	return b.stickersSrvc
+}
+
+func (b *StatusNode) updatesService() *updates.Service {
+	if b.updatesSrvc == nil {
+		b.updatesSrvc = updates.NewService(b.ensService())
+	}
+
+	return b.updatesSrvc
 }
 
 func (b *StatusNode) gifService(accountsDB *accounts.Database) *gif.Service {

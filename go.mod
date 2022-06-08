@@ -23,6 +23,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
+	github.com/hashicorp/go-version v1.2.0
 	github.com/imdario/mergo v0.3.12
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ds-sql v0.3.0
