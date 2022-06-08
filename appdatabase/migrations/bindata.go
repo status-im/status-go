@@ -19,6 +19,7 @@
 // 1650616788_add_communities_archives_info_table.up.sql (208B)
 // 1652715604_add_clock_accounts.up.sql (62B)
 // 1653037334_add_notifications_settings_table.up.sql (1.276kB)
+// 1654702119_add_mutual_contact_settings.up.sql (78B)
 // doc.go (74B)
 
 package migrations
@@ -463,8 +464,28 @@ func _1653037334_add_notifications_settings_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1653037334_add_notifications_settings_table.up.sql", size: 1276, mode: os.FileMode(0644), modTime: time.Unix(1653980143, 0)}
+	info := bindataFileInfo{name: "1653037334_add_notifications_settings_table.up.sql", size: 1276, mode: os.FileMode(0644), modTime: time.Unix(1654616593, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4b, 0xc4, 0x65, 0xac, 0xa, 0xf2, 0xef, 0xb6, 0x39, 0x3c, 0xc5, 0xb1, 0xb2, 0x9c, 0x86, 0x58, 0xe0, 0x38, 0xcb, 0x57, 0x3c, 0x76, 0x73, 0x87, 0x79, 0x4e, 0xf6, 0xed, 0xb0, 0x8e, 0x9e, 0xa}}
+	return a, nil
+}
+
+var __1654702119_add_mutual_contact_settingsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0e\xc3\x20\x0c\x05\xd0\xbd\xa7\xf8\xf7\xe8\x64\x8a\x99\x5c\x90\x5a\x98\x11\x21\x28\x8a\x44\xc8\x80\xb9\x7f\x1e\x49\xe4\x1f\x22\x19\x61\xcc\xa6\x7a\x8e\x63\x82\xac\xc5\x27\x48\xfa\x7a\x5c\x4b\x57\xe9\xb9\xde\x43\x4b\xd5\xdc\x46\xd9\x7a\xdb\x61\x42\x10\x26\x0f\xcb\x8e\x92\x44\x38\x92\x3f\xbf\x5f\x4f\x00\x00\x00\xff\xff\xb0\x94\xdd\xaf\x4e\x00\x00\x00")
+
+func _1654702119_add_mutual_contact_settingsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1654702119_add_mutual_contact_settingsUpSql,
+		"1654702119_add_mutual_contact_settings.up.sql",
+	)
+}
+
+func _1654702119_add_mutual_contact_settingsUpSql() (*asset, error) {
+	bytes, err := _1654702119_add_mutual_contact_settingsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1654702119_add_mutual_contact_settings.up.sql", size: 78, mode: os.FileMode(0644), modTime: time.Unix(1654702142, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x26, 0x66, 0x67, 0x50, 0xfe, 0xd7, 0xe3, 0x29, 0x8b, 0xff, 0x9d, 0x5a, 0x87, 0xa7, 0x99, 0x6e, 0xd6, 0xcd, 0x2e, 0xbb, 0x17, 0xdf, 0x7f, 0xf7, 0xa3, 0xfa, 0x32, 0x7c, 0x2d, 0x92, 0xc8, 0x74}}
 	return a, nil
 }
 
@@ -617,6 +638,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1653037334_add_notifications_settings_table.up.sql": _1653037334_add_notifications_settings_tableUpSql,
 
+	"1654702119_add_mutual_contact_settings.up.sql": _1654702119_add_mutual_contact_settingsUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -680,6 +703,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1650616788_add_communities_archives_info_table.up.sql":        &bintree{_1650616788_add_communities_archives_info_tableUpSql, map[string]*bintree{}},
 	"1652715604_add_clock_accounts.up.sql":                         &bintree{_1652715604_add_clock_accountsUpSql, map[string]*bintree{}},
 	"1653037334_add_notifications_settings_table.up.sql":           &bintree{_1653037334_add_notifications_settings_tableUpSql, map[string]*bintree{}},
+	"1654702119_add_mutual_contact_settings.up.sql":                &bintree{_1654702119_add_mutual_contact_settingsUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 

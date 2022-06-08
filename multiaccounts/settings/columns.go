@@ -172,6 +172,11 @@ var (
 		reactFieldName: "mnemonic",
 		dBColumnName:   "mnemonic",
 	}
+	MutualContactEnabled = SettingField{
+		reactFieldName: "mutual-contact-enabled?",
+		dBColumnName:   "mutual_contact_enabled",
+		valueHandler:   BoolHandler,
+	}
 	Name = SettingField{
 		reactFieldName: "name",
 		dBColumnName:   "name",
@@ -420,6 +425,7 @@ var (
 		LogLevel,
 		MessagesFromContactsOnly,
 		Mnemonic,
+		MutualContactEnabled,
 		Name,
 		NetworksCurrentNetwork,
 		NetworksNetworks,
