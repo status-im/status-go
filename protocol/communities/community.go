@@ -301,6 +301,16 @@ func (o *Community) OutroMessage() string {
 	return ""
 }
 
+func (o *Community) Color() string {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil &&
+		o.config.CommunityDescription.Identity != nil {
+		return o.config.CommunityDescription.Identity.Color
+	}
+	return ""
+}
+
 func (o *Community) MembersCount() int {
 	if o != nil &&
 		o.config != nil &&
@@ -1069,24 +1079,59 @@ func (o *Community) ToBytes() ([]byte, error) {
 }
 
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
 	response := make(map[string]*protobuf.CommunityChat)
-	for k, v := range o.config.CommunityDescription.Chats {
-		response[k] = v
+
+	if o != nil {
+		o.mutex.Lock()
+		defer o.mutex.Unlock()
+	} else {
+		return response
 	}
+
+	if o != nil && o.config != nil && o.config.CommunityDescription != nil {
+		for k, v := range o.config.CommunityDescription.Chats {
+			response[k] = v
+		}
+	}
+
+	return response
+}
+
+func (o *Community) Images() map[string]*protobuf.IdentityImage {
+	response := make(map[string]*protobuf.IdentityImage)
+
+	if o != nil {
+		o.mutex.Lock()
+		defer o.mutex.Unlock()
+	} else {
+		return response
+	}
+
+	if o != nil && o.config != nil && o.config.CommunityDescription != nil && o.config.CommunityDescription.Identity != nil {
+		for k, v := range o.config.CommunityDescription.Identity.Images {
+			response[k] = v
+		}
+	}
+
 	return response
 }
 
 func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
 	response := make(map[string]*protobuf.CommunityCategory)
-	for k, v := range o.config.CommunityDescription.Categories {
-		response[k] = v
+
+	if o != nil {
+		o.mutex.Lock()
+		defer o.mutex.Unlock()
+	} else {
+		return response
 	}
+
+	if o != nil && o.config != nil && o.config.CommunityDescription != nil {
+		for k, v := range o.config.CommunityDescription.Categories {
+			response[k] = v
+		}
+	}
+
 	return response
 }
 

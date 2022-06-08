@@ -150,7 +150,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		chGrp := ChannelGroup{
 			Type:           Community,
 			Name:           community.Name(),
-			Color:          community.Description().Identity.Color,
+			Color:          community.Color(),
 			Images:         make(map[string]images.IdentityImage),
 			Chats:          make(map[string]*Chat),
 			Categories:     make(map[string]communities.CommunityCategory),
@@ -165,11 +165,11 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Muted:          community.Muted(),
 		}
 
-		for t, i := range community.Description().Identity.Images {
+		for t, i := range community.Images() {
 			chGrp.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
 		}
 
-		for _, cat := range community.Description().Categories {
+		for _, cat := range community.Categories() {
 			chGrp.Categories[cat.CategoryId] = communities.CommunityCategory{
 				ID:       cat.CategoryId,
 				Name:     cat.Name,
