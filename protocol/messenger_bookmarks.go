@@ -38,3 +38,7 @@ func (m *Messenger) UpdateBookmark(ctx context.Context, oldURL string, bookmark 
 	}
 	return m.SyncBookmark(ctx, &bookmark)
 }
+
+func (m *Messenger) GarbageCollectRemovedBookmarks() error {
+	return m.persistence.DeleteSoftRemovedBookmarks(uint64(time.Now().AddDate(0, 0, -30).Unix()))
+}

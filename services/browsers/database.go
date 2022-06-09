@@ -136,7 +136,7 @@ type Bookmark struct {
 	ImageURL  string `json:"imageUrl"`
 	Removed   bool   `json:"removed"`
 	Clock     uint64 `json:"-"` //used to sync
-	DeletedAt uint64 `json:"deletedAt"`
+	DeletedAt uint64 `json:"deletedAt,omitempty"`
 }
 
 func (db *Database) GetBookmarks() ([]*Bookmark, error) {
@@ -161,7 +161,7 @@ func (db *Database) GetBookmarks() ([]*Bookmark, error) {
 }
 
 func (db *Database) StoreBookmark(bookmark Bookmark) (Bookmark, error) {
-	insert, err := db.db.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url, removed, clock) VALUES (?, ?, ?, ?, ?)")
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url, removed, clock, deleted_at) VALUES (?, ?, ?, ?, ?, ?)")
 
 	if err != nil {
 		return bookmark, err
@@ -182,7 +182,7 @@ func (db *Database) StoreBookmark(bookmark Bookmark) (Bookmark, error) {
 		log.Error("error getting the bookmark icon", "iconError", iconError)
 	}
 
-	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock)
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt)
 	return bookmark, err
 }
 
@@ -202,7 +202,7 @@ func (db *Database) StoreBookmarkWithoutFetchIcon(bookmark *Bookmark, tx *sql.Tx
 		}()
 	}
 
-	insert, err := tx.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url, removed, clock) VALUES (?, ?, ?, ?, ?)")
+	insert, err := tx.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url, removed, clock, deleted_at) VALUES (?, ?, ?, ?, ?, ?)")
 
 	if err != nil {
 		return err
@@ -210,7 +210,7 @@ func (db *Database) StoreBookmarkWithoutFetchIcon(bookmark *Bookmark, tx *sql.Tx
 
 	defer insert.Close()
 
-	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock)
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt)
 	return err
 }
 
