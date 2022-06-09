@@ -18,6 +18,7 @@ type SuggestedFees struct {
 	MaxFeePerGasLow      *big.Float `json:"maxFeePerGasLow"`
 	MaxFeePerGasMedium   *big.Float `json:"maxFeePerGasMedium"`
 	MaxFeePerGasHigh     *big.Float `json:"maxFeePerGasHigh"`
+	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
 type FeeHistory struct {
@@ -43,13 +44,7 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	if err != nil {
 		return nil, err
 	}
-
 	gasPrice, err := backend.SuggestGasPrice(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	maxPriorityFeePerGas, err := backend.SuggestGasTipCap(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +53,20 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	if err != nil {
 		return nil, err
 	}
+
+	maxPriorityFeePerGas, err := backend.SuggestGasTipCap(ctx)
+	if err != nil {
+		return &SuggestedFees{
+			GasPrice:             weiToGwei(gasPrice),
+			BaseFee:              big.NewFloat(0),
+			MaxPriorityFeePerGas: big.NewFloat(0),
+			MaxFeePerGasLow:      big.NewFloat(0),
+			MaxFeePerGasMedium:   big.NewFloat(0),
+			MaxFeePerGasHigh:     big.NewFloat(0),
+			EIP1559Enabled:       false,
+		}, nil
+	}
+
 	config := params.MainnetChainConfig
 	baseFee := misc.CalcBaseFee(config, block.Header())
 
@@ -103,5 +112,6 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		MaxFeePerGasLow:      weiToGwei(perc10),
 		MaxFeePerGasMedium:   weiToGwei(maxFeePerGasMedium),
 		MaxFeePerGasHigh:     weiToGwei(maxFeePerGasHigh),
+		EIP1559Enabled:       true,
 	}, nil
 }

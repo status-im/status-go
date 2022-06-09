@@ -482,6 +482,21 @@ func Recover(rpcParams string) string {
 	return prepareJSONResponse(addr.String(), err)
 }
 
+// SendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
+func SendTransactionWithChainID(chainID int, txArgsJSON, password string) string {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(txArgsJSON), &params)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	hash, err := statusBackend.SendTransactionWithChainID(uint64(chainID), params, password)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return prepareJSONResponseWithCode(hash.String(), err, code)
+}
+
 // SendTransaction converts RPC args and calls backend.SendTransaction.
 func SendTransaction(txArgsJSON, password string) string {
 	var params transactions.SendTxArgs
