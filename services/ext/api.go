@@ -352,6 +352,11 @@ func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.
 	return api.service.messenger.JoinedCommunities()
 }
 
+// CommunityTags return the list of possible community tags
+func (api *PublicAPI) CommunityTags(parent context.Context) map[string]string {
+	return requests.TagsEmojies
+}
+
 // CuratedCommunities returns the list of curated communities stored in the smart contract. If a community is
 // already known by the node, its description will be returned and and will asynchronously retrieve the
 // description for the communities it does not know
