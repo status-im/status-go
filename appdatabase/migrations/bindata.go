@@ -24,6 +24,7 @@
 // 1655385721_drop_networks_config.up.sql (27B)
 // 1655385724_networks_chainColor_shortName.up.sql (220B)
 // 1655456688_add_deleted_at_field_to_bookmarks_table.up.sql (69B)
+// 1655462032_create_bookmarks_deleted_at_index.up.sql (81B)
 // doc.go (74B)
 
 package migrations
@@ -508,7 +509,7 @@ func _1655375270_add_clock_field_to_communities_settings_tableUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655375270_add_clock_field_to_communities_settings_table.up.sql", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1655379619, 0)}
+	info := bindataFileInfo{name: "1655375270_add_clock_field_to_communities_settings_table.up.sql", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1655462002, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x19, 0xc5, 0xc0, 0xf9, 0x84, 0x53, 0xdf, 0x83, 0xcf, 0xb6, 0x40, 0x6d, 0xf5, 0xdc, 0x77, 0x37, 0xb7, 0xe3, 0xa, 0x75, 0xe7, 0x6, 0x11, 0xca, 0x2b, 0x51, 0x92, 0xdd, 0x7d, 0xdb, 0xc3, 0xf5}}
 	return a, nil
 }
@@ -528,7 +529,7 @@ func _1655385721_drop_networks_configUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655385721_drop_networks_config.up.sql", size: 27, mode: os.FileMode(0664), modTime: time.Unix(1655456669, 0)}
+	info := bindataFileInfo{name: "1655385721_drop_networks_config.up.sql", size: 27, mode: os.FileMode(0664), modTime: time.Unix(1655462002, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfc, 0xa7, 0x20, 0xbb, 0x67, 0x21, 0xe, 0xc6, 0xc8, 0x21, 0x74, 0xe0, 0xce, 0xc8, 0xe2, 0x2, 0xb4, 0xea, 0xf0, 0xe5, 0xc4, 0x4d, 0xdd, 0xd4, 0x52, 0x31, 0xa9, 0x3d, 0xcd, 0xd8, 0x9b, 0xab}}
 	return a, nil
 }
@@ -548,7 +549,7 @@ func _1655385724_networks_chaincolor_shortnameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655385724_networks_chainColor_shortName.up.sql", size: 220, mode: os.FileMode(0664), modTime: time.Unix(1655456669, 0)}
+	info := bindataFileInfo{name: "1655385724_networks_chainColor_shortName.up.sql", size: 220, mode: os.FileMode(0664), modTime: time.Unix(1655462002, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd9, 0xe7, 0x84, 0xbb, 0x5f, 0xd2, 0x2c, 0x42, 0x88, 0x62, 0x52, 0xb6, 0x58, 0x31, 0xac, 0xc, 0x96, 0x2b, 0x1b, 0xe5, 0x4e, 0x9a, 0x3a, 0xf6, 0xf6, 0xfc, 0xa9, 0x1a, 0x35, 0x62, 0x28, 0x88}}
 	return a, nil
 }
@@ -568,8 +569,28 @@ func _1655456688_add_deleted_at_field_to_bookmarks_tableUpSql() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655456688_add_deleted_at_field_to_bookmarks_table.up.sql", size: 69, mode: os.FileMode(0664), modTime: time.Unix(1655456719, 0)}
+	info := bindataFileInfo{name: "1655456688_add_deleted_at_field_to_bookmarks_table.up.sql", size: 69, mode: os.FileMode(0664), modTime: time.Unix(1655462002, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe7, 0x9a, 0xbd, 0x9a, 0xc9, 0xf, 0xdf, 0x90, 0x0, 0x5d, 0xea, 0x6e, 0x7d, 0x51, 0x95, 0xcd, 0x90, 0xd3, 0x1a, 0x36, 0x6c, 0xf4, 0xbd, 0xa7, 0x6b, 0xbf, 0xe5, 0xdb, 0xa3, 0x88, 0xe3, 0x50}}
+	return a, nil
+}
+
+var __1655462032_create_bookmarks_deleted_at_indexUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\x48\x49\xcd\x49\x2d\x49\x4d\x89\x4f\x2c\x89\x4f\xca\xcf\xcf\xce\x4d\x2c\xca\x2e\x56\xf0\xf7\x53\x40\x70\x34\x10\x4a\x34\x15\xc2\x3d\x5c\x83\x5c\x51\x84\xac\xb9\xb8\x00\x01\x00\x00\xff\xff\xb9\x08\x04\xda\x51\x00\x00\x00")
+
+func _1655462032_create_bookmarks_deleted_at_indexUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1655462032_create_bookmarks_deleted_at_indexUpSql,
+		"1655462032_create_bookmarks_deleted_at_index.up.sql",
+	)
+}
+
+func _1655462032_create_bookmarks_deleted_at_indexUpSql() (*asset, error) {
+	bytes, err := _1655462032_create_bookmarks_deleted_at_indexUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1655462032_create_bookmarks_deleted_at_index.up.sql", size: 81, mode: os.FileMode(0664), modTime: time.Unix(1655462091, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf, 0x8e, 0x20, 0x6b, 0x14, 0x9e, 0xcd, 0x97, 0xd3, 0xfe, 0x62, 0x3, 0x26, 0x59, 0x1, 0x6c, 0x99, 0xef, 0x6d, 0x21, 0xd4, 0xb5, 0xa3, 0xf4, 0x39, 0x40, 0x54, 0x6, 0xd, 0x60, 0x13, 0x38}}
 	return a, nil
 }
 
@@ -732,6 +753,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1655456688_add_deleted_at_field_to_bookmarks_table.up.sql": _1655456688_add_deleted_at_field_to_bookmarks_tableUpSql,
 
+	"1655462032_create_bookmarks_deleted_at_index.up.sql": _1655462032_create_bookmarks_deleted_at_indexUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -800,6 +823,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1655385721_drop_networks_config.up.sql":                          &bintree{_1655385721_drop_networks_configUpSql, map[string]*bintree{}},
 	"1655385724_networks_chainColor_shortName.up.sql":                 &bintree{_1655385724_networks_chaincolor_shortnameUpSql, map[string]*bintree{}},
 	"1655456688_add_deleted_at_field_to_bookmarks_table.up.sql":       &bintree{_1655456688_add_deleted_at_field_to_bookmarks_tableUpSql, map[string]*bintree{}},
+	"1655462032_create_bookmarks_deleted_at_index.up.sql":             &bintree{_1655462032_create_bookmarks_deleted_at_indexUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 

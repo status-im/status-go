@@ -1081,3 +1081,19 @@ func (db *sqlitePersistence) UpdateBookmark(oldURL string, bookmark browsers.Boo
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, oldURL)
 	return err
 }
+
+func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+	_, err = tx.Exec(`DELETE from bookmarks WHERE removed = 1 AND deleted_at < ?`, threshold)
+	return err
+}

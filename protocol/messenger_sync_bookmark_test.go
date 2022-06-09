@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"testing"
+	"time"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -153,4 +154,54 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 
 	s.Require().NoError(theirMessenger.Shutdown())
 
+}
+
+func (s *MessengerSyncBookmarkSuite) TestGarbageCollectRemovedBookmarks() {
+
+	now := time.Now()
+
+	// Create bookmarks that are flagged as deleted for more than 30 days
+	bookmark1 := browsers.Bookmark{
+		Name:      "status official site",
+		URL:       "https://status.im",
+		Removed:   true,
+		DeletedAt: uint64(now.AddDate(0, 0, -31).Unix()),
+	}
+
+	bookmark2 := browsers.Bookmark{
+		Name:      "Uniswap",
+		URL:       "https://uniswap.org",
+		Removed:   true,
+		DeletedAt: uint64(now.AddDate(0, 0, -31).Unix()),
+	}
+
+	// This one is flagged for deletion less than 30 days
+	bookmark3 := browsers.Bookmark{
+		Name:      "Maker DAO",
+		URL:       "https://makerdao.com",
+		Removed:   true,
+		DeletedAt: uint64(now.AddDate(0, 0, -29).Unix()),
+	}
+
+	// Store bookmarks
+	_, err := s.m.browserDatabase.StoreBookmark(bookmark1)
+	s.Require().NoError(err)
+
+	_, err = s.m.browserDatabase.StoreBookmark(bookmark2)
+	s.Require().NoError(err)
+
+	_, err = s.m.browserDatabase.StoreBookmark(bookmark3)
+	s.Require().NoError(err)
+
+	bookmarks, err := s.m.browserDatabase.GetBookmarks()
+	s.Require().NoError(err)
+	s.Require().Len(bookmarks, 3)
+
+	// err = s.m.GarbageCollectRemovedBookmarks(&now)
+	err = s.m.GarbageCollectRemovedBookmarks()
+	s.Require().NoError(err)
+
+	bookmarks, err = s.m.browserDatabase.GetBookmarks()
+	s.Require().NoError(err)
+	s.Require().Len(bookmarks, 1)
 }

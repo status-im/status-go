@@ -683,6 +683,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
+	err = m.GarbageCollectRemovedBookmarks()
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 
