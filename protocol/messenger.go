@@ -4218,6 +4218,10 @@ func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 	return m.persistence.MessagesExist(ids)
 }
 
+func (m *Messenger) latestIncomingMessageClock(chatID string) (uint64, error) {
+	return m.persistence.latestIncomingMessageClock(chatID)
+}
+
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
@@ -4395,11 +4399,15 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 		return err
 	}
 
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return errors.New("chat not found")
+	clock, _ := m.latestIncomingMessageClock(chatID)
+
+	if clock == 0 {
+		chat, ok := m.allChats.Load(chatID)
+		if !ok {
+			return errors.New("chat not found")
+		}
+		clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	return m.markAllRead(chatID, clock, true)
 }
