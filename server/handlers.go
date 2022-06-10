@@ -1,7 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -18,6 +20,11 @@ const (
 	imagesPath     = basePath + "/images"
 	audioPath      = basePath + "/audio"
 	ipfsPath       = "/ipfs"
+
+	// Handler routes for pairing
+	pairingBase    = "/pairing"
+	pairingSend    = pairingBase + "/send"
+	pairingReceive = pairingBase + "/receive"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -131,5 +138,28 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.Res
 		if err != nil {
 			logger.Error("failed to write ipfs resource", zap.Error(err))
 		}
+	}
+}
+
+func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		content, err := ioutil.ReadAll(r.Body)
+		ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
+		ps.payload.Receive(content)
+	}
+}
+
+func handlePairingSend(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+
+		b := make([]byte, 32)
+		_, err := rand.Read(b)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+		}
+
+		ps.payload.Mount(b)
+		w.Write(b)
 	}
 }

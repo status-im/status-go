@@ -1,10 +1,9 @@
 package server
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
+	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -12,6 +11,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetOutboundIPSuite(t *testing.T) {
+	suite.Run(t, new(GetOutboundIPSuite))
+}
+
+type GetOutboundIPSuite struct {
+	suite.Suite
+	TestPairingServerComponents
+}
+
+func (s *GetOutboundIPSuite) SetupSuite() {
+	s.SetupPairingServerComponents(s.T())
+}
 
 func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,35 +49,17 @@ func makeThingToSay() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
-	// Get 3 key components for tls.cert generation
-	// 1) Ephemeral private key
-	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
+func (goip *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e(t *testing.T) {
+	goip.PS.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
 
-	// 2) Device outbound IP address
-	ip, err := GetOutboundIP()
-	require.NoError(t, err)
-
-	// 3) NotBefore time
-	certTime := time.Now()
-
-	// Generate tls.Certificate and Server
-	cert, _, err := GenerateCertFromKey(pk, certTime, ip.String())
-	require.NoError(t, err)
-
-	s := NewPairingServer(&Config{pk, &cert, ip.String(), Sending})
-
-	s.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
-
-	err = s.Start()
+	err := goip.PS.Start()
 	require.NoError(t, err)
 
 	// Give time for the sever to be ready, hacky I know, I'll iron this out
 	time.Sleep(100 * time.Millisecond)
 
 	// Server generates a QR code connection string
-	cp, err := s.MakeConnectionParams()
+	cp, err := goip.PS.MakeConnectionParams()
 	require.NoError(t, err)
 
 	qr, err := cp.ToString()
@@ -76,7 +70,7 @@ func TestGetOutboundIPWithFullServerE2e(t *testing.T) {
 	err = ccp.FromString(qr)
 	require.NoError(t, err)
 
-	c, err := NewClient(ccp)
+	c, err := NewPairingClient(ccp)
 	require.NoError(t, err)
 
 	thing, err := makeThingToSay()

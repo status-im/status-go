@@ -10,8 +10,10 @@ import (
 type PairingServer struct {
 	Server
 
-	pk   *ecdsa.PrivateKey
-	mode Mode
+	pk      *ecdsa.PrivateKey
+	aesKey  []byte
+	mode    Mode
+	payload *PayloadManager
 }
 
 type Config struct {
@@ -22,13 +24,20 @@ type Config struct {
 }
 
 // NewPairingServer returns a *NewPairingServer init from the given *Config
-func NewPairingServer(config *Config) *PairingServer {
+func NewPairingServer(config *Config) (*PairingServer, error) {
+	ek, err := makeEncryptionKey(config.PK)
+	if err != nil {
+		return nil, err
+	}
+
 	return &PairingServer{Server: NewServer(
 		config.Cert,
 		config.Hostname,
 	),
-		pk:   config.PK,
-		mode: config.Mode}
+		pk:      config.PK,
+		aesKey:  ek,
+		mode:    config.Mode,
+		payload: new(PayloadManager)}, nil
 }
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
@@ -57,4 +66,29 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 	}
 
 	return NewConnectionParams(netIP, s.port, s.pk, s.cert.Leaf.NotBefore, s.mode), nil
+}
+
+func (s *PairingServer) MountPayload(data []byte) {
+	s.payload.Mount(data)
+}
+
+func (s *PairingServer) StartPairing() error {
+	switch s.mode {
+	case Receiving:
+		return s.startReceivingAccountData()
+	case Sending:
+		return s.startSendingAccountData()
+	default:
+		return fmt.Errorf("invalid server mode '%d'", s.mode)
+	}
+}
+
+func (s *PairingServer) startReceivingAccountData() error {
+	s.SetHandlers(HandlerPatternMap{pairingReceive: handlePairingReceive(s)})
+	return s.Start()
+}
+
+func (s *PairingServer) startSendingAccountData() error {
+	s.SetHandlers(HandlerPatternMap{pairingSend: handlePairingSend(s)})
+	return s.Start()
 }
