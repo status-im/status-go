@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"io/ioutil"
 	"net/http"
@@ -143,23 +142,24 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.Res
 
 func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		content, err := ioutil.ReadAll(r.Body)
-		ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
-		ps.payload.Receive(content)
+		payload, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
+		}
+
+		err = ps.payload.Receive(payload)
+		if err != nil {
+			ps.logger.Error("ps.payload.Receive(payload)", zap.Error(err))
+		}
 	}
 }
 
 func handlePairingSend(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
-
-		b := make([]byte, 32)
-		_, err := rand.Read(b)
+		_, err := w.Write(ps.payload.ToSend())
 		if err != nil {
-			w.Write([]byte(err.Error()))
+			ps.logger.Error("w.Write(ps.payload.ToSend())", zap.Error(err))
 		}
-
-		ps.payload.Mount(b)
-		w.Write(b)
 	}
 }

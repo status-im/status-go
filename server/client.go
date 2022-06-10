@@ -17,7 +17,6 @@ type PairingClient struct {
 	baseAddress *url.URL
 	certPEM     []byte
 	privateKey  *ecdsa.PrivateKey
-	aesKey      []byte
 	serverMode  Mode
 	payload     *PayloadManager
 }
@@ -45,7 +44,7 @@ func NewPairingClient(c *ConnectionParams) (*PairingClient, error) {
 		},
 	}
 
-	ek, err := makeEncryptionKey(c.privateKey)
+	pm, err := NewPayloadManager(c.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +54,13 @@ func NewPairingClient(c *ConnectionParams) (*PairingClient, error) {
 		baseAddress: u,
 		certPEM:     certPem,
 		privateKey:  c.privateKey,
-		aesKey:      ek,
 		serverMode:  c.serverMode,
-		payload:     new(PayloadManager),
+		payload:     pm,
 	}, nil
 }
 
-func (s *PairingClient) MountPayload(data []byte) {
-	s.payload.Mount(data)
+func (c *PairingClient) MountPayload(data []byte) error {
+	return c.payload.Mount(data)
 }
 
 func (c *PairingClient) PairAccount() error {
@@ -93,8 +91,10 @@ func (c *PairingClient) receiveAccountData() error {
 		return err
 	}
 
-	content, _ := ioutil.ReadAll(resp.Body)
-	c.payload.Receive(content)
+	payload, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return c.payload.Receive(payload)
 }

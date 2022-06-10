@@ -3,13 +3,13 @@ package server
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestGetOutboundIPSuite(t *testing.T) {
@@ -49,17 +49,17 @@ func makeThingToSay() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (goip *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e(t *testing.T) {
-	goip.PS.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
+func (s *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e(t *testing.T) {
+	s.PS.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
 
-	err := goip.PS.Start()
+	err := s.PS.Start()
 	require.NoError(t, err)
 
 	// Give time for the sever to be ready, hacky I know, I'll iron this out
 	time.Sleep(100 * time.Millisecond)
 
 	// Server generates a QR code connection string
-	cp, err := goip.PS.MakeConnectionParams()
+	cp, err := s.PS.MakeConnectionParams()
 	require.NoError(t, err)
 
 	qr, err := cp.ToString()

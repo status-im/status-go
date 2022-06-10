@@ -36,7 +36,8 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		s.Require().NoError(err)
 
 		if m == Sending {
-			s.PS.MountPayload(data)
+			err := s.PS.MountPayload(data)
+			s.Require().NoError(err)
 		}
 
 		err = s.PS.StartPairing()
@@ -60,16 +61,27 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		s.Require().NoError(err)
 
 		if m == Receiving {
-			c.MountPayload(data)
+			err := c.MountPayload(data)
+			s.Require().NoError(err)
 		}
 
 		err = c.PairAccount()
 		s.Require().NoError(err)
 
-		s.Require().Equal(s.PS.payload.ToSend(), c.payload.Received())
-		s.Require().Equal(s.PS.payload.Received(), c.payload.ToSend())
+		switch m {
+		case Receiving:
+			s.Require().Equal(data, s.PS.payload.Received())
+			s.Require().Equal(s.PS.payload.received.encrypted, c.payload.toSend.encrypted)
+			s.Require().Nil(s.PS.payload.ToSend())
+			s.Require().Nil(c.payload.Received())
+		case Sending:
+			s.Require().Equal(c.payload.Received(), data)
+			s.Require().Equal(c.payload.received.encrypted, s.PS.payload.toSend.encrypted)
+			s.Require().Nil(c.payload.ToSend())
+			s.Require().Nil(s.PS.payload.Received())
+		}
 
 		// Reset the server's PayloadManager
-		s.PS.payload = new(PayloadManager)
+		s.PS.payload.ResetPayload()
 	}
 }
