@@ -11,7 +11,6 @@ type PairingServer struct {
 	Server
 
 	pk      *ecdsa.PrivateKey
-	aesKey  []byte
 	mode    Mode
 	payload *PayloadManager
 }
@@ -25,7 +24,7 @@ type Config struct {
 
 // NewPairingServer returns a *NewPairingServer init from the given *Config
 func NewPairingServer(config *Config) (*PairingServer, error) {
-	ek, err := makeEncryptionKey(config.PK)
+	pm, err := NewPayloadManager(config.PK)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +34,8 @@ func NewPairingServer(config *Config) (*PairingServer, error) {
 		config.Hostname,
 	),
 		pk:      config.PK,
-		aesKey:  ek,
 		mode:    config.Mode,
-		payload: new(PayloadManager)}, nil
+		payload: pm}, nil
 }
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
@@ -68,8 +66,8 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 	return NewConnectionParams(netIP, s.port, s.pk, s.cert.Leaf.NotBefore, s.mode), nil
 }
 
-func (s *PairingServer) MountPayload(data []byte) {
-	s.payload.Mount(data)
+func (s *PairingServer) MountPayload(data []byte) error {
+	return s.payload.Mount(data)
 }
 
 func (s *PairingServer) StartPairing() error {
