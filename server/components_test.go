@@ -3,8 +3,11 @@ package server
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
 	"encoding/asn1"
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
@@ -69,4 +72,38 @@ func (tcc *TestCertComponents) SetupCertComponents(t *testing.T) {
 	require.NoError(t, err)
 
 	tcc.NotAfter = tcc.NotBefore.Add(time.Hour)
+}
+
+type TestPairingServerComponents struct {
+	EphemeralPK *ecdsa.PrivateKey
+	OutboundIP  net.IP
+	CertTime    time.Time
+	Cert        tls.Certificate
+	PS          *PairingServer
+}
+
+func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing.T) {
+	var err error
+
+	// Get 3 key components for tls.cert generation
+	// 1) Ephemeral private key
+	tpsc.EphemeralPK, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	// 2) Device outbound IP address
+	tpsc.OutboundIP, err = GetOutboundIP()
+	require.NoError(t, err)
+
+	// 3) NotBefore time
+	tpsc.CertTime = time.Now()
+
+	// Generate tls.Certificate and Server
+	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, tpsc.CertTime, tpsc.OutboundIP.String())
+	require.NoError(t, err)
+
+	tpsc.PS, err = NewPairingServer(&Config{
+		PK:       tpsc.EphemeralPK,
+		Cert:     &tpsc.Cert,
+		Hostname: tpsc.OutboundIP.String()})
+	require.NoError(t, err)
 }
