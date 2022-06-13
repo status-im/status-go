@@ -231,14 +231,68 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 	}
 }
 
+func (m *Messenger) PendingNotificationContactRequest(contactID string) (*ActivityCenterNotification, error) {
+	return m.persistence.ActiveContactRequestNotification(contactID)
+}
+
 func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message) error {
 
-	// Legacy contact request
-	if contactRequest == nil {
+	if contactRequest == nil || contactRequest.ContactRequestState == common.ContactRequestStatePending {
+		notification, err := m.PendingNotificationContactRequest(contact.ID)
+		if err != nil {
+			return err
+		}
 
+		// If there's already a notification, we will check whether is a default notification
+		// that has not been dismissed (nor accepted???)
+		// If it is, we replace it with a non-default, since it contains a message
+		if notification != nil {
+			// Check if it's the default notification
+			if notification.Message.ID == defaultContactRequestID(contact.ID) {
+				// Nothing to do, we already have a default notification
+				if contactRequest == nil {
+					return nil
+				}
+				// We first dismiss it in the database
+				err := m.persistence.DismissActivityCenterNotifications([]types.HexBytes{types.Hex2Bytes(notification.Message.ID)})
+				if err != nil {
+					return err
+				}
+				//  we mark the notification as dismissed
+				notification.Dismissed = true
+				// We remove it from the response, since the client has never seen it, better to just remove it
+				found := messageState.Response.RemoveActivityCenterNotification(notification.Message.ID)
+				// Otherwise, it means we have already passed it to the client, so we add it with a `dismissed` flag
+				// so it can clean up
+				if !found {
+					messageState.Response.AddActivityCenterNotification(notification)
+				}
+			}
+		}
+	}
+
+	// Legacy//ContactUpdate contact request
+	if contactRequest == nil {
 		if messageState.CurrentMessageState == nil || messageState.CurrentMessageState.MessageID == "" {
 			return errors.New("no available id")
 		}
+		// We use a known id so that we can check if already in the database
+		defaultID := defaultContactRequestID(contact.ID)
+
+		// Pull one from the db if there
+		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(defaultID))
+		if err != nil {
+			return err
+		}
+
+		// if the notification is accepted, we clear it, as this one will replace it
+		if notification != nil && notification.Accepted {
+			err = m.persistence.DeleteActivityCenterNotification(types.FromHex(defaultID))
+			if err != nil {
+				return err
+			}
+		}
+
 		contactRequest = &common.Message{}
 
 		contactRequest.WhisperTimestamp = messageState.CurrentMessageState.WhisperTimestamp
@@ -247,9 +301,9 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		contactRequest.From = contact.ID
 		contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 		contactRequest.Clock = messageState.CurrentMessageState.Message.Clock
-		contactRequest.ID = messageState.CurrentMessageState.MessageID
+		contactRequest.ID = defaultID
 		contactRequest.ContactRequestState = common.ContactRequestStatePending
-		err := contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+		err = contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			return err
 		}
@@ -260,7 +314,6 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		if err != nil {
 			return err
 		}
-
 	}
 
 	notification := &ActivityCenterNotification{
@@ -669,7 +722,6 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 	state.Response.AddMessage(request)
 	return nil
-
 }
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
@@ -687,7 +739,14 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 	// We remove from our old contacts only if mutual contacts are enabled
 	if mutualContactEnabled {
 		contact.Added = false
+
 	}
+	// We remove anything that's related to this contact request
+	err = m.persistence.RemoveAllContactRequestActivityCenterNotifications(contact.ID)
+	if err != nil {
+		return err
+	}
+
 	contact.HasAddedUs = false
 	contact.ContactRequestClock = message.Clock
 	contact.ContactRequestRetracted()
@@ -738,7 +797,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
-		/* Disabling for now in order to avoid duplicated contact requests in activity center
+		// Has the user added us?
 		if contact.ContactRequestState == ContactRequestStateNone {
 			contact.ContactRequestState = ContactRequestStateReceived
 			err = m.createContactRequestNotification(contact, state, nil)
@@ -746,7 +805,11 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 				m.logger.Warn("could not create contact request notification", zap.Error(err))
 			}
 
-		}*/
+			// Has the user replied to a default contact request
+		} else if contact.ContactRequestState == ContactRequestStateSent {
+			contact.ContactRequestState = ContactRequestStateMutual
+
+		}
 	}
 
 	if chat.LastClockValue < message.Clock {
