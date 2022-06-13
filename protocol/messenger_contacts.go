@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -22,6 +23,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 
 	contactRequest, err := m.persistence.MessageByID(request.ID.String())
 	if err != nil {
+		m.logger.Error("could not find contact request message", zap.Error(err))
 		return nil, err
 	}
 
@@ -847,4 +849,8 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
 	return m.persistence.PendingContactRequests(cursor, limit)
+}
+
+func defaultContactRequestID(contactID string) string {
+	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
 }

@@ -416,26 +416,30 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 
 func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes) (*ActivityCenterNotification, error) {
 	row := db.db.QueryRow(`
-  SELECT
-  a.id,
-  a.timestamp,
-  a.notification_type,
-  a.chat_id,
-  a.read,
-  a.accepted,
-  a.dismissed,
-  a.message,
-  c.last_message,
-  a.reply_message,
-  c.name,
-  a.author
-  FROM activity_center_notifications a
-  LEFT JOIN chats c
-  ON
-  c.id = a.chat_id
-  WHERE a.id = ?`, id)
+    SELECT
+    a.id,
+    a.timestamp,
+    a.notification_type,
+    a.chat_id,
+    a.read,
+    a.accepted,
+    a.dismissed,
+    a.message,
+    c.last_message,
+    a.reply_message,
+    c.name,
+    a.author
+    FROM activity_center_notifications a
+    LEFT JOIN chats c
+    ON
+    c.id = a.chat_id
+    WHERE a.id = ?`, id)
 
-	return db.unmarshalActivityCenterNotificationRow(row)
+	notification, err := db.unmarshalActivityCenterNotificationRow(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return notification, err
 }
 
 func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
@@ -672,4 +676,41 @@ func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, er
 	var count uint64
 	err := db.db.QueryRow(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read AND NOT dismissed AND NOT accepted`).Scan(&count)
 	return count, err
+}
+
+func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (*ActivityCenterNotification, error) {
+	row := db.db.QueryRow(`
+    SELECT
+    a.id,
+    a.timestamp,
+    a.notification_type,
+    a.chat_id,
+    a.read,
+    a.accepted,
+    a.dismissed,
+    a.message,
+    c.last_message,
+    a.reply_message,
+    c.name,
+    a.author
+    FROM activity_center_notifications a
+    LEFT JOIN chats c
+    ON
+    c.id = a.chat_id
+    WHERE NOT dismissed AND NOT a.accepted AND notification_type = ? AND author = ?`, ActivityCenterNotificationTypeContactRequest, contactID)
+	notification, err := db.unmarshalActivityCenterNotificationRow(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return notification, err
+}
+
+func (db sqlitePersistence) RemoveAllContactRequestActivityCenterNotifications(chatID string) error {
+	_, err := db.db.Exec(`
+        DELETE FROM activity_center_notifications
+	WHERE
+	chat_id = ?
+	AND notification_type = ?
+	`, chatID, ActivityCenterNotificationTypeContactRequest)
+	return err
 }

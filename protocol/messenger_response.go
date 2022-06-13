@@ -360,6 +360,19 @@ func (r *MessengerResponse) AddActivityCenterNotification(n *ActivityCenterNotif
 	r.activityCenterNotifications[n.ID.String()] = n
 }
 
+func (r *MessengerResponse) RemoveActivityCenterNotification(id string) bool {
+	if r.activityCenterNotifications == nil {
+		return false
+	}
+
+	if _, ok := r.activityCenterNotifications[id]; ok {
+		delete(r.activityCenterNotifications, id)
+		return true
+	}
+
+	return false
+}
+
 func (r *MessengerResponse) ActivityCenterNotifications() []*ActivityCenterNotification {
 	var ns []*ActivityCenterNotification
 	for _, n := range r.activityCenterNotifications {
