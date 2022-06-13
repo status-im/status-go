@@ -4256,8 +4256,21 @@ func (m *Messenger) DeleteMessage(id string) error {
 	return m.persistence.DeleteMessage(id)
 }
 
-func (m *Messenger) DeleteMessagesByChatID(id string) error {
-	return m.persistence.DeleteMessagesByChatID(id)
+func (m *Messenger) DeleteMessagesByChatID(ctx context.Context, id string) error {
+	err := m.persistence.DeleteMessagesByChatID(id)
+	if err != nil {
+		return err
+	}
+
+	chat := m.Chat(id)
+	if chat != nil {
+		err := m.syncClearHistory(ctx, chat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
@@ -5642,7 +5655,7 @@ func (m *Messenger) handleSyncClearHistory(state *ReceivedMessageState, message 
 		return ErrChatNotFound
 	}
 
-	if existingChat.DeletedAtClockValue >= message.ClearedAt {
+	if existingChat.DeletedAtClockValue >= message.ClearedAt && (existingChat.DeletedAtClockValue != 0 && message.ClearedAt != 0) {
 		return nil
 	}
 

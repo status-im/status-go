@@ -586,8 +586,8 @@ func (api *PublicAPI) DeleteMessage(id string) error {
 	return api.service.messenger.DeleteMessage(id)
 }
 
-func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
-	return api.service.messenger.DeleteMessagesByChatID(id)
+func (api *PublicAPI) DeleteMessagesByChatID(ctx context.Context, id string) error {
+	return api.service.messenger.DeleteMessagesByChatID(ctx, id)
 }
 
 func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessagSeenResponse, error) {
