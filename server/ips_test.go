@@ -49,39 +49,40 @@ func makeThingToSay() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (s *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e(t *testing.T) {
-	s.PS.SetHandlers(HandlerPatternMap{"/hello": testHandler(t)})
+func (s *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e() {
+	s.PS.mode = Sending
+	s.PS.SetHandlers(HandlerPatternMap{"/hello": testHandler(s.T())})
 
 	err := s.PS.Start()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Give time for the sever to be ready, hacky I know, I'll iron this out
 	time.Sleep(100 * time.Millisecond)
 
 	// Server generates a QR code connection string
 	cp, err := s.PS.MakeConnectionParams()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	qr, err := cp.ToString()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Client reads QR code and parses the connection string
 	ccp := new(ConnectionParams)
 	err = ccp.FromString(qr)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	c, err := NewPairingClient(ccp)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	thing, err := makeThingToSay()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	response, err := c.Get(c.baseAddress.String() + "/hello?say=" + thing)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	defer response.Body.Close()
 
 	content, err := ioutil.ReadAll(response.Body)
-	require.NoError(t, err)
-	require.Equal(t, "Hello I like to be a tls server. You said: `"+thing+"`", string(content[:109]))
+	s.Require().NoError(err)
+	s.Require().Equal("Hello I like to be a tls server. You said: `"+thing+"`", string(content[:109]))
 }
