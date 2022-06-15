@@ -2,7 +2,6 @@ package stickers
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/zenthangplus/goccm"
@@ -44,7 +43,7 @@ type API struct {
 
 	keyStoreDir string
 	downloader  *ipfs.Downloader
-	httpServer  *server.Server
+	httpServer  *server.MediaServer
 
 	ctx context.Context
 }
@@ -85,7 +84,7 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.Server) *API {
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
@@ -327,7 +326,7 @@ func (api *API) downloadPackData(stickerPack *StickerPack, contentHash []byte, t
 }
 
 func (api *API) hashToURL(hash string) string {
-	return fmt.Sprintf("https://localhost:%d/ipfs?hash=%s", api.httpServer.Port, hash)
+	return api.httpServer.MakeStickerURL(hash)
 }
 
 func (api *API) populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, translateHashes bool) error {

@@ -15,22 +15,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/services/browsers"
-
+	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/event"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
@@ -56,9 +52,9 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
-
 	"github.com/status-im/status-go/telemetry"
 )
 
@@ -128,7 +124,7 @@ type Messenger struct {
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
 	browserDatabase            *browsers.Database
-	httpServer                 *server.Server
+	httpServer                 *server.MediaServer
 	quit                       chan struct{}
 
 	requestedCommunitiesLock sync.RWMutex
@@ -4220,7 +4216,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	}
 	if m.httpServer != nil {
 		for idx := range msgs {
-			msgs[idx].PrepareServerURLs(m.httpServer.Port)
+			msgs[idx].PrepareServerURLs(m.httpServer)
 		}
 	}
 
@@ -4230,7 +4226,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 	if m.httpServer != nil {
 		for idx := range messages {
-			messages[idx].PrepareServerURLs(m.httpServer.Port)
+			messages[idx].PrepareServerURLs(m.httpServer)
 		}
 	}
 }

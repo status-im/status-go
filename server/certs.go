@@ -2,35 +2,53 @@ package server
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"time"
 )
 
-func GenerateX509Cert(from, to time.Time) (*x509.Certificate, error) {
+var globalCertificate *tls.Certificate = nil
+var globalPem string
+
+func makeRandomSerialNumber() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	return rand.Int(rand.Reader, serialNumberLimit)
+}
 
-	if err != nil {
-		return nil, err
-	}
+func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
+	h := sha256.New()
+	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
 
-	template := &x509.Certificate{
-		SerialNumber:          serialNumber,
+	return new(big.Int).SetBytes(h.Sum(nil))
+}
+
+func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
+	c := &x509.Certificate{
+		SerialNumber:          sn,
 		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             from,
 		NotAfter:              to,
-		DNSNames:              []string{"localhost"},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
 
-	return template, nil
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		c.IPAddresses = []net.IP{ip}
+	} else {
+		c.DNSNames = []string{hostname}
+	}
+
+	return c
 }
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
@@ -47,4 +65,78 @@ func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, k
 	keyPem = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 
 	return
+}
+
+func generateTLSCert() error {
+	if globalCertificate != nil {
+		return nil
+	}
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	notBefore := time.Now()
+	notAfter := notBefore.Add(365 * 24 * time.Hour)
+
+	sn, err := makeRandomSerialNumber()
+	if err != nil {
+		return err
+	}
+
+	cert := GenerateX509Cert(sn, notBefore, notAfter, localhost)
+	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
+	if err != nil {
+		return err
+	}
+
+	finalCert, err := tls.X509KeyPair(certPem, keyPem)
+	if err != nil {
+		return err
+	}
+
+	globalCertificate = &finalCert
+	globalPem = string(certPem)
+	return nil
+}
+
+func PublicTLSCert() (string, error) {
+	err := generateTLSCert()
+	if err != nil {
+		return "", err
+	}
+
+	return globalPem, nil
+}
+
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, ttl time.Duration, hostname string) (tls.Certificate, []byte, error) {
+	// TODO fix, this isn't deterministic,
+
+	notBefore := time.Now()
+	notAfter := notBefore.Add(ttl)
+
+	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), notBefore, notAfter, hostname)
+	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+
+	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
+	if err != nil {
+		return tls.Certificate{}, nil, err
+	}
+
+	return tlsCert, certPem, nil
+}
+
+// ToECDSA takes a []byte of D and uses it to create an ecdsa.PublicKey on the elliptic.P256 curve
+// this function is basically a P256 curve version of eth-node/crypto.ToECDSA without all the nice validation
+func ToECDSA(d []byte) *ecdsa.PrivateKey {
+	k := new(ecdsa.PrivateKey)
+	k.D = new(big.Int).SetBytes(d)
+	k.PublicKey.Curve = elliptic.P256()
+
+	k.PublicKey.X, k.PublicKey.Y = k.PublicKey.Curve.ScalarBaseMult(d)
+	return k
 }

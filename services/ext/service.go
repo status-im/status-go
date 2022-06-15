@@ -11,10 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/browsers"
-
 	"github.com/syndtr/goleveldb/leveldb"
+	"go.uber.org/zap"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -24,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
@@ -39,12 +36,13 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/transfer"
-
-	"go.uber.org/zap"
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -109,7 +107,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.Server, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -394,7 +392,7 @@ func buildMessengerOptions(
 	config params.NodeConfig,
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
-	httpServer *server.Server,
+	httpServer *server.MediaServer,
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
