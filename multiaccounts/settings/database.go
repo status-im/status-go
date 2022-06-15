@@ -244,6 +244,10 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 		return err
 	}
 
+	if setting.SyncProtobufFactory() != nil && setting.SyncProtobufFactory().AppendHandler() != nil {
+		return setting.SyncProtobufFactory().AppendHandler()(setting, value, db)
+	}
+
 	return db.saveSetting(setting, value)
 }
 

@@ -102,6 +102,7 @@ var (
 			fromStruct:        gifFavouritesProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_FAVOURITES,
+			appendHandler:     nil, // TODO
 		},
 	}
 	GifRecents = SettingField{
@@ -116,6 +117,7 @@ var (
 			fromStruct:        gifRecentsProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_RECENTS,
+			appendHandler:     nil, // TODO
 		},
 	}
 	HideHomeTooltip = SettingField{
@@ -321,6 +323,7 @@ var (
 			fromStruct:        stickersPacksInstalledProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
+			appendHandler:     AppendStickerPacks,
 		},
 	}
 	StickersPacksPending = SettingField{
@@ -333,6 +336,7 @@ var (
 			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_PENDING,
+			appendHandler:     AppendStickerPacks,
 		},
 	}
 	StickersRecentStickers = SettingField{
@@ -345,6 +349,7 @@ var (
 			fromStruct:        stickersRecentStickersProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
+			appendHandler:     AppendStickerPacks,
 		},
 	}
 	SyncingOnMobileNetwork = SettingField{

@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common/stickers"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -19,7 +21,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -31,6 +33,105 @@ var (
     "author":"cryptoworld1373",
     "id":1,
     "name":"Status Cat",
+    "preview":"e3010170122050efc0a3e661339f31e1e44b3d15a1bf4e501c965a0523f57b701667fa90ccca",
+    "price":0,
+    "stickers":[
+      {"hash":"e30101701220eab9a8ef4eac6c3e5836a3768d8e04935c10c67d9a700436a0e53199e9b64d29"},
+      {"hash":"e30101701220c8f28aebe4dbbcee896d1cdff89ceeaceaf9f837df55c79125388f954ee5f1fe"},
+      {"hash":"e301017012204861f93e29dd8e7cf6699135c7b13af1bce8ceeaa1d9959ab8592aa20f05d15f"},
+      {"hash":"e301017012203ffa57a51cceaf2ce040852de3b300d395d5ba4d70e08ba993f93a25a387e3a9"},
+      {"hash":"e301017012204f2674db0bc7f7cfc0382d1d7f79b4ff73c41f5c487ef4c3bb3f3a4cf3f87d70"},
+      {"hash":"e30101701220e8d4d8b9fb5f805add2f63c1cb5c891e60f9929fc404e3bb725aa81628b97b5f"},
+      {"hash":"e301017012206fdad56fe7a2facb02dabe8294f3ac051443fcc52d67c2fbd8615eb72f9d74bd"},
+      {"hash":"e30101701220a691193cf0559905c10a3c5affb9855d730eae05509d503d71327e6c820aaf98"},
+      {"hash":"e30101701220d8004af925f8e85b4e24813eaa5ef943fa6a0c76035491b64fbd2e632a5cc2fd"},
+      {"hash":"e3010170122049f7bc650615568f14ee1cfa9ceaf89bfbc4745035479a7d8edee9b4465e64de"},
+      {"hash":"e301017012201915dc0faad8e6783aca084a854c03553450efdabf977d57b4f22f73d5c53b50"},
+      {"hash":"e301017012200b9fb71a129048c2a569433efc8e4d9155c54d598538be7f65ea26f665be1e84"},
+      {"hash":"e30101701220d37944e3fb05213d45416fa634cf9e10ec1f43d3bf72c4eb3062ae6cc4ed9b08"},
+      {"hash":"e3010170122059390dca66ba8713a9c323925bf768612f7dd16298c13a07a6b47cb5af4236e6"},
+      {"hash":"e30101701220daaf88ace8a3356559be5d6912d5d442916e3cc92664954526c9815d693dc32b"},
+      {"hash":"e301017012203ae30594fdf56d7bfd686cef1a45c201024e9c10a792722ef07ba968c83c064d"},
+      {"hash":"e3010170122016e5eba0bbd32fc1ff17d80d1247fc67432705cd85731458b52febb84fdd6408"},
+      {"hash":"e3010170122014fe2c2186cbf9d15ff61e04054fd6b0a5dbd7f365a1807f6f3d3d3e93e50875"},
+      {"hash":"e30101701220f23a7dad3ea7ad3f3553a98fb305148d285e4ebf66b427d85a2340f66d51da94"},
+      {"hash":"e3010170122047a637c6af02904a8ae702ec74b3df5fd8914df6fb11c99446a36d890beeb7ee"},
+      {"hash":"e30101701220776f1ff89f6196ae68414545f6c6a5314c35eee7406cb8591d607a2b0533cc86"}
+    ],
+    "thumbnail":"e30101701220e9876531554a7cb4f20d7ebbf9daef2253e6734ad9c96ba288586a9b88bef491"
+  }
+}`)
+	rawSticker2 = []byte(`{
+  "2":{
+    "author":"crytotoad",
+    "id":2,
+    "name":"Cypher Toads",
+    "preview":"e3010170122050efc0a3e661339f31e1e44b3d15a1bf4e501c965a0523f57b701667fa90ccca",
+    "price":0,
+    "stickers":[
+      {"hash":"e30101701220eab9a8ef4eac6c3e5836a3768d8e04935c10c67d9a700436a0e53199e9b64d29"},
+      {"hash":"e30101701220c8f28aebe4dbbcee896d1cdff89ceeaceaf9f837df55c79125388f954ee5f1fe"},
+      {"hash":"e301017012204861f93e29dd8e7cf6699135c7b13af1bce8ceeaa1d9959ab8592aa20f05d15f"},
+      {"hash":"e301017012203ffa57a51cceaf2ce040852de3b300d395d5ba4d70e08ba993f93a25a387e3a9"},
+      {"hash":"e301017012204f2674db0bc7f7cfc0382d1d7f79b4ff73c41f5c487ef4c3bb3f3a4cf3f87d70"},
+      {"hash":"e30101701220e8d4d8b9fb5f805add2f63c1cb5c891e60f9929fc404e3bb725aa81628b97b5f"},
+      {"hash":"e301017012206fdad56fe7a2facb02dabe8294f3ac051443fcc52d67c2fbd8615eb72f9d74bd"},
+      {"hash":"e30101701220a691193cf0559905c10a3c5affb9855d730eae05509d503d71327e6c820aaf98"},
+      {"hash":"e30101701220d8004af925f8e85b4e24813eaa5ef943fa6a0c76035491b64fbd2e632a5cc2fd"},
+      {"hash":"e3010170122049f7bc650615568f14ee1cfa9ceaf89bfbc4745035479a7d8edee9b4465e64de"},
+      {"hash":"e301017012201915dc0faad8e6783aca084a854c03553450efdabf977d57b4f22f73d5c53b50"},
+      {"hash":"e301017012200b9fb71a129048c2a569433efc8e4d9155c54d598538be7f65ea26f665be1e84"},
+      {"hash":"e30101701220d37944e3fb05213d45416fa634cf9e10ec1f43d3bf72c4eb3062ae6cc4ed9b08"},
+      {"hash":"e3010170122059390dca66ba8713a9c323925bf768612f7dd16298c13a07a6b47cb5af4236e6"},
+      {"hash":"e30101701220daaf88ace8a3356559be5d6912d5d442916e3cc92664954526c9815d693dc32b"},
+      {"hash":"e301017012203ae30594fdf56d7bfd686cef1a45c201024e9c10a792722ef07ba968c83c064d"},
+      {"hash":"e3010170122016e5eba0bbd32fc1ff17d80d1247fc67432705cd85731458b52febb84fdd6408"},
+      {"hash":"e3010170122014fe2c2186cbf9d15ff61e04054fd6b0a5dbd7f365a1807f6f3d3d3e93e50875"},
+      {"hash":"e30101701220f23a7dad3ea7ad3f3553a98fb305148d285e4ebf66b427d85a2340f66d51da94"},
+      {"hash":"e3010170122047a637c6af02904a8ae702ec74b3df5fd8914df6fb11c99446a36d890beeb7ee"},
+      {"hash":"e30101701220776f1ff89f6196ae68414545f6c6a5314c35eee7406cb8591d607a2b0533cc86"}
+    ],
+    "thumbnail":"e30101701220e9876531554a7cb4f20d7ebbf9daef2253e6734ad9c96ba288586a9b88bef491"
+  }
+}`)
+	rawSticker3 = []byte(`{
+  "1337":{
+    "author":"apes",
+    "id":1337,
+    "name":"Status Apes",
+    "preview":"e3010170122050efc0a3e661339f31e1e44b3d15a1bf4e501c965a0523f57b701667fa90ccca",
+    "price":0,
+    "stickers":[
+      {"hash":"e30101701220eab9a8ef4eac6c3e5836a3768d8e04935c10c67d9a700436a0e53199e9b64d29"},
+      {"hash":"e30101701220c8f28aebe4dbbcee896d1cdff89ceeaceaf9f837df55c79125388f954ee5f1fe"},
+      {"hash":"e301017012204861f93e29dd8e7cf6699135c7b13af1bce8ceeaa1d9959ab8592aa20f05d15f"},
+      {"hash":"e301017012203ffa57a51cceaf2ce040852de3b300d395d5ba4d70e08ba993f93a25a387e3a9"},
+      {"hash":"e301017012204f2674db0bc7f7cfc0382d1d7f79b4ff73c41f5c487ef4c3bb3f3a4cf3f87d70"},
+      {"hash":"e30101701220e8d4d8b9fb5f805add2f63c1cb5c891e60f9929fc404e3bb725aa81628b97b5f"},
+      {"hash":"e301017012206fdad56fe7a2facb02dabe8294f3ac051443fcc52d67c2fbd8615eb72f9d74bd"},
+      {"hash":"e30101701220a691193cf0559905c10a3c5affb9855d730eae05509d503d71327e6c820aaf98"},
+      {"hash":"e30101701220d8004af925f8e85b4e24813eaa5ef943fa6a0c76035491b64fbd2e632a5cc2fd"},
+      {"hash":"e3010170122049f7bc650615568f14ee1cfa9ceaf89bfbc4745035479a7d8edee9b4465e64de"},
+      {"hash":"e301017012201915dc0faad8e6783aca084a854c03553450efdabf977d57b4f22f73d5c53b50"},
+      {"hash":"e301017012200b9fb71a129048c2a569433efc8e4d9155c54d598538be7f65ea26f665be1e84"},
+      {"hash":"e30101701220d37944e3fb05213d45416fa634cf9e10ec1f43d3bf72c4eb3062ae6cc4ed9b08"},
+      {"hash":"e3010170122059390dca66ba8713a9c323925bf768612f7dd16298c13a07a6b47cb5af4236e6"},
+      {"hash":"e30101701220daaf88ace8a3356559be5d6912d5d442916e3cc92664954526c9815d693dc32b"},
+      {"hash":"e301017012203ae30594fdf56d7bfd686cef1a45c201024e9c10a792722ef07ba968c83c064d"},
+      {"hash":"e3010170122016e5eba0bbd32fc1ff17d80d1247fc67432705cd85731458b52febb84fdd6408"},
+      {"hash":"e3010170122014fe2c2186cbf9d15ff61e04054fd6b0a5dbd7f365a1807f6f3d3d3e93e50875"},
+      {"hash":"e30101701220f23a7dad3ea7ad3f3553a98fb305148d285e4ebf66b427d85a2340f66d51da94"},
+      {"hash":"e3010170122047a637c6af02904a8ae702ec74b3df5fd8914df6fb11c99446a36d890beeb7ee"},
+      {"hash":"e30101701220776f1ff89f6196ae68414545f6c6a5314c35eee7406cb8591d607a2b0533cc86"}
+    ],
+    "thumbnail":"e30101701220e9876531554a7cb4f20d7ebbf9daef2253e6734ad9c96ba288586a9b88bef491"
+  }
+}`)
+	rawSticker4 = []byte(`{
+  "25":{
+    "author":"totallynotascam",
+    "id":25,
+    "name":"Official Vitalik Stickers",
     "preview":"e3010170122050efc0a3e661339f31e1e44b3d15a1bf4e501c965a0523f57b701667fa90ccca",
     "price":0,
     "stickers":[
@@ -298,11 +399,6 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
-	if s.ignoreTests {
-		s.T().Skip("Currently sticker pack syncing has been deactivated, testing to resume after sticker packs works correctly")
-		return
-	}
-
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
@@ -332,7 +428,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().NoError(err)
 	spi, err := as.StickerPacksInstalled.MarshalJSON()
 	s.Require().NoError(err)
-	s.Require().Equal(2169, len(spi))
+	s.Require().Len(spi, 2180)
 
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
@@ -354,6 +450,65 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	ospi, err := aos.StickerPacksInstalled.MarshalJSON()
 	s.Require().NoError(err)
 	s.Require().Exactly(spi, ospi)
+
+	//// Add new sticker pack to alice device
+	// Unmarshal cypher toads stickers
+	cypherToadsStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker2, &cypherToadsStickers)
+	s.Require().NoError(err)
+
+	// Unmarshal alice device 1 sticker pack collection
+	nsc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(spi, &nsc)
+	s.Require().NoError(err)
+
+	// merge new cypher toads stickers into alice device 1 current sticker pack collection
+	nsc.Merge(cypherToadsStickers)
+	s.Require().Len(nsc, 2)
+
+	// Save new merged sticker pack collection
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, cypherToadsStickers)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Get alice device 2 sticker packs after sync
+	aos, err = s.alice2.settings.GetSettings()
+	s.Require().NoError(err)
+	ospi, err = aos.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+
+	// Unmarshal alice device 2 sticker pack collection
+	nosc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(ospi, &nosc)
+	s.Require().NoError(err)
+
+	aosp1 := nosc[1]
+	aosp2 := nosc[2]
+
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, aosp1.ID)
+	s.Require().Equal("Status Cat", aosp1.Name)
+	s.Require().Equal("cryptoworld1373", aosp1.Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, aosp2.ID)
+	s.Require().Equal("Cypher Toads", aosp2.Name)
+	s.Require().Equal("crytotoad", aosp2.Author)
+
+	// TODO include tests that cover scenarios from https://github.com/status-im/status-react/pull/13358#issuecomment-1155352702
+	s.Require().Greater(len(rawSticker3), 1)
+	s.Require().Greater(len(rawSticker4), 1)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {

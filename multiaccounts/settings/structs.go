@@ -12,6 +12,7 @@ type ValueHandler func(interface{}) (interface{}, error)
 type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, error)
 type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
+type SyncSettingAppendHandler func(sf SettingField, value interface{}, db *Database) error
 
 // SyncProtobufFactory represents a collection of functionality to generate and parse *protobuf.SyncSetting
 type SyncProtobufFactory struct {
@@ -20,6 +21,7 @@ type SyncProtobufFactory struct {
 	fromStruct        SyncSettingProtobufFactoryStruct
 	valueFromProtobuf SyncSettingProtobufToValue
 	protobufType      protobuf.SyncSetting_Type
+	appendHandler     SyncSettingAppendHandler
 }
 
 func (spf *SyncProtobufFactory) Inactive() bool {
@@ -40,6 +42,10 @@ func (spf *SyncProtobufFactory) ExtractValueFromProtobuf() SyncSettingProtobufTo
 
 func (spf *SyncProtobufFactory) SyncSettingProtobufType() protobuf.SyncSetting_Type {
 	return spf.protobufType
+}
+
+func (spf *SyncProtobufFactory) AppendHandler() SyncSettingAppendHandler {
+	return spf.appendHandler
 }
 
 // SyncSettingField represents a binding between a Value and a SettingField

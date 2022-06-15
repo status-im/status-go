@@ -3,14 +3,15 @@ package stickers
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/common/stickers"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const maxNumberRecentStickers = 24
 
-func (api *API) recentStickers() ([]Sticker, error) {
-	recentStickersList := make([]Sticker, 0)
+func (api *API) recentStickers() ([]stickers.Sticker, error) {
+	recentStickersList := make([]stickers.Sticker, 0)
 
 	recentStickersJSON, err := api.accountsDB.GetRecentStickers()
 	if err != nil {
@@ -30,11 +31,11 @@ func (api *API) recentStickers() ([]Sticker, error) {
 }
 
 func (api *API) ClearRecent() error {
-	var recentStickersList []Sticker
+	var recentStickersList []stickers.Sticker
 	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)
 }
 
-func (api *API) Recent() ([]Sticker, error) {
+func (api *API) Recent() ([]stickers.Sticker, error) {
 	recentStickersList, err := api.recentStickers()
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func (api *API) Recent() ([]Sticker, error) {
 }
 
 func (api *API) AddRecent(packID *bigint.BigInt, hash string) error {
-	sticker := Sticker{
+	sticker := stickers.Sticker{
 		PackID: packID,
 		Hash:   hash,
 	}
@@ -73,9 +74,9 @@ func (api *API) AddRecent(packID *bigint.BigInt, hash string) error {
 	sticker.URL = ""
 
 	if len(recentStickersList) >= maxNumberRecentStickers {
-		recentStickersList = append([]Sticker{sticker}, recentStickersList[:maxNumberRecentStickers-1]...)
+		recentStickersList = append([]stickers.Sticker{sticker}, recentStickersList[:maxNumberRecentStickers-1]...)
 	} else {
-		recentStickersList = append([]Sticker{sticker}, recentStickersList...)
+		recentStickersList = append([]stickers.Sticker{sticker}, recentStickersList...)
 	}
 
 	return api.accountsDB.SaveSettingField(settings.StickersRecentStickers, recentStickersList)

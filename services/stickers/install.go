@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/status-im/status-go/common/stickers"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -40,8 +41,8 @@ func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {
 	return nil
 }
 
-func (api *API) installedStickerPacks() (StickerPackCollection, error) {
-	stickerPacks := make(StickerPackCollection)
+func (api *API) installedStickerPacks() (stickers.StickerPackCollection, error) {
+	stickerPacks := make(stickers.StickerPackCollection)
 
 	installedStickersJSON, err := api.accountsDB.GetInstalledStickerPacks()
 	if err != nil {
@@ -60,14 +61,14 @@ func (api *API) installedStickerPacks() (StickerPackCollection, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) Installed() (StickerPackCollection, error) {
+func (api *API) Installed() (stickers.StickerPackCollection, error) {
 	stickerPacks, err := api.installedStickerPacks()
 	if err != nil {
 		return nil, err
 	}
 
 	for packID, stickerPack := range stickerPacks {
-		stickerPack.Status = statusInstalled
+		stickerPack.Status = stickers.StatusInstalled
 		stickerPack.Preview = api.hashToURL(stickerPack.Preview)
 		stickerPack.Thumbnail = api.hashToURL(stickerPack.Thumbnail)
 		for i, sticker := range stickerPack.Stickers {
@@ -116,7 +117,7 @@ func (api *API) Uninstall(packID *bigint.BigInt) error {
 	}
 
 	if idx > -1 {
-		var newRecentStickers []Sticker
+		var newRecentStickers []stickers.Sticker
 		newRecentStickers = append(newRecentStickers, recentStickers[:idx]...)
 		if idx != len(recentStickers)-1 {
 			newRecentStickers = append(newRecentStickers, recentStickers[idx+1:]...)

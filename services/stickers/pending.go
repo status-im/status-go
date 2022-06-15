@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/status-im/status-go/common/stickers"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -34,8 +35,8 @@ func (api *API) AddPending(chainID uint64, packID *bigint.BigInt) error {
 	return api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingPacks)
 }
 
-func (api *API) pendingStickerPacks() (StickerPackCollection, error) {
-	stickerPacks := make(StickerPackCollection)
+func (api *API) pendingStickerPacks() (stickers.StickerPackCollection, error) {
+	stickerPacks := make(stickers.StickerPackCollection)
 
 	pendingStickersJSON, err := api.accountsDB.GetPendingStickerPacks()
 	if err != nil {
@@ -54,14 +55,14 @@ func (api *API) pendingStickerPacks() (StickerPackCollection, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) Pending() (StickerPackCollection, error) {
+func (api *API) Pending() (stickers.StickerPackCollection, error) {
 	stickerPacks, err := api.pendingStickerPacks()
 	if err != nil {
 		return nil, err
 	}
 
 	for packID, stickerPack := range stickerPacks {
-		stickerPack.Status = statusPending
+		stickerPack.Status = stickers.StatusPending
 		stickerPack.Preview = api.hashToURL(stickerPack.Preview)
 		stickerPack.Thumbnail = api.hashToURL(stickerPack.Thumbnail)
 		for i, sticker := range stickerPack.Stickers {
@@ -74,7 +75,7 @@ func (api *API) Pending() (StickerPackCollection, error) {
 	return stickerPacks, nil
 }
 
-func (api *API) ProcessPending(chainID uint64) (pendingChanged StickerPackCollection, err error) {
+func (api *API) ProcessPending(chainID uint64) (pendingChanged stickers.StickerPackCollection, err error) {
 	pendingStickerPacks, err := api.pendingStickerPacks()
 	if err != nil {
 		return nil, err
@@ -101,14 +102,14 @@ func (api *API) ProcessPending(chainID uint64) (pendingChanged StickerPackCollec
 				purchasedPacks[uint(packID.Uint64())] = struct{}{}
 			}
 		case <-doneChan:
-			result := make(StickerPackCollection)
+			result := make(stickers.StickerPackCollection)
 			for _, stickerPack := range pendingStickerPacks {
 				packID := uint(stickerPack.ID.Uint64())
 				if _, exists := purchasedPacks[packID]; !exists {
 					continue
 				}
 				delete(pendingStickerPacks, packID)
-				stickerPack.Status = statusPurchased
+				stickerPack.Status = stickers.StatusPurchased
 				result[packID] = stickerPack
 			}
 			err = api.accountsDB.SaveSettingField(settings.StickersPacksPending, pendingStickerPacks)

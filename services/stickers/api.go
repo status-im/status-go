@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
+	comStickers "github.com/status-im/status-go/common/stickers"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
@@ -25,16 +26,6 @@ import (
 
 const maxConcurrentRequests = 3
 
-// ConnectionType constants
-type stickerStatus int
-
-const (
-	statusAvailable stickerStatus = iota
-	statusInstalled
-	statusPending
-	statusPurchased
-)
-
 type API struct {
 	contractMaker   *contracts.ContractMaker
 	accountsManager *account.GethManager
@@ -47,27 +38,6 @@ type API struct {
 
 	ctx context.Context
 }
-
-type Sticker struct {
-	PackID *bigint.BigInt `json:"packID,omitempty"`
-	URL    string         `json:"url,omitempty"`
-	Hash   string         `json:"hash,omitempty"`
-}
-
-type StickerPack struct {
-	ID        *bigint.BigInt `json:"id"`
-	Name      string         `json:"name"`
-	Author    string         `json:"author"`
-	Owner     common.Address `json:"owner,omitempty"`
-	Price     *bigint.BigInt `json:"price"`
-	Preview   string         `json:"preview"`
-	Thumbnail string         `json:"thumbnail"`
-	Stickers  []Sticker      `json:"stickers"`
-
-	Status stickerStatus `json:"status"`
-}
-
-type StickerPackCollection map[uint]StickerPack
 
 type ednSticker struct {
 	Hash string
@@ -101,7 +71,7 @@ func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, 
 	return result
 }
 
-func (api *API) Market(chainID uint64) ([]StickerPack, error) {
+func (api *API) Market(chainID uint64) ([]comStickers.StickerPack, error) {
 	// TODO: eventually this should be changed to include pagination
 	accs, err := api.accountsDB.GetAccounts()
 	if err != nil {
@@ -132,14 +102,14 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 			}
 
 		case <-doneChan:
-			var result []StickerPack
+			var result []comStickers.StickerPack
 			for _, pack := range allStickerPacks {
 				packID := uint(pack.ID.Uint64())
 				_, isPurchased := purchasedPacks[packID]
 				if isPurchased {
-					pack.Status = statusPurchased
+					pack.Status = comStickers.StatusPurchased
 				} else {
-					pack.Status = statusAvailable
+					pack.Status = comStickers.StatusAvailable
 				}
 				result = append(result, pack)
 			}
@@ -229,7 +199,7 @@ func (api *API) getPurchasedPackIDs(chainID uint64, account types.Address) ([]*b
 	return api.getTokenPackIDs(chainID, tokenIDs)
 }
 
-func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack, errChan chan<- error, doneChan chan<- struct{}) {
+func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *comStickers.StickerPack, errChan chan<- error, doneChan chan<- struct{}) {
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -296,7 +266,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 	c.WaitAllDone()
 }
 
-func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int, translateHashes bool) (*StickerPack, error) {
+func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int, translateHashes bool) (*comStickers.StickerPack, error) {
 	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
 	packData, err := stickerType.GetPackData(callOpts, packID)
@@ -304,7 +274,7 @@ func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int
 		return nil, err
 	}
 
-	stickerPack := &StickerPack{
+	stickerPack := &comStickers.StickerPack{
 		ID:    &bigint.BigInt{Int: packID},
 		Owner: packData.Owner,
 		Price: &bigint.BigInt{Int: packData.Price},
@@ -318,7 +288,7 @@ func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int
 	return stickerPack, nil
 }
 
-func (api *API) downloadPackData(stickerPack *StickerPack, contentHash []byte, translateHashes bool) error {
+func (api *API) downloadPackData(stickerPack *comStickers.StickerPack, contentHash []byte, translateHashes bool) error {
 	fileContent, err := api.downloader.Get(hexutil.Encode(contentHash)[2:], true)
 	if err != nil {
 		return err
@@ -330,7 +300,7 @@ func (api *API) hashToURL(hash string) string {
 	return api.httpServer.MakeStickerURL(hash)
 }
 
-func (api *API) populateStickerPackAttributes(stickerPack *StickerPack, ednSource []byte, translateHashes bool) error {
+func (api *API) populateStickerPackAttributes(stickerPack *comStickers.StickerPack, ednSource []byte, translateHashes bool) error {
 	var stickerpackIPFSInfo ednStickerPackInfo
 	err := edn.Unmarshal(ednSource, &stickerpackIPFSInfo)
 	if err != nil {
@@ -354,7 +324,7 @@ func (api *API) populateStickerPackAttributes(stickerPack *StickerPack, ednSourc
 			url = api.hashToURL(s.Hash)
 		}
 
-		stickerPack.Stickers = append(stickerPack.Stickers, Sticker{
+		stickerPack.Stickers = append(stickerPack.Stickers, comStickers.Sticker{
 			PackID: stickerPack.ID,
 			URL:    url,
 			Hash:   s.Hash,
@@ -364,14 +334,14 @@ func (api *API) populateStickerPackAttributes(stickerPack *StickerPack, ednSourc
 	return nil
 }
 
-func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {
-	stickerPackChan := make(chan *StickerPack)
+func (api *API) getContractPacks(chainID uint64) ([]comStickers.StickerPack, error) {
+	stickerPackChan := make(chan *comStickers.StickerPack)
 	errChan := make(chan error)
 	doneChan := make(chan struct{}, 1)
 
 	go api.fetchStickerPacks(chainID, stickerPackChan, errChan, doneChan)
 
-	var packs []StickerPack
+	var packs []comStickers.StickerPack
 
 	for {
 		select {
