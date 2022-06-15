@@ -12,12 +12,16 @@ func TestServerURLSuite(t *testing.T) {
 
 type ServerURLSuite struct {
 	suite.Suite
+	TestKeyComponents
 
-	server       *MediaServer
-	serverNoPort *MediaServer
+	server        *MediaServer
+	serverNoPort  *MediaServer
+	pairingServer *PairingServer
 }
 
 func (s *ServerURLSuite) SetupSuite() {
+	s.SetupKeyComponents(s.T())
+
 	s.server = &MediaServer{Server: Server{
 		hostname: defaultIP.String(),
 		port:     1337,
