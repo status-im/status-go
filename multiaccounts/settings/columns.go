@@ -43,6 +43,7 @@ var (
 			fromStruct:        currencyProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_CURRENCY,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	CurrentUserStatus = SettingField{
@@ -102,7 +103,7 @@ var (
 			fromStruct:        gifFavouritesProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_FAVOURITES,
-			appendHandler:     nil, // TODO
+			storeHandler:      nil, // TODO something similar to sticker pack store handler
 		},
 	}
 	GifRecents = SettingField{
@@ -117,7 +118,7 @@ var (
 			fromStruct:        gifRecentsProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_GIF_RECENTS,
-			appendHandler:     nil, // TODO
+			storeHandler:      nil, // TODO something similar to sticker pack store handler
 		},
 	}
 	HideHomeTooltip = SettingField{
@@ -172,6 +173,7 @@ var (
 			fromStruct:        messagesFromContactsOnlyProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_MESSAGES_FROM_CONTACTS_ONLY,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	Mnemonic = SettingField{
@@ -231,6 +233,7 @@ var (
 			fromStruct:        preferredNameProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PREFERRED_NAME,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	PreviewPrivacy = SettingField{
@@ -244,6 +247,7 @@ var (
 			fromStruct:        previewPrivacyProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PREVIEW_PRIVACY,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	ProfilePicturesShowTo = SettingField{
@@ -254,6 +258,7 @@ var (
 			fromStruct:        profilePicturesShowToProtobufFactoryStruct,
 			valueFromProtobuf: Int64FromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PROFILE_PICTURES_SHOW_TO,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	ProfilePicturesVisibility = SettingField{
@@ -264,6 +269,7 @@ var (
 			fromStruct:        profilePicturesVisibilityProtobufFactoryStruct,
 			valueFromProtobuf: Int64FromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	PublicKey = SettingField{
@@ -311,6 +317,7 @@ var (
 			fromStruct:        sendStatusUpdatesProtobufFactoryStruct,
 			valueFromProtobuf: BoolFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_SEND_STATUS_UPDATES,
+			storeHandler:      OverwriteStoreHandler,
 		},
 	}
 	StickersPacksInstalled = SettingField{
@@ -323,7 +330,7 @@ var (
 			fromStruct:        stickersPacksInstalledProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
-			appendHandler:     AppendStickerPacks,
+			storeHandler:      StickerPacksStoreHandler,
 		},
 	}
 	StickersPacksPending = SettingField{
@@ -336,7 +343,7 @@ var (
 			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_PACKS_PENDING,
-			appendHandler:     AppendStickerPacks,
+			storeHandler:      StickerPacksStoreHandler,
 		},
 	}
 	StickersRecentStickers = SettingField{
@@ -349,7 +356,7 @@ var (
 			fromStruct:        stickersRecentStickersProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
 			protobufType:      protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
-			appendHandler:     AppendStickerPacks,
+			storeHandler:      StickerPacksStoreHandler,
 		},
 	}
 	SyncingOnMobileNetwork = SettingField{

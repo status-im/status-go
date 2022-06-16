@@ -6,7 +6,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -80,12 +79,7 @@ func (m *Messenger) handleSyncSetting(response *MessengerResponse, syncSetting *
 	}
 
 	value := spf.ExtractValueFromProtobuf()(syncSetting)
-
-	err = m.settings.SaveSyncSetting(sf, value, syncSetting.Clock)
-	if err == errors.ErrNewClockOlderThanCurrent {
-		m.logger.Info("handleSyncSetting - SaveSyncSetting :", zap.Error(err))
-		return nil
-	}
+	err = spf.StoreHandler()(m.settings.Database, sf, value, syncSetting.Clock)
 	if err != nil {
 		return err
 	}
