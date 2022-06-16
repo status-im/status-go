@@ -108,13 +108,32 @@ func insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error {
 
 	for _, network := range c.Networks {
 		_, err := tx.Exec(`
-	INSERT OR REPLACE INTO network_config (
-		chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
-		native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
-		synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
+        INSERT OR REPLACE INTO network_config (
+                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
+                native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
+                synthetic_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
 			network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL, network.NativeCurrencyName,
 			network.NativeCurrencySymbol, network.NativeCurrencyDecimals, network.IsTest, network.Layer, network.Enabled,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertNetworkConfigWithChainColorShortName(tx *sql.Tx, c *params.NodeConfig) error {
+	for _, network := range c.Networks {
+		_, err := tx.Exec(`
+        INSERT OR REPLACE INTO networks (
+                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
+		native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
+                chain_color, short_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
+			network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
+			network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
 		)
 		if err != nil {
 			return err
@@ -359,7 +378,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertIPCConfig,
 		insertLogConfig,
 		insertUpstreamConfig,
-		insertNetworkConfig,
+		insertNetworkConfigWithChainColorShortName,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
@@ -505,9 +524,9 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	rows, err = tx.Query(`SELECT 
-		chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
-		native_currency_symbol, native_currency_decimals, is_test, layer, enabled
-	FROM network_config WHERE synthetic_id = 'id' ORDER BY chain_id ASC`)
+                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
+                native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
+        FROM networks ORDER BY chain_id ASC`)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -516,7 +535,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		var n params.Network
 		err = rows.Scan(&n.ChainID, &n.ChainName, &n.RPCURL, &n.BlockExplorerURL, &n.IconURL,
 			&n.NativeCurrencyName, &n.NativeCurrencySymbol, &n.NativeCurrencyDecimals, &n.IsTest,
-			&n.Layer, &n.Enabled,
+			&n.Layer, &n.Enabled, &n.ChainColor, &n.ShortName,
 		)
 		if err != nil {
 			return nil, err

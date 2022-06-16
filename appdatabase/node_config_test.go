@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
@@ -50,9 +49,8 @@ func TestSaveNodeConfig(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	require.NoError(t, nodecfg.SaveNodeConfig(db, randomNodeConfig()))
-
 	newNodeConfig := randomNodeConfig()
+
 	require.NoError(t, nodecfg.SaveNodeConfig(db, newNodeConfig))
 
 	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
@@ -61,44 +59,13 @@ func TestSaveNodeConfig(t *testing.T) {
 }
 
 func TestMigrateNodeConfig(t *testing.T) {
+	// Migration will be run in setupTestDB. If there's an error, that function will fail
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	nodeConfig := &params.NodeConfig{
-		NetworkID:  uint64(randomInt(10)),
-		DataDir:    randomString(),
-		ListenAddr: randomString(),
-		Rendezvous: true,
-		ShhextConfig: params.ShhextConfig{
-			PFSEnabled: true,
-		},
-		WakuV2Config: params.WakuV2Config{
-			CustomNodes: make(map[string]string),
-		},
-		RequireTopics: make(map[discv5.Topic]params.Limits),
-	}
-	value := &sqlite.JSONBlob{Data: nodeConfig}
-
-	fmt.Println(value)
-	update, err := db.Prepare("INSERT INTO settings(node_config, address, current_network, dapps_address, installation_id, key_uid, name, networks, photo_path, public_key, signing_phrase, wallet_root_address, synthetic_id) VALUES(?, '', 0, '', '', '', '', '', '', '', '', '', 'id')")
-	require.NoError(t, err)
-	b, err := update.Exec(value)
-	require.NoError(t, err)
-	fmt.Println(b.RowsAffected())
-	// Forcing deletion of node_config data to be able to run migration
-	_, err = db.Exec("DELETE FROM node_config WHERE synthetic_id = 'id'")
-	require.NoError(t, err)
-
-	err = nodecfg.MigrateNodeConfig(db)
-	require.NoError(t, err)
-
-	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
-	require.NoError(t, err)
-	require.Equal(t, nodeConfig, dbNodeConfig)
-
 	// node_config column should be empty
 	var result string
-	err = db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
+	err := db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
 	require.NoError(t, err)
 	require.Equal(t, "empty", result)
 }
@@ -176,6 +143,8 @@ func randomNetworkSlice() []params.Network {
 			IsTest:                 randomBool(),
 			Layer:                  uint64(int64(randomInt(math.MaxInt64))),
 			Enabled:                randomBool(),
+			ChainColor:             randomString(),
+			ShortName:              randomString(),
 		}
 		result = append(result, n)
 	}
