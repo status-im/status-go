@@ -620,6 +620,14 @@ func (api *PublicAPI) AcceptContactRequest(ctx context.Context, request *request
 	return api.service.messenger.AcceptContactRequest(ctx, request)
 }
 
+func (api *PublicAPI) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptLatestContactRequestForContact(ctx, request)
+}
+
+func (api *PublicAPI) DismissLatestContactRequestForContact(ctx context.Context, request *requests.DismissLatestContactRequestForContact) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DismissLatestContactRequestForContact(ctx, request)
+}
+
 func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *requests.RetractContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RetractContactRequest(request)
 }

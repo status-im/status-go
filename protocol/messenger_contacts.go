@@ -819,6 +819,32 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 	return response, err
 }
 
+func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(request.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+}
+
+func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, request *requests.DismissLatestContactRequestForContact) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(request.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return m.DismissContactRequest(ctx, &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+}
+
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
 	return m.persistence.PendingContactRequests(cursor, limit)
 }
