@@ -3,6 +3,8 @@ package settings
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common/stickers"
@@ -21,46 +23,62 @@ func OverwriteStoreHandler(db *Database, sf SettingField, value interface{}, clo
 }
 
 func StickerPacksStoreHandler(db *Database, sf SettingField, value interface{}, clock uint64) error {
+	v, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("value must be of type []byte")
+	}
+
+	// Get current sticker packs from db
 	jrm := new(json.RawMessage)
 	err := db.makeSelectRow(sf).Scan(&jrm)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
-	var sc stickers.StickerPackCollection
-	if jrm == nil {
-		sc = make(stickers.StickerPackCollection)
-	} else {
+	// Unmarshal the db sticker pack data into a sticker.StickerPackCollection
+	sc := make(stickers.StickerPackCollection)
+	if jrm != nil {
 		mj, err := jrm.MarshalJSON()
 		if err != nil {
 			return err
 		}
 
-		sc = make(stickers.StickerPackCollection)
 		err = json.Unmarshal(mj, &sc)
 		if err != nil {
 			return err
 		}
 	}
 
+	// Unmarshal the sync sticker pack data into a sticker.StickerPackCollection
 	sp := make(stickers.StickerPackCollection)
-	err = json.Unmarshal(value.([]byte), &sp)
-	if err != nil {
-		return err
+	if v != nil && len(v) > 0 {
+		err = json.Unmarshal(v, &sp)
+		if err != nil {
+			return err
+		}
 	}
 
 	sc.Merge(sp)
 
-	v, err := sf.ValueHandler()(sc)
+	scv, err := sf.ValueHandler()(sc)
 	if err != nil {
 		return err
 	}
 
-	err = db.saveSyncSetting(sf, v, clock)
-	if err == errors.ErrNewClockOlderThanCurrent {
-		logger := logutils.Logger()
-		logger.Info("StickerPacksStoreHandler - saveSyncSetting :", zap.Error(err))
-		return nil
+	ls, err := db.GetSettingLastSynced(sf)
+	if err != nil {
+		return err
 	}
-	return err
+	if clock <= ls {
+		// If clock is less than or equal to last synced time, set clock to ls plus 1
+		// Because we are merging and not overwriting
+		clock = ls + 1
+	}
+
+	err = db.SetSettingLastSynced(sf, clock)
+	if err != nil {
+		return err
+	}
+
+	return db.saveSetting(sf, scv)
 }

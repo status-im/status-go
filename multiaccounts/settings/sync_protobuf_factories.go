@@ -279,31 +279,6 @@ func stickersPacksInstalledProtobufFactoryStruct(s Settings, clock uint64, chatI
 	return buildRawStickerPacksInstalledSyncMessage(spi, clock, chatID)
 }
 
-// StickerPacksPending
-
-func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {
-	pb := &protobuf.SyncSetting{
-		Type:  protobuf.SyncSetting_STICKERS_PACKS_PENDING,
-		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
-		Clock: clock,
-	}
-	return buildRawSyncSettingMessage(pb, chatID)
-}
-
-func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, error) {
-	v, err := parseJSONBlobData(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return buildRawStickerPacksPendingSyncMessage(v, clock, chatID)
-}
-
-func stickersPacksPendingProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, error) {
-	spp := extractJSONRawMessage(s.StickerPacksPending)
-	return buildRawStickerPacksPendingSyncMessage(spp, clock, chatID)
-}
-
 // StickersRecentStickers
 
 func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, error) {

@@ -398,7 +398,16 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().Exactly(settings.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
 }
 
-func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
+func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksSimple() {
+	//// Merge from only device 1
+	// - device 1 and device 2 pair
+	// - device 1 adds sticker pack 1
+	// - device 2 receives synced sticker pack 1
+	// - device 1 adds sticker pack 2
+	// - device 2 receives synced sticker pack 2
+	// - device 2 gets all sticker packs
+	// - device 2 has 2 sticker packs
+
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
@@ -505,10 +514,439 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, aosp2.ID)
 	s.Require().Equal("Cypher Toads", aosp2.Name)
 	s.Require().Equal("crytotoad", aosp2.Author)
+}
 
-	// TODO include tests that cover scenarios from https://github.com/status-im/status-react/pull/13358#issuecomment-1155352702
-	s.Require().Greater(len(rawSticker3), 1)
-	s.Require().Greater(len(rawSticker4), 1)
+func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksPrePair() {
+	//// Merge into device 2 with pre-pair sticker pack
+	// - device 2 adds a sticker pack
+	// - device 1 and device 2 pair
+	// - device 1 adds a different sticker pack
+	// - device 2 receives new sticker pack shows in list of sticker packs
+	// - device 2 shows 2 sticker packs (original sticker pack from device 2 and new sticker pack from device 1)
+
+	// Check alice 1 settings values
+	as, err := s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(as.StickerPacksInstalled)
+	s.Require().Nil(as.StickerPacksPending)
+	s.Require().Nil(as.StickersRecentStickers)
+
+	// Check alice 2 settings values
+	aos, err := s.alice2.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(aos.StickerPacksInstalled)
+	s.Require().Nil(aos.StickerPacksPending)
+	s.Require().Nil(aos.StickersRecentStickers)
+
+	// Add sticker pack to alice device 2
+	statusApesStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker3, &statusApesStickers)
+	s.Require().NoError(err)
+
+	err = s.alice2.settings.SaveSettingField(settings.StickersPacksInstalled, statusApesStickers)
+	s.Require().NoError(err)
+
+	aos, err = s.alice2.settings.GetSettings()
+	s.Require().NoError(err)
+	ospi, err := aos.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(ospi, 2176)
+
+	// Pair devices, both directions
+	s.pairTwoDevices(s.alice2, s.alice)
+	s.pairTwoDevices(s.alice, s.alice2)
+
+	// Trigger initial sync between devices, only for settings
+	err = s.alice.syncSettings()
+	s.Require().NoError(err)
+	err = s.alice2.syncSettings()
+	s.Require().NoError(err)
+
+	// Wait for sync message to reach device 1
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check device 1 received the pre-pair sticker pack from device 2
+	as, err = s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+	spi, err := as.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Exactly(ospi, spi)
+
+	// Add sticker pack 4 to alice device 1
+	vitalikOfficialStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker4, &vitalikOfficialStickers)
+	s.Require().NoError(err)
+
+	// Unmarshal alice device 1 sticker pack collection
+	aspc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(spi, &aspc)
+	s.Require().NoError(err)
+
+	// merge new Vitalik Official stickers into alice device 1 current sticker pack collection
+	aspc.Merge(vitalikOfficialStickers)
+	s.Require().Len(aspc, 2)
+
+	// Save merged sticker packs
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, aspc)
+	s.Require().NoError(err)
+
+	// Check that the newly merged sticker packs are in the DB
+	jrm, err := s.alice.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err := jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(jrmb, 4372)
+
+	// Wait for sync message to reach device 2
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check device 2 received the sticker pack from device 1
+	as, err = s.alice2.settings.GetSettings()
+	s.Require().NoError(err)
+	ospi, err = as.StickerPacksInstalled.MarshalJSON()
+	s.Require().NoError(err)
+
+	// Unmarshal alice device 2 sticker pack collection
+	nosc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(ospi, &nosc)
+	s.Require().NoError(err)
+	s.Require().Len(nosc, 2)
+
+	aosp1 := nosc[1337]
+	aosp2 := nosc[25]
+
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1337)}, aosp1.ID)
+	s.Require().Equal("Status Apes", aosp1.Name)
+	s.Require().Equal("apes", aosp1.Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(25)}, aosp2.ID)
+	s.Require().Equal("Official Vitalik Stickers", aosp2.Name)
+	s.Require().Equal("totallynotascam", aosp2.Author)
+}
+
+func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksBothPreAndPostPair() {
+	// device 1 adds sticker pack 1
+	// device 2 adds sticker pack 2
+	// device 1 and device 2 pair
+	// device 1 shows 2 sticker packs, sticker pack 1 and 2
+	// device 2 shows 2 sticker packs, sticker pack 2 and 1
+	// device 1 adds sticker pack 3
+	// device 2 adds sticker pack 4
+	// device 1 shows 4 sticker packs, sticker pack 1, 2, 3 and 4
+	// device 2 shows 4 sticker packs, sticker pack 2, 1, 4 and 3
+
+	// Check alice 1 settings values
+	as, err := s.alice.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(as.StickerPacksInstalled)
+	s.Require().Nil(as.StickerPacksPending)
+	s.Require().Nil(as.StickersRecentStickers)
+
+	// Check alice 2 settings values
+	aos, err := s.alice2.settings.GetSettings()
+	s.Require().NoError(err)
+	s.Require().Nil(aos.StickerPacksInstalled)
+	s.Require().Nil(aos.StickerPacksPending)
+	s.Require().Nil(aos.StickersRecentStickers)
+
+	// Add sticker pack 1 to alice device 1
+	statusCatStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker, &statusCatStickers)
+	s.Require().NoError(err)
+
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, statusCatStickers)
+	s.Require().NoError(err)
+
+	// Add sticker pack 2 to alice device 2
+	cypherToadsStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker2, &cypherToadsStickers)
+	s.Require().NoError(err)
+
+	err = s.alice2.settings.SaveSettingField(settings.StickersPacksInstalled, cypherToadsStickers)
+	s.Require().NoError(err)
+
+	// Check sticker pack 1 is in the device 1 DB
+	jrm, err := s.alice.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err := jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(jrmb, 2180)
+
+	ad1spc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad1spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad1spc, 1)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, ad1spc[1].ID)
+	s.Require().Equal("Status Cat", ad1spc[1].Name)
+	s.Require().Equal("cryptoworld1373", ad1spc[1].Author)
+
+	// Check sticker pack 2 is in the device 2 DB
+	jrm, err = s.alice2.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(jrmb, 2176)
+
+	ad2spc := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad2spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad2spc, 1)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, ad2spc[2].ID)
+	s.Require().Equal("Cypher Toads", ad2spc[2].Name)
+	s.Require().Equal("crytotoad", ad2spc[2].Author)
+
+	// Pair devices, both directions
+	s.pairTwoDevices(s.alice2, s.alice)
+	s.pairTwoDevices(s.alice, s.alice2)
+
+	// Trigger initial sync between devices, only for settings
+	err = s.alice.syncSettings()
+	s.Require().NoError(err)
+	err = s.alice2.syncSettings()
+	s.Require().NoError(err)
+
+	// Wait for sync message to reach device 1
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check sticker pack 1 and 2 is in the device 1 DB
+	jrm, err = s.alice.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(jrmb, 4355)
+
+	ad1spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad1spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad1spc, 2)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, ad1spc[1].ID)
+	s.Require().Equal("Status Cat", ad1spc[1].Name)
+	s.Require().Equal("cryptoworld1373", ad1spc[1].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, ad1spc[2].ID)
+	s.Require().Equal("Cypher Toads", ad1spc[2].Name)
+	s.Require().Equal("crytotoad", ad1spc[2].Author)
+
+	// Wait for sync message to reach device 2
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check sticker pack 2 is in the device 2 DB
+	jrm, err = s.alice2.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Require().Len(jrmb, 4355)
+
+	ad2spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad2spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad2spc, 2)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, ad2spc[1].ID)
+	s.Require().Equal("Status Cat", ad2spc[1].Name)
+	s.Require().Equal("cryptoworld1373", ad2spc[1].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, ad2spc[2].ID)
+	s.Require().Equal("Cypher Toads", ad2spc[2].Name)
+	s.Require().Equal("crytotoad", ad2spc[2].Author)
+
+	// Add sticker pack 3 to alice device 1
+	statusApeStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker3, &statusApeStickers)
+	s.Require().NoError(err)
+
+	ad1spc.Merge(statusApeStickers)
+	s.Require().Len(ad1spc, 3)
+
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, ad1spc)
+	s.Require().NoError(err)
+
+	// Add sticker pack 4 to alice device 2
+	officialVitalikStickers := make(stickers.StickerPackCollection)
+	err = json.Unmarshal(rawSticker4, &officialVitalikStickers)
+	s.Require().NoError(err)
+
+	ad2spc.Merge(officialVitalikStickers)
+	s.Require().Len(ad2spc, 3)
+
+	err = s.alice2.settings.SaveSettingField(settings.StickersPacksInstalled, ad2spc)
+	s.Require().NoError(err)
+
+	// Check sticker pack 3 is in the device 1 DB
+	jrm, err = s.alice.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Len(jrmb, 6530)
+
+	ad1spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad1spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad1spc, 3)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1337)}, ad1spc[1337].ID)
+	s.Require().Equal("Status Apes", ad1spc[1337].Name)
+	s.Require().Equal("apes", ad1spc[1337].Author)
+
+	// Check sticker pack 4 is in the device 2 DB
+	jrm, err = s.alice2.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Len(jrmb, 6551)
+
+	ad2spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad2spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad2spc, 3)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(25)}, ad2spc[25].ID)
+	s.Require().Equal("Official Vitalik Stickers", ad2spc[25].Name)
+	s.Require().Equal("totallynotascam", ad2spc[25].Author)
+
+	// Wait for sync message to reach device 1
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check sticker pack 1 and 2 is in the device 1 DB
+	jrm, err = s.alice.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Len(jrmb, 8726)
+
+	ad1spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad1spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad1spc, 4)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, ad1spc[1].ID)
+	s.Require().Equal("Status Cat", ad1spc[1].Name)
+	s.Require().Equal("cryptoworld1373", ad1spc[1].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, ad1spc[2].ID)
+	s.Require().Equal("Cypher Toads", ad1spc[2].Name)
+	s.Require().Equal("crytotoad", ad1spc[2].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1337)}, ad1spc[1337].ID)
+	s.Require().Equal("Status Apes", ad1spc[1337].Name)
+	s.Require().Equal("apes", ad1spc[1337].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(25)}, ad1spc[25].ID)
+	s.Require().Equal("Official Vitalik Stickers", ad1spc[25].Name)
+	s.Require().Equal("totallynotascam", ad1spc[25].Author)
+
+	// Wait for sync message to reach device 2
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := s.alice2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		for _, s := range mr.Settings {
+			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				return nil
+			}
+		}
+		return errors.New("StickersPacksInstalled sync setting not in MessengerResponse")
+	})
+	s.Require().NoError(err)
+
+	// Check sticker pack 2 is in the device 2 DB
+	jrm, err = s.alice2.settings.GetInstalledStickerPacks()
+	s.Require().NoError(err)
+	jrmb, err = jrm.MarshalJSON()
+	s.Require().NoError(err)
+	s.Len(jrmb, 8726)
+
+	ad2spc = make(stickers.StickerPackCollection)
+	err = json.Unmarshal(jrmb, &ad2spc)
+	s.Require().NoError(err)
+	s.Require().Len(ad2spc, 4)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1)}, ad2spc[1].ID)
+	s.Require().Equal("Status Cat", ad2spc[1].Name)
+	s.Require().Equal("cryptoworld1373", ad2spc[1].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(2)}, ad2spc[2].ID)
+	s.Require().Equal("Cypher Toads", ad2spc[2].Name)
+	s.Require().Equal("crytotoad", ad2spc[2].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(1337)}, ad2spc[1337].ID)
+	s.Require().Equal("Status Apes", ad2spc[1337].Name)
+	s.Require().Equal("apes", ad2spc[1337].Author)
+	s.Require().Equal(&bigint.BigInt{Int: big.NewInt(25)}, ad2spc[25].ID)
+	s.Require().Equal("Official Vitalik Stickers", ad2spc[25].Name)
+	s.Require().Equal("totallynotascam", ad2spc[25].Author)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
