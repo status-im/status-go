@@ -284,7 +284,7 @@ func (s *MessengerSyncSettingsSuite) pairTwoDevices(device1, device2 *Messenger)
 	response, err := device1.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Len(response.Chats(), 1)
+	s.Require().Len(response.Chats(), 1)
 	s.False(response.Chats()[0].Active)
 
 	i, ok := device1.allInstallations.Load(device1.installationID)
@@ -623,8 +623,13 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksPrePair() {
 		if len(mr.Settings) == 0 {
 			return errors.New("sync settings not in MessengerResponse")
 		}
-		for _, s := range mr.Settings {
-			if s.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+		for _, setting := range mr.Settings {
+			if setting.GetDBName() == settings.StickersPacksInstalled.GetDBName() {
+				b, err := setting.Value.(json.RawMessage).MarshalJSON()
+				s.Require().NoError(err)
+				if len(b) == 0 {
+					return errors.New("empty StickersPacksInstalled")
+				}
 				return nil
 			}
 		}
@@ -837,7 +842,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksBothPreAndPost
 	s.Require().NoError(err)
 	jrmb, err = jrm.MarshalJSON()
 	s.Require().NoError(err)
-	s.Len(jrmb, 6530)
+	s.Require().Len(jrmb, 6530)
 
 	ad1spc = make(stickers.StickerPackCollection)
 	err = json.Unmarshal(jrmb, &ad1spc)
@@ -852,7 +857,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksBothPreAndPost
 	s.Require().NoError(err)
 	jrmb, err = jrm.MarshalJSON()
 	s.Require().NoError(err)
-	s.Len(jrmb, 6551)
+	s.Require().Len(jrmb, 6551)
 
 	ad2spc = make(stickers.StickerPackCollection)
 	err = json.Unmarshal(jrmb, &ad2spc)
@@ -886,7 +891,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksBothPreAndPost
 	s.Require().NoError(err)
 	jrmb, err = jrm.MarshalJSON()
 	s.Require().NoError(err)
-	s.Len(jrmb, 8726)
+	s.Require().Len(jrmb, 8726)
 
 	ad1spc = make(stickers.StickerPackCollection)
 	err = json.Unmarshal(jrmb, &ad1spc)
@@ -929,7 +934,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacksBothPreAndPost
 	s.Require().NoError(err)
 	jrmb, err = jrm.MarshalJSON()
 	s.Require().NoError(err)
-	s.Len(jrmb, 8726)
+	s.Require().Len(jrmb, 8726)
 
 	ad2spc = make(stickers.StickerPackCollection)
 	err = json.Unmarshal(jrmb, &ad2spc)
