@@ -312,6 +312,7 @@ var (
 		dBColumnName:   "stickers_packs_installed",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // TODO current version of stickers introduces a regression on deleting sticker packs
 			fromInterface:     stickersPacksInstalledProtobufFactory,
 			fromStruct:        stickersPacksInstalledProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
@@ -323,6 +324,7 @@ var (
 		dBColumnName:   "stickers_packs_pending",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // TODO current version of stickers introduces a regression on deleting sticker packs
 			fromInterface:     stickersPacksPendingProtobufFactory,
 			fromStruct:        stickersPacksPendingProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
@@ -334,6 +336,7 @@ var (
 		dBColumnName:   "stickers_recent_stickers",
 		valueHandler:   JSONBlobHandler,
 		syncProtobufFactory: &SyncProtobufFactory{
+			inactive:          true, // TODO current version of stickers introduces a regression on deleting sticker packs
 			fromInterface:     stickersRecentStickersProtobufFactory,
 			fromStruct:        stickersRecentStickersProtobufFactoryStruct,
 			valueFromProtobuf: BytesFromSyncProtobuf,
