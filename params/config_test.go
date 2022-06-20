@@ -48,7 +48,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, "/some/data/path/archivedata", c.TorrentConfig.DataDir)
 	assert.Equal(t, "/some/data/path/torrents", c.TorrentConfig.TorrentDir)
 	assert.Equal(t, 9025, c.TorrentConfig.Port)
-	assert.Equal(t, false, c.TorrentConfig.Enabled)
+	assert.Equal(t, true, c.TorrentConfig.Enabled)
 
 	assert.NoError(t, c.UpdateWithDefaults())
 	assert.NotEmpty(t, c.ShhextConfig.DefaultPushNotificationsServers)
@@ -77,7 +77,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, uint64(3), c.NetworkID)
 	require.Equal(t, tmpDir, c.DataDir)
 	require.Equal(t, tmpDir, c.KeyStoreDir)
-	require.Equal(t, false, c.TorrentConfig.Enabled)
+	require.Equal(t, true, c.TorrentConfig.Enabled)
 	require.Equal(t, 9025, c.TorrentConfig.Port)
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
