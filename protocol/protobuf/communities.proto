@@ -33,6 +33,19 @@ message CommunityPermissions {
   // https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md is a candidate for the algorithm to be used in case we want to have private communityal chats, lighter than pairwise encryption using the DR, less secure, but more efficient for large number of participants
   bool private = 2;
   Access access = 3;
+
+  string ens_subdomain = 4;
+
+  enum AllowedPermissions {
+    UNKNOWN = 0;
+    ADMIN = 1;
+    MEMBER = 2;
+    MODERATE = 3;
+    READ_WRITE = 4;
+    READ = 5;
+  }
+
+  repeated AllowedPermissions allows = 5;
 }
 
 message CommunityDescription {

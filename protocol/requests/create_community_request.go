@@ -34,6 +34,7 @@ type CreateCommunity struct {
 	Emoji                        string                               `json:"emoji"`
 	Membership                   protobuf.CommunityPermissions_Access `json:"membership"`
 	EnsOnly                      bool                                 `json:"ensOnly"`
+	EnsSubdomain                 string                               `json:"ensSubdomain"`
 	Image                        string                               `json:"image"`
 	ImageAx                      int                                  `json:"imageAx"`
 	ImageAy                      int                                  `json:"imageAy"`
@@ -116,8 +117,9 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 	description := &protobuf.CommunityDescription{
 		Identity: ci,
 		Permissions: &protobuf.CommunityPermissions{
-			Access:  c.Membership,
-			EnsOnly: c.EnsOnly,
+			Access:       c.Membership,
+			EnsOnly:      c.EnsOnly,
+			EnsSubdomain: c.EnsSubdomain,
 		},
 		AdminSettings: &protobuf.CommunityAdminSettings{
 			PinMessageAllMembersEnabled: c.PinMessageAllMembersEnabled,
