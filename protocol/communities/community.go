@@ -746,6 +746,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	if o.config.CommunityDescription.AdminSettings == nil {
 		o.config.CommunityDescription.AdminSettings = &protobuf.CommunityAdminSettings{}
 	}
+	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
 	o.increaseClock()
 }
