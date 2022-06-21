@@ -1137,7 +1137,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	if chat.ReadMessagesAtClockValue > state.CurrentMessageState.WhisperTimestamp {
+	if chat.ReadMessagesAtClockValue >= receivedMessage.Clock {
 		receivedMessage.Seen = true
 	}
 

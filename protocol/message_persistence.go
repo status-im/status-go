@@ -604,6 +604,25 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, error) {
+	var clock uint64
+	err := db.db.QueryRow(
+		`
+			SELECT
+                clock_value
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ? AND m1.outgoing_status = ''
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id DESC
+			LIMIT 1
+		`, chatID).Scan(&clock)
+	if err != nil {
+		return 0, err
+	}
+	return clock, nil
+}
+
 func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
