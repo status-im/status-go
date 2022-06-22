@@ -961,6 +961,13 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 
 	contact, _ := state.AllContacts.Load(contactID)
 
+	if len(requestToJoinProto.DisplayName) != 0 {
+		contact.DisplayName = requestToJoinProto.DisplayName
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+		state.ModifiedContacts.Store(contact.ID, true)
+	}
+
 	state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
 
 	return nil
