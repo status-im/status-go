@@ -80,6 +80,7 @@ message CommunityRequestToJoin {
   string ens_name = 2;
   string chat_id = 3;
   bytes community_id = 4;
+  string display_name = 5;
 }
 
 message CommunityRequestToJoinResponse {

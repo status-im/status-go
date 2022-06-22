@@ -354,6 +354,11 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
 	community, requestToJoin, err := m.communitiesManager.RequestToJoin(&m.identity.PublicKey, request)
 	if err != nil {
 		return nil, err
@@ -366,6 +371,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
 		Clock:       requestToJoin.Clock,
 		EnsName:     requestToJoin.ENSName,
+		DisplayName: displayName,
 		CommunityId: community.ID(),
 	}
 
