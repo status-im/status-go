@@ -356,9 +356,18 @@ func NewMessenger(
 		anonMetricsServer.Logger = logger
 	}
 
+	settings, err := accounts.NewDB(database)
+	if err != nil {
+		return nil, err
+	}
+
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName)
+		fleet, err := settings.GetFleet()
+		if err != nil {
+			return nil, err
+		}
+		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, fleet)
 	}
 
 	// Initialize push notification server
@@ -387,11 +396,6 @@ func NewMessenger(
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
 	communitiesManager, err := communities.NewManager(&identity.PublicKey, database, logger, ensVerifier, transp, c.torrentConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	settings, err := accounts.NewDB(database)
 	if err != nil {
 		return nil, err
 	}

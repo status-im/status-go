@@ -20,15 +20,21 @@ type Client struct {
 	logger     *zap.Logger
 	keyUID     string
 	nodeName   string
+	fleet      string
 }
 
-func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string) *Client {
+func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, fleet string) *Client {
+	realFleet := "prod.eth"
+	if len(fleet) > 0 {
+		realFleet = fleet
+	}
 	return &Client{
 		serverURL:  serverURL,
 		httpClient: &http.Client{Timeout: time.Minute},
 		logger:     logger,
 		keyUID:     keyUID,
 		nodeName:   nodeName,
+		fleet:      realFleet,
 	}
 }
 
@@ -37,6 +43,8 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 	url := fmt.Sprintf("%s/received-messages", c.serverURL)
 	var postBody []map[string]interface{}
 	for _, message := range messages {
+		fmt.Println("HELLO")
+		fmt.Println(c.fleet)
 		postBody = append(postBody, map[string]interface{}{
 			"chatId":         filter.ChatID,
 			"messageHash":    types.EncodeHex(sshMessage.Hash),
@@ -45,6 +53,7 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 			"topic":          filter.Topic.String(),
 			"receiverKeyUID": c.keyUID,
 			"nodeName":       c.nodeName,
+			"fleet":          c.fleet,
 		})
 	}
 	body, _ := json.Marshal(postBody)
