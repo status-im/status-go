@@ -449,6 +449,11 @@ func (api *PublicAPI) BanUserFromCommunity(request *requests.BanUserFromCommunit
 	return api.service.messenger.BanUserFromCommunity(request)
 }
 
+// UnbanUserFromCommunity removes the user's pk from the community ban list
+func (api *PublicAPI) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.UnbanUserFromCommunity(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()

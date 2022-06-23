@@ -110,6 +110,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Link                   string                          `json:"link"`
 		CommunityAdminSettings CommunityAdminSettings          `json:"adminSettings"`
 		Encrypted              bool                            `json:"encrypted"`
+		BanList                []string                        `json:"banList"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -150,6 +151,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
+		communityItem.BanList = o.config.CommunityDescription.BanList
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -204,6 +206,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Muted                  bool                                 `json:"muted"`
 		CommunityAdminSettings CommunityAdminSettings               `json:"adminSettings"`
 		Encrypted              bool                                 `json:"encrypted"`
+		BanList                []string                             `json:"banList"`
 	}{
 		ID:                o.ID(),
 		Admin:             o.IsAdmin(),
@@ -252,6 +255,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
+		communityItem.BanList = o.config.CommunityDescription.BanList
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -721,6 +725,28 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	// Remove from chats
 	for _, chat := range o.config.CommunityDescription.Chats {
 		delete(chat.Members, key)
+	}
+
+	o.increaseClock()
+
+	return o.config.CommunityDescription, nil
+}
+
+func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+	key := common.PubkeyToHex(pk)
+
+	for i, v := range o.config.CommunityDescription.BanList {
+		if v == key {
+			o.config.CommunityDescription.BanList =
+				append(o.config.CommunityDescription.BanList[:i], o.config.CommunityDescription.BanList[i+1:]...)
+			break
+		}
 	}
 
 	o.increaseClock()

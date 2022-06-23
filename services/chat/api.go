@@ -94,6 +94,7 @@ type ChannelGroup struct {
 	Members        map[string]*protobuf.CommunityMember     `json:"members"`
 	CanManageUsers bool                                     `json:"canManageUsers"`
 	Muted          bool                                     `json:"muted"`
+	BanList        []string                                 `json:"banList"`
 }
 
 func NewAPI(service *Service) *API {
@@ -166,6 +167,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Members:        community.Description().Members,
 			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),
 			Muted:          community.Muted(),
+			BanList:        community.Description().BanList,
 		}
 
 		for t, i := range community.Images() {
