@@ -979,6 +979,17 @@ func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.
 	return nil
 }
 
+func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.BanUserFromCommunity(request)
 	if err != nil {

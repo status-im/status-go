@@ -1143,6 +1143,18 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 
+	response, err = s.bob.UnbanUserFromCommunity(
+		&requests.UnbanUserFromCommunity{
+			CommunityID: community.ID(),
+			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().False(community.IsBanned(&s.alice.identity.PublicKey))
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
