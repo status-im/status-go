@@ -830,6 +830,9 @@ func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, re
 	if err != nil {
 		return nil, err
 	}
+	if contactRequestID == "" {
+		contactRequestID = defaultContactRequestID(request.ID.String())
+	}
 
 	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 }
