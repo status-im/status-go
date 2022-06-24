@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
@@ -82,22 +83,21 @@ type PayloadMarshaller struct {
 }
 
 func (pm *PayloadMarshaller) LoadPayloads(keystorePath, keyUID, password string) error {
-	err := pm.LoadKeys(keystorePath)
+	err := pm.loadKeys(keystorePath)
 	if err != nil {
 		return err
 	}
 
-	acc, err := pm.multiaccountDB.GetAccount(keyUID)
+	pm.multiaccount, err = pm.multiaccountDB.GetAccount(keyUID)
 	if err != nil {
 		return err
 	}
-	pm.multiaccount = acc
 	pm.password = password
 
 	return nil
 }
 
-func (pm *PayloadMarshaller) LoadKeys(keyStorePath string) error {
+func (pm *PayloadMarshaller) loadKeys(keyStorePath string) error {
 	pm.keys = make(map[string][]byte)
 
 	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
@@ -134,6 +134,65 @@ func (pm *PayloadMarshaller) LoadKeys(keyStorePath string) error {
 	}
 
 	return nil
+}
+
+func (pm *PayloadMarshaller) StorePayloads(keystorePath, password string) error {
+	err := pm.validateKeys(password)
+	if err != nil {
+		return err
+	}
+
+	err = pm.storeKeys(keystorePath)
+	if err != nil {
+		return err
+	}
+
+	err = pm.storeMultiAccount()
+	if err != nil {
+		return err
+	}
+
+	// TODO install PublicKey into settings, probably do this outside of StorePayloads
+	return nil
+}
+
+func (pm *PayloadMarshaller) validateKeys(password string) error {
+	for _, key := range pm.keys {
+		k, err := keystore.DecryptKey(key, password)
+		if err != nil {
+			return err
+		}
+
+		err = generator.ValidateKeystoreExtendedKey(k)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (pm *PayloadMarshaller) storeKeys(keyStorePath string) error {
+	for name, data := range pm.keys {
+		accountKey := new(keystore.EncryptedKeyJSONV3)
+		if err := json.Unmarshal(data, &accountKey); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if len(accountKey.Address) != 40 {
+			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
+		}
+
+		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (pm *PayloadMarshaller) storeMultiAccount() error {
+	return pm.multiaccountDB.SaveAccount(*pm.multiaccount)
 }
 
 func (pm *PayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
