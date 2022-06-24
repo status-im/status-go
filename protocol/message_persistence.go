@@ -702,6 +702,10 @@ func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID st
 			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id DESC
 			LIMIT 1
 		`, contactID, protobuf.ChatMessage_CONTACT_REQUEST).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+
 	if err != nil {
 		return "", err
 	}
