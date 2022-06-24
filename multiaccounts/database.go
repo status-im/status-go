@@ -218,8 +218,21 @@ func (db *Database) SaveAccount(account Account) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if account.Images == nil {
+		return nil
+	}
+
+	var iis []*images.IdentityImage
+	for _, ii := range account.Images {
+		iis = append(iis, &ii)
+	}
+	return db.StoreIdentityImages(account.KeyUID, iis, false)
 }
 
 func (db *Database) UpdateAccount(account Account) error {
