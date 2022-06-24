@@ -138,6 +138,81 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 	return rst, nil
 }
 
+func (db *Database) GetAccount(keyUID string) (acc *Account, err error) {
+	// TODO add test for this
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		errClose := rows.Close()
+		err = valueOr(err, errClose)
+	}()
+
+	for rows.Next() {
+		accLoginTimestamp := sql.NullInt64{}
+		accIdenticon := sql.NullString{}
+		accColorHash := sql.NullString{}
+		accColorID := sql.NullInt64{}
+		ii := &images.IdentityImage{}
+		iiName := sql.NullString{}
+		iiWidth := sql.NullInt64{}
+		iiHeight := sql.NullInt64{}
+		iiFileSize := sql.NullInt64{}
+		iiResizeTarget := sql.NullInt64{}
+		iiClock := sql.NullInt64{}
+
+		err = rows.Scan(
+			&acc.Name,
+			&accLoginTimestamp,
+			&accIdenticon,
+			&accColorHash,
+			&accColorID,
+			&acc.KeycardPairing,
+			&acc.KeyUID,
+			&iiName,
+			&ii.Payload,
+			&iiWidth,
+			&iiHeight,
+			&iiFileSize,
+			&iiResizeTarget,
+			&iiClock,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		acc.Timestamp = accLoginTimestamp.Int64
+		acc.Identicon = accIdenticon.String
+		acc.ColorID = accColorID.Int64
+		if len(accColorHash.String) != 0 {
+			err = json.Unmarshal([]byte(accColorHash.String), &acc.ColorHash)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		ii.KeyUID = acc.KeyUID
+		ii.Name = iiName.String
+		ii.Width = int(iiWidth.Int64)
+		ii.Height = int(iiHeight.Int64)
+		ii.FileSize = int(iiFileSize.Int64)
+		ii.ResizeTarget = int(iiResizeTarget.Int64)
+		ii.Clock = uint64(iiClock.Int64)
+
+		if ii.Name == "" && len(ii.Payload) == 0 && ii.Width == 0 && ii.Height == 0 && ii.FileSize == 0 && ii.ResizeTarget == 0 {
+			ii = nil
+		}
+
+		// Don't process nil identity images
+		if ii != nil {
+			acc.Images = append(acc.Images, *ii)
+		}
+	}
+
+	return acc, nil
+}
+
 func (db *Database) SaveAccount(account Account) error {
 	colorHash, err := json.Marshal(account.ColorHash)
 	if err != nil {

@@ -8,14 +8,14 @@ import (
 )
 
 type IdentityImage struct {
-	KeyUID       string
-	Name         string
-	Payload      []byte
-	Width        int
-	Height       int
-	FileSize     int
-	ResizeTarget int
-	Clock        uint64
+	KeyUID       string `json:"key_uid"`
+	Name         string `json:"name"`
+	Payload      []byte `json:"payload"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	FileSize     int    `json:"file_size"`
+	ResizeTarget int    `json:"resize_target"`
+	Clock        uint64 `json:"clock"`
 }
 
 func (i IdentityImage) GetType() (ImageType, error) {

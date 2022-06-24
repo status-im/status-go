@@ -3,8 +3,19 @@ package server
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
+	"github.com/golang/protobuf/proto"
+
+	"github.com/status-im/status-go/eth-node/keystore"
+	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Payload struct {
@@ -60,4 +71,182 @@ func (pm *PayloadManager) Received() []byte {
 func (pm *PayloadManager) ResetPayload() {
 	pm.toSend = new(Payload)
 	pm.received = new(Payload)
+}
+
+type PayloadMarshaller struct {
+	multiaccountDB *multiaccounts.Database
+
+	keys         map[string][]byte
+	multiaccount *multiaccounts.Account
+	password     string
+}
+
+func (pm *PayloadMarshaller) LoadPayloads(keystorePath, keyUID, password string) error {
+	err := pm.LoadKeys(keystorePath)
+	if err != nil {
+		return err
+	}
+
+	acc, err := pm.multiaccountDB.GetAccount(keyUID)
+	if err != nil {
+		return err
+	}
+	pm.multiaccount = acc
+	pm.password = password
+
+	return nil
+}
+
+func (pm *PayloadMarshaller) LoadKeys(keyStorePath string) error {
+	pm.keys = make(map[string][]byte)
+
+	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fileInfo.IsDir() || filepath.Dir(path) != keyStorePath {
+			return nil
+		}
+
+		rawKeyFile, err := ioutil.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("invalid account key file: %v", err)
+		}
+
+		accountKey := new(keystore.EncryptedKeyJSONV3)
+		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if len(accountKey.Address) != 40 {
+			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
+		}
+
+		pm.keys[fileInfo.Name()] = rawKeyFile
+
+		return nil
+	}
+
+	err := filepath.Walk(keyStorePath, fileWalker)
+	if err != nil {
+		return fmt.Errorf("cannot traverse key store folder: %v", err)
+	}
+
+	return nil
+}
+
+func (pm *PayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
+	// TODO test this
+	return proto.Marshal(&protobuf.LocalPairingPayload{
+		Keys:         pm.accountKeysToProtobuf(),
+		Multiaccount: pm.multiaccountToProtobuf(),
+		Password:     pm.password,
+	})
+}
+
+func (pm *PayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
+	var keys []*protobuf.LocalPairingPayload_Key
+	for name, data := range pm.keys {
+		keys = append(keys, &protobuf.LocalPairingPayload_Key{Name: name, Data: data})
+	}
+	return keys
+}
+
+func (pm *PayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
+	var colourHashes []*protobuf.MultiAccount_ColourHash
+	for _, index := range pm.multiaccount.ColorHash {
+		var i []int64
+		for _, is := range index {
+			i = append(i, int64(is))
+		}
+
+		colourHashes = append(colourHashes, &protobuf.MultiAccount_ColourHash{Index: i})
+	}
+
+	var identityImages []*protobuf.MultiAccount_IdentityImage
+	for _, ii := range pm.multiaccount.Images {
+		identityImages = append(identityImages, &protobuf.MultiAccount_IdentityImage{
+			KeyUid:       ii.KeyUID,
+			Name:         ii.Name,
+			Payload:      ii.Payload,
+			Width:        int64(ii.Width),
+			Height:       int64(ii.Height),
+			Filesize:     int64(ii.FileSize),
+			ResizeTarget: int64(ii.ResizeTarget),
+			Clock:        ii.Clock,
+		})
+	}
+
+	return &protobuf.MultiAccount{
+		Name:           pm.multiaccount.Name,
+		Timestamp:      pm.multiaccount.Timestamp,
+		Identicon:      pm.multiaccount.Identicon,
+		ColorHash:      colourHashes,
+		ColorId:        pm.multiaccount.ColorID,
+		KeycardPairing: pm.multiaccount.KeycardPairing,
+		KeyUid:         pm.multiaccount.KeyUID,
+		Images:         identityImages,
+	}
+}
+
+func (pm *PayloadMarshaller) UnmarshalProtobuf(data []byte) error {
+	// TODO test this
+	pb := new(protobuf.LocalPairingPayload)
+	err := proto.Unmarshal(data, pb)
+	if err != nil {
+		return err
+	}
+
+	pm.accountKeysFromProtobuf(pb.Keys)
+	pm.multiaccountFromProtobuf(pb.Multiaccount)
+	pm.password = pb.Password
+	return nil
+}
+
+func (pm *PayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
+	if pm.keys == nil {
+		pm.keys = make(map[string][]byte)
+	}
+
+	for _, key := range pbKeys {
+		pm.keys[key.Name] = key.Data
+	}
+}
+
+func (pm *PayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
+	var colourHash [][]int
+	for _, index := range pbMultiAccount.ColorHash {
+		var i []int
+		for _, is := range index.Index {
+			i = append(i, int(is))
+		}
+
+		colourHash = append(colourHash, i)
+	}
+
+	var identityImages []images.IdentityImage
+	for _, ii := range pbMultiAccount.Images {
+		identityImages = append(identityImages, images.IdentityImage{
+			KeyUID:       ii.KeyUid,
+			Name:         ii.Name,
+			Payload:      ii.Payload,
+			Width:        int(ii.Width),
+			Height:       int(ii.Height),
+			FileSize:     int(ii.Filesize),
+			ResizeTarget: int(ii.ResizeTarget),
+			Clock:        ii.Clock,
+		})
+	}
+
+	pm.multiaccount = &multiaccounts.Account{
+		Name:           pbMultiAccount.Name,
+		Timestamp:      pbMultiAccount.Timestamp,
+		Identicon:      pbMultiAccount.Identicon,
+		ColorHash:      colourHash,
+		ColorID:        pbMultiAccount.ColorId,
+		KeycardPairing: pbMultiAccount.KeycardPairing,
+		KeyUID:         pbMultiAccount.KeyUid,
+		Images:         identityImages,
+	}
 }
