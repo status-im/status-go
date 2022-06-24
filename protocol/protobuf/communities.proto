@@ -48,6 +48,7 @@ message CommunityDescription {
   string intro_message = 11;
   string outro_message = 12;
   bool encrypted = 13;
+  repeated string tags = 14;
 }
 
 message CommunityAdminSettings {

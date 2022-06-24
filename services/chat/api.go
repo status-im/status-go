@@ -89,6 +89,7 @@ type ChannelGroup struct {
 	Description    string                                   `json:"description"`
 	IntroMessage   string                                   `json:"introMessage"`
 	OutroMessage   string                                   `json:"outroMessage"`
+	Tags           []communities.CommunityTag               `json:"tags"`
 	Permissions    *protobuf.CommunityPermissions           `json:"permissions"`
 	Members        map[string]*protobuf.CommunityMember     `json:"members"`
 	CanManageUsers bool                                     `json:"canManageUsers"`
@@ -130,6 +131,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		Description:  "",
 		IntroMessage: "",
 		OutroMessage: "",
+		Tags:         []communities.CommunityTag{},
 		Permissions:  &protobuf.CommunityPermissions{},
 		Muted:        false,
 	}
@@ -159,6 +161,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Description:    community.DescriptionText(),
 			IntroMessage:   community.IntroMessage(),
 			OutroMessage:   community.OutroMessage(),
+			Tags:           community.Tags(),
 			Permissions:    community.Description().Permissions,
 			Members:        community.Description().Members,
 			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),

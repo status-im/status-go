@@ -21,6 +21,7 @@ var ErrInvalidCommunityDescriptionCategoryNoName = errors.New("invalid community
 var ErrInvalidCommunityDescriptionChatIdentity = errors.New("invalid community chat name, missing")
 var ErrInvalidCommunityDescriptionDuplicatedName = errors.New("invalid community chat name, duplicated")
 var ErrInvalidCommunityDescriptionUnknownChatCategory = errors.New("invalid community category in chat")
+var ErrInvalidCommunityTags = errors.New("invalid community tags")
 var ErrNotAdmin = errors.New("no admin privileges for this community")
 var ErrInvalidGrant = errors.New("invalid grant")
 var ErrNotAuthorized = errors.New("not authorized")
