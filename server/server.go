@@ -83,6 +83,7 @@ func (s *Server) applyHandlers() {
 
 func (s *Server) Start() error {
 	// Once Shutdown has been called on a server, it may not be reused;
+	s.logger.Info("media server starting...")
 	s.resetServer()
 	s.applyHandlers()
 	go s.listenAndServe()

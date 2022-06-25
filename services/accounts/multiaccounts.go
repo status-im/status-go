@@ -3,6 +3,8 @@ package accounts
 import (
 	"errors"
 
+	"github.com/status-im/status-go/server"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 )
@@ -12,13 +14,14 @@ var (
 	ErrUpdatingWrongAccount = errors.New("failed to update wrong account. Please login with that account first")
 )
 
-func NewMultiAccountsAPI(db *multiaccounts.Database) *MultiAccountsAPI {
-	return &MultiAccountsAPI{db: db}
+func NewMultiAccountsAPI(db *multiaccounts.Database, mediaServer *server.MediaServer) *MultiAccountsAPI {
+	return &MultiAccountsAPI{db: db, mediaServer: mediaServer}
 }
 
 // MultiAccountsAPI is class with methods available over RPC.
 type MultiAccountsAPI struct {
-	db *multiaccounts.Database
+	db          *multiaccounts.Database
+	mediaServer *server.MediaServer
 }
 
 func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error {
@@ -31,12 +34,20 @@ func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error 
 
 // GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
 func (api *MultiAccountsAPI) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
-	return api.db.GetIdentityImages(keyUID)
+	images, err := api.db.GetIdentityImages(keyUID)
+	for i, _ := range images {
+		images[i].RingUrl = api.mediaServer.MakeDrawRingURL(keyUID, server.DrawRingTypeAccount, images[i].Name)
+	}
+	return images, err
 }
 
 // GetIdentityImage returns a json object representing the image with the given name
 func (api *MultiAccountsAPI) GetIdentityImage(keyUID, name string) (*images.IdentityImage, error) {
-	return api.db.GetIdentityImage(keyUID, name)
+	image, err := api.db.GetIdentityImage(keyUID, name)
+	if image != nil {
+		image.RingUrl = api.mediaServer.MakeDrawRingURL(keyUID, server.DrawRingTypeAccount, image.Name)
+	}
+	return image, err
 }
 
 // StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.

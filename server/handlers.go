@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"crypto/rand"
 	"database/sql"
+	"image"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
+
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
+	"github.com/status-im/status-go/protocol/identity/ring"
 
 	"github.com/btcsuite/btcutil/base58"
 	"go.uber.org/zap"
@@ -36,13 +43,119 @@ const (
 	// Session names
 	sessionChallenge = "challenge"
 	sessionBlocked   = "blocked"
+
+	drawRingPath        = basePath + "/drawRing"
+	DrawRingTypeAccount = "account"
+	DrawRingTypeContact = "contact"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
 
+func drawRingForAccountIdentity(multiaccountsDB *multiaccounts.Database, publicKey string, imageName string, theme ring.Theme, colorHash [][]int) ([]byte, error) {
+	image, err := multiaccountsDB.GetIdentityImage(publicKey, imageName)
+	if err != nil {
+		return nil, err
+	}
+	return ring.DrawRing(&ring.DrawRingParam{
+		Theme: theme, ColorHash: colorHash, ImageBytes: image.Payload, Height: image.Height, Width: image.Width,
+	})
+}
+
+func drawRingForContactIdentity(db *sql.DB, publicKey string, imageName string, theme ring.Theme, colorHash [][]int) ([]byte, error) {
+	var payload []byte
+	err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, publicKey, imageName).Scan(&payload)
+	if err != nil {
+		return nil, err
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return ring.DrawRing(&ring.DrawRingParam{
+		Theme: theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
+	})
+}
+
+func handleDrawRing(db *sql.DB, multiaccountsDB *multiaccounts.Database, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+		pks, ok := params["publicKey"]
+		if !ok || len(pks) == 0 {
+			logger.Error("no publicKey")
+			return
+		}
+		types, ok := params["type"] // account or contact
+		if !ok || len(types) == 0 {
+			logger.Error("no type")
+			return
+		}
+		imageNames, ok := params["imageName"]
+		if !ok || len(imageNames) == 0 {
+			logger.Error("no imageName")
+			return
+		}
+		colorHash, err := colorhash.GenerateFor(pks[0])
+		if err != nil {
+			logger.Error("could not generate color hash")
+			return
+		}
+
+		var image []byte
+		var theme = getTheme(params, logger)
+		if types[0] == DrawRingTypeAccount {
+			image, err = drawRingForAccountIdentity(multiaccountsDB, pks[0], imageNames[0], theme, colorHash)
+			if err != nil {
+				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				return
+			}
+		} else if types[0] == DrawRingTypeContact {
+			image, err = drawRingForContactIdentity(db, pks[0], imageNames[0], theme, colorHash)
+			if err != nil {
+				logger.Error("failed to draw ring for contact identity", zap.Error(err))
+				return
+			}
+		} else {
+			logger.Error("unknown type:", zap.String("type", types[0]))
+			return
+		}
+
+		if len(image) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.ImageMime(image)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
+	theme := ring.LightTheme // default
+	themes, ok := params["theme"]
+	if ok && len(themes) > 0 {
+		t, err := strconv.Atoi(themes[0])
+		if err != nil {
+			logger.Error("invalid param[theme], value: " + themes[0])
+		} else {
+			theme = ring.Theme(t)
+		}
+	}
+	return theme
+}
+
 func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pks, ok := r.URL.Query()["publicKey"]
+		params := r.URL.Query()
+		pks, ok := params["publicKey"]
 		if !ok || len(pks) == 0 {
 			logger.Error("no publicKey")
 			return
@@ -51,6 +164,22 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 		image, err := identicon.Generate(pk)
 		if err != nil {
 			logger.Error("could not generate identicon")
+		}
+
+		if image != nil {
+			colorHash, err := colorhash.GenerateFor(pk)
+			if err != nil {
+				logger.Error("could not generate color hash")
+				return
+			}
+
+			theme := getTheme(params, logger)
+			image, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: colorHash, ImageBytes: image, Height: identicon.Height, Width: identicon.Width,
+			})
+			if err != nil {
+				logger.Error("failed to draw ring", zap.Error(err))
+			}
 		}
 
 		w.Header().Set("Content-Type", "image/png")
