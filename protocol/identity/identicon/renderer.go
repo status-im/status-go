@@ -9,6 +9,11 @@ import (
 	"image/png"
 )
 
+const (
+	Width  = 50
+	Height = 50
+)
+
 func renderBase64(id Identicon) (string, error) {
 	img, err := render(id)
 	if err != nil {
@@ -38,7 +43,7 @@ func drawRect(rgba *image.RGBA, i int, c color.Color) {
 }
 
 func render(id Identicon) ([]byte, error) {
-	img := image.NewRGBA(image.Rect(0, 0, 50, 50))
+	img := image.NewRGBA(image.Rect(0, 0, Width, Height))
 	var buff bytes.Buffer
 
 	setBackgroundTransparent(img)

@@ -1788,6 +1788,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	if contact.DisplayName != ci.DisplayName && len(ci.DisplayName) != 0 {
 		contact.DisplayName = ci.DisplayName
 		state.ModifiedContacts.Store(contact.ID, true)
+		m.SetRingUrlForContactImage(contact)
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
@@ -1844,8 +1845,8 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 				contact.Images = make(map[string]images.IdentityImage)
 			}
 			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
-
 		}
+		m.SetRingUrlForContactImage(contact)
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}

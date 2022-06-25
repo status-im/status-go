@@ -16,6 +16,7 @@ type IdentityImage struct {
 	FileSize     int
 	ResizeTarget int
 	Clock        uint64
+	RingUrl      string
 }
 
 func (i IdentityImage) GetType() (ImageType, error) {
@@ -36,9 +37,13 @@ func (i IdentityImage) GetDataURI() (string, error) {
 }
 
 func (i IdentityImage) MarshalJSON() ([]byte, error) {
-	uri, err := i.GetDataURI()
-	if err != nil {
-		return nil, err
+	var uri = i.RingUrl
+	if i.RingUrl == "" {
+		b64Uri, err := i.GetDataURI()
+		if err != nil {
+			return nil, err
+		}
+		uri = b64Uri
 	}
 
 	temp := struct {

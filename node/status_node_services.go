@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/status-im/status-go/server"
+
 	logging "github.com/ipfs/go-log"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -59,7 +61,7 @@ var (
 	OpenseaKeyFromEnv string
 )
 
-func (b *StatusNode) initServices(config *params.NodeConfig) error {
+func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
 	accountsFeed := &event.Feed{}
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -78,7 +80,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
-	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB))
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
@@ -364,7 +366,7 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 	return b.rpcStatsSrvc
 }
 
-func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.Database) *accountssvc.Service {
+func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.Database, mediaServer *server.MediaServer) *accountssvc.Service {
 	if b.accountsSrvc == nil {
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,
@@ -372,6 +374,7 @@ func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.D
 			b.gethAccountManager,
 			b.config,
 			accountsFeed,
+			mediaServer,
 		)
 	}
 

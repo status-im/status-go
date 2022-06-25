@@ -1402,6 +1402,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	m.SetRingUrlForContactImages(contacts)
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
@@ -1427,6 +1428,20 @@ func (m *Messenger) Init() error {
 
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
 	return err
+}
+
+func (m *Messenger) SetRingUrlForContactImages(contacts []*Contact) {
+	for i, _ := range contacts {
+		m.SetRingUrlForContactImage(contacts[i])
+	}
+}
+
+func (m *Messenger) SetRingUrlForContactImage(contact *Contact) {
+	for key, _ := range contact.Images {
+		image := contact.Images[key]
+		image.RingUrl = m.httpServer.MakeDrawRingURL(contact.ID, server.DrawRingTypeContact, image.Name)
+		contact.Images[key] = image
+	}
 }
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
