@@ -80,6 +80,8 @@ require (
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3
 )
 
+require github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
+
 require github.com/gorilla/sessions v1.2.1
 
 require (
@@ -135,6 +137,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-migrate/migrate/v4 v4.15.2 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.0.1 // indirect
