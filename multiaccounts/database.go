@@ -138,8 +138,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 	return rst, nil
 }
 
-func (db *Database) GetAccount(keyUID string) (acc *Account, err error) {
-	// TODO add test for this
+func (db *Database) GetAccount(keyUID string) (*Account, error) {
 	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
 	if err != nil {
 		return nil, err
@@ -148,6 +147,8 @@ func (db *Database) GetAccount(keyUID string) (acc *Account, err error) {
 		errClose := rows.Close()
 		err = valueOr(err, errClose)
 	}()
+
+	acc := new(Account)
 
 	for rows.Next() {
 		accLoginTimestamp := sql.NullInt64{}
@@ -200,12 +201,8 @@ func (db *Database) GetAccount(keyUID string) (acc *Account, err error) {
 		ii.ResizeTarget = int(iiResizeTarget.Int64)
 		ii.Clock = uint64(iiClock.Int64)
 
-		if ii.Name == "" && len(ii.Payload) == 0 && ii.Width == 0 && ii.Height == 0 && ii.FileSize == 0 && ii.ResizeTarget == 0 {
-			ii = nil
-		}
-
-		// Don't process nil identity images
-		if ii != nil {
+		// Don't process empty identity images
+		if !ii.IsEmpty() {
 			acc.Images = append(acc.Images, *ii)
 		}
 	}
@@ -228,11 +225,7 @@ func (db *Database) SaveAccount(account Account) error {
 		return nil
 	}
 
-	var iis []*images.IdentityImage
-	for _, ii := range account.Images {
-		iis = append(iis, &ii)
-	}
-	return db.StoreIdentityImages(account.KeyUID, iis, false)
+	return db.StoreIdentityImages(account.KeyUID, account.Images, false)
 }
 
 func (db *Database) UpdateAccount(account Account) error {
@@ -295,7 +288,7 @@ func (db *Database) GetIdentityImage(keyUID, it string) (*images.IdentityImage, 
 	return &ii, nil
 }
 
-func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityImage, publish bool) (err error) {
+func (db *Database) StoreIdentityImages(keyUID string, iis []images.IdentityImage, publish bool) (err error) {
 	// Because SQL INSERTs are triggered in a loop use a tx to ensure a single call to the DB.
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -312,7 +305,7 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityIma
 	}()
 
 	for _, ii := range iis {
-		if ii == nil {
+		if ii.IsEmpty() {
 			continue
 		}
 

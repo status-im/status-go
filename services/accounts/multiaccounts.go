@@ -43,7 +43,7 @@ func (api *MultiAccountsAPI) GetIdentityImage(keyUID, name string) (*images.Iden
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
-func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) ([]*images.IdentityImage, error) {
+func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) ([]images.IdentityImage, error) {
 	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 	return iis, err
 }
 
-func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]*images.IdentityImage, error) {
+func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]images.IdentityImage, error) {
 	iis, err := images.GenerateIdentityImagesFromURL(url)
 	if err != nil {
 		return nil, err

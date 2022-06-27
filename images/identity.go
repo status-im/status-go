@@ -63,3 +63,10 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(temp)
 }
+
+func (i IdentityImage) IsEmpty() bool {
+	if i.KeyUID == "" && i.Name == "" && len(i.Payload) == 0 && i.Width == 0 && i.Height == 0 && i.FileSize == 0 && i.ResizeTarget == 0 && i.Clock == 0 {
+		return true
+	}
+	return false
+}
