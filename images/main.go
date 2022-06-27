@@ -5,8 +5,8 @@ import (
 	"image"
 )
 
-func GenerateImageVariants(cImg image.Image) ([]*IdentityImage, error) {
-	var iis []*IdentityImage
+func GenerateImageVariants(cImg image.Image) ([]IdentityImage, error) {
+	var iis []IdentityImage
 	var err error
 
 	for _, s := range ResizeDimensions {
@@ -18,7 +18,7 @@ func GenerateImageVariants(cImg image.Image) ([]*IdentityImage, error) {
 			return nil, err
 		}
 
-		ii := &IdentityImage{
+		ii := IdentityImage{
 			Name:         ResizeDimensionToName[s],
 			Payload:      bb.Bytes(),
 			Width:        rImg.Bounds().Dx(),
@@ -33,7 +33,7 @@ func GenerateImageVariants(cImg image.Image) ([]*IdentityImage, error) {
 	return iis, nil
 }
 
-func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityImage, error) {
+func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]IdentityImage, error) {
 	img, err := Decode(filepath)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityIma
 	return GenerateImageVariants(cImg)
 }
 
-func GenerateIdentityImagesFromURL(url string) ([]*IdentityImage, error) {
+func GenerateIdentityImagesFromURL(url string) ([]IdentityImage, error) {
 	img, err := DecodeFromURL(url)
 	if err != nil {
 		return nil, err

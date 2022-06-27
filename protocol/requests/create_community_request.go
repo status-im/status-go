@@ -104,7 +104,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 				return nil, err
 			}
 			for _, img := range imgs {
-				ciis[img.Name] = adaptIdentityImageToProtobuf(img)
+				ciis[img.Name] = adaptIdentityImageToProtobuf(&img)
 			}
 		}
 		if c.Banner.ImagePath != "" {

@@ -126,7 +126,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 	s.NoError(err)
 }
 
-func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) []*images.IdentityImage {
+func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) []images.IdentityImage {
 	keyUID := s.generateKeyUID(&m.identity.PublicKey)
 	iis := images.SampleIdentityImages()
 	s.Require().NoError(m.multiAccounts.StoreIdentityImages(keyUID, iis, false))

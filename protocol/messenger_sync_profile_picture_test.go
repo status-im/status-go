@@ -110,8 +110,8 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	)
 
 	iis := images.SampleIdentityImages()
-	for _, img := range iis {
-		img.Clock = highClock
+	for i := range iis {
+		iis[i].Clock = highClock
 	}
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
 
@@ -131,7 +131,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 			return nil
 		}
 
-		return errors.New("Not received all identity images")
+		return errors.New("not received all identity images")
 	})
 
 	s.Require().NoError(err)
@@ -143,13 +143,13 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 
 	// Check that we don't update images with earlier clock values
 
-	for _, img := range iis {
-		img.Clock = lowClock
+	for i := range iis {
+		iis[i].Clock = lowClock
 	}
 	iis2 := images.SampleIdentityImages()
-	for i, img := range iis2 {
-		img.Name = fmt.Sprintf("newimg%d", i)
-		img.Clock = highClock
+	for i := range iis2 {
+		iis2[i].Name = fmt.Sprintf("newimg%d", i)
+		iis2[i].Clock = highClock
 	}
 	iis = append(iis, iis2...)
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
@@ -169,7 +169,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 			return nil
 		}
 
-		return errors.New("Not received all identity images")
+		return errors.New("not received all identity images")
 	})
 
 	syncedImages, err = theirMessenger.multiAccounts.GetIdentityImages(keyUID)
@@ -180,5 +180,4 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	}
 
 	s.Require().NoError(theirMessenger.Shutdown())
-
 }

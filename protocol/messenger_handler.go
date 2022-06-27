@@ -543,14 +543,14 @@ func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, messa
 	for _, img := range dbImages {
 		dbImageMap[img.Name] = img
 	}
-	idImages := make([]*images.IdentityImage, len(message.Pictures))
+	idImages := make([]images.IdentityImage, len(message.Pictures))
 	i := 0
 	for _, message := range message.Pictures {
 		dbImg := dbImageMap[message.Name]
 		if dbImg != nil && message.Clock <= dbImg.Clock {
 			continue
 		}
-		image := &images.IdentityImage{
+		image := images.IdentityImage{
 			Name:         message.Name,
 			Payload:      message.Payload,
 			Width:        int(message.Width),
