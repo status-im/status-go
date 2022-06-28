@@ -550,6 +550,11 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 	} else {
 		contact.Block()
 	}
+
+	_, retractErr := m.retractContactRequest(contact)
+	if retractErr != nil {
+		return nil, retractErr
+	}
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
@@ -769,19 +774,11 @@ func (m *Messenger) addENSNameToContact(contact *Contact) error {
 	return nil
 }
 
-func (m *Messenger) RetractContactRequest(request *requests.RetractContactRequest) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-	contact, ok := m.allContacts.Load(request.ContactID.String())
-	if !ok {
-		return nil, errors.New("contact not found")
-	}
+func (m *Messenger) retractContactRequest(contact *Contact) (*MessengerResponse, error) {
 	contact.HasAddedUs = false
 	m.allContacts.Store(contact.ID, contact)
 	response := &MessengerResponse{}
-	err = m.removeContact(context.Background(), response, contact.ID)
+	err := m.removeContact(context.Background(), response, contact.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -819,6 +816,19 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 	}
 
 	return response, err
+}
+
+func (m *Messenger) RetractContactRequest(request *requests.RetractContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+	contact, ok := m.allContacts.Load(request.ContactID.String())
+	if !ok {
+		return nil, errors.New("contact not found")
+	}
+
+	return m.retractContactRequest(contact)
 }
 
 func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*MessengerResponse, error) {
