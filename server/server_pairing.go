@@ -22,7 +22,7 @@ type Config struct {
 	Mode     Mode
 }
 
-// NewPairingServer returns a *NewPairingServer init from the given *Config
+// NewPairingServer returns a *PairingServer init from the given *Config
 func NewPairingServer(config *Config) (*PairingServer, error) {
 	pm, err := NewPayloadManager(config.PK)
 	if err != nil {
