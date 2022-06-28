@@ -74,12 +74,18 @@ func (pm *PayloadManager) ResetPayload() {
 	pm.received = new(Payload)
 }
 
+// PayloadMarshaller is responsible for loading, parsing, marshalling, unmarshalling and storing of PairingServer
+// payload data
 type PayloadMarshaller struct {
 	multiaccountDB *multiaccounts.Database
 
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
+}
+
+func NewPayloadMarshaller(db *multiaccounts.Database) *PayloadMarshaller {
+	return &PayloadMarshaller{multiaccountDB: db}
 }
 
 func (pm *PayloadMarshaller) LoadPayloads(keystorePath, keyUID, password string) error {
@@ -196,7 +202,6 @@ func (pm *PayloadMarshaller) storeMultiAccount() error {
 }
 
 func (pm *PayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
-	// TODO test this
 	return proto.Marshal(&protobuf.LocalPairingPayload{
 		Keys:         pm.accountKeysToProtobuf(),
 		Multiaccount: pm.multiaccountToProtobuf(),
@@ -250,7 +255,6 @@ func (pm *PayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
 }
 
 func (pm *PayloadMarshaller) UnmarshalProtobuf(data []byte) error {
-	// TODO test this
 	pb := new(protobuf.LocalPairingPayload)
 	err := proto.Unmarshal(data, pb)
 	if err != nil {
