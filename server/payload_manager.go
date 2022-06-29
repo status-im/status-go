@@ -19,207 +19,121 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-type Payload struct {
+type PairingPayloadManager struct {
+	pem *PayloadEncryptionManager
+	ppm *PairingPayloadMarshaller
+	ppr *PairingPayloadRepository
+}
+
+func NewPairingPayloadManager(pk *ecdsa.PrivateKey, db *multiaccounts.Database) (*PairingPayloadManager, error) {
+	pem, err := NewPayloadEncryptionManager(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PairingPayloadManager{
+		pem: pem,
+		ppm: NewPairingPayloadMarshaller(),
+		ppr: NewPairingPayloadRepository(db),
+	}, nil
+}
+
+// EncryptionPayload represents the plain text and encrypted text of a Server's payload data
+type EncryptionPayload struct {
 	plain     []byte
 	encrypted []byte
 }
 
-type PayloadManager struct {
+// PayloadEncryptionManager is responsible for encrypting and decrypting a Server's payload data
+type PayloadEncryptionManager struct {
 	aesKey   []byte
-	toSend   *Payload
-	received *Payload
+	toSend   *EncryptionPayload
+	received *EncryptionPayload
 }
 
-func NewPayloadManager(pk *ecdsa.PrivateKey) (*PayloadManager, error) {
+func NewPayloadEncryptionManager(pk *ecdsa.PrivateKey) (*PayloadEncryptionManager, error) {
 	ek, err := makeEncryptionKey(pk)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PayloadManager{ek, new(Payload), new(Payload)}, nil
+	return &PayloadEncryptionManager{ek, new(EncryptionPayload), new(EncryptionPayload)}, nil
 }
 
-func (pm *PayloadManager) Mount(data []byte) error {
-	ep, err := common.Encrypt(data, pm.aesKey, rand.Reader)
+func (pem *PayloadEncryptionManager) Mount(data []byte) error {
+	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
 	if err != nil {
 		return err
 	}
 
-	pm.toSend.plain = data
-	pm.toSend.encrypted = ep
+	pem.toSend.plain = data
+	pem.toSend.encrypted = ep
 	return nil
 }
 
-func (pm *PayloadManager) Receive(data []byte) error {
-	pd, err := common.Decrypt(data, pm.aesKey)
+func (pem *PayloadEncryptionManager) Receive(data []byte) error {
+	pd, err := common.Decrypt(data, pem.aesKey)
 	if err != nil {
 		return err
 	}
 
-	pm.received.encrypted = data
-	pm.received.plain = pd
+	pem.received.encrypted = data
+	pem.received.plain = pd
 	return nil
 }
 
-func (pm *PayloadManager) ToSend() []byte {
-	return pm.toSend.encrypted
+func (pem *PayloadEncryptionManager) ToSend() []byte {
+	return pem.toSend.encrypted
 }
 
-func (pm *PayloadManager) Received() []byte {
-	return pm.received.plain
+func (pem *PayloadEncryptionManager) Received() []byte {
+	return pem.received.plain
 }
 
-func (pm *PayloadManager) ResetPayload() {
-	pm.toSend = new(Payload)
-	pm.received = new(Payload)
+func (pem *PayloadEncryptionManager) ResetPayload() {
+	pem.toSend = new(EncryptionPayload)
+	pem.received = new(EncryptionPayload)
 }
 
-// PayloadMarshaller is responsible for loading, parsing, marshalling, unmarshalling and storing of PairingServer
-// payload data
-type PayloadMarshaller struct {
-	multiaccountDB *multiaccounts.Database
-
+// PairingPayload represents the payload structure a PairingServer handles
+type PairingPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
 }
 
-func NewPayloadMarshaller(db *multiaccounts.Database) *PayloadMarshaller {
-	return &PayloadMarshaller{multiaccountDB: db}
+// PairingPayloadMarshaller is responsible for marshalling and unmarshalling PairingServer payload data
+type PairingPayloadMarshaller struct {
+	*PairingPayload
 }
 
-func (pm *PayloadMarshaller) LoadPayloads(keystorePath, keyUID, password string) error {
-	err := pm.loadKeys(keystorePath)
-	if err != nil {
-		return err
-	}
-
-	pm.multiaccount, err = pm.multiaccountDB.GetAccount(keyUID)
-	if err != nil {
-		return err
-	}
-	pm.password = password
-
-	return nil
+func NewPairingPayloadMarshaller() *PairingPayloadMarshaller {
+	return &PairingPayloadMarshaller{PairingPayload: new(PairingPayload)}
 }
 
-func (pm *PayloadMarshaller) loadKeys(keyStorePath string) error {
-	pm.keys = make(map[string][]byte)
-
-	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if fileInfo.IsDir() || filepath.Dir(path) != keyStorePath {
-			return nil
-		}
-
-		rawKeyFile, err := ioutil.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("invalid account key file: %v", err)
-		}
-
-		accountKey := new(keystore.EncryptedKeyJSONV3)
-		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
-		}
-
-		if len(accountKey.Address) != 40 {
-			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
-		}
-
-		pm.keys[fileInfo.Name()] = rawKeyFile
-
-		return nil
-	}
-
-	err := filepath.Walk(keyStorePath, fileWalker)
-	if err != nil {
-		return fmt.Errorf("cannot traverse key store folder: %v", err)
-	}
-
-	return nil
+func (ppm *PairingPayloadMarshaller) Load(payload *PairingPayload) {
+	ppm.PairingPayload = payload
 }
 
-func (pm *PayloadMarshaller) StorePayloads(keystorePath, password string) error {
-	err := pm.validateKeys(password)
-	if err != nil {
-		return err
-	}
-
-	err = pm.storeKeys(keystorePath)
-	if err != nil {
-		return err
-	}
-
-	err = pm.storeMultiAccount()
-	if err != nil {
-		return err
-	}
-
-	// TODO install PublicKey into settings, probably do this outside of StorePayloads
-	return nil
-}
-
-func (pm *PayloadMarshaller) validateKeys(password string) error {
-	for _, key := range pm.keys {
-		k, err := keystore.DecryptKey(key, password)
-		if err != nil {
-			return err
-		}
-
-		err = generator.ValidateKeystoreExtendedKey(k)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (pm *PayloadMarshaller) storeKeys(keyStorePath string) error {
-	for name, data := range pm.keys {
-		accountKey := new(keystore.EncryptedKeyJSONV3)
-		if err := json.Unmarshal(data, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
-		}
-
-		if len(accountKey.Address) != 40 {
-			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
-		}
-
-		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (pm *PayloadMarshaller) storeMultiAccount() error {
-	return pm.multiaccountDB.SaveAccount(*pm.multiaccount)
-}
-
-func (pm *PayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
+func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
 	return proto.Marshal(&protobuf.LocalPairingPayload{
-		Keys:         pm.accountKeysToProtobuf(),
-		Multiaccount: pm.multiaccountToProtobuf(),
-		Password:     pm.password,
+		Keys:         ppm.accountKeysToProtobuf(),
+		Multiaccount: ppm.multiaccountToProtobuf(),
+		Password:     ppm.password,
 	})
 }
 
-func (pm *PayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
+func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
 	var keys []*protobuf.LocalPairingPayload_Key
-	for name, data := range pm.keys {
+	for name, data := range ppm.keys {
 		keys = append(keys, &protobuf.LocalPairingPayload_Key{Name: name, Data: data})
 	}
 	return keys
 }
 
-func (pm *PayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
+func (ppm *PairingPayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
 	var colourHashes []*protobuf.MultiAccount_ColourHash
-	for _, index := range pm.multiaccount.ColorHash {
+	for _, index := range ppm.multiaccount.ColorHash {
 		var i []int64
 		for _, is := range index {
 			i = append(i, int64(is))
@@ -229,7 +143,7 @@ func (pm *PayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
 	}
 
 	var identityImages []*protobuf.MultiAccount_IdentityImage
-	for _, ii := range pm.multiaccount.Images {
+	for _, ii := range ppm.multiaccount.Images {
 		identityImages = append(identityImages, &protobuf.MultiAccount_IdentityImage{
 			KeyUid:       ii.KeyUID,
 			Name:         ii.Name,
@@ -243,41 +157,41 @@ func (pm *PayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
 	}
 
 	return &protobuf.MultiAccount{
-		Name:           pm.multiaccount.Name,
-		Timestamp:      pm.multiaccount.Timestamp,
-		Identicon:      pm.multiaccount.Identicon,
+		Name:           ppm.multiaccount.Name,
+		Timestamp:      ppm.multiaccount.Timestamp,
+		Identicon:      ppm.multiaccount.Identicon,
 		ColorHash:      colourHashes,
-		ColorId:        pm.multiaccount.ColorID,
-		KeycardPairing: pm.multiaccount.KeycardPairing,
-		KeyUid:         pm.multiaccount.KeyUID,
+		ColorId:        ppm.multiaccount.ColorID,
+		KeycardPairing: ppm.multiaccount.KeycardPairing,
+		KeyUid:         ppm.multiaccount.KeyUID,
 		Images:         identityImages,
 	}
 }
 
-func (pm *PayloadMarshaller) UnmarshalProtobuf(data []byte) error {
+func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	pb := new(protobuf.LocalPairingPayload)
 	err := proto.Unmarshal(data, pb)
 	if err != nil {
 		return err
 	}
 
-	pm.accountKeysFromProtobuf(pb.Keys)
-	pm.multiaccountFromProtobuf(pb.Multiaccount)
-	pm.password = pb.Password
+	ppm.accountKeysFromProtobuf(pb.Keys)
+	ppm.multiaccountFromProtobuf(pb.Multiaccount)
+	ppm.password = pb.Password
 	return nil
 }
 
-func (pm *PayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
-	if pm.keys == nil {
-		pm.keys = make(map[string][]byte)
+func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
+	if ppm.keys == nil {
+		ppm.keys = make(map[string][]byte)
 	}
 
 	for _, key := range pbKeys {
-		pm.keys[key.Name] = key.Data
+		ppm.keys[key.Name] = key.Data
 	}
 }
 
-func (pm *PayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
+func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
 	var colourHash [][]int
 	for _, index := range pbMultiAccount.ColorHash {
 		var i []int
@@ -302,7 +216,7 @@ func (pm *PayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.M
 		})
 	}
 
-	pm.multiaccount = &multiaccounts.Account{
+	ppm.multiaccount = &multiaccounts.Account{
 		Name:           pbMultiAccount.Name,
 		Timestamp:      pbMultiAccount.Timestamp,
 		Identicon:      pbMultiAccount.Identicon,
@@ -312,4 +226,140 @@ func (pm *PayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.M
 		KeyUID:         pbMultiAccount.KeyUid,
 		Images:         identityImages,
 	}
+}
+
+// PairingPayloadRepository is responsible for loading, parsing, validating and storing PairingServer payload data
+type PairingPayloadRepository struct {
+	*PairingPayload
+
+	multiaccountsDB *multiaccounts.Database
+}
+
+func NewPairingPayloadRepository(db *multiaccounts.Database) *PairingPayloadRepository {
+	return &PairingPayloadRepository{
+		PairingPayload:  new(PairingPayload),
+		multiaccountsDB: db,
+	}
+}
+
+func (ppr *PairingPayloadRepository) Load(payload *PairingPayload) {
+	ppr.PairingPayload = payload
+}
+
+func (ppr *PairingPayloadRepository) LoadFromSource(keystorePath, keyUID, password string) error {
+	err := ppr.loadKeys(keystorePath)
+	if err != nil {
+		return err
+	}
+
+	err = ppr.validateKeys(password)
+	if err != nil {
+		return err
+	}
+
+	ppr.multiaccount, err = ppr.multiaccountsDB.GetAccount(keyUID)
+	if err != nil {
+		return err
+	}
+	ppr.password = password
+
+	return nil
+}
+
+func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
+	ppr.keys = make(map[string][]byte)
+
+	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fileInfo.IsDir() || filepath.Dir(path) != keyStorePath {
+			return nil
+		}
+
+		rawKeyFile, err := ioutil.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("invalid account key file: %v", err)
+		}
+
+		accountKey := new(keystore.EncryptedKeyJSONV3)
+		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if len(accountKey.Address) != 40 {
+			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
+		}
+
+		ppr.keys[fileInfo.Name()] = rawKeyFile
+
+		return nil
+	}
+
+	err := filepath.Walk(keyStorePath, fileWalker)
+	if err != nil {
+		return fmt.Errorf("cannot traverse key store folder: %v", err)
+	}
+
+	return nil
+}
+
+func (ppr *PairingPayloadRepository) StoreToSource(keystorePath, password string) error {
+	err := ppr.validateKeys(password)
+	if err != nil {
+		return err
+	}
+
+	err = ppr.storeKeys(keystorePath)
+	if err != nil {
+		return err
+	}
+
+	err = ppr.storeMultiAccount()
+	if err != nil {
+		return err
+	}
+
+	// TODO install PublicKey into settings, probably do this outside of StoreToSource
+	return nil
+}
+
+func (ppr *PairingPayloadRepository) validateKeys(password string) error {
+	for _, key := range ppr.keys {
+		k, err := keystore.DecryptKey(key, password)
+		if err != nil {
+			return err
+		}
+
+		err = generator.ValidateKeystoreExtendedKey(k)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
+	for name, data := range ppr.keys {
+		accountKey := new(keystore.EncryptedKeyJSONV3)
+		if err := json.Unmarshal(data, &accountKey); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if len(accountKey.Address) != 40 {
+			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
+		}
+
+		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ppr *PairingPayloadRepository) storeMultiAccount() error {
+	return ppr.multiaccountsDB.SaveAccount(*ppr.multiaccount)
 }

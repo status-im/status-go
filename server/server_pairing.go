@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PairingServer struct {
@@ -12,7 +14,7 @@ type PairingServer struct {
 
 	pk      *ecdsa.PrivateKey
 	mode    Mode
-	payload *PayloadManager
+	payload *PairingPayloadManager
 }
 
 type Config struct {
@@ -23,8 +25,8 @@ type Config struct {
 }
 
 // NewPairingServer returns a *PairingServer init from the given *Config
-func NewPairingServer(config *Config) (*PairingServer, error) {
-	pm, err := NewPayloadManager(config.PK)
+func NewPairingServer(config *Config, db *multiaccounts.Database) (*PairingServer, error) {
+	pm, err := NewPairingPayloadManager(config.PK, db)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 }
 
 func (s *PairingServer) MountPayload(data []byte) error {
-	return s.payload.Mount(data)
+	return s.payload.pem.Mount(data)
 }
 
 func (s *PairingServer) StartPairing() error {

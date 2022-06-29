@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PairingClient struct {
@@ -18,10 +20,10 @@ type PairingClient struct {
 	certPEM     []byte
 	privateKey  *ecdsa.PrivateKey
 	serverMode  Mode
-	payload     *PayloadManager
+	payload     *PairingPayloadManager
 }
 
-func NewPairingClient(c *ConnectionParams) (*PairingClient, error) {
+func NewPairingClient(c *ConnectionParams, db *multiaccounts.Database) (*PairingClient, error) {
 	u, certPem, err := c.Generate()
 	if err != nil {
 		return nil, err
@@ -44,7 +46,7 @@ func NewPairingClient(c *ConnectionParams) (*PairingClient, error) {
 		},
 	}
 
-	pm, err := NewPayloadManager(c.privateKey)
+	pm, err := NewPairingPayloadManager(c.privateKey, db)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,7 @@ func NewPairingClient(c *ConnectionParams) (*PairingClient, error) {
 }
 
 func (c *PairingClient) MountPayload(data []byte) error {
-	return c.payload.Mount(data)
+	return c.payload.pem.Mount(data)
 }
 
 func (c *PairingClient) PairAccount() error {
@@ -76,7 +78,7 @@ func (c *PairingClient) PairAccount() error {
 
 func (c *PairingClient) sendAccountData() error {
 	c.baseAddress.Path = pairingReceive
-	_, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.payload.ToSend()))
+	_, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.payload.pem.ToSend()))
 	if err != nil {
 		return err
 	}
@@ -96,5 +98,5 @@ func (c *PairingClient) receiveAccountData() error {
 		return err
 	}
 
-	return c.payload.Receive(payload)
+	return c.payload.pem.Receive(payload)
 }

@@ -147,7 +147,7 @@ func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http
 			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
 		}
 
-		err = ps.payload.Receive(payload)
+		err = ps.payload.pem.Receive(payload)
 		if err != nil {
 			ps.logger.Error("ps.payload.Receive(payload)", zap.Error(err))
 		}
@@ -157,7 +157,7 @@ func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http
 func handlePairingSend(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
-		_, err := w.Write(ps.payload.ToSend())
+		_, err := w.Write(ps.payload.pem.ToSend())
 		if err != nil {
 			ps.logger.Error("w.Write(ps.payload.ToSend())", zap.Error(err))
 		}
