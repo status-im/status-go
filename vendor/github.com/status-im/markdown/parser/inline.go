@@ -2,9 +2,12 @@ package parser
 
 import (
 	"bytes"
+	"encoding/hex"
 	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/status-im/markdown/ast"
 )
 
@@ -64,38 +67,60 @@ func (p *Parser) Inline(currBlock ast.Node, data []byte) {
 }
 
 const pkLength = 132
+const compressedPkPrefixLen = 3
 
 func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
 	data = data[offset:]
 	n := len(data)
 
-	if n < pkLength+1 {
-		return 0, nil
-	}
-
-	// need to start with 0x
-	if data[1] != '0' || data[2] != 'x' {
-
-		return 0, nil
-	}
-
-	i := 3
-	for i < pkLength+1 {
-		if !isValidPublicKeyChar(data[i]) {
+	if n >= pkLength+1 {
+		// need to start with 0x
+		if data[1] != '0' || data[2] != 'x' {
 			return 0, nil
 		}
-		i++
+
+		i := 3
+		for i < pkLength+1 {
+			if !isValidPublicKeyChar(data[i]) {
+				return 0, nil
+			}
+			i++
+		}
+
+		// Check there's a space
+		if n != pkLength+1 && !isValidTerminatingMentionChar(data[pkLength+1]) {
+			return 0, nil
+		}
+
+		mention := &ast.Mention{}
+		mention.Literal = data[1 : pkLength+1]
+
+		return i, mention
+	} else if n >= compressedPkPrefixLen+1 {
+		if data[1] != 'z' || data[2] != 'Q' || data[3] != '3' {
+			return 0, nil
+		}
+
+		i := 1
+		for _, c := range data[1:] {
+			if !isValidCompressedPublicKeyChar(c) {
+				break
+			}
+			i++
+		}
+
+		decodedPK := base58.Decode(string(data[2:i]))
+		decodedPKStr := hex.EncodeToString(decodedPK)
+		if !strings.HasPrefix(decodedPKStr, "e701") || len(decodedPKStr) != 70 {
+			return 0, nil
+		}
+
+		mention := &ast.Mention{}
+		mention.Literal = data[1:i]
+		return i, mention
 	}
 
-	// Check there's a space
-	if n != pkLength+1 && !isValidTerminatingMentionChar(data[pkLength+1]) {
-		return 0, nil
-	}
-
-	mention := &ast.Mention{}
-	mention.Literal = data[1 : pkLength+1]
-
-	return i, mention
+	return 0, nil
 }
 
 func statusTag(p *Parser, data []byte, offset int) (int, ast.Node) {

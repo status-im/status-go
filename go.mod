@@ -54,7 +54,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/go-waku v0.0.0-20220403002242-f1a40fad73c3
 	github.com/status-im/go-waku-rendezvous v0.0.0-20211018070416-a93f3b70c432
-	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
+	github.com/status-im/markdown v0.0.0-20220622180305-7ee4aa8bbc3f
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.5-0.20220406135049-e84f589e197a
 	github.com/status-im/status-go/extkeys v1.1.2
