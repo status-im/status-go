@@ -127,10 +127,12 @@ func (pms *PayloadMarshallerSuite) TearDownTest() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
-	pm := NewPayloadMarshaller(pms.db1)
-	err := pm.LoadPayloads(pms.keystore1, keyUID, password)
+	// Make and LoadFromSource PairingPayloadRepository 1
+	pm := NewPairingPayloadRepository(pms.db1)
+	err := pm.LoadFromSource(pms.keystore1, keyUID, password)
 	pms.Require().NoError(err)
 
+	// TEST PairingPayloadRepository 1 LoadFromSource()
 	pms.Require().Len(pm.keys, 2)
 	pms.Require().Len(pm.keys[utils.GetAccount1PKFile()], 489)
 	pms.Require().Len(pm.keys[utils.GetAccount2PKFile()], 489)
@@ -155,11 +157,17 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
-	pm := NewPayloadMarshaller(pms.db1)
-	err := pm.LoadPayloads(pms.keystore1, keyUID, password)
+	// Make and LoadFromSource PairingPayloadRepository 1
+	ppr := NewPairingPayloadRepository(pms.db1)
+	err := ppr.LoadFromSource(pms.keystore1, keyUID, password)
 	pms.Require().NoError(err)
 
-	pb, err := pm.MarshalToProtobuf()
+	// Make and Load PairingPayloadMarshaller 1
+	ppm := NewPairingPayloadMarshaller()
+	ppm.Load(ppr.PairingPayload)
+
+	// TEST PairingPayloadMarshaller 1 MarshalToProtobuf()
+	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
 	pms.Require().Len(pb, 1216)
 
@@ -169,60 +177,80 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
-	pm := NewPayloadMarshaller(pms.db1)
-	err := pm.LoadPayloads(pms.keystore1, keyUID, password)
+	// Make and LoadFromSource PairingPayloadRepository 1
+	ppr := NewPairingPayloadRepository(pms.db1)
+	err := ppr.LoadFromSource(pms.keystore1, keyUID, password)
 	pms.Require().NoError(err)
 
-	pb, err := pm.MarshalToProtobuf()
+	// Make and Load PairingPayloadMarshaller 1
+	ppm := NewPairingPayloadMarshaller()
+	ppm.Load(ppr.PairingPayload)
+
+	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
 
-	pm2 := NewPayloadMarshaller(pms.db1)
-	pms.Require().Nil(pm2.keys)
-	pms.Require().Nil(pm2.multiaccount)
-	pms.Require().Empty(pm2.password)
+	// Make PairingPayloadMarshaller 2
+	ppm2 := NewPairingPayloadMarshaller()
 
-	err = pm2.UnmarshalProtobuf(pb)
+	// TEST PairingPayloadMarshaller 2 is empty
+	pms.Require().Nil(ppm2.keys)
+	pms.Require().Nil(ppm2.multiaccount)
+	pms.Require().Empty(ppm2.password)
+
+	// TEST PairingPayloadMarshaller 2 UnmarshalProtobuf()
+	err = ppm2.UnmarshalProtobuf(pb)
 	pms.Require().NoError(err)
 
-	pms.Require().Len(pm2.keys, 2)
-	pms.Require().Len(pm2.keys[utils.GetAccount1PKFile()], 489)
-	pms.Require().Len(pm2.keys[utils.GetAccount2PKFile()], 489)
+	pms.Require().Len(ppm2.keys, 2)
+	pms.Require().Len(ppm2.keys[utils.GetAccount1PKFile()], 489)
+	pms.Require().Len(ppm2.keys[utils.GetAccount2PKFile()], 489)
 
 	h1 := sha256.New()
-	h1.Write(pm2.keys[utils.GetAccount1PKFile()])
+	h1.Write(ppm2.keys[utils.GetAccount1PKFile()])
 	pms.Require().Exactly(account1Hash, h1.Sum(nil))
 
 	h2 := sha256.New()
-	h2.Write(pm2.keys[utils.GetAccount2PKFile()])
+	h2.Write(ppm2.keys[utils.GetAccount2PKFile()])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
 
-	pms.Require().Exactly(expected.ColorHash, pm2.multiaccount.ColorHash)
-	pms.Require().Exactly(expected.ColorID, pm2.multiaccount.ColorID)
-	pms.Require().Exactly(expected.Identicon, pm2.multiaccount.Identicon)
-	pms.Require().Exactly(expected.KeycardPairing, pm2.multiaccount.KeycardPairing)
-	pms.Require().Exactly(expected.KeyUID, pm2.multiaccount.KeyUID)
-	pms.Require().Exactly(expected.Name, pm2.multiaccount.Name)
-	pms.Require().Exactly(expected.Timestamp, pm2.multiaccount.Timestamp)
-	pms.Require().Len(pm2.multiaccount.Images, 2)
-	pms.Require().Equal(password, pm2.password)
+	pms.Require().Exactly(expected.ColorHash, ppm2.multiaccount.ColorHash)
+	pms.Require().Exactly(expected.ColorID, ppm2.multiaccount.ColorID)
+	pms.Require().Exactly(expected.Identicon, ppm2.multiaccount.Identicon)
+	pms.Require().Exactly(expected.KeycardPairing, ppm2.multiaccount.KeycardPairing)
+	pms.Require().Exactly(expected.KeyUID, ppm2.multiaccount.KeyUID)
+	pms.Require().Exactly(expected.Name, ppm2.multiaccount.Name)
+	pms.Require().Exactly(expected.Timestamp, ppm2.multiaccount.Timestamp)
+	pms.Require().Len(ppm2.multiaccount.Images, 2)
+	pms.Require().Equal(password, ppm2.password)
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
-	pm := NewPayloadMarshaller(pms.db1)
-	err := pm.LoadPayloads(pms.keystore1, keyUID, password)
+	// Make and LoadFromSource PairingPayloadRepository 1
+	ppr := NewPairingPayloadRepository(pms.db1)
+	err := ppr.LoadFromSource(pms.keystore1, keyUID, password)
 	pms.Require().NoError(err)
 
-	pb, err := pm.MarshalToProtobuf()
+	// Make and Load PairingPayloadMarshaller 1
+	ppm := NewPairingPayloadMarshaller()
+	ppm.Load(ppr.PairingPayload)
+
+	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
 
-	pm2 := NewPayloadMarshaller(pms.db2)
+	// Make PairingPayloadMarshaller 2
+	ppm2 := NewPairingPayloadMarshaller()
 
-	err = pm2.UnmarshalProtobuf(pb)
+	err = ppm2.UnmarshalProtobuf(pb)
 	pms.Require().NoError(err)
 
-	err = pm2.StorePayloads(pms.keystore2, password)
+	// Make and Load PairingPayloadRepository 2
+	ppr2 := NewPairingPayloadRepository(pms.db2)
+	ppr2.Load(ppm2.PairingPayload)
+
+	err = ppr2.StoreToSource(pms.keystore2, password)
 	pms.Require().NoError(err)
 
+	// TEST PairingPayloadRepository 2 StoreToSource()
 	keys := getFiles(pms.T(), pms.keystore2)
 
 	pms.Require().Len(keys, 2)

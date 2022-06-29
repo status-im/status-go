@@ -57,7 +57,7 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		err = ccp.FromString(qr)
 		s.Require().NoError(err)
 
-		c, err := NewPairingClient(ccp)
+		c, err := NewPairingClient(ccp, nil)
 		s.Require().NoError(err)
 
 		if m == Receiving {
@@ -70,18 +70,18 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 
 		switch m {
 		case Receiving:
-			s.Require().Equal(data, s.PS.payload.Received())
-			s.Require().Equal(s.PS.payload.received.encrypted, c.payload.toSend.encrypted)
-			s.Require().Nil(s.PS.payload.ToSend())
-			s.Require().Nil(c.payload.Received())
+			s.Require().Equal(data, s.PS.payload.pem.Received())
+			s.Require().Equal(s.PS.payload.pem.received.encrypted, c.payload.pem.toSend.encrypted)
+			s.Require().Nil(s.PS.payload.pem.ToSend())
+			s.Require().Nil(c.payload.pem.Received())
 		case Sending:
-			s.Require().Equal(c.payload.Received(), data)
-			s.Require().Equal(c.payload.received.encrypted, s.PS.payload.toSend.encrypted)
-			s.Require().Nil(c.payload.ToSend())
-			s.Require().Nil(s.PS.payload.Received())
+			s.Require().Equal(c.payload.pem.Received(), data)
+			s.Require().Equal(c.payload.pem.received.encrypted, s.PS.payload.pem.toSend.encrypted)
+			s.Require().Nil(c.payload.pem.ToSend())
+			s.Require().Nil(s.PS.payload.pem.Received())
 		}
 
-		// Reset the server's PayloadManager
-		s.PS.payload.ResetPayload()
+		// Reset the server's PayloadEncryptionManager
+		s.PS.payload.pem.ResetPayload()
 	}
 }

@@ -104,6 +104,6 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	tpsc.PS, err = NewPairingServer(&Config{
 		PK:       tpsc.EphemeralPK,
 		Cert:     &tpsc.Cert,
-		Hostname: tpsc.OutboundIP.String()})
+		Hostname: tpsc.OutboundIP.String()}, nil)
 	require.NoError(t, err)
 }
