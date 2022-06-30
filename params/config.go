@@ -498,6 +498,8 @@ type NodeConfig struct {
 
 	// PushNotificationServerConfig is the config for the push notification server
 	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
+
+	OutputMessageCSVEnabled bool
 }
 
 type Network struct {
