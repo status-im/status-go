@@ -89,6 +89,7 @@ message CommunityRequestToJoinResponse {
   CommunityDescription community = 2;
   bool accepted = 3;
   bytes grant = 4;
+  bytes community_id = 5;
 }
 
 message CommunityMessageArchiveMagnetlink {

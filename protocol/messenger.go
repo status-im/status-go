@@ -3947,6 +3947,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
 							continue
 						}
+					case protobuf.CommunityRequestToJoinResponse:
+						logger.Debug("Handling CommunityRequestToJoinResponse")
+						requestToJoinResponse := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoinResponse)
+						err = m.HandleCommunityRequestToJoinResponse(messageState, publicKey, requestToJoinResponse)
+						if err != nil {
+							logger.Warn("failed to handle CommunityRequestToJoinResponse", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 
 					case protobuf.CommunityMessageArchiveMagnetlink:
 						logger.Debug("Handling CommunityMessageArchiveMagnetlink")

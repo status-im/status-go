@@ -502,7 +502,45 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	}
 
 	community, err := m.communitiesManager.AcceptRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
 
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	grant, err := community.BuildGrant(pk, "")
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
+		Clock:       community.Clock(),
+		Accepted:    true,
+		CommunityId: community.ID(),
+		Community:   community.Description(),
+		Grant:       grant,
+	}
+
+	payload, err := proto.Marshal(requestToJoinResponseProto)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:        payload,
+		Sender:         community.PrivateKey(),
+		SkipEncryption: true,
+		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+	}
+	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +855,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString())
 
 	// We add ourselves
-	_, err = m.communitiesManager.InviteUsersToCommunity(community.ID(), []*ecdsa.PublicKey{&m.identity.PublicKey})
+	community, err = m.communitiesManager.AddMemberToCommunity(community.ID(), &m.identity.PublicKey)
 	if err != nil {
 		return nil, err
 	}

@@ -538,17 +538,11 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 	if o.config.PrivateKey == nil {
 		return nil, ErrNotAdmin
 	}
-	memberKey := common.PubkeyToHex(pk)
 
-	if o.config.CommunityDescription.Members == nil {
-		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	err := o.AddMember(pk)
+	if err != nil {
+		return nil, err
 	}
-
-	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
-		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{}
-	}
-
-	o.increaseClock()
 
 	response := &protobuf.CommunityInvitation{}
 	marshaledCommunity, err := o.toBytes()
@@ -1051,10 +1045,22 @@ func (o *Community) InvitationOnly() bool {
 	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_INVITATION_ONLY
 }
 
-func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.CommunityRequestToJoin) error {
+func (o *Community) AcceptRequestToJoinAutomatically() bool {
+	// We no longer have the notion of "no membership", but for historical reasons
+	// we use `NO_MEMBERSHIP` to determine wether requests to join should be automatically
+	// accepted or not.
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP
+}
 
-	// If they want access to the org only, check that the org is ON_REQUEST
-	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST {
+func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.CommunityRequestToJoin) error {
+	// Previously, requests to join a community where only necessary when the community
+	// permissions were indeed set to `ON_REQUEST`.
+	// Now, users always have to request access but can get accepted automatically
+	// (if permissions are set to NO_MEMBERSHIP).
+	//
+	// Hence, not only do we check whether the community permissions are ON_REQUEST but
+	// also NO_MEMBERSHIP.
+	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST && o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_NO_MEMBERSHIP {
 		return ErrCantRequestAccess
 	}
 
@@ -1326,6 +1332,10 @@ func (o *Community) canPostWithGrant(pk *ecdsa.PublicKey, chatID string, grantBy
 	return true, nil
 }
 
+func (o *Community) BuildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
+	return o.buildGrant(key, chatID)
+}
+
 func (o *Community) buildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
 	grant := &protobuf.Grant{
 		CommunityId: o.ID(),
@@ -1444,6 +1454,24 @@ func (o *Community) AddRequestToJoin(request *RequestToJoin) {
 
 func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
+}
+
+func (o *Community) AddMember(publicKey *ecdsa.PublicKey) error {
+	if o.config.PrivateKey == nil {
+		return ErrNotAdmin
+	}
+
+	memberKey := common.PubkeyToHex(publicKey)
+
+	if o.config.CommunityDescription.Members == nil {
+		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	}
+
+	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
+		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{}
+	}
+	o.increaseClock()
+	return nil
 }
 
 func (o *Community) ChatIDs() (chatIDs []string) {

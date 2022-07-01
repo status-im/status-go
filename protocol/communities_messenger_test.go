@@ -579,6 +579,8 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().True(response.Communities()[0].IsAdmin())
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -623,15 +625,13 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
+		if !response.Communities()[0].IsAdmin() {
+			return errors.New("isn't admin despite import")
+		}
 		return nil
 	})
 
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Categories(), 1)
-	community = response.Communities()[0]
-	s.Require().True(community.Joined())
-	s.Require().True(community.IsAdmin())
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
