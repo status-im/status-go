@@ -19,13 +19,26 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+type PayloadManager interface {
+	Mount() error
+	Receive(data []byte) error
+	ToSend() []byte
+	Received() []byte
+}
+
+type PairingPayloadManagerConfig struct {
+	DB                             *multiaccounts.Database
+	KeystorePath, KeyUID, Password string
+}
+
+// PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
 type PairingPayloadManager struct {
 	pem *PayloadEncryptionManager
 	ppm *PairingPayloadMarshaller
-	ppr *PairingPayloadRepository
+	ppr PayloadRepository
 }
 
-func NewPairingPayloadManager(pk *ecdsa.PrivateKey, db *multiaccounts.Database) (*PairingPayloadManager, error) {
+func NewPairingPayloadManager(pk *ecdsa.PrivateKey, config *PairingPayloadManagerConfig) (*PairingPayloadManager, error) {
 	pem, err := NewPayloadEncryptionManager(pk)
 	if err != nil {
 		return nil, err
@@ -34,17 +47,55 @@ func NewPairingPayloadManager(pk *ecdsa.PrivateKey, db *multiaccounts.Database) 
 	return &PairingPayloadManager{
 		pem: pem,
 		ppm: NewPairingPayloadMarshaller(),
-		ppr: NewPairingPayloadRepository(db),
+		ppr: NewPairingPayloadRepository(config),
 	}, nil
 }
 
-// EncryptionPayload represents the plain text and encrypted text of a Server's payload data
+func (ppm *PairingPayloadManager) Mount() error {
+	err := ppm.ppr.LoadFromSource()
+	if err != nil {
+		return err
+	}
+
+	ppm.ppm.LoadPayload(ppm.ppr.GetPayload())
+	pb, err := ppm.ppm.MarshalToProtobuf()
+	if err != nil {
+		return err
+	}
+
+	return ppm.pem.Encrypt(pb)
+}
+
+func (ppm *PairingPayloadManager) Receive(data []byte) error {
+	err := ppm.pem.Decrypt(data)
+	if err != nil {
+		return err
+	}
+
+	err = ppm.ppm.UnmarshalProtobuf(ppm.pem.Received())
+	if err != nil {
+		return err
+	}
+
+	ppm.ppr.LoadPayload(ppm.ppm.GetPayload())
+	return ppm.ppr.StoreToSource()
+}
+
+func (ppm *PairingPayloadManager) ToSend() []byte {
+	return ppm.pem.ToSend()
+}
+
+func (ppm *PairingPayloadManager) Received() []byte {
+	return ppm.pem.Received()
+}
+
+// EncryptionPayload represents the plain text and encrypted text of payload data
 type EncryptionPayload struct {
 	plain     []byte
 	encrypted []byte
 }
 
-// PayloadEncryptionManager is responsible for encrypting and decrypting a Server's payload data
+// PayloadEncryptionManager is responsible for encrypting and decrypting payload data
 type PayloadEncryptionManager struct {
 	aesKey   []byte
 	toSend   *EncryptionPayload
@@ -60,7 +111,7 @@ func NewPayloadEncryptionManager(pk *ecdsa.PrivateKey) (*PayloadEncryptionManage
 	return &PayloadEncryptionManager{ek, new(EncryptionPayload), new(EncryptionPayload)}, nil
 }
 
-func (pem *PayloadEncryptionManager) Mount(data []byte) error {
+func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
 	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
 	if err != nil {
 		return err
@@ -71,7 +122,7 @@ func (pem *PayloadEncryptionManager) Mount(data []byte) error {
 	return nil
 }
 
-func (pem *PayloadEncryptionManager) Receive(data []byte) error {
+func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
 	pd, err := common.Decrypt(data, pem.aesKey)
 	if err != nil {
 		return err
@@ -111,8 +162,12 @@ func NewPairingPayloadMarshaller() *PairingPayloadMarshaller {
 	return &PairingPayloadMarshaller{PairingPayload: new(PairingPayload)}
 }
 
-func (ppm *PairingPayloadMarshaller) Load(payload *PairingPayload) {
+func (ppm *PairingPayloadMarshaller) LoadPayload(payload *PairingPayload) {
 	ppm.PairingPayload = payload
+}
+
+func (ppm *PairingPayloadMarshaller) GetPayload() *PairingPayload {
+	return ppm.PairingPayload
 }
 
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
@@ -228,40 +283,66 @@ func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	}
 }
 
+type PayloadHandler interface {
+	LoadPayload(*PairingPayload)
+	GetPayload() *PairingPayload
+}
+
+type PayloadRepository interface {
+	PayloadHandler
+
+	LoadFromSource() error
+	StoreToSource() error
+}
+
 // PairingPayloadRepository is responsible for loading, parsing, validating and storing PairingServer payload data
 type PairingPayloadRepository struct {
 	*PairingPayload
 
 	multiaccountsDB *multiaccounts.Database
+
+	keystorePath, keyUID string
 }
 
-func NewPairingPayloadRepository(db *multiaccounts.Database) *PairingPayloadRepository {
-	return &PairingPayloadRepository{
-		PairingPayload:  new(PairingPayload),
-		multiaccountsDB: db,
+func NewPairingPayloadRepository(config *PairingPayloadManagerConfig) *PairingPayloadRepository {
+	ppr := &PairingPayloadRepository{
+		PairingPayload: new(PairingPayload),
 	}
+
+	if config == nil {
+		return ppr
+	}
+
+	ppr.multiaccountsDB = config.DB
+	ppr.keystorePath = config.KeystorePath
+	ppr.keyUID = config.KeyUID
+	ppr.password = config.Password
+	return ppr
 }
 
-func (ppr *PairingPayloadRepository) Load(payload *PairingPayload) {
+func (ppr *PairingPayloadRepository) LoadPayload(payload *PairingPayload) {
 	ppr.PairingPayload = payload
 }
 
-func (ppr *PairingPayloadRepository) LoadFromSource(keystorePath, keyUID, password string) error {
-	err := ppr.loadKeys(keystorePath)
+func (ppr *PairingPayloadRepository) GetPayload() *PairingPayload {
+	return ppr.PairingPayload
+}
+
+func (ppr *PairingPayloadRepository) LoadFromSource() error {
+	err := ppr.loadKeys(ppr.keystorePath)
 	if err != nil {
 		return err
 	}
 
-	err = ppr.validateKeys(password)
+	err = ppr.validateKeys(ppr.password)
 	if err != nil {
 		return err
 	}
 
-	ppr.multiaccount, err = ppr.multiaccountsDB.GetAccount(keyUID)
+	ppr.multiaccount, err = ppr.multiaccountsDB.GetAccount(ppr.keyUID)
 	if err != nil {
 		return err
 	}
-	ppr.password = password
 
 	return nil
 }
@@ -305,13 +386,13 @@ func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) StoreToSource(keystorePath, password string) error {
-	err := ppr.validateKeys(password)
+func (ppr *PairingPayloadRepository) StoreToSource() error {
+	err := ppr.validateKeys(ppr.password)
 	if err != nil {
 		return err
 	}
 
-	err = ppr.storeKeys(keystorePath)
+	err = ppr.storeKeys(ppr.keystorePath)
 	if err != nil {
 		return err
 	}
