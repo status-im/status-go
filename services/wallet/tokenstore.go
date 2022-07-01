@@ -1441,6 +1441,32 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			ChainID:  4,
 		},
 	},
+	5: {
+		common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"): &Token{
+			Address:  common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"),
+			Name:     "Xeenus 💪",
+			Symbol:   "XEENUS",
+			Color:    "#f8f8f8",
+			Decimals: 18,
+			ChainID:  5,
+		},
+		common.HexToAddress("0xc6fde3fd2cc2b173aec24cc3f267cb3cd78a26b7"): &Token{
+			Address:  common.HexToAddress("0xc6fde3fd2cc2b173aec24cc3f267cb3cd78a26b7"),
+			Name:     "Yeenus 💪",
+			Symbol:   "YEENUS",
+			Color:    "#f8f8f8",
+			Decimals: 8,
+			ChainID:  5,
+		},
+		common.HexToAddress("0x1f9061b953bba0e36bf50f21876132dcf276fc6e"): &Token{
+			Address:  common.HexToAddress("0x1f9061b953bba0e36bf50f21876132dcf276fc6e"),
+			Name:     "Zeenus 💪",
+			Symbol:   "ZEENUS",
+			Color:    "#f8f8f8",
+			Decimals: 0,
+			ChainID:  5,
+		},
+	},
 	100: {
 		common.HexToAddress("0x3e50bf6703fc132a94e4baff068db2055655f11b"): &Token{
 			Address:  common.HexToAddress("0x3e50bf6703fc132a94e4baff068db2055655f11b"),
