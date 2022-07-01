@@ -104,6 +104,44 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	tpsc.PS, err = NewPairingServer(&Config{
 		PK:       tpsc.EphemeralPK,
 		Cert:     &tpsc.Cert,
-		Hostname: tpsc.OutboundIP.String()}, nil)
+		Hostname: tpsc.OutboundIP.String()})
 	require.NoError(t, err)
+}
+
+type MockEncryptOnlyPayloadManager struct {
+	pem *PayloadEncryptionManager
+}
+
+func NewMockEncryptOnlyPayloadManager(pk *ecdsa.PrivateKey) (*MockEncryptOnlyPayloadManager, error) {
+	pem, err := NewPayloadEncryptionManager(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MockEncryptOnlyPayloadManager{
+		pem: pem,
+	}, nil
+}
+
+func (m *MockEncryptOnlyPayloadManager) Mount() error {
+	// Make a random payload
+	data := make([]byte, 32)
+	_, err := rand.Read(data)
+	if err != nil {
+		return err
+	}
+
+	return m.pem.Encrypt(data)
+}
+
+func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
+	return m.pem.Decrypt(data)
+}
+
+func (m *MockEncryptOnlyPayloadManager) ToSend() []byte {
+	return m.pem.ToSend()
+}
+
+func (m *MockEncryptOnlyPayloadManager) Received() []byte {
+	return m.pem.Received()
 }

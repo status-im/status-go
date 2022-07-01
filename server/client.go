@@ -9,21 +9,19 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-
-	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PairingClient struct {
 	*http.Client
 
-	baseAddress *url.URL
-	certPEM     []byte
-	privateKey  *ecdsa.PrivateKey
-	serverMode  Mode
-	payload     *PairingPayloadManager
+	baseAddress    *url.URL
+	certPEM        []byte
+	privateKey     *ecdsa.PrivateKey
+	serverMode     Mode
+	PayloadManager PayloadManager
 }
 
-func NewPairingClient(c *ConnectionParams, db *multiaccounts.Database) (*PairingClient, error) {
+func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
 	u, certPem, err := c.Generate()
 	if err != nil {
 		return nil, err
@@ -46,23 +44,19 @@ func NewPairingClient(c *ConnectionParams, db *multiaccounts.Database) (*Pairing
 		},
 	}
 
-	pm, err := NewPairingPayloadManager(c.privateKey, db)
+	pm, err := NewPairingPayloadManager(c.privateKey, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PairingClient{
-		Client:      &http.Client{Transport: tr},
-		baseAddress: u,
-		certPEM:     certPem,
-		privateKey:  c.privateKey,
-		serverMode:  c.serverMode,
-		payload:     pm,
+		Client:         &http.Client{Transport: tr},
+		baseAddress:    u,
+		certPEM:        certPem,
+		privateKey:     c.privateKey,
+		serverMode:     c.serverMode,
+		PayloadManager: pm,
 	}, nil
-}
-
-func (c *PairingClient) MountPayload(data []byte) error {
-	return c.payload.pem.Mount(data)
 }
 
 func (c *PairingClient) PairAccount() error {
@@ -78,7 +72,7 @@ func (c *PairingClient) PairAccount() error {
 
 func (c *PairingClient) sendAccountData() error {
 	c.baseAddress.Path = pairingReceive
-	_, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.payload.pem.ToSend()))
+	_, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
 	if err != nil {
 		return err
 	}
@@ -98,5 +92,5 @@ func (c *PairingClient) receiveAccountData() error {
 		return err
 	}
 
-	return c.payload.pem.Receive(payload)
+	return c.PayloadManager.Receive(payload)
 }
