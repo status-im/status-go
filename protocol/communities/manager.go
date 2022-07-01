@@ -435,6 +435,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 		community.config.PrivateKey = key
 	}
 
+	community.Join()
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
@@ -726,7 +727,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	pkString := common.PubkeyToHex(m.identity)
 
 	// If the community require membership, we set whether we should leave/join the community after a state change
-	if community.InvitationOnly() || community.OnRequest() {
+	if community.InvitationOnly() || community.OnRequest() || community.AcceptRequestToJoinAutomatically() {
 		if changes.HasNewMember(pkString) {
 			hasPendingRequest, err := m.persistence.HasPendingRequestsToJoinForUserAndCommunity(pkString, changes.Community.ID())
 			if err != nil {
@@ -805,7 +806,27 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	return m.inviteUsersToCommunity(community, []*ecdsa.PublicKey{pk})
+	err = community.AddMember(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := m.markRequestToJoin(pk, community); err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
+func (m *Manager) GetRequestToJoin(ID types.HexBytes) (*RequestToJoin, error) {
+	return m.persistence.GetRequestToJoin(ID)
 }
 
 func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCommunity) error {
@@ -850,7 +871,61 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	if community.AcceptRequestToJoinAutomatically() {
+		err = m.markRequestToJoin(signer, community)
+		if err != nil {
+			return nil, err
+		}
+		requestToJoin.State = RequestToJoinStateAccepted
+	}
+
 	return requestToJoin, nil
+}
+
+func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) error {
+
+	community, err := m.persistence.GetByID(m.identity, request.CommunityId)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return ErrOrgNotFound
+	}
+
+	communityDescriptionBytes, err := proto.Marshal(request.Community)
+	if err != nil {
+		return err
+	}
+
+	// We need to wrap `request.Community` in an `ApplicationMetadataMessage`
+	// of type `CommunityDescription` because `UpdateCommunityDescription` expects this.
+	//
+	// This is merely for marsheling/unmarsheling, hence we attaching a `Signature`
+	// is not needed.
+	metadataMessage := &protobuf.ApplicationMetadataMessage{
+		Payload: communityDescriptionBytes,
+		Type:    protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
+	}
+
+	appMetadataMsg, err := proto.Marshal(metadataMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = community.UpdateCommunityDescription(signer, request.Community, appMetadataMsg)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	if request.Accepted {
+		return m.markRequestToJoin(m.identity, community)
+	}
+	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(m.identity), community.ID(), RequestToJoinStateDeclined)
 }
 
 func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*CommunityResponse, error) {
@@ -970,6 +1045,29 @@ func (m *Manager) InviteUsersToCommunity(communityID types.HexBytes, pks []*ecds
 	}
 
 	return m.inviteUsersToCommunity(community, pks)
+}
+
+func (m *Manager) AddMemberToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	err = community.AddMember(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+	return community, nil
 }
 
 func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
