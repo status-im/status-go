@@ -765,6 +765,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	o.config.CommunityDescription.Identity.DisplayName = description.Identity.DisplayName
 	o.config.CommunityDescription.Identity.Description = description.Identity.Description
 	o.config.CommunityDescription.Identity.Color = description.Identity.Color
+	o.config.CommunityDescription.Tags = description.Tags
 	o.config.CommunityDescription.Identity.Emoji = description.Identity.Emoji
 	o.config.CommunityDescription.Identity.Images = description.Identity.Images
 	o.config.CommunityDescription.IntroMessage = description.IntroMessage
