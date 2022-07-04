@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+// PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
 type PayloadManager interface {
 	Mount() error
 	Receive(data []byte) error
@@ -26,6 +27,7 @@ type PayloadManager interface {
 	Received() []byte
 }
 
+// PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
 type PairingPayloadManagerConfig struct {
 	DB                             *multiaccounts.Database
 	KeystorePath, KeyUID, Password string
@@ -38,26 +40,30 @@ type PairingPayloadManager struct {
 	ppr PayloadRepository
 }
 
+// NewPairingPayloadManager generates a new and initialised PairingPayloadManager
 func NewPairingPayloadManager(pk *ecdsa.PrivateKey, config *PairingPayloadManagerConfig) (*PairingPayloadManager, error) {
 	pem, err := NewPayloadEncryptionManager(pk)
 	if err != nil {
 		return nil, err
 	}
 
+	// A new SHARED PairingPayload
+	p := new(PairingPayload)
+
 	return &PairingPayloadManager{
 		pem: pem,
-		ppm: NewPairingPayloadMarshaller(),
-		ppr: NewPairingPayloadRepository(config),
+		ppm: NewPairingPayloadMarshaller(p),
+		ppr: NewPairingPayloadRepository(p, config),
 	}, nil
 }
 
+// Mount loads and prepares the payload to be stored in the PairingPayloadManager's state ready for later access
 func (ppm *PairingPayloadManager) Mount() error {
 	err := ppm.ppr.LoadFromSource()
 	if err != nil {
 		return err
 	}
 
-	ppm.ppm.LoadPayload(ppm.ppr.GetPayload())
 	pb, err := ppm.ppm.MarshalToProtobuf()
 	if err != nil {
 		return err
@@ -66,6 +72,7 @@ func (ppm *PairingPayloadManager) Mount() error {
 	return ppm.pem.Encrypt(pb)
 }
 
+// Receive takes a []byte representing raw data, parses and stores the data
 func (ppm *PairingPayloadManager) Receive(data []byte) error {
 	err := ppm.pem.Decrypt(data)
 	if err != nil {
@@ -77,14 +84,15 @@ func (ppm *PairingPayloadManager) Receive(data []byte) error {
 		return err
 	}
 
-	ppm.ppr.LoadPayload(ppm.ppm.GetPayload())
 	return ppm.ppr.StoreToSource()
 }
 
+// ToSend returns the result of Mount
 func (ppm *PairingPayloadManager) ToSend() []byte {
 	return ppm.pem.ToSend()
 }
 
+// Received returns the decrypted input of Receive
 func (ppm *PairingPayloadManager) Received() []byte {
 	return ppm.pem.Received()
 }
@@ -158,16 +166,8 @@ type PairingPayloadMarshaller struct {
 	*PairingPayload
 }
 
-func NewPairingPayloadMarshaller() *PairingPayloadMarshaller {
-	return &PairingPayloadMarshaller{PairingPayload: new(PairingPayload)}
-}
-
-func (ppm *PairingPayloadMarshaller) LoadPayload(payload *PairingPayload) {
-	ppm.PairingPayload = payload
-}
-
-func (ppm *PairingPayloadMarshaller) GetPayload() *PairingPayload {
-	return ppm.PairingPayload
+func NewPairingPayloadMarshaller(p *PairingPayload) *PairingPayloadMarshaller {
+	return &PairingPayloadMarshaller{PairingPayload: p}
 }
 
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
@@ -283,14 +283,7 @@ func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	}
 }
 
-type PayloadHandler interface {
-	LoadPayload(*PairingPayload)
-	GetPayload() *PairingPayload
-}
-
 type PayloadRepository interface {
-	PayloadHandler
-
 	LoadFromSource() error
 	StoreToSource() error
 }
@@ -304,9 +297,9 @@ type PairingPayloadRepository struct {
 	keystorePath, keyUID string
 }
 
-func NewPairingPayloadRepository(config *PairingPayloadManagerConfig) *PairingPayloadRepository {
+func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManagerConfig) *PairingPayloadRepository {
 	ppr := &PairingPayloadRepository{
-		PairingPayload: new(PairingPayload),
+		PairingPayload: p,
 	}
 
 	if config == nil {
@@ -318,14 +311,6 @@ func NewPairingPayloadRepository(config *PairingPayloadManagerConfig) *PairingPa
 	ppr.keyUID = config.KeyUID
 	ppr.password = config.Password
 	return ppr
-}
-
-func (ppr *PairingPayloadRepository) LoadPayload(payload *PairingPayload) {
-	ppr.PairingPayload = payload
-}
-
-func (ppr *PairingPayloadRepository) GetPayload() *PairingPayload {
-	return ppr.PairingPayload
 }
 
 func (ppr *PairingPayloadRepository) LoadFromSource() error {
