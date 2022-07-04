@@ -206,7 +206,7 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 
 	pendingTransactions := make(map[uint64][]*PendingTransaction)
 	for _, chainID := range chainIDs {
-		pendingTx, err := r.s.transactionManager.getAllPendings(chainID)
+		pendingTx, err := r.s.transactionManager.getAllPendings([]uint64{chainID})
 		if err != nil {
 			return nil, err
 		}

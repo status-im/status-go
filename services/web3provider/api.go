@@ -71,6 +71,7 @@ type ETHPayload struct {
 	Method   string        `json:"method"`
 	Params   []interface{} `json:"params"`
 	Password string        `json:"password,omitempty"`
+	ChainID  uint64        `json:"chainId,omitempty"`
 }
 
 type JSONRPCResponse struct {
@@ -326,7 +327,7 @@ func (api *API) ProcessWeb3ReadOnlyRequest(request Web3SendAsyncReadOnlyRequest)
 			return nil, err
 		}
 
-		hash, err := api.sendTransaction(trxArgs, request.Payload.Password)
+		hash, err := api.sendTransaction(request.Payload.ChainID, trxArgs, request.Payload.Password)
 		if err != nil {
 			log.Error("could not send transaction message", "err", err)
 			return &Web3SendAsyncReadOnlyResponse{
