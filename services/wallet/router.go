@@ -49,7 +49,7 @@ func (r *Router) suitableTokenExists(ctx context.Context, network *params.Networ
 	return false, nil
 }
 
-func (r *Router) suggestedRoutes(ctx context.Context, account common.Address, amount float64, tokenSymbol string) (*SuggestedRoutes, error) {
+func (r *Router) suggestedRoutes(ctx context.Context, account common.Address, amount float64, tokenSymbol string, disabledChainIDs []uint64) (*SuggestedRoutes, error) {
 	areTestNetworksEnabled, err := r.s.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
@@ -68,6 +68,19 @@ func (r *Router) suggestedRoutes(ctx context.Context, account common.Address, am
 	for networkIdx := range networks {
 		network := networks[networkIdx]
 		if network.IsTest != areTestNetworksEnabled {
+			continue
+		}
+
+		networkFound := false
+		for _, chainID := range disabledChainIDs {
+			networkFound = false
+			if chainID == network.ChainID {
+				networkFound = true
+				break
+			}
+		}
+		// This is network cannot be used as a suggestedRoute as the user has disabled it
+		if networkFound {
 			continue
 		}
 
