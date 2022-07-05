@@ -145,3 +145,7 @@ func (m *MockEncryptOnlyPayloadManager) ToSend() []byte {
 func (m *MockEncryptOnlyPayloadManager) Received() []byte {
 	return m.pem.Received()
 }
+
+func (m *MockEncryptOnlyPayloadManager) ResetPayload() {
+	m.pem.ResetPayload()
+}

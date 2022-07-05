@@ -9,10 +9,10 @@ import (
 
 type PairingServer struct {
 	Server
+	PayloadManager
 
-	pk             *ecdsa.PrivateKey
-	mode           Mode
-	PayloadManager PayloadManager
+	pk   *ecdsa.PrivateKey
+	mode Mode
 }
 
 type Config struct {

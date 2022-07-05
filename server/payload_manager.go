@@ -25,6 +25,7 @@ type PayloadManager interface {
 	Receive(data []byte) error
 	ToSend() []byte
 	Received() []byte
+	ResetPayload()
 }
 
 // PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
@@ -35,6 +36,7 @@ type PairingPayloadManagerConfig struct {
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
 type PairingPayloadManager struct {
+	pp  *PairingPayload
 	pem *PayloadEncryptionManager
 	ppm *PairingPayloadMarshaller
 	ppr PayloadRepository
@@ -51,6 +53,7 @@ func NewPairingPayloadManager(pk *ecdsa.PrivateKey, config *PairingPayloadManage
 	p := new(PairingPayload)
 
 	return &PairingPayloadManager{
+		pp:  p,
 		pem: pem,
 		ppm: NewPairingPayloadMarshaller(p),
 		ppr: NewPairingPayloadRepository(p, config),
@@ -95,6 +98,12 @@ func (ppm *PairingPayloadManager) ToSend() []byte {
 // Received returns the decrypted input of Receive
 func (ppm *PairingPayloadManager) Received() []byte {
 	return ppm.pem.Received()
+}
+
+// ResetPayload resets all payload state managed by the PairingPayloadManager
+func (ppm *PairingPayloadManager) ResetPayload() {
+	ppm.pp.ResetPayload()
+	ppm.pem.ResetPayload()
 }
 
 // EncryptionPayload represents the plain text and encrypted text of payload data
@@ -159,6 +168,10 @@ type PairingPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
+}
+
+func (pp *PairingPayload) ResetPayload() {
+	*pp = PairingPayload{}
 }
 
 // PairingPayloadMarshaller is responsible for marshalling and unmarshalling PairingServer payload data
