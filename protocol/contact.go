@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/verification"
 )
 
 type ContactRequestState int
@@ -66,6 +67,14 @@ func (c *Contact) CanonicalImage(profilePicturesVisibility settings.ProfilePictu
 	return c.Identicon
 }
 
+type VerificationStatus int
+
+const (
+	VerificationStatusUNVERIFIED VerificationStatus = iota
+	VerificationStatusVERIFYING
+	VerificationStatusVERIFIED
+)
+
 // Contact has information about a "Contact"
 type Contact struct {
 	// ID of the contact. It's a hex-encoded public key (prefixed with 0x).
@@ -103,6 +112,29 @@ type Contact struct {
 
 	IsSyncing bool
 	Removed   bool
+
+	VerificationStatus VerificationStatus       `json:"verificationStatus"`
+	TrustStatus        verification.TrustStatus `json:"trustStatus"`
+}
+
+func (c Contact) IsVerified() bool {
+	return c.VerificationStatus == VerificationStatusVERIFIED
+}
+
+func (c Contact) IsVerifying() bool {
+	return c.VerificationStatus == VerificationStatusVERIFYING
+}
+
+func (c Contact) IsUnverified() bool {
+	return c.VerificationStatus == VerificationStatusUNVERIFIED
+}
+
+func (c Contact) IsUntrustworthy() bool {
+	return c.TrustStatus == verification.TrustStatusUNTRUSTWORTHY
+}
+
+func (c Contact) IsTrusted() bool {
+	return c.TrustStatus == verification.TrustStatusTRUSTED
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {

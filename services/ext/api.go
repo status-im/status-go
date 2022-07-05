@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/urls"
+	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
 
@@ -732,6 +733,58 @@ func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, pi
 
 func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {
 	return api.service.messenger.SetDisplayName(displayName)
+}
+
+func (api *PublicAPI) MarkAsTrusted(ctx context.Context, contactID string) error {
+	return api.service.messenger.MarkAsTrusted(ctx, contactID)
+}
+
+func (api *PublicAPI) MarkAsUntrustworthy(ctx context.Context, contactID string) error {
+	return api.service.messenger.MarkAsUntrustworthy(ctx, contactID)
+}
+
+func (api *PublicAPI) RemoveTrustStatus(ctx context.Context, contactID string) error {
+	return api.service.messenger.RemoveTrustStatus(ctx, contactID)
+}
+
+func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (verification.TrustStatus, error) {
+	return api.service.messenger.GetTrustStatus(contactID)
+}
+
+func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) error {
+	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
+}
+
+func (api *PublicAPI) GetVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
+	return api.service.messenger.GetVerificationRequestFrom(ctx, contactID)
+}
+
+func (api *PublicAPI) GetReceivedVerificationRequests(ctx context.Context) ([]*verification.Request, error) {
+	return api.service.messenger.GetReceivedVerificationRequests(ctx)
+}
+
+func (api *PublicAPI) GetVerificationRequestSentTo(ctx context.Context, contactID string) (*verification.Request, error) {
+	return api.service.messenger.GetVerificationRequestSentTo(ctx, contactID)
+}
+
+func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID string) error {
+	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
+}
+
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) error {
+	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
+}
+
+func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) error {
+	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
+}
+
+func (api *PublicAPI) VerifiedTrusted(ctx context.Context, contactID string) error {
+	return api.service.messenger.VerifiedTrusted(ctx, contactID)
+}
+
+func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, contactID string) error {
+	return api.service.messenger.VerifiedUntrustworthy(ctx, contactID)
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {

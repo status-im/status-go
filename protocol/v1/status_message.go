@@ -282,6 +282,18 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.RetractContactRequest))
 	case protobuf.ApplicationMetadataMessage_SYNC_COMMUNITY_SETTINGS:
 		return m.unmarshalProtobufData(new(protobuf.SyncCommunitySettings))
+	case protobuf.ApplicationMetadataMessage_REQUEST_CONTACT_VERIFICATION:
+		return m.unmarshalProtobufData(new(protobuf.RequestContactVerification))
+	case protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_VERIFICATION:
+		return m.unmarshalProtobufData(new(protobuf.AcceptContactVerification))
+	case protobuf.ApplicationMetadataMessage_CONTACT_VERIFICATION_TRUSTED:
+		return m.unmarshalProtobufData(new(protobuf.ContactVerificationTrusted))
+	case protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_VERIFICATION:
+		return m.unmarshalProtobufData(new(protobuf.DeclineContactVerification))
+	case protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER:
+		return m.unmarshalProtobufData((new(protobuf.SyncTrustedUser)))
+	case protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST:
+		return m.unmarshalProtobufData((new(protobuf.SyncVerificationRequest)))
 	}
 	return nil
 }
