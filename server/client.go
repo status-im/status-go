@@ -13,12 +13,12 @@ import (
 
 type PairingClient struct {
 	*http.Client
+	PayloadManager
 
-	baseAddress    *url.URL
-	certPEM        []byte
-	privateKey     *ecdsa.PrivateKey
-	serverMode     Mode
-	PayloadManager PayloadManager
+	baseAddress *url.URL
+	certPEM     []byte
+	privateKey  *ecdsa.PrivateKey
+	serverMode  Mode
 }
 
 func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
