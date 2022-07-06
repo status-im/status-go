@@ -545,7 +545,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.contact_request_clock,
 			i.image_type,
 			i.payload,
-                        i.clock,
+                        i.clock_value,
 			COALESCE(c.verification_status, 0) as verification_status,
 			COALESCE(t.trust_status, 0) as trust_status
 		FROM contacts c
