@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/signal"
 )
 
 type Server struct {
@@ -48,6 +49,7 @@ func (s *Server) listenAndServe() {
 	}
 
 	s.port = listener.Addr().(*net.TCPAddr).Port
+        signal.SendMediaServerStarted(s.port)
 	s.run = true
 
 	err = s.server.Serve(listener)
