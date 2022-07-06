@@ -29,6 +29,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader) (*MediaServer, erro
 	s.SetHandlers(HandlerPatternMap{
 		imagesPath:     handleImage(s.db, s.logger),
 		audioPath:      handleAudio(s.db, s.logger),
+                identityImagesPath: handleIdentityImage(s.db, s.logger),
 		identiconsPath: handleIdenticon(s.logger),
 		ipfsPath:       handleIPFS(s.downloader, s.logger),
 	})
