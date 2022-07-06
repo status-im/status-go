@@ -313,7 +313,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 
 // DeleteMultiaccount
 func DeleteMultiaccount(keyUID, keyStoreDir string) string {
-	err := statusBackend.DeleteMulticcount(keyUID, keyStoreDir)
+	err := statusBackend.DeleteMultiaccount(keyUID, keyStoreDir)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

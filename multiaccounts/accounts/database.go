@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -36,9 +35,9 @@ type Account struct {
 }
 
 const (
-	accountTypeGenerated = "generated"
-	accountTypeKey       = "key"
-	accountTypeSeed      = "seed"
+	AccountTypeGenerated = "generated"
+	AccountTypeKey       = "key"
+	AccountTypeSeed      = "seed"
 	AccountTypeWatch     = "watch"
 )
 
@@ -46,7 +45,7 @@ const (
 // NOTE: Wallet flag can't be used as it actually indicates that it's the default
 // Wallet
 func (a *Account) IsOwnAccount() bool {
-	return a.Wallet || a.Type == accountTypeSeed || a.Type == accountTypeGenerated || a.Type == accountTypeKey
+	return a.Wallet || a.Type == AccountTypeSeed || a.Type == AccountTypeGenerated || a.Type == AccountTypeKey
 }
 
 func (a *Account) MarshalJSON() ([]byte, error) {
@@ -87,8 +86,6 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-var accountSubscriptions []chan []*Account
-
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	*settings.Database
@@ -118,10 +115,8 @@ func (db Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]*Account, error) {
-	log.Info("### GetAccounts 1")
 	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock FROM accounts ORDER BY created_at")
 	if err != nil {
-		log.Info("### GetAccounts err", "err", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -133,7 +128,6 @@ func (db *Database) GetAccounts() ([]*Account, error) {
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
 			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock)
 		if err != nil {
-			log.Info("### GetAccounts for loop err", "err", err)
 			return nil, err
 		}
 		if lth := len(pubkey); lth > 0 {
@@ -217,55 +211,13 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 	return
 }
 
-func (db *Database) SaveAccountsAndPublish(accounts []*Account) (err error) {
-	err = db.SaveAccounts(accounts)
-	if err == nil {
-		db.publishOnAccountSubscriptions(accounts)
-	}
-	return err
-}
-
-func (db *Database) SubscribeToAccountChanges() chan []*Account {
-	s := make(chan []*Account, 100)
-	accountSubscriptions = append(accountSubscriptions, s)
-	return s
-}
-
-func (db *Database) publishOnAccountSubscriptions(accounts []*Account) {
-	// Publish on channels, drop if buffer is full
-
-	for _, s := range accountSubscriptions {
-		select {
-		case s <- accounts:
-		default:
-			log.Warn("subscription channel full, dropping message")
-		}
-	}
-}
-
 func (db *Database) DeleteAccount(address types.Address) error {
 	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
 	return err
 }
 
-func (db *Database) DeleteAccountAndPublish(address types.Address) error {
-	acc, err := db.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-	err = db.DeleteAccount(address)
-
-	if err != nil {
-		return err
-	}
-	acc.Removed = true
-	db.publishOnAccountSubscriptions([]*Account{acc})
-
-	return nil
-}
-
 func (db *Database) DeleteSeedAndKeyAccounts() error {
-	_, err := db.db.Exec("DELETE FROM accounts WHERE type = ? OR type = ?", accountTypeSeed, accountTypeKey)
+	_, err := db.db.Exec("DELETE FROM accounts WHERE type = ? OR type = ?", AccountTypeSeed, AccountTypeKey)
 	return err
 }
 
@@ -317,6 +269,12 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
 	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM accounts WHERE address = ?)", address).Scan(&exists)
 	return exists, err
+}
+
+// GetPath returns true if account with given address was recently key and doesn't have a key yet
+func (db *Database) GetPath(address types.Address) (path string, err error) {
+	err = db.db.QueryRow("SELECT path FROM accounts WHERE address = ?", address).Scan(&path)
+	return path, err
 }
 
 func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {

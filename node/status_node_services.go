@@ -205,6 +205,10 @@ func (b *StatusNode) StatusPublicService() *status.Service {
 	return b.statusPublicSrvc
 }
 
+func (b *StatusNode) AccountService() *accountssvc.Service {
+	return b.accountsSrvc
+}
+
 func (b *StatusNode) WakuService() *waku.Waku {
 	return b.wakuSrvc
 }

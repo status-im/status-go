@@ -647,7 +647,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
-	m.watchAccountListChanges()
 	m.broadcastLatestUserStatus()
 	m.startBackupLoop()
 	err = m.startAutoMessageLoop()
@@ -2792,25 +2791,28 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	return m.syncWallets(accounts)
 }
 
-// Sync wallets in case of account changes
-func (m *Messenger) watchAccountListChanges() {
-	m.logger.Debug("watching account changes")
+func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
+	err := m.settings.SaveAccounts(accs)
+	if err != nil {
+		return err
+	}
+	return m.syncWallets(accs)
+}
 
-	channel := m.settings.SubscribeToAccountChanges()
+func (m *Messenger) DeleteAccount(address types.Address) error {
+	err := m.settings.DeleteAccount(address)
+	if err != nil {
+		return err
+	}
 
-	go func() {
-		for {
-			select {
-			case accounts := <-channel:
-				err := m.syncWallets(accounts)
-				if err != nil {
-					m.logger.Error("failed to sync wallet accounts to paired devices", zap.Error(err))
-				}
-			case <-m.quit:
-				return
-			}
-		}
-	}()
+	acc, err := m.settings.GetAccountByAddress(address)
+	if err != nil {
+		return err
+	}
+	acc.Removed = true
+
+	accs := []*accounts.Account{acc}
+	return m.syncWallets(accs)
 }
 
 // syncWallets syncs all wallets with paired devices
@@ -2826,11 +2828,10 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 
 	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
 	for _, acc := range accs {
-		// Only sync watch type accounts
-		if acc.Type != accounts.AccountTypeWatch {
+		if acc.Type != accounts.AccountTypeWatch &&
+			acc.Type != accounts.AccountTypeGenerated {
 			continue
 		}
-
 		var accountClock uint64
 		if acc.Clock == 0 {
 			accountClock = clock

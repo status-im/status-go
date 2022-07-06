@@ -149,7 +149,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image")
 	s.Require().NoError(err)
 
-	// Retrieve community link & community
 	err = tt.RetryWithBackOff(func() error {
 		_, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
@@ -193,7 +192,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 		Color:   "blue",
 		Type:    accounts.AccountTypeWatch,
 	}
-	s.Require().NoError(s.m.settings.SaveAccountsAndPublish([]*accounts.Account{watchOnly2}))
+	s.Require().NoError(s.m.SaveAccounts([]*accounts.Account{watchOnly2}))
 
 	// Sync between devices is triggered automatically
 	// via watch account changes subscription

@@ -332,7 +332,7 @@ func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string,
 	return api.getDerivedAddresses(ctx, info.ID, path, pageSize, pageNumber)
 }
 
-func (api *API) GetDerivedAddressesForMenominicWithPath(ctx context.Context, mnemonic string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
+func (api *API) GetDerivedAddressesForMnemonicWithPath(ctx context.Context, mnemonic string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
 	info, err := api.s.gethManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")

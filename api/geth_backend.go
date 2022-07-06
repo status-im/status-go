@@ -181,7 +181,7 @@ func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
 	return b.multiaccountsDB.SaveAccount(account)
 }
 
-func (b *GethStatusBackend) DeleteMulticcount(keyUID string, keyStoreDir string) error {
+func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
@@ -670,7 +670,7 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 	if err != nil {
 		return err
 	}
-	return accdb.SaveAccountsAndPublish(subaccs)
+	return accdb.SaveAccounts(subaccs)
 }
 
 func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
@@ -973,7 +973,6 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
-
 	db, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		b.log.Error("failed to create new *Database instance", "error", err)
@@ -991,6 +990,13 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 
 	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)
+	if _, ok := err.(*account.ErrCannotLocateKeyFile); ok {
+		key, err = b.generatePartialAccountKey(db, address, password)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err != nil {
 		b.log.Error("failed to verify account", "account", address, "error", err)
 		return nil, err
@@ -1000,6 +1006,37 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil
+}
+
+func (b *GethStatusBackend) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
+	dbPath, err := db.GetPath(types.HexToAddress(address))
+	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
+	if err != nil {
+		b.log.Error("failed to get path for given account address", "account", address, "error", err)
+		return nil, err
+	}
+
+	rootAddress, err := db.GetWalletRootAddress()
+	if err != nil {
+		return nil, err
+	}
+	info, err := b.accountManager.AccountsGenerator().LoadAccount(rootAddress.Hex(), password)
+	if err != nil {
+		return nil, err
+	}
+	masterID := info.ID
+
+	accInfosMap, err := b.accountManager.AccountsGenerator().StoreDerivedAccounts(masterID, password, []string{path})
+	if err != nil {
+		return nil, err
+	}
+
+	_, key, err := b.accountManager.AddressToDecryptedAccount(accInfosMap[path].Address, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -1219,6 +1256,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		messenger := st.Messenger()
 		// Init public status api
 		b.statusNode.StatusPublicService().Init(messenger)
+		b.statusNode.AccountService().Init(messenger)
 		// Init chat service
 		accDB, err := accounts.NewDB(b.appDB)
 		if err != nil {

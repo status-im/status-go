@@ -33,6 +33,14 @@ var (
 	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
 )
 
+type ErrCannotLocateKeyFile struct {
+	Msg string
+}
+
+func (e ErrCannotLocateKeyFile) Error() string {
+	return e.Msg
+}
+
 var zeroAddress = types.Address{}
 
 // Manager represents account manager interface.
@@ -146,7 +154,6 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
 			return fmt.Errorf("failed to read key file: %s", e)
 		}
-
 		if types.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
 			foundKeyFile = rawKeyFile
 		}
@@ -165,7 +172,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	}
 
 	if len(foundKeyFile) == 0 {
-		return nil, fmt.Errorf("cannot locate account for address: %s", addressObj.Hex())
+		return nil, &ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", addressObj.Hex())}
 	}
 
 	key, err := keystore.DecryptKey(foundKeyFile, password)
@@ -229,7 +236,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 	return nil
 }
 
-// MainAccountAddress returns currently selected watch addresses.
+// MainAccountAddress returns main account address set during login
 func (m *Manager) MainAccountAddress() (types.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -633,7 +640,7 @@ func (m *Manager) DeleteAccount(keyDirPath string, address types.Address) error 
 	}
 
 	if len(foundKeyFile) == 0 {
-		return fmt.Errorf("cannot locate account for address: %s", address.Hex())
+		return ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", address.Hex())}
 	}
 	return os.Remove(foundKeyFile)
 }

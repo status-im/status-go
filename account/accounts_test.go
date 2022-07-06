@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -65,14 +64,14 @@ func TestVerifyAccountPassword(t *testing.T) {
 			emptyKeyStoreDir,
 			utils.TestConfig.Account1.WalletAddress,
 			utils.TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
+			ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", account1Address.Hex())},
 		},
 		{
 			"wrong address, correct password",
 			keyStoreDir,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
 			utils.TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535"),
+			ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535")},
 		},
 		{
 			"correct address, wrong password",
@@ -84,7 +83,8 @@ func TestVerifyAccountPassword(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		accountKey, err := accManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
-		if !reflect.DeepEqual(err, testCase.expectedError) {
+		if testCase.expectedError != nil && err != nil && testCase.expectedError.Error() != err.Error() ||
+			((testCase.expectedError == nil || err == nil) && testCase.expectedError != err) {
 			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
