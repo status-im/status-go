@@ -620,6 +620,8 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 	config := defaultEncryptorConfig("none", s.logger)
 	// Set MaxMessageKeysPerSession to an high value so it does not interfere
 	config.MaxMessageKeysPerSession = 100000
+	// Set MaxKeep to a small number for testing
+	config.MaxKeep = 10
 
 	s.initDatabases(config)
 
