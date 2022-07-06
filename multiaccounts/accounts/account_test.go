@@ -12,17 +12,17 @@ func TestIsOwnAccount(t *testing.T) {
 	require.True(t, account.IsOwnAccount())
 
 	account = Account{
-		Type: accountTypeGenerated,
+		Type: AccountTypeGenerated,
 	}
 	require.True(t, account.IsOwnAccount())
 
 	account = Account{
-		Type: accountTypeKey,
+		Type: AccountTypeKey,
 	}
 	require.True(t, account.IsOwnAccount())
 
 	account = Account{
-		Type: accountTypeSeed,
+		Type: AccountTypeSeed,
 	}
 	require.True(t, account.IsOwnAccount())
 

@@ -386,20 +386,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	utils.Init()
 
 	password := "test"
-	tmpdir, err := ioutil.TempDir("", "verified-account-test-")
+	backend, defers, err := setupWalletTest(t, password)
 	require.NoError(t, err)
-	defer os.Remove(tmpdir)
-	backend := NewGethStatusBackend()
-	backend.UpdateRootDataDir(tmpdir)
-	require.NoError(t, backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore")))
-	require.NoError(t, backend.ensureAppDBOpened(multiaccounts.Account{KeyUID: "0x1"}, password))
-	config, err := params.NewNodeConfig(tmpdir, 178733)
-	require.NoError(t, err)
-	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
-	require.NoError(t, backend.StartNode(config))
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
+	defer defers()
 
 	t.Run("AccountDoesntExist", func(t *testing.T) {
 		pkey, err := gethcrypto.GenerateKey()
@@ -415,6 +404,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		db, err := accounts.NewDB(backend.appDB)
+
 		require.NoError(t, err)
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
@@ -424,12 +414,43 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.Nil(t, key)
 	})
 
+	t.Run("PartialAccount", func(t *testing.T) {
+		// Create a derived wallet account without storing the keys
+		db, err := accounts.NewDB(backend.appDB)
+		require.NoError(t, err)
+		newPath := "m/0"
+		walletRootAddress, err := db.GetWalletRootAddress()
+		require.NoError(t, err)
+
+		walletInfo, err := backend.AccountManager().AccountsGenerator().LoadAccount(walletRootAddress.String(), password)
+		require.NoError(t, err)
+		derivedInfos, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(walletInfo.ID, []string{newPath})
+		require.NoError(t, err)
+		derivedInfo := derivedInfos[newPath]
+
+		partialAcc := &accounts.Account{
+			Address:   types.HexToAddress(derivedInfo.Address),
+			Type:      accounts.AccountTypeGenerated,
+			PublicKey: types.Hex2Bytes(derivedInfo.PublicKey),
+			Path:      newPath,
+			Wallet:    false,
+			Name:      "PartialAccount",
+		}
+		require.NoError(t, db.SaveAccounts([]*accounts.Account{partialAcc}))
+
+		// With partial account we need to dynamically generate private key
+		key, err := backend.getVerifiedWalletAccount(partialAcc.Address.Hex(), password)
+		require.NoError(t, err)
+		require.Equal(t, partialAcc.Address, key.Address)
+	})
+
 	t.Run("Success", func(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		db, err := accounts.NewDB(backend.appDB)
 		require.NoError(t, err)
+		defer db.Close()
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
 		require.NoError(t, db.SaveAccounts([]*accounts.Account{{Address: address}}))
@@ -515,7 +536,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	require.NoError(t, b.VerifyDatabasePassword(main.KeyUID, "test-pass"))
 }
 
-func TestDeleteMulticcount(t *testing.T) {
+func TestDeleteMultiaccount(t *testing.T) {
 	backend := NewGethStatusBackend()
 
 	rootDataDir, err := ioutil.TempDir("", "test-keystore-dir")
@@ -583,7 +604,7 @@ func TestDeleteMulticcount(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, 3, len(files))
 
-	err = backend.DeleteMulticcount(account.KeyUID, keyStoreDir)
+	err = backend.DeleteMultiaccount(account.KeyUID, keyStoreDir)
 	require.NoError(t, err)
 
 	files, err = ioutil.ReadDir(rootDataDir)

@@ -1994,8 +1994,20 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 		return err
 	}
 
+	latestDerivedPath, err := m.settings.GetLatestDerivedPath()
+	if err != nil {
+		return err
+	}
+
+	newPath := latestDerivedPath + uint(len(accs))
+	err = m.settings.SaveSettingField(settings.LatestDerivedPath, newPath)
+	if err != nil {
+		return err
+	}
+
 	if err == nil {
 		state.Response.Accounts = accs
+		state.Response.Settings = []*settings.SyncSettingField{{settings.LatestDerivedPath, newPath}}
 	}
 
 	return err

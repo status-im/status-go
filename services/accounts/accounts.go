@@ -15,21 +15,23 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 )
 
 const pathWalletRoot = "m/44'/60'/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 
-func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed) *API {
-	return &API{manager, config, db, feed}
+func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
+	return &API{manager, config, db, feed, messenger}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	manager *account.GethManager
-	config  *params.NodeConfig
-	db      *accounts.Database
-	feed    *event.Feed
+	manager   *account.GethManager
+	config    *params.NodeConfig
+	db        *accounts.Database
+	feed      *event.Feed
+	messenger **protocol.Messenger
 }
 
 type DerivedAddress struct {
@@ -41,7 +43,7 @@ type DerivedAddress struct {
 
 func (api *API) SaveAccounts(ctx context.Context, accounts []*accounts.Account) error {
 	log.Info("[AccountsAPI::SaveAccounts]")
-	err := api.db.SaveAccountsAndPublish(accounts)
+	err := (*api.messenger).SaveAccounts(accounts)
 	if err != nil {
 		return err
 	}
@@ -76,12 +78,13 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	}
 	if acc.Type != accounts.AccountTypeWatch {
 		err = api.manager.DeleteAccount(api.config.KeyStoreDir, address)
-		if err != nil {
+		var e *account.ErrCannotLocateKeyFile
+		if err != nil && !errors.As(err, &e) {
 			return err
 		}
 	}
 
-	return api.db.DeleteAccountAndPublish(address)
+	return (*api.messenger).DeleteAccount(address)
 }
 
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
@@ -152,7 +155,7 @@ func (api *API) AddAccountWithPrivateKey(
 	account := &accounts.Account{
 		Address:   types.Address(common.HexToAddress(info.Address)),
 		PublicKey: types.HexBytes(info.PublicKey),
-		Type:      "key",
+		Type:      accounts.AccountTypeKey,
 		Name:      name,
 		Emoji:     emoji,
 		Color:     color,
@@ -250,7 +253,7 @@ func (api *API) addAccountWithMnemonic(
 	account := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
 		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
-		Type:        "seed",
+		Type:        accounts.AccountTypeSeed,
 		Name:        name,
 		Emoji:       emoji,
 		Color:       color,
@@ -292,7 +295,7 @@ func (api *API) generateAccount(
 	acc := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(infos[path].Address)),
 		PublicKey:   types.HexBytes(infos[path].PublicKey),
-		Type:        "generated",
+		Type:        accounts.AccountTypeGenerated,
 		Name:        name,
 		Emoji:       emoji,
 		Color:       color,
