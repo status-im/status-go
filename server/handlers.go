@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
-	identityImages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 )
@@ -187,12 +186,20 @@ func handleIdenticon(logger *zap.Logger) func(w http.ResponseWriter, r *http.Req
 // TODO: return error
 func handleIdentityImage(db *sql.DB,   logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pks, ok := r.URL.Query()["publicKey"]
+	params := r.URL.Query()
+	pks, ok := params["publicKey"]
 		if !ok || len(pks) == 0 {
 			logger.Error("no publicKey")
 			return
 		}
 		pk := pks[0]
+		colorHash, err := colorhash.GenerateFor(pk)
+		if err != nil {
+			logger.Error("could not generate color hash")
+			return
+		}
+
+
                 rows, err := db.Query(`SELECT image_type, payload FROM chat_identity_contacts WHERE contact_id = ?`, pk)
                 if err != nil {
                   logger.Error("could not fetch identity images")
@@ -201,7 +208,8 @@ func handleIdentityImage(db *sql.DB,   logger *zap.Logger) func(w http.ResponseW
 
                 defer rows.Close()
 
-                var identityImage identityImages.IdentityImage
+                var byteImage []byte
+			theme := getTheme(params, logger)
                 for rows.Next() {
                 var imageType sql.NullString
                 var imagePayload []byte
@@ -214,45 +222,50 @@ func handleIdentityImage(db *sql.DB,   logger *zap.Logger) func(w http.ResponseW
                     return
                   }
 
-                  identityImage = identityImages.IdentityImage{Name: imageType.String, Payload: imagePayload}
-                }
-
-                imageType := "image/png"
-                var image []byte
-
-
-                if identityImage.Payload != nil {
-                  t, err := identityImage.GetType()
+                  config, _, err := image.DecodeConfig(bytes.NewReader(imagePayload))
                   if err != nil {
-                    logger.Error("could not get image type")
+                    logger.Error("could not decode config")
                     return
                   }
-                  switch t {
-                  case identityImages.JPEG:
-                    imageType = "image/jpeg"
-                  case identityImages.PNG:
-                    imageType = "image/png"
-                  case identityImages.GIF:
-                    imageType = "image/gif"
-                  case identityImages.WEBP:
-                    imageType = "image/webp"
-                  }
-                  image = identityImage.Payload
-                } else {
 
-		image, err = identicon.Generate(pk)
+
+                  byteImage, err = ring.DrawRing(&ring.DrawRingParam{
+                    Theme: theme, ColorHash: colorHash, ImageBytes: imagePayload, Height: config.Height, Width: config.Width,
+                  })
+                  if err != nil {
+                    logger.Error("could not generate ring")
+                    return
+                  }
+
+                }
+
+                if len(byteImage) == 0  {
+
+		byteImage, err = identicon.Generate(pk)
                 if err != nil {
 			logger.Error("could not generate identicon")
                         return
                       }
-                    }
+			byteImage, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: colorHash, ImageBytes: byteImage, Height: identicon.Height, Width: identicon.Width,
+			})
+			if err != nil {
+				logger.Error("failed to draw ring", zap.Error(err))
+			}
 
+                      }
 
-		w.Header().Set("Content-Type", imageType)
+                      mime, err := images.ImageMime(byteImage)
+                      if err != nil {
+                        logger.Error("failed to get mime", zap.Error(err))
+                        return
+                      }
+
+		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "max-age:290304000, public")
 		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
 
-		_, err = w.Write(image)
+		_, err = w.Write(byteImage)
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
 		}
