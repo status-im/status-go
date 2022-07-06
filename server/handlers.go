@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
+	identityImages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 )
@@ -18,6 +19,7 @@ const (
 	identiconsPath = basePath + "/identicons"
 	imagesPath     = basePath + "/images"
 	audioPath      = basePath + "/audio"
+        identityImagesPath = "/identityImages"
 	ipfsPath       = "/ipfs"
 
 	// Handler routes for pairing
@@ -51,6 +53,82 @@ func handleIdenticon(logger *zap.Logger) func(w http.ResponseWriter, r *http.Req
 		}
 	}
 }
+
+// TODO: return error
+func handleIdentityImage(db *sql.DB,   logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		pks, ok := r.URL.Query()["publicKey"]
+		if !ok || len(pks) == 0 {
+			logger.Error("no publicKey")
+			return
+		}
+		pk := pks[0]
+                rows, err := db.Query(`SELECT image_type, payload FROM chat_identity_contacts WHERE contact_id = ?`, pk)
+                if err != nil {
+                  logger.Error("could not fetch identity images")
+                  return
+                }
+
+                defer rows.Close()
+
+                var identityImage identityImages.IdentityImage
+                for rows.Next() {
+                var imageType sql.NullString
+                var imagePayload []byte
+                  err := rows.Scan(
+                    &imageType,
+                    &imagePayload,
+                  )
+                  if err != nil {
+                    logger.Error("could not scan image row")
+                    return
+                  }
+
+                  identityImage = identityImages.IdentityImage{Name: imageType.String, Payload: imagePayload}
+                }
+
+                imageType := "image/png"
+                var image []byte
+
+
+                if identityImage.Payload != nil {
+                  t, err := identityImage.GetType()
+                  if err != nil {
+                    logger.Error("could not get image type")
+                    return
+                  }
+                  switch t {
+                  case identityImages.JPEG:
+                    imageType = "image/jpeg"
+                  case identityImages.PNG:
+                    imageType = "image/png"
+                  case identityImages.GIF:
+                    imageType = "image/gif"
+                  case identityImages.WEBP:
+                    imageType = "image/webp"
+                  }
+                  image = identityImage.Payload
+                } else {
+
+		image, err = identicon.Generate(pk)
+                if err != nil {
+			logger.Error("could not generate identicon")
+                        return
+                      }
+                    }
+
+
+		w.Header().Set("Content-Type", imageType)
+		w.Header().Set("Cache-Control", "max-age:290304000, public")
+		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
 
 func handleImage(db *sql.DB, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -500,6 +500,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
                         c.contact_request_clock,
 			i.image_type,
 			i.payload,
+                        i.clock,
 			COALESCE(c.verification_status, 0) as verification_status,
 			COALESCE(t.trust_status, 0) as trust_status
 		FROM contacts c 
@@ -528,6 +529,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			removed             sql.NullBool
 			hasAddedUs          sql.NullBool
 			lastUpdatedLocally  sql.NullInt64
+			identityImageClock  sql.NullInt64
 			imagePayload        []byte
 		)
 
@@ -552,6 +554,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contactRequestClock,
 			&imageType,
 			&imagePayload,
+                        &identityImageClock,
 			&contact.VerificationStatus,
 			&contact.TrustStatus,
 		)
@@ -606,13 +609,13 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		previousContact, ok := allContacts[contact.ID]
 		if !ok {
 			if imageType.Valid {
-				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+                          contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			}
 
 			allContacts[contact.ID] = &contact
 
 		} else if imageType.Valid {
-			previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+                  previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			allContacts[contact.ID] = previousContact
 
 		}
