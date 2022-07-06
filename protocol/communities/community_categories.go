@@ -6,6 +6,22 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+func (o *Community) ChatsByCategoryID(categoryID string) []string {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	var chatIDs []string
+	if o == nil || o.config == nil || o.config.CommunityDescription == nil {
+		return chatIDs
+	}
+
+	for chatID, chat := range o.config.CommunityDescription.Chats {
+		if chat.CategoryId == categoryID {
+			chatIDs = append(chatIDs, chatID)
+		}
+	}
+	return chatIDs
+}
+
 func (o *Community) CreateCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()

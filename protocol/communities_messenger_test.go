@@ -1758,3 +1758,94 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	aoCom := mr.Communities()[0]
 	s.Equal(aCom, aoCom)
 }
+
+func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	orgChat1 := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+
+	orgChat2 := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core2",
+			Emoji:       "😎",
+			Description: "status-core community chat2",
+		},
+	}
+
+	mr, err = s.alice.CreateCommunityChat(newCommunity.ID(), orgChat1)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Chats(), 1)
+
+	mr, err = s.alice.CreateCommunityChat(newCommunity.ID(), orgChat2)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Chats(), 1)
+
+	var chatIds []string
+	for k := range newCommunity.Chats() {
+		chatIds = append(chatIds, k)
+	}
+	category := &requests.CreateCommunityCategory{
+		CommunityID:  newCommunity.ID(),
+		CategoryName: "category-name",
+		ChatIDs:      chatIds,
+	}
+
+	mr, err = s.alice.CreateCommunityCategory(category)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Communities()[0].Categories(), 1)
+
+	var categoryID string
+	for k := range mr.Communities()[0].Categories() {
+		categoryID = k
+	}
+
+	err = s.alice.SetMutePropertyOnChatsByCategory(newCommunity.IDString(), categoryID, true)
+	s.Require().NoError(err)
+
+	for _, chat := range s.alice.Chats() {
+		if chat.CategoryID == categoryID {
+			s.Require().True(chat.Muted)
+		}
+	}
+
+	err = s.alice.SetMutePropertyOnChatsByCategory(newCommunity.IDString(), categoryID, false)
+	s.Require().NoError(err)
+
+	for _, chat := range s.alice.Chats() {
+		s.Require().False(chat.Muted)
+	}
+}
