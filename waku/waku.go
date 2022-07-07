@@ -1029,19 +1029,21 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 }
 
 // Unsubscribe removes an installed message handler.
-// TODO: This does not seem to update the bloom filter, but does update
+// TODO: This does not update the bloom filter, but does update
 // the topic interest map
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
-
-	return w.SetTopicInterest(w.filters.AllTopics())
+	if !w.settings.BloomFilterMode {
+		return w.SetTopicInterest(w.filters.AllTopics())
+	}
+	return nil
 }
 
 // Unsubscribe removes an installed message handler.
-// TODO: This does not seem to update the bloom filter, but does update
+// TODO: This does not update the bloom filter, but does update
 // the topic interest map
 func (w *Waku) UnsubscribeMany(ids []string) error {
 	for _, id := range ids {
@@ -1051,7 +1053,10 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 			w.logger.Warn("could not remove filter with id", zap.String("id", id))
 		}
 	}
-	return w.SetTopicInterest(w.filters.AllTopics())
+	if !w.settings.BloomFilterMode {
+		return w.SetTopicInterest(w.filters.AllTopics())
+	}
+	return nil
 }
 
 // Send injects a message into the waku send queue, to be distributed in the
