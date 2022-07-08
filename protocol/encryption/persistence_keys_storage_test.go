@@ -1,7 +1,6 @@
 package encryption
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,9 +30,7 @@ type SQLLitePersistenceKeysStorageTestSuite struct {
 }
 
 func (s *SQLLitePersistenceKeysStorageTestSuite) SetupTest() {
-	dir, err := os.MkdirTemp("", "keys-storage-persistence")
-	s.Require().NoError(err)
-
+	dir := s.T().TempDir()
 	key := "blahblahblah"
 
 	db, err := sqlite.Open(filepath.Join(dir, "db.sql"), key, sqlite.ReducedKDFIterationsNumber)

@@ -1,7 +1,6 @@
 package mailserver
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -15,15 +14,7 @@ import (
 func TestLevelDB_BuildIteratorWithTopic(t *testing.T) {
 	topic := []byte{0x01, 0x02, 0x03, 0x04}
 
-	dir, err := os.MkdirTemp("/tmp", "status-go-test-level-db")
-	require.NoError(t, err)
-
-	db, err := NewLevelDB(dir)
-
-	defer func() {
-		_ = os.Remove(dir)
-	}()
-
+	db, err := NewLevelDB(t.TempDir())
 	require.NoError(t, err)
 
 	envelope, err := newTestEnvelope(topic)

@@ -23,13 +23,8 @@ const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
 	accManager := NewGethManager()
-	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
-	require.NoError(t, err)
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
-
-	emptyKeyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts_empty")
-	require.NoError(t, err)
-	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
+	keyStoreDir := t.TempDir()
+	emptyKeyStoreDir := t.TempDir()
 
 	// import account keys
 	utils.Init()
@@ -102,13 +97,11 @@ func TestVerifyAccountPassword(t *testing.T) {
 // TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
 // can handle accounts before introduction of EIP55.
 func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
-	keyStoreDir, err := os.MkdirTemp("", "status-accounts-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+	keyStoreDir := t.TempDir()
 
 	// Import keys and make sure one was created before EIP55 introduction.
 	utils.Init()
-	err = utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
+	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
 	accManager := NewGethManager()
@@ -143,8 +136,7 @@ type testAccount struct {
 func (s *ManagerTestSuite) SetupTest() {
 	s.accManager = NewGethManager()
 
-	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
-	s.Require().NoError(err)
+	keyStoreDir := s.T().TempDir()
 	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))
 	s.keydir = keyStoreDir
 
@@ -169,10 +161,6 @@ func (s *ManagerTestSuite) SetupTest() {
 		accountInfo.ChatPubKey,
 		mnemonic,
 	}
-}
-
-func (s *ManagerTestSuite) TearDownTest() {
-	s.Require().NoError(os.RemoveAll(s.keydir))
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {

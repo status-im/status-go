@@ -62,27 +62,21 @@ func setupTestDB(t *testing.T) (*multiaccounts.Database, func()) {
 	}
 }
 
-func makeKeystores(t *testing.T) (string, string, func()) {
-	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
-	require.NoError(t, err)
-
-	emptyKeyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts_empty")
-	require.NoError(t, err)
+func makeKeystores(t *testing.T) (string, string) {
+	keyStoreDir := t.TempDir()
+	emptyKeyStoreDir := t.TempDir()
 
 	keyStoreDir = filepath.Join(keyStoreDir, keystoreDir, keyUID)
 	// TODO test case where the keystore dir does not yet exist because the device is new
 	emptyKeyStoreDir = filepath.Join(emptyKeyStoreDir, keystoreDir)
 
-	err = os.MkdirAll(keyStoreDir, 0777)
+	err := os.MkdirAll(keyStoreDir, 0777)
 	require.NoError(t, err)
 
 	err = os.MkdirAll(emptyKeyStoreDir, 0777)
 	require.NoError(t, err)
 
-	return keyStoreDir, emptyKeyStoreDir, func() {
-		os.RemoveAll(keyStoreDir)
-		os.RemoveAll(emptyKeyStoreDir)
-	}
+	return keyStoreDir, emptyKeyStoreDir
 }
 
 func initKeys(t *testing.T, keyStoreDir string) {
@@ -122,11 +116,10 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 
 	db1, db1td := setupTestDB(pms.T())
 	db2, db2td := setupTestDB(pms.T())
-	keystore1, keystore2, kstd := makeKeystores(pms.T())
+	keystore1, keystore2 := makeKeystores(pms.T())
 	pms.teardown = func() {
 		db1td()
 		db2td()
-		kstd()
 	}
 
 	initKeys(pms.T(), keystore1)

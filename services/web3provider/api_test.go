@@ -39,8 +39,7 @@ func createDB(t *testing.T) (*sql.DB, func()) {
 func setupTestAPI(t *testing.T) (*API, func()) {
 	db, cancel := createDB(t)
 
-	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
-	require.NoError(t, err)
+	keyStoreDir := t.TempDir()
 
 	// Creating a dummy status node to simulate what it's done in get_status_node.go
 	upstreamConfig := params.UpstreamRPCConfig{

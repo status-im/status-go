@@ -3,7 +3,6 @@ package pairing
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -49,19 +48,8 @@ type SyncDeviceSuite struct {
 
 func (s *SyncDeviceSuite) SetupTest() {
 	s.password = "password"
-
-	clientAsSenderTmpdir, err := os.MkdirTemp("", "TestPairingSyncDeviceClientAsSender")
-	require.NoError(s.T(), err)
-	s.clientAsSenderTmpdir = clientAsSenderTmpdir
-
-	clientAsReceiverTmpdir, err := os.MkdirTemp("", "TestPairingSyncDeviceClientAsReceiver")
-	require.NoError(s.T(), err)
-	s.clientAsReceiverTmpdir = clientAsReceiverTmpdir
-}
-
-func (s *SyncDeviceSuite) TearDownTest() {
-	os.RemoveAll(s.clientAsSenderTmpdir)
-	os.RemoveAll(s.clientAsReceiverTmpdir)
+	s.clientAsSenderTmpdir = s.T().TempDir()
+	s.clientAsReceiverTmpdir = s.T().TempDir()
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStatusBackend {

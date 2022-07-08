@@ -34,9 +34,6 @@ func createDB(t *testing.T) (*sql.DB, func()) {
 func setupTestAPI(t *testing.T) (*API, func()) {
 	db, cancel := createDB(t)
 
-	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
-	require.NoError(t, err)
-
 	// Creating a dummy status node to simulate what it's done in get_status_node.go
 	upstreamConfig := params.UpstreamRPCConfig{
 		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
@@ -54,7 +51,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	// import account keys
 	utils.Init()
-	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
+	require.NoError(t, utils.ImportTestAccount(t.TempDir(), utils.GetAccount1PKFile()))
 
 	return NewAPI(rpcClient, nil, nil, nil, db), cancel
 }
