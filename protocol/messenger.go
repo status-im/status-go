@@ -819,6 +819,18 @@ func (m *Messenger) publishContactCode() error {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
 
+	joinedCommunities, err := m.communitiesManager.Joined()
+	if err != nil {
+		return err
+	}
+	for _, community := range joinedCommunities {
+		rawMessage.LocalChatID = community.MemberUpdateChannelID()
+		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
 	m.logger.Debug("contact code sent")
 	return err
 }
@@ -1285,7 +1297,7 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
-		publicChatIDs = append(publicChatIDs, org.IDString(), org.StatusUpdatesChannelID(), org.MagnetlinkMessageChannelID())
+		publicChatIDs = append(publicChatIDs, org.IDString(), org.StatusUpdatesChannelID(), org.MagnetlinkMessageChannelID(), org.MemberUpdateChannelID())
 
 		// This is for status-go versions that didn't have `CommunitySettings`
 		// We need to ensure communities that existed before community settings
