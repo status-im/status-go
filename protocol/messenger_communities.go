@@ -342,6 +342,11 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		return nil, err
 	}
 
+	err = m.PublishIdentityImage()
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 

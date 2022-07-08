@@ -1110,11 +1110,16 @@ func (o *Community) MagnetlinkMessageChannelID() string {
 	return o.IDString() + "-magnetlinks"
 }
 
+func (o *Community) MemberUpdateChannelID() string {
+	return o.IDString() + "-memberUpdate"
+}
+
 func (o *Community) DefaultFilters() []string {
 	cID := o.IDString()
 	updatesChannelID := o.StatusUpdatesChannelID()
 	mlChannelID := o.MagnetlinkMessageChannelID()
-	return []string{cID, updatesChannelID, mlChannelID}
+	memberUpdateChannelID := o.MemberUpdateChannelID()
+	return []string{cID, updatesChannelID, mlChannelID, memberUpdateChannelID}
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {

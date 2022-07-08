@@ -16,9 +16,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -115,12 +117,19 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 }
 
 func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpFile, err := ioutil.TempFile("", "")
+	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
 	s.Require().NoError(err)
+	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	s.Require().NoError(err)
+
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
 
 	options := []Option{
 		WithCustomLogger(s.logger),
-		WithDatabaseConfig(tmpFile.Name(), ""),
+		WithDatabaseConfig(":memory:", "somekey"),
+		WithMultiAccounts(madb),
+		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)
@@ -388,6 +397,92 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().False(response.Communities()[0].Joined())
 	s.Require().Len(response.RemovedChats(), 3)
+}
+
+func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	community := response.Communities()[0]
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+
+	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	joinCommunity := func(user *Messenger) {
+		chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
+
+		inputMessage := &common.Message{}
+		inputMessage.ChatId = chat.ID
+		inputMessage.Text = "some text"
+		inputMessage.CommunityID = community.IDString()
+
+		err = s.bob.SaveChat(chat)
+		s.Require().NoError(err)
+		_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
+		s.Require().NoError(err)
+
+		// Ensure community is received
+		err = tt.RetryWithBackOff(func() error {
+			response, err = user.RetrieveAll()
+			if err != nil {
+				return err
+			}
+			if len(response.Communities()) == 0 {
+				return errors.New("community not received")
+			}
+			return nil
+		})
+		s.Require().NoError(err)
+
+		// Join the community
+		response, err = user.JoinCommunity(context.Background(), community.ID())
+		s.Require().NoError(err)
+		s.Require().NotNil(response)
+	}
+
+	patryk := s.newMessenger()
+	joinCommunity(patryk)
+	joinCommunity(s.alice)
+
+	// Trigger ContactCodeAdvertisement
+	err = patryk.SetDisplayName("patryk")
+	s.Require().NoError(err)
+
+	// Ensure alice receives patryk's ContactCodeAdvertisement
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Contacts) == 0 {
+			return errors.New("no contacts in response")
+		}
+		if response.Contacts[0].DisplayName != "patryk" {
+			return errors.New("display name was not updated")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
