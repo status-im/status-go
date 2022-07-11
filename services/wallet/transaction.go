@@ -10,14 +10,48 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/transactions"
 )
 
 type TransactionManager struct {
-	db *sql.DB
+	db          *sql.DB
+	gethManager *account.GethManager
+	transactor  *transactions.Transactor
+	config      *params.NodeConfig
+	accountsDB  *accounts.Database
+}
+
+type MultiTransactionType uint8
+
+const (
+	MultiTransactionSend = iota
+	MultiTransactionSwap
+	MultiTransactionBridge
+)
+
+type MultiTransaction struct {
+	ID          uint                 `json:"id"`
+	Timestamp   uint64               `json:"timestamp"`
+	FromAddress common.Address       `json:"fromAddress"`
+	ToAddress   common.Address       `json:"toAddress"`
+	FromAsset   string               `json:"fromAsset"`
+	ToAsset     string               `json:"toAsset"`
+	FromAmount  *hexutil.Big         `json:"fromAmount"`
+	Type        MultiTransactionType `json:"type"`
+}
+
+type MultiTransactionResult struct {
+	ID     int64                   `json:"id"`
+	Hashes map[uint64][]types.Hash `json:"hashes"`
 }
 
 type PendingTrxType string
@@ -31,18 +65,19 @@ const (
 )
 
 type PendingTransaction struct {
-	Hash           common.Hash    `json:"hash"`
-	Timestamp      uint64         `json:"timestamp"`
-	Value          bigint.BigInt  `json:"value"`
-	From           common.Address `json:"from"`
-	To             common.Address `json:"to"`
-	Data           string         `json:"data"`
-	Symbol         string         `json:"symbol"`
-	GasPrice       bigint.BigInt  `json:"gasPrice"`
-	GasLimit       bigint.BigInt  `json:"gasLimit"`
-	Type           PendingTrxType `json:"type"`
-	AdditionalData string         `json:"additionalData"`
-	ChainID        uint64         `json:"network_id"`
+	Hash               common.Hash    `json:"hash"`
+	Timestamp          uint64         `json:"timestamp"`
+	Value              bigint.BigInt  `json:"value"`
+	From               common.Address `json:"from"`
+	To                 common.Address `json:"to"`
+	Data               string         `json:"data"`
+	Symbol             string         `json:"symbol"`
+	GasPrice           bigint.BigInt  `json:"gasPrice"`
+	GasLimit           bigint.BigInt  `json:"gasLimit"`
+	Type               PendingTrxType `json:"type"`
+	AdditionalData     string         `json:"additionalData"`
+	ChainID            uint64         `json:"network_id"`
+	MultiTransactionID int64          `json:"multi_transaction_id"`
 }
 
 func arrayToString(a []uint64, delim string) string {
@@ -177,6 +212,93 @@ func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.
 	defer cancel()
 
 	return watchTxCommand.Command()(commandContext)
+}
+
+func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data map[uint64][]transactions.SendTxArgs, password string) (*MultiTransactionResult, error) {
+	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
+	if err != nil {
+		return nil, err
+	}
+
+	insert, err := tm.db.Prepare(`INSERT OR REPLACE INTO multi_transactions
+                                      (from_address, from_asset, from_amount, to_address, to_asset, type, timestamp)
+                                      VALUES
+                                      (?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return nil, err
+	}
+	result, err := insert.Exec(
+		multiTransaction.FromAddress,
+		multiTransaction.FromAsset,
+		multiTransaction.FromAmount.String(),
+		multiTransaction.ToAddress,
+		multiTransaction.ToAsset,
+		multiTransaction.Type,
+		time.Now().Unix(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer insert.Close()
+	multiTransactionID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	hashes := make(map[uint64][]types.Hash)
+	for chainID, txs := range data {
+		for _, tx := range txs {
+			hash, err := tm.transactor.SendTransactionWithChainID(chainID, tx, selectedAccount)
+			if err != nil {
+				return nil, err
+			}
+
+			err = tm.addPending(PendingTransaction{
+				Hash:               common.Hash(hash),
+				Timestamp:          uint64(time.Now().Unix()),
+				Value:              bigint.BigInt{tx.Value.ToInt()},
+				From:               common.Address(tx.From),
+				To:                 common.Address(*tx.To),
+				Data:               tx.Data.String(),
+				Type:               WalletTransfer,
+				ChainID:            chainID,
+				MultiTransactionID: multiTransactionID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			hashes[chainID] = append(hashes[chainID], hash)
+		}
+	}
+
+	return &MultiTransactionResult{
+		ID:     multiTransactionID,
+		Hashes: hashes,
+	}, nil
+}
+
+func (tm *TransactionManager) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
+	exists, err := tm.accountsDB.AddressExists(types.HexToAddress(address))
+	if err != nil {
+		log.Error("failed to query db for a given address", "address", address, "error", err)
+		return nil, err
+	}
+
+	if !exists {
+		log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
+		return nil, transactions.ErrAccountDoesntExist
+	}
+
+	key, err := tm.gethManager.VerifyAccountPassword(tm.config.KeyStoreDir, address, password)
+	if err != nil {
+		log.Error("failed to verify account", "account", address, "error", err)
+		return nil, err
+	}
+
+	return &account.SelectedExtKey{
+		Address:    key.Address,
+		AccountKey: key,
+	}, nil
 }
 
 type watchTransactionCommand struct {
