@@ -2800,12 +2800,13 @@ func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
-	err := m.settings.DeleteAccount(address)
+
+	acc, err := m.settings.GetAccountByAddress(address)
 	if err != nil {
 		return err
 	}
 
-	acc, err := m.settings.GetAccountByAddress(address)
+	err = m.settings.DeleteAccount(address)
 	if err != nil {
 		return err
 	}
