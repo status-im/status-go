@@ -20,6 +20,7 @@ import (
 var (
 	ErrChatNotFound            = errors.New("can't find chat")
 	ErrCommunitiesNotSupported = errors.New("communities are not supported")
+	ErrChatTypeNotSupported    = errors.New("chat type not supported")
 )
 
 type ChannelGroupType string
@@ -398,4 +399,27 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 	}
 
 	return messengerChat, community, nil
+}
+
+func (api *API) EditChat(ctx context.Context, communityID types.HexBytes, chatID string, name string, color string, image string) (*Chat, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
+	chatToEdit := api.s.messenger.Chat(chatID)
+	if chatToEdit == nil {
+		return nil, ErrChatNotFound
+	}
+
+	if chatToEdit.ChatType != protocol.ChatTypePrivateGroupChat {
+		return nil, ErrChatTypeNotSupported
+	}
+
+	response, err := api.s.messenger.EditGroupChat(ctx, chatID, name, color, image)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	return api.toAPIChat(response.Chats()[0], nil, pubKey)
 }

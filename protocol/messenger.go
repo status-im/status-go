@@ -1548,7 +1548,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	group, err := v1protocol.NewGroupWithCreator(name, clock, m.identity)
+	group, err := v1protocol.NewGroupWithCreator(name, chat.Color, clock, m.identity)
 	if err != nil {
 		return nil, err
 	}
@@ -1776,7 +1776,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	}
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	// Add members
+	// Change name
 	event := v1protocol.NewNameChangedEvent(name, clock)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
@@ -1815,6 +1815,87 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	var response MessengerResponse
 
 	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
+}
+
+func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "EditGroupChat"))
+	logger.Info("Editing group chat details", zap.String("chatID", chatID), zap.String("name", name), zap.String("color", color))
+
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	signAndProcessEvent := func(m *Messenger, event *v1protocol.MembershipUpdateEvent) error {
+		err := event.Sign(m.identity)
+		if err != nil {
+			return err
+		}
+
+		err = group.ProcessEvent(*event)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	var events []v1protocol.MembershipUpdateEvent
+
+	if chat.Name != name {
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+		event := v1protocol.NewNameChangedEvent(name, clock)
+		event.ChatID = chat.ID
+		err = signAndProcessEvent(m, &event)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	if chat.Color != color {
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+		event := v1protocol.NewColorChangedEvent(color, clock)
+		event.ChatID = chat.ID
+		err = signAndProcessEvent(m, &event)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	// TODO add image change
+
+	recipients, err := stringSliceToPublicKeys(group.Members())
+	if err != nil {
+		return nil, err
+	}
+
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+		Recipients:  recipients,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	chat.updateChatFromGroupMembershipChanges(group)
+
+	var response MessengerResponse
+
+	return m.addMessagesAndChat(chat, buildSystemMessages(events, m.systemMessagesTranslations), &response)
 }
 
 func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string,
