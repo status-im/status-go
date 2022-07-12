@@ -267,6 +267,9 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 	// Name
 	c.Name = g.Name()
 
+	// Color
+	c.Color = g.Color()
+
 	// Members
 	members := g.Members()
 	admins := g.Admins()

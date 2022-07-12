@@ -66,16 +66,21 @@ func (s *EventToSystemMessageSuite) TestRun() {
 	}{
 		{
 			Name:     "chat created event",
-			Event:    v1protocol.NewChatCreatedEvent("chat-name", 12),
+			Event:    v1protocol.NewChatCreatedEvent("chat-name", "#7cda00", 12),
 			From:     "admin",
 			Expected: "@admin created the group chat-name",
 		},
-
 		{
 			Name:     "chat name changed event",
 			Event:    v1protocol.NewNameChangedEvent("chat-name-2", 12),
 			From:     "admin",
 			Expected: "@admin changed the group's name to chat-name-2",
+		},
+		{
+			Name:     "chat color changed event",
+			Event:    v1protocol.NewColorChangedEvent("#7cda00", 12),
+			From:     "admin",
+			Expected: "@admin changed the group's color",
 		},
 		{
 			Name:     "members added event",

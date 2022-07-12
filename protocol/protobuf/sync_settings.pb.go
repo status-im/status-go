@@ -209,7 +209,9 @@ func init() {
 	proto.RegisterType((*SyncSetting)(nil), "protobuf.SyncSetting")
 }
 
-func init() { proto.RegisterFile("sync_settings.proto", fileDescriptor_e2f7a0bce2873c78) }
+func init() {
+	proto.RegisterFile("sync_settings.proto", fileDescriptor_e2f7a0bce2873c78)
+}
 
 var fileDescriptor_e2f7a0bce2873c78 = []byte{
 	// 447 bytes of a gzipped FileDescriptorProto

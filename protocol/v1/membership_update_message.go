@@ -54,6 +54,7 @@ func MembershipUpdateEventFromProtobuf(chatID string, raw []byte) (*MembershipUp
 		Members:    decodedEvent.Members,
 		Name:       decodedEvent.Name,
 		Type:       decodedEvent.Type,
+		Color:      decodedEvent.Color,
 		Signature:  signature,
 		RawPayload: encodedEvent,
 		From:       from,
@@ -119,6 +120,7 @@ type MembershipUpdateEvent struct {
 	ClockValue uint64                                   `json:"clockValue"`
 	Members    []string                                 `json:"members,omitempty"` // in "members-added" and "admins-added" events
 	Name       string                                   `json:"name,omitempty"`    // name of the group chat
+	Color      string                                   `json:"color,omitempty"`   // color of the group chat
 	From       string                                   `json:"from,omitempty"`
 	Signature  []byte                                   `json:"signature,omitempty"`
 	ChatID     string                                   `json:"chatId"`
@@ -155,6 +157,7 @@ func (u *MembershipUpdateEvent) ToProtobuf() *protobuf.MembershipUpdateEvent {
 	return &protobuf.MembershipUpdateEvent{
 		Clock:   u.ClockValue,
 		Name:    u.Name,
+		Color:   u.Color,
 		Members: u.Members,
 		Type:    u.Type,
 	}
@@ -176,11 +179,12 @@ func MergeMembershipUpdateEvents(dest []MembershipUpdateEvent, src []MembershipU
 	return dest
 }
 
-func NewChatCreatedEvent(name string, clock uint64) MembershipUpdateEvent {
+func NewChatCreatedEvent(name string, color string, clock uint64) MembershipUpdateEvent {
 	return MembershipUpdateEvent{
 		Type:       protobuf.MembershipUpdateEvent_CHAT_CREATED,
 		Name:       name,
 		ClockValue: clock,
+		Color:      color,
 	}
 }
 
@@ -188,6 +192,14 @@ func NewNameChangedEvent(name string, clock uint64) MembershipUpdateEvent {
 	return MembershipUpdateEvent{
 		Type:       protobuf.MembershipUpdateEvent_NAME_CHANGED,
 		Name:       name,
+		ClockValue: clock,
+	}
+}
+
+func NewColorChangedEvent(color string, clock uint64) MembershipUpdateEvent {
+	return MembershipUpdateEvent{
+		Type:       protobuf.MembershipUpdateEvent_COLOR_CHANGED,
+		Color:      color,
 		ClockValue: clock,
 	}
 }
@@ -234,6 +246,7 @@ func NewAdminRemovedEvent(admin string, clock uint64) MembershipUpdateEvent {
 type Group struct {
 	chatID  string
 	name    string
+	color   string
 	events  []MembershipUpdateEvent
 	admins  *stringSet
 	members *stringSet
@@ -247,9 +260,9 @@ func NewGroupWithEvents(chatID string, events []MembershipUpdateEvent) (*Group, 
 	return newGroup(chatID, events)
 }
 
-func NewGroupWithCreator(name string, clock uint64, creator *ecdsa.PrivateKey) (*Group, error) {
+func NewGroupWithCreator(name string, color string, clock uint64, creator *ecdsa.PrivateKey) (*Group, error) {
 	chatID := groupChatID(&creator.PublicKey)
-	chatCreated := NewChatCreatedEvent(name, clock)
+	chatCreated := NewChatCreatedEvent(name, color, clock)
 	chatCreated.ChatID = chatID
 	err := chatCreated.Sign(creator)
 	if err != nil {
@@ -308,6 +321,10 @@ func (g Group) Name() string {
 	return g.name
 }
 
+func (g Group) Color() string {
+	return g.color
+}
+
 func (g Group) Events() []MembershipUpdateEvent {
 	return g.events
 }
@@ -326,6 +343,7 @@ func isInSlice(m string, set []string) bool {
 func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEvent {
 	var events []MembershipUpdateEvent
 	var nameChangedEventFound bool
+	var colorChangedEventFound bool
 	var joinedEventFound bool
 	memberID := publicKeyToString(publicKey)
 	var addedEventFound bool
@@ -342,6 +360,12 @@ func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEven
 			}
 			events = append(events, event)
 			nameChangedEventFound = true
+		case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
+			if colorChangedEventFound {
+				continue
+			}
+			events = append(events, event)
+			colorChangedEventFound = true
 		case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 			// If we already have an added event
 			// or the user is not in slice, ignore
@@ -454,6 +478,8 @@ func (g Group) validateEvent(event MembershipUpdateEvent) bool {
 		return g.admins.Empty() && g.members.Empty()
 	case protobuf.MembershipUpdateEvent_NAME_CHANGED:
 		return g.admins.Has(event.From) && len(event.Name) > 0
+	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
+		return g.admins.Has(event.From) && len(event.Color) > 0
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 		return g.admins.Has(event.From)
 	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
@@ -474,10 +500,13 @@ func (g *Group) processEvent(event MembershipUpdateEvent) {
 	switch event.Type {
 	case protobuf.MembershipUpdateEvent_CHAT_CREATED:
 		g.name = event.Name
+		g.color = event.Color
 		g.members.Add(event.From)
 		g.admins.Add(event.From)
 	case protobuf.MembershipUpdateEvent_NAME_CHANGED:
 		g.name = event.Name
+	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
+		g.color = event.Color
 	case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
 		g.admins.Add(event.Members...)
 	case protobuf.MembershipUpdateEvent_ADMIN_REMOVED:
