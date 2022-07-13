@@ -857,6 +857,10 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 		return nil, err
 	}
 
+	if contactRequestID == "" {
+		contactRequestID = defaultContactRequestID(request.ID.String())
+	}
+
 	return m.DismissContactRequest(ctx, &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 }
 
