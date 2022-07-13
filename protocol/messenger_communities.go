@@ -3,7 +3,10 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,6 +20,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -1777,4 +1781,91 @@ func (m *Messenger) SyncCommunitySettings(ctx context.Context, settings *communi
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (map[string]*discord.Category, []*discord.ExportedData, int, error) {
+
+	var discordChannels []*discord.ExportedData
+	discordCategories := map[string]*discord.Category{}
+	oldestMessageTime := 0
+
+	for _, fileToImport := range filesToImport {
+		filePath := strings.Replace(fileToImport, "file://", "", -1)
+		bytes, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+
+		var discordExportedData discord.ExportedData
+
+		err = json.Unmarshal(bytes, &discordExportedData)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+
+		discordExportedData.Channel.FilePath = filePath
+		categoryID := discordExportedData.Channel.CategoryID
+
+		discordCategory := discord.Category{
+			ID:   categoryID,
+			Name: discordExportedData.Channel.CategoryName,
+		}
+
+		_, ok := discordCategories[categoryID]
+		if !ok {
+			discordCategories[categoryID] = &discordCategory
+		}
+
+		discordChannels = append(discordChannels, &discordExportedData)
+
+		if len(discordExportedData.Messages) > 0 {
+			layout := "2006-01-02T15:04:05+00:00"
+			msgTime, err := time.Parse(layout, discordExportedData.Messages[0].Timestamp)
+			if err != nil {
+				return nil, nil, 0, err
+			}
+
+			if oldestMessageTime == 0 || int(msgTime.Unix()) <= oldestMessageTime {
+				// Exported discord channel data already comes with `messages` being
+				// sorted, starting with the oldest, so we can safely rely on the first
+				// message
+				oldestMessageTime = int(msgTime.Unix())
+			}
+		}
+	}
+	return discordCategories, discordChannels, oldestMessageTime, nil
+}
+
+func (m *Messenger) ExtractDiscordChannelsAndCategories(filesToImport []string) (*MessengerResponse, error) {
+
+	response := &MessengerResponse{}
+
+	categories, exportedChannels, oldestMessageTime, err := m.ExtractDiscordDataFromImportFiles(filesToImport)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, category := range categories {
+		response.AddDiscordCategory(category)
+	}
+	for _, export := range exportedChannels {
+		response.AddDiscordChannel(&export.Channel)
+	}
+	if oldestMessageTime != 0 {
+		response.DiscordOldestMessageTimestamp = oldestMessageTime
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
+	go func() {
+		response, err := m.ExtractDiscordChannelsAndCategories(filesToImport)
+		if err != nil {
+			m.logger.Error("failed to extract discord channel and categories", zap.Error(err))
+			m.config.messengerSignalsHandler.ExtractDiscordCategoriesAndChannelsFailed()
+			return
+		}
+		m.config.messengerSignalsHandler.DiscordCategoriesAndChannelsExtracted(response.DiscordCategories, response.DiscordChannels, int64(response.DiscordOldestMessageTimestamp))
+	}()
 }

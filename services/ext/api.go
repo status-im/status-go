@@ -1102,6 +1102,14 @@ func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) 
 	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
 }
 
+func (api *PublicAPI) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
+	api.service.messenger.RequestExtractDiscordChannelsAndCategories(filesToImport)
+}
+
+func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
+}
+
 // -----
 // HELPER
 // -----
