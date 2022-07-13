@@ -4,6 +4,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -121,4 +122,8 @@ func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, f
 
 func (m *MessengerSignalsHandler) StatusUpdatesTimedOut(statusUpdates *[]protocol.UserStatus) {
 	signal.SendStatusUpdatesTimedOut(statusUpdates)
+}
+
+func (m *MessengerSignalsHandler) DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
+	signal.SendDiscordCategoriesAndChannelsExtracted(categories, channels, oldestMessageTimestamp, errors)
 }

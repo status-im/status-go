@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -1100,6 +1101,14 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 
 func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) error {
 	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
+}
+
+func (api *PublicAPI) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
+	api.service.messenger.RequestExtractDiscordChannelsAndCategories(filesToImport)
+}
+
+func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string) (*protocol.MessengerResponse, map[string]*discord.ImportError) {
+	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
 }
 
 // -----

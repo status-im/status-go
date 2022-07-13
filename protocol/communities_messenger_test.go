@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -1974,4 +1976,87 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	for _, chat := range s.alice.Chats() {
 		s.Require().False(chat.Muted)
 	}
+}
+
+func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
+
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "discord-channel-")
+	s.Require().NoError(err)
+	defer os.Remove(tmpFile.Name())
+
+	discordMessage := &protobuf.DiscordMessage{
+		Id:              "1234",
+		Type:            "Default",
+		Timestamp:       "2022-07-26T14:20:17.305+00:00",
+		TimestampEdited: "",
+		Content:         "Some discord message",
+		Author: &protobuf.DiscordMessageAuthor{
+			Id:            "123",
+			Name:          "TestAuthor",
+			Discriminator: "456",
+			Nickname:      "",
+			AvatarUrl:     "",
+		},
+	}
+
+	messages := make([]*protobuf.DiscordMessage, 0)
+	messages = append(messages, discordMessage)
+
+	exportedDiscordData := &discord.ExportedData{
+		Channel: discord.Channel{
+			ID:           "12345",
+			CategoryName: "test-category",
+			CategoryID:   "6789",
+			Name:         "test-channel",
+			Description:  "This is a channel topic",
+			FilePath:     tmpFile.Name(),
+		},
+		Messages: messages,
+	}
+
+	data, err := json.Marshal(exportedDiscordData)
+	s.Require().NoError(err)
+
+	err = os.WriteFile(tmpFile.Name(), data, 0666) // nolint: gosec
+	s.Require().NoError(err)
+
+	files := make([]string, 0)
+	files = append(files, tmpFile.Name())
+	mr, errs := s.bob.ExtractDiscordChannelsAndCategories(files)
+	s.Require().Len(errs, 0)
+
+	s.Require().Len(mr.DiscordCategories, 1)
+	s.Require().Len(mr.DiscordChannels, 1)
+	s.Require().Equal(mr.DiscordOldestMessageTimestamp, int(1658845217))
+}
+
+func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_WithErrors() {
+
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "discord-channel-2")
+	s.Require().NoError(err)
+	defer os.Remove(tmpFile.Name())
+
+	exportedDiscordData := &discord.ExportedData{
+		Channel: discord.Channel{
+			ID:           "12345",
+			CategoryName: "test-category",
+			CategoryID:   "6789",
+			Name:         "test-channel",
+			Description:  "This is a channel topic",
+			FilePath:     tmpFile.Name(),
+		},
+		Messages: make([]*protobuf.DiscordMessage, 0),
+	}
+
+	data, err := json.Marshal(exportedDiscordData)
+	s.Require().NoError(err)
+
+	err = os.WriteFile(tmpFile.Name(), data, 0666) // nolint: gosec
+	s.Require().NoError(err)
+
+	files := make([]string, 0)
+	files = append(files, tmpFile.Name())
+	_, errs := s.bob.ExtractDiscordChannelsAndCategories(files)
+	// Expecting 1 errors since there are no messages to be extracted
+	s.Require().Len(errs, 1)
 }
