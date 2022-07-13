@@ -318,6 +318,11 @@ func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*Suggeste
 	return api.s.feesManager.suggestedFees(ctx, chainID)
 }
 
+func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas float64) (TransactionEstimation, error) {
+	log.Debug("call to getTransactionEstimatedTime")
+	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
+}
+
 func (api *API) GetSuggestedRoutes(ctx context.Context, account common.Address, amount float64, tokenSymbol string) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
 	return api.router.suggestedRoutes(ctx, account, amount, tokenSymbol)
