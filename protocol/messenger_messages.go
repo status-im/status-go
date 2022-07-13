@@ -194,6 +194,7 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	}
 
 	message.Deleted = true
+	message.Seen = true
 
 	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {

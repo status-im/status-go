@@ -237,3 +237,115 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	s.Require().Len(state.Response.RemovedMessages(), 0)
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
+
+func (s *MessengerDeleteMessageSuite) TestDeleteMessageUnviewedCount() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	messageID := sendResponse.Messages()[0].ID
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(response.Chats()[0].UnviewedMessagesCount, uint(1))
+
+	ogMessage := sendResponse.Messages()[0]
+
+	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 0)
+	s.Require().Len(sendResponse.RemovedMessages(), 1)
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
+	s.Require().Len(sendResponse.Chats(), 1)
+	// LastMessage is removed
+	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
+
+	res, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.RemovedMessages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(res.Chats(), 1)
+	s.Require().Len(res.RemovedMessages(), 1)
+	s.Require().Equal(res.Chats()[0].UnviewedMessagesCount, uint(0))
+
+}
+
+func (s *MessengerDeleteMessageSuite) TestDeleteMessageUnviewedMention() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	inputMessage.Seen = false
+	inputMessage.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage.Mentioned = true
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	messageID := sendResponse.Messages()[0].ID
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(response.Chats()[0].UnviewedMentionsCount, uint(1))
+
+	ogMessage := sendResponse.Messages()[0]
+
+	sendResponse, err = theirMessenger.DeleteMessageAndSend(context.Background(), ogMessage.ID)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 0)
+	s.Require().Len(sendResponse.RemovedMessages(), 1)
+	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
+	s.Require().Len(sendResponse.Chats(), 1)
+	// LastMessage is removed
+	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
+
+	res, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.RemovedMessages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(res.Chats(), 1)
+	s.Require().Len(res.RemovedMessages(), 1)
+	s.Require().Equal(res.Chats()[0].UnviewedMentionsCount, uint(0))
+
+}

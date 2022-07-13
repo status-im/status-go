@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/rand"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
@@ -328,6 +329,8 @@ func (c *Chat) NextClockAndTimestamp(timesource common.TimeSource) (uint64, uint
 func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.TimeSource) error {
 	c.Timestamp = int64(timesource.GetCurrentTime())
 
+	spew.Dump("UpdateFromMessage before", message.Clock, c.LastMessage.Clock, c.LastClockValue)
+
 	// If the clock of the last message is lower, we set the message
 	if c.LastMessage == nil || c.LastMessage.Clock <= message.Clock {
 		c.LastMessage = message
@@ -336,6 +339,9 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 	if c.LastClockValue < message.Clock {
 		c.LastClockValue = message.Clock
 	}
+
+	spew.Dump("UpdateFromMessage before", message.Clock, c.LastMessage.Clock, c.LastClockValue)
+
 	return nil
 }
 

@@ -374,7 +374,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, message.Mentioned)
+		m.increaseUnviewedCounts(chat, message.Mentioned)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -1149,7 +1149,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
-	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
+	err = m.persistence.HideMessage(deleteMessage.MessageId)
 	if err != nil {
 		return err
 	}
@@ -1163,13 +1163,19 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	}
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-                m.logger.Info("last message match",zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
+		m.logger.Info("last message match", zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
 		}
 	} else {
-                m.logger.Info("not updating last message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
-        }
+		m.logger.Info("not updating last message", zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
+	}
+
+	if !originalMessage.Seen {
+		if chat.UnviewedMessagesCount > 0 {
+			m.decreaseUnviewedCounts(chat, originalMessage.Mentioned)
+		}
+	}
 
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	state.Response.AddChat(chat)
@@ -1182,15 +1188,15 @@ func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
 	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
 	if err != nil {
-          m.logger.Error("failed to find message by chat id", zap.Error(err))
+		m.logger.Error("failed to find message by chat id", zap.Error(err))
 		return err
 	}
 
 	if len(messages) > 0 {
-                m.logger.Info("found  message",zap.Any("chat-last-message", messages[0]))
+		m.logger.Info("found  message", zap.Any("chat-last-message", messages[0]))
 		chat.LastMessage = messages[0]
 	} else {
-          m.logger.Info("not found message setting nil")
+		m.logger.Info("not found message setting nil")
 		chat.LastMessage = nil
 	}
 
@@ -1274,16 +1280,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	// Increase unviewed count
-	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
-		if !receivedMessage.Seen {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
-		}
-	} else {
-		// Our own message, mark as sent
-		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
-	}
-
 	contact := state.CurrentMessageState.Contact
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
@@ -1315,9 +1311,19 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
+	// Increase unviewed count
+	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
+		if !receivedMessage.Seen {
+			m.increaseUnviewedCounts(chat, receivedMessage.Mentioned)
+		}
+	} else {
+		// Our own message, mark as sent
+		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
+	}
+
 	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 
-                m.logger.Info("handle  chat message, message deleted",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+		m.logger.Info("handle  chat message, message deleted", zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
 		if err != nil {
@@ -1329,12 +1335,15 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			chat.LastMessage = nil
 		}
 	} else {
-                m.logger.Info("updating message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+		m.logger.Info("updating message", zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+	}
+
+	if !receivedMessage.Seen {
 		err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
 		if err != nil {
 			return err
 		}
-                m.logger.Info("updating message 2",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+		m.logger.Info("updating message 2", zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 	}
 
 	// If the chat is not active, create a notification in the center
@@ -2043,10 +2052,17 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	return contact.Added, nil
 }
 
-func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {
+func (m *Messenger) increaseUnviewedCounts(chat *Chat, mentioned bool) {
 	chat.UnviewedMessagesCount++
 	if mentioned {
 		chat.UnviewedMentionsCount++
+	}
+}
+
+func (m *Messenger) decreaseUnviewedCounts(chat *Chat, mentioned bool) {
+	chat.UnviewedMessagesCount--
+	if mentioned {
+		chat.UnviewedMentionsCount--
 	}
 }
 
