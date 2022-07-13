@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -45,6 +46,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
 	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
+	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError)
 }
 
 type config struct {

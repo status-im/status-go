@@ -54,6 +54,22 @@ message DeleteMessage {
   MessageType message_type = 5;
 }
 
+message DiscordMessage {
+  string id = 1;
+  string type = 2;
+  string timestamp = 3;
+  string timestampEdited = 4;
+  string content = 5;
+  DiscordMessageAuthor author = 6;
+}
+
+message DiscordMessageAuthor {
+  string id = 1;
+  string name = 2;
+  string discriminator = 3;
+  string nickname = 4;
+  string avatarUrl = 5;
+}
 
 message ChatMessage {
   // Lamport timestamp of the chat message
