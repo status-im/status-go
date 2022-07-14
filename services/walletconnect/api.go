@@ -11,10 +11,6 @@ type API struct {
 	db *Database
 }
 
-func (api *API) AddWalletConnectSession(ctx context.Context, session Session) error {
-	return api.db.InsertWalletConnectSession(session)
-}
-
 func (api *API) StoreWalletConnectSession(ctx context.Context, session Session) (Session, error) {
 	log.Debug("call to create a bookmark")
 	walletConnectSessionStoreResult, err := api.db.InsertWalletConnectSession(session)
