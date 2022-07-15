@@ -710,12 +710,12 @@ func (c *Client) subscribeForMessageEvents() {
 				switch m.Type {
 				case common.MessageScheduled:
 					c.config.Logger.Debug("handling message scheduled")
-					if err := c.handleMessageScheduled(m.RawMessage); err != nil {
+					if err := c.handleMessageScheduled(m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
 				case common.MessageSent:
 					c.config.Logger.Debug("handling message sent")
-					if err := c.handleMessageSent(m.SentMessage); err != nil {
+					if err := c.handleMessageSent(m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
 				default:
@@ -825,10 +825,16 @@ func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) e
 }
 
 // handleMessageSent is called every time a message is sent
-func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
+func (c *Client) handleMessageSent(e *common.MessageEvent) error {
 
+	sentMessage := e.SentMessage
 	// Ignore if we are not sending notifications
 	if !c.config.SendEnabled {
+		return nil
+	}
+
+	// check if it's for one of our devices, do nothing in that case
+	if e.Recipient != nil && common.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
 		return nil
 	}
 
@@ -1028,10 +1034,17 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 }
 
 // handleMessageScheduled keeps track of the message to make sure we notify on it
-func (c *Client) handleMessageScheduled(message *common.RawMessage) error {
+func (c *Client) handleMessageScheduled(e *common.MessageEvent) error {
+	message := e.RawMessage
 	if !message.SendPushNotification {
 		return nil
 	}
+
+	// check if it's for one of our devices, do nothing in that case
+	if e.Recipient != nil && common.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
+		return nil
+	}
+
 	messageID, err := types.DecodeHex(message.ID)
 	if err != nil {
 		return err
@@ -1041,6 +1054,11 @@ func (c *Client) handleMessageScheduled(message *common.RawMessage) error {
 
 // shouldNotifyOn check whether we should notify a particular public-key/installation-id/message-id combination
 func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
+
+	if publicKey != nil && common.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
+		return false, nil
+	}
+
 	if len(installationID) == 0 {
 		return c.persistence.ShouldSendNotificationToAllInstallationIDs(publicKey, messageID)
 	}
@@ -1294,6 +1312,10 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 // SendNotification sends an actual notification to the push notification server.
 // the notification is sent using an ephemeral key to shield the real identity of the sender
 func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) ([]*PushNotificationInfo, error) {
+
+	if common.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
+		return nil, nil
+	}
 
 	// get latest push notification infos
 	err := c.queryNotificationInfo(publicKey, false)
