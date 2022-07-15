@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/transactions"
 )
 
 func NewAPI(s *Service) *API {
@@ -467,4 +468,9 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 	}
 
 	return address, nil
+}
+
+func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data map[uint64][]transactions.SendTxArgs, password string) (*MultiTransactionResult, error) {
+	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
+	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, password)
 }

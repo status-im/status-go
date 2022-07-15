@@ -19,7 +19,7 @@ func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
-	return &TransactionManager{db}, func() {
+	return &TransactionManager{db, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}

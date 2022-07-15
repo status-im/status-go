@@ -10,18 +10,29 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/transactions"
 )
 
 // NewService initializes service instance.
-func NewService(db *sql.DB, accountsDB *accounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, openseaAPIKey string, gethManager *account.GethManager) *Service {
+func NewService(
+	db *sql.DB,
+	accountsDB *accounts.Database,
+	rpcClient *rpc.Client,
+	accountFeed *event.Feed,
+	openseaAPIKey string,
+	gethManager *account.GethManager,
+	transactor *transactions.Transactor,
+	config *params.NodeConfig,
+) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
 	tokenManager := &TokenManager{db: db, RPCClient: rpcClient, networkManager: rpcClient.NetworkManager}
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := &TransactionManager{db: db}
+	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	favouriteManager := &FavouriteManager{db: db}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
 
