@@ -190,7 +190,11 @@ func (s *ClientSuite) TestHandleMessageScheduled() {
 		LocalChatID:          chatID,
 	}
 
-	s.Require().NoError(s.client.handleMessageScheduled(rawMessage))
+	event := &common.MessageEvent{
+		RawMessage: rawMessage,
+	}
+
+	s.Require().NoError(s.client.handleMessageScheduled(event))
 
 	key1, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -250,4 +254,14 @@ func (s *ClientSuite) TestShouldRefreshToken() {
 
 	// allow from contacts only is enabled
 	s.Require().True(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}, false, true))
+}
+
+func (s *ClientSuite) TestHandleMessageScheduledFromPairedDevice() {
+	messageID := []byte("message-id")
+	installationID1 := "1"
+
+	// Should return nil
+	response, err := s.client.shouldNotifyOn(&s.identity.PublicKey, installationID1, messageID)
+	s.Require().NoError(err)
+	s.Require().False(response)
 }

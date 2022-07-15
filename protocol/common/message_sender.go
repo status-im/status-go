@@ -51,6 +51,7 @@ const (
 )
 
 type MessageEvent struct {
+	Recipient   *ecdsa.PublicKey
 	Type        MessageEventType
 	SentMessage *SentMessage
 	RawMessage  *RawMessage
@@ -247,7 +248,7 @@ func (s *MessageSender) sendCommunity(
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
-	s.notifyOnScheduledMessage(rawMessage)
+	s.notifyOnScheduledMessage(nil, rawMessage)
 
 	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
 		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.CommunityID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
@@ -318,7 +319,7 @@ func (s *MessageSender) sendPrivate(
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
-	s.notifyOnScheduledMessage(rawMessage)
+	s.notifyOnScheduledMessage(recipient, rawMessage)
 
 	if s.featureFlags.Datasync && rawMessage.ResendAutomatically {
 		// No need to call transport tracking.
@@ -508,7 +509,7 @@ func (s *MessageSender) SendPublic(
 	rawMessage.ID = types.EncodeHex(messageID)
 
 	// notify before dispatching
-	s.notifyOnScheduledMessage(&rawMessage)
+	s.notifyOnScheduledMessage(nil, &rawMessage)
 
 	hash, err := s.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
@@ -830,8 +831,9 @@ func (s *MessageSender) notifyOnSentMessage(sentMessage *SentMessage) {
 
 }
 
-func (s *MessageSender) notifyOnScheduledMessage(message *RawMessage) {
+func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, message *RawMessage) {
 	event := &MessageEvent{
+		Recipient:  recipient,
 		Type:       MessageScheduled,
 		RawMessage: message,
 	}
