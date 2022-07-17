@@ -15,7 +15,7 @@ We use `0` as the MAJOR version and bump only MINOR when there are breaking chan
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/manual/), 
 1. Leave "RELEASE" **unchecked** and use your branch name.
 
-After successful build, open it (https://ci.status.im/job/status-go/job/manual/$BUILD_ID/) in a browser. Artifacts will have a random ID, for example `status-go-android-181221-143603-5708af.aar`, means that `181221-143603-5708af` is a version you can use in [status-react](https://github.com/status-im/status-react).
+After successful build, open it (https://ci.status.im/job/status-go/job/manual/$BUILD_ID/) in a browser. Artifacts will have a random ID, for example `status-go-android-181221-143603-5708af.aar`, means that `181221-143603-5708af` is a version you can use in [status-mobile](https://github.com/status-im/status-mobile).
 
 ## Releasing a new patch (no breaking changes or a hot-fix release)
 

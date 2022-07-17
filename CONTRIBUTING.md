@@ -7,7 +7,7 @@ If you just have a question, don't open an issue but rather ask us on our [Disco
 
 You just want to contribute something without reading tons of documentation, right? There're only a few useful links to start with.
 
-How [status-react](github.com/status-im/status-react) uses us:
+How [status-mobile](github.com/status-im/status-mobile) uses us:
 https://github.com/status-im/status-go/wiki/Notes-on-Bindings
 
 Architecture: TBD in [#238](https://github.com/status-im/status-go/issues/238)

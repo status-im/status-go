@@ -177,7 +177,7 @@ Additionally, the file contains `EnvelopeEvent{}`, which serves as a representat
 
 #### Usage
 
-A `status-go` node will install / register filters through RPC calls from a client (eg `status-react`). The basic implementation of a filter requires at least 2 things:
+A `status-go` node will install / register filters through RPC calls from a client (eg `status-mobile`). The basic implementation of a filter requires at least 2 things:
 
 1) An encryption key, example "`superSafeEncryptionKey`"
 2) A 4 byte topic (`TopicType`), example "`0x1234`"
@@ -196,7 +196,7 @@ In addition to the basic example above `Filter{}` allows for richer filtering:
 |`KeyAsym`   |`*ecdsa.PrivateKey`|Private Key of recipient                   |
 |`KeySym`    |`[]byte`           |Key associated with the Topic              |
 |`Topics`    |`[][]byte`         |Topics to filter messages with             |
-|`PoW`       |`float64`          |Proof of work as [described in the Waku specs](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md#pow-requirement-update) .<br/><br/>**Note:** *In `status-react` each client listens to the topic hash(pk), if a client wants to send a message to hash(pk1) they will also need to listen the hash(pk1) topic. However if the client doesn't want to receive envelopes for topic hash(pk1), the client may set the PoW to 1 so that all envelopes for topic hash(pk1) are discarded.*|
+|`PoW`       |`float64`          |Proof of work as [described in the Waku specs](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md#pow-requirement-update) .<br/><br/>**Note:** *In `status-mobile` each client listens to the topic hash(pk), if a client wants to send a message to hash(pk1) they will also need to listen the hash(pk1) topic. However if the client doesn't want to receive envelopes for topic hash(pk1), the client may set the PoW to 1 so that all envelopes for topic hash(pk1) are discarded.*|
 |`AllowP2P`  |`bool`             |Indicates whether this filter is interested in direct peer-to-peer messages.<br/><br/>**Note:** *Typically set to true, we always want to receive P2P envelopes on a filter from trusted peers*|
 |`SymKeyHash`|`common.Hash`      |The Keccak256Hash of the symmetric key, needed for optimization|   
 
@@ -242,7 +242,7 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 
 `Peer` represents a remote Waku client with which the local host waku instance exchanges data / messages. 
 
-`WakuHost` is the local instance of waku, which both interacts with remote clients (peers) and local clients (like `status-react`, via a RPC API).
+`WakuHost` is the local instance of waku, which both interacts with remote clients (peers) and local clients (like `status-mobile`, via a RPC API).
 
 ---
 

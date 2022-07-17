@@ -30,7 +30,7 @@ var (
 	ResizeDimensions = []ResizeDimension{SmallDim, LargeDim}
 
 	// DimensionSizeLimit the size limits imposed on each resize dimension
-	// Figures are based on the following sample data https://github.com/status-im/status-react/issues/11047#issuecomment-694970473
+	// Figures are based on the following sample data https://github.com/status-im/status-mobile/issues/11047#issuecomment-694970473
 	DimensionSizeLimit = map[ResizeDimension]DimensionLimits{
 		SmallDim: {
 			Ideal: 2560, // Base on the largest sample image at quality 60% (2,554 bytes ∴ 1024 * 2.5)

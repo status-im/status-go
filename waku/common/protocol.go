@@ -97,7 +97,7 @@ type WakuHost interface {
 	// this only works if the peer is a mailserver
 	OnMessagesRequest(MessagesRequest, Peer) error
 	// OnDeprecatedMessagesRequest handles when the peer receive a message request
-	// using the *Envelope format. Currently the only production client (status-react)
+	// using the *Envelope format. Currently the only production client (status-mobile)
 	// is exclusively using this one.
 	OnDeprecatedMessagesRequest(*Envelope, Peer) error
 

@@ -846,7 +846,7 @@ func TestSaveLinks(t *testing.T) {
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
-		Links:       []string{"https://github.com/status-im/status-react"},
+		Links:       []string{"https://github.com/status-im/status-mobile"},
 	}
 
 	err = p.SaveMessages([]*common.Message{&message})

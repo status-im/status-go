@@ -23,7 +23,7 @@ type CryptoOnRamp struct {
 	LogoURL     string            `json:"logoUrl"`
 	SiteURL     string            `json:"siteUrl"`
 	Hostname    string            `json:"hostname"`
-	Params      map[string]string `json:"params"` // TODO implement params in JSON and parsing status-react
+	Params      map[string]string `json:"params"` // TODO implement params in JSON and parsing status-mobile
 }
 
 type DataSourceType int

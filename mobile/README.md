@@ -4,7 +4,7 @@ Package mobile implements [gomobile](https://github.com/golang/mobile) bindings 
 
 Individual bindings and their descriptions are available in `status.go`.
 
-The primary consumer of this package is [status-react project](https://github.com/status-im/status-react).
+The primary consumer of this package is [status-mobile project](https://github.com/status-im/status-mobile).
 
 The framework name is generated from the package name, hence these things are done intentionally:
 (1) this package's name isn't equal to the directory name (`statusgo` vs `mobile` respectively);

@@ -28,7 +28,7 @@ The db will be created in the `./tmp` directory
 
 ### How to import the db
 
-1) Create an account in status-react
+1) Create an account in status-mobile
 2) Login, copy the seed phrase
 3) Create a db using this script using the seed phrase
 4) Copy the db to the import directory

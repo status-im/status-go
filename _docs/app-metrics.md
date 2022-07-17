@@ -95,8 +95,8 @@ Transmission happens over Waku, and as of now, all data is deleted locally after
 - [#2195 - Added Anonymous Metrics Send Opt-In Setting](https://github.com/status-im/status-go/pull/2195)
 - [#2198 - Anon Metrics Broadcast](https://github.com/status-im/status-go/pull/2198)
 
-### `status-react`
-- [#11901 - Feature/anon metrics](https://github.com/status-im/status-react/pull/11901)
-- [#11941 - Feature/anon metrics](https://github.com/status-im/status-react/pull/11941)
-- [#11963 - 🗂️ Anon metrics batching](https://github.com/status-im/status-react/pull/11963)
-- [#12024 - 🔘 Anon metrics opt-in UI (disabled using feature flags)](https://github.com/status-im/status-react/pull/12024)
+### `status-mobile`
+- [#11901 - Feature/anon metrics](https://github.com/status-im/status-mobile/pull/11901)
+- [#11941 - Feature/anon metrics](https://github.com/status-im/status-mobile/pull/11941)
+- [#11963 - 🗂️ Anon metrics batching](https://github.com/status-im/status-mobile/pull/11963)
+- [#12024 - 🔘 Anon metrics opt-in UI (disabled using feature flags)](https://github.com/status-im/status-mobile/pull/12024)

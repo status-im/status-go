@@ -115,7 +115,7 @@ func (s *MessengerAnonMetricsSuite) TearDownTest() {
 }
 
 func (s *MessengerAnonMetricsSuite) TestReceiveAnonMetric() {
-	// Create the appmetrics API to simulate incoming metrics from `status-react`
+	// Create the appmetrics API to simulate incoming metrics from `status-mobile`
 	ama := appmetrics.NewAPI(appmetricsDB.NewDB(s.alice.database))
 
 	// Generate and store some metrics to Alice

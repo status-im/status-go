@@ -38,7 +38,7 @@ type Page struct {
 }
 
 const (
-	// status-react navigation events
+	// status-mobile navigation events
 	NavigateTo         AppMetricEventType = "navigate-to"
 	ScreensOnWillFocus AppMetricEventType = "screens/on-will-focus"
 )

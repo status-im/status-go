@@ -1201,7 +1201,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return ErrMessageNotAllowed
 	}
 
-	// It looks like status-react created profile chats as public chats
+	// It looks like status-mobile created profile chats as public chats
 	// so for now we need to check for the presence of "@" in their chatID
 	if chat.Public() && !chat.ProfileUpdates() {
 		switch receivedMessage.ContentType {

@@ -90,7 +90,7 @@ var (
 		reactFieldName: "gifs/favorite-gifs",
 		dBColumnName:   "gif_favorites",
 		valueHandler:   JSONBlobHandler,
-		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		// TODO resolve issue 8 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1065179963
 		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
 		syncProtobufFactory: &SyncProtobufFactory{
 			inactive:          true, // Remove after issue is resolved
@@ -104,7 +104,7 @@ var (
 		reactFieldName: "gifs/recent-gifs",
 		dBColumnName:   "gif_recents",
 		valueHandler:   JSONBlobHandler,
-		// TODO resolve issue 8 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		// TODO resolve issue 8 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1065179963
 		//  The reported issue is not directly related, but I suspect that gifs suffer the same issue
 		syncProtobufFactory: &SyncProtobufFactory{
 			inactive:          true, // Remove after issue is resolved
@@ -218,7 +218,7 @@ var (
 	PreferredName = SettingField{
 		reactFieldName: "preferred-name",
 		dBColumnName:   "preferred_name",
-		// TODO resolve issue 9 https://github.com/status-im/status-react/pull/13053#issuecomment-1075336559
+		// TODO resolve issue 9 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1075336559
 		syncProtobufFactory: &SyncProtobufFactory{
 			inactive:          true, // Remove after issue is resolved
 			fromInterface:     preferredNameProtobufFactory,
@@ -231,7 +231,7 @@ var (
 		reactFieldName: "preview-privacy?",
 		dBColumnName:   "preview_privacy",
 		valueHandler:   BoolHandler,
-		// TODO resolved issue 7 https://github.com/status-im/status-react/pull/13053#issuecomment-1065179963
+		// TODO resolved issue 7 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1065179963
 		syncProtobufFactory: &SyncProtobufFactory{
 			inactive:          true, // Remove after issue is resolved
 			fromInterface:     previewPrivacyProtobufFactory,
@@ -298,7 +298,7 @@ var (
 		reactFieldName: "send-status-updates?",
 		dBColumnName:   "send_status_updates",
 		valueHandler:   BoolHandler,
-		// TODO resolve issue 10 https://github.com/status-im/status-react/pull/13053#issuecomment-1075352256
+		// TODO resolve issue 10 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1075352256
 		syncProtobufFactory: &SyncProtobufFactory{
 			inactive:          true, // Remove after issue is resolved
 			fromInterface:     sendStatusUpdatesProtobufFactory,

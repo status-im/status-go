@@ -29,7 +29,7 @@ type AnonymousMetric struct {
 	Event string `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
 	// value is a filtered and validated raw json payload attached to the event
 	Value []byte `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
-	// app_version is the version of the `status-react` app that the metric came from
+	// app_version is the version of the `status-mobile` app that the metric came from
 	AppVersion string `protobuf:"bytes,4,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
 	// os is the operating system of the device the application is installed on
 	Os string `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`

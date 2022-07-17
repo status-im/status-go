@@ -168,7 +168,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 }
 
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
-	// Start a loop that retrieves all messages and propagates them to status-react.
+	// Start a loop that retrieves all messages and propagates them to status-mobile.
 	s.cancelMessenger = make(chan struct{})
 	response, err := s.messenger.Start()
 	if err != nil {

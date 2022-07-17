@@ -89,7 +89,7 @@ func TestPrepareContentMentions(t *testing.T) {
 func TestPrepareContentLinks(t *testing.T) {
 	message := &Message{}
 
-	link1 := "https://github.com/status-im/status-react"
+	link1 := "https://github.com/status-im/status-mobile"
 	link2 := "https://www.youtube.com/watch?v=6RYO8KCY6YE"
 
 	message.Text = "Just look at that repo " + link1 + " . And watch this video - " + link2
