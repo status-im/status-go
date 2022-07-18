@@ -237,7 +237,7 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 		return 0, err
 	}
 
-	data, err := registrarABI.Pack("release", nameHash(username))
+	data, err := registrarABI.Pack("release", usernameToLabel(username))
 	if err != nil {
 		return 0, err
 	}
