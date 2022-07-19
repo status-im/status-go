@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/walletconnect"
 )
 
 var (
@@ -1103,4 +1104,30 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	}()
 	_, err = tx.Exec(`DELETE from bookmarks WHERE removed = 1 AND deleted_at < ?`, threshold)
 	return err
+}
+
+func (db *sqlitePersistence) InsertWalletConnectSession(walletconnect walletconnect.Session) (Session, error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return walletconnect,err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peer_id, connector_info) VALUES(?, ?)")
+	if err != nil {
+		return walletconnect,err
+	}
+	_, err = sessionInsertPreparedStatement.Exec(walletconnect.PeerId, walletconnect.ConnectorInfo)
+	sessionInsertPreparedStatement.Close()
+	if err != nil {
+		return walletconnect,err
+	}
+
+	return walletconnect,err
 }
