@@ -906,7 +906,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 		Description: "status community description",
 	}
 
-	response, err := bob.CreateCommunity(description)
+	response, err := bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)

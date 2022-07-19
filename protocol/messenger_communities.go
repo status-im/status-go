@@ -739,10 +739,12 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*MessengerResponse, error) {
+func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDefaultChannel bool) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
+
+	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.CreateCommunity(request)
 	if err != nil {
@@ -770,22 +772,25 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		return nil, err
 	}
 
-	chatResponse, err := m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "general",
-			Description: "General channel for the community",
-			Color:       community.Description().Identity.Color,
-		},
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
+	if createDefaultChannel {
+		chatResponse, err := m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+			Identity: &protobuf.ChatIdentity{
+				DisplayName: "general",
+				Description: "General channel for the community",
+				Color:       community.Description().Identity.Color,
+			},
+			Permissions: &protobuf.CommunityPermissions{
+				Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	// updating community so it contains the general chat
-	community = chatResponse.Communities()[0]
+		// updating community so it contains the general chat
+		community = chatResponse.Communities()[0]
+		response.AddChat(chatResponse.Chats()[0])
+	}
 
 	if request.Encrypted {
 		// Init hash ratchet for community
@@ -796,10 +801,8 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 		}
 	}
 
-	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)
-	response.AddChat(chatResponse.Chats()[0])
 	err = m.syncCommunity(context.Background(), community)
 	if err != nil {
 		return nil, err
