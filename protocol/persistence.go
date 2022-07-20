@@ -1106,10 +1106,10 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	return err
 }
 
-func (db *sqlitePersistence) InsertWalletConnectSession(walletconnect walletconnect.Session) (Session, error) {
+func (db *sqlitePersistence) InsertWalletConnectSession(peerId string, connectorInfo string) error {
 	tx, err := db.db.Begin()
 	if err != nil {
-		return walletconnect,err
+		return err
 	}
 	defer func() {
 		if err == nil {
@@ -1119,15 +1119,15 @@ func (db *sqlitePersistence) InsertWalletConnectSession(walletconnect walletconn
 		_ = tx.Rollback()
 	}()
 
-	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peer_id, connector_info) VALUES(?, ?)")
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peerId, connectorInfo) VALUES(?, ?)")
 	if err != nil {
-		return walletconnect,err
+		return err
 	}
-	_, err = sessionInsertPreparedStatement.Exec(walletconnect.PeerId, walletconnect.ConnectorInfo)
+	_, err = sessionInsertPreparedStatement.Exec(peerId, connectorInfo)
 	sessionInsertPreparedStatement.Close()
 	if err != nil {
-		return walletconnect,err
+		return err
 	}
 
-	return walletconnect,err
+	return err
 }

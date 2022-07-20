@@ -1171,3 +1171,8 @@ func topicsToBloom(topics ...types.TopicType) []byte {
 func TopicsToBloom(topics ...types.TopicType) []byte {
 	return topicsToBloom(topics...)
 }
+
+//WalletConnect
+func (api *PublicAPI) StoreWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddWalletConnectSession(ctx, request)
+}
