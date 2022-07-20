@@ -436,11 +436,6 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 	contact, ok := state.AllContacts.Load(message.Id)
 	if !ok {
-		if message.Removed {
-			// Nothing to do in case if contact doesn't exist
-			return nil
-		}
-
 		var err error
 		contact, err = buildContactFromPkString(message.Id)
 		if err != nil {
