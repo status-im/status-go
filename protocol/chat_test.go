@@ -120,6 +120,15 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(chat.LastMessage, message)
 	s.Require().Equal(uint64(4), chat.LastClockValue)
 
+	// Clock higher, message deleted
+	message = &common.Message{Deleted: true}
+	message.Clock = 5
+
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().Equal(uint64(5), chat.LastClockValue)
+	s.Require().NotNil(chat.LastMessage)
+	s.Require().NotEqual(message, chat.LastMessage)
+
 }
 
 func (s *ChatTestSuite) TestSerializeJSON() {

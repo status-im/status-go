@@ -1322,20 +1322,27 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
-
+		chat.LastMessage = nil
 		m.logger.Info("handle  chat message, message deleted", zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
 		if err != nil {
 			return err
 		}
+
+		allMessages := state.Response.Messages()
 		if len(messages) != 0 {
-			chat.LastMessage = messages[0]
-		} else {
-			chat.LastMessage = nil
+			allMessages = append(allMessages, messages[0])
 		}
-	} else {
-		m.logger.Info("updating message", zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+
+		for i := 0; i < len(allMessages); i++ {
+			if !allMessages[i].Deleted && allMessages[i].ChatId == chat.ID {
+				if chat.LastMessage == nil || allMessages[i].Clock > chat.LastMessage.Clock {
+					chat.LastMessage = allMessages[i]
+				}
+			}
+		}
+
 	}
 
 	if !receivedMessage.Seen {
