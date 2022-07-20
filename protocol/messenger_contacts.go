@@ -551,10 +551,11 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 		contact.Block()
 	}
 
-	_, retractErr := m.retractContactRequest(contact)
-	if retractErr != nil {
-		return nil, retractErr
+	err := m.sendRetractContactRequest(contact)
+	if err != nil {
+		return nil, err
 	}
+
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
@@ -774,50 +775,6 @@ func (m *Messenger) addENSNameToContact(contact *Contact) error {
 	return nil
 }
 
-func (m *Messenger) retractContactRequest(contact *Contact) (*MessengerResponse, error) {
-	contact.HasAddedUs = false
-	m.allContacts.Store(contact.ID, contact)
-	response := &MessengerResponse{}
-	err := m.removeContact(context.Background(), response, contact.ID)
-	if err != nil {
-		return nil, err
-	}
-	chat, ok := m.allChats.Load(contact.ID)
-	if !ok {
-		pubKey, err := contact.PublicKey()
-		if err != nil {
-			return nil, err
-		}
-
-		chat = OneToOneFromPublicKey(pubKey, m.getTimesource())
-		chat.Active = false
-		if err := m.saveChat(chat); err != nil {
-			return nil, err
-		}
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	retractContactRequest := &protobuf.RetractContactRequest{
-		Clock: clock,
-	}
-	encodedMessage, err := proto.Marshal(retractContactRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
-		LocalChatID:         contact.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
-		ResendAutomatically: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return response, err
-}
-
 func (m *Messenger) RetractContactRequest(request *requests.RetractContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
@@ -827,8 +784,55 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 	if !ok {
 		return nil, errors.New("contact not found")
 	}
+	contact.HasAddedUs = false
+	m.allContacts.Store(contact.ID, contact)
+	response := &MessengerResponse{}
+	err = m.removeContact(context.Background(), response, contact.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return m.retractContactRequest(contact)
+	err = m.sendRetractContactRequest(contact)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, err
+}
+
+// Send message to remote account to remove our contact from their end.
+func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
+	chat, ok := m.allChats.Load(contact.ID)
+	if !ok {
+		pubKey, err := contact.PublicKey()
+		if err != nil {
+			return err
+		}
+
+		chat = OneToOneFromPublicKey(pubKey, m.getTimesource())
+		chat.Active = false
+		if err := m.saveChat(chat); err != nil {
+			return err
+		}
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	retractContactRequest := &protobuf.RetractContactRequest{
+		Clock: clock,
+	}
+
+	encodedMessage, err := proto.Marshal(retractContactRequest)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
+		LocalChatID:         contact.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
+		ResendAutomatically: true,
+	})
+
+	return err
 }
 
 func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*MessengerResponse, error) {
