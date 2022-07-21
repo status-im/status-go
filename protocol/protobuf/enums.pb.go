@@ -102,9 +102,7 @@ func init() {
 	proto.RegisterEnum("protobuf.ImageType", ImageType_name, ImageType_value)
 }
 
-func init() {
-	proto.RegisterFile("enums.proto", fileDescriptor_888b6bd9597961ff)
-}
+func init() { proto.RegisterFile("enums.proto", fileDescriptor_888b6bd9597961ff) }
 
 var fileDescriptor_888b6bd9597961ff = []byte{
 	// 241 bytes of a gzipped FileDescriptorProto

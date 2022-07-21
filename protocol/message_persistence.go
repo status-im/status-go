@@ -1737,6 +1737,27 @@ func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) (
 	return chats, err
 }
 
+func (db sqlitePersistence) HasDiscordMessageAuthor(id string) (exists bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_authors WHERE id = ?)`, id).Scan(&exists)
+	return exists, err
+}
+
+func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
+	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url) VALUES (?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	_, err = stmt.Exec(
+		author.GetId(),
+		author.GetName(),
+		author.GetDiscriminator(),
+		author.GetNickname(),
+		author.GetAvatarUrl(),
+	)
+	return
+}
+
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
 	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
