@@ -1869,3 +1869,149 @@ func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []s
 		m.config.messengerSignalsHandler.DiscordCategoriesAndChannelsExtracted(response.DiscordCategories, response.DiscordChannels, int64(response.DiscordOldestMessageTimestamp))
 	}()
 }
+
+func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommunity) (*MessengerResponse, error) {
+
+	discordCategories, exportedData, _, err := m.ExtractDiscordDataFromImportFiles(request.FilesToImport)
+	if err != nil {
+		return nil, err
+	}
+
+	createCommunityRequest := request.ToCreateCommunityRequest()
+	response, err := m.CreateCommunity(createCommunityRequest, false)
+	if err != nil {
+		return nil, err
+	}
+	response.CommunityChanges = []*communities.CommunityChanges{}
+
+	// We can safely assume that there's at least one community
+	// in the `MessengerResponse` because we've just created it
+	discordCommunity := response.Communities()[0]
+	addedCategoriesIds := make(map[string]string, 0)
+
+	for _, category := range discordCategories {
+		createCommunityCategoryRequest := &requests.CreateCommunityCategory{
+			CommunityID:  discordCommunity.ID(),
+			CategoryName: category.Name,
+			ChatIDs:      make([]string, 0),
+		}
+
+		r, err := m.CreateCommunityCategory(createCommunityCategoryRequest)
+		if err != nil {
+			return nil, err
+		}
+		response.AddCommunities(r.Communities())
+
+		// We can safely assume that there's at least one `CommunityChanges`
+		// in the `MessengerResponse` because we've just added a category
+		addedCategoryChange := r.CommunityChanges[0]
+		for _, addedCategory := range addedCategoryChange.CategoriesAdded {
+			addedCategoriesIds[category.ID] = addedCategory.CategoryId
+		}
+	}
+
+	messagesToSave := make([]*common.Message, 0)
+
+	for _, exportedChannel := range exportedData {
+
+		communityChat := &protobuf.CommunityChat{
+			Permissions: &protobuf.CommunityPermissions{
+				Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			},
+			Identity: &protobuf.ChatIdentity{
+				DisplayName: exportedChannel.Channel.Name,
+				Emoji:       "😎",
+				Description: exportedChannel.Channel.Description,
+			},
+			CategoryId: addedCategoriesIds[exportedChannel.Channel.CategoryID],
+		}
+
+		r, err := m.CreateCommunityChat(discordCommunity.ID(), communityChat)
+		if err != nil {
+			return nil, err
+		}
+		response.AddCommunities(r.Communities())
+
+		channelId := ""
+
+		// This looks like we keep overriding the `channelId` but in practice,
+		// this iterates only once
+		addedChatChange := r.CommunityChanges[0]
+		for chatId, _ := range addedChatChange.ChatsAdded {
+			channelId = chatId
+		}
+
+		for _, discordMessage := range exportedChannel.Messages {
+			exists, err := m.persistence.HasDiscordMessageAuthor(discordMessage.Author.GetId())
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				err := m.persistence.SaveDiscordMessageAuthor(discordMessage.Author)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			payload, err := proto.Marshal(discordMessage)
+			if err != nil {
+				return nil, err
+			}
+
+			// Creating a `common.RawMessage` to get a `messageID`
+			rawMessage := &common.RawMessage{
+				Payload:        payload,
+				MessageType:    protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+				Sender:         m.identity,
+				SkipEncryption: true,
+			}
+
+			messageID, err := m.sender.GetMessageID(rawMessage)
+			if err != nil {
+				return nil, err
+			}
+
+			layout := "2006-01-02T15:04:05+00:00"
+			timestamp, err := time.Parse(layout, discordMessage.Timestamp)
+			if err != nil {
+				return nil, err
+			}
+			discordMessage.Timestamp = fmt.Sprintf("%d", timestamp.Unix())
+
+			if discordMessage.TimestampEdited != "" {
+				timestampEdited, err := time.Parse(layout, discordMessage.TimestampEdited)
+				if err != nil {
+					return nil, err
+				}
+				discordMessage.TimestampEdited = fmt.Sprintf("%d", timestampEdited.Unix())
+			}
+
+			messageToSave := &common.Message{
+				ID:               types.EncodeHex(messageID),
+				WhisperTimestamp: uint64(timestamp.Unix()),
+				From:             types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+				Seen:             true,
+				LocalChatID:      channelId,
+				SigPubKey:        &m.identity.PublicKey,
+				CommunityID:      discordCommunity.IDString(),
+				ChatMessage: protobuf.ChatMessage{
+					MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+					ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+					Clock:       m.getTimesource().GetCurrentTime(),
+					ChatId:      channelId,
+					Payload: &protobuf.ChatMessage_DiscordMessage{
+						DiscordMessage: discordMessage,
+					},
+				},
+			}
+			messagesToSave = append(messagesToSave, messageToSave)
+		}
+	}
+
+	err = m.persistence.SaveMessages(messagesToSave)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}

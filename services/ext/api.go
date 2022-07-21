@@ -1110,6 +1110,10 @@ func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string
 	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
 }
 
+func (api *PublicAPI) ImportDiscordCommunity(request *requests.ImportDiscordCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ImportDiscordCommunity(request)
+}
+
 // -----
 // HELPER
 // -----
