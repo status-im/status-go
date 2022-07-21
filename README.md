@@ -5,6 +5,7 @@
 
 # Docs
 
+
 - [How to Build](https://status.im/technical/build_status/status_go.html)
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](RELEASING.md)
