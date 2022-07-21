@@ -179,6 +179,15 @@ func (m *Messenger) addWalletConnectSession(peerId string, connectorInfo string)
 	return  nil, err
 }
 
+func (m *Messenger) getWalletConnectSession()  (Session, error) {
+
+	response,err := m.persistence.GetWalletConnectSession()
+	if err != nil {
+		return response, err
+	}
+	return  response, err
+}
+
 func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string) (*MessengerResponse, error) {
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
@@ -390,8 +399,21 @@ func (m *Messenger) AddWalletConnectSession(ctx context.Context, request *reques
 	if err != nil {
 		return nil, err
 	}
+	return m.addWalletConnectSession(request.PeerId, request.ConnectorInfo)
+}
 
-	return m.addWalletConnectSession(request.PeerId.String(), request.ConnectorInfo.String())
+func (m *Messenger) GetWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (Session, error) {
+
+	seshObject := Session{
+		PeerId:        "",
+		ConnectorInfo: "",
+	}
+
+	err := request.Validate()
+	if err != nil {
+		return seshObject, err
+	}
+	return m.getWalletConnectSession()
 }
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {

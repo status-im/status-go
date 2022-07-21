@@ -48,3 +48,51 @@ func (db *Database) InsertWalletConnectSession(session Session) (Session, error)
 
 	return session,err
 }
+
+func (db *Database) GetWalletConnectSession() (Session, error) {
+	tx, err := db.db.Begin()
+
+	seshObject := Session{
+		PeerId:        "",
+		ConnectorInfo: "",
+	}
+	if err != nil {
+		return seshObject,err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query("SELECT * FROM wallet_connect_sessions")
+
+	if err != nil {
+		return seshObject,err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var PeerId string
+		var ConnectorInfo string
+
+		errPeerId := rows.Scan(&PeerId)
+		errConnectorInfo := rows.Scan(&ConnectorInfo)
+
+		if errPeerId != nil {
+			return seshObject, errPeerId
+		}
+
+		if errConnectorInfo != nil {
+			return seshObject, errConnectorInfo
+		}
+
+		seshObject.PeerId = PeerId
+		seshObject.ConnectorInfo = ConnectorInfo
+	}
+
+	return seshObject,err
+}

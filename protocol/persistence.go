@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/walletconnect"
 )
 
 var (
@@ -32,6 +31,11 @@ var (
 type sqlitePersistence struct {
 	*common.RawMessagesPersistence
 	db *sql.DB
+}
+
+type Session struct {
+	PeerId           string   `json:"peer-id"`
+	ConnectorInfo    string   `json:"connector-info"`
 }
 
 func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
@@ -1130,4 +1134,52 @@ func (db *sqlitePersistence) InsertWalletConnectSession(peerId string, connector
 	}
 
 	return err
+}
+
+func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
+	tx, err := db.db.Begin()
+
+	seshObject := Session{
+		PeerId:        "",
+		ConnectorInfo: "",
+	}
+	if err != nil {
+		return seshObject,err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query("SELECT * FROM wallet_connect_sessions")
+
+	if err != nil {
+		return seshObject,err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var PeerId string
+		var ConnectorInfo string
+
+		errPeerId := rows.Scan(&PeerId)
+		errConnectorInfo := rows.Scan(&ConnectorInfo)
+
+		if errPeerId != nil {
+			return seshObject, errPeerId
+		}
+
+		if errConnectorInfo != nil {
+			return seshObject, errConnectorInfo
+		}
+
+		seshObject.PeerId = PeerId
+		seshObject.ConnectorInfo = ConnectorInfo
+	}
+
+	return seshObject,err
 }
