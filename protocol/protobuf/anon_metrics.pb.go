@@ -6,7 +6,7 @@ package protobuf
 import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	math "math"
 )
 
@@ -36,10 +36,10 @@ type AnonymousMetric struct {
 	// session_id is the id of the session the metric was recorded in
 	SessionId string `protobuf:"bytes,6,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// created_at is the datetime at which the metric was stored in the local db
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
-	XXX_unrecognized     []byte                 `json:"-"`
-	XXX_sizecache        int32                  `json:"-"`
+	CreatedAt            *timestamp.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
 }
 
 func (m *AnonymousMetric) Reset()         { *m = AnonymousMetric{} }
@@ -109,7 +109,7 @@ func (m *AnonymousMetric) GetSessionId() string {
 	return ""
 }
 
-func (m *AnonymousMetric) GetCreatedAt() *timestamppb.Timestamp {
+func (m *AnonymousMetric) GetCreatedAt() *timestamp.Timestamp {
 	if m != nil {
 		return m.CreatedAt
 	}
@@ -162,9 +162,7 @@ func init() {
 	proto.RegisterType((*AnonymousMetricBatch)(nil), "protobuf.AnonymousMetricBatch")
 }
 
-func init() {
-	proto.RegisterFile("anon_metrics.proto", fileDescriptor_4be044a92fa0408c)
-}
+func init() { proto.RegisterFile("anon_metrics.proto", fileDescriptor_4be044a92fa0408c) }
 
 var fileDescriptor_4be044a92fa0408c = []byte{
 	// 269 bytes of a gzipped FileDescriptorProto

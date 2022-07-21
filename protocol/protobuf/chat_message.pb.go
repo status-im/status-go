@@ -848,9 +848,7 @@ func init() {
 	proto.RegisterType((*ContactRequestSignature)(nil), "protobuf.ContactRequestSignature")
 }
 
-func init() {
-	proto.RegisterFile("chat_message.proto", fileDescriptor_263952f55fd35689)
-}
+func init() { proto.RegisterFile("chat_message.proto", fileDescriptor_263952f55fd35689) }
 
 var fileDescriptor_263952f55fd35689 = []byte{
 	// 983 bytes of a gzipped FileDescriptorProto

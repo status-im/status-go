@@ -1313,3 +1313,22 @@ func TestHasPendingNotificationsForChatSanityCheck(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, result)
 }
+
+func TestSaveDiscordMessageAuthor(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(&protobuf.DiscordMessageAuthor{
+		Id:            "1",
+		Name:          "Testuser",
+		Discriminator: "1234",
+		Nickname:      "User",
+		AvatarUrl:     "http://example.com/profile.jpg",
+	}))
+
+	exists, err := p.HasDiscordMessageAuthor("1")
+	require.NoError(t, err)
+	require.True(t, exists)
+}
