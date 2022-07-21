@@ -99,6 +99,7 @@ message ChatMessage {
     ImageMessage image = 10;
     AudioMessage audio = 11;
     bytes community = 12;
+    DiscordMessage discord_message = 99;
   }
 
   // Grant for community chat messages
@@ -126,6 +127,7 @@ message ChatMessage {
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;
+    DISCORD_MESSAGE = 12;
   }
 
   

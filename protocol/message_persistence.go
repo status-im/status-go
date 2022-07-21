@@ -55,7 +55,13 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		gap_from,
 		gap_to,
 		contact_request_state,
-		mentioned`
+		mentioned,
+    discord_message_id,
+    discord_message_type,
+    discord_message_timestamp,
+    discord_message_timestamp_edited,
+    discord_message_content,
+    discord_message_author_id`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -99,6 +105,16 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.gap_to,
 		m1.contact_request_state,
 		m1.mentioned,
+    m1.discord_message_id,
+    m1.discord_message_type,
+    m1.discord_message_timestamp,
+    m1.discord_message_timestamp_edited,
+    m1.discord_message_content,
+    m1.discord_message_author_id,
+    COALESCE(dm_author.name, ""),
+    COALESCE(dm_author.discriminator, ""),
+    COALESCE(dm_author.nickname, ""),
+    COALESCE(dm_author.avatar_url, ""),
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -141,6 +157,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	command := &common.CommandParameters{}
 	audio := &protobuf.AudioMessage{}
 	image := &protobuf.ImageMessage{}
+	discordMessage := &protobuf.DiscordMessage{
+		Author: &protobuf.DiscordMessageAuthor{},
+	}
 
 	args := []interface{}{
 		&message.ID,
@@ -183,6 +202,16 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&gapTo,
 		&contactRequestState,
 		&message.Mentioned,
+		&discordMessage.Id,
+		&discordMessage.Type,
+		&discordMessage.Timestamp,
+		&discordMessage.TimestampEdited,
+		&discordMessage.Content,
+		&discordMessage.Author.Id,
+		&discordMessage.Author.Name,
+		&discordMessage.Author.Discriminator,
+		&discordMessage.Author.Nickname,
+		&discordMessage.Author.AvatarUrl,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -263,6 +292,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			Type:    image.Type,
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
+
+	case protobuf.ChatMessage_DISCORD_MESSAGE:
+		message.Payload = &protobuf.ChatMessage_DiscordMessage{
+			DiscordMessage: discordMessage,
+		}
 	}
 
 	return nil
@@ -289,6 +323,13 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 	command := message.CommandParameters
 	if command == nil {
 		command = &common.CommandParameters{}
+	}
+
+	discordMessage := message.GetDiscordMessage()
+	if discordMessage == nil {
+		discordMessage = &protobuf.DiscordMessage{
+			Author: &protobuf.DiscordMessageAuthor{},
+		}
 	}
 
 	if message.GapParameters != nil {
@@ -358,6 +399,12 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		gapTo,
 		message.ContactRequestState,
 		message.Mentioned,
+		discordMessage.Id,
+		discordMessage.Type,
+		discordMessage.Timestamp,
+		discordMessage.TimestampEdited,
+		discordMessage.Content,
+		discordMessage.Author.Id,
 	}, nil
 }
 
@@ -396,6 +443,12 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message,
 			        contacts c
 		        ON
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				m1.id = ?
 		`, allFields),
@@ -432,6 +485,12 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Messa
 			        contacts c
 		        ON
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				m1.command_id = ?
 				AND
@@ -515,8 +574,13 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 			LEFT JOIN
 			      contacts c
 			ON
-
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE NOT(m1.hide) AND m1.id IN (%s)`, allFields, inVector), idsArgs...)
 	if err != nil {
 		return nil, err
@@ -568,6 +632,12 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 			ON
 
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id = ? %s
 			ORDER BY cursor DESC
@@ -653,6 +723,12 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 			ON
 
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				NOT(m1.hide) AND NOT(m1.seen) AND m1.content_type = ? %s
 			ORDER BY cursor DESC
@@ -747,6 +823,12 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 			ON
 
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id = ? %s
 			ORDER BY cursor DESC
@@ -848,6 +930,12 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 		ON
 
 		m1.source = c.id
+
+    LEFT JOIN
+          discord_message_authors dm_author
+    ON
+    m1.discord_message_author_id = dm_author.id
+
 		WHERE
 			NOT(m1.hide) %s
 		ORDER BY cursor DESC
@@ -944,6 +1032,12 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 				contacts c
 			ON
 				m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
 			WHERE
 				pm.pinned = 1
 				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
@@ -1029,6 +1123,11 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 			ON
 
 			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id IN %s %s
 			ORDER BY cursor DESC
