@@ -34,7 +34,7 @@ type sqlitePersistence struct {
 }
 
 type Session struct {
-	PeerId        string `json:"peer-id"`
+	PeerID        string `json:"peer-id"`
 	ConnectorInfo string `json:"connector-info"`
 }
 
@@ -1162,7 +1162,7 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	return err
 }
 
-func (db *sqlitePersistence) InsertWalletConnectSession(peerId string, connectorInfo string) error {
+func (db *sqlitePersistence) InsertWalletConnectSession(peerID string, connectorInfo string) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1179,7 +1179,7 @@ func (db *sqlitePersistence) InsertWalletConnectSession(peerId string, connector
 	if err != nil {
 		return err
 	}
-	_, err = sessionInsertPreparedStatement.Exec(peerId, connectorInfo)
+	_, err = sessionInsertPreparedStatement.Exec(peerID, connectorInfo)
 	sessionInsertPreparedStatement.Close()
 	if err != nil {
 		return err
@@ -1192,7 +1192,7 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 	tx, err := db.db.Begin()
 
 	seshObject := Session{
-		PeerId:        "",
+		PeerID:        "",
 		ConnectorInfo: "",
 	}
 	if err != nil {
@@ -1215,18 +1215,18 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var Id sql.NullInt64
-		var PeerId string
+		var ID sql.NullInt64
+		var PeerID string
 		var ConnectorInfo string
 		var CreatedAt string
 
-		errorWhileScanning := rows.Scan(&Id, &PeerId, &ConnectorInfo, &CreatedAt)
+		errorWhileScanning := rows.Scan(&ID, &PeerID, &ConnectorInfo, &CreatedAt)
 
 		if errorWhileScanning != nil {
 			return seshObject, errorWhileScanning
 		}
 
-		seshObject.PeerId = PeerId
+		seshObject.PeerID = PeerID
 		seshObject.ConnectorInfo = ConnectorInfo
 	}
 
