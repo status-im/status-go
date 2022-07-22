@@ -2,11 +2,12 @@ package protocol
 
 import (
 	"context"
+
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-func (m *Messenger) addWalletConnectSession(peerId string, connectorInfo string) (*MessengerResponse, error) {
-	err := m.persistence.InsertWalletConnectSession(peerId, connectorInfo)
+func (m *Messenger) addWalletConnectSession(peerID string, connectorInfo string) (*MessengerResponse, error) {
+	err := m.persistence.InsertWalletConnectSession(peerID, connectorInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -27,13 +28,13 @@ func (m *Messenger) AddWalletConnectSession(ctx context.Context, request *reques
 	if err != nil {
 		return nil, err
 	}
-	return m.addWalletConnectSession(request.PeerId, request.ConnectorInfo)
+	return m.addWalletConnectSession(request.PeerID, request.ConnectorInfo)
 }
 
 func (m *Messenger) GetWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (Session, error) {
 
 	seshObject := Session{
-		PeerId:        "",
+		PeerID:        "",
 		ConnectorInfo: "",
 	}
 
