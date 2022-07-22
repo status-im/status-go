@@ -33,6 +33,11 @@ type sqlitePersistence struct {
 	db *sql.DB
 }
 
+type Session struct {
+	PeerId        string `json:"peer-id"`
+	ConnectorInfo string `json:"connector-info"`
+}
+
 func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
 	return &sqlitePersistence{common.NewRawMessagesPersistence(db), db}
 }
@@ -1103,4 +1108,75 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	}()
 	_, err = tx.Exec(`DELETE from bookmarks WHERE removed = 1 AND deleted_at < ?`, threshold)
 	return err
+}
+
+func (db *sqlitePersistence) InsertWalletConnectSession(peerId string, connectorInfo string) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peer_id, connector_info) VALUES(?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = sessionInsertPreparedStatement.Exec(peerId, connectorInfo)
+	sessionInsertPreparedStatement.Close()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
+	tx, err := db.db.Begin()
+
+	seshObject := Session{
+		PeerId:        "",
+		ConnectorInfo: "",
+	}
+	if err != nil {
+		return seshObject, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query("SELECT * FROM wallet_connect_sessions")
+
+	if err != nil {
+		return seshObject, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var Id sql.NullInt64
+		var PeerId string
+		var ConnectorInfo string
+		var CreatedAt string
+
+		errorWhileScanning := rows.Scan(&Id, &PeerId, &ConnectorInfo, &CreatedAt)
+
+		if errorWhileScanning != nil {
+			return seshObject, errorWhileScanning
+		}
+
+		seshObject.PeerId = PeerId
+		seshObject.ConnectorInfo = ConnectorInfo
+	}
+
+	return seshObject, err
 }
