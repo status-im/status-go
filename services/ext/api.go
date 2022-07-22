@@ -820,8 +820,20 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 	return api.service.messenger.SignMessage(message)
 }
 
-// PushNotifications server endpoints
+// wallet connect session apis
+func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
+	return api.service.messenger.AddWalletConnectSession(request)
+}
 
+func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.WalletConnectSession, error) {
+	return api.service.messenger.GetWalletConnectSession()
+}
+
+func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
+	return api.service.messenger.DestroyWalletConnectSession(PeerID)
+}
+
+// PushNotifications server endpoints
 func (api *PublicAPI) StartPushNotificationsServer() error {
 	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
 	if err != nil {
