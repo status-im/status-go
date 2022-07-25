@@ -11,7 +11,7 @@ import (
 
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")
 var ErrInvalidDeleteTypeAuthor = errors.New("message type cannot be deleted")
-var ErrInvalidEditContentType = errors.New("only text messages can be replaced")
+var ErrInvalidEditContentType = errors.New("only text or emoji messages can be replaced")
 
 func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessage) (*MessengerResponse, error) {
 	err := request.Validate()
@@ -27,7 +27,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, ErrInvalidEditOrDeleteAuthor
 	}
 
-	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN {
+	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI {
 		return nil, ErrInvalidEditContentType
 	}
 
@@ -42,6 +42,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	editMessage := &EditMessage{}
 
 	editMessage.Text = request.Text
+	editMessage.ContentType = request.ContentType
 	editMessage.ChatId = message.ChatId
 	editMessage.MessageId = request.ID.String()
 	editMessage.Clock = clock
@@ -165,6 +166,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	}
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
+	message.ContentType = editMessage.ContentType
 
 	// Save original message as edit so we can retrieve history
 	if message.EditedAt == 0 {
@@ -173,6 +175,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 		originalEdit.LocalChatID = message.LocalChatID
 		originalEdit.MessageId = message.ID
 		originalEdit.Text = message.Text
+		originalEdit.ContentType = message.ContentType
 		originalEdit.From = message.From
 		err := m.persistence.SaveEdit(originalEdit)
 		if err != nil {

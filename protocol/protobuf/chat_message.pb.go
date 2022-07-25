@@ -260,10 +260,12 @@ type EditMessage struct {
 	Text      string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 	ChatId    string `protobuf:"bytes,3,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	MessageId string `protobuf:"bytes,4,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+
 	// Grant for community edit messages
 	Grant []byte `protobuf:"bytes,5,opt,name=grant,proto3" json:"grant,omitempty"`
 	// The type of message (public/one-to-one/private-group-chat)
 	MessageType          MessageType `protobuf:"varint,6,opt,name=message_type,json=messageType,proto3,enum=protobuf.MessageType" json:"message_type,omitempty"`
+	ContentType ChatMessage_ContentType `protobuf:"varint,7,opt,name=content_type,json=contentType,proto3,enum=protobuf.ChatMessage_ContentType" json:"content_type,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`

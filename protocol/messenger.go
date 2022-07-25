@@ -4474,6 +4474,12 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 	}
+	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_AUDIO) {
+		msg.QuotedMessage.AudioLocalURL = s.MakeAudioURL(msg.QuotedMessage.ID)
+	}
+	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_STICKER) {
+		msg.QuotedMessage.HasSticker = true
+	}
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
 	}

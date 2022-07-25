@@ -31,6 +31,10 @@ type QuotedMessage struct {
 	ParsedText json.RawMessage `json:"parsedText,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"image,omitempty"`
+	// AudioLocalURL is the local url of the audio
+	AudioLocalURL string `json:"audio,omitempty"`
+
+	HasSticker bool `json:"sticker,omitempty"`
 	// CommunityID is the id of the community advertised
 	CommunityID string `json:"communityId,omitempty"`
 }
