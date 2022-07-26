@@ -128,6 +128,8 @@ func (db *LevelDB) BuildIterator(query CursorQuery) (Iterator, error) {
 	defer recoverLevelDBPanics("BuildIterator")
 
 	i := db.ldb.NewIterator(&util.Range{Start: query.start, Limit: query.end}, nil)
+
+	envelopeQueriesCounter.WithLabelValues("unknown", "unknown").Inc()
 	// seek to the end as we want to return envelopes in a descending order
 	if len(query.cursor) == CursorLength {
 		i.Seek(query.cursor)
