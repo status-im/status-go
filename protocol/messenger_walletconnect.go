@@ -23,6 +23,15 @@ func (m *Messenger) getWalletConnectSession() (Session, error) {
 	return response, err
 }
 
+func (m *Messenger) destroyWalletConnectSession(peerID string) (Session, error) {
+
+	response, err := m.persistence.DeleteWalletConnectSession(peerID)
+	if err != nil {
+		return response, err
+	}
+	return response, err
+}
+
 func (m *Messenger) AddWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
@@ -43,4 +52,18 @@ func (m *Messenger) GetWalletConnectSession(ctx context.Context, request *reques
 		return seshObject, err
 	}
 	return m.getWalletConnectSession()
+}
+
+func (m *Messenger) DestroyWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (Session, error) {
+
+	seshObject := Session{
+		PeerID:        "",
+		ConnectorInfo: "",
+	}
+
+	err := request.Validate()
+	if err != nil {
+		return seshObject, err
+	}
+	return m.destroyWalletConnectSession(request.PeerID)
 }

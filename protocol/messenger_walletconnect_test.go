@@ -75,4 +75,12 @@ func (s *WalletConnectSessionsSuite) TestMotherShip() {
 	s.Require().Equal(response.PeerID, peerID)
 	s.Require().Equal(response.ConnectorInfo, connectorInfo)
 
+	_, errWhileDeletion := s.m.destroyWalletConnectSession(peerID)
+	s.Require().NoError(errWhileDeletion)
+
+	shouldBeEmpty, errWhileFetchingAgain := s.m.getWalletConnectSession()
+	s.Require().NoError(errWhileFetchingAgain)
+	s.Require().Equal(shouldBeEmpty.PeerID, "")
+	s.Require().Equal(shouldBeEmpty.ConnectorInfo, "")
+
 }

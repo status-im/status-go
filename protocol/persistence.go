@@ -1180,3 +1180,36 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 
 	return seshObject, err
 }
+
+func (db *sqlitePersistence) DeleteWalletConnectSession(peerID string) (Session, error) {
+	tx, err := db.db.Begin()
+
+	seshObject := Session{
+		PeerID:        "",
+		ConnectorInfo: "",
+	}
+	if err != nil {
+		return seshObject, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	deleteStatement, err := tx.Prepare("DELETE FROM wallet_connect_sessions WHERE peer_id=?")
+
+	if err != nil {
+		return seshObject, err
+	}
+
+	_, err = deleteStatement.Exec(peerID)
+
+	if err != nil {
+		return seshObject, err
+	}
+
+	return seshObject, err
+}
