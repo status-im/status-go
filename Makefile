@@ -81,7 +81,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -mod=vendor -i -v \
+	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o $(GOBIN)/statusd ./cmd/statusd
 	@echo "Compilation done."
@@ -101,13 +101,13 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
-	go build -i -v \
+	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o $(GOBIN)/bootnode ./cmd/bootnode/
 	@echo "Compilation done."
 
 node-canary: ##@build Build P2P node canary using status-go deps
-	go build -i -v \
+	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o $(GOBIN)/node-canary ./cmd/node-canary/
 	@echo "Compilation done."
