@@ -7,7 +7,7 @@ elif [[ -x $(command -v pacman) ]]; then
 elif [[ -x $(command -v brew) ]]; then
   brew install protobuf jq
 elif [[ -x $(command -v nix-env) ]]; then
-  nix-env -iA nixos.protobuf3_13
+  nix-env -iA nixos.protobuf3_17
 else
   echo "ERROR: No known package manager found!" >&2
   exit 1
