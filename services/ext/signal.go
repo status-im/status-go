@@ -127,3 +127,7 @@ func (m *MessengerSignalsHandler) DiscordCategoriesAndChannelsExtracted(categori
 func (m *MessengerSignalsHandler) ExtractDiscordCategoriesAndChannelsFailed() {
 	signal.SendExtractDiscordCategoriesAndChannelsFailed()
 }
+
+func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(communityId string) {
+	signal.SendDiscordCommunityImportFinished(communityId)
+}

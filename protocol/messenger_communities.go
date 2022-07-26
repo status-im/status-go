@@ -1920,7 +1920,8 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 			},
 			Identity: &protobuf.ChatIdentity{
 				DisplayName: exportedChannel.Channel.Name,
-				Emoji:       "😎",
+				Emoji:       "",
+        Color: createCommunityRequest.Color,
 				Description: exportedChannel.Channel.Description,
 			},
 			CategoryId: addedCategoriesIds[exportedChannel.Channel.CategoryID],
@@ -1991,14 +1992,14 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 				WhisperTimestamp: uint64(timestamp.Unix()),
 				From:             types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 				Seen:             true,
-				LocalChatID:      channelId,
+				LocalChatID:      discordCommunity.IDString() + channelId,
 				SigPubKey:        &m.identity.PublicKey,
 				CommunityID:      discordCommunity.IDString(),
 				ChatMessage: protobuf.ChatMessage{
 					MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 					ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
 					Clock:       m.getTimesource().GetCurrentTime(),
-					ChatId:      channelId,
+					ChatId:      discordCommunity.IDString() + channelId,
 					Payload: &protobuf.ChatMessage_DiscordMessage{
 						DiscordMessage: discordMessage,
 					},
@@ -2012,6 +2013,12 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 	if err != nil {
 		return nil, err
 	}
+
+  c := response.Communities()[0]
+  go func () {
+    time.Sleep(5000)
+	  m.config.messengerSignalsHandler.DiscordCommunityImportFinished(c.IDString())
+  }()
 
 	return response, nil
 }

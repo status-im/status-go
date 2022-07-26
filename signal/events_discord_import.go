@@ -13,6 +13,10 @@ const (
 	// EventExtractDiscordCategoriesAndChannelsFailed triggered when extraction of
 	// categories and channels from exported discord files have failed
 	EventExtractDiscordCategoriesAndChannelsFailed = "community.extractDiscordCategoriesAndChannelsFailed"
+
+	// EventDiscordCommunityImportFinished triggered when importing
+	// the discord community into status was successful
+	EventDiscordCommunityImportFinished = "community.discordCommunityImportFinished"
 )
 
 type DiscordCategoriesAndChannelsExtractedSignal struct {
@@ -22,6 +26,10 @@ type DiscordCategoriesAndChannelsExtractedSignal struct {
 }
 
 type ExtractDiscordCategoriesAndChannelsFailedSignal struct{}
+
+type DiscordCommunityImportFinishedSignal struct{
+  CommunityID string `json:"communityId"`
+}
 
 func SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64) {
 	send(EventDiscordCategoriesAndChannelsExtracted, DiscordCategoriesAndChannelsExtractedSignal{
@@ -33,4 +41,10 @@ func SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, c
 
 func SendExtractDiscordCategoriesAndChannelsFailed() {
 	send(EventExtractDiscordCategoriesAndChannelsFailed, ExtractDiscordCategoriesAndChannelsFailedSignal{})
+}
+
+func SendDiscordCommunityImportFinished(communityId string) {
+  send(EventDiscordCommunityImportFinished, DiscordCommunityImportFinishedSignal{
+    CommunityID: communityId,
+  })
 }

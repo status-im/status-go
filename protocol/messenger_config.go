@@ -47,6 +47,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchiveDownloaded(communityID string, from int, to int)
 	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64)
 	ExtractDiscordCategoriesAndChannelsFailed()
+	DiscordCommunityImportFinished(communityID string)
 }
 
 type config struct {
