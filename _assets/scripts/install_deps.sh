@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [[ -x $(command -v apt) ]]; then
-  apt install -y protobuf-compiler jq
+if [[ -x $(command -v apt-get) ]]; then
+  apt-get install -y protobuf-compiler jq
 elif [[ -x $(command -v pacman) ]]; then
   pacman -Sy protobuf jq --noconfirm
 elif [[ -x $(command -v brew) ]]; then
