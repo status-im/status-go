@@ -4,6 +4,11 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+const (
+  MessageTypeDefault string = "Default"
+  MessageTypeReply string = "Reply"
+)
+
 type Channel struct {
 	ID           string `json:"id"`
 	CategoryName string `json:"category"`

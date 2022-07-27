@@ -1833,6 +1833,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (m
 			}
 		}
 	}
+
 	return discordCategories, discordChannels, oldestMessageTime, nil
 }
 
@@ -1911,6 +1912,7 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 	}
 
 	messagesToSave := make([]*common.Message, 0)
+  messageReplyIds := map[string]string{}
 
 	for _, exportedChannel := range exportedData {
 
@@ -1963,7 +1965,7 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 			rawMessage := &common.RawMessage{
 				Payload:        payload,
 				MessageType:    protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-				Sender:         m.identity,
+				Sender:         discordCommunity.PrivateKey(),
 				SkipEncryption: true,
 			}
 
@@ -1987,13 +1989,21 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 				discordMessage.TimestampEdited = fmt.Sprintf("%d", timestampEdited.Unix())
 			}
 
+      if discordMessage.Reference == nil {
+        discordMessage.Reference = &protobuf.DiscordMessageReference{}
+      }
+
+      if discordMessage.Type == discord.MessageTypeReply {
+        messageReplyIds[discordMessage.Id] = discordMessage.Reference.MessageId
+      }
+
 			messageToSave := &common.Message{
 				ID:               types.EncodeHex(messageID),
 				WhisperTimestamp: uint64(timestamp.Unix()),
-				From:             types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+				From:             types.EncodeHex(crypto.FromECDSAPub(&discordCommunity.PrivateKey().PublicKey)),
 				Seen:             true,
 				LocalChatID:      discordCommunity.IDString() + channelId,
-				SigPubKey:        &m.identity.PublicKey,
+				SigPubKey:        &discordCommunity.PrivateKey().PublicKey,
 				CommunityID:      discordCommunity.IDString(),
 				ChatMessage: protobuf.ChatMessage{
 					MessageType: protobuf.MessageType_COMMUNITY_CHAT,
@@ -2015,10 +2025,12 @@ func (m *Messenger) ImportDiscordCommunity(request *requests.ImportDiscordCommun
 	}
 
   c := response.Communities()[0]
-  go func () {
-    time.Sleep(5000)
-	  m.config.messengerSignalsHandler.DiscordCommunityImportFinished(c.IDString())
-  }()
+  err = m.persistence.UpdateMessageResponseToByDiscordReplyId(messageReplyIds, c.IDString())
+  if err != nil {
+    return nil, err
+  }
+
+	m.config.messengerSignalsHandler.DiscordCommunityImportFinished(c.IDString())
 
 	return response, nil
 }

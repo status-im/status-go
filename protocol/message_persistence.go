@@ -61,7 +61,9 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
     discord_message_timestamp,
     discord_message_timestamp_edited,
     discord_message_content,
-    discord_message_author_id`
+    discord_message_author_id,
+    discord_message_reference_message_id,
+    discord_message_reference_channel_id`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -111,6 +113,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
     m1.discord_message_timestamp_edited,
     m1.discord_message_content,
     m1.discord_message_author_id,
+    m1.discord_message_reference_message_id,
+    m1.discord_message_reference_channel_id,
     COALESCE(dm_author.name, ""),
     COALESCE(dm_author.discriminator, ""),
     COALESCE(dm_author.nickname, ""),
@@ -159,6 +163,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	image := &protobuf.ImageMessage{}
 	discordMessage := &protobuf.DiscordMessage{
 		Author: &protobuf.DiscordMessageAuthor{},
+    Reference: &protobuf.DiscordMessageReference{},
 	}
 
 	args := []interface{}{
@@ -208,6 +213,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&discordMessage.TimestampEdited,
 		&discordMessage.Content,
 		&discordMessage.Author.Id,
+    &discordMessage.Reference.MessageId,
+    &discordMessage.Reference.ChannelId,
 		&discordMessage.Author.Name,
 		&discordMessage.Author.Discriminator,
 		&discordMessage.Author.Nickname,
@@ -329,6 +336,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 	if discordMessage == nil {
 		discordMessage = &protobuf.DiscordMessage{
 			Author: &protobuf.DiscordMessageAuthor{},
+			Reference: &protobuf.DiscordMessageReference{},
 		}
 	}
 
@@ -405,6 +413,8 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		discordMessage.TimestampEdited,
 		discordMessage.Content,
 		discordMessage.Author.Id,
+    discordMessage.Reference.MessageId,
+    discordMessage.Reference.ChannelId,
 	}, nil
 }
 
@@ -514,6 +524,108 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Messa
 
 func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
 	return db.messageByID(nil, id)
+}
+
+func (db sqlitePersistence) UpdateMessageResponseToByDiscordReplyId(messageReplyIds map[string]string, communityId string) error {
+
+  query := `UPDATE user_messages
+    SET response_to =
+      (SELECT id
+      FROM user_messages
+      WHERE discord_message_id = ?)
+    WHERE community_id = ? AND discord_message_id = ?`
+
+  tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+  if err != nil {
+    return err
+  }
+  defer func() {
+    if err == nil {
+      err = tx.Commit()
+      return
+    }
+    // don't shadow original error
+    _ = tx.Rollback()
+  }()
+
+	stmt, err := tx.Prepare(query)
+
+  for msgId, replyToMsgId := range messageReplyIds {
+    fmt.Println("Executing with: ", replyToMsgId, msgId)
+    _, err = stmt.Exec(replyToMsgId, communityId, msgId)
+		if err != nil {
+			return err
+		}
+  }
+  return nil
+}
+
+func (db sqlitePersistence) MessageIDByDiscordMessageID(id string) (string, error) {
+
+  var messageId string
+  tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+  if err != nil {
+    return "", err
+  }
+	err = tx.QueryRow(`SELECT COUNT(1) id, FROM user_messages 
+				WHERE discord_message_id = ?`, id).Scan(&messageId)
+  return messageId, err
+}
+
+func (db sqlitePersistence) MessageByDiscordMessageID(id string) (*common.Message, error) {
+	var err error
+  tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+  if err != nil {
+    return nil, err
+  }
+  defer func() {
+    if err == nil {
+      err = tx.Commit()
+      return
+    }
+    // don't shadow original error
+    _ = tx.Rollback()
+  }()
+
+	var message common.Message
+	allFields := db.tableUserMessagesAllFieldsJoin()
+
+	row := tx.QueryRow(
+		fmt.Sprintf(`
+			SELECT
+				%s
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			        contacts c
+		        ON
+			m1.source = c.id
+
+      LEFT JOIN
+            discord_message_authors dm_author
+      ON
+      m1.discord_message_author_id = dm_author.id
+
+			WHERE
+				m1.discord_message_id = ?
+		`, allFields),
+		id,
+	)
+
+	err = db.tableUserMessagesScanAllFields(row, &message)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, common.ErrRecordNotFound
+	case nil:
+		return &message, nil
+	default:
+		return nil, err
+	}
 }
 
 func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error) {
@@ -1729,6 +1841,15 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 	return countWithMentions + countNoMentions, countWithMentions, err
+}
+
+func (db sqlitePersistence) UpdateMessageResponseTo(id string, responseToId string) error {
+	_, err := db.db.Exec(`
+		UPDATE user_messages
+		SET response_to = ?
+		WHERE id = ?
+	`, responseToId, id)
+	return err
 }
 
 func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingStatus string) error {

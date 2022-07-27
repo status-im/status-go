@@ -172,6 +172,7 @@ type Message struct {
 	// ContactRequestState is the state of the contact request message
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
 
+  // DiscordMessage is the original message payload coming from discord
   DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 

@@ -533,14 +533,11 @@ type ApplicationStatusUpdatesResponse struct {
 }
 
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
-  fmt.Println("FETCHIGN CHAT MESSAGES FOR: ", chatID, cursor, limit)
 	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, cursor, limit)
 	if err != nil {
-    fmt.Println("ERROR: ", err)
 		return nil, err
 	}
 
-  fmt.Println("FOUND MESSAGES: ", messages[0])
 	return &ApplicationMessagesResponse{
 		Messages: messages,
 		Cursor:   cursor,
