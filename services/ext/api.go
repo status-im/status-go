@@ -820,16 +820,16 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 }
 
 // wallet connect session apis
-func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AddWalletConnectSession(ctx, request)
+func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddWalletConnectSession(ctx, PeerID, ConnectorInfo)
 }
 
-func (api *PublicAPI) GetWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (protocol.Session, error) {
-	return api.service.messenger.GetWalletConnectSession(ctx, request)
+func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) (protocol.Session, error) {
+	return api.service.messenger.GetWalletConnectSession(ctx)
 }
 
-func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (protocol.Session, error) {
-	return api.service.messenger.DestroyWalletConnectSession(ctx, request)
+func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) (protocol.Session, error) {
+	return api.service.messenger.DestroyWalletConnectSession(ctx, PeerID)
 }
 
 // PushNotifications server endpoints

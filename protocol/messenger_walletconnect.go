@@ -2,8 +2,6 @@ package protocol
 
 import (
 	"context"
-
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 func (m *Messenger) addWalletConnectSession(peerID string, connectorInfo string) (*MessengerResponse, error) {
@@ -32,38 +30,16 @@ func (m *Messenger) destroyWalletConnectSession(peerID string) (Session, error) 
 	return response, err
 }
 
-func (m *Messenger) AddWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-	return m.addWalletConnectSession(request.PeerID, request.ConnectorInfo)
+func (m *Messenger) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string) (*MessengerResponse, error) {
+	return m.addWalletConnectSession(PeerID, ConnectorInfo)
 }
 
-func (m *Messenger) GetWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (Session, error) {
+func (m *Messenger) GetWalletConnectSession(ctx context.Context) (Session, error) {
 
-	seshObject := Session{
-		PeerID:        "",
-		ConnectorInfo: "",
-	}
-
-	err := request.Validate()
-	if err != nil {
-		return seshObject, err
-	}
 	return m.getWalletConnectSession()
 }
 
-func (m *Messenger) DestroyWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (Session, error) {
+func (m *Messenger) DestroyWalletConnectSession(ctx context.Context, PeerID string) (Session, error) {
 
-	seshObject := Session{
-		PeerID:        "",
-		ConnectorInfo: "",
-	}
-
-	err := request.Validate()
-	if err != nil {
-		return seshObject, err
-	}
-	return m.destroyWalletConnectSession(request.PeerID)
+	return m.destroyWalletConnectSession(PeerID)
 }
