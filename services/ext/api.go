@@ -820,6 +820,19 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 	return api.service.messenger.SignMessage(message)
 }
 
+// wallet connect session apis
+func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddWalletConnectSession(ctx, request)
+}
+
+func (api *PublicAPI) GetWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (protocol.Session, error) {
+	return api.service.messenger.GetWalletConnectSession(ctx, request)
+}
+
+func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, request *requests.StoreWalletConnectSession) (protocol.Session, error) {
+	return api.service.messenger.DestroyWalletConnectSession(ctx, request)
+}
+
 // PushNotifications server endpoints
 
 func (api *PublicAPI) StartPushNotificationsServer() error {
