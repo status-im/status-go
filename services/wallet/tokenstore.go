@@ -1474,6 +1474,14 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Decimals: 0,
 			ChainID:  5,
 		},
+		common.HexToAddress("0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"): &Token{
+			Address:  common.HexToAddress("0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"),
+			Name:     "Status Test Token",
+			Symbol:   "STT",
+			Color:    "#f8f8f8",
+			Decimals: 18,
+			ChainID:  3,
+		},
 	},
 	100: {
 		common.HexToAddress("0x3e50bf6703fc132a94e4baff068db2055655f11b"): &Token{
