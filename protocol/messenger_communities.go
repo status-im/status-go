@@ -1322,13 +1322,13 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 		return
 	}
 
-	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
+	if err != nil {
+		m.logger.Warn("cant get community and pass it to signal handler", zap.Error(err))
 		return
 	}
 
-	if err != nil {
-		m.logger.Warn("cant get community and pass it to signal handler", zap.Error(err))
+	//if there is no info helpful for client, we don't post it
+	if community.Name() == "" && community.DescriptionText() == "" && community.MembersCount() == 0 {
 		return
 	}
 
