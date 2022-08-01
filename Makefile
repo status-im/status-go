@@ -82,7 +82,7 @@ HELP_FUN = \
 
 statusgo: ##@build Build status-go as statusd server
 	go build -mod=vendor -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-tags '$(BUILD_TAGS) gowaku_skip_migrations' $(BUILD_FLAGS) \
 		-o $(GOBIN)/statusd ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
@@ -102,13 +102,13 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-tags '$(BUILD_TAGS) gowaku_skip_migrations' $(BUILD_FLAGS) \
 		-o $(GOBIN)/bootnode ./cmd/bootnode/
 	@echo "Compilation done."
 
 node-canary: ##@build Build P2P node canary using status-go deps
 	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-tags '$(BUILD_TAGS) gowaku_skip_migrations' $(BUILD_FLAGS) \
 		-o $(GOBIN)/node-canary ./cmd/node-canary/
 	@echo "Compilation done."
 
@@ -123,6 +123,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
 		$(BUILD_FLAGS_MOBILE) \
+		-tags 'gowaku_skip_migrations' \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
@@ -134,6 +135,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
 		$(BUILD_FLAGS_MOBILE) \
+		-tags 'gowaku_skip_migrations' \
 		-o build/bin/Statusgo.framework \
 		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
@@ -145,6 +147,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Building static library..."
 	go build \
 		$(BUILD_FLAGS) \
+		-tags 'gowaku_skip_migrations' \
 		-buildmode=c-archive \
 		-o $(GOBIN)/libstatus.a \
 		$(GOBIN)/statusgo-lib
@@ -157,6 +160,7 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building shared library..."
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+		-tags 'gowaku_skip_migrations' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
 		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
@@ -173,7 +177,7 @@ endif
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
-		--build-arg "build_tags=$(BUILD_TAGS)" \
+		--build-arg "build_tags=$(BUILD_TAGS) gowaku_skip_migrations" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
@@ -183,7 +187,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 bootnode-image:
 	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
-		--build-arg "build_tags=$(BUILD_TAGS)" \
+		--build-arg "build_tags=$(BUILD_TAGS) gowaku_skip_migrations" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
@@ -299,8 +303,8 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -timeout 20m -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
-	cd ./waku && go test -timeout 20m -v -failfast ./... $(gotest_extraflags)
+	go test -timeout 20m -v -failfast -tags=gowaku_skip_migrations $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	cd ./waku && go test -timeout 20m -v -failfast -tags=gowaku_skip_migrations ./... $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

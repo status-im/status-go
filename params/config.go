@@ -203,6 +203,15 @@ type WakuV2Config struct {
 
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
+
+	// EnableStore indicates if WakuStore protocol should be enabled or not
+	EnableStore bool
+
+	// StoreCapacity indicates the max number of messages to store
+	StoreCapacity int
+
+	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
+	StoreSeconds int
 }
 
 // ----------

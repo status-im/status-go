@@ -27,14 +27,14 @@ type MetricsReporter interface {
 	AllowProtocol(proto protocol.ID)
 	// BlockProtocol is invoked when setting the protocol for a stream is blocked
 	BlockProtocol(proto protocol.ID)
-	// BlockedProtocolPeer is invoekd when setting the protocol for a stream is blocked at the per protocol peer scope
+	// BlockProtocolPeer is invoked when setting the protocol for a stream is blocked at the per protocol peer scope
 	BlockProtocolPeer(proto protocol.ID, p peer.ID)
 
-	// AllowPService is invoked when setting the protocol for a stream is allowed
+	// AllowService is invoked when setting the protocol for a stream is allowed
 	AllowService(svc string)
-	// BlockPService is invoked when setting the protocol for a stream is blocked
+	// BlockService is invoked when setting the protocol for a stream is blocked
 	BlockService(svc string)
-	// BlockedServicePeer is invoked when setting the service for a stream is blocked at the per service peer scope
+	// BlockServicePeer is invoked when setting the service for a stream is blocked at the per service peer scope
 	BlockServicePeer(svc string, p peer.ID)
 
 	// AllowMemory is invoked when a memory reservation is allowed

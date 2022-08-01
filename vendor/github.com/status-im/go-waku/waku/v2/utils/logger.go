@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -8,6 +10,7 @@ import (
 var log *zap.Logger = nil
 var atom = zap.NewAtomicLevel()
 
+// SetLogLevel sets a custom log level
 func SetLogLevel(level string) error {
 	lvl := zapcore.InfoLevel // zero value
 	err := lvl.Set(level)
@@ -18,30 +21,36 @@ func SetLogLevel(level string) error {
 	return nil
 }
 
+// Logger creates a zap.Logger with some reasonable defaults
 func Logger() *zap.Logger {
 	if log == nil {
-		cfg := zap.Config{
-			Encoding:         "console",
-			Level:            atom,
-			OutputPaths:      []string{"stderr"},
-			ErrorOutputPaths: []string{"stderr"},
-			EncoderConfig: zapcore.EncoderConfig{
-				MessageKey:   "message",
-				LevelKey:     "level",
-				EncodeLevel:  zapcore.CapitalLevelEncoder,
-				TimeKey:      "time",
-				EncodeTime:   zapcore.ISO8601TimeEncoder,
-				NameKey:      "caller",
-				EncodeCaller: zapcore.ShortCallerEncoder,
-			},
-		}
-
-		logger, err := cfg.Build()
-		if err != nil {
-			panic("could not create logger")
-		}
-
-		log = logger.Named("gowaku")
+		InitLogger("console")
 	}
 	return log
+}
+
+// InitLogger initializes a global logger using an specific encoding
+func InitLogger(encoding string) {
+	cfg := zap.Config{
+		Encoding:         encoding,
+		Level:            atom,
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+		EncoderConfig: zapcore.EncoderConfig{
+			MessageKey:   "message",
+			LevelKey:     "level",
+			EncodeLevel:  zapcore.CapitalLevelEncoder,
+			TimeKey:      "time",
+			EncodeTime:   zapcore.ISO8601TimeEncoder,
+			NameKey:      "caller",
+			EncodeCaller: zapcore.ShortCallerEncoder,
+		},
+	}
+
+	logger, err := cfg.Build()
+	if err != nil {
+		panic(fmt.Errorf("could not create logger: %s", err.Error()))
+	}
+
+	log = logger.Named("gowaku")
 }

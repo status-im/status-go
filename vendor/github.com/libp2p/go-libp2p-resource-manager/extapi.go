@@ -138,7 +138,7 @@ func (r *resourceManager) Stat() (result ResourceManagerStat) {
 	}
 	result.Services = make(map[string]network.ScopeStat, len(svcs))
 	for _, svc := range svcs {
-		result.Services[svc.name] = svc.Stat()
+		result.Services[svc.service] = svc.Stat()
 	}
 	result.Transient = r.transient.Stat()
 	result.System = r.system.Stat()

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math"
 	"sync"
 
@@ -13,12 +12,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
+	"github.com/status-im/go-waku/logging"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 
 type (
 	Filter struct {
+		filterID       string
 		PeerID         peer.ID
 		Topic          string
 		ContentFilters []string
@@ -49,25 +51,24 @@ type (
 		isFullNode bool
 		MsgC       chan *protocol.Envelope
 		wg         *sync.WaitGroup
-		log        *zap.SugaredLogger
+		log        *zap.Logger
 
 		filters     *FilterMap
 		subscribers *Subscribers
 	}
 )
 
-// NOTE This is just a start, the design of this protocol isn't done yet. It
-// should be direct payload exchange (a la req-resp), not be coupled with the
-// relay protocol.
+// FilterID_v20beta1 is the current Waku Filter protocol identifier
 const FilterID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter/2.0.0-beta1")
 
-func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, log *zap.SugaredLogger, opts ...Option) (*WakuFilter, error) {
+// NewWakuRelay returns a new instance of Waku Filter struct setup according to the chosen parameter and options
+func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, log *zap.Logger, opts ...Option) (*WakuFilter, error) {
 	wf := new(WakuFilter)
-	wf.log = log.Named("filter")
+	wf.log = log.Named("filter").With(zap.Bool("fullNode", isFullNode))
 
 	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "filter"))
 	if err != nil {
-		wf.log.Error(err)
+		wf.log.Error("creating tag map", zap.Error(err))
 		return nil, errors.New("could not start waku filter")
 	}
 
@@ -89,19 +90,15 @@ func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, log *za
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
 
 	wf.wg.Add(1)
-	go wf.FilterListener()
+	go wf.filterListener()
 
-	if wf.isFullNode {
-		wf.log.Info("Filter protocol started")
-	} else {
-		wf.log.Info("Filter protocol started (only client mode)")
-	}
-
+	wf.log.Info("filter protocol started")
 	return wf, nil
 }
 
 func (wf *WakuFilter) onRequest(s network.Stream) {
 	defer s.Close()
+	logger := wf.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
 
 	filterRPCRequest := &pb.FilterRPC{}
 
@@ -109,11 +106,11 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 
 	err := reader.ReadMsg(filterRPCRequest)
 	if err != nil {
-		wf.log.Error("error reading request", err)
+		logger.Error("reading request", zap.Error(err))
 		return
 	}
 
-	wf.log.Info(fmt.Sprintf("%s: received request from %s", s.Conn().LocalPeer(), s.Conn().RemotePeer()))
+	logger.Info("received request")
 
 	if filterRPCRequest.Push != nil && len(filterRPCRequest.Push.Messages) > 0 {
 		// We're on a light node.
@@ -122,7 +119,7 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 			wf.filters.Notify(message, filterRPCRequest.RequestId) // Trigger filter handlers on a light node
 		}
 
-		wf.log.Info("filter light node, received a message push. ", len(filterRPCRequest.Push.Messages), " messages")
+		logger.Info("received a message push", zap.Int("messages", len(filterRPCRequest.Push.Messages)))
 		stats.Record(wf.ctx, metrics.Messages.M(int64(len(filterRPCRequest.Push.Messages))))
 	} else if filterRPCRequest.Request != nil && wf.isFullNode {
 		// We're on a full node.
@@ -131,29 +128,30 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 			subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
 			len := wf.subscribers.Append(subscriber)
 
-			wf.log.Info("filter full node, add a filter subscriber: ", subscriber.peer)
+			logger.Info("adding subscriber")
 			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(len)))
 		} else {
 			peerId := s.Conn().RemotePeer()
-			wf.subscribers.RemoveContentFilters(peerId, filterRPCRequest.Request.ContentFilters)
+			wf.subscribers.RemoveContentFilters(peerId, filterRPCRequest.RequestId, filterRPCRequest.Request.ContentFilters)
 
-			wf.log.Info("filter full node, remove a filter subscriber: ", peerId.Pretty())
+			logger.Info("removing subscriber")
 			stats.Record(wf.ctx, metrics.FilterSubscriptions.M(int64(wf.subscribers.Length())))
 		}
 	} else {
-		wf.log.Error("can't serve request")
+		logger.Error("can't serve request")
 		return
 	}
 }
 
 func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) error {
 	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*pb.WakuMessage{msg}}}
+	logger := wf.log.With(logging.HostID("peer", subscriber.peer))
 
 	// We connect first so dns4 addresses are resolved (NewStream does not do it)
 	err := wf.h.Connect(wf.ctx, wf.h.Peerstore().PeerInfo(subscriber.peer))
 	if err != nil {
 		wf.subscribers.FlagAsFailure(subscriber.peer)
-		wf.log.Error("failed to connect to peer", err)
+		logger.Error("connecting to peer", zap.Error(err))
 		return err
 	}
 
@@ -161,7 +159,7 @@ func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) er
 	if err != nil {
 		wf.subscribers.FlagAsFailure(subscriber.peer)
 
-		wf.log.Error("failed to open peer stream", err)
+		logger.Error("opening peer stream", zap.Error(err))
 		//waku_filter_errors.inc(labelValues = [dialFailure])
 		return err
 	}
@@ -170,7 +168,7 @@ func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) er
 	writer := protoio.NewDelimitedWriter(conn)
 	err = writer.WriteMsg(pushRPC)
 	if err != nil {
-		wf.log.Error("failed to push messages to remote peer", err)
+		logger.Error("pushing messages to peer", zap.Error(err))
 		wf.subscribers.FlagAsFailure(subscriber.peer)
 		return nil
 	}
@@ -179,41 +177,45 @@ func (wf *WakuFilter) pushMessage(subscriber Subscriber, msg *pb.WakuMessage) er
 	return nil
 }
 
-func (wf *WakuFilter) FilterListener() {
+func (wf *WakuFilter) filterListener() {
 	defer wf.wg.Done()
 
 	// This function is invoked for each message received
 	// on the full node in context of Waku2-Filter
 	handle := func(envelope *protocol.Envelope) error { // async
 		msg := envelope.Message()
-		topic := envelope.PubsubTopic()
+		pubsubTopic := envelope.PubsubTopic()
+		logger := wf.log.With(zap.Stringer("message", msg))
+		g := new(errgroup.Group)
 		// Each subscriber is a light node that earlier on invoked
 		// a FilterRequest on this node
-		for subscriber := range wf.subscribers.Items() {
-			if subscriber.filter.Topic != "" && subscriber.filter.Topic != topic {
-				wf.log.Info("Subscriber's filter pubsubTopic does not match message topic", subscriber.filter.Topic, topic)
+		for subscriber := range wf.subscribers.Items(&(msg.ContentTopic)) {
+			logger := logger.With(logging.HostID("subscriber", subscriber.peer))
+			subscriber := subscriber // https://golang.org/doc/faq#closures_and_goroutines
+			if subscriber.filter.Topic != "" && subscriber.filter.Topic != pubsubTopic {
+				logger.Info("pubsub topic mismatch",
+					zap.String("subscriberTopic", subscriber.filter.Topic),
+					zap.String("messageTopic", pubsubTopic))
 				continue
 			}
 
-			for _, filter := range subscriber.filter.ContentFilters {
-				if msg.ContentTopic == filter.ContentTopic {
-					wf.log.Info("found matching contentTopic ", filter, msg)
-					// Do a message push to light node
-					wf.log.Info("pushing messages to light node: ", subscriber.peer)
-					if err := wf.pushMessage(subscriber, msg); err != nil {
-						return err
-					}
-
+			// Do a message push to light node
+			logger.Info("pushing message to light node", zap.String("contentTopic", msg.ContentTopic))
+			g.Go(func() (err error) {
+				err = wf.pushMessage(subscriber, msg)
+				if err != nil {
+					logger.Error("pushing message", zap.Error(err))
 				}
-			}
+				return err
+			})
 		}
 
-		return nil
+		return g.Wait()
 	}
 
 	for m := range wf.MsgC {
 		if err := handle(m); err != nil {
-			wf.log.Error("failed to handle message", err)
+			wf.log.Error("handling message", zap.Error(err))
 		}
 	}
 }
@@ -266,10 +268,10 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 
 	writer := protoio.NewDelimitedWriter(conn)
 	filterRPC := &pb.FilterRPC{RequestId: requestID, Request: &request}
-	wf.log.Info("sending filterRPC: ", filterRPC)
+	wf.log.Info("sending filterRPC", zap.Stringer("rpc", filterRPC))
 	err = writer.WriteMsg(filterRPC)
 	if err != nil {
-		wf.log.Error("failed to write message", err)
+		wf.log.Error("sending filterRPC", zap.Error(err))
 		return
 	}
 
@@ -280,6 +282,7 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 	return
 }
 
+// Unsubscribe is used to stop receiving messages from a peer that match a content filter
 func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilter, peer peer.ID) error {
 	// We connect first so dns4 addresses are resolved (NewStream does not do it)
 	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(peer))
@@ -318,6 +321,7 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilt
 	return nil
 }
 
+// Stop unmounts the filter protocol
 func (wf *WakuFilter) Stop() {
 	close(wf.MsgC)
 
@@ -326,6 +330,7 @@ func (wf *WakuFilter) Stop() {
 	wf.wg.Wait()
 }
 
+// Subscribe setups a subscription to receive messages that match a specific content filter
 func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...FilterSubscribeOption) (filterID string, theFilter Filter, err error) {
 	// TODO: check if there's an existing pubsub topic that uses the same peer. If so, reuse filter, and return same channel and filterID
 
@@ -334,7 +339,7 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...Fi
 	remoteSubs, err := wf.requestSubscription(ctx, f, opts...)
 	if err != nil || remoteSubs.RequestID == "" {
 		// Failed to subscribe
-		wf.log.Error("remote subscription to filter failed", err)
+		wf.log.Error("requesting subscription", zap.Error(err))
 		return
 	}
 
@@ -342,6 +347,7 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...Fi
 
 	filterID = remoteSubs.RequestID
 	theFilter = Filter{
+		filterID:       filterID,
 		PeerID:         remoteSubs.Peer,
 		Topic:          f.Topic,
 		ContentFilters: f.ContentTopics,
@@ -351,6 +357,16 @@ func (wf *WakuFilter) Subscribe(ctx context.Context, f ContentFilter, opts ...Fi
 	wf.filters.Set(filterID, theFilter)
 
 	return
+}
+
+// UnsubscribeFilterByID removes a subscription to a filter node completely
+// using using a filter. It also closes the filter channel
+func (wf *WakuFilter) UnsubscribeByFilter(ctx context.Context, filter Filter) error {
+	err := wf.UnsubscribeFilterByID(ctx, filter.filterID)
+	if err != nil {
+		close(filter.Chan)
+	}
+	return err
 }
 
 // UnsubscribeFilterByID removes a subscription to a filter node completely

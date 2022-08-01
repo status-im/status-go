@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -250,6 +252,12 @@ func (mp *Multiplex) sendMsg(timeout, cancel <-chan struct{}, header uint64, dat
 }
 
 func (mp *Multiplex) handleOutgoing() {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic in handleOutgoing: %s\n%s\n", rerr, debug.Stack())
+		}
+	}()
+
 	for {
 		select {
 		case <-mp.shutdown:
@@ -349,6 +357,12 @@ func (mp *Multiplex) cleanup() {
 }
 
 func (mp *Multiplex) handleIncoming() {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic in handleIncoming: %s\n%s\n", rerr, debug.Stack())
+		}
+	}()
+
 	defer mp.cleanup()
 
 	recvTimeout := time.NewTimer(0)

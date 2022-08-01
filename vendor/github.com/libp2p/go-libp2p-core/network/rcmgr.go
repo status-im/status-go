@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multiaddr"
 )
 
 // ResourceManager is the interface to the network resource management subsystem.
@@ -83,7 +84,7 @@ type ResourceManager interface {
 	// is scoped at the transient scope.
 	// The caller owns the returned scope and is responsible for calling Done in order to signify
 	// the end of the scope's span.
-	OpenConnection(dir Direction, usefd bool) (ConnManagementScope, error)
+	OpenConnection(dir Direction, usefd bool, endpoint multiaddr.Multiaddr) (ConnManagementScope, error)
 
 	// OpenStream creates a new stream scope, initially unnegotiated.
 	// An unnegotiated stream will be initially unattached to any protocol scope
@@ -300,7 +301,7 @@ func (n *nullResourceManager) ViewProtocol(p protocol.ID, f func(ProtocolScope) 
 func (n *nullResourceManager) ViewPeer(p peer.ID, f func(PeerScope) error) error {
 	return f(NullScope)
 }
-func (n *nullResourceManager) OpenConnection(dir Direction, usefd bool) (ConnManagementScope, error) {
+func (n *nullResourceManager) OpenConnection(dir Direction, usefd bool, endpoint multiaddr.Multiaddr) (ConnManagementScope, error) {
 	return NullScope, nil
 }
 func (n *nullResourceManager) OpenStream(p peer.ID, dir Direction) (StreamManagementScope, error) {

@@ -5,17 +5,18 @@ package libp2p
 import (
 	"crypto/rand"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	mplex "github.com/libp2p/go-libp2p-mplex"
-	noise "github.com/libp2p/go-libp2p-noise"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	quic "github.com/libp2p/go-libp2p-quic-transport"
-	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
-	tls "github.com/libp2p/go-libp2p-tls"
-	yamux "github.com/libp2p/go-libp2p-yamux"
+	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-	"github.com/libp2p/go-tcp-transport"
-	ws "github.com/libp2p/go-ws-transport"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
+
+	"github.com/libp2p/go-libp2p-core/crypto"
+
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -32,10 +33,7 @@ var DefaultSecurity = ChainOptions(
 //
 // Use this option when you want to *extend* the set of multiplexers used by
 // libp2p instead of replacing them.
-var DefaultMuxers = ChainOptions(
-	Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-	Muxer("/mplex/6.7.0", mplex.DefaultTransport),
-)
+var DefaultMuxers = Muxer("/yamux/1.0.0", yamux.DefaultTransport)
 
 // DefaultTransports are the default libp2p transports.
 //
@@ -89,10 +87,9 @@ var DefaultEnableRelay = func(cfg *Config) error {
 
 var DefaultResourceManager = func(cfg *Config) error {
 	// Default memory limit: 1/8th of total memory, minimum 128MB, maximum 1GB
-	limiter := rcmgr.NewDefaultLimiter()
-	SetDefaultServiceLimits(limiter)
-
-	mgr, err := rcmgr.NewResourceManager(limiter)
+	limits := rcmgr.DefaultLimits
+	SetDefaultServiceLimits(&limits)
+	mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limits.AutoScale()))
 	if err != nil {
 		return err
 	}
@@ -100,7 +97,7 @@ var DefaultResourceManager = func(cfg *Config) error {
 	return cfg.Apply(ResourceManager(mgr))
 }
 
-// DefaultConnManager creates a default connection manager
+// DefaultConnectionManager creates a default connection manager
 var DefaultConnectionManager = func(cfg *Config) error {
 	mgr, err := connmgr.NewConnManager(160, 192)
 	if err != nil {
