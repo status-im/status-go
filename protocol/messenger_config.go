@@ -44,6 +44,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
 }
 
 type config struct {

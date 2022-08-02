@@ -648,6 +648,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
+	m.timeoutAutomaticStatusUpdates()
 	m.startBackupLoop()
 	err = m.startAutoMessageLoop()
 	if err != nil {

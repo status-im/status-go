@@ -8,6 +8,9 @@ const (
 	// EventCommunityFound triggered when user requested info about some community and messenger successfully
 	// retrieved it from mailserver
 	EventCommunityInfoFound = "community.found"
+
+	// Event Automatic Status Updates Timed out
+	EventStatusUpdatesTimedOut = "status.updates.timedout"
 )
 
 // MessageDeliveredSignal specifies chat and message that was delivered
@@ -16,7 +19,6 @@ type MessageDeliveredSignal struct {
 	MessageID string `json:"messageID"`
 }
 
-// MessageDeliveredSignal specifies chat and message that was delivered
 type CommunityInfoFoundSignal struct {
 	Name         string `json:"name"`
 	Description  string `json:"description"`
@@ -32,4 +34,8 @@ func SendMessageDelivered(chatID string, messageID string) {
 // SendMessageDelivered notifies about delivered message
 func SendCommunityInfoFound(community interface{}) {
 	send(EventCommunityInfoFound, community)
+}
+
+func SendStatusUpdatesTimedOut(statusUpdates interface{}) {
+	send(EventStatusUpdatesTimedOut, statusUpdates)
 }
