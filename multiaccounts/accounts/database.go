@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
+	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -90,6 +91,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 type Database struct {
 	*settings.Database
 	*notificationssettings.NotificationsSettings
+	*sociallinkssettings.SocialLinksSettings
 	db *sql.DB
 }
 
@@ -100,8 +102,9 @@ func NewDB(db *sql.DB) (*Database, error) {
 		return nil, err
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
+	ssl := sociallinkssettings.NewSocialLinksSettings(db)
 
-	return &Database{sDB, sn, db}, nil
+	return &Database{sDB, sn, ssl, db}, nil
 }
 
 // DB Gets db sql.DB
