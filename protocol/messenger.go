@@ -44,6 +44,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/ens"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
@@ -864,7 +865,17 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, m.getIdentityHash(displayName, img))
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, identityHash)
 	if err != nil {
 		return err
 	}
@@ -929,7 +940,17 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, m.getIdentityHash(displayName, img))
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, identityHash)
 	if err != nil {
 		return err
 	}
@@ -937,11 +958,15 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName string, img *userimage.IdentityImage) []byte {
-	if img == nil {
-		return crypto.Keccak256([]byte(displayName))
+func (m *Messenger) getIdentityHash(displayName string, img *userimage.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+	socialLinksData, err := socialLinks.Serialize()
+	if err != nil {
+		return []byte{}, err
 	}
-	return crypto.Keccak256(img.Payload, []byte(displayName))
+	if img == nil {
+		return crypto.Keccak256([]byte(displayName), socialLinksData), nil
+	}
+	return crypto.Keccak256(img.Payload, []byte(displayName), socialLinksData), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -970,7 +995,17 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	if !bytes.Equal(hash, m.getIdentityHash(displayName, img)) {
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return false, err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	if err != nil {
+		return false, err
+	}
+
+	if !bytes.Equal(hash, identityHash) {
 		return true, nil
 	}
 
@@ -990,10 +1025,16 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		return nil, err
 	}
 
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return nil, err
+	}
+
 	ci := &protobuf.ChatIdentity{
 		Clock:       m.transport.GetCurrentTime(),
 		EnsName:     "", // TODO add ENS name handling to dedicate PR
 		DisplayName: displayName,
+		SocialLinks: socialLinks.TransformToProtobuf(),
 	}
 
 	err = m.attachIdentityImagesToChatIdentity(context, ci)

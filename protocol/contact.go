@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/verification"
@@ -100,6 +101,8 @@ type Contact struct {
 
 	// Display name of the contact
 	DisplayName string `json:"displayName"`
+
+	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
 	Images map[string]images.IdentityImage `json:"images"`
 

@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -1816,17 +1817,6 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	}
 
 	contact := state.CurrentMessageState.Contact
-
-	if err = ValidateDisplayName(&ci.DisplayName); err != nil {
-		return err
-	}
-
-	if contact.DisplayName != ci.DisplayName && len(ci.DisplayName) != 0 {
-		contact.DisplayName = ci.DisplayName
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-	}
-
 	viewFromContacts := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly
 	viewFromNoOne := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityNone
 
@@ -1870,11 +1860,13 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		}
 	}
 
-	newImages, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
+	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
 	if err != nil {
 		return err
 	}
-	if newImages {
+	contactModified := false
+
+	if imagesChanged {
 		for imageType, image := range ci.Images {
 			if contact.Images == nil {
 				contact.Images = make(map[string]images.IdentityImage)
@@ -1882,6 +1874,26 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
 
 		}
+		contactModified = true
+	}
+
+	if clockChanged {
+		if err = ValidateDisplayName(&ci.DisplayName); err != nil {
+			return err
+		}
+
+		if contact.DisplayName != ci.DisplayName && len(ci.DisplayName) != 0 {
+			contact.DisplayName = ci.DisplayName
+			contactModified = true
+		}
+
+		if !contact.SocialLinks.EqualsProtobuf(ci.SocialLinks) {
+			contact.SocialLinks = *identity.NewSocialLinks(ci.SocialLinks)
+			contactModified = true
+		}
+	}
+
+	if contactModified {
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}

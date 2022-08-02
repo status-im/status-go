@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
 )
@@ -496,14 +497,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.removed,
 			c.has_added_us,
 			c.local_nickname,
-                        c.contact_request_state,
-                        c.contact_request_clock,
+			c.contact_request_state,
+			c.contact_request_clock,
 			i.image_type,
 			i.payload,
 			COALESCE(c.verification_status, 0) as verification_status,
 			COALESCE(t.trust_status, 0) as trust_status
-		FROM contacts c 
-		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id 
+		FROM contacts c
+		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id
 		LEFT JOIN ens_verification_records v ON c.id = v.public_key
 		LEFT JOIN trusted_users t ON c.id = t.id;
 	`)
@@ -618,6 +619,37 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		}
 	}
 
+	// Read social links
+	for _, contact := range allContacts {
+		rows, err := db.db.Query(`SELECT link_text, link_url FROM chat_identity_social_links WHERE chat_id = ?`, contact.ID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var (
+				text sql.NullString
+				url  sql.NullString
+			)
+			err := rows.Scan(
+				&text, &url,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			link := identity.SocialLink{}
+			if text.Valid {
+				link.Text = text.String
+			}
+			if url.Valid {
+				link.URL = url.String
+			}
+			contact.SocialLinks = append(contact.SocialLinks, link)
+		}
+	}
+
 	var response []*Contact
 	for key := range allContacts {
 		response = append(response, allContacts[key])
@@ -626,14 +658,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (updated bool, err error) {
+func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (clockUpdated, imagesUpdated bool, err error) {
 	if chatIdentity.Clock == 0 {
-		return false, errors.New("clock value unset")
+		return false, false, errors.New("clock value unset")
 	}
 
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	defer func() {
 		if err == nil {
@@ -644,11 +676,42 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		_ = tx.Rollback()
 	}()
 
+	updateClock := func() (updated bool, err error) {
+		var newerClockEntryExists bool
+		err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_last_received WHERE chat_id = ? AND clock_value >= ?)`, contactID, chatIdentity.Clock).Scan(&newerClockEntryExists)
+		if err != nil {
+			return false, err
+		}
+		if newerClockEntryExists {
+			return false, nil
+		}
+
+		stmt, err := tx.Prepare("INSERT INTO chat_identity_last_received (chat_id, clock_value) VALUES (?, ?)")
+		if err != nil {
+			return false, err
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(
+			contactID,
+			chatIdentity.Clock,
+		)
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
+
+	clockUpdated, err = updateClock()
+	if err != nil {
+		return false, false, err
+	}
+
 	for imageType, image := range chatIdentity.Images {
 		var exists bool
 		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ? AND image_type = ? AND clock_value >= ?)`, contactID, imageType, chatIdentity.Clock).Scan(&exists)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 
 		if exists {
@@ -657,7 +720,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 
 		stmt, err := tx.Prepare(`INSERT INTO chat_identity_contacts (contact_id, image_type, clock_value, payload) VALUES (?, ?, ?, ?)`)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 		defer stmt.Close()
 		if image.Payload == nil {
@@ -668,7 +731,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		// Validate image URI to make sure it's serializable
 		_, err = images.GetPayloadDataURI(image.Payload)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 
 		_, err = stmt.Exec(
@@ -678,9 +741,28 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 			image.Payload,
 		)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
-		updated = true
+		imagesUpdated = true
+	}
+
+	if clockUpdated && chatIdentity.SocialLinks != nil {
+		stmt, err := tx.Prepare(`INSERT INTO chat_identity_social_links (chat_id, link_text, link_url) VALUES (?, ?, ?)`)
+		if err != nil {
+			return clockUpdated, imagesUpdated, err
+		}
+		defer stmt.Close()
+
+		for _, link := range chatIdentity.SocialLinks {
+			_, err = stmt.Exec(
+				contactID,
+				link.Text,
+				link.Url,
+			)
+			if err != nil {
+				return clockUpdated, imagesUpdated, err
+			}
+		}
 	}
 
 	return

@@ -836,7 +836,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
-func TestSaveContactIdentityImage(t *testing.T) {
+func TestSaveContactChatIdentity(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -863,25 +863,58 @@ func TestSaveContactIdentityImage(t *testing.T) {
 		ImageType:  protobuf.ImageType_PNG,
 	}
 
-	images := &protobuf.ChatIdentity{
-		Clock:  1,
-		Images: identityImages,
+	toArrayOfPointers := func(array []protobuf.SocialLink) (result []*protobuf.SocialLink) {
+		result = make([]*protobuf.SocialLink, len(array))
+		for i := range array {
+			result[i] = &array[i]
+		}
+		return
 	}
 
-	result, err := p.SaveContactChatIdentity(contactID, images)
-	require.NoError(t, err)
-	require.True(t, result)
+	chatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: identityImages,
+		SocialLinks: toArrayOfPointers([]protobuf.SocialLink{
+			{
+				Text: "Personal Site",
+				Url:  "status.im",
+			},
+			{
+				Text: "Twitter",
+				Url:  "Status_ico",
+			},
+		}),
+	}
 
-	// Save again same clock, it should return false
-	result, err = p.SaveContactChatIdentity(contactID, images)
+	clockUpdated, imagesUpdated, err := p.SaveContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
-	require.False(t, result)
+	require.True(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	// Save again same clock and data
+	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.False(t, clockUpdated)
+	require.False(t, imagesUpdated)
+
+	// Save again newer clock and no images
+	chatIdentity.Clock = 2
+	chatIdentity.Images = make(map[string]*protobuf.IdentityImage)
+	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.True(t, clockUpdated)
+	require.False(t, imagesUpdated)
 
 	contacts, err := p.Contacts()
 	require.NoError(t, err)
 	require.Len(t, contacts, 1)
 
 	require.Len(t, contacts[0].Images, 2)
+	require.Len(t, contacts[0].SocialLinks, 2)
+	require.Equal(t, "Personal Site", contacts[0].SocialLinks[0].Text)
+	require.Equal(t, "status.im", contacts[0].SocialLinks[0].URL)
+	require.Equal(t, "Twitter", contacts[0].SocialLinks[1].Text)
+	require.Equal(t, "Status_ico", contacts[0].SocialLinks[1].URL)
 }
 
 func TestSaveLinks(t *testing.T) {

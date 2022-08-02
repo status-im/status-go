@@ -7,16 +7,19 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/identity"
 )
 
-func NewSettingsAPI(db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
-	return &SettingsAPI{db, config}
+func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
+	return &SettingsAPI{messenger, db, config}
 }
 
 // SettingsAPI is class with methods available over RPC.
 type SettingsAPI struct {
-	db     *accounts.Database
-	config *params.NodeConfig
+	messenger **protocol.Messenger
+	db        *accounts.Database
+	config    *params.NodeConfig
 }
 
 func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interface{}) error {
@@ -155,4 +158,12 @@ func (api *SettingsAPI) NotificationsSetExemptions(id string, muteAllMessages bo
 
 func (api *SettingsAPI) DeleteExemptions(id string) error {
 	return api.db.DeleteExemptions(id)
+}
+
+func (api *SettingsAPI) GetSocialLinks() (identity.SocialLinks, error) {
+	return api.db.GetSocialLinks()
+}
+
+func (api *SettingsAPI) SetSocialLinks(socialLinks identity.SocialLinks) error {
+	return (*api.messenger).SetSocialLinks(&socialLinks)
 }
