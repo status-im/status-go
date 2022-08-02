@@ -404,7 +404,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	}
 
 	// Create a community chat
-	response, err := bob1.CreateCommunity(description)
+	response, err := bob1.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)

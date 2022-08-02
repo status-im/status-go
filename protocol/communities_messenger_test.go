@@ -142,6 +142,37 @@ func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
+func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+	response, err := s.bob.CreateCommunity(description, true)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+}
+
+func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() {
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+	response, err := s.bob.CreateCommunity(description, false)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 0)
+}
+
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	alice := s.newMessenger()
 
@@ -152,7 +183,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 		Description: "status community description",
 	}
 
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -210,7 +241,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -408,7 +439,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -494,7 +525,7 @@ func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -548,7 +579,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -669,7 +700,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -740,7 +771,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -903,7 +934,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -1156,7 +1187,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -1204,7 +1235,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description)
+	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -1274,7 +1305,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 		Description: "new community description",
 	}
 
-	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
 	var newCommunity *communities.Community
 	for _, com := range mr.Communities() {
@@ -1335,7 +1366,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 		Description: "new community description",
 	}
 
-	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
 	var newCommunity *communities.Community
 	for _, com := range mr.Communities() {
@@ -1436,7 +1467,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 		Description: "new community description",
 	}
 
-	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
 	var newCommunity *communities.Community
 	for _, com := range mr.Communities() {
@@ -1531,7 +1562,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 		Color:       "#000000",
 		Description: "new community description",
 	}
-	mr, err := s.bob.CreateCommunity(createCommunityReq)
+	mr, err := s.bob.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "CreateCommunity")
 	s.Require().NotNil(mr)
 	s.Len(mr.Communities(), 1)
@@ -1767,7 +1798,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 		Color:       "#000000",
 		Description: "new community description",
 	}
-	mr, err := s.bob.CreateCommunity(createCommunityReq)
+	mr, err := s.bob.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "CreateCommunity")
 	s.Require().NotNil(mr)
 	s.Len(mr.Communities(), 1)
@@ -1863,7 +1894,7 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 		Description: "new community description",
 	}
 
-	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
 	var newCommunity *communities.Community
 	for _, com := range mr.Communities() {

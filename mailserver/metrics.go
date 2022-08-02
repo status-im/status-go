@@ -60,6 +60,10 @@ var (
 		Help:    "Size of envelopes saved.",
 		Buckets: prom.ExponentialBuckets(1024, 2, 11),
 	}, []string{"db"})
+	envelopeQueriesCounter = prom.NewCounterVec(prom.CounterOpts{
+		Name: "mailserver_envelope_queries_total",
+		Help: "Number of queries for envelopes in the DB.",
+	}, []string{"filter", "history"})
 )
 
 func init() {
@@ -76,4 +80,5 @@ func init() {
 	prom.MustRegister(archivedErrorsCounter)
 	prom.MustRegister(archivedEnvelopesGauge)
 	prom.MustRegister(archivedEnvelopeSizeMeter)
+	prom.MustRegister(envelopeQueriesCounter)
 }

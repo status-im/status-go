@@ -130,20 +130,26 @@ func (i *PostgresDB) BuildIterator(query CursorQuery) (Iterator, error) {
 
 	stmtString := "SELECT id, data FROM envelopes"
 
+	var historyRange string
 	if len(query.cursor) > 0 {
 		args = append(args, query.start, query.cursor)
 		// If we have a cursor, we don't want to include that envelope in the result set
 		stmtString += " " + "WHERE id >= $1 AND id < $2"
+		historyRange = "partial" //nolint: goconst
 	} else {
 		args = append(args, query.start, query.end)
 		stmtString += " " + "WHERE id >= $1 AND id <= $2"
+		historyRange = "full" //nolint: goconst
 	}
 
+	var filterRange string
 	if len(query.topics) > 0 {
 		args = append(args, pq.Array(query.topics))
 		stmtString += " " + "AND topic = any($3)"
+		filterRange = "partial" //nolint: goconst
 	} else {
 		stmtString += " " + fmt.Sprintf("AND bloom & b'%s'::bit(512) = bloom", toBitString(query.bloom))
+		filterRange = "full" //nolint: goconst
 	}
 
 	// Positional argument depends on the fact whether the query uses topics or bloom filter.
@@ -156,10 +162,13 @@ func (i *PostgresDB) BuildIterator(query CursorQuery) (Iterator, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	envelopeQueriesCounter.WithLabelValues(filterRange, historyRange).Inc()
 	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
+
 	return &postgresIterator{rows}, nil
 }
 
