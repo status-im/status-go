@@ -118,3 +118,7 @@ func (m *MessengerSignalsHandler) HistoryArchivesUnseeded(communityID string) {
 func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, from int, to int) {
 	signal.SendHistoryArchiveDownloaded(communityID, from, to)
 }
+
+func (m *MessengerSignalsHandler) StatusUpdatesTimedOut(statusUpdates *[]protocol.UserStatus) {
+	signal.SendStatusUpdatesTimedOut(statusUpdates)
+}
