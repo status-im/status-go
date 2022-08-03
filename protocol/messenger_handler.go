@@ -2043,7 +2043,16 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 
 	if err == nil {
 		state.Response.Accounts = accs
-		state.Response.Settings = []*settings.SyncSettingField{{settings.LatestDerivedPath, newPath}}
+		if state.Response.Settings == nil {
+			state.Response.Settings = []*settings.SyncSettingField{}
+		}
+
+		state.Response.Settings = append(
+			state.Response.Settings,
+			&settings.SyncSettingField{
+				SettingField: settings.LatestDerivedPath,
+				Value:        newPath,
+			})
 	}
 
 	return err
