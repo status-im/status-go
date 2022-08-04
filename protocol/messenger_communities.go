@@ -1021,6 +1021,10 @@ func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*com
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
 }
 
+func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
+}
+
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
 	publicKey, err := common.HexToPubkey(pkString)
 	if err != nil {

@@ -337,9 +337,9 @@ func (p *Persistence) HasPendingRequestsToJoinForUserAndCommunity(userPk string,
 	return count > 0, nil
 }
 
-func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+func (p *Persistence) RequestsToJoinForCommunityWithState(id []byte, state RequestToJoinState) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
-	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND community_id = ?`, RequestToJoinStatePending, id)
+	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND community_id = ?`, state, id)
 	if err != nil {
 		return nil, err
 	}
@@ -354,6 +354,14 @@ func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestTo
 		requests = append(requests, request)
 	}
 	return requests, nil
+}
+
+func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStatePending)
+}
+
+func (p *Persistence) DeclinedRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateDeclined)
 }
 
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
