@@ -171,6 +171,8 @@ type Message struct {
 
 	// ContactRequestState is the state of the contact request message
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
+
+	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -216,6 +218,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EditedAt            uint64                           `json:"editedAt,omitempty"`
 		Deleted             bool                             `json:"deleted,omitempty"`
 		ContactRequestState ContactRequestState              `json:"contactRequestState,omitempty"`
+		DiscordMessage      *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
 	}{
 		ID:                  m.ID,
 		WhisperTimestamp:    m.WhisperTimestamp,
@@ -262,6 +265,10 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 
 	if audio := m.GetAudio(); audio != nil {
 		item.AudioDurationMs = audio.DurationMs
+	}
+
+	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
+		item.DiscordMessage = discordMessage
 	}
 
 	return json.Marshal(item)

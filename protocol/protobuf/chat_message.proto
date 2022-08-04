@@ -61,6 +61,7 @@ message DiscordMessage {
   string timestampEdited = 4;
   string content = 5;
   DiscordMessageAuthor author = 6;
+  DiscordMessageReference reference = 7;
 }
 
 message DiscordMessageAuthor {
@@ -69,6 +70,12 @@ message DiscordMessageAuthor {
   string discriminator = 3;
   string nickname = 4;
   string avatarUrl = 5;
+}
+
+message DiscordMessageReference {
+  string messageId = 1;
+  string channelId = 2;
+  string guildId = 3;
 }
 
 message ChatMessage {
@@ -99,6 +106,7 @@ message ChatMessage {
     ImageMessage image = 10;
     AudioMessage audio = 11;
     bytes community = 12;
+    DiscordMessage discord_message = 99;
   }
 
   // Grant for community chat messages
@@ -126,6 +134,7 @@ message ChatMessage {
     // Only local
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;
+    DISCORD_MESSAGE = 12;
   }
 
   

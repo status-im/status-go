@@ -14,6 +14,13 @@ const (
 	Error
 )
 
+type MessageType string
+
+const (
+	MessageTypeDefault MessageType = "Default"
+	MessageTypeReply   MessageType = "Reply"
+)
+
 type Channel struct {
 	ID           string `json:"id"`
 	CategoryName string `json:"category"`

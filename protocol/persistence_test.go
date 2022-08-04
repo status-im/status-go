@@ -74,6 +74,25 @@ func TestMessageByID(t *testing.T) {
 	require.EqualValues(t, id, m.ID)
 }
 
+func TestMessageByID_WithDiscordMessagePayload(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	id := "1"
+	discordMessageID := "2"
+
+	err = insertMinimalDiscordMessage(p, id, discordMessageID)
+	require.NoError(t, err)
+
+	m, err := p.MessageByID(id)
+	require.NoError(t, err)
+	require.EqualValues(t, id, m.ID)
+	require.NotNil(t, m.GetDiscordMessage())
+	require.EqualValues(t, discordMessageID, m.GetDiscordMessage().Id)
+	require.EqualValues(t, "2", m.GetDiscordMessage().Author.Id)
+}
+
 func TestMessagesExist(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -680,6 +699,38 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
+	}})
+}
+
+func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessageID string) error {
+	discordMessage := &protobuf.DiscordMessage{
+		Id:        discordMessageID,
+		Type:      "Default",
+		Timestamp: "123456",
+		Content:   "This is the message",
+		Author: &protobuf.DiscordMessageAuthor{
+			Id: "2",
+		},
+		Reference: &protobuf.DiscordMessageReference{},
+	}
+
+	err := p.SaveDiscordMessage(discordMessage)
+	if err != nil {
+		return err
+	}
+
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		LocalChatID: testPublicChatID,
+		From:        "me",
+		ChatMessage: protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_DiscordMessage{
+				DiscordMessage: discordMessage,
+			},
+		},
 	}})
 }
 
@@ -1331,4 +1382,42 @@ func TestSaveDiscordMessageAuthor(t *testing.T) {
 	exists, err := p.HasDiscordMessageAuthor("1")
 	require.NoError(t, err)
 	require.True(t, exists)
+}
+
+func TestSaveDiscordMessage(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.SaveDiscordMessage(&protobuf.DiscordMessage{
+		Id:        "1",
+		Type:      "Default",
+		Timestamp: "123456",
+		Content:   "This is the message",
+		Author: &protobuf.DiscordMessageAuthor{
+			Id: "2",
+		},
+		Reference: &protobuf.DiscordMessageReference{},
+	}))
+
+	require.NoError(t, err)
+}
+
+func TestSaveDiscordMessages(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalDiscordMessage(p, id, id)
+		require.NoError(t, err)
+
+		m, err := p.MessageByID(id)
+		require.NoError(t, err)
+		dm := m.GetDiscordMessage()
+		require.NotNil(t, dm)
+		require.EqualValues(t, id, dm.Id)
+	}
 }
