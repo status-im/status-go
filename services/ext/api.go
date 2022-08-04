@@ -474,6 +474,11 @@ func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*c
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
 }
 
+// DeclinedRequestsToJoinForCommunity returns the declined requests to join for a given community
+func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
+}
+
 // AcceptRequestToJoinCommunity accepts a pending request to join a community
 func (api *PublicAPI) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptRequestToJoinCommunity(request)
