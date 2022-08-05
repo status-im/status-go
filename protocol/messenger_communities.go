@@ -1798,7 +1798,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 		bytes, err := os.ReadFile(filePath)
 		if err != nil {
 			errors[fileToImport] = &discord.ImportError{
-				Code:    201,
+				Code:    2,
 				Message: err.Error(),
 			}
 			continue
@@ -1809,7 +1809,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 		err = json.Unmarshal(bytes, &discordExportedData)
 		if err != nil {
 			errors[fileToImport] = &discord.ImportError{
-				Code:    202,
+				Code:    2,
 				Message: err.Error(),
 			}
 			continue
@@ -1817,7 +1817,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 
 		if len(discordExportedData.Messages) == 0 {
 			errors[fileToImport] = &discord.ImportError{
-				Code:    203,
+				Code:    2,
 				Message: "No messages to import",
 			}
 			continue
