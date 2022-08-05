@@ -102,6 +102,9 @@ type Contact struct {
 	// Display name of the contact
 	DisplayName string `json:"displayName"`
 
+	// Bio - description of the contact (tell us about yourself)
+	Bio string `json:"bio"`
+
 	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
 	Images map[string]images.IdentityImage `json:"images"`

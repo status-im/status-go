@@ -500,6 +500,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	// Trigger ContactCodeAdvertisement
 	err = patryk.SetDisplayName("patryk")
 	s.Require().NoError(err)
+	err = patryk.SetBio("I like P2P chats")
+	s.Require().NoError(err)
 
 	// Ensure alice receives patryk's ContactCodeAdvertisement
 	err = tt.RetryWithBackOff(func() error {
@@ -512,6 +514,9 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 		}
 		if response.Contacts[0].DisplayName != "patryk" {
 			return errors.New("display name was not updated")
+		}
+		if response.Contacts[0].Bio != "I like P2P chats" {
+			return errors.New("bio was not updated")
 		}
 		return nil
 	})

@@ -27,6 +27,7 @@
 // 1655462032_create_bookmarks_deleted_at_index.up.sql (81B)
 // 1657617291_add_multi_transactions_table.up.sql (412B)
 // 1660134042_add_social_links_settings_table.up.sql (334B)
+// 1660134060_settings_bio.up.sql (91B)
 // doc.go (74B)
 
 package migrations
@@ -636,6 +637,26 @@ func _1660134042_add_social_links_settings_tableUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1660134060_settings_bioUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xca\xcc\x57\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\x41\xd2\x18\xec\x1a\x02\xd6\x61\x0b\x92\x05\x04\x00\x00\xff\xff\xe2\x7f\x74\xc2\x5b\x00\x00\x00")
+
+func _1660134060_settings_bioUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1660134060_settings_bioUpSql,
+		"1660134060_settings_bio.up.sql",
+	)
+}
+
+func _1660134060_settings_bioUpSql() (*asset, error) {
+	bytes, err := _1660134060_settings_bioUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1660134060_settings_bio.up.sql", size: 91, mode: os.FileMode(0664), modTime: time.Unix(1660134283, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x46, 0x25, 0xa0, 0xa6, 0x47, 0xff, 0xbc, 0x2a, 0x0, 0xff, 0x59, 0x4b, 0xb0, 0xc9, 0x4e, 0x15, 0xe4, 0xd9, 0xda, 0xeb, 0xfe, 0x55, 0x98, 0xc3, 0x9d, 0x96, 0xe7, 0xf, 0xd1, 0x5c, 0x93, 0x73}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -801,6 +822,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1660134042_add_social_links_settings_table.up.sql": _1660134042_add_social_links_settings_tableUpSql,
 
+	"1660134060_settings_bio.up.sql": _1660134060_settings_bioUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -872,7 +895,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1655462032_create_bookmarks_deleted_at_index.up.sql":             &bintree{_1655462032_create_bookmarks_deleted_at_indexUpSql, map[string]*bintree{}},
 	"1657617291_add_multi_transactions_table.up.sql":                  &bintree{_1657617291_add_multi_transactions_tableUpSql, map[string]*bintree{}},
 	"1660134042_add_social_links_settings_table.up.sql":               &bintree{_1660134042_add_social_links_settings_tableUpSql, map[string]*bintree{}},
-	"doc.go": &bintree{docGo, map[string]*bintree{}},
+	"1660134060_settings_bio.up.sql":                                  &bintree{_1660134060_settings_bioUpSql, map[string]*bintree{}},
+	"doc.go":                                                          &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
