@@ -160,6 +160,10 @@ func (api *SettingsAPI) DeleteExemptions(id string) error {
 	return api.db.DeleteExemptions(id)
 }
 
+func (api *SettingsAPI) SetBio(bio string) error {
+	return (*api.messenger).SetBio(bio)
+}
+
 func (api *SettingsAPI) GetSocialLinks() (identity.SocialLinks, error) {
 	return api.db.GetSocialLinks()
 }

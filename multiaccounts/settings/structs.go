@@ -119,6 +119,7 @@ type Settings struct {
 	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
 	DappsAddress              types.Address    `json:"dapps-address"`
 	DisplayName               string           `json:"display-name"`
+	Bio                       string           `json:"bio,omitempty"`
 	EIP1581Address            types.Address    `json:"eip1581-address"`
 	Fleet                     *string          `json:"fleet,omitempty"`
 	HideHomeTooltip           bool             `json:"hide-home-tooltip?,omitempty"`

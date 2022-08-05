@@ -1887,6 +1887,11 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 			contactModified = true
 		}
 
+		if contact.Bio != ci.Description {
+			contact.Bio = ci.Description
+			contactModified = true
+		}
+
 		if !contact.SocialLinks.EqualsProtobuf(ci.SocialLinks) {
 			contact.SocialLinks = *identity.NewSocialLinks(ci.SocialLinks)
 			contactModified = true

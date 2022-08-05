@@ -865,12 +865,17 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return err
+	}
+
 	socialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
 	if err != nil {
 		return err
 	}
@@ -940,12 +945,17 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return err
+	}
+
 	socialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
 	if err != nil {
 		return err
 	}
@@ -958,15 +968,15 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName string, img *userimage.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *userimage.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
 	}
 	if img == nil {
-		return crypto.Keccak256([]byte(displayName), socialLinksData), nil
+		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData), nil
 	}
-	return crypto.Keccak256(img.Payload, []byte(displayName), socialLinksData), nil
+	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -995,12 +1005,17 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return false, err
+	}
+
 	socialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
 	if err != nil {
 		return false, err
 	}
@@ -1025,6 +1040,11 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		return nil, err
 	}
 
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return nil, err
+	}
+
 	socialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return nil, err
@@ -1034,6 +1054,7 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		Clock:       m.transport.GetCurrentTime(),
 		EnsName:     "", // TODO add ENS name handling to dedicate PR
 		DisplayName: displayName,
+		Description: bio,
 		SocialLinks: socialLinks.TransformToProtobuf(),
 	}
 

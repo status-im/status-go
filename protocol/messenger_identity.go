@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 )
 
@@ -59,6 +60,56 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 	}
 
 	err = m.settings.SaveSettingField(settings.DisplayName, displayName)
+	if err != nil {
+		return err
+	}
+
+	err = m.resetLastPublishedTimeForChatIdentity()
+	if err != nil {
+		return err
+	}
+
+	return m.publishContactCode()
+}
+
+func (m *Messenger) SetBio(bio string) error {
+	currentBio, err := m.settings.Bio()
+	if err != nil {
+		return err
+	}
+
+	if currentBio == bio {
+		return nil // Do nothing
+	}
+
+	// TODO: add validation
+
+	err = m.settings.SaveSettingField(settings.Bio, bio)
+	if err != nil {
+		return err
+	}
+
+	err = m.resetLastPublishedTimeForChatIdentity()
+	if err != nil {
+		return err
+	}
+
+	return m.publishContactCode()
+}
+
+func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
+	currentSocialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+
+	if currentSocialLinks.Equals(*socialLinks) {
+		return nil // Do nothing
+	}
+
+	// TODO: add validation
+
+	err = m.settings.SetSocialLinks(socialLinks)
 	if err != nil {
 		return err
 	}
