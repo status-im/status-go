@@ -117,6 +117,16 @@ func (s *Server) SetHandlers(handlers HandlerPatternMap) {
 	s.handlers = handlers
 }
 
+func (s *Server) AddHandlers(handlers HandlerPatternMap) {
+	if s.handlers == nil {
+		s.handlers = make(HandlerPatternMap)
+	}
+
+	for name := range handlers {
+		s.handlers[name] = handlers[name]
+	}
+}
+
 func (s *Server) MakeBaseURL() *url.URL {
 	return &url.URL{
 		Scheme: "https",

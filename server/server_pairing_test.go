@@ -59,6 +59,9 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		c, err := NewPairingClient(ccp, nil)
 		s.Require().NoError(err)
 
+		err = c.getServerCert()
+		s.Require().NoError(err)
+
 		// Replace PairingClient.PayloadManager with a MockEncryptOnlyPayloadManager
 		c.PayloadManager, err = NewMockEncryptOnlyPayloadManager(s.EphemeralPK)
 		s.Require().NoError(err)
