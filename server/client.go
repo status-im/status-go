@@ -3,10 +3,13 @@ package server
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/asn1"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/url"
 )
@@ -19,6 +22,7 @@ type PairingClient struct {
 	certPEM     []byte
 	privateKey  *ecdsa.PrivateKey
 	serverMode  Mode
+	serverCert  *x509.Certificate
 }
 
 func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
@@ -93,4 +97,56 @@ func (c *PairingClient) receiveAccountData() error {
 	}
 
 	return c.PayloadManager.Receive(payload)
+}
+
+func verifyCertSig(cert *x509.Certificate) (bool, error) {
+	var esig struct {
+		R, S *big.Int
+	}
+	if _, err := asn1.Unmarshal(cert.Signature, &esig); err != nil {
+		return false, err
+	}
+
+	hash := sha256.New()
+	hash.Write(cert.RawTBSCertificate)
+
+	verified := ecdsa.Verify(cert.PublicKey.(*ecdsa.PublicKey), hash.Sum(nil), esig.R, esig.S)
+	return verified, nil
+}
+
+func (c *PairingClient) getServerCert() error {
+	conf := &tls.Config{
+		InsecureSkipVerify: true, // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
+	}
+
+	conn, err := tls.Dial("tcp", c.baseAddress.Host, conf)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	certs := conn.ConnectionState().PeerCertificates
+	if len(certs) != 1 {
+		return fmt.Errorf("expected 1 TLS certificate, received '%d'", len(certs))
+	}
+
+	certKey, ok := certs[0].PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("unexpected public key type, expected ecdsa.PublicKey")
+	}
+
+	if certKey.Equal(c.privateKey) {
+		return fmt.Errorf("server certificate MUST match the given public key")
+	}
+
+	verified, err := verifyCertSig(certs[0])
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return fmt.Errorf("server certificate signature MUST verify")
+	}
+
+	c.serverCert = certs[0]
+	return nil
 }
