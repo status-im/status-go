@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -20,22 +21,31 @@ type PairingClient struct {
 
 	baseAddress *url.URL
 	certPEM     []byte
-	privateKey  *ecdsa.PrivateKey
+	serverPK    *ecdsa.PublicKey
 	serverMode  Mode
 	serverCert  *x509.Certificate
 }
 
 func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
-	u, certPem, err := c.Generate()
+	u, err := c.URL()
 	if err != nil {
 		return nil, err
 	}
+
+	serverCert, err := getServerCert(u)
+	if err != nil {
+		return nil, err
+	}
+	err = verifyCert(serverCert, c.publicKey)
+	if err != nil {
+		return nil, err
+	}
+	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCert.Raw})
 
 	rootCAs, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, err
 	}
-
 	if ok := rootCAs.AppendCertsFromPEM(certPem); !ok {
 		return nil, fmt.Errorf("failed to append certPem to rootCAs")
 	}
@@ -48,7 +58,7 @@ func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) 
 		},
 	}
 
-	pm, err := NewPairingPayloadManager(c.privateKey, config)
+	pm, err := NewPairingPayloadManager(c.aesKey, config)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +67,8 @@ func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) 
 		Client:         &http.Client{Transport: tr},
 		baseAddress:    u,
 		certPEM:        certPem,
-		privateKey:     c.privateKey,
+		serverCert:     serverCert,
+		serverPK:       c.publicKey,
 		serverMode:     c.serverMode,
 		PayloadManager: pm,
 	}, nil
@@ -99,6 +110,18 @@ func (c *PairingClient) receiveAccountData() error {
 	return c.PayloadManager.Receive(payload)
 }
 
+func verifyPublicKey(cert *x509.Certificate, publicKey *ecdsa.PublicKey) error {
+	certKey, ok := cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("unexpected public key type, expected ecdsa.PublicKey")
+	}
+
+	if !certKey.Equal(publicKey) {
+		return fmt.Errorf("server certificate MUST match the given public key")
+	}
+	return nil
+}
+
 func verifyCertSig(cert *x509.Certificate) (bool, error) {
 	var esig struct {
 		R, S *big.Int
@@ -114,39 +137,37 @@ func verifyCertSig(cert *x509.Certificate) (bool, error) {
 	return verified, nil
 }
 
-func (c *PairingClient) getServerCert() error {
-	conf := &tls.Config{
-		InsecureSkipVerify: true, // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
-	}
-
-	conn, err := tls.Dial("tcp", c.baseAddress.Host, conf)
+func verifyCert(cert *x509.Certificate, publicKey *ecdsa.PublicKey) error {
+	err := verifyPublicKey(cert, publicKey)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	certs := conn.ConnectionState().PeerCertificates
-	if len(certs) != 1 {
-		return fmt.Errorf("expected 1 TLS certificate, received '%d'", len(certs))
-	}
-
-	certKey, ok := certs[0].PublicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return fmt.Errorf("unexpected public key type, expected ecdsa.PublicKey")
-	}
-
-	if certKey.Equal(c.privateKey) {
-		return fmt.Errorf("server certificate MUST match the given public key")
-	}
-
-	verified, err := verifyCertSig(certs[0])
+	verified, err := verifyCertSig(cert)
 	if err != nil {
 		return err
 	}
 	if !verified {
 		return fmt.Errorf("server certificate signature MUST verify")
 	}
-
-	c.serverCert = certs[0]
 	return nil
+}
+
+func getServerCert(URL *url.URL) (*x509.Certificate, error) {
+	conf := &tls.Config{
+		InsecureSkipVerify: true, // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
+	}
+
+	conn, err := tls.Dial("tcp", URL.Host, conf)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	certs := conn.ConnectionState().PeerCertificates
+	if len(certs) != 1 {
+		return nil, fmt.Errorf("expected 1 TLS certificate, received '%d'", len(certs))
+	}
+
+	return certs[0], nil
 }

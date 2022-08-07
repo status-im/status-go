@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -44,8 +43,8 @@ type PairingPayloadManager struct {
 }
 
 // NewPairingPayloadManager generates a new and initialised PairingPayloadManager
-func NewPairingPayloadManager(pk *ecdsa.PrivateKey, config *PairingPayloadManagerConfig) (*PairingPayloadManager, error) {
-	pem, err := NewPayloadEncryptionManager(pk)
+func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig) (*PairingPayloadManager, error) {
+	pem, err := NewPayloadEncryptionManager(aesKey)
 	if err != nil {
 		return nil, err
 	}
@@ -120,13 +119,8 @@ type PayloadEncryptionManager struct {
 	received *EncryptionPayload
 }
 
-func NewPayloadEncryptionManager(pk *ecdsa.PrivateKey) (*PayloadEncryptionManager, error) {
-	ek, err := makeEncryptionKey(pk)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PayloadEncryptionManager{ek, new(EncryptionPayload), new(EncryptionPayload)}, nil
+func NewPayloadEncryptionManager(aesKey []byte) (*PayloadEncryptionManager, error) {
+	return &PayloadEncryptionManager{aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
 }
 
 func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {

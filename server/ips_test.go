@@ -63,8 +63,7 @@ func (s *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e() {
 	cp, err := s.PS.MakeConnectionParams()
 	s.Require().NoError(err)
 
-	qr, err := cp.ToString()
-	s.Require().NoError(err)
+	qr := cp.ToString()
 
 	// Client reads QR code and parses the connection string
 	ccp := new(ConnectionParams)

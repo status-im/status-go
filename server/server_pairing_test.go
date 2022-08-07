@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func (s *PairingServerSuite) SetupSuite() {
 
 func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
-	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralPK)
+	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
 	s.Require().NoError(err)
 	s.PS.PayloadManager = pm
 
@@ -48,8 +49,7 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		cp, err := s.PS.MakeConnectionParams()
 		s.Require().NoError(err)
 
-		qr, err := cp.ToString()
-		s.Require().NoError(err)
+		qr := cp.ToString()
 
 		// Client reads QR code and parses the connection string
 		ccp := new(ConnectionParams)
@@ -59,11 +59,20 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		c, err := NewPairingClient(ccp, nil)
 		s.Require().NoError(err)
 
-		err = c.getServerCert()
-		s.Require().NoError(err)
+		// Compare cert values
+		cert := c.serverCert
+		cl := s.PS.cert.Leaf
+		s.Require().Equal(cl.Signature, cert.Signature)
+		s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).X.Cmp(cert.PublicKey.(*ecdsa.PublicKey).X))
+		s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).Y.Cmp(cert.PublicKey.(*ecdsa.PublicKey).Y))
+		s.Require().Equal(cl.Version, cert.Version)
+		s.Require().Zero(cl.SerialNumber.Cmp(cert.SerialNumber))
+		s.Require().Exactly(cl.NotBefore, cert.NotBefore)
+		s.Require().Exactly(cl.NotAfter, cert.NotAfter)
+		s.Require().Exactly(cl.IPAddresses, cert.IPAddresses)
 
 		// Replace PairingClient.PayloadManager with a MockEncryptOnlyPayloadManager
-		c.PayloadManager, err = NewMockEncryptOnlyPayloadManager(s.EphemeralPK)
+		c.PayloadManager, err = NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
 		s.Require().NoError(err)
 
 		if m == Receiving {
