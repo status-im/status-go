@@ -2,13 +2,12 @@ package server
 
 import (
 	"crypto/ecdsa"
-	"encoding/asn1"
+	"crypto/elliptic"
 	"fmt"
 	"math/big"
 	"net"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 )
@@ -29,18 +28,18 @@ type ConnectionParams struct {
 	version    ConnectionParamVersion
 	netIP      net.IP
 	port       int
-	privateKey *ecdsa.PrivateKey
-	notBefore  time.Time
+	publicKey  *ecdsa.PublicKey
+	aesKey     []byte
 	serverMode Mode
 }
 
-func NewConnectionParams(netIP net.IP, port int, privateKey *ecdsa.PrivateKey, notBefore time.Time, mode Mode) *ConnectionParams {
+func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte, mode Mode) *ConnectionParams {
 	cp := new(ConnectionParams)
 	cp.version = Version1
 	cp.netIP = netIP
 	cp.port = port
-	cp.privateKey = privateKey
-	cp.notBefore = notBefore
+	cp.publicKey = publicKey
+	cp.aesKey = aesKey
 	cp.serverMode = mode
 	return cp
 }
@@ -48,28 +47,24 @@ func NewConnectionParams(netIP net.IP, port int, privateKey *ecdsa.PrivateKey, n
 // ToString generates a string required for generating a secure connection to another Status device.
 //
 // The returned string will look like below:
-//   - "2:4FHRnp:H6G:6jpbvo2ucrtrnpXXF4DQYuysh697isH9ppd2aT8uSRDh:eQUriVtGtkWhPJFeLZjF:2"
+//   - "2:4FHRnp:H6G:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6:2"
 //
 // Format bytes encoded into a base58 string, delimited by ":"
 //   - version
 //   - net.IP
 //   - port
-//   - ecdsa.PrivateKey D field
-//   - asn1.Marshal time.Time
+//   - ecdsa CompressedPublicKey
+//   - AES encryption key
 //   - server mode
-func (cp *ConnectionParams) ToString() (string, error) {
+func (cp *ConnectionParams) ToString() string {
 	v := base58.Encode(new(big.Int).SetInt64(int64(cp.version)).Bytes())
 	ip := base58.Encode(cp.netIP)
 	p := base58.Encode(new(big.Int).SetInt64(int64(cp.port)).Bytes())
-	k := base58.Encode(cp.privateKey.D.Bytes())
-	tb, err := asn1.Marshal(cp.notBefore.UTC())
-	if err != nil {
-		return "", err
-	}
-	t := base58.Encode(tb)
+	k := base58.Encode(elliptic.MarshalCompressed(cp.publicKey.Curve, cp.publicKey.X, cp.publicKey.Y))
+	ek := base58.Encode(cp.aesKey)
 	m := base58.Encode(new(big.Int).SetInt64(int64(cp.serverMode)).Bytes())
 
-	return fmt.Sprintf("%s:%s:%s:%s:%s:%s", v, ip, p, k, t, m), nil
+	return fmt.Sprintf("%s:%s:%s:%s:%s:%s", v, ip, p, k, ek, m)
 }
 
 // FromString parses a connection params string required for to securely connect to another Status device.
@@ -85,14 +80,10 @@ func (cp *ConnectionParams) FromString(s string) error {
 	cp.version = ConnectionParamVersion(new(big.Int).SetBytes(base58.Decode(sData[0])).Int64())
 	cp.netIP = base58.Decode(sData[1])
 	cp.port = int(new(big.Int).SetBytes(base58.Decode(sData[2])).Int64())
-	cp.privateKey = ToECDSA(base58.Decode(sData[3]))
-
-	t := time.Time{}
-	_, err := asn1.Unmarshal(base58.Decode(sData[4]), &t)
-	if err != nil {
-		return err
-	}
-	cp.notBefore = t
+	cp.publicKey = new(ecdsa.PublicKey)
+	cp.publicKey.X, cp.publicKey.Y = elliptic.UnmarshalCompressed(elliptic.P256(), base58.Decode(sData[3]))
+	cp.publicKey.Curve = elliptic.P256()
+	cp.aesKey = base58.Decode(sData[4])
 	cp.serverMode = Mode(new(big.Int).SetBytes(base58.Decode(sData[5])).Int64())
 
 	return cp.validate()
@@ -114,12 +105,12 @@ func (cp *ConnectionParams) validate() error {
 		return err
 	}
 
-	err = cp.validatePrivateKey()
+	err = cp.validatePublicKey()
 	if err != nil {
 		return err
 	}
 
-	err = cp.validateNotBefore()
+	err = cp.validateAESKey()
 	if err != nil {
 		return err
 	}
@@ -151,22 +142,22 @@ func (cp *ConnectionParams) validatePort() error {
 	return fmt.Errorf("port '%d' outside of bounds of 1 - 65535", cp.port)
 }
 
-func (cp *ConnectionParams) validatePrivateKey() error {
+func (cp *ConnectionParams) validatePublicKey() error {
 	switch {
-	case cp.privateKey.D == nil, cp.privateKey.D.Cmp(big.NewInt(0)) == 0:
-		return fmt.Errorf("private key D not set")
-	case cp.privateKey.PublicKey.X == nil, cp.privateKey.PublicKey.X.Cmp(big.NewInt(0)) == 0:
+	case cp.publicKey.Curve == nil, cp.publicKey.Curve != elliptic.P256():
+		return fmt.Errorf("public key Curve not `elliptic.P256`")
+	case cp.publicKey.X == nil, cp.publicKey.X.Cmp(big.NewInt(0)) == 0:
 		return fmt.Errorf("public key X not set")
-	case cp.privateKey.PublicKey.Y == nil, cp.privateKey.PublicKey.Y.Cmp(big.NewInt(0)) == 0:
+	case cp.publicKey.Y == nil, cp.publicKey.Y.Cmp(big.NewInt(0)) == 0:
 		return fmt.Errorf("public key Y not set")
 	default:
 		return nil
 	}
 }
 
-func (cp *ConnectionParams) validateNotBefore() error {
-	if cp.notBefore.IsZero() {
-		return fmt.Errorf("notBefore time is zero")
+func (cp *ConnectionParams) validateAESKey() error {
+	if len(cp.aesKey) != 32 {
+		return fmt.Errorf("AES key invalid length, expect length 32, received length '%d'", len(cp.aesKey))
 	}
 	return nil
 }
@@ -180,22 +171,15 @@ func (cp *ConnectionParams) validateServerMode() error {
 	}
 }
 
-// Generate returns a *url.URL and encoded pem.Block generated from ConnectionParams set fields
-func (cp *ConnectionParams) Generate() (*url.URL, []byte, error) {
+func (cp *ConnectionParams) URL() (*url.URL, error) {
 	err := cp.validate()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	u := &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", cp.netIP, cp.port),
 	}
-
-	_, pem, err := GenerateCertFromKey(cp.privateKey, cp.notBefore, cp.netIP.String())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return u, pem, nil
+	return u, nil
 }

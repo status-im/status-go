@@ -11,13 +11,15 @@ type PairingServer struct {
 	Server
 	PayloadManager
 
-	pk   *ecdsa.PrivateKey
+	pk   *ecdsa.PublicKey
+	ek   []byte
 	mode Mode
 }
 
 type Config struct {
 	// Connection fields
-	PK       *ecdsa.PrivateKey
+	PK       *ecdsa.PublicKey
+	EK       []byte
 	Cert     *tls.Certificate
 	Hostname string
 	Mode     Mode
@@ -28,7 +30,7 @@ type Config struct {
 
 // NewPairingServer returns a *PairingServer init from the given *Config
 func NewPairingServer(config *Config) (*PairingServer, error) {
-	pm, err := NewPairingPayloadManager(config.PK, config.PairingPayloadManagerConfig)
+	pm, err := NewPairingPayloadManager(config.EK, config.PairingPayloadManagerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -38,21 +40,13 @@ func NewPairingServer(config *Config) (*PairingServer, error) {
 		config.Hostname,
 	),
 		pk:             config.PK,
+		ek:             config.EK,
 		mode:           config.Mode,
 		PayloadManager: pm}, nil
 }
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
-	switch {
-	case s.cert == nil:
-		return nil, fmt.Errorf("server has no cert set")
-	case s.cert.Leaf == nil:
-		return nil, fmt.Errorf("server cert has no Leaf set")
-	case s.cert.Leaf.NotBefore.IsZero():
-		return nil, fmt.Errorf("server cert Leaf has a zero value NotBefore")
-	}
-
 	netIP := net.ParseIP(s.hostname)
 	if netIP == nil {
 		return nil, fmt.Errorf("invalid ip address given '%s'", s.hostname)
@@ -67,7 +61,7 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 		return nil, fmt.Errorf("port is 0, listener is not yet set")
 	}
 
-	return NewConnectionParams(netIP, s.port, s.pk, s.cert.Leaf.NotBefore, s.mode), nil
+	return NewConnectionParams(netIP, s.port, s.pk, s.ek, s.mode), nil
 }
 
 func (s *PairingServer) StartPairing() error {
