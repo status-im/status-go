@@ -1906,7 +1906,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 			if contact.Images == nil {
 				contact.Images = make(map[string]images.IdentityImage)
 			}
-			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
+			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
 
 		}
 		contactModified = true

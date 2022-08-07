@@ -11,21 +11,21 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/signal"
 )
 
 type Server struct {
-	run      bool
-	server   *http.Server
-	logger   *zap.Logger
-	cert     *tls.Certificate
-	hostname string
-	port     int
-	handlers HandlerPatternMap
+	run              bool
+	server           *http.Server
+	logger           *zap.Logger
+	cert             *tls.Certificate
+	hostname         string
+	port             int
+	handlers         HandlerPatternMap
+	afterPortChanged func(port int)
 }
 
-func NewServer(cert *tls.Certificate, hostname string) Server {
-	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname}
+func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int)) Server {
+	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname, afterPortChanged: afterPortChanged}
 }
 
 func (s *Server) getHost() string {
@@ -49,7 +49,9 @@ func (s *Server) listenAndServe() {
 	}
 
 	s.port = listener.Addr().(*net.TCPAddr).Port
-        signal.SendMediaServerStarted(s.port)
+	if s.afterPortChanged != nil {
+		s.afterPortChanged(s.port)
+	}
 	s.run = true
 
 	err = s.server.Serve(listener)
@@ -83,7 +85,6 @@ func (s *Server) applyHandlers() {
 
 func (s *Server) Start() error {
 	// Once Shutdown has been called on a server, it may not be reused;
-	s.logger.Info("media server starting...")
 	s.resetServer()
 	s.applyHandlers()
 	go s.listenAndServe()

@@ -80,7 +80,7 @@ require (
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3
 )
 
-require github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
+require github.com/fogleman/gg v1.3.0
 
 require github.com/gorilla/sessions v1.2.1
 

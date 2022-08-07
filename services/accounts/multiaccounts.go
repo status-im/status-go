@@ -34,20 +34,12 @@ func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error 
 
 // GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
 func (api *MultiAccountsAPI) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
-	images, err := api.db.GetIdentityImages(keyUID)
-	for i, _ := range images {
-		images[i].RingUrl = api.mediaServer.MakeDrawRingURL(keyUID, server.DrawRingTypeAccount, images[i].Name)
-	}
-	return images, err
+	return api.db.GetIdentityImages(keyUID)
 }
 
 // GetIdentityImage returns a json object representing the image with the given name
 func (api *MultiAccountsAPI) GetIdentityImage(keyUID, name string) (*images.IdentityImage, error) {
-	image, err := api.db.GetIdentityImage(keyUID, name)
-	if image != nil {
-		image.RingUrl = api.mediaServer.MakeDrawRingURL(keyUID, server.DrawRingTypeAccount, image.Name)
-	}
-	return image, err
+	return api.db.GetIdentityImage(keyUID, name)
 }
 
 // StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.

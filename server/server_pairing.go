@@ -69,6 +69,7 @@ func NewPairingServer(config *Config) (*PairingServer, error) {
 	return &PairingServer{Server: NewServer(
 		config.Cert,
 		config.Hostname,
+		nil,
 	),
 		pk:             config.PK,
 		ek:             config.EK,

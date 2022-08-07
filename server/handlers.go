@@ -11,17 +11,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/identity/colorhash"
-	"github.com/status-im/status-go/protocol/identity/ring"
-
 	"github.com/btcsuite/btcutil/base58"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
-	identityImages "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/signal"
 )
@@ -31,7 +29,6 @@ const (
 	identiconsPath = basePath + "/identicons"
 	imagesPath     = basePath + "/images"
 	audioPath      = basePath + "/audio"
-        identityImagesPath = "/identityImages"
 	ipfsPath       = "/ipfs"
 
 	// Handler routes for pairing
@@ -44,49 +41,84 @@ const (
 	sessionChallenge = "challenge"
 	sessionBlocked   = "blocked"
 
-	drawRingPath        = basePath + "/drawRing"
-	DrawRingTypeAccount = "account"
-	DrawRingTypeContact = "contact"
+	accountImagesPath = "/accountImages"
+	contactImagesPath = "/contactImages"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
 
-func drawRingForAccountIdentity(multiaccountsDB *multiaccounts.Database, publicKey string, imageName string, theme ring.Theme, colorHash [][]int) ([]byte, error) {
-	image, err := multiaccountsDB.GetIdentityImage(publicKey, imageName)
-	if err != nil {
-		return nil, err
+func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		keyUids, ok := params["keyUid"]
+		if !ok || len(keyUids) == 0 {
+			logger.Error("no keyUid")
+			return
+		}
+		imageNames, ok := params["imageName"]
+		if !ok || len(imageNames) == 0 {
+			logger.Error("no imageName")
+			return
+		}
+
+		identityImage, err := multiaccountsDB.GetIdentityImage(keyUids[0], imageNames[0])
+		if err != nil {
+			logger.Error("handleAccountImages: failed to load image.", zap.String("keyUid", keyUids[0]), zap.String("imageName", imageNames[0]), zap.Error(err))
+			return
+		}
+
+		var payload = identityImage.Payload
+
+		if ringEnabled(params) {
+			pks, ok := params["publicKey"]
+			if !ok || len(pks) == 0 {
+				logger.Error("no publicKey")
+				return
+			}
+			colorHash, err := colorhash.GenerateFor(pks[0])
+			if err != nil {
+				logger.Error("could not generate color hash")
+				return
+			}
+
+			var theme = getTheme(params, logger)
+
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: colorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+			})
+
+			if err != nil {
+				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				return
+			}
+		}
+
+		if len(payload) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.ImageMime(payload)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(payload)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
 	}
-	return ring.DrawRing(&ring.DrawRingParam{
-		Theme: theme, ColorHash: colorHash, ImageBytes: image.Payload, Height: image.Height, Width: image.Width,
-	})
 }
 
-func drawRingForContactIdentity(db *sql.DB, publicKey string, imageName string, theme ring.Theme, colorHash [][]int) ([]byte, error) {
-	var payload []byte
-	err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, publicKey, imageName).Scan(&payload)
-	if err != nil {
-		return nil, err
-	}
-	config, _, err := image.DecodeConfig(bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-	return ring.DrawRing(&ring.DrawRingParam{
-		Theme: theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
-	})
-}
-
-func handleDrawRing(db *sql.DB, multiaccountsDB *multiaccounts.Database, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		pks, ok := params["publicKey"]
 		if !ok || len(pks) == 0 {
 			logger.Error("no publicKey")
-			return
-		}
-		types, ok := params["type"] // account or contact
-		if !ok || len(types) == 0 {
-			logger.Error("no type")
 			return
 		}
 		imageNames, ok := params["imageName"]
@@ -100,30 +132,36 @@ func handleDrawRing(db *sql.DB, multiaccountsDB *multiaccounts.Database, logger 
 			return
 		}
 
-		var image []byte
-		var theme = getTheme(params, logger)
-		if types[0] == DrawRingTypeAccount {
-			image, err = drawRingForAccountIdentity(multiaccountsDB, pks[0], imageNames[0], theme, colorHash)
-			if err != nil {
-				logger.Error("failed to draw ring for account identity", zap.Error(err))
-				return
-			}
-		} else if types[0] == DrawRingTypeContact {
-			image, err = drawRingForContactIdentity(db, pks[0], imageNames[0], theme, colorHash)
-			if err != nil {
-				logger.Error("failed to draw ring for contact identity", zap.Error(err))
-				return
-			}
-		} else {
-			logger.Error("unknown type:", zap.String("type", types[0]))
+		var payload []byte
+		err = db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, pks[0], imageNames[0]).Scan(&payload)
+		if err != nil {
+			logger.Error("failed to load image.", zap.String("contact id", pks[0]), zap.String("image type", imageNames[0]), zap.Error(err))
 			return
 		}
 
-		if len(image) == 0 {
+		if ringEnabled(params) {
+			var theme = getTheme(params, logger)
+			config, _, err := image.DecodeConfig(bytes.NewReader(payload))
+			if err != nil {
+				logger.Error("failed to decode config.", zap.String("contact id", pks[0]), zap.String("image type", imageNames[0]), zap.Error(err))
+				return
+			}
+
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
+			})
+
+			if err != nil {
+				logger.Error("failed to draw ring for contact image.", zap.Error(err))
+				return
+			}
+		}
+
+		if len(payload) == 0 {
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(image)
+		mime, err := images.ImageMime(payload)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -131,11 +169,16 @@ func handleDrawRing(db *sql.DB, multiaccountsDB *multiaccounts.Database, logger 
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-store")
 
-		_, err = w.Write(image)
+		_, err = w.Write(payload)
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
 		}
 	}
+}
+
+func ringEnabled(params url.Values) bool {
+	addRings, ok := params["addRing"]
+	return ok && len(addRings) == 1 && addRings[0] == "1"
 }
 
 func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
@@ -166,7 +209,7 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 			logger.Error("could not generate identicon")
 		}
 
-		if image != nil {
+		if image != nil && ringEnabled(params) {
 			colorHash, err := colorhash.GenerateFor(pk)
 			if err != nil {
 				logger.Error("could not generate color hash")
@@ -183,81 +226,6 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Cache-Control", "max-age:290304000, public")
-		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
-	}
-}
-
-// TODO: return error
-func handleIdentityImage(db *sql.DB,   logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		pks, ok := r.URL.Query()["publicKey"]
-		if !ok || len(pks) == 0 {
-			logger.Error("no publicKey")
-			return
-		}
-		pk := pks[0]
-		rows, err := db.Query(`SELECT image_type, payload FROM chat_identity_contacts WHERE contact_id = ?`, pk)
-		if err != nil {
-			logger.Error("could not fetch identity images")
-			return
-		}
-
-		defer rows.Close()
-
-		var identityImage identityImages.IdentityImage
-		for rows.Next() {
-			var imageType sql.NullString
-			var imagePayload []byte
-			err := rows.Scan(
-				&imageType,
-				&imagePayload,
-			)
-			if err != nil {
-				logger.Error("could not scan image row")
-				return
-			}
-
-			identityImage = identityImages.IdentityImage{Name: imageType.String, Payload: imagePayload}
-		}
-
-		imageType := "image/png"
-		var image []byte
-
-
-		if identityImage.Payload != nil {
-			t, err := identityImage.GetType()
-			if err != nil {
-				logger.Error("could not get image type")
-				return
-			}
-			switch t {
-			case identityImages.JPEG:
-				imageType = "image/jpeg"
-			case identityImages.PNG:
-				imageType = "image/png"
-			case identityImages.GIF:
-				imageType = "image/gif"
-			case identityImages.WEBP:
-				imageType = "image/webp"
-			}
-			image = identityImage.Payload
-		} else {
-
-			image, err = identicon.Generate(pk)
-			if err != nil {
-				logger.Error("could not generate identicon")
-				return
-			}
-		}
-
-
-		w.Header().Set("Content-Type", imageType)
 		w.Header().Set("Cache-Control", "max-age:290304000, public")
 		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
 

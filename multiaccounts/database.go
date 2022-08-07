@@ -363,15 +363,14 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []images.IdentityImag
 		err = valueOr(err, errRollback)
 	}()
 
-	for _, ii := range iis {
+	for i, ii := range iis {
 		if ii.IsEmpty() {
 			continue
 		}
-
-		ii.KeyUID = keyUID
+		iis[i].KeyUID = keyUID
 		_, err := tx.Exec(
 			"INSERT INTO identity_images (key_uid, name, image_payload, width, height, file_size, resize_target, clock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			ii.KeyUID,
+			keyUID,
 			ii.Name,
 			ii.Payload,
 			ii.Width,

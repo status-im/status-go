@@ -4,7 +4,6 @@ const (
 	// EventMediaServerStarted triggers when the media server successfully binds a new port
 	EventMediaServerStarted = "mediaserver.started"
 
-
 	// EventMesssageDelivered triggered when we got acknowledge from datasync level, that means peer got message
 	EventMesssageDelivered = "message.delivered"
 
@@ -24,7 +23,7 @@ type MessageDeliveredSignal struct {
 
 // MediaServerStarted specifies chat and message that was delivered
 type MediaServerStarted struct {
-	Port    int `json:"port"`
+	Port int `json:"port"`
 }
 
 // MessageDeliveredSignal specifies chat and message that was delivered
@@ -44,7 +43,6 @@ func SendMessageDelivered(chatID string, messageID string) {
 func SendMediaServerStarted(port int) {
 	send(EventMediaServerStarted, MediaServerStarted{Port: port})
 }
-
 
 // SendMessageDelivered notifies about delivered message
 func SendCommunityInfoFound(community interface{}) {
