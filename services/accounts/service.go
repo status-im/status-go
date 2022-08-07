@@ -20,12 +20,12 @@ func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *acc
 
 // Service is a browsers service.
 type Service struct {
-	db        *accounts.Database
-	mdb       *multiaccounts.Database
-	manager   *account.GethManager
-	config    *params.NodeConfig
-	feed      *event.Feed
-	messenger *protocol.Messenger
+	db          *accounts.Database
+	mdb         *multiaccounts.Database
+	manager     *account.GethManager
+	config      *params.NodeConfig
+	feed        *event.Feed
+	messenger   *protocol.Messenger
 	mediaServer *server.MediaServer
 }
 

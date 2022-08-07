@@ -2,9 +2,7 @@ package images
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -13,7 +11,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"golang.org/x/image/webp"
@@ -34,15 +31,6 @@ func Decode(fileName string) (image.Image, error) {
 	}
 
 	return decodeImageData(fb, file)
-}
-
-func DecodeFromB64Uri(b64Uri string) ([]byte, error) {
-	a := strings.Split(b64Uri, ";")
-	if len(a) != 2 || len(a[1]) <= 7 {
-		return nil, errors.New(fmt.Sprintf("b64Uri can not be parsed. b64Uri: %s", b64Uri))
-	}
-	imageB64String := strings.Split(b64Uri, ";")[1][7:]
-	return base64.StdEncoding.DecodeString(imageB64String)
 }
 
 func DecodeFromURL(path string) (image.Image, error) {

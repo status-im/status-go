@@ -29,7 +29,7 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, defaultIP.String())
 	s.Require().NoError(err)
 
-	bs := NewServer(&cert, defaultIP.String())
+	bs := NewServer(&cert, defaultIP.String(), func(int) {})
 	bs.port = 1337
 
 	s.server = &PairingServer{

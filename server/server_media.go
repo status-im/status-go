@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"net/url"
 
+	"github.com/status-im/status-go/signal"
+
 	"github.com/status-im/status-go/multiaccounts"
 
 	"github.com/status-im/status-go/ipfs"
@@ -25,18 +27,18 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	}
 
 	s := &MediaServer{
-		Server:          NewServer(globalCertificate, localhost),
+		Server:          NewServer(globalCertificate, localhost, signal.SendMediaServerStarted),
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
-		imagesPath:     handleImage(s.db, s.logger),
-		audioPath:      handleAudio(s.db, s.logger),
-                identityImagesPath: handleIdentityImage(s.db, s.logger),
-		identiconsPath: handleIdenticon(s.logger),
-		ipfsPath:       handleIPFS(s.downloader, s.logger),
-		drawRingPath:   handleDrawRing(s.db, s.multiaccountsDB, s.logger),
+		imagesPath:        handleImage(s.db, s.logger),
+		audioPath:         handleAudio(s.db, s.logger),
+		identiconsPath:    handleIdenticon(s.logger),
+		ipfsPath:          handleIPFS(s.downloader, s.logger),
+		accountImagesPath: handleAccountImages(s.multiaccountsDB, s.logger),
+		contactImagesPath: handleContactImages(s.db, s.logger),
 	})
 
 	return s, nil
@@ -76,14 +78,6 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	u := s.MakeBaseURL()
 	u.Path = ipfsPath
 	u.RawQuery = url.Values{"hash": {stickerHash}}.Encode()
-
-	return u.String()
-}
-
-func (s *MediaServer) MakeDrawRingURL(publicKey string, drawRingType string, imageName string) string {
-	u := s.MakeBaseURL()
-	u.Path = drawRingPath
-	u.RawQuery = url.Values{"publicKey": {publicKey}, "type": {drawRingType}, "imageName": {imageName}}.Encode()
 
 	return u.String()
 }

@@ -8,9 +8,6 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/status-im/status-go/extkeys"
-	"github.com/status-im/status-go/protocol/identity/ring"
-
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -24,6 +21,7 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -54,31 +52,6 @@ func OpenAccounts(datadir string) string {
 		return makeJSONResponse(err)
 	}
 	data, err := json.Marshal(accs)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return string(data)
-}
-
-func DrawIdentityImageRing(drawRingParamsJson string) string {
-	var drawRingParams []ring.DrawRingParam
-	if err := json.Unmarshal([]byte(drawRingParamsJson), &drawRingParams); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	var ringImageUris []string
-	for _, param := range drawRingParams {
-		ringImageBytes, err := ring.DrawRing(&param)
-		if err != nil {
-			return makeJSONResponse(err)
-		}
-		ringImageUri, err := images.GetPayloadDataURI(ringImageBytes)
-		if err != nil {
-			return makeJSONResponse(err)
-		}
-		ringImageUris = append(ringImageUris, ringImageUri)
-	}
-	data, err := json.Marshal(ringImageUris)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

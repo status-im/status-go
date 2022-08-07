@@ -2,15 +2,12 @@ package ring
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"image"
 	"image/png"
 	"math"
 
 	"github.com/fogleman/gg"
-
-	"github.com/status-im/status-go/images"
 )
 
 type Theme int
@@ -29,7 +26,6 @@ type DrawRingParam struct {
 	Theme      Theme   `json:"theme"`
 	ColorHash  [][]int `json:"colorHash"`
 	ImageBytes []byte  `json:"imageBytes"`
-	ImageUri   string  `json:"uri"`
 	Height     int     `json:"height"`
 	Width      int     `json:"width"`
 }
@@ -42,17 +38,10 @@ func DrawRing(param *DrawRingParam) ([]byte, error) {
 	case DarkTheme:
 		colors = darkThemeIdenticonRingColors
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown theme"))
+		return nil, fmt.Errorf("unknown theme")
 	}
 
 	dc := gg.NewContext(param.Width, param.Height)
-	if param.ImageUri != "" {
-		imageBytes, err := images.DecodeFromB64Uri(param.ImageUri)
-		if err != nil {
-			return nil, err
-		}
-		param.ImageBytes = imageBytes
-	}
 	img, _, err := image.Decode(bytes.NewReader(param.ImageBytes))
 	if err != nil {
 		return nil, err

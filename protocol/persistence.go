@@ -599,7 +599,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contactRequestClock,
 			&imageType,
 			&imagePayload,
-                        &identityImageClock,
+			&identityImageClock,
 			&contact.VerificationStatus,
 			&contact.TrustStatus,
 		)
@@ -654,13 +654,13 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		previousContact, ok := allContacts[contact.ID]
 		if !ok {
 			if imageType.Valid {
-                          contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
+				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			}
 
 			allContacts[contact.ID] = &contact
 
 		} else if imageType.Valid {
-                  previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
+			previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			allContacts[contact.ID] = previousContact
 
 		}
