@@ -296,6 +296,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData((new(protobuf.SyncTrustedUser)))
 	case protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST:
 		return m.unmarshalProtobufData((new(protobuf.SyncVerificationRequest)))
+	case protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION:
+		return m.unmarshalProtobufData((new(protobuf.SyncContactRequestDecision)))
 	}
 	return nil
 }

@@ -232,3 +232,14 @@ message SyncVerificationRequest {
     CANCELED = 4;
   }
 }
+
+message SyncContactRequestDecision {
+  uint64 clock = 1;
+  string requestId = 2;
+  DecisionStatus decision_status = 3;
+
+  enum DecisionStatus {
+    ACCEPTED = 0;
+    DECLINED = 1;
+  }
+}

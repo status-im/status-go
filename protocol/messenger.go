@@ -3056,6 +3056,45 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 	return m.saveChat(chat)
 }
 
+func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool) error {
+	m.logger.Info("syncContactRequestDecision", zap.Any("from", requestID))
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	var status protobuf.SyncContactRequestDecision_DecisionStatus
+	if accepted {
+		status = protobuf.SyncContactRequestDecision_ACCEPTED
+	} else {
+		status = protobuf.SyncContactRequestDecision_DECLINED
+	}
+
+	message := &protobuf.SyncContactRequestDecision{
+		RequestId:      requestID,
+		Clock:          clock,
+		DecisionStatus: status,
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
@@ -4411,6 +4450,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						if err != nil {
 							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
 							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncContactRequestDecision:
+						logger.Info("SyncContactRequestDecision")
+						p := msg.ParsedMessage.Interface().(protobuf.SyncContactRequestDecision)
+						err := m.HandleSyncContactRequestDecision(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncContactRequestDecisio", zap.Error(err))
 							continue
 						}
 					default:

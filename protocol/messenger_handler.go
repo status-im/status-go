@@ -2083,3 +2083,22 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 
 	return err
 }
+
+func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message protobuf.SyncContactRequestDecision) error {
+	var err error
+	var response *MessengerResponse
+	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
+		response, err = m.updateAcceptedContactRequest(nil, message.RequestId)
+
+	} else {
+		response, err = m.dismissContactRequest(message.RequestId, true)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	state.Response = response
+
+	return nil
+}
