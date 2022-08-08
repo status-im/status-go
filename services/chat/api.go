@@ -75,6 +75,7 @@ type Chat struct {
 	Highlight                bool                               `json:"highlight,omitempty"`
 	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
 	CanPost                  bool                               `json:"canPost"`
+	Base64Image              string                             `json:"image,omitempty"`
 }
 
 type ChannelGroup struct {
@@ -274,6 +275,7 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		SyncedTo:                 protocolChat.SyncedTo,
 		SyncedFrom:               protocolChat.SyncedFrom,
 		Highlight:                protocolChat.Highlight,
+		Base64Image:              protocolChat.Base64Image,
 	}
 
 	if protocolChat.OneToOne() {
@@ -401,7 +403,7 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 	return messengerChat, community, nil
 }
 
-func (api *API) EditChat(ctx context.Context, communityID types.HexBytes, chatID string, name string, color string, image string) (*Chat, error) {
+func (api *API) EditChat(ctx context.Context, communityID types.HexBytes, chatID string, name string, color string, image images.CroppedImage) (*Chat, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}

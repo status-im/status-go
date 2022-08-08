@@ -83,6 +83,12 @@ func (s *EventToSystemMessageSuite) TestRun() {
 			Expected: "@admin changed the group's color",
 		},
 		{
+			Name:     "chat image changed event",
+			Event:    v1protocol.NewImageChangedEvent([]byte{1, 2, 3}, 12),
+			From:     "admin",
+			Expected: "@admin changed the group's image",
+		},
+		{
 			Name:     "members added event",
 			Event:    v1protocol.NewMembersAddedEvent([]string{"a", "b", "c"}, 12),
 			From:     "admin",

@@ -55,6 +55,7 @@ func MembershipUpdateEventFromProtobuf(chatID string, raw []byte) (*MembershipUp
 		Name:       decodedEvent.Name,
 		Type:       decodedEvent.Type,
 		Color:      decodedEvent.Color,
+		Image:      decodedEvent.Image,
 		Signature:  signature,
 		RawPayload: encodedEvent,
 		From:       from,
@@ -121,6 +122,7 @@ type MembershipUpdateEvent struct {
 	Members    []string                                 `json:"members,omitempty"` // in "members-added" and "admins-added" events
 	Name       string                                   `json:"name,omitempty"`    // name of the group chat
 	Color      string                                   `json:"color,omitempty"`   // color of the group chat
+	Image      []byte                                   `json:"image,omitempty"`   // image of the group chat
 	From       string                                   `json:"from,omitempty"`
 	Signature  []byte                                   `json:"signature,omitempty"`
 	ChatID     string                                   `json:"chatId"`
@@ -158,6 +160,7 @@ func (u *MembershipUpdateEvent) ToProtobuf() *protobuf.MembershipUpdateEvent {
 		Clock:   u.ClockValue,
 		Name:    u.Name,
 		Color:   u.Color,
+		Image:   u.Image,
 		Members: u.Members,
 		Type:    u.Type,
 	}
@@ -200,6 +203,14 @@ func NewColorChangedEvent(color string, clock uint64) MembershipUpdateEvent {
 	return MembershipUpdateEvent{
 		Type:       protobuf.MembershipUpdateEvent_COLOR_CHANGED,
 		Color:      color,
+		ClockValue: clock,
+	}
+}
+
+func NewImageChangedEvent(image []byte, clock uint64) MembershipUpdateEvent {
+	return MembershipUpdateEvent{
+		Type:       protobuf.MembershipUpdateEvent_IMAGE_CHANGED,
+		Image:      image,
 		ClockValue: clock,
 	}
 }
@@ -247,6 +258,7 @@ type Group struct {
 	chatID  string
 	name    string
 	color   string
+	image   []byte
 	events  []MembershipUpdateEvent
 	admins  *stringSet
 	members *stringSet
@@ -325,6 +337,10 @@ func (g Group) Color() string {
 	return g.color
 }
 
+func (g Group) Image() []byte {
+	return g.image
+}
+
 func (g Group) Events() []MembershipUpdateEvent {
 	return g.events
 }
@@ -344,6 +360,7 @@ func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEven
 	var events []MembershipUpdateEvent
 	var nameChangedEventFound bool
 	var colorChangedEventFound bool
+	var imageChangedEventFound bool
 	var joinedEventFound bool
 	memberID := publicKeyToString(publicKey)
 	var addedEventFound bool
@@ -366,6 +383,12 @@ func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEven
 			}
 			events = append(events, event)
 			colorChangedEventFound = true
+		case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
+			if imageChangedEventFound {
+				continue
+			}
+			events = append(events, event)
+			imageChangedEventFound = true
 		case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 			// If we already have an added event
 			// or the user is not in slice, ignore
@@ -480,6 +503,8 @@ func (g Group) validateEvent(event MembershipUpdateEvent) bool {
 		return g.admins.Has(event.From) && len(event.Name) > 0
 	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
 		return g.admins.Has(event.From) && len(event.Color) > 0
+	case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
+		return g.admins.Has(event.From) && len(event.Image) > 0
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 		return g.admins.Has(event.From)
 	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
@@ -507,6 +532,8 @@ func (g *Group) processEvent(event MembershipUpdateEvent) {
 		g.name = event.Name
 	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
 		g.color = event.Color
+	case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
+		g.image = event.Image
 	case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
 		g.admins.Add(event.Members...)
 	case protobuf.MembershipUpdateEvent_ADMIN_REMOVED:

@@ -22,6 +22,7 @@ func init() {
 		protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} left the group",
 		protobuf.MembershipUpdateEvent_ADMIN_REMOVED:  "{{member}} is not admin anymore",
 		protobuf.MembershipUpdateEvent_COLOR_CHANGED:  "{{from}} changed the group's color",
+		protobuf.MembershipUpdateEvent_IMAGE_CHANGED:  "{{from}} changed the group's image",
 	}
 	defaultSystemMessagesTranslations.Init(defaultSystemMessagesTranslationSet)
 }
@@ -44,7 +45,10 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *syst
 		text = tsprintf(message, map[string]string{"from": "@" + e.From, "name": e.Name})
 	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
 		message, _ := translations.Load(protobuf.MembershipUpdateEvent_COLOR_CHANGED)
-		text = tsprintf(message, map[string]string{"from": "@" + e.From, "color": e.Color})
+		text = tsprintf(message, map[string]string{"from": "@" + e.From})
+	case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_IMAGE_CHANGED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From})
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 
 		var memberMentions []string
