@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -1898,7 +1899,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
 }
 
-func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image string) (*MessengerResponse, error) {
+func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image userimage.CroppedImage) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "EditGroupChat"))
 	logger.Info("Editing group chat details", zap.String("chatID", chatID), zap.String("name", name), zap.String("color", color))
 
@@ -1950,7 +1951,23 @@ func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name strin
 		events = append(events, event)
 	}
 
-	// TODO add image change
+	if len(image.ImagePath) > 0 {
+		payload, err := m.OpenAndAdjustImage(image, true)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// prepare event
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+		event := v1protocol.NewImageChangedEvent(payload, clock)
+		event.ChatID = chat.ID
+		err = signAndProcessEvent(m, &event)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
 
 	recipients, err := stringSliceToPublicKeys(group.Members())
 	if err != nil {
@@ -2585,6 +2602,53 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
+func (m *Messenger) OpenAndAdjustImage(inputImage userimage.CroppedImage, crop bool) ([]byte, error) {
+	file, err := os.Open(inputImage.ImagePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	payload, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	img, err := userimage.Decode(inputImage.ImagePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if crop {
+		cropRect := image.Rectangle{
+			Min: image.Point{X: inputImage.X, Y: inputImage.Y},
+			Max: image.Point{X: inputImage.X + inputImage.Width, Y: inputImage.Y + inputImage.Height},
+		}
+		img, err = userimage.Crop(img, cropRect)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bb := bytes.NewBuffer([]byte{})
+	err = userimage.EncodeToLimits(bb, img, userimage.DimensionLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// We keep the smallest one
+	if len(payload) > len(bb.Bytes()) {
+		payload = bb.Bytes()
+	}
+
+	if len(payload) > maxChatMessageImageSize {
+		return nil, errors.New("image too large")
+	}
+
+	return payload, nil
+}
+
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
@@ -2595,36 +2659,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	message.DisplayName = displayName
 	if len(message.ImagePath) != 0 {
 
-		file, err := os.Open(message.ImagePath)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		payload, err := ioutil.ReadAll(file)
-		if err != nil {
-			return nil, err
-		}
-
-		img, err := userimage.Decode(message.ImagePath)
-		if err != nil {
-			return nil, err
-		}
-
-		bb := bytes.NewBuffer([]byte{})
-		err = userimage.EncodeToLimits(bb, img, userimage.DimensionLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
+		payload, err := m.OpenAndAdjustImage(userimage.CroppedImage{ImagePath: message.ImagePath}, false)
 
 		if err != nil {
 			return nil, err
-		}
-
-		// We keep the smallest one
-		if len(payload) > len(bb.Bytes()) {
-			payload = bb.Bytes()
-		}
-
-		if len(payload) > maxChatMessageImageSize {
-			return nil, errors.New("image too large")
 		}
 
 		image := protobuf.ImageMessage{

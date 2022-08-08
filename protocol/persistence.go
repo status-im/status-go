@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -137,12 +138,20 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value, received_invitation_admin)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
+
+	var imagePayload []byte
+	if len(chat.Base64Image) > 0 {
+		imagePayload, err = userimage.GetPayloadFromURI(chat.Base64Image)
+		if err != nil {
+			return err
+		}
+	}
 
 	_, err = stmt.Exec(
 		chat.ID,
@@ -170,6 +179,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Highlight,
 		chat.ReadMessagesAtClockValue,
 		chat.ReceivedInvitationAdmin,
+		imagePayload,
 	)
 
 	if err != nil {
@@ -248,7 +258,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.type,
 			chats.timestamp,
 			chats.deleted_at_clock_value,
-                        chats.read_messages_at_clock_value,
+			chats.read_messages_at_clock_value,
 			chats.unviewed_message_count,
 			chats.unviewed_mentions_count,
 			chats.last_clock_value,
@@ -264,8 +274,9 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.synced_to,
 		    chats.description,
 			contacts.alias,
-                        chats.highlight,
-                        chats.received_invitation_admin
+			chats.highlight,
+			chats.received_invitation_admin,
+			chats.image_payload
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
 	`)
@@ -285,6 +296,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
 			lastMessageBytes         []byte
+			imagePayload             []byte
 		)
 		err = rows.Scan(
 			&chat.ID,
@@ -313,6 +325,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&alias,
 			&chat.Highlight,
 			&chat.ReceivedInvitationAdmin,
+			&imagePayload,
 		)
 
 		if err != nil {
@@ -349,6 +362,13 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat.SyncedTo = uint32(syncedTo.Int64)
 		}
 
+		if imagePayload != nil {
+			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			if err == nil {
+				chat.Base64Image = base64Image
+			}
+		}
+
 		// Restore last message
 		if lastMessageBytes != nil {
 			message := &common.Message{}
@@ -375,6 +395,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		profile                  sql.NullString
 		syncedFrom               sql.NullInt64
 		syncedTo                 sql.NullInt64
+		imagePayload             []byte
 	)
 
 	err := db.db.QueryRow(`
@@ -398,12 +419,13 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			invitation_admin,
 			profile,
 			community_id,
-            joined,
-		    description,
-                    highlight,
-                    received_invitation_admin,
-                    synced_from,
-                    synced_to
+			joined,
+			description,
+			highlight,
+			received_invitation_admin,
+			synced_from,
+			synced_to,
+			image_payload
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -431,6 +453,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.ReceivedInvitationAdmin,
 		&syncedFrom,
 		&syncedTo,
+		&imagePayload,
 	)
 	switch err {
 	case sql.ErrNoRows:
@@ -469,6 +492,13 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 				return nil, err
 			}
 			chat.LastMessage = message
+		}
+
+		if imagePayload != nil {
+			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			if err == nil {
+				chat.Base64Image = base64Image
+			}
 		}
 
 		return &chat, nil

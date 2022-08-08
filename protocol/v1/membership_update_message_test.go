@@ -73,10 +73,11 @@ func TestGroupCreator(t *testing.T) {
 }
 
 func TestGroupProcessEvent(t *testing.T) {
-	createGroup := func(admins, members, joined []string, name string, color string) Group {
+	createGroup := func(admins, members, joined []string, name string, color string, image string) Group {
 		return Group{
 			name:    name,
 			color:   color,
+			image:   []byte(image),
 			admins:  newStringSetFromSlice(admins),
 			members: newStringSetFromSlice(members),
 		}
@@ -84,6 +85,7 @@ func TestGroupProcessEvent(t *testing.T) {
 
 	const emptyName = ""
 	const emptyColor = ""
+	const emptyImage = ""
 
 	testCases := []struct {
 		Name   string
@@ -94,57 +96,64 @@ func TestGroupProcessEvent(t *testing.T) {
 	}{
 		{
 			Name:   "chat-created event",
-			Group:  createGroup(nil, nil, nil, emptyName, emptyColor),
-			Result: createGroup([]string{"0xabc"}, []string{"0xabc"}, []string{"0xabc"}, "some-name", "#7cda00"),
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup([]string{"0xabc"}, []string{"0xabc"}, []string{"0xabc"}, "some-name", "#7cda00", emptyImage),
 			From:   "0xabc",
 			Event:  NewChatCreatedEvent("some-name", "#7cda00", 0),
 		},
 		{
 			Name:   "name-changed event",
-			Group:  createGroup(nil, nil, nil, emptyName, emptyColor),
-			Result: createGroup(nil, nil, nil, "some-name", emptyColor),
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, nil, nil, "some-name", emptyColor, emptyImage),
 			From:   "0xabc",
 			Event:  NewNameChangedEvent("some-name", 0),
 		},
 		{
 			Name:   "color-changed event",
-			Group:  createGroup(nil, nil, nil, emptyName, emptyColor),
-			Result: createGroup(nil, nil, nil, emptyName, "#7cda00"),
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, nil, nil, emptyName, "#7cda00", emptyImage),
 			From:   "0xabc",
 			Event:  NewColorChangedEvent("#7cda00", 0),
 		},
 		{
+			Name:   "image-changed event",
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, nil, nil, emptyName, emptyColor, "123"),
+			From:   "0xabc",
+			Event:  NewImageChangedEvent([]byte("123"), 0),
+		},
+		{
 			Name:   "admins-added event",
-			Group:  createGroup(nil, nil, nil, emptyName, emptyColor),
-			Result: createGroup([]string{"0xabc", "0x123"}, nil, nil, emptyName, emptyColor),
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup([]string{"0xabc", "0x123"}, nil, nil, emptyName, emptyColor, emptyImage),
 			From:   "0xabc",
 			Event:  NewAdminsAddedEvent([]string{"0xabc", "0x123"}, 0),
 		},
 		{
 			Name:   "admin-removed event",
-			Group:  createGroup([]string{"0xabc", "0xdef"}, nil, nil, emptyName, emptyColor),
-			Result: createGroup([]string{"0xdef"}, nil, nil, emptyName, emptyColor),
+			Group:  createGroup([]string{"0xabc", "0xdef"}, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup([]string{"0xdef"}, nil, nil, emptyName, emptyColor, emptyImage),
 			From:   "0xabc",
 			Event:  NewAdminRemovedEvent("0xabc", 0),
 		},
 		{
 			Name:   "members-added event",
-			Group:  createGroup(nil, nil, nil, emptyName, emptyColor),
-			Result: createGroup(nil, []string{"0xabc", "0xdef"}, nil, emptyName, emptyColor),
+			Group:  createGroup(nil, nil, nil, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, []string{"0xabc", "0xdef"}, nil, emptyName, emptyColor, emptyImage),
 			From:   "0xabc",
 			Event:  NewMembersAddedEvent([]string{"0xabc", "0xdef"}, 0),
 		},
 		{
 			Name:   "member-removed event",
-			Group:  createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xdef", "0xabc"}, emptyName, emptyColor),
-			Result: createGroup(nil, []string{"0xdef"}, []string{"0xdef"}, emptyName, emptyColor),
+			Group:  createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xdef", "0xabc"}, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, []string{"0xdef"}, []string{"0xdef"}, emptyName, emptyColor, emptyImage),
 			From:   "0xabc",
 			Event:  NewMemberRemovedEvent("0xabc", 0),
 		},
 		{
 			Name:   "member-joined event",
-			Group:  createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xabc"}, emptyName, emptyColor),
-			Result: createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xabc", "0xdef"}, emptyName, emptyColor),
+			Group:  createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xabc"}, emptyName, emptyColor, emptyImage),
+			Result: createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xabc", "0xdef"}, emptyName, emptyColor, emptyImage),
 			From:   "0xdef",
 			Event:  NewMemberJoinedEvent(0),
 		},
@@ -221,6 +230,20 @@ func TestGroupValidateEvent(t *testing.T) {
 			From:   "0xabc",
 			Group:  createGroup(nil, nil),
 			Event:  NewColorChangedEvent("#7cda00", 0),
+			Result: false,
+		},
+		{
+			Name:   "image-changed allowed because from is admin",
+			From:   "0xabc",
+			Group:  createGroup([]string{"0xabc"}, nil),
+			Event:  NewImageChangedEvent([]byte{1, 2, 3}, 0),
+			Result: true,
+		},
+		{
+			Name:   "image-changed not allowed for non-admins",
+			From:   "0xabc",
+			Group:  createGroup(nil, nil),
+			Event:  NewImageChangedEvent([]byte{1, 2, 3}, 0),
 			Result: false,
 		},
 		{

@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -109,6 +110,9 @@ type Chat struct {
 
 	// Highlight is used for highlight chats
 	Highlight bool `json:"highlight,omitempty"`
+
+	// Image of the chat in Base64 format
+	Base64Image string `json:"image,omitempty"`
 }
 
 type ChatPreview struct {
@@ -271,6 +275,12 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 	color := g.Color()
 	if color != "" {
 		c.Color = g.Color()
+	}
+
+	// Image
+	base64Image, err := userimage.GetPayloadDataURI(g.Image())
+	if err == nil {
+		c.Base64Image = base64Image
 	}
 
 	// Members

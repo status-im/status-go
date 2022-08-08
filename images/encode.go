@@ -3,10 +3,12 @@ package images
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
+	"regexp"
 )
 
 type EncodeConfig struct {
@@ -73,4 +75,13 @@ func GetPayloadDataURI(payload []byte) (string, error) {
 	b64 := base64.StdEncoding.EncodeToString(payload)
 
 	return "data:image/" + mt + ";base64," + b64, nil
+}
+
+func GetPayloadFromURI(uri string) ([]byte, error) {
+	re := regexp.MustCompile("^data:image/(.*?);base64,(.*?)$")
+	res := re.FindStringSubmatch(uri)
+	if len(res) != 3 {
+		return nil, errors.New("wrong uri format")
+	}
+	return base64.StdEncoding.DecodeString(res[2])
 }
