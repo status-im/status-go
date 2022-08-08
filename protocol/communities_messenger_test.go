@@ -1188,6 +1188,8 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 		Description: "status community description",
 	}
 
+	inviteMessage := "invite to community testing message"
+
 	// Create an community chat
 	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
@@ -1198,8 +1200,9 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	response, err = s.bob.ShareCommunity(
 		&requests.ShareCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+			CommunityID:   community.ID(),
+			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+			InviteMessage: inviteMessage,
 		},
 	)
 	s.Require().NoError(err)
@@ -1226,6 +1229,10 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
+
+	message := response.Messages()[0]
+	s.Require().Equal(community.IDString(), message.CommunityID)
+	s.Require().Equal(inviteMessage, message.Text)
 }
 
 func (s *MessengerCommunitiesSuite) TestBanUser() {
