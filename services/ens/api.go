@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -40,6 +42,8 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 		accountsManager: accountsManager,
 		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
+		addrPerChain:    make(map[uint64]common.Address),
+		quit:            make(chan struct{}),
 	}
 }
 
@@ -54,10 +58,18 @@ type API struct {
 	accountsManager *account.GethManager
 	rpcFiltersSrvc  *rpcfilters.Service
 	config          *params.NodeConfig
+
+	addrPerChain      map[uint64]common.Address
+	addrPerChainMutex sync.Mutex
+	quit              chan struct{}
+}
+
+func (api *API) Stop() {
+	api.quit <- struct{}{}
 }
 
 func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error) {
-	return registrar.ContractAddress(chainID)
+	return api.usernameRegistrarAddr(ctx, chainID)
 }
 
 func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
@@ -174,8 +186,59 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 	return &addr, nil
 }
 
+func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (common.Address, error) {
+	api.addrPerChainMutex.Lock()
+	defer api.addrPerChainMutex.Unlock()
+
+	addr, ok := api.addrPerChain[chainID]
+	if ok {
+		return addr, nil
+	}
+
+	registryAddr, err := api.OwnerOf(ctx, chainID, "stateofus.eth")
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	api.addrPerChain[chainID] = *registryAddr
+
+	go func() {
+		registry, err := api.contractMaker.NewRegistry(chainID)
+		if err != nil {
+			return
+		}
+
+		logs := make(chan *resolver.ENSRegistryWithFallbackNewOwner)
+
+		sub, err := registry.WatchNewOwner(&bind.WatchOpts{}, logs, nil, nil)
+		if err != nil {
+			return
+		}
+
+		for {
+			select {
+			case <-api.quit:
+				return
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case vLog := <-logs:
+				api.addrPerChainMutex.Lock()
+				api.addrPerChain[chainID] = vLog.Owner
+				api.addrPerChainMutex.Unlock()
+			}
+		}
+	}()
+
+	return *registryAddr, nil
+}
+
 func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (string, error) {
-	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
+	if err != nil {
+		return "", err
+	}
+
+	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID, registryAddr)
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +253,12 @@ func (api *API) ExpireAt(ctx context.Context, chainID uint64, username string) (
 }
 
 func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
-	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
+	if err != nil {
+		return "", err
+	}
+
+	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID, registryAddr)
 	if err != nil {
 		return "", err
 	}
@@ -216,7 +284,12 @@ func (api *API) getSigner(chainID uint64, from types.Address, password string) b
 }
 
 func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string) (string, error) {
-	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
+	if err != nil {
+		return "", err
+	}
+
+	registrar, err := api.contractMaker.NewUsernameRegistrar(chainID, registryAddr)
 	if err != nil {
 		return "", err
 	}
@@ -247,14 +320,14 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 		return 0, err
 	}
 
-	registrarAddress, err := registrar.ContractAddress(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
 	if err != nil {
 		return 0, err
 	}
 
 	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
 		From:  common.Address(txArgs.From),
-		To:    &registrarAddress,
+		To:    &registryAddr,
 		Value: big.NewInt(0),
 		Data:  data,
 	})
@@ -284,7 +357,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	registrarAddress, err := registrar.ContractAddress(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
 	if err != nil {
 		return "", err
 	}
@@ -292,7 +365,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
 	tx, err := snt.ApproveAndCall(
 		txOpts,
-		registrarAddress,
+		registryAddr,
 		price,
 		extraData,
 	)
@@ -329,12 +402,12 @@ func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, tx
 		return ethereum.CallMsg{}, err
 	}
 
-	registrarAddress, err := registrar.ContractAddress(chainID)
+	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}
 
-	data, err := sntABI.Pack("approveAndCall", registrarAddress, price, extraData)
+	data, err := sntABI.Pack("approveAndCall", registryAddr, price, extraData)
 	if err != nil {
 		return ethereum.CallMsg{}, err
 	}

@@ -36,6 +36,7 @@ func (s *Service) Start() error {
 
 // Stop a service.
 func (s *Service) Stop() error {
+	s.api.Stop()
 	return nil
 }
 
