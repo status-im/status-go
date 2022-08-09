@@ -4,8 +4,8 @@ import (
 	"context"
 )
 
-func (m *Messenger) addWalletConnectSession(peerID string, connectorInfo string) (*MessengerResponse, error) {
-	err := m.persistence.InsertWalletConnectSession(peerID, connectorInfo)
+func (m *Messenger) addWalletConnectSession(peerID string, connectorInfo string, sessionInfo string) (*MessengerResponse, error) {
+	err := m.persistence.InsertWalletConnectSession(peerID, connectorInfo, sessionInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -30,8 +30,8 @@ func (m *Messenger) destroyWalletConnectSession(peerID string) (Session, error) 
 	return response, err
 }
 
-func (m *Messenger) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string) (*MessengerResponse, error) {
-	return m.addWalletConnectSession(PeerID, ConnectorInfo)
+func (m *Messenger) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string, SessionInfo string) (*MessengerResponse, error) {
+	return m.addWalletConnectSession(PeerID, ConnectorInfo, SessionInfo)
 }
 
 func (m *Messenger) GetWalletConnectSession(ctx context.Context) (Session, error) {

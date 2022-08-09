@@ -1,0 +1,1 @@
+ALTER TABLE wallet_connect_sessions ADD COLUMN session_info TEXT;
