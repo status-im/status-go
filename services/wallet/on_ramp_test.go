@@ -1,18 +1,27 @@
 package wallet
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	path = "../../_assets/tests/"
+)
+
 func TestCryptoOnRamps_Get(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
+
 	cs := []*CryptoOnRampManager{
 		{options: &CryptoOnRampOptions{dataSourceType: DataSourceStatic}},
 		{options: &CryptoOnRampOptions{
 			dataSourceType: DataSourceHTTP,
-			dataSource:     cryptoOnRampsData,
+			dataSource:     s.URL + "/ramps.json",
 		}},
 	}
 
@@ -26,9 +35,12 @@ func TestCryptoOnRamps_Get(t *testing.T) {
 }
 
 func TestCryptoOnRampManager_hasCacheExpired(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
+
 	corm := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceHTTP,
-		dataSource:     cryptoOnRampsData,
+		dataSource:     s.URL + "/ramps.json",
 	})
 	nt := time.Time{}.Add(30 * time.Minute)
 

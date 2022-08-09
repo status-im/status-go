@@ -4,9 +4,8 @@ import (
 	"errors"
 	"image"
 	"net/http"
-	"net/url"
+	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -88,16 +87,8 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecodeFromURL(t *testing.T) {
-	u := url.URL{
-		Scheme: "http",
-		Host:   "localhost:8089",
-	}
-
-	go func() {
-		err := http.ListenAndServe(u.Host, http.FileServer(http.Dir("../_assets/tests")))
-		require.NoError(t, err)
-	}()
-	time.Sleep(100 * time.Millisecond)
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
 
 	cs := []struct {
 		Filepath string
@@ -105,7 +96,7 @@ func TestDecodeFromURL(t *testing.T) {
 		Bounds   image.Rectangle
 	}{
 		{
-			u.String() + "/2x1.png",
+			s.URL + "/2x1.png",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -113,7 +104,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			u.String() + "/1.jpg",
+			s.URL + "/1.jpg",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -121,7 +112,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			u.String() + "/1.gif",
+			s.URL + "/1.gif",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -129,7 +120,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			u.String() + "/1.webp",
+			s.URL + "/1.webp",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -137,7 +128,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			u.String() + "/1.webp",
+			s.URL + "/1.webp",
 			true,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},

@@ -119,7 +119,6 @@ func LinkPreviewWhitelist() []Site {
 }
 
 func GetURLContent(url string) (data []byte, err error) {
-	// nolint: gosec
 	response, err := httpClient.Get(url)
 	if err != nil {
 		return data, fmt.Errorf("can't get content from link %s", url)
