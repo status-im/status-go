@@ -139,7 +139,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 }
 
 func (db *Database) GetAccount(keyUID string) (*Account, error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.key_uid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +156,7 @@ func (db *Database) GetAccount(keyUID string) (*Account, error) {
 		accColorHash := sql.NullString{}
 		accColorID := sql.NullInt64{}
 		ii := &images.IdentityImage{}
+		iiKeyUID := sql.NullString{}
 		iiName := sql.NullString{}
 		iiWidth := sql.NullInt64{}
 		iiHeight := sql.NullInt64{}
@@ -171,6 +172,7 @@ func (db *Database) GetAccount(keyUID string) (*Account, error) {
 			&accColorID,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
+			&iiKeyUID,
 			&iiName,
 			&ii.Payload,
 			&iiWidth,
@@ -193,7 +195,7 @@ func (db *Database) GetAccount(keyUID string) (*Account, error) {
 			}
 		}
 
-		ii.KeyUID = acc.KeyUID
+		ii.KeyUID = iiKeyUID.String
 		ii.Name = iiName.String
 		ii.Width = int(iiWidth.Int64)
 		ii.Height = int(iiHeight.Int64)
