@@ -821,8 +821,8 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 }
 
 // wallet connect session apis
-func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AddWalletConnectSession(ctx, PeerID, ConnectorInfo)
+func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string, SessionInfo string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddWalletConnectSession(ctx, PeerID, ConnectorInfo, SessionInfo)
 }
 
 func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) (protocol.Session, error) {

@@ -36,6 +36,7 @@ type sqlitePersistence struct {
 type Session struct {
 	PeerID        string `json:"peer-id"`
 	ConnectorInfo string `json:"connector-info"`
+	SessionInfo   string `json:"session-info"`
 }
 
 func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
@@ -1162,7 +1163,7 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	return err
 }
 
-func (db *sqlitePersistence) InsertWalletConnectSession(peerID string, connectorInfo string) error {
+func (db *sqlitePersistence) InsertWalletConnectSession(peerID string, connectorInfo string, sessionInfo string) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1175,11 +1176,11 @@ func (db *sqlitePersistence) InsertWalletConnectSession(peerID string, connector
 		_ = tx.Rollback()
 	}()
 
-	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peer_id, connector_info) VALUES(?, ?)")
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_sessions(peer_id, connector_info,session_info) VALUES(?, ?, ?)")
 	if err != nil {
 		return err
 	}
-	_, err = sessionInsertPreparedStatement.Exec(peerID, connectorInfo)
+	_, err = sessionInsertPreparedStatement.Exec(peerID, connectorInfo, sessionInfo)
 	sessionInsertPreparedStatement.Close()
 	if err != nil {
 		return err
@@ -1194,6 +1195,7 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 	seshObject := Session{
 		PeerID:        "",
 		ConnectorInfo: "",
+		SessionInfo:   "",
 	}
 	if err != nil {
 		return seshObject, err
@@ -1219,8 +1221,9 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 		var PeerID string
 		var ConnectorInfo string
 		var CreatedAt string
+		var SessionInfo string
 
-		errorWhileScanning := rows.Scan(&ID, &PeerID, &ConnectorInfo, &CreatedAt)
+		errorWhileScanning := rows.Scan(&ID, &PeerID, &ConnectorInfo, &CreatedAt, &SessionInfo)
 
 		if errorWhileScanning != nil {
 			return seshObject, errorWhileScanning
@@ -1228,6 +1231,7 @@ func (db *sqlitePersistence) GetWalletConnectSession() (Session, error) {
 
 		seshObject.PeerID = PeerID
 		seshObject.ConnectorInfo = ConnectorInfo
+		seshObject.SessionInfo = SessionInfo
 	}
 
 	return seshObject, err
@@ -1239,6 +1243,7 @@ func (db *sqlitePersistence) DeleteWalletConnectSession(peerID string) (Session,
 	seshObject := Session{
 		PeerID:        "",
 		ConnectorInfo: "",
+		SessionInfo:   "",
 	}
 	if err != nil {
 		return seshObject, err
@@ -1251,13 +1256,13 @@ func (db *sqlitePersistence) DeleteWalletConnectSession(peerID string) (Session,
 		_ = tx.Rollback()
 	}()
 
-	deleteStatement, err := tx.Prepare("DELETE FROM wallet_connect_sessions WHERE peer_id=?")
+	deleteStatement, err := tx.Prepare("DELETE FROM wallet_connect_sessions")
 
 	if err != nil {
 		return seshObject, err
 	}
 
-	_, err = deleteStatement.Exec(peerID)
+	_, err = deleteStatement.Exec()
 
 	if err != nil {
 		return seshObject, err

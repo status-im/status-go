@@ -65,8 +65,9 @@ func (s *WalletConnectSessionsSuite) newMessenger(shh types.Waku) *Messenger {
 func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 	peerID := "0643983b-0000-2222-1111-b05fdac338zd"
 	connectorInfo := "{:connected true,:accounts #js [0x3Ed3ab4A64C7D412bF628aDe9722c910ab20cE86], :chainId 1, :bridge https://c.bridge.walletconnect.org, :key c4ae6c97875ab90e64678f8fbeaeff5e38408f0d6ea3f58628556bc25bcc5092, :clientId 0643983b-0000-2222-1111-b05fdac338zd, :clientMeta #js {:name Status Wallet, :description Status is a secure messaging app, crypto wallet, and Web3 browser built with state of the art technology., :url #, :icons #js [https://statusnetwork.com/img/press-kit-status-logo.svg]}, :peerId 0643983b-0000-2222-1111-b05fdac338zd, :peerMeta #js {:name 1inch dApp, :description DeFi / DEX aggregator with the most liquidity and the best rates on Ethereum, Binance Smart Chain, Optimism, Polygon, 1inch dApp is an entry point to the 1inch Network's tech., :url https://app.1inch.io, :icons #js [https://app.1inch.io/assets/images/1inch_logo_without_text.svg https://app.1inch.io/assets/images/logo.png]}, :handshakeId 1657776235200377, :handshakeTopic 0643983b-0000-2222-1111-b05fdac338zd}"
+	sessionInfo := "some dummy text that looks like a json"
 
-	_, err := s.m.AddWalletConnectSession(context.Background(), peerID, connectorInfo)
+	_, err := s.m.AddWalletConnectSession(context.Background(), peerID, connectorInfo, sessionInfo)
 	s.Require().NoError(err)
 
 	response, err := s.m.GetWalletConnectSession(context.Background())
@@ -75,6 +76,7 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 	s.Require().NotNil(response)
 	s.Require().Equal(response.PeerID, peerID)
 	s.Require().Equal(response.ConnectorInfo, connectorInfo)
+	s.Require().Equal(response.SessionInfo, sessionInfo)
 
 	_, errWhileDeletion := s.m.DestroyWalletConnectSession(context.Background(), peerID)
 	s.Require().NoError(errWhileDeletion)
@@ -83,5 +85,6 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 	s.Require().NoError(errWhileFetchingAgain)
 	s.Require().Equal(shouldBeEmpty.PeerID, "")
 	s.Require().Equal(shouldBeEmpty.ConnectorInfo, "")
+	s.Require().Equal(shouldBeEmpty.SessionInfo, "")
 
 }
