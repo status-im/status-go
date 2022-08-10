@@ -10,9 +10,16 @@ import (
 	"github.com/status-im/status-go/protocol/identity/alias"
 )
 
+const (
+	maxBioLength            = 240
+	maxSocialLinkTextLength = 24
+)
+
 var ErrInvalidDisplayNameRegExp = errors.New("only letters, numbers, underscores and hyphens allowed")
 var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are not allowed`)
 var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
+var ErrInvalidBioLength = errors.New("invalid bio length")
+var ErrInvalidSocialLinkTextLength = errors.New("invalid social link text length")
 
 func ValidateDisplayName(displayName *string) error {
 	name := strings.TrimSpace(*displayName)
@@ -72,6 +79,13 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 	return m.publishContactCode()
 }
 
+func ValidateBio(bio *string) error {
+	if len(*bio) > maxBioLength {
+		return ErrInvalidBioLength
+	}
+	return nil
+}
+
 func (m *Messenger) SetBio(bio string) error {
 	currentBio, err := m.settings.Bio()
 	if err != nil {
@@ -82,19 +96,28 @@ func (m *Messenger) SetBio(bio string) error {
 		return nil // Do nothing
 	}
 
-	// TODO: add validation
-
-	err = m.settings.SaveSettingField(settings.Bio, bio)
-	if err != nil {
+	if err = ValidateBio(&bio); err != nil {
 		return err
 	}
 
-	err = m.resetLastPublishedTimeForChatIdentity()
-	if err != nil {
+	if err = m.settings.SaveSettingField(settings.Bio, bio); err != nil {
+		return err
+	}
+
+	if err = m.resetLastPublishedTimeForChatIdentity(); err != nil {
 		return err
 	}
 
 	return m.publishContactCode()
+}
+
+func ValidateSocialLinks(socialLinks *identity.SocialLinks) error {
+	for _, link := range *socialLinks {
+		if len(link.Text) > maxSocialLinkTextLength {
+			return ErrInvalidSocialLinkTextLength
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
@@ -107,15 +130,15 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 		return nil // Do nothing
 	}
 
-	// TODO: add validation
-
-	err = m.settings.SetSocialLinks(socialLinks)
-	if err != nil {
+	if err = ValidateSocialLinks(socialLinks); err != nil {
 		return err
 	}
 
-	err = m.resetLastPublishedTimeForChatIdentity()
-	if err != nil {
+	if err = m.settings.SetSocialLinks(socialLinks); err != nil {
+		return err
+	}
+
+	if err = m.resetLastPublishedTimeForChatIdentity(); err != nil {
 		return err
 	}
 
