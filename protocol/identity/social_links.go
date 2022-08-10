@@ -55,21 +55,6 @@ func (s SocialLinks) Equals(rhs SocialLinks) bool {
 	return true
 }
 
-func (s SocialLinks) EqualsProtobuf(rhs []*protobuf.SocialLink) bool {
-	if len(s) != len(rhs) {
-		return false
-	}
-	sort.Slice(s, func(i, j int) bool { return s[i].Text < s[j].Text })
-	sort.Slice(rhs, func(i, j int) bool { return rhs[i].Text < rhs[j].Text })
-	for i := range s {
-		if s[i].Text != rhs[i].Text || s[i].URL != rhs[i].Url {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (s *SocialLinks) Serialize() ([]byte, error) {
 	return json.Marshal(s)
 }

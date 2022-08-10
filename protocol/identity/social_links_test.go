@@ -20,16 +20,19 @@ func TestEquals(t *testing.T) {
 		},
 	}
 
-	other := []*protobuf.SocialLink{}
-	require.False(t, socialLinks.EqualsProtobuf(other))
+	protobufLinks := []*protobuf.SocialLink{}
+	transformedLinks := NewSocialLinks(protobufLinks)
+	require.False(t, socialLinks.Equals(*transformedLinks))
 
-	other = append(other, &protobuf.SocialLink{Text: "A", Url: "B"})
-	other = append(other, &protobuf.SocialLink{Text: "X", Url: "Y"})
-	require.True(t, socialLinks.EqualsProtobuf(other))
+	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "A", Url: "B"})
+	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "X", Url: "Y"})
+	transformedLinks = NewSocialLinks(protobufLinks)
+	require.True(t, socialLinks.Equals(*transformedLinks))
 
 	// order does not matter
-	other = []*protobuf.SocialLink{}
-	other = append(other, &protobuf.SocialLink{Text: "X", Url: "Y"})
-	other = append(other, &protobuf.SocialLink{Text: "A", Url: "B"})
-	require.True(t, socialLinks.EqualsProtobuf(other))
+	protobufLinks = []*protobuf.SocialLink{}
+	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "X", Url: "Y"})
+	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "A", Url: "B"})
+	transformedLinks = NewSocialLinks(protobufLinks)
+	require.True(t, socialLinks.Equals(*transformedLinks))
 }
