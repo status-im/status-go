@@ -83,8 +83,5 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 
 	shouldBeEmpty, errWhileFetchingAgain := s.m.GetWalletConnectSession(context.Background())
 	s.Require().NoError(errWhileFetchingAgain)
-	s.Require().Equal(shouldBeEmpty[0].PeerID, "")
-	s.Require().Equal(shouldBeEmpty[0].ConnectorInfo, "")
-	s.Require().Equal(shouldBeEmpty[0].SessionInfo, "")
-
+	s.Require().Nil(shouldBeEmpty)
 }

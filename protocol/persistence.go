@@ -1146,7 +1146,7 @@ func (db *sqlitePersistence) GetWalletConnectSession() (seshArray []Session, err
 		SessionInfo:   "",
 	}
 
-	seshArray = append(seshArray, seshObject)
+	//seshArray = append(seshArray, seshObject)
 
 	if err != nil {
 		return seshArray, err
