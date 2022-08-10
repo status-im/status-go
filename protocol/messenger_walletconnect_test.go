@@ -74,17 +74,17 @@ func (s *WalletConnectSessionsSuite) TestCreateReadAndDeleteSessions() {
 	fmt.Println(response)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Equal(response.PeerID, peerID)
-	s.Require().Equal(response.ConnectorInfo, connectorInfo)
-	s.Require().Equal(response.SessionInfo, sessionInfo)
+	s.Require().Equal(response[0].PeerID, peerID)
+	s.Require().Equal(response[0].ConnectorInfo, connectorInfo)
+	s.Require().Equal(response[0].SessionInfo, sessionInfo)
 
 	_, errWhileDeletion := s.m.DestroyWalletConnectSession(context.Background(), peerID)
 	s.Require().NoError(errWhileDeletion)
 
 	shouldBeEmpty, errWhileFetchingAgain := s.m.GetWalletConnectSession(context.Background())
 	s.Require().NoError(errWhileFetchingAgain)
-	s.Require().Equal(shouldBeEmpty.PeerID, "")
-	s.Require().Equal(shouldBeEmpty.ConnectorInfo, "")
-	s.Require().Equal(shouldBeEmpty.SessionInfo, "")
+	s.Require().Equal(shouldBeEmpty[0].PeerID, "")
+	s.Require().Equal(shouldBeEmpty[0].ConnectorInfo, "")
+	s.Require().Equal(shouldBeEmpty[0].SessionInfo, "")
 
 }

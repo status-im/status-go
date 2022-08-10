@@ -12,7 +12,7 @@ func (m *Messenger) addWalletConnectSession(peerID string, connectorInfo string,
 	return nil, err
 }
 
-func (m *Messenger) getWalletConnectSession() (Session, error) {
+func (m *Messenger) getWalletConnectSession() ([]Session, error) {
 
 	response, err := m.persistence.GetWalletConnectSession()
 	if err != nil {
@@ -34,7 +34,7 @@ func (m *Messenger) AddWalletConnectSession(ctx context.Context, PeerID string, 
 	return m.addWalletConnectSession(PeerID, ConnectorInfo, SessionInfo)
 }
 
-func (m *Messenger) GetWalletConnectSession(ctx context.Context) (Session, error) {
+func (m *Messenger) GetWalletConnectSession(ctx context.Context) ([]Session, error) {
 
 	return m.getWalletConnectSession()
 }
