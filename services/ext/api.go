@@ -824,7 +824,7 @@ func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, PeerID string
 	return api.service.messenger.AddWalletConnectSession(ctx, PeerID, ConnectorInfo, SessionInfo)
 }
 
-func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) (protocol.Session, error) {
+func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.Session, error) {
 	return api.service.messenger.GetWalletConnectSession(ctx)
 }
 
