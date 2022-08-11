@@ -832,8 +832,11 @@ func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID st
 	return api.service.messenger.DestroyWalletConnectSession(ctx, PeerID)
 }
 
-// PushNotifications server endpoints
+func (api *PublicAPI) NukeAllOfTheWalletConnectSession(ctx context.Context) (protocol.Session, error) {
+	return api.service.messenger.NukeAllOfTheWalletConnectSession(ctx)
+}
 
+// PushNotifications server endpoints
 func (api *PublicAPI) StartPushNotificationsServer() error {
 	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
 	if err != nil {

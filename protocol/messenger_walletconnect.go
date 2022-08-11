@@ -30,6 +30,15 @@ func (m *Messenger) destroyWalletConnectSession(peerID string) (Session, error) 
 	return response, err
 }
 
+func (m *Messenger) nukeAllOfTheWalletConnectSession() (Session, error) {
+
+	response, err := m.persistence.NukeAllOfTheWalletConnectSession()
+	if err != nil {
+		return response, err
+	}
+	return response, err
+}
+
 func (m *Messenger) AddWalletConnectSession(ctx context.Context, PeerID string, ConnectorInfo string, SessionInfo string) (*MessengerResponse, error) {
 	return m.addWalletConnectSession(PeerID, ConnectorInfo, SessionInfo)
 }
@@ -42,4 +51,9 @@ func (m *Messenger) GetWalletConnectSession(ctx context.Context) ([]Session, err
 func (m *Messenger) DestroyWalletConnectSession(ctx context.Context, PeerID string) (Session, error) {
 
 	return m.destroyWalletConnectSession(PeerID)
+}
+
+func (m *Messenger) NukeAllOfTheWalletConnectSession(ctx context.Context) (Session, error) {
+
+	return m.nukeAllOfTheWalletConnectSession()
 }
