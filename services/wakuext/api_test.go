@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
 )
@@ -126,7 +127,7 @@ func TestInitProtocol(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	require.NoError(t, err)
 
-	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
+	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")
@@ -188,7 +189,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.Require().NoError(err)
 	nodeWrapper := ext.NewTestNodeWrapper(nil, gethbridge.NewGethWakuWrapper(w))
 	service := New(config, nodeWrapper, nil, nil, db)
-	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
+	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 
 	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")

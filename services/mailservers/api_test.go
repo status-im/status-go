@@ -11,12 +11,13 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "mailservers-service")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "mailservers-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "mailservers-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return NewDB(db), func() {
 		require.NoError(t, db.Close())

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/sqlite"
 )
 
 var (
@@ -68,7 +69,7 @@ func TestClosingsqlDB(t *testing.T) {
 	password := "settings-tests"
 
 	// Make connection with sql.DB
-	db, err := appdatabase.InitializeDB(testFileName, password)
+	db, err := appdatabase.InitializeDB(testFileName, password, sqlite.ReducedKDFIterationsNumber)
 
 	// handle removing the test file on any exit
 	defer func() {
@@ -93,7 +94,7 @@ func TestClosingsqlDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make another connection with sql.DB
-	db2, err := appdatabase.InitializeDB(testFileName, password)
+	db2, err := appdatabase.InitializeDB(testFileName, password, sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	// Init settings.Database struct using second connection

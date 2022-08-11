@@ -33,7 +33,7 @@ func (s *PersistenceSuite) SetupTest() {
 	dbPath, err := ioutil.TempFile("", "")
 	s.NoError(err, "creating temp file for db")
 
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "")
+	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 	s.NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)

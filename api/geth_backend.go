@@ -266,7 +266,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
 	}
 
-	b.appDB, err = appdatabase.InitializeDB(newPath, password)
+	b.appDB, err = appdatabase.InitializeDB(newPath, password, account.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -498,7 +498,7 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
 	}
 
-	err = appdatabase.DecryptDatabase(newPath, directory, password)
+	err = appdatabase.DecryptDatabase(newPath, directory, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -518,7 +518,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 
 	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
 
-	err := appdatabase.EncryptDatabase(databasePath, path, password)
+	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -538,7 +538,11 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 		}
 	}
 
-	err := appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
+	if err != nil {
+		return err
+	}
+	err = appdatabase.ChangeDatabasePassword(dbPath, password, kdfIterations, newPassword)
 	if err != nil {
 		if config != nil {
 			keyDir := config.KeyStoreDir
@@ -594,7 +598,12 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
-	err := b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID}, password)
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
 	if err != nil {
 		return err
 	}

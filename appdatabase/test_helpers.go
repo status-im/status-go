@@ -8,13 +8,15 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 )
 
+const kdfIterationsNumberForTests = 3200
+
 // SetupTestSQLDB creates a temporary sqlite database file, initialises and then returns with a teardown func
 func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
 	tmpfile, err := ioutil.TempFile("", prefix)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := InitializeDB(tmpfile.Name(), prefix)
+	db, err := InitializeDB(tmpfile.Name(), prefix, kdfIterationsNumberForTests)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -29,7 +31,7 @@ func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
 }
 
 func SetupTestMemorySQLDB(prefix string) (*sql.DB, error) {
-	db, err := InitializeDB(sqlite.InMemoryPath, prefix)
+	db, err := InitializeDB(sqlite.InMemoryPath, prefix, kdfIterationsNumberForTests)
 	if err != nil {
 		return nil, err
 	}

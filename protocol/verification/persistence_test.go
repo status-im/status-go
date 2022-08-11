@@ -26,7 +26,7 @@ func (s *PersistenceSuite) SetupTest() {
 	dbPath, err := ioutil.TempFile("", "")
 	s.NoError(err, "creating temp file for db")
 
-	db, err := sqlite.Open(dbPath.Name(), "")
+	db, err := sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 	s.NoError(err, "creating sqlite db instance")
 
 	s.db = &Persistence{db: db}

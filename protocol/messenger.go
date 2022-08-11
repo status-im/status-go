@@ -174,8 +174,9 @@ type mailserverCycle struct {
 }
 
 type dbConfig struct {
-	dbPath string
-	dbKey  string
+	dbPath          string
+	dbKey           string
+	dbKDFIterations int
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -260,9 +261,9 @@ func NewMessenger(
 		return nil, errors.New("database instance or database path needs to be provided")
 	}
 	if c.db == nil {
-		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath))
+		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath), zap.Int("KDFIterations", c.dbConfig.dbKDFIterations))
 		var err error
-		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey)
+		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey, c.dbConfig.dbKDFIterations)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize database from the db config")
 		}

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/sqlite"
 )
 
 func Test_GetDBFilename(t *testing.T) {
@@ -19,7 +21,7 @@ func Test_GetDBFilename(t *testing.T) {
 	require.True(t, len(fn) > 0)
 
 	// Test with in memory instance
-	mdb, err := InitializeDB(":memory:", "test")
+	mdb, err := InitializeDB(":memory:", "test", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, mdb.Close())

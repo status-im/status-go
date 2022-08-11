@@ -722,7 +722,7 @@ func openTestDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sqlite.Open(dbPath.Name(), "")
+	return sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 }
 
 func insertMinimalMessage(p *sqlitePersistence, id string) error {

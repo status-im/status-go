@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/sqlite"
 )
 
 var initNetworks = []params.Network{
@@ -83,7 +84,7 @@ var initNetworks = []params.Network{
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-network-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-network-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-network-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, db.Close())

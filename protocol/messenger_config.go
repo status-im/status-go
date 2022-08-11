@@ -114,9 +114,9 @@ func WithCustomLogger(logger *zap.Logger) Option {
 	}
 }
 
-func WithDatabaseConfig(dbPath, dbKey string) Option {
+func WithDatabaseConfig(dbPath string, dbKey string, dbKDFIterations int) Option {
 	return func(c *config) error {
-		c.dbConfig = dbConfig{dbPath: dbPath, dbKey: dbKey}
+		c.dbConfig = dbConfig{dbPath: dbPath, dbKey: dbKey, dbKDFIterations: dbKDFIterations}
 		return nil
 	}
 }

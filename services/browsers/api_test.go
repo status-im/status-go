@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "browsers-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "browsers-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "browsers-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return NewDB(db), func() {
 		require.NoError(t, db.Close())

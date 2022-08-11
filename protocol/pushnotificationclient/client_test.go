@@ -43,7 +43,7 @@ func (s *ClientSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.tmpFile = tmpFile
 
-	database, err := sqlite.Open(s.tmpFile.Name(), "")
+	database, err := sqlite.Open(s.tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	s.persistence = NewPersistence(database)
 

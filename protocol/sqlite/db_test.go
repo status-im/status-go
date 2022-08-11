@@ -17,7 +17,7 @@ func TestOpen(t *testing.T) {
 	dbPath := filepath.Join(dir, "db.sql")
 
 	// Open the db for the first time.
-	db, err := openAndMigrate(dbPath, "some-key", reducedKdfIterationsNumber)
+	db, err := openAndMigrate(dbPath, "some-key", ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	// Insert some data.
@@ -30,7 +30,7 @@ func TestOpen(t *testing.T) {
 	// Open again with different key should fail
 	// because the file already exists and it should not
 	// be recreated.
-	_, err = openAndMigrate(dbPath, "different-key", reducedKdfIterationsNumber)
+	_, err = openAndMigrate(dbPath, "different-key", ReducedKDFIterationsNumber)
 	require.Error(t, err)
 }
 
@@ -40,7 +40,7 @@ func TestOpen(t *testing.T) {
 // then execute again, and we should be all migrated.
 func TestCommunitiesMigrationDirty(t *testing.T) {
 	// Open the db for the first time.
-	db, err := open(InMemoryPath, "some-key", reducedKdfIterationsNumber)
+	db, err := open(InMemoryPath, "some-key", ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	// Create a communities table, so that migration will fail
@@ -88,7 +88,7 @@ func TestCommunitiesMigrationDirty(t *testing.T) {
 // dirty to false and then execute again, and we should be all migrated.
 func TestCommunitiesMigrationNotDirty(t *testing.T) {
 	// Open the db for the first time.
-	db, err := open(InMemoryPath, "some-key", reducedKdfIterationsNumber)
+	db, err := open(InMemoryPath, "some-key", ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	// Create a communities table, so that migration will fail

@@ -10,12 +10,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestTransferDB(t *testing.T) (*Block, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-transfer-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return &Block{db}, func() {
 		require.NoError(t, db.Close())

@@ -7,23 +7,25 @@ import (
 	"os"
 
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 const (
 	// The reduced number of kdf iterations (for performance reasons) which is
-	// currently used for derivation of the database key
+	// used as the default value
 	// https://github.com/status-im/status-go/pull/1343
 	// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
-	kdfIterationsNumber = 3200
+	ReducedKDFIterationsNumber = 3200
+
 	// WALMode for sqlite.
 	WALMode      = "wal"
 	inMemoryPath = ":memory:"
 )
 
 // DecryptDB completely removes the encryption from the db
-func DecryptDB(oldPath, newPath, key string) error {
+func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber int) error {
 
-	db, err := openDB(oldPath, key)
+	db, err := openDB(oldPath, key, kdfIterationsNumber)
 	if err != nil {
 		return err
 	}
@@ -42,8 +44,7 @@ func DecryptDB(oldPath, newPath, key string) error {
 }
 
 // EncryptDB takes a plaintext database and adds encryption
-func EncryptDB(unencryptedPath, encryptedPath, key string) error {
-
+func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIterationsNumber int) error {
 	_ = os.Remove(encryptedPath)
 
 	db, err := OpenUnecryptedDB(unencryptedPath)
@@ -54,6 +55,10 @@ func EncryptDB(unencryptedPath, encryptedPath, key string) error {
 	_, err = db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
 	if err != nil {
 		return err
+	}
+
+	if kdfIterationsNumber <= 0 {
+		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 	}
 
 	_, err = db.Exec(fmt.Sprintf("PRAGMA encrypted.kdf_iter = '%d'", kdfIterationsNumber))
@@ -69,7 +74,7 @@ func EncryptDB(unencryptedPath, encryptedPath, key string) error {
 	return err
 }
 
-func openDB(path, key string) (*sql.DB, error) {
+func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
@@ -84,6 +89,10 @@ func openDB(path, key string) (*sql.DB, error) {
 	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
 	if _, err = db.Exec(keyString); err != nil {
 		return nil, errors.New("failed to set key pragma")
+	}
+
+	if kdfIterationsNumber <= 0 {
+		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 	}
 
 	if _, err = db.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber)); err != nil {
@@ -106,8 +115,8 @@ func openDB(path, key string) (*sql.DB, error) {
 }
 
 // OpenDB opens not-encrypted database.
-func OpenDB(path, key string) (*sql.DB, error) {
-	return openDB(path, key)
+func OpenDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
+	return openDB(path, key, kdfIterationsNumber)
 }
 
 // OpenUnecryptedDB opens database with setting PRAGMA key.
@@ -138,8 +147,12 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func ChangeEncryptionKey(path, key, newKey string) error {
-	db, err := openDB(path, key)
+func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string) error {
+	if kdfIterationsNumber <= 0 {
+		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+	}
+
+	db, err := openDB(path, key, kdfIterationsNumber)
 
 	if err != nil {
 		return err
