@@ -1055,7 +1055,7 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		EnsName:     "", // TODO add ENS name handling to dedicate PR
 		DisplayName: displayName,
 		Description: bio,
-		SocialLinks: socialLinks.TransformToProtobuf(),
+		SocialLinks: socialLinks.ToProtobuf(),
 	}
 
 	err = m.attachIdentityImagesToChatIdentity(context, ci)

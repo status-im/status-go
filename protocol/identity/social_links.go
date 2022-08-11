@@ -32,7 +32,7 @@ func NewSocialLinks(links []*protobuf.SocialLink) *SocialLinks {
 	return &res
 }
 
-func (s *SocialLinks) TransformToProtobuf() []*protobuf.SocialLink {
+func (s *SocialLinks) ToProtobuf() []*protobuf.SocialLink {
 	res := []*protobuf.SocialLink{}
 	for _, link := range *s {
 		res = append(res, &protobuf.SocialLink{Text: link.Text, Url: link.URL})
