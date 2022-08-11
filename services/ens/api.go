@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -568,7 +569,10 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to obtain base36 representation")
 		}
-		host := str + ".ipfs.infura-ipfs.io/"
+
+		parsedURL, _ := url.Parse(params.IpfsGatewayURL)
+		// Remove scheme from the url
+		host := parsedURL.Hostname() + parsedURL.Path + str
 		return &URI{scheme, host, ""}, nil
 	case "ipns-ns":
 		id, offset := binary.Uvarint(data)

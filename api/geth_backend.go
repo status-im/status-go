@@ -83,7 +83,7 @@ type GethStatusBackend struct {
 
 // NewGethStatusBackend create a new GethStatusBackend instance
 func NewGethStatusBackend() *GethStatusBackend {
-	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit)
+	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit, "IpfsGatewayURL", params.IpfsGatewayURL)
 
 	backend := &GethStatusBackend{}
 	backend.initialize()
