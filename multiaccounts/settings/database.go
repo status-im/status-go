@@ -108,10 +108,11 @@ INSERT INTO settings (
   public_key,
   signing_phrase,
   wallet_root_address,
-  synthetic_id
+  synthetic_id,
+  current_user_status
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id')`,
+?,?,?,?,?,?,?,?,?,'id',?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -133,6 +134,7 @@ INSERT INTO settings (
 		s.PublicKey,
 		s.SigningPhrase,
 		s.WalletRootAddress,
+		s.CurrentUserStatus,
 	)
 	if err != nil {
 		return err
