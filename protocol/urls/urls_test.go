@@ -8,28 +8,33 @@ import (
 )
 
 func TestGetLinkPreviewData(t *testing.T) {
-
 	statusTownhall := LinkPreviewData{
 		Site:         "YouTube",
 		Title:        "Status Town Hall #67 - 12 October 2020",
 		ThumbnailURL: "https://i.ytimg.com/vi/mzOyYtfXkb0/hqdefault.jpg",
 	}
 
-	previewData, err := GetLinkPreviewData("https://www.youtube.com/watch?v=mzOyYtfXkb0")
-	require.NoError(t, err)
-	require.Equal(t, statusTownhall.Site, previewData.Site)
-	require.Equal(t, statusTownhall.Title, previewData.Title)
-	require.Equal(t, statusTownhall.ThumbnailURL, previewData.ThumbnailURL)
+	ts := []struct {
+		URL        string
+		ShouldFail bool
+	}{
+		{"https://www.youtube.com/watch?v=mzOyYtfXkb0", false},
+		{"https://youtu.be/mzOyYtfXkb0", false},
+		{"https://www.test.com/unknown", true},
+	}
 
-	previewData, err = GetLinkPreviewData("https://youtu.be/mzOyYtfXkb0")
-	require.NoError(t, err)
-	require.Equal(t, statusTownhall.Site, previewData.Site)
-	require.Equal(t, statusTownhall.Title, previewData.Title)
-	require.Equal(t, statusTownhall.ThumbnailURL, previewData.ThumbnailURL)
+	for _, u := range ts {
+		previewData, err := GetLinkPreviewData(u.URL)
+		if u.ShouldFail {
+			require.Error(t, err)
+			continue
+		}
 
-	_, err = GetLinkPreviewData("https://www.test.com/unknown")
-	require.Error(t, err)
-
+		require.NoError(t, err)
+		require.Equal(t, statusTownhall.Site, previewData.Site)
+		require.Equal(t, statusTownhall.Title, previewData.Title)
+		require.Equal(t, statusTownhall.ThumbnailURL, previewData.ThumbnailURL)
+	}
 }
 
 // split at "." and ignore the first item
@@ -130,43 +135,42 @@ func TestStatusLinkPreviewData(t *testing.T) {
 // }
 
 func TestTwitterLinkPreviewData(t *testing.T) {
-
 	statusTweet1 := LinkPreviewData{
 		Site:  "Twitter",
 		Title: "Crypto isn't going anywhere.— Status (@ethstatus) July 26, 2021",
 	}
-
-	previewData1, err := GetLinkPreviewData("https://twitter.com/ethstatus/status/1419674733885407236")
-	require.NoError(t, err)
-	require.Equal(t, statusTweet1.Site, previewData1.Site)
-	require.Equal(t, statusTweet1.Title, previewData1.Title)
-	require.Equal(t, statusTweet1.ThumbnailURL, "")
-
 	statusTweet2 := LinkPreviewData{
 		Site: "Twitter",
 		Title: "🎉 Status v1.15 is a go! 🎉\n\n📌 Pin important messages in chats and groups" +
 			"\n✏️ Edit messages after sending\n🔬 Scan QR codes with the browser\n⚡️ FASTER app navigation!" +
 			"\nhttps://t.co/qKrhDArVKb— Status (@ethstatus) July 27, 2021",
 	}
-
-	previewData2, err := GetLinkPreviewData("https://twitter.com/ethstatus/status/1420035091997278214")
-	require.NoError(t, err)
-	require.Equal(t, statusTweet2.Site, previewData2.Site)
-	require.Equal(t, statusTweet2.Title, previewData2.Title)
-	require.Equal(t, statusTweet2.ThumbnailURL, "")
-
 	statusProfile := LinkPreviewData{
 		Site:  "Twitter",
 		Title: "Tweets by ethstatus",
 	}
 
-	previewData3, err := GetLinkPreviewData("https://twitter.com/ethstatus")
-	require.NoError(t, err)
-	require.Equal(t, statusProfile.Site, previewData3.Site)
-	require.Equal(t, statusProfile.Title, previewData3.Title)
-	require.Equal(t, statusProfile.ThumbnailURL, "")
+	ts := []struct {
+		URL        string
+		Expected   LinkPreviewData
+		ShouldFail bool
+	}{
+		{"https://twitter.com/ethstatus/status/1419674733885407236", statusTweet1, false},
+		{"https://twitter.com/ethstatus/status/1420035091997278214", statusTweet2, false},
+		{"https://twitter.com/ethstatus", statusProfile, false},
+		{"https://www.test.com/unknown", LinkPreviewData{}, true},
+	}
 
-	_, err = GetLinkPreviewData("https://www.test.com/unknown")
-	require.Error(t, err)
+	for _, u := range ts {
+		previewData, err := GetLinkPreviewData(u.URL)
+		if u.ShouldFail {
+			require.Error(t, err)
+			continue
+		}
 
+		require.NoError(t, err)
+		require.Equal(t, u.Expected.Site, previewData.Site)
+		require.Equal(t, u.Expected.Title, previewData.Title)
+		require.Equal(t, u.Expected.ThumbnailURL, previewData.ThumbnailURL)
+	}
 }
