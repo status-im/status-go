@@ -7,6 +7,7 @@ import (
 	"os"
 
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+
 	"github.com/status-im/status-go/protocol/sqlite"
 )
 

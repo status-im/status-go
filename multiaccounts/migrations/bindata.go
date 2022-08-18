@@ -274,7 +274,7 @@ func _1660238799_accounts_kdfUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660238799_accounts_kdf.up.sql", size: 115, mode: os.FileMode(0664), modTime: time.Unix(1660238865, 0)}
+	info := bindataFileInfo{name: "1660238799_accounts_kdf.up.sql", size: 115, mode: os.FileMode(0664), modTime: time.Unix(1661173104, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdf, 0xe6, 0x7a, 0x69, 0x25, 0x42, 0x3b, 0x9c, 0x20, 0xf5, 0xcb, 0xae, 0xb0, 0xb3, 0x1b, 0x66, 0xc2, 0x5d, 0xd0, 0xc1, 0x59, 0xe8, 0xa9, 0xc5, 0x69, 0x58, 0x8f, 0xae, 0xe6, 0xd1, 0x4c, 0x53}}
 	return a, nil
 }

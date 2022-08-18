@@ -311,7 +311,7 @@ func (db *Database) UpdateAccount(account Account) error {
 		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}
 
-	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID, account.KDFIterations)
+	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KDFIterations, account.KeyUID)
 	return err
 }
 
