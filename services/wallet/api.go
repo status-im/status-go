@@ -270,6 +270,13 @@ func (api *API) AddFavourite(ctx context.Context, favourite Favourite) error {
 	return err
 }
 
+func (api *API) DeleteFavourite(ctx context.Context, address common.Address) error {
+	log.Debug("call to delete an entry in favourites")
+	err := api.s.favouriteManager.DeleteFavourite(address)
+	log.Debug("result from database for delete an entry in favourites", "err", err)
+	return err
+}
+
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }

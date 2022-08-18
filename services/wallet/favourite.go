@@ -44,3 +44,8 @@ func (fm *FavouriteManager) AddFavourite(favourite Favourite) error {
 	_, err = insert.Exec(favourite.Address, favourite.Name)
 	return err
 }
+
+func (fm *FavouriteManager) DeleteFavourite(address common.Address) error {
+	_, err := fm.db.Exec("DELETE FROM favourites WHERE address = ?", address)
+	return err
+}
