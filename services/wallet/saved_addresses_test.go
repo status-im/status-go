@@ -32,9 +32,10 @@ func TestSavedAddresses(t *testing.T) {
 	require.Nil(t, rst)
 
 	sa := SavedAddress{
-		Address: common.Address{1},
-		Name:    "Zilliqa",
-		ChainID: 777,
+		Address:   common.Address{1},
+		Name:      "Zilliqa",
+		Favourite: true,
+		ChainID:   777,
 	}
 
 	err = manager.AddSavedAddress(sa)

@@ -37,7 +37,6 @@ type ReaderAccount struct {
 
 type Wallet struct {
 	Accounts            []ReaderAccount                  `json:"accounts"`
-	Favorites           []Favourite                      `json:"favorites"`
 	OnRamp              []CryptoOnRamp                   `json:"onRamp"`
 	SavedAddresses      map[uint64][]SavedAddress        `json:"savedAddresses"`
 	Tokens              map[uint64][]*Token              `json:"tokens"`
@@ -199,11 +198,6 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 		return nil, err
 	}
 
-	favorites, err := r.s.favouriteManager.GetFavourites()
-	if err != nil {
-		return nil, err
-	}
-
 	pendingTransactions := make(map[uint64][]*PendingTransaction)
 	for _, chainID := range chainIDs {
 		pendingTx, err := r.s.transactionManager.getAllPendings([]uint64{chainID})
@@ -214,7 +208,6 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 	}
 	return &Wallet{
 		Accounts:            readerAccounts,
-		Favorites:           favorites,
 		OnRamp:              onRamp,
 		SavedAddresses:      savedAddressesMap,
 		Tokens:              tokensMap,

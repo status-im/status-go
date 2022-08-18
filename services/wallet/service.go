@@ -33,14 +33,12 @@ func NewService(
 	tokenManager := &TokenManager{db: db, RPCClient: rpcClient, networkManager: rpcClient.NetworkManager}
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
-	favouriteManager := &FavouriteManager{db: db}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
 
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
 		rpcClient:             rpcClient,
-		favouriteManager:      favouriteManager,
 		tokenManager:          tokenManager,
 		savedAddressesManager: savedAddressesManager,
 		transactionManager:    transactionManager,
@@ -60,7 +58,6 @@ type Service struct {
 	savedAddressesManager *SavedAddressesManager
 	tokenManager          *TokenManager
 	transactionManager    *TransactionManager
-	favouriteManager      *FavouriteManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
