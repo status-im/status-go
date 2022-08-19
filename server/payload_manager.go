@@ -13,7 +13,6 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -188,7 +187,7 @@ func NewPairingPayloadMarshaller(p *PairingPayload) *PairingPayloadMarshaller {
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
 	return proto.Marshal(&protobuf.LocalPairingPayload{
 		Keys:         ppm.accountKeysToProtobuf(),
-		Multiaccount: ppm.multiaccountToProtobuf(),
+		Multiaccount: ppm.multiaccount.ToProtobuf(),
 		Password:     ppm.password,
 	})
 }
@@ -199,43 +198,6 @@ func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPa
 		keys = append(keys, &protobuf.LocalPairingPayload_Key{Name: name, Data: data})
 	}
 	return keys
-}
-
-func (ppm *PairingPayloadMarshaller) multiaccountToProtobuf() *protobuf.MultiAccount {
-	var colourHashes []*protobuf.MultiAccount_ColourHash
-	for _, index := range ppm.multiaccount.ColorHash {
-		var i []int64
-		for _, is := range index {
-			i = append(i, int64(is))
-		}
-
-		colourHashes = append(colourHashes, &protobuf.MultiAccount_ColourHash{Index: i})
-	}
-
-	var identityImages []*protobuf.MultiAccount_IdentityImage
-	for _, ii := range ppm.multiaccount.Images {
-		identityImages = append(identityImages, &protobuf.MultiAccount_IdentityImage{
-			KeyUid:       ii.KeyUID,
-			Name:         ii.Name,
-			Payload:      ii.Payload,
-			Width:        int64(ii.Width),
-			Height:       int64(ii.Height),
-			Filesize:     int64(ii.FileSize),
-			ResizeTarget: int64(ii.ResizeTarget),
-			Clock:        ii.Clock,
-		})
-	}
-
-	return &protobuf.MultiAccount{
-		Name:           ppm.multiaccount.Name,
-		Timestamp:      ppm.multiaccount.Timestamp,
-		Identicon:      ppm.multiaccount.Identicon,
-		ColorHash:      colourHashes,
-		ColorId:        ppm.multiaccount.ColorID,
-		KeycardPairing: ppm.multiaccount.KeycardPairing,
-		KeyUid:         ppm.multiaccount.KeyUID,
-		Images:         identityImages,
-	}
 }
 
 func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
@@ -262,40 +224,8 @@ func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 }
 
 func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
-	var colourHash [][]int
-	for _, index := range pbMultiAccount.ColorHash {
-		var i []int
-		for _, is := range index.Index {
-			i = append(i, int(is))
-		}
-
-		colourHash = append(colourHash, i)
-	}
-
-	var identityImages []images.IdentityImage
-	for _, ii := range pbMultiAccount.Images {
-		identityImages = append(identityImages, images.IdentityImage{
-			KeyUID:       ii.KeyUid,
-			Name:         ii.Name,
-			Payload:      ii.Payload,
-			Width:        int(ii.Width),
-			Height:       int(ii.Height),
-			FileSize:     int(ii.Filesize),
-			ResizeTarget: int(ii.ResizeTarget),
-			Clock:        ii.Clock,
-		})
-	}
-
-	ppm.multiaccount = &multiaccounts.Account{
-		Name:           pbMultiAccount.Name,
-		Timestamp:      pbMultiAccount.Timestamp,
-		Identicon:      pbMultiAccount.Identicon,
-		ColorHash:      colourHash,
-		ColorID:        pbMultiAccount.ColorId,
-		KeycardPairing: pbMultiAccount.KeycardPairing,
-		KeyUID:         pbMultiAccount.KeyUid,
-		Images:         identityImages,
-	}
+	ppm.multiaccount = new(multiaccounts.Account)
+	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
 
 type PayloadRepository interface {
