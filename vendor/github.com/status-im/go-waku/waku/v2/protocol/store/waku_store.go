@@ -404,6 +404,12 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 		return nil, err
 	}
 
+	if historyResponseRPC.Response == nil {
+		historyResponseRPC.Response = new(pb.HistoryResponse)
+		historyResponseRPC.Response.PagingInfo = new(pb.PagingInfo)
+		historyResponseRPC.Response.PagingInfo.Cursor = new(pb.Index)
+	}
+
 	metrics.RecordMessage(ctx, "retrieved", len(historyResponseRPC.Response.Messages))
 
 	return historyResponseRPC.Response, nil

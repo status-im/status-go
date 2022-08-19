@@ -922,7 +922,7 @@ github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/go-rln v0.0.9
 ## explicit; go 1.17
 github.com/status-im/go-rln/rln
-# github.com/status-im/go-waku v0.1.1-0.20220818125955-051de1fcdb4c
+# github.com/status-im/go-waku v0.1.1-0.20220819160153-b0761ad70648
 ## explicit; go 1.17
 github.com/status-im/go-waku/logging
 github.com/status-im/go-waku/waku/persistence
