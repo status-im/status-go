@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/migrations"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -21,6 +22,62 @@ type Account struct {
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
 	Images         []images.IdentityImage `json:"images"`
+}
+
+func (a *Account) ToProtobuf() *protobuf.MultiAccount {
+	var colourHashes []*protobuf.MultiAccount_ColourHash
+	for _, index := range a.ColorHash {
+		var i []int64
+		for _, is := range index {
+			i = append(i, int64(is))
+		}
+
+		colourHashes = append(colourHashes, &protobuf.MultiAccount_ColourHash{Index: i})
+	}
+
+	var identityImages []*protobuf.MultiAccount_IdentityImage
+	for _, ii := range a.Images {
+		identityImages = append(identityImages, ii.ToProtobuf())
+	}
+
+	return &protobuf.MultiAccount{
+		Name:           a.Name,
+		Timestamp:      a.Timestamp,
+		Identicon:      a.Identicon,
+		ColorHash:      colourHashes,
+		ColorId:        a.ColorID,
+		KeycardPairing: a.KeycardPairing,
+		KeyUid:         a.KeyUID,
+		Images:         identityImages,
+	}
+}
+
+func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
+	var colourHash [][]int
+	for _, index := range ma.ColorHash {
+		var i []int
+		for _, is := range index.Index {
+			i = append(i, int(is))
+		}
+
+		colourHash = append(colourHash, i)
+	}
+
+	var identityImages []images.IdentityImage
+	for _, ii := range ma.Images {
+		iii := images.IdentityImage{}
+		iii.FromProtobuf(ii)
+		identityImages = append(identityImages, iii)
+	}
+
+	a.Name = ma.Name
+	a.Timestamp = ma.Timestamp
+	a.Identicon = ma.Identicon
+	a.ColorHash = colourHash
+	a.ColorID = ma.ColorId
+	a.KeycardPairing = ma.KeycardPairing
+	a.KeyUID = ma.KeyUid
+	a.Images = identityImages
 }
 
 type MultiAccountMarshaller interface {
