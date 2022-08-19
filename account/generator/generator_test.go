@@ -70,6 +70,18 @@ func TestGenerator_ImportPrivateKey(t *testing.T) {
 	assert.Equal(t, testAccount.bip44Address0, info.Address)
 }
 
+func TestGenerator_CreateAccountFromMnemonic(t *testing.T) {
+	g := New(nil)
+	assert.Equal(t, 0, len(g.accounts))
+
+	info, err := g.CreateAccountFromMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(g.accounts))
+	assert.Equal(t, 36, len(info.ID))
+	assert.Equal(t, 66, len(info.KeyUID))
+}
+
 func TestGenerator_ImportMnemonic(t *testing.T) {
 	g := New(nil)
 	assert.Equal(t, 0, len(g.accounts))
