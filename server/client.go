@@ -9,18 +9,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
+
+	"github.com/btcsuite/btcutil/base58"
 )
 
 type PairingClient struct {
 	*http.Client
 	PayloadManager
 
-	baseAddress *url.URL
-	certPEM     []byte
-	serverPK    *ecdsa.PublicKey
-	serverMode  Mode
-	serverCert  *x509.Certificate
+	baseAddress     *url.URL
+	certPEM         []byte
+	serverPK        *ecdsa.PublicKey
+	serverMode      Mode
+	serverCert      *x509.Certificate
+	serverChallenge []byte
 }
 
 func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
@@ -55,13 +59,18 @@ func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) 
 		},
 	}
 
+	cj, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	pm, err := NewPairingPayloadManager(c.aesKey, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PairingClient{
-		Client:         &http.Client{Transport: tr},
+		Client:         &http.Client{Transport: tr, Jar: cj},
 		baseAddress:    u,
 		certPEM:        certPem,
 		serverCert:     serverCert,
@@ -76,6 +85,10 @@ func (c *PairingClient) PairAccount() error {
 	case Receiving:
 		return c.sendAccountData()
 	case Sending:
+		err := c.getChallenge()
+		if err != nil {
+			return err
+		}
 		return c.receiveAccountData()
 	default:
 		return fmt.Errorf("unrecognised server mode '%d'", c.serverMode)
@@ -84,9 +97,13 @@ func (c *PairingClient) PairAccount() error {
 
 func (c *PairingClient) sendAccountData() error {
 	c.baseAddress.Path = pairingReceive
-	_, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status not ok, received '%s'", resp.Status)
 	}
 
 	return nil
@@ -94,9 +111,27 @@ func (c *PairingClient) sendAccountData() error {
 
 func (c *PairingClient) receiveAccountData() error {
 	c.baseAddress.Path = pairingSend
-	resp, err := c.Get(c.baseAddress.String())
+	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
 		return err
+	}
+
+	if c.serverChallenge != nil {
+		ec, err := c.PayloadManager.EncryptPlain(c.serverChallenge)
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status not ok, received '%s'", resp.Status)
 	}
 
 	payload, err := ioutil.ReadAll(resp.Body)
@@ -105,4 +140,19 @@ func (c *PairingClient) receiveAccountData() error {
 	}
 
 	return c.PayloadManager.Receive(payload)
+}
+
+func (c *PairingClient) getChallenge() error {
+	c.baseAddress.Path = pairingChallenge
+	resp, err := c.Get(c.baseAddress.String())
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status not ok, received '%s'", resp.Status)
+	}
+
+	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
+	return err
 }

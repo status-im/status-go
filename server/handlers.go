@@ -1,14 +1,18 @@
 package server
 
 import (
+	"bytes"
+	"crypto/rand"
 	"database/sql"
 	"io/ioutil"
 	"net/http"
 	"time"
 
+	"github.com/btcsuite/btcutil/base58"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 )
@@ -21,14 +25,19 @@ const (
 	ipfsPath       = "/ipfs"
 
 	// Handler routes for pairing
-	pairingBase    = "/pairing"
-	pairingSend    = pairingBase + "/send"
-	pairingReceive = pairingBase + "/receive"
+	pairingBase      = "/pairing"
+	pairingSend      = pairingBase + "/send"
+	pairingReceive   = pairingBase + "/receive"
+	pairingChallenge = pairingBase + "/challenge"
+
+	// Session names
+	sessionChallenge = "challenge"
+	sessionBlocked   = "blocked"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
 
-func handleIdenticon(logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pks, ok := r.URL.Query()["publicKey"]
 		if !ok || len(pks) == 0 {
@@ -52,7 +61,7 @@ func handleIdenticon(logger *zap.Logger) func(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func handleImage(db *sql.DB, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -85,7 +94,7 @@ func handleImage(db *sql.DB, logger *zap.Logger) func(w http.ResponseWriter, r *
 	}
 }
 
-func handleAudio(db *sql.DB, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -114,7 +123,7 @@ func handleAudio(db *sql.DB, logger *zap.Logger) func(w http.ResponseWriter, r *
 	}
 }
 
-func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.ResponseWriter, r *http.Request) {
+func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hashes, ok := r.URL.Query()["hash"]
 		if !ok || len(hashes) == 0 {
@@ -140,7 +149,7 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) func(w http.Res
 	}
 }
 
-func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
+func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -154,12 +163,96 @@ func handlePairingReceive(ps *PairingServer) func(w http.ResponseWriter, r *http
 	}
 }
 
-func handlePairingSend(ps *PairingServer) func(w http.ResponseWriter, r *http.Request) {
+func handlePairingSend(ps *PairingServer) http.HandlerFunc {
+	// TODO lock sending after one successful transfer
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err := w.Write(ps.PayloadManager.ToSend())
 		if err != nil {
 			ps.logger.Error("w.Write(ps.PayloadManager.ToSend())", zap.Error(err))
+		}
+	}
+}
+
+func challengeMiddleware(ps *PairingServer, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s, err := ps.cookieStore.Get(r, sessionChallenge)
+		if err != nil {
+			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
+		}
+
+		blocked, ok := s.Values[sessionBlocked].(bool)
+		if ok && blocked {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		// If the request header doesn't include a challenge don't punish the client, just throw a 403
+		pc := r.Header.Get(sessionChallenge)
+		if pc == "" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		c, err := common.Decrypt(base58.Decode(pc), ps.ek)
+		if err != nil {
+			ps.logger.Error("c, err := common.Decrypt(rc, ps.ek)", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
+			return
+		}
+
+		// If the challenge is not in the session store don't punish the client, just throw a 403
+		challenge, ok := s.Values[sessionChallenge].([]byte)
+		if !ok {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		// Only if we have both a challenge in the session store and in the request header
+		// do we entertain blocking the client. Because then we know someone is trying to be sneaky.
+		if bytes.Compare(c, challenge) != 0 {
+			s.Values[sessionBlocked] = true
+			err = s.Save(r, w)
+			if err != nil {
+				ps.logger.Error("err = s.Save(r, w)", zap.Error(err))
+			}
+
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s, err := ps.cookieStore.Get(r, sessionChallenge)
+		if err != nil {
+			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
+		}
+
+		var challenge []byte
+		challenge, ok := s.Values[sessionChallenge].([]byte)
+		if !ok {
+			challenge = make([]byte, 64)
+			_, err = rand.Read(challenge)
+			if err != nil {
+				ps.logger.Error("_, err = rand.Read(auth)", zap.Error(err))
+			}
+
+			s.Values[sessionChallenge] = challenge
+			err = s.Save(r, w)
+			if err != nil {
+				ps.logger.Error("err = s.Save(r, w)", zap.Error(err))
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, err = w.Write(challenge)
+		if err != nil {
+			ps.logger.Error("_, err = w.Write(challenge)", zap.Error(err))
 		}
 	}
 }
