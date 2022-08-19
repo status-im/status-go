@@ -25,7 +25,7 @@ var (
 	// queries
 	purgeLookaheadQuery = query.Query{
 		Prefix:   gcLookaheadBase.String(),
-		Orders:   []query.Order{query.OrderByKey{}},
+		Orders:   []query.Order{query.OrderByFunction(orderByTimestampInKey)},
 		KeysOnly: true,
 	}
 
@@ -95,7 +95,7 @@ func (gc *dsAddrBookGc) background() {
 	defer gc.ab.childrenDone.Done()
 
 	select {
-	case <-time.After(gc.ab.opts.GCInitialDelay):
+	case <-gc.ab.clock.After(gc.ab.opts.GCInitialDelay):
 	case <-gc.ab.ctx.Done():
 		// yield if we have been cancelled/closed before the delay elapses.
 		return
@@ -180,7 +180,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 	}
 	defer results.Close()
 
-	now := time.Now().Unix()
+	now := gc.ab.clock.Now().Unix()
 
 	// keys: 	/peers/gc/addrs/<unix timestamp of next visit>/<peer ID b32>
 	// values: 	nil
@@ -214,7 +214,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 		if e, ok := gc.ab.cache.Peek(id); ok {
 			cached := e.(*addrsRecord)
 			cached.Lock()
-			if cached.clean() {
+			if cached.clean(gc.ab.clock.Now()) {
 				if err = cached.flush(batch); err != nil {
 					log.Warnf("failed to flush entry modified by GC for peer: &v, err: %v", id.Pretty(), err)
 				}
@@ -239,7 +239,7 @@ func (gc *dsAddrBookGc) purgeLookahead() {
 			dropInError(gcKey, err, "unmarshalling entry")
 			continue
 		}
-		if record.clean() {
+		if record.clean(gc.ab.clock.Now()) {
 			err = record.flush(batch)
 			if err != nil {
 				log.Warnf("failed to flush entry modified by GC for peer: &v, err: %v", id.Pretty(), err)
@@ -284,7 +284,7 @@ func (gc *dsAddrBookGc) purgeStore() {
 		}
 
 		id := record.Id.ID
-		if !record.clean() {
+		if !record.clean(gc.ab.clock.Now()) {
 			continue
 		}
 
@@ -317,7 +317,7 @@ func (gc *dsAddrBookGc) populateLookahead() {
 		return
 	}
 
-	until := time.Now().Add(gc.ab.opts.GCLookaheadInterval).Unix()
+	until := gc.ab.clock.Now().Add(gc.ab.opts.GCLookaheadInterval).Unix()
 
 	var id peer.ID
 	record := &addrsRecord{AddrBookRecord: &pb.AddrBookRecord{}}
@@ -385,4 +385,26 @@ func (gc *dsAddrBookGc) populateLookahead() {
 	}
 
 	gc.currWindowEnd = until
+}
+
+// orderByTimestampInKey orders the results by comparing the timestamp in the
+// key. A lexiographic sort by itself is wrong since "10" is less than "2", but
+// as an int 2 is obviously less than 10.
+func orderByTimestampInKey(a, b query.Entry) int {
+	aKey := ds.RawKey(a.Key)
+	aInt, err := strconv.ParseInt(aKey.Parent().Name(), 10, 64)
+	if err != nil {
+		return -1
+	}
+	bKey := ds.RawKey(b.Key)
+	bInt, err := strconv.ParseInt(bKey.Parent().Name(), 10, 64)
+	if err != nil {
+		return -1
+	}
+	if aInt < bInt {
+		return -1
+	} else if aInt == bInt {
+		return 0
+	}
+	return 1
 }

@@ -45,6 +45,7 @@ var (
 	GossipSubFanoutTTL                        = 60 * time.Second
 	GossipSubPrunePeers                       = 16
 	GossipSubPruneBackoff                     = time.Minute
+	GossipSubUnsubscribeBackoff               = 10 * time.Second
 	GossipSubConnectors                       = 8
 	GossipSubMaxPendingConnections            = 128
 	GossipSubConnectionTimeout                = 30 * time.Second
@@ -153,6 +154,11 @@ type GossipSubParams struct {
 	// before attempting to re-graft.
 	PruneBackoff time.Duration
 
+	// UnsubscribeBackoff controls the backoff time to use when unsuscribing
+	// from a topic. A peer should not resubscribe to this topic before this
+	// duration.
+	UnsubscribeBackoff time.Duration
+
 	// Connectors controls the number of active connection attempts for peers obtained through PX.
 	Connectors int
 
@@ -235,7 +241,7 @@ func DefaultGossipSubParams() GossipSubParams {
 		Dscore:                    GossipSubDscore,
 		Dout:                      GossipSubDout,
 		HistoryLength:             GossipSubHistoryLength,
-		HistoryGossip:             GossipSubHistoryLength,
+		HistoryGossip:             GossipSubHistoryGossip,
 		Dlazy:                     GossipSubDlazy,
 		GossipFactor:              GossipSubGossipFactor,
 		GossipRetransmission:      GossipSubGossipRetransmission,
@@ -244,6 +250,7 @@ func DefaultGossipSubParams() GossipSubParams {
 		FanoutTTL:                 GossipSubFanoutTTL,
 		PrunePeers:                GossipSubPrunePeers,
 		PruneBackoff:              GossipSubPruneBackoff,
+		UnsubscribeBackoff:        GossipSubUnsubscribeBackoff,
 		Connectors:                GossipSubConnectors,
 		MaxPendingConnections:     GossipSubMaxPendingConnections,
 		ConnectionTimeout:         GossipSubConnectionTimeout,
@@ -295,7 +302,7 @@ func WithPeerScore(params *PeerScoreParams, thresholds *PeerScoreThresholds) Opt
 			ps.tracer = &pubsubTracer{
 				raw:   []RawTracer{gs.score, gs.gossipTracer},
 				pid:   ps.host.ID(),
-				msgID: ps.msgID,
+				idGen: ps.idGen,
 			}
 		}
 
@@ -484,7 +491,7 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 	gs.tagTracer.Start(gs)
 
 	// start using the same msg ID function as PubSub for caching messages.
-	gs.mcache.SetMsgIdFn(p.msgID)
+	gs.mcache.SetMsgIdFn(p.idGen.ID)
 
 	// start the heartbeat
 	go gs.heartbeatTimer()
@@ -705,7 +712,7 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 				continue
 			}
 
-			ihave[mid] = msg
+			ihave[mid] = msg.Message
 		}
 	}
 
@@ -777,7 +784,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 				gs.score.AddPenalty(p, 1)
 			}
 			// refresh the backoff
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			prune = append(prune, topic)
 			continue
 		}
@@ -791,7 +798,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			// but we won't PX to them
 			doPX = false
 			// add/refresh backoff so that we don't reGRAFT too early even if the score decays back up
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			continue
 		}
 
@@ -800,7 +807,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		// mesh takeover attacks combined with love bombing
 		if len(peers) >= gs.params.Dhi && !gs.outbound[p] {
 			prune = append(prune, topic)
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			continue
 		}
 
@@ -815,7 +822,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	cprune := make([]*pb.ControlPrune, 0, len(prune))
 	for _, topic := range prune {
-		cprune = append(cprune, gs.makePrune(p, topic, doPX))
+		cprune = append(cprune, gs.makePrune(p, topic, doPX, false))
 	}
 
 	return cprune
@@ -839,7 +846,7 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 		if backoff > 0 {
 			gs.doAddBackoff(p, topic, time.Duration(backoff)*time.Second)
 		} else {
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 		}
 
 		px := prune.GetPeers()
@@ -855,8 +862,12 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 	}
 }
 
-func (gs *GossipSubRouter) addBackoff(p peer.ID, topic string) {
-	gs.doAddBackoff(p, topic, gs.params.PruneBackoff)
+func (gs *GossipSubRouter) addBackoff(p peer.ID, topic string, isUnsubscribe bool) {
+	backoff := gs.params.PruneBackoff
+	if isUnsubscribe {
+		backoff = gs.params.UnsubscribeBackoff
+	}
+	gs.doAddBackoff(p, topic, backoff)
 }
 
 func (gs *GossipSubRouter) doAddBackoff(p peer.ID, topic string, interval time.Duration) {
@@ -954,7 +965,7 @@ func (gs *GossipSubRouter) connector() {
 }
 
 func (gs *GossipSubRouter) Publish(msg *Message) {
-	gs.mcache.Put(msg.Message)
+	gs.mcache.Put(msg)
 
 	from := msg.ReceivedFrom
 	topic := msg.GetTopic()
@@ -1036,10 +1047,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 
 	gmap, ok = gs.fanout[topic]
 	if ok {
+		backoff := gs.backoff[topic]
 		// these peers have a score above the publish threshold, which may be negative
 		// so drop the ones with a negative score
 		for p := range gmap {
-			if gs.score.Score(p) < 0 {
+			_, doBackOff := backoff[p]
+			if gs.score.Score(p) < 0 || doBackOff {
 				delete(gmap, p)
 			}
 		}
@@ -1047,10 +1060,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 		if len(gmap) < gs.params.D {
 			// we need more peers; eager, as this would get fixed in the next heartbeat
 			more := gs.getPeers(topic, gs.params.D-len(gmap), func(p peer.ID) bool {
-				// filter our current peers, direct peers, and peers with negative scores
+				// filter our current peers, direct peers, peers we are backing off, and
+				// peers with negative scores
 				_, inMesh := gmap[p]
 				_, direct := gs.direct[p]
-				return !inMesh && !direct && gs.score.Score(p) >= 0
+				_, doBackOff := backoff[p]
+				return !inMesh && !direct && !doBackOff && gs.score.Score(p) >= 0
 			})
 			for _, p := range more {
 				gmap[p] = struct{}{}
@@ -1060,10 +1075,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 		delete(gs.fanout, topic)
 		delete(gs.lastpub, topic)
 	} else {
+		backoff := gs.backoff[topic]
 		peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
-			// filter direct peers and peers with negative score
+			// filter direct peers, peers we are backing off and peers with negative score
 			_, direct := gs.direct[p]
-			return !direct && gs.score.Score(p) >= 0
+			_, doBackOff := backoff[p]
+			return !direct && !doBackOff && gs.score.Score(p) >= 0
 		})
 		gmap = peerListToMap(peers)
 		gs.mesh[topic] = gmap
@@ -1090,7 +1107,11 @@ func (gs *GossipSubRouter) Leave(topic string) {
 	for p := range gmap {
 		log.Debugf("LEAVE: Remove mesh link to %s in %s", p, topic)
 		gs.tracer.Prune(p, topic)
-		gs.sendPrune(p, topic)
+		gs.sendPrune(p, topic, true)
+		// Add a backoff to this peer to prevent us from eagerly
+		// re-grafting this peer into our mesh if we rejoin this
+		// topic before the backoff period ends.
+		gs.addBackoff(p, topic, true)
 	}
 }
 
@@ -1100,8 +1121,8 @@ func (gs *GossipSubRouter) sendGraft(p peer.ID, topic string) {
 	gs.sendRPC(p, out)
 }
 
-func (gs *GossipSubRouter) sendPrune(p peer.ID, topic string) {
-	prune := []*pb.ControlPrune{gs.makePrune(p, topic, gs.doPX)}
+func (gs *GossipSubRouter) sendPrune(p peer.ID, topic string, isUnsubscribe bool) {
+	prune := []*pb.ControlPrune{gs.makePrune(p, topic, gs.doPX, isUnsubscribe)}
 	out := rpcWithControl(nil, nil, nil, nil, prune)
 	gs.sendRPC(p, out)
 }
@@ -1358,7 +1379,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		prunePeer := func(p peer.ID) {
 			gs.tracer.Prune(p, topic)
 			delete(peers, p)
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			topics := toprune[p]
 			toprune[p] = append(topics, topic)
 		}
@@ -1658,7 +1679,7 @@ func (gs *GossipSubRouter) sendGraftPrune(tograft, toprune map[peer.ID][]string,
 			delete(toprune, p)
 			prune = make([]*pb.ControlPrune, 0, len(pruning))
 			for _, topic := range pruning {
-				prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p]))
+				prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p], false))
 			}
 		}
 
@@ -1669,7 +1690,7 @@ func (gs *GossipSubRouter) sendGraftPrune(tograft, toprune map[peer.ID][]string,
 	for p, topics := range toprune {
 		prune := make([]*pb.ControlPrune, 0, len(topics))
 		for _, topic := range topics {
-			prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p]))
+			prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p], false))
 		}
 
 		out := rpcWithControl(nil, nil, nil, nil, prune)
@@ -1824,13 +1845,17 @@ func (gs *GossipSubRouter) piggybackControl(p peer.ID, out *RPC, ctl *pb.Control
 	}
 }
 
-func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool) *pb.ControlPrune {
+func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool, isUnsubscribe bool) *pb.ControlPrune {
 	if !gs.feature(GossipSubFeaturePX, gs.peers[p]) {
 		// GossipSub v1.0 -- no peer exchange, the peer won't be able to parse it anyway
 		return &pb.ControlPrune{TopicID: &topic}
 	}
 
 	backoff := uint64(gs.params.PruneBackoff / time.Second)
+	if isUnsubscribe {
+		backoff = uint64(gs.params.UnsubscribeBackoff / time.Second)
+	}
+
 	var px []*pb.PeerInfo
 	if doPX {
 		// select peers for Peer eXchange

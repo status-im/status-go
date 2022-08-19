@@ -259,6 +259,15 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		opts = append(opts, node.WithWakuRelay(relayOpts...))
 	}
 
+	if cfg.EnableStore {
+		opts = append(opts, node.WithWakuStore(true, true))
+		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, node.WithMessageProvider(dbStore))
+	}
+
 	if waku.node, err = node.New(ctx, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
@@ -342,8 +351,11 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 	if !ok {
 		w.dnsAddressCacheLock.Lock()
 		var err error
-		multiaddresses, err = dnsdisc.RetrieveNodes(ctx, enrtreeAddress)
-		w.dnsAddressCache[enrtreeAddress] = multiaddresses
+		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress)
+		for _, d := range discoveredNodes {
+			w.dnsAddressCache[enrtreeAddress] = append(w.dnsAddressCache[enrtreeAddress], d.Addresses...)
+		}
+
 		w.dnsAddressCacheLock.Unlock()
 		if err != nil {
 			log.Warn("dns discovery error ", err)
@@ -384,7 +396,7 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 	}
 
 	addToStore := func(m multiaddr.Multiaddr, protocol libp2pproto.ID) {
-		peerID, err := w.node.AddPeer(m, protocol)
+		peerID, err := w.node.AddPeer(m, string(protocol))
 		if err != nil {
 			log.Warn("could not add peer", "multiaddr", m, "err", err)
 			return
@@ -868,7 +880,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(hash)]
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		envelope := wakuprotocol.NewEnvelope(msg, relay.DefaultWakuTopic)
+		envelope := wakuprotocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
@@ -899,7 +911,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 	}
 
 	for _, msg := range result.Messages {
-		envelope := wakuprotocol.NewEnvelope(msg, relay.DefaultWakuTopic)
+		envelope := wakuprotocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		w.logger.Debug("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
 		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
@@ -1097,7 +1109,7 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, string(store.StoreID_v20beta4))
 	if err != nil {
 		return "", err
 	}
@@ -1110,7 +1122,7 @@ func (w *Waku) AddRelayPeer(address string) (string, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, string(relay.WakuRelayID_v200))
 	if err != nil {
 		return "", err
 	}

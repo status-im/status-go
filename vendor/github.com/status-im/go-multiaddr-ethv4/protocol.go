@@ -1,7 +1,6 @@
 package ethv4
 
 import (
-	"crypto/ecdsa"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -9,6 +8,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
+
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 )
 
 const (
@@ -61,5 +62,6 @@ func PeerIDToNodeID(pid string) (n enode.ID, err error) {
 	if !ok {
 		return n, errors.New("public key is not on the secp256k1 curve")
 	}
-	return enode.PubkeyToIDV4((*ecdsa.PublicKey)(seckey)), nil
+
+	return enode.PubkeyToIDV4((*btcec.PublicKey)(seckey).ToECDSA()), nil
 }

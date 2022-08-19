@@ -690,7 +690,7 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 		return NULL;
 
 	/* Get the IORegistry entry for the given path */
-	entry = IORegistryEntryFromPath(kIOMasterPortDefault, path);
+	entry = IORegistryEntryFromPath(kIOMainPortDefault, path);
 	if (entry == MACH_PORT_NULL) {
 		/* Path wasn't valid (maybe device was removed?) */
 		goto return_error;

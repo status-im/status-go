@@ -2,6 +2,7 @@ package rcmgr
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/network"
@@ -32,6 +33,8 @@ type resourceScope struct {
 	done   bool
 	refCnt int
 
+	spanID int
+
 	rc    resources
 	owner *resourceScope   // set in span scopes, which define trees
 	edges []*resourceScope // set in DAG scopes, it's the linearized parent set
@@ -59,16 +62,21 @@ func newResourceScope(limit Limit, edges []*resourceScope, name string, trace *t
 	return r
 }
 
-func newResourceScopeSpan(owner *resourceScope) *resourceScope {
+func newResourceScopeSpan(owner *resourceScope, id int) *resourceScope {
 	r := &resourceScope{
 		rc:      resources{limit: owner.rc.limit},
 		owner:   owner,
-		name:    fmt.Sprintf("%s.span", owner.name),
+		name:    fmt.Sprintf("%s.span-%d", owner.name, id),
 		trace:   owner.trace,
 		metrics: owner.metrics,
 	}
 	r.trace.CreateScope(r.name, r.rc.limit)
 	return r
+}
+
+// IsSpan will return true if this name was created by newResourceScopeSpan
+func IsSpan(name string) bool {
+	return strings.Contains(name, ".span-")
 }
 
 // Resources implementation
@@ -79,9 +87,14 @@ func (rc *resources) checkMemory(rsvp int64, prio uint8) error {
 	threshold := (1 + int64(prio)) * limit / 256
 
 	if newmem > threshold {
-		return network.ErrResourceLimitExceeded
+		return &errMemoryLimitExceeded{
+			current:   rc.memory,
+			attempted: rsvp,
+			limit:     limit,
+			priority:  prio,
+			err:       network.ErrResourceLimitExceeded,
+		}
 	}
-
 	return nil
 }
 
@@ -112,14 +125,36 @@ func (rc *resources) addStream(dir network.Direction) error {
 }
 
 func (rc *resources) addStreams(incount, outcount int) error {
-	if incount > 0 && rc.nstreamsIn+incount > rc.limit.GetStreamLimit(network.DirInbound) {
-		return fmt.Errorf("cannot reserve stream: %w", network.ErrResourceLimitExceeded)
+	if incount > 0 {
+		limit := rc.limit.GetStreamLimit(network.DirInbound)
+		if rc.nstreamsIn+incount > limit {
+			return &errStreamOrConnLimitExceeded{
+				current:   rc.nstreamsIn,
+				attempted: incount,
+				limit:     limit,
+				err:       fmt.Errorf("cannot reserve inbound stream: %w", network.ErrResourceLimitExceeded),
+			}
+		}
 	}
-	if outcount > 0 && rc.nstreamsOut+outcount > rc.limit.GetStreamLimit(network.DirOutbound) {
-		return fmt.Errorf("cannot reserve stream: %w", network.ErrResourceLimitExceeded)
+	if outcount > 0 {
+		limit := rc.limit.GetStreamLimit(network.DirOutbound)
+		if rc.nstreamsOut+outcount > limit {
+			return &errStreamOrConnLimitExceeded{
+				current:   rc.nstreamsOut,
+				attempted: outcount,
+				limit:     limit,
+				err:       fmt.Errorf("cannot reserve outbound stream: %w", network.ErrResourceLimitExceeded),
+			}
+		}
 	}
-	if rc.nstreamsIn+incount+rc.nstreamsOut+outcount > rc.limit.GetStreamTotalLimit() {
-		return fmt.Errorf("cannot reserve stream: %w", network.ErrResourceLimitExceeded)
+
+	if limit := rc.limit.GetStreamTotalLimit(); rc.nstreamsIn+incount+rc.nstreamsOut+outcount > limit {
+		return &errStreamOrConnLimitExceeded{
+			current:   rc.nstreamsIn + rc.nstreamsOut,
+			attempted: incount + outcount,
+			limit:     limit,
+			err:       fmt.Errorf("cannot reserve stream: %w", network.ErrResourceLimitExceeded),
+		}
 	}
 
 	rc.nstreamsIn += incount
@@ -163,17 +198,47 @@ func (rc *resources) addConn(dir network.Direction, usefd bool) error {
 }
 
 func (rc *resources) addConns(incount, outcount, fdcount int) error {
-	if incount > 0 && rc.nconnsIn+incount > rc.limit.GetConnLimit(network.DirInbound) {
-		return fmt.Errorf("cannot reserve connection: %w", network.ErrResourceLimitExceeded)
+	if incount > 0 {
+		limit := rc.limit.GetConnLimit(network.DirInbound)
+		if rc.nconnsIn+incount > limit {
+			return &errStreamOrConnLimitExceeded{
+				current:   rc.nconnsIn,
+				attempted: incount,
+				limit:     limit,
+				err:       fmt.Errorf("cannot reserve inbound connection: %w", network.ErrResourceLimitExceeded),
+			}
+		}
 	}
-	if outcount > 0 && rc.nconnsOut+outcount > rc.limit.GetConnLimit(network.DirOutbound) {
-		return fmt.Errorf("cannot reserve connection: %w", network.ErrResourceLimitExceeded)
+	if outcount > 0 {
+		limit := rc.limit.GetConnLimit(network.DirOutbound)
+		if rc.nconnsOut+outcount > limit {
+			return &errStreamOrConnLimitExceeded{
+				current:   rc.nconnsOut,
+				attempted: outcount,
+				limit:     limit,
+				err:       fmt.Errorf("cannot reserve outbound connection: %w", network.ErrResourceLimitExceeded),
+			}
+		}
 	}
-	if rc.nconnsIn+incount+rc.nconnsOut+outcount > rc.limit.GetConnTotalLimit() {
-		return fmt.Errorf("cannot reserve connection: %w", network.ErrResourceLimitExceeded)
+
+	if connLimit := rc.limit.GetConnTotalLimit(); rc.nconnsIn+incount+rc.nconnsOut+outcount > connLimit {
+		return &errStreamOrConnLimitExceeded{
+			current:   rc.nconnsIn + rc.nconnsOut,
+			attempted: incount + outcount,
+			limit:     connLimit,
+			err:       fmt.Errorf("cannot reserve connection: %w", network.ErrResourceLimitExceeded),
+		}
 	}
-	if fdcount > 0 && rc.nfd+fdcount > rc.limit.GetFDLimit() {
-		return fmt.Errorf("cannot reserve file descriptor: %w", network.ErrResourceLimitExceeded)
+	if fdcount > 0 {
+		limit := rc.limit.GetFDLimit()
+		if rc.nfd+fdcount > limit {
+			return &errStreamOrConnLimitExceeded{
+				current:   rc.nfd,
+				attempted: fdcount,
+				limit:     limit,
+				err:       fmt.Errorf("cannot reserve file descriptor: %w", network.ErrResourceLimitExceeded),
+			}
+		}
 	}
 
 	rc.nconnsIn += incount
@@ -239,7 +304,7 @@ func (s *resourceScope) ReserveMemory(size int, prio uint8) error {
 	}
 
 	if err := s.rc.reserveMemory(int64(size), prio); err != nil {
-		log.Debugw("blocked memory reservation", "scope", s.name, "size", size, "priority", prio, "stat", s.rc.stat(), "error", err)
+		log.Debugw("blocked memory reservation", logValuesMemoryLimit(s.name, "", s.rc.stat(), err)...)
 		s.trace.BlockReserveMemory(s.name, prio, int64(size), s.rc.memory)
 		s.metrics.BlockMemory(size)
 		return s.wrapError(err)
@@ -264,8 +329,10 @@ func (s *resourceScope) reserveMemoryForEdges(size int, prio uint8) error {
 	var reserved int
 	var err error
 	for _, e := range s.edges {
-		if err = e.ReserveMemoryForChild(int64(size), prio); err != nil {
-			log.Debugw("blocked memory reservation from constraining edge", "scope", s.name, "edge", e.name, "size", size, "priority", prio, "stat", e.Stat(), "error", err)
+		var stat network.ScopeStat
+		stat, err = e.ReserveMemoryForChild(int64(size), prio)
+		if err != nil {
+			log.Debugw("blocked memory reservation from constraining edge", logValuesMemoryLimit(s.name, e.name, stat, err)...)
 			break
 		}
 
@@ -293,21 +360,21 @@ func (s *resourceScope) releaseMemoryForEdges(size int) {
 	}
 }
 
-func (s *resourceScope) ReserveMemoryForChild(size int64, prio uint8) error {
+func (s *resourceScope) ReserveMemoryForChild(size int64, prio uint8) (network.ScopeStat, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.done {
-		return s.wrapError(network.ErrResourceScopeClosed)
+		return s.rc.stat(), s.wrapError(network.ErrResourceScopeClosed)
 	}
 
 	if err := s.rc.reserveMemory(size, prio); err != nil {
 		s.trace.BlockReserveMemory(s.name, prio, size, s.rc.memory)
-		return s.wrapError(err)
+		return s.rc.stat(), s.wrapError(err)
 	}
 
 	s.trace.ReserveMemory(s.name, prio, size, s.rc.memory)
-	return nil
+	return network.ScopeStat{}, nil
 }
 
 func (s *resourceScope) ReleaseMemory(size int) {
@@ -344,7 +411,7 @@ func (s *resourceScope) AddStream(dir network.Direction) error {
 	}
 
 	if err := s.rc.addStream(dir); err != nil {
-		log.Debugw("blocked stream", "scope", s.name, "direction", dir, "stat", s.rc.stat(), "error", err)
+		log.Debugw("blocked stream", logValuesStreamLimit(s.name, "", dir, s.rc.stat(), err)...)
 		s.trace.BlockAddStream(s.name, dir, s.rc.nstreamsIn, s.rc.nstreamsOut)
 		return s.wrapError(err)
 	}
@@ -366,8 +433,10 @@ func (s *resourceScope) addStreamForEdges(dir network.Direction) error {
 	var err error
 	var reserved int
 	for _, e := range s.edges {
-		if err = e.AddStreamForChild(dir); err != nil {
-			log.Debugw("blocked stream from constraining edge", "scope", s.name, "edge", e.name, "direction", dir, "stat", e.Stat(), "error", err)
+		var stat network.ScopeStat
+		stat, err = e.AddStreamForChild(dir)
+		if err != nil {
+			log.Debugw("blocked stream from constraining edge", logValuesStreamLimit(s.name, e.name, dir, stat, err)...)
 			break
 		}
 		reserved++
@@ -382,21 +451,21 @@ func (s *resourceScope) addStreamForEdges(dir network.Direction) error {
 	return err
 }
 
-func (s *resourceScope) AddStreamForChild(dir network.Direction) error {
+func (s *resourceScope) AddStreamForChild(dir network.Direction) (network.ScopeStat, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.done {
-		return s.wrapError(network.ErrResourceScopeClosed)
+		return s.rc.stat(), s.wrapError(network.ErrResourceScopeClosed)
 	}
 
 	if err := s.rc.addStream(dir); err != nil {
 		s.trace.BlockAddStream(s.name, dir, s.rc.nstreamsIn, s.rc.nstreamsOut)
-		return s.wrapError(err)
+		return s.rc.stat(), s.wrapError(err)
 	}
 
 	s.trace.AddStream(s.name, dir, s.rc.nstreamsIn, s.rc.nstreamsOut)
-	return nil
+	return network.ScopeStat{}, nil
 }
 
 func (s *resourceScope) RemoveStream(dir network.Direction) {
@@ -444,7 +513,7 @@ func (s *resourceScope) AddConn(dir network.Direction, usefd bool) error {
 	}
 
 	if err := s.rc.addConn(dir, usefd); err != nil {
-		log.Debugw("blocked connection", "scope", s.name, "direction", dir, "usefd", usefd, "stat", s.rc.stat(), "error", err)
+		log.Debugw("blocked connection", logValuesConnLimit(s.name, "", dir, usefd, s.rc.stat(), err)...)
 		s.trace.BlockAddConn(s.name, dir, usefd, s.rc.nconnsIn, s.rc.nconnsOut, s.rc.nfd)
 		return s.wrapError(err)
 	}
@@ -466,8 +535,10 @@ func (s *resourceScope) addConnForEdges(dir network.Direction, usefd bool) error
 	var err error
 	var reserved int
 	for _, e := range s.edges {
-		if err = e.AddConnForChild(dir, usefd); err != nil {
-			log.Debugw("blocked connection from constraining edge", "scope", s.name, "edge", e.name, "direction", dir, "usefd", usefd, "stat", e.Stat(), "error", err)
+		var stat network.ScopeStat
+		stat, err = e.AddConnForChild(dir, usefd)
+		if err != nil {
+			log.Debugw("blocked connection from constraining edge", logValuesConnLimit(s.name, e.name, dir, usefd, stat, err)...)
 			break
 		}
 		reserved++
@@ -482,21 +553,21 @@ func (s *resourceScope) addConnForEdges(dir network.Direction, usefd bool) error
 	return err
 }
 
-func (s *resourceScope) AddConnForChild(dir network.Direction, usefd bool) error {
+func (s *resourceScope) AddConnForChild(dir network.Direction, usefd bool) (network.ScopeStat, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.done {
-		return s.wrapError(network.ErrResourceScopeClosed)
+		return s.rc.stat(), s.wrapError(network.ErrResourceScopeClosed)
 	}
 
 	if err := s.rc.addConn(dir, usefd); err != nil {
 		s.trace.BlockAddConn(s.name, dir, usefd, s.rc.nconnsIn, s.rc.nconnsOut, s.rc.nfd)
-		return s.wrapError(err)
+		return s.rc.stat(), s.wrapError(err)
 	}
 
 	s.trace.AddConn(s.name, dir, usefd, s.rc.nconnsIn, s.rc.nconnsOut, s.rc.nfd)
-	return nil
+	return network.ScopeStat{}, nil
 }
 
 func (s *resourceScope) RemoveConn(dir network.Direction, usefd bool) {
@@ -610,6 +681,11 @@ func (s *resourceScope) ReleaseResources(st network.ScopeStat) {
 	s.trace.RemoveConns(s.name, st.NumConnsInbound, st.NumConnsOutbound, st.NumFD, s.rc.nconnsIn, s.rc.nconnsOut, s.rc.nfd)
 }
 
+func (s *resourceScope) nextSpanID() int {
+	s.spanID++
+	return s.spanID
+}
+
 func (s *resourceScope) BeginSpan() (network.ResourceScopeSpan, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -619,7 +695,7 @@ func (s *resourceScope) BeginSpan() (network.ResourceScopeSpan, error) {
 	}
 
 	s.refCnt++
-	return newResourceScopeSpan(s), nil
+	return newResourceScopeSpan(s, s.nextSpanID()), nil
 }
 
 func (s *resourceScope) Done() {

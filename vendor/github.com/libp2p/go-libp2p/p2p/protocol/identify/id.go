@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -54,19 +53,6 @@ var (
 	maxMessages      = 10
 	defaultUserAgent = "github.com/libp2p/go-libp2p"
 )
-
-func init() {
-	bi, ok := debug.ReadBuildInfo()
-	if !ok {
-		return
-	}
-	version := bi.Main.Version
-	if version == "(devel)" {
-		defaultUserAgent = bi.Main.Path
-	} else {
-		defaultUserAgent = fmt.Sprintf("%s@%s", bi.Main.Path, bi.Main.Version)
-	}
-}
 
 type addPeerHandlerReq struct {
 	rp   peer.ID
@@ -341,6 +327,7 @@ func (ids *idService) IdentifyWait(c network.Conn) <-chan struct{} {
 		go func() {
 			defer close(wait)
 			if err := ids.identifyConn(c); err != nil {
+				log.Warnf("failed to identify %s: %s", c.RemotePeer(), err)
 				ids.emitters.evtPeerIdentificationFailed.Emit(event.EvtPeerIdentificationFailed{Peer: c.RemotePeer(), Reason: err})
 				return
 			}
@@ -776,15 +763,6 @@ func (ids *idService) consumeObservedAddress(observed []byte, c network.Conn) {
 	ids.observedAddrs.Record(c, maddr)
 }
 
-func addrInAddrs(a ma.Multiaddr, as []ma.Multiaddr) bool {
-	for _, b := range as {
-		if a.Equal(b) {
-			return true
-		}
-	}
-	return false
-}
-
 func signedPeerRecordFromMessage(msg *pb.Identify) (*record.Envelope, error) {
 	if msg.SignedPeerRecord == nil || len(msg.SignedPeerRecord) == 0 {
 		return nil, nil
@@ -828,7 +806,5 @@ func (nn *netNotifiee) Disconnected(n network.Network, v network.Conn) {
 	}
 }
 
-func (nn *netNotifiee) OpenedStream(n network.Network, v network.Stream) {}
-func (nn *netNotifiee) ClosedStream(n network.Network, v network.Stream) {}
-func (nn *netNotifiee) Listen(n network.Network, a ma.Multiaddr)         {}
-func (nn *netNotifiee) ListenClose(n network.Network, a ma.Multiaddr)    {}
+func (nn *netNotifiee) Listen(n network.Network, a ma.Multiaddr)      {}
+func (nn *netNotifiee) ListenClose(n network.Network, a ma.Multiaddr) {}
