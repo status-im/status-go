@@ -8,13 +8,13 @@ import (
 )
 
 type IdentityImage struct {
-	KeyUID       string `json:"key_uid"`
+	KeyUID       string `json:"keyUID"`
 	Name         string `json:"name"`
 	Payload      []byte `json:"payload"`
 	Width        int    `json:"width"`
 	Height       int    `json:"height"`
-	FileSize     int    `json:"file_size"`
-	ResizeTarget int    `json:"resize_target"`
+	FileSize     int    `json:"fileSize"`
+	ResizeTarget int    `json:"resizeTarget"`
 	Clock        uint64 `json:"clock"`
 }
 
@@ -65,8 +65,5 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 }
 
 func (i IdentityImage) IsEmpty() bool {
-	if i.KeyUID == "" && i.Name == "" && len(i.Payload) == 0 && i.Width == 0 && i.Height == 0 && i.FileSize == 0 && i.ResizeTarget == 0 && i.Clock == 0 {
-		return true
-	}
-	return false
+	return i.KeyUID == "" && i.Name == "" && len(i.Payload) == 0 && i.Width == 0 && i.Height == 0 && i.FileSize == 0 && i.ResizeTarget == 0 && i.Clock == 0
 }

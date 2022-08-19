@@ -30,8 +30,10 @@ type PayloadManager interface {
 
 // PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
 type PairingPayloadManagerConfig struct {
-	DB                             *multiaccounts.Database
-	KeystorePath, KeyUID, Password string
+	DB           *multiaccounts.Database
+	KeystorePath string
+	KeyUID       string
+	Password     string
 }
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
