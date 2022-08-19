@@ -1452,5 +1452,6 @@ func TestSaveDiscordMessages(t *testing.T) {
 		dm := m.GetDiscordMessage()
 		require.NotNil(t, dm)
 		require.EqualValues(t, id, dm.Id)
+		require.EqualValues(t, "2", dm.Author.Id)
 	}
 }

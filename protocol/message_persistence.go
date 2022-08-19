@@ -1935,7 +1935,7 @@ func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMess
 		_ = tx.Rollback()
 	}()
 
-	query := "INSERT INTO discord_messages(id, author_id, type, timestamp, timestamp_edited, content, reference_message_id, reference_channel_id, reference_guild_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	query := "INSERT OR REPLACE INTO discord_messages(id, author_id, type, timestamp, timestamp_edited, content, reference_message_id, reference_channel_id, reference_guild_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -1945,11 +1945,11 @@ func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMess
 	for _, msg := range messages {
 		_, err = stmt.Exec(
 			msg.GetId(),
+			msg.Author.GetId(),
 			msg.GetType(),
 			msg.GetTimestamp(),
 			msg.GetTimestampEdited(),
 			msg.GetContent(),
-			msg.Author.GetId(),
 			msg.Reference.GetMessageId(),
 			msg.Reference.GetChannelId(),
 			msg.Reference.GetGuildId(),
