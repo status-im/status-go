@@ -286,7 +286,7 @@ func (m *Manager) Created() ([]*Community, error) {
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
-func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community, error) {
+func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish bool) (*Community, error) {
 
 	description, err := request.ToCommunityDescription()
 	if err != nil {
@@ -329,7 +329,9 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, nil
 }
@@ -444,7 +446,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -464,7 +466,9 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, changes, nil
 }
@@ -528,7 +532,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	return community, description, nil
 }
 
-func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publish bool) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -556,7 +560,9 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Co
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, changes, nil
 }

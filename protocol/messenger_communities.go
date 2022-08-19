@@ -453,7 +453,7 @@ func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCat
 	}
 
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateCategory(request)
+	community, changes, err := m.communitiesManager.CreateCategory(request, true)
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +651,7 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateChat(communityID, c)
+	community, changes, err := m.communitiesManager.CreateChat(communityID, c, true)
 	if err != nil {
 		return nil, err
 	}
@@ -750,7 +750,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 
 	response := &MessengerResponse{}
 
-	community, err := m.communitiesManager.CreateCommunity(request)
+	community, err := m.communitiesManager.CreateCommunity(request, true)
 	if err != nil {
 		return nil, err
 	}
