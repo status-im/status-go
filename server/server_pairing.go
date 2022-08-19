@@ -2,9 +2,12 @@ package server
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/tls"
 	"fmt"
 	"net"
+
+	"github.com/gorilla/sessions"
 )
 
 type PairingServer struct {
@@ -14,6 +17,8 @@ type PairingServer struct {
 	pk   *ecdsa.PublicKey
 	ek   []byte
 	mode Mode
+
+	cookieStore *sessions.CookieStore
 }
 
 type Config struct {
@@ -28,9 +33,30 @@ type Config struct {
 	*PairingPayloadManagerConfig
 }
 
+func makeCookieStore() (*sessions.CookieStore, error) {
+	auth := make([]byte, 64)
+	_, err := rand.Read(auth)
+	if err != nil {
+		return nil, err
+	}
+
+	enc := make([]byte, 32)
+	_, err = rand.Read(enc)
+	if err != nil {
+		return nil, err
+	}
+
+	return sessions.NewCookieStore(auth, enc), nil
+}
+
 // NewPairingServer returns a *PairingServer init from the given *Config
 func NewPairingServer(config *Config) (*PairingServer, error) {
 	pm, err := NewPairingPayloadManager(config.EK, config.PairingPayloadManagerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, err := makeCookieStore()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +68,9 @@ func NewPairingServer(config *Config) (*PairingServer, error) {
 		pk:             config.PK,
 		ek:             config.EK,
 		mode:           config.Mode,
-		PayloadManager: pm}, nil
+		PayloadManager: pm,
+		cookieStore:    cs,
+	}, nil
 }
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
@@ -76,11 +104,17 @@ func (s *PairingServer) StartPairing() error {
 }
 
 func (s *PairingServer) startReceivingAccountData() error {
-	s.SetHandlers(HandlerPatternMap{pairingReceive: handlePairingReceive(s)})
+	s.SetHandlers(HandlerPatternMap{
+		pairingReceive:   handlePairingReceive(s),
+		pairingChallenge: handlePairingChallenge(s),
+	})
 	return s.Start()
 }
 
 func (s *PairingServer) startSendingAccountData() error {
-	s.SetHandlers(HandlerPatternMap{pairingSend: handlePairingSend(s)})
+	s.SetHandlers(HandlerPatternMap{
+		pairingSend:      challengeMiddleware(s, handlePairingSend(s)),
+		pairingChallenge: handlePairingChallenge(s),
+	})
 	return s.Start()
 }

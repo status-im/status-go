@@ -116,7 +116,7 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 }
 
 type MockEncryptOnlyPayloadManager struct {
-	pem *PayloadEncryptionManager
+	*PayloadEncryptionManager
 }
 
 func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadManager, error) {
@@ -126,7 +126,7 @@ func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadMan
 	}
 
 	return &MockEncryptOnlyPayloadManager{
-		pem: pem,
+		pem,
 	}, nil
 }
 
@@ -138,21 +138,9 @@ func (m *MockEncryptOnlyPayloadManager) Mount() error {
 		return err
 	}
 
-	return m.pem.Encrypt(data)
+	return m.Encrypt(data)
 }
 
 func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
-	return m.pem.Decrypt(data)
-}
-
-func (m *MockEncryptOnlyPayloadManager) ToSend() []byte {
-	return m.pem.ToSend()
-}
-
-func (m *MockEncryptOnlyPayloadManager) Received() []byte {
-	return m.pem.Received()
-}
-
-func (m *MockEncryptOnlyPayloadManager) ResetPayload() {
-	m.pem.ResetPayload()
+	return m.Decrypt(data)
 }

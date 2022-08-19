@@ -24,6 +24,7 @@ type PayloadManager interface {
 	ToSend() []byte
 	Received() []byte
 	ResetPayload()
+	EncryptPlain(plaintext []byte) ([]byte, error)
 }
 
 // PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
@@ -36,8 +37,8 @@ type PairingPayloadManagerConfig struct {
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
 type PairingPayloadManager struct {
-	pp  *PairingPayload
-	pem *PayloadEncryptionManager
+	pp *PairingPayload
+	*PayloadEncryptionManager
 	ppm *PairingPayloadMarshaller
 	ppr PayloadRepository
 }
@@ -53,10 +54,10 @@ func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig
 	p := new(PairingPayload)
 
 	return &PairingPayloadManager{
-		pp:  p,
-		pem: pem,
-		ppm: NewPairingPayloadMarshaller(p),
-		ppr: NewPairingPayloadRepository(p, config),
+		pp:                       p,
+		PayloadEncryptionManager: pem,
+		ppm:                      NewPairingPayloadMarshaller(p),
+		ppr:                      NewPairingPayloadRepository(p, config),
 	}, nil
 }
 
@@ -72,17 +73,17 @@ func (ppm *PairingPayloadManager) Mount() error {
 		return err
 	}
 
-	return ppm.pem.Encrypt(pb)
+	return ppm.Encrypt(pb)
 }
 
 // Receive takes a []byte representing raw data, parses and stores the data
 func (ppm *PairingPayloadManager) Receive(data []byte) error {
-	err := ppm.pem.Decrypt(data)
+	err := ppm.Decrypt(data)
 	if err != nil {
 		return err
 	}
 
-	err = ppm.ppm.UnmarshalProtobuf(ppm.pem.Received())
+	err = ppm.ppm.UnmarshalProtobuf(ppm.Received())
 	if err != nil {
 		return err
 	}
@@ -90,20 +91,10 @@ func (ppm *PairingPayloadManager) Receive(data []byte) error {
 	return ppm.ppr.StoreToSource()
 }
 
-// ToSend returns the result of Mount
-func (ppm *PairingPayloadManager) ToSend() []byte {
-	return ppm.pem.ToSend()
-}
-
-// Received returns the decrypted input of Receive
-func (ppm *PairingPayloadManager) Received() []byte {
-	return ppm.pem.Received()
-}
-
 // ResetPayload resets all payload state managed by the PairingPayloadManager
 func (ppm *PairingPayloadManager) ResetPayload() {
 	ppm.pp.ResetPayload()
-	ppm.pem.ResetPayload()
+	ppm.PayloadEncryptionManager.ResetPayload()
 }
 
 // EncryptionPayload represents the plain text and encrypted text of payload data
@@ -121,6 +112,10 @@ type PayloadEncryptionManager struct {
 
 func NewPayloadEncryptionManager(aesKey []byte) (*PayloadEncryptionManager, error) {
 	return &PayloadEncryptionManager{aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
+}
+
+func (pem *PayloadEncryptionManager) EncryptPlain(plaintext []byte) ([]byte, error) {
+	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
 }
 
 func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
