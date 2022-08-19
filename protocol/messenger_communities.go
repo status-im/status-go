@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -208,7 +210,7 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
-	testNetworksEnabled, err := m.settings.TestNetworksEnabled()
+	/*testNetworksEnabled, err := m.settings.TestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -222,6 +224,34 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	if err != nil {
 		return nil, err
 	}
+	*/
+
+	// --- Delete this code once we have the curated communities contract in mainnet
+	// Since we are bypassing tesnet being enabled or not, we gotta obtain the networks from the node config
+	chainID := uint64(69)
+	sDB, err := accounts.NewDB(m.database)
+	if err != nil {
+		return nil, err
+	}
+	nodeConfig, err := sDB.GetNodeConfig()
+	if err != nil {
+		return nil, err
+	}
+	var backend *ethclient.Client
+	for _, n := range nodeConfig.Networks {
+		if n.ChainID == chainID {
+			b, err := ethclient.Dial(n.RPCURL)
+			if err != nil {
+				return nil, err
+			}
+			backend = b
+		}
+	}
+	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, backend)
+	if err != nil {
+		return nil, err
+	}
+	// --- end delete
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
