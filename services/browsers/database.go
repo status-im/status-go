@@ -33,6 +33,14 @@ type Bookmark struct {
 	Clock     uint64 `json:"-"` //used to sync
 	DeletedAt uint64 `json:"deletedAt,omitempty"`
 }
+type Browser struct {
+	ID           string   `json:"browser-id"`
+	Name         string   `json:"name"`
+	Timestamp    uint64   `json:"timestamp"`
+	Dapp         bool     `json:"dapp?"`
+	HistoryIndex int      `json:"history-index"`
+	History      []string `json:"history,omitempty"`
+}
 
 func (db *Database) GetBookmarks() ([]*Bookmark, error) {
 	rows, err := db.db.Query(`SELECT url, name, image_url, removed, deleted_at FROM bookmarks`)

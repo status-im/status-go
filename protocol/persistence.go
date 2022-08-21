@@ -1176,16 +1176,7 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 	return bookmark, err
 }
 
-type Browser struct {
-	ID           string   `json:"browser-id"`
-	Name         string   `json:"name"`
-	Timestamp    uint64   `json:"timestamp"`
-	Dapp         bool     `json:"dapp?"`
-	HistoryIndex int      `json:"history-index"`
-	History      []string `json:"history,omitempty"`
-}
-
-func (db *sqlitePersistence) AddBrowser(browser Browser) (err error) {
+func (db *sqlitePersistence) AddBrowser(browser browsers.Browser) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return
@@ -1225,7 +1216,7 @@ func (db *sqlitePersistence) AddBrowser(browser Browser) (err error) {
 	return
 }
 
-func (db *sqlitePersistence) InsertBrowser(browser Browser) (err error) {
+func (db *sqlitePersistence) InsertBrowser(browser browsers.Browser) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return
@@ -1283,7 +1274,7 @@ func (db *sqlitePersistence) RemoveBookmark(url string, deletedAt uint64) error 
 	return err
 }
 
-func (db *sqlitePersistence) GetBrowsers() (rst []*Browser, err error) {
+func (db *sqlitePersistence) GetBrowsers() (rst []*browsers.Browser, err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return
@@ -1302,14 +1293,14 @@ func (db *sqlitePersistence) GetBrowsers() (rst []*Browser, err error) {
 		return
 	}
 	defer bRows.Close()
-	browsers := map[string]*Browser{}
+	browsersArr := map[string]*browsers.Browser{}
 	for bRows.Next() {
-		browser := Browser{}
+		browser := browsers.Browser{}
 		err = bRows.Scan(&browser.ID, &browser.Name, &browser.Timestamp, &browser.Dapp, &browser.HistoryIndex)
 		if err != nil {
 			return nil, err
 		}
-		browsers[browser.ID] = &browser
+		browsersArr[browser.ID] = &browser
 		rst = append(rst, &browser)
 	}
 
@@ -1327,7 +1318,7 @@ func (db *sqlitePersistence) GetBrowsers() (rst []*Browser, err error) {
 		if err != nil {
 			return
 		}
-		browsers[id].History = append(browsers[id].History, history)
+		browsersArr[id].History = append(browsersArr[id].History, history)
 	}
 
 	return rst, nil
