@@ -210,25 +210,9 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
-	/*testNetworksEnabled, err := m.settings.TestNetworksEnabled()
-	if err != nil {
-		return nil, err
-	}
+	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
 
-	chainID := uint64(10) // Optimism (mainnet)
-	if testNetworksEnabled {
-		chainID = 69 // Optimism (kovan)
-	}
-
-	directory, err := m.contractMaker.NewDirectory(chainID)
-	if err != nil {
-		return nil, err
-	}
-	*/
-
-	// --- Delete this code once we have the curated communities contract in mainnet
-	// Since we are bypassing tesnet being enabled or not, we gotta obtain the networks from the node config
-	chainID := uint64(69)
+	chainID := uint64(69) // Optimism Kovan
 	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
 		return nil, err
