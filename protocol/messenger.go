@@ -4408,6 +4408,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+					case protobuf.CommunityRequestToLeave:
+						logger.Debug("Handling CommunityRequestToLeave")
+						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToLeave)
+						err = m.HandleCommunityRequestToLeave(messageState, publicKey, request)
+						if err != nil {
+							logger.Warn("failed to handle CommunityRequestToLeave", zap.Error(err))
+							continue
+						}
 
 					case protobuf.CommunityMessageArchiveMagnetlink:
 						logger.Debug("Handling CommunityMessageArchiveMagnetlink")

@@ -202,6 +202,23 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	}
 }
 
+func (s *PersistenceSuite) TestSaveRequestToLeave() {
+	rtl := &RequestToLeave{
+		ID:          []byte("0x123456"),
+		PublicKey:   "0xffffff",
+		Clock:       2,
+		CommunityID: []byte("0x654321"),
+	}
+
+	err := s.db.SaveRequestToLeave(rtl)
+	s.NoError(err)
+
+	// older clocks should not be saved
+	rtl.Clock = 1
+	err = s.db.SaveRequestToLeave(rtl)
+	s.Error(err)
+}
+
 func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Community {
 	comPrivKey, err := crypto.GenerateKey()
 	s.NoError(err, "crypto.GenerateKey shouldn't give any error")

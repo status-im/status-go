@@ -1022,6 +1022,28 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	return nil
 }
 
+func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToLeaveProto protobuf.CommunityRequestToLeave) error {
+	if requestToLeaveProto.CommunityId == nil {
+		return errors.New("invalid community id")
+	}
+
+	err := m.communitiesManager.HandleCommunityRequestToLeave(signer, &requestToLeaveProto)
+	if err != nil {
+		return err
+	}
+
+	response, err := m.RemoveUserFromCommunity(requestToLeaveProto.CommunityId, common.PubkeyToHex(signer))
+	if err != nil {
+		return err
+	}
+
+	if len(response.Communities()) > 0 {
+		state.Response.AddCommunity(response.Communities()[0])
+	}
+
+	return nil
+}
+
 // handleWrappedCommunityDescriptionMessage handles a wrapped community description
 func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*communities.CommunityResponse, error) {
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
