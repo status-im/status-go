@@ -1,17 +1,67 @@
 package protocol
 
 import (
+	"context"
+	"crypto/ecdsa"
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
 
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/waku"
 )
 
-func TestBrowsersOrderedNewestFirst(t *testing.T) {
-	db, _ := openTestDB()
-	p := newSQLitePersistence(db)
+
+func TestBrowserSuite(t *testing.T) {
+	suite.Run(t, new(BrowserSuite))
+}
+
+type BrowserSuite struct {
+	suite.Suite
+	m          *Messenger        // main instance of Messenger
+	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
+	// If one wants to send messages between different instances of Messenger,
+	// a single waku service should be shared.
+	shh    types.Waku
+	logger *zap.Logger
+}
+
+func (s *BrowserSuite) SetupTest() {
+	s.logger = tt.MustCreateTestLogger()
+
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	shh := waku.New(&config, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
+	s.Require().NoError(shh.Start())
+
+	s.m = s.newMessenger()
+	s.privateKey = s.m.identity
+	_, err := s.m.Start()
+	s.Require().NoError(err)
+}
+
+func (s *BrowserSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
+}
+
+func (s *BrowserSuite) newMessenger() *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	return messenger
+}
+
+func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst () {
+	msngr := s.newMessenger()
 	testBrowsers := []*browsers.Browser{
 		{
 			ID:        "1",
@@ -35,21 +85,20 @@ func TestBrowsersOrderedNewestFirst(t *testing.T) {
 		},
 	}
 	for i := 0; i < len(testBrowsers); i++ {
-		require.NoError(t, p.AddBrowser(*testBrowsers[i]))
+		s.Require().NoError( msngr.AddBrowser(context.TODO(),*testBrowsers[i]))
 	}
 
 	sort.Slice(testBrowsers, func(i, j int) bool {
 		return testBrowsers[i].Timestamp > testBrowsers[j].Timestamp
 	})
 
-	rst, err := p.GetBrowsers()
-	require.NoError(t, err)
-	require.Equal(t, testBrowsers, rst)
+	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError( err)
+	s.Require().Equal(testBrowsers, rst)
 }
 
-func TestBrowsersHistoryIncluded(t *testing.T) {
-	db, _ := openTestDB()
-	p := newSQLitePersistence(db)
+func (s *MessengerBackupSuite) TestBrowsersHistoryIncluded () {
+	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:           "1",
 		Name:         "first",
@@ -58,16 +107,15 @@ func TestBrowsersHistoryIncluded(t *testing.T) {
 		HistoryIndex: 1,
 		History:      []string{"one", "two"},
 	}
-	require.NoError(t, p.AddBrowser(*browser))
-	rst, err := p.GetBrowsers()
-	require.NoError(t, err)
-	require.Len(t, rst, 1)
-	require.Equal(t, browser, rst[0])
+	s.Require().NoError(msngr.AddBrowser(context.TODO(),*browser))
+	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError( err)
+	s.Require().Len(rst, 1)
+	s.Require().Equal(browser, rst[0])
 }
 
-func TestBrowsersReplaceOnUpdate(t *testing.T) {
-	db, _ := openTestDB()
-	p := newSQLitePersistence(db)
+func (s *MessengerBackupSuite) TestBrowsersReplaceOnUpdate() {
+	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",
@@ -75,20 +123,19 @@ func TestBrowsersReplaceOnUpdate(t *testing.T) {
 		Timestamp: 10,
 		History:   []string{"one", "two"},
 	}
-	require.NoError(t, p.AddBrowser(*browser))
+	s.Require().NoError( msngr.AddBrowser(context.TODO(),*browser))
 	browser.Dapp = false
 	browser.History = []string{"one", "three"}
 	browser.Timestamp = 107
-	require.NoError(t, p.AddBrowser(*browser))
-	rst, err := p.GetBrowsers()
-	require.NoError(t, err)
-	require.Len(t, rst, 1)
-	require.Equal(t, browser, rst[0])
+	s.Require().NoError( msngr.AddBrowser(context.TODO(),*browser))
+	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError( err)
+	s.Require().Len( rst, 1)
+	s.Require().Equal( browser, rst[0])
 }
 
-func TestDeleteBrowser(t *testing.T) {
-	db, _ := openTestDB()
-	p := newSQLitePersistence(db)
+func (s *MessengerBackupSuite) TestDeleteBrowser() {
+	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",
@@ -97,13 +144,13 @@ func TestDeleteBrowser(t *testing.T) {
 		History:   []string{"one", "two"},
 	}
 
-	require.NoError(t, p.AddBrowser(*browser))
-	rst, err := p.GetBrowsers()
-	require.NoError(t, err)
-	require.Len(t, rst, 1)
+	s.Require().NoError( msngr.AddBrowser(context.TODO(), *browser))
+	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError( err)
+	s.Require().Len( rst, 1)
 
-	require.NoError(t, p.DeleteBrowser(browser.ID))
-	rst, err = p.GetBrowsers()
-	require.NoError(t, err)
-	require.Len(t, rst, 0)
+	s.Require().NoError( msngr.DeleteBrowser(context.TODO(), browser.ID))
+	rst, err = msngr.GetBrowsers(context.TODO())
+	s.Require().NoError( err)
+	s.Require().Len( rst, 0)
 }
