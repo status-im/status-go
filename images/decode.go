@@ -33,6 +33,10 @@ func Decode(fileName string) (image.Image, error) {
 	return decodeImageData(fb, file)
 }
 
+func DecodeFromBytes(bodyBytes []byte) (image.Image, error) {
+	return decodeImageData(bodyBytes, bytes.NewReader(bodyBytes))
+}
+
 func DecodeFromURL(path string) (image.Image, error) {
 	client := http.Client{
 		Timeout: 5 * time.Second,

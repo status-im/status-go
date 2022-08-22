@@ -112,6 +112,9 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
     COALESCE(dm_author.discriminator, ""),
     COALESCE(dm_author.nickname, ""),
     COALESCE(dm_author.avatar_url, ""),
+    dm_author.avatar_image_payload,
+    COALESCE(dm_author.avatar_image_type, 0),
+    COALESCE(dm_author.avatar_image_base64, ""),
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -157,6 +160,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	discordMessage := &protobuf.DiscordMessage{
 		Author:    &protobuf.DiscordMessageAuthor{},
 		Reference: &protobuf.DiscordMessageReference{},
+    Attachments: make([]*protobuf.DiscordMessageAttachment, 0),
 	}
 
 	args := []interface{}{
@@ -212,6 +216,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&discordMessage.Author.Discriminator,
 		&discordMessage.Author.Nickname,
 		&discordMessage.Author.AvatarUrl,
+		&discordMessage.Author.AvatarImagePayload,
+		&discordMessage.Author.AvatarImageType,
+		&discordMessage.Author.AvatarImageBase64,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -330,6 +337,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		discordMessage = &protobuf.DiscordMessage{
 			Author:    &protobuf.DiscordMessageAuthor{},
 			Reference: &protobuf.DiscordMessageReference{},
+      Attachments: make([]*protobuf.DiscordMessageAttachment, 0),
 		}
 	}
 
@@ -605,6 +613,12 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
 			return nil, err
 		}
+
+    attachments, err := db.GetDiscordMessageAttachmentByDiscordMessageID(message.DiscordMessage.Id)
+    if err != nil {
+      return nil, err
+    }
+    message.DiscordMessage.Attachments = attachments
 		result = append(result, &message)
 	}
 
@@ -679,9 +693,33 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
 			return nil, "", err
 		}
+
 		result = append(result, &message)
 		cursors = append(cursors, cursor)
 	}
+
+  for i, message := range result {
+	  if message.ContentType != protobuf.ChatMessage_DISCORD_MESSAGE {
+      continue
+    }
+
+    discordMessage := message.GetDiscordMessage()
+
+    if discordMessage == nil {
+      continue
+    }
+
+    attachments, err := db.GetDiscordMessageAttachmentByDiscordMessageID(discordMessage.Id)
+    if err != nil {
+      return nil, "", err
+    }
+    fmt.Println("ADDIGN ATTACHMENTS")
+    discordMessage.Attachments = attachments
+    message.Payload = &protobuf.ChatMessage_DiscordMessage{
+      DiscordMessage: discordMessage,
+    }
+    result[i] = message
+  }
 
 	var newCursor string
 	if len(result) > limit {
@@ -1885,7 +1923,7 @@ func (db sqlitePersistence) HasDiscordMessageAuthor(id string) (exists bool, err
 }
 
 func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
-	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url) VALUES (?,?,?,?,?)"
+	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload, avatar_image_type, avatar_image_base64) VALUES (?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
@@ -1896,8 +1934,39 @@ func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMes
 		author.GetDiscriminator(),
 		author.GetNickname(),
 		author.GetAvatarUrl(),
+		author.GetAvatarImagePayload(),
+		author.GetAvatarImageType(),
+		author.GetAvatarImageBase64(),
 	)
 	return
+}
+
+func (db sqlitePersistence) UpdateDiscordMessageAuthorImage(authorId string, payload []byte, imageType protobuf.ImageType, imageBase64 string) (err error) {
+	query := "UPDATE discord_message_authors SET avatar_image_payload = ?, avatar_image_type = ?, avatar_image_base64 = ? WHERE id = ?"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(payload, imageType, imageBase64, authorId)
+	return
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorByID(id string) (*protobuf.DiscordMessageAuthor, error) {
+
+	author := &protobuf.DiscordMessageAuthor{}
+
+	row := db.db.QueryRow("SELECT id, name, discriminator, nickname, avatar_url, avatar_image_payload, avatar_image_type, avatar_image_base64 FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(
+		&author.Id,
+		&author.Name,
+		&author.Discriminator,
+		&author.Nickname,
+		&author.AvatarUrl,
+		&author.AvatarImagePayload,
+		&author.AvatarImageType,
+		&author.AvatarImageBase64)
+	return author, err
 }
 
 func (db sqlitePersistence) SaveDiscordMessage(message *protobuf.DiscordMessage) (err error) {
@@ -1959,6 +2028,46 @@ func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMess
 		}
 	}
 	return
+}
+
+func (db sqlitePersistence) SaveDiscordMessageAttachment(attachment *protobuf.DiscordMessageAttachment) (err error) {
+	query := "INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, type, base64) VALUES (?,?,?,?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	_, err = stmt.Exec(
+		attachment.GetId(),
+		attachment.GetMessageId(),
+		attachment.GetUrl(),
+		attachment.GetFileName(),
+		attachment.GetFileSizeBytes(),
+		attachment.GetPayload(),
+		attachment.GetType(),
+		attachment.GetBase64(),
+	)
+	return
+}
+
+func (db sqlitePersistence) GetDiscordMessageAttachmentByDiscordMessageID(id string) ([]*protobuf.DiscordMessageAttachment, error) {
+  query := fmt.Sprintf("SELECT id, url, file_name, base64 FROM discord_message_attachments WHERE discord_message_id = %s", id)
+  fmt.Println("GETTING HERE: ", query)
+	rows, err := db.db.Query(query)
+  if err != nil {
+    return nil, err
+  }
+	defer rows.Close()
+
+  attachments := []*protobuf.DiscordMessageAttachment{}
+	for rows.Next() {
+		attachment := &protobuf.DiscordMessageAttachment{}
+		err := rows.Scan(&attachment.Id, &attachment.Url, &attachment.FileName, &attachment.Base64)
+    if err != nil {
+      return nil, err
+    }
+    attachments = append(attachments, attachment)
+  }
+  return attachments, nil
 }
 
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {

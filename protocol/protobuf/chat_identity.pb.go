@@ -289,9 +289,7 @@ func init() {
 	proto.RegisterType((*SocialLink)(nil), "protobuf.SocialLink")
 }
 
-func init() {
-	proto.RegisterFile("chat_identity.proto", fileDescriptor_7a652489000a5879)
-}
+func init() { proto.RegisterFile("chat_identity.proto", fileDescriptor_7a652489000a5879) }
 
 var fileDescriptor_7a652489000a5879 = []byte{
 	// 489 bytes of a gzipped FileDescriptorProto

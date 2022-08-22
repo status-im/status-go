@@ -62,6 +62,7 @@ message DiscordMessage {
   string content = 5;
   DiscordMessageAuthor author = 6;
   DiscordMessageReference reference = 7;
+  repeated DiscordMessageAttachment attachments = 8;
 }
 
 message DiscordMessageAuthor {
@@ -70,12 +71,26 @@ message DiscordMessageAuthor {
   string discriminator = 3;
   string nickname = 4;
   string avatarUrl = 5;
+  bytes avatarImagePayload = 6;
+  ImageType avatarImageType = 7;
+  string avatarImageBase64 = 8;
 }
 
 message DiscordMessageReference {
   string messageId = 1;
   string channelId = 2;
   string guildId = 3;
+}
+
+message DiscordMessageAttachment {
+  string id = 1;
+  string messageId = 2;
+  string url = 3;
+  string fileName = 4;
+  uint64 fileSizeBytes = 5;
+  bytes payload = 6;
+  string type = 7;
+  string base64 = 8;
 }
 
 message ChatMessage {
@@ -135,6 +150,7 @@ message ChatMessage {
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;
     DISCORD_MESSAGE = 12;
+    DISCORD_IMAGE_MESSAGE = 13;
   }
 
   

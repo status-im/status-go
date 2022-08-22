@@ -127,3 +127,11 @@ func (m *MessengerSignalsHandler) StatusUpdatesTimedOut(statusUpdates *[]protoco
 func (m *MessengerSignalsHandler) DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
 	signal.SendDiscordCategoriesAndChannelsExtracted(categories, channels, oldestMessageTimestamp, errors)
 }
+
+func (m *MessengerSignalsHandler) DiscordCommunityImportProgress(importProgress *discord.ImportProgress) {
+	signal.SendDiscordCommunityImportProgress(importProgress)
+}
+
+func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
+	signal.SendDiscordCommunityImportFinished(id)
+}

@@ -1455,3 +1455,31 @@ func TestSaveDiscordMessages(t *testing.T) {
 		require.EqualValues(t, "2", dm.Author.Id)
 	}
 }
+
+func TestUpdateDiscordMessageAuthorImage(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(&protobuf.DiscordMessageAuthor{
+		Id:            "1",
+		Name:          "Testuser",
+		Discriminator: "1234",
+		Nickname:      "User",
+		AvatarUrl:     "http://example.com/profile.jpg",
+	}))
+
+	exists, err := p.HasDiscordMessageAuthor("1")
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	payload := []byte{1, 2, 3, 4}
+
+	err = p.UpdateDiscordMessageAuthorImage("1", payload, protobuf.ImageType_JPEG, "test")
+	require.NoError(t, err)
+	author, err := p.GetDiscordMessageAuthorByID("1")
+	require.NoError(t, err)
+	require.Equal(t, payload, author.AvatarImagePayload)
+	require.Equal(t, "test", author.AvatarImageBase64)
+}

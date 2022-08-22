@@ -4589,6 +4589,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 			return nil, "", err
 		}
 	} else {
+		fmt.Println("TRYING HERE:")
 		msgs, nextCursor, err = m.persistence.MessageByChatID(chatID, cursor, limit)
 		if err != nil {
 			return nil, "", err
