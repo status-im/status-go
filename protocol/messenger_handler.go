@@ -1133,10 +1133,13 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	}
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+                m.logger.Info("last message match",zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
 		}
-	}
+	} else {
+                m.logger.Info("not updating last message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
+        }
 
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	state.Response.AddChat(chat)
@@ -1149,11 +1152,15 @@ func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
 	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
 	if err != nil {
+          m.logger.Error("failed to find message by chat id", zap.Error(err))
 		return err
 	}
+
 	if len(messages) > 0 {
+                m.logger.Info("found  message",zap.Any("chat-last-message", messages[0]))
 		chat.LastMessage = messages[0]
 	} else {
+          m.logger.Info("not found message setting nil")
 		chat.LastMessage = nil
 	}
 
@@ -1275,6 +1282,8 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+
+                m.logger.Info("handle  chat message, message deleted",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
 		if err != nil {
@@ -1286,10 +1295,12 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			chat.LastMessage = nil
 		}
 	} else {
+                m.logger.Info("updating message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 		err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
 		if err != nil {
 			return err
 		}
+                m.logger.Info("updating message 2",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
 	}
 
 	// If the chat is not active, create a notification in the center
