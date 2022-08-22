@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
@@ -43,7 +43,8 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
 		addrPerChain:    make(map[uint64]common.Address),
-		quit:            make(chan struct{}),
+
+		quit: make(chan struct{}),
 	}
 }
 
@@ -61,11 +62,15 @@ type API struct {
 
 	addrPerChain      map[uint64]common.Address
 	addrPerChainMutex sync.Mutex
-	quit              chan struct{}
+
+	quitOnce sync.Once
+	quit     chan struct{}
 }
 
 func (api *API) Stop() {
-	api.quit <- struct{}{}
+	api.quitOnce.Do(func() {
+		close(api.quit)
+	})
 }
 
 func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error) {
@@ -187,6 +192,7 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 }
 
 func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (common.Address, error) {
+	log.Info("obtaining username registrar address")
 	api.addrPerChainMutex.Lock()
 	defer api.addrPerChainMutex.Unlock()
 
@@ -218,9 +224,14 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 		for {
 			select {
 			case <-api.quit:
+				log.Info("quitting ens contract subscription")
+				sub.Unsubscribe()
 				return
 			case err := <-sub.Err():
-				log.Fatal(err)
+				if err != nil {
+					log.Error("ens contract subscription error: " + err.Error())
+				}
+				return
 			case vLog := <-logs:
 				api.addrPerChainMutex.Lock()
 				api.addrPerChain[chainID] = vLog.Owner
