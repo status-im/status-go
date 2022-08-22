@@ -1085,6 +1085,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	}
 
 	messageID := deleteMessage.MessageId
+        m.logger.Info("delete message-id", zap.String("id", messageID))
 	// Check if it's already in the response
 	originalMessage := state.Response.GetMessage(messageID)
 	// otherwise pull from database
@@ -1097,9 +1098,13 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
+
 	if originalMessage == nil {
+                m.logger.Info("saving delete", zap.Any("delete", deleteMessage))
 		return m.persistence.SaveDelete(deleteMessage)
 	}
+
+        m.logger.Info("not saving delete", zap.Any("delete", deleteMessage))
 
 	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
 	if !ok {
@@ -1131,6 +1136,8 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
 		return err
 	}
+
+        m.logger.Info("after delete activity", zap.Any("message", originalMessage), zap.Any("delete message", deleteMessage))
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
                 m.logger.Info("last message match",zap.Any("chat-last-message", chat.LastMessage), zap.Any("original-message", originalMessage))
@@ -1182,6 +1189,8 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		Identicon:        state.CurrentMessageState.Contact.Identicon,
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
+
+        m.logger.Info("handling chat message", zap.String("message", receivedMessage.ID), zap.Any("mesage", receivedMessage))
 
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		receivedMessage.Seen = true
