@@ -22,6 +22,7 @@ type Persistence struct {
 }
 
 var ErrOldRequestToJoin = errors.New("old request to join")
+var ErrOldRequestToLeave = errors.New("old request to leave")
 
 const OR = " OR "
 const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
@@ -306,6 +307,37 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	}
 
 	_, err = tx.Exec(`INSERT INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) VALUES (?, ?, ?, ?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.ENSName, request.ChatID, request.CommunityID, request.State)
+	return err
+}
+
+func (p *Persistence) SaveRequestToLeave(request *RequestToLeave) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	var clock uint64
+	// Fetch any existing request to leave
+	err = tx.QueryRow(`SELECT clock FROM communities_requests_to_leave WHERE public_key = ? AND community_id = ?`, request.PublicKey, request.CommunityID).Scan(&clock)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	// This is already processed
+	if clock >= request.Clock {
+		return ErrOldRequestToLeave
+	}
+
+	_, err = tx.Exec(`INSERT INTO communities_requests_to_leave(id,public_key,clock,community_id) VALUES (?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.CommunityID)
 	return err
 }
 

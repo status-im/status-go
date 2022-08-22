@@ -614,6 +614,34 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 	}
 
+	isAdmin, err := m.communitiesManager.IsAdminCommunityByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isAdmin {
+		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
+			Clock:       uint64(time.Now().Unix()),
+			CommunityId: communityID,
+		}
+
+		payload, err := proto.Marshal(requestToLeaveProto)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage := common.RawMessage{
+			Payload:        payload,
+			CommunityID:    communityID,
+			SkipEncryption: true,
+			MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+		}
+		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return mr, nil
 }
 

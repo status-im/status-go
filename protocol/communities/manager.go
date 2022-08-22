@@ -853,11 +853,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, ErrOrgNotFound
 	}
 
-	// If they are already a member, ignore
-	if community.HasMember(signer) {
-		return nil, ErrAlreadyMember
-	}
-
 	if err := community.ValidateRequestToJoin(signer, request); err != nil {
 		return nil, err
 	}
@@ -876,7 +871,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
-	if community.AcceptRequestToJoinAutomatically() {
+	// If user is already a member, then accept request automatically
+	// It may happen when member removes itself from community and then tries to rejoin
+	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
+	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
+	if acceptAutomatically {
 		err = m.markRequestToJoin(signer, community)
 		if err != nil {
 			return nil, err
@@ -931,6 +930,24 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return m.markRequestToJoin(m.identity, community)
 	}
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(m.identity), community.ID(), RequestToJoinStateDeclined)
+}
+
+func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *protobuf.CommunityRequestToLeave) error {
+	requestToLeave := NewRequestToLeave(common.PubkeyToHex(signer), proto)
+	if err := m.persistence.SaveRequestToLeave(requestToLeave); err != nil {
+		return err
+	}
+
+	// Ensure corresponding requestToJoin clock is older than requestToLeave
+	requestToJoin, err := m.persistence.GetRequestToJoin(requestToLeave.ID)
+	if err != nil {
+		return err
+	}
+	if requestToJoin.Clock > requestToLeave.Clock {
+		return ErrOldRequestToLeave
+	}
+
+	return nil
 }
 
 func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*CommunityResponse, error) {
@@ -1178,9 +1195,9 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 		return nil, nil, err
 	}
 
-	// We don't allow requesting access if already a member
-	if community.HasMember(m.identity) {
-		return nil, nil, ErrAlreadyMember
+	// We don't allow requesting access if already joined
+	if community.Joined() {
+		return nil, nil, ErrAlreadyJoined
 	}
 
 	clock := uint64(time.Now().Unix())
@@ -1333,6 +1350,14 @@ func (m *Manager) GetAdminCommunitiesChatIDs() (map[string]bool, error) {
 		}
 	}
 	return chatIDs, nil
+}
+
+func (m *Manager) IsAdminCommunityByID(communityID types.HexBytes) (bool, error) {
+	pubKey, err := crypto.DecompressPubkey(communityID)
+	if err != nil {
+		return false, err
+	}
+	return m.IsAdminCommunity(pubKey)
 }
 
 func (m *Manager) IsAdminCommunity(pubKey *ecdsa.PublicKey) (bool, error) {
