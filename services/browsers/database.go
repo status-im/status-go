@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/mat/besticon/besticon"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Database sql wrapper for operations with browser objects.

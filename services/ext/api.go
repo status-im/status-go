@@ -820,7 +820,6 @@ func (api *PublicAPI) DeleteBrowser(ctx context.Context, id string) error {
 	return api.service.messenger.DeleteBrowser(ctx, id)
 }
 
-
 func (api *PublicAPI) RemoveBookmark(ctx context.Context, url string) error {
 	return api.service.messenger.RemoveBookmark(ctx, url)
 }

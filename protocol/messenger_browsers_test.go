@@ -4,8 +4,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/status-im/status-go/services/browsers"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/services/browsers"
 )
 
 func TestBrowsersOrderedNewestFirst(t *testing.T) {
