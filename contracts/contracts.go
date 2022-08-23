@@ -40,12 +40,7 @@ func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *commo
 	return resolver.NewPublicResolver(*resolverAddress, backend)
 }
 
-func (c *ContractMaker) NewUsernameRegistrar(chainID uint64) (*registrar.UsernameRegistrar, error) {
-	contractAddr, err := registrar.ContractAddress(chainID)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common.Address) (*registrar.UsernameRegistrar, error) {
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
