@@ -314,6 +314,16 @@ func (api *API) FetchPrices(ctx context.Context, symbols []string, currency stri
 	return fetchCryptoComparePrices(symbols, currency)
 }
 
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]MarketCoinValues, error) {
+	log.Debug("call to FetchMarketValues")
+	return fetchTokenMarketValues(symbols, currency)
+}
+
+func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
+	log.Debug("call to FetchTokenDetails")
+	return fetchCryptoCompareTokenDetails(symbols)
+}
+
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	log.Debug("call to GetSuggestedFees")
 	return api.s.feesManager.suggestedFees(ctx, chainID)
