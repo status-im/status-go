@@ -40,6 +40,7 @@ func TestMessengerCommunitiesSuite(t *testing.T) {
 
 type MessengerCommunitiesSuite struct {
 	suite.Suite
+	admin *Messenger
 	bob   *Messenger
 	alice *Messenger
 	// If one wants to send messages between different instances of Messenger,
@@ -57,15 +58,19 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
+	s.admin = s.newMessenger()
 	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
-	_, err := s.bob.Start()
+	_, err := s.admin.Start()
+	s.Require().NoError(err)
+	_, err = s.bob.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
+	s.Require().NoError(s.admin.Shutdown())
 	s.Require().NoError(s.bob.Shutdown())
 	s.Require().NoError(s.alice.Shutdown())
 	_ = s.logger.Sync()
@@ -432,7 +437,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.RemovedChats(), 3)
 }
 
-func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
+func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -441,7 +446,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	}
 
 	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
+	response, err := s.admin.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -457,62 +462,105 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 		},
 	}
 
-	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
+	response, err = s.admin.CreateCommunityChat(community.ID(), orgChat)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
-	joinCommunity := func(user *Messenger) {
-		chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
+	return community
+}
 
-		inputMessage := &common.Message{}
-		inputMessage.ChatId = chat.ID
-		inputMessage.Text = "some text"
-		inputMessage.CommunityID = community.IDString()
+func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
+	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
 
-		err = s.bob.SaveChat(chat)
-		s.Require().NoError(err)
-		_, err = s.bob.SendChatMessage(context.Background(), inputMessage)
-		s.Require().NoError(err)
+	inputMessage := &common.Message{}
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
 
-		// Ensure community is received
-		err = tt.RetryWithBackOff(func() error {
-			response, err = user.RetrieveAll()
-			if err != nil {
-				return err
-			}
-			if len(response.Communities()) == 0 {
-				return errors.New("community not received")
-			}
-			return nil
-		})
-		s.Require().NoError(err)
+	err := s.admin.SaveChat(chat)
+	s.Require().NoError(err)
+	_, err = s.admin.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
 
-		// Join the community
-		response, err = user.JoinCommunity(context.Background(), community.ID())
-		s.Require().NoError(err)
-		s.Require().NotNil(response)
-	}
+	// Ensure community is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err := user.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+}
 
-	patryk := s.newMessenger()
-	joinCommunity(patryk)
-	joinCommunity(s.alice)
+func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
+	// Request to join the community
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// Retrieve and accept join request
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.admin.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response")
+		}
+		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
+			return errors.New("user not accepted")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Retrieve join request response
+	err = tt.RetryWithBackOff(func() error {
+		response, err := user.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response")
+		}
+		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
+			return errors.New("user not a member")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
+	community := s.createCommunity()
+	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunity(community, s.bob)
+	s.joinCommunity(community, s.alice)
 
 	// Trigger ContactCodeAdvertisement
-	err = patryk.SetDisplayName("patryk")
+	err := s.bob.SetDisplayName("bobby")
 	s.Require().NoError(err)
-	err = patryk.SetBio("I like P2P chats")
+	err = s.bob.SetBio("I like P2P chats")
 	s.Require().NoError(err)
 
-	// Ensure alice receives patryk's ContactCodeAdvertisement
+	// Ensure alice receives bob's ContactCodeAdvertisement
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
+		response, err := s.alice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 		if len(response.Contacts) == 0 {
 			return errors.New("no contacts in response")
 		}
-		if response.Contacts[0].DisplayName != "patryk" {
+		if response.Contacts[0].DisplayName != "bobby" {
 			return errors.New("display name was not updated")
 		}
 		if response.Contacts[0].Bio != "I like P2P chats" {
@@ -1362,6 +1410,74 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	requestsToJoin, err = s.alice.MyPendingRequestsToJoin()
 	s.Require().NoError(err)
 	s.Require().Len(requestsToJoin, 0)
+}
+
+func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
+	community := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community, s.bob)
+
+	s.joinCommunity(community, s.alice)
+	s.joinCommunity(community, s.bob)
+
+	joinedCommunities, err := s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(3, joinedCommunities[0].MembersCount())
+
+	response, err := s.alice.LeaveCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(response.Communities()[0].Joined())
+
+	// admin should receive alice's request to leave
+	// and then update and advertise community members list accordingly
+
+	verifyCommunityMembers := func(user *Messenger) error {
+		response, err := user.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response")
+		}
+
+		var communityMembersError error = nil
+
+		if response.Communities()[0].MembersCount() != 2 {
+			communityMembersError = fmt.Errorf("invalid number of members: %d", response.Communities()[0].MembersCount())
+		} else if !response.Communities()[0].HasMember(&s.admin.identity.PublicKey) {
+			communityMembersError = errors.New("admin removed from community")
+		} else if !response.Communities()[0].HasMember(&s.bob.identity.PublicKey) {
+			communityMembersError = errors.New("bob removed from community")
+		} else if response.Communities()[0].HasMember(&s.alice.identity.PublicKey) {
+			communityMembersError = errors.New("alice not removed from community")
+		}
+
+		s.Require().NoError(communityMembersError)
+
+		return nil
+	}
+	err = tt.RetryWithBackOff(func() error {
+		return verifyCommunityMembers(s.admin)
+	})
+	s.Require().NoError(err)
+	err = tt.RetryWithBackOff(func() error {
+		return verifyCommunityMembers(s.bob)
+	})
+	s.Require().NoError(err)
+
+	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(2, joinedCommunities[0].MembersCount())
+
+	// alice can rejoin
+	s.joinCommunity(community, s.alice)
+
+	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(3, joinedCommunities[0].MembersCount())
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
