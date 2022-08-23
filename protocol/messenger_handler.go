@@ -1290,27 +1290,20 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
-
-                m.logger.Info("handle  chat message, message deleted",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
-		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
-		if err != nil {
-			return err
-		}
-		if len(messages) != 0 {
-			chat.LastMessage = messages[0]
-		} else {
-			chat.LastMessage = nil
-		}
-	} else {
-                m.logger.Info("updating message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
-		err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
-		if err != nil {
-			return err
-		}
-                m.logger.Info("updating message 2",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
-	}
+        if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+          m.logger.Info("handle  chat message, message deleted",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+          err := m.updateLastMessage(chat)
+          if err != nil {
+            return err
+          }
+        } else {
+          m.logger.Info("updating message",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+          err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
+          if err != nil {
+            return err
+          }
+          m.logger.Info("updating message 2",zap.Any("chat-last-message", chat.LastMessage), zap.Any("received", receivedMessage))
+        }
 
 	// If the chat is not active, create a notification in the center
 	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active && receivedMessage.ContentType != protobuf.ChatMessage_CONTACT_REQUEST {

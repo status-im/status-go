@@ -237,3 +237,81 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	s.Require().Len(state.Response.RemovedMessages(), 0)
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
+
+// Here we test for the following scenario:
+// 1) Message A arrives
+// 2) Message B arrives
+// 3) Message B is deleted
+// All these operations happens in a batch, but A is only saved at the end of
+// the loop, yet, it should be considered the last message.
+
+func (s *MessengerDeleteMessageSuite) TestResetToHandledMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+	messageID1 := "message-id-1"
+	messageID2 := "message-id-2"
+
+	inputMessage := buildTestMessage(*theirChat)
+	inputMessage.Clock = 1
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	// Handle first chat message
+        state.CurrentMessageState = &CurrentMessageState{
+			Message:          inputMessage.ChatMessage,
+			MessageID:        messageID1,
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &theirMessenger.identity.PublicKey,
+		}
+	err = s.m.HandleChatMessage(state)
+	s.Require().NoError(err)
+
+        // Handle second chat message
+	inputMessage = buildTestMessage(*theirChat)
+	inputMessage.Clock = 2
+
+         state.CurrentMessageState = &CurrentMessageState{
+			Message:          inputMessage.ChatMessage,
+			MessageID:        messageID2,
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &theirMessenger.identity.PublicKey,
+		}
+
+	err = s.m.HandleChatMessage(state)
+	s.Require().NoError(err)
+
+	deleteMessage := DeleteMessage{
+		        DeleteMessage: protobuf.DeleteMessage{
+			Clock:       3,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+			MessageId:   messageID2,
+			ChatId:      theirChat.ID,
+		},
+		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+	}
+
+
+	// Handle Delete first
+	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	s.Require().NoError(err)
+
+	s.Require().Len(state.Response.Messages(), 1)
+	s.Require().NotNil(state.Response.Chats()[0].LastMessage)
+        s.Require().Equal(messageID2, state.Response.Chats()[0].LastMessage.ID)
+}
