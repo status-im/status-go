@@ -16,15 +16,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/appdatabase"
