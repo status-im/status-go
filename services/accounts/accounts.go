@@ -305,3 +305,11 @@ func (api *API) generateAccount(
 
 	return api.SaveAccounts(ctx, []*accounts.Account{acc})
 }
+
+func (api *API) VerifyPassword(password string) bool {
+	err := api.verifyPassword(password)
+	if err != nil {
+		return false
+	}
+	return true
+}
