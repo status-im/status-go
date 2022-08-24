@@ -605,6 +605,10 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 		return nil
 	}
 
+	if chat.DeletedAtClockValue > message.Clock {
+		return nil
+	}
+
 	if chat.PrivateGroupChat() {
 		_, err := m.leaveGroupChat(context.Background(), state.Response, message.Id, true, false)
 		if err != nil {
