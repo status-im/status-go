@@ -88,6 +88,8 @@ type config struct {
 
 	logger *zap.Logger
 
+	outputMessagesCSV bool
+
 	messengerSignalsHandler MessengerSignalsHandler
 
 	telemetryServerURL string
@@ -293,6 +295,13 @@ func WithHTTPServer(s *server.MediaServer) Option {
 func WithRPCClient(r *rpc.Client) Option {
 	return func(c *config) error {
 		c.rpcClient = r
+		return nil
+	}
+}
+
+func WithMessageCSV(enabled bool) Option {
+	return func(c *config) error {
+		c.outputMessagesCSV = enabled
 		return nil
 	}
 }
