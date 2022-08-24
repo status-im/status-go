@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
 
+	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
@@ -936,4 +937,52 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 
 	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
 	return makeJSONResponse(err)
+}
+
+func EncodeTransfer(to string, value string) string {
+	result, err := abi_spec.EncodeTransfer(to, value)
+	if err != nil {
+		log.Error("failed to encode transfer", "to", to, "value", value, "error", err)
+		return ""
+	}
+	return result
+}
+
+func EncodeFunctionCall(method string, paramsJSON string) string {
+	result, err := abi_spec.Encode(method, paramsJSON)
+	if err != nil {
+		log.Error("failed to encode function call", "method", method, "paramsJSON", paramsJSON, "error", err)
+	}
+	return result
+}
+
+func DecodeParameters(decodeParamJSON string) string {
+	decodeParam := struct {
+		BytesString string   `json:"bytesString"`
+		Types       []string `json:"types"`
+	}{}
+	err := json.Unmarshal([]byte(decodeParamJSON), &decodeParam)
+	if err != nil {
+		log.Error("failed to unmarshal json when decoding parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	result, err := abi_spec.Decode(decodeParam.BytesString, decodeParam.Types)
+	if err != nil {
+		log.Error("failed to decode parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	bytes, err := json.Marshal(result)
+	if err != nil {
+		log.Error("failed to marshal result", "result", result, "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	return string(bytes)
+}
+
+func HexToNumber(hex string) string {
+	return abi_spec.HexToNumber(hex)
+}
+
+func NumberToHex(numString string) string {
+	return abi_spec.NumberToHex(numString)
 }
