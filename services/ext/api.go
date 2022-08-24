@@ -813,6 +813,18 @@ func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmar
 	return api.service.messenger.AddBookmark(ctx, bookmark)
 }
 
+func (api *PublicAPI) AddBrowser(ctx context.Context, browser browsers.Browser) error {
+	return api.service.messenger.AddBrowser(ctx, browser)
+}
+
+func (api *PublicAPI) GetBrowsers(ctx context.Context) (browsers []*browsers.Browser, err error) {
+	return api.service.messenger.GetBrowsers(ctx)
+}
+
+func (api *PublicAPI) DeleteBrowser(ctx context.Context, id string) error {
+	return api.service.messenger.DeleteBrowser(ctx, id)
+}
+
 func (api *PublicAPI) RemoveBookmark(ctx context.Context, url string) error {
 	return api.service.messenger.RemoveBookmark(ctx, url)
 }
