@@ -2865,7 +2865,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 			}
 		}
 
-		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active {
+		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active && chat.DeletedAtClockValue > 0 {
 			pending, err := m.persistence.HasPendingNotificationsForChat(chat.ID)
 			if err != nil {
 				return false

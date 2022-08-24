@@ -169,6 +169,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// add and deactivate chat
 	chat2 := CreatePublicChat(removedChatID, s.m.transport)
+	chat2.DeletedAtClockValue = 1
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
 	_, err = s.m.deactivateChat(removedChatID, 0, true)
