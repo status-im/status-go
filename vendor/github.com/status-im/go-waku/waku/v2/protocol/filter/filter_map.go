@@ -5,6 +5,7 @@ import (
 
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"github.com/status-im/go-waku/waku/v2/utils"
 )
 
 type FilterMap struct {
@@ -79,7 +80,7 @@ func (fm *FilterMap) Notify(msg *pb.WakuMessage, requestId string) {
 	defer fm.RUnlock()
 
 	for key, filter := range fm.items {
-		envelope := protocol.NewEnvelope(msg, filter.Topic)
+		envelope := protocol.NewEnvelope(msg, utils.GetUnixEpoch(), filter.Topic)
 
 		// We do this because the key for the filter is set to the requestId received from the filter protocol.
 		// This means we do not need to check the content filter explicitly as all MessagePushs already contain

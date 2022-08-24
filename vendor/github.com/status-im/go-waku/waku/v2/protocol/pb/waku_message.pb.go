@@ -22,22 +22,109 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-type WakuMessage struct {
-	Payload              []byte   `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
-	ContentTopic         string   `protobuf:"bytes,2,opt,name=contentTopic,proto3" json:"contentTopic,omitempty"`
-	Version              uint32   `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	Timestamp            int64    `protobuf:"zigzag64,10,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Proof                []byte   `protobuf:"bytes,21,opt,name=proof,proto3" json:"proof,omitempty"`
+type RateLimitProof struct {
+	Proof                []byte   `protobuf:"bytes,1,opt,name=proof,proto3" json:"proof,omitempty"`
+	MerkleRoot           []byte   `protobuf:"bytes,2,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"`
+	Epoch                []byte   `protobuf:"bytes,3,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	ShareX               []byte   `protobuf:"bytes,4,opt,name=share_x,json=shareX,proto3" json:"share_x,omitempty"`
+	ShareY               []byte   `protobuf:"bytes,5,opt,name=share_y,json=shareY,proto3" json:"share_y,omitempty"`
+	Nullifier            []byte   `protobuf:"bytes,6,opt,name=nullifier,proto3" json:"nullifier,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *RateLimitProof) Reset()         { *m = RateLimitProof{} }
+func (m *RateLimitProof) String() string { return proto.CompactTextString(m) }
+func (*RateLimitProof) ProtoMessage()    {}
+func (*RateLimitProof) Descriptor() ([]byte, []int) {
+	return fileDescriptor_6f0a20862b3bf714, []int{0}
+}
+func (m *RateLimitProof) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *RateLimitProof) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_RateLimitProof.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *RateLimitProof) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RateLimitProof.Merge(m, src)
+}
+func (m *RateLimitProof) XXX_Size() int {
+	return m.Size()
+}
+func (m *RateLimitProof) XXX_DiscardUnknown() {
+	xxx_messageInfo_RateLimitProof.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RateLimitProof proto.InternalMessageInfo
+
+func (m *RateLimitProof) GetProof() []byte {
+	if m != nil {
+		return m.Proof
+	}
+	return nil
+}
+
+func (m *RateLimitProof) GetMerkleRoot() []byte {
+	if m != nil {
+		return m.MerkleRoot
+	}
+	return nil
+}
+
+func (m *RateLimitProof) GetEpoch() []byte {
+	if m != nil {
+		return m.Epoch
+	}
+	return nil
+}
+
+func (m *RateLimitProof) GetShareX() []byte {
+	if m != nil {
+		return m.ShareX
+	}
+	return nil
+}
+
+func (m *RateLimitProof) GetShareY() []byte {
+	if m != nil {
+		return m.ShareY
+	}
+	return nil
+}
+
+func (m *RateLimitProof) GetNullifier() []byte {
+	if m != nil {
+		return m.Nullifier
+	}
+	return nil
+}
+
+type WakuMessage struct {
+	Payload              []byte          `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
+	ContentTopic         string          `protobuf:"bytes,2,opt,name=contentTopic,proto3" json:"contentTopic,omitempty"`
+	Version              uint32          `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Timestamp            int64           `protobuf:"zigzag64,10,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	RateLimitProof       *RateLimitProof `protobuf:"bytes,21,opt,name=rate_limit_proof,json=rateLimitProof,proto3" json:"rate_limit_proof,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
 func (m *WakuMessage) Reset()         { *m = WakuMessage{} }
 func (m *WakuMessage) String() string { return proto.CompactTextString(m) }
 func (*WakuMessage) ProtoMessage()    {}
 func (*WakuMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_6f0a20862b3bf714, []int{0}
+	return fileDescriptor_6f0a20862b3bf714, []int{1}
 }
 func (m *WakuMessage) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -94,33 +181,110 @@ func (m *WakuMessage) GetTimestamp() int64 {
 	return 0
 }
 
-func (m *WakuMessage) GetProof() []byte {
+func (m *WakuMessage) GetRateLimitProof() *RateLimitProof {
 	if m != nil {
-		return m.Proof
+		return m.RateLimitProof
 	}
 	return nil
 }
 
 func init() {
+	proto.RegisterType((*RateLimitProof)(nil), "pb.RateLimitProof")
 	proto.RegisterType((*WakuMessage)(nil), "pb.WakuMessage")
 }
 
 func init() { proto.RegisterFile("waku_message.proto", fileDescriptor_6f0a20862b3bf714) }
 
 var fileDescriptor_6f0a20862b3bf714 = []byte{
-	// 184 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x2a, 0x4f, 0xcc, 0x2e,
-	0x8d, 0xcf, 0x4d, 0x2d, 0x2e, 0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62,
-	0x2a, 0x48, 0x52, 0x9a, 0xc9, 0xc8, 0xc5, 0x1d, 0x9e, 0x98, 0x5d, 0xea, 0x0b, 0x91, 0x11, 0x92,
-	0xe0, 0x62, 0x2f, 0x48, 0xac, 0xcc, 0xc9, 0x4f, 0x4c, 0x91, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09,
-	0x82, 0x71, 0x85, 0x94, 0xb8, 0x78, 0x92, 0xf3, 0xf3, 0x4a, 0x52, 0xf3, 0x4a, 0x42, 0xf2, 0x0b,
-	0x32, 0x93, 0x25, 0x98, 0x14, 0x18, 0x35, 0x38, 0x83, 0x50, 0xc4, 0x40, 0xba, 0xcb, 0x52, 0x8b,
-	0x8a, 0x33, 0xf3, 0xf3, 0x24, 0x98, 0x15, 0x18, 0x35, 0x78, 0x83, 0x60, 0x5c, 0x21, 0x19, 0x2e,
-	0xce, 0x92, 0xcc, 0xdc, 0xd4, 0xe2, 0x92, 0xc4, 0xdc, 0x02, 0x09, 0x2e, 0x05, 0x46, 0x0d, 0xa1,
-	0x20, 0x84, 0x80, 0x90, 0x08, 0x17, 0x6b, 0x41, 0x51, 0x7e, 0x7e, 0x9a, 0x84, 0x28, 0xd8, 0x4e,
-	0x08, 0xc7, 0x49, 0xe0, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63,
-	0x9c, 0xf1, 0x58, 0x8e, 0x21, 0x89, 0x0d, 0xec, 0x70, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x33, 0x1b, 0x64, 0x81, 0xce, 0x00, 0x00, 0x00,
+	// 299 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x91, 0xbf, 0x4e, 0xf3, 0x30,
+	0x14, 0xc5, 0x3f, 0xf7, 0xa3, 0xad, 0x7a, 0x5b, 0xaa, 0xca, 0x02, 0xe1, 0x01, 0x85, 0xaa, 0x53,
+	0xa7, 0x0e, 0xb0, 0x32, 0x31, 0x83, 0x84, 0x2c, 0x24, 0x60, 0x8a, 0x9c, 0x70, 0x4b, 0xad, 0xfc,
+	0xb9, 0x96, 0xe3, 0x00, 0x7d, 0x13, 0x5e, 0x82, 0x87, 0x60, 0x63, 0xe4, 0x11, 0x50, 0x78, 0x11,
+	0x14, 0x87, 0x2a, 0x64, 0xf3, 0xef, 0x1c, 0x1d, 0xe9, 0xf8, 0x5c, 0xe0, 0xcf, 0x2a, 0x29, 0xc3,
+	0x0c, 0x8b, 0x42, 0x3d, 0xe2, 0xca, 0x58, 0x72, 0xc4, 0x7b, 0x26, 0x5a, 0xbc, 0x31, 0x98, 0x4a,
+	0xe5, 0xf0, 0x52, 0x67, 0xda, 0x5d, 0x5b, 0xa2, 0x35, 0x3f, 0x80, 0xbe, 0xa9, 0x1f, 0x82, 0xcd,
+	0xd9, 0x72, 0x22, 0x1b, 0xe0, 0x27, 0x30, 0xce, 0xd0, 0x26, 0x29, 0x86, 0x96, 0xc8, 0x89, 0x9e,
+	0xf7, 0xa0, 0x91, 0x24, 0x91, 0xab, 0x63, 0x68, 0x28, 0xde, 0x88, 0xff, 0x4d, 0xcc, 0x03, 0x3f,
+	0x82, 0x61, 0xb1, 0x51, 0x16, 0xc3, 0x17, 0xb1, 0xe7, 0xf5, 0x81, 0xc7, 0xbb, 0xd6, 0xd8, 0x8a,
+	0xfe, 0x1f, 0xe3, 0x9e, 0x1f, 0xc3, 0x28, 0x2f, 0xd3, 0x54, 0xaf, 0x35, 0x5a, 0x31, 0xf0, 0x56,
+	0x2b, 0x2c, 0xde, 0x19, 0x8c, 0x6f, 0x55, 0x52, 0x5e, 0x35, 0x3f, 0xe1, 0x02, 0x86, 0x46, 0x6d,
+	0x53, 0x52, 0x0f, 0xbf, 0x75, 0x77, 0xc8, 0x17, 0x30, 0x89, 0x29, 0x77, 0x98, 0xbb, 0x1b, 0x32,
+	0x3a, 0xf6, 0x8d, 0x47, 0xb2, 0xa3, 0xd5, 0xe9, 0x27, 0xb4, 0x85, 0xa6, 0xdc, 0xb7, 0xde, 0x97,
+	0x3b, 0xac, 0x5b, 0x38, 0x9d, 0x61, 0xe1, 0x54, 0x66, 0x04, 0xcc, 0xd9, 0x92, 0xcb, 0x56, 0xe0,
+	0xe7, 0x30, 0xb3, 0xca, 0x61, 0x98, 0xd6, 0xab, 0x85, 0xcd, 0x5a, 0x87, 0x73, 0xb6, 0x1c, 0x9f,
+	0xf2, 0x95, 0x89, 0x56, 0xdd, 0x41, 0xe5, 0xd4, 0x76, 0xf8, 0x62, 0xf6, 0x51, 0x05, 0xec, 0xb3,
+	0x0a, 0xd8, 0x57, 0x15, 0xb0, 0xd7, 0xef, 0xe0, 0x5f, 0x34, 0xf0, 0x07, 0x39, 0xfb, 0x09, 0x00,
+	0x00, 0xff, 0xff, 0x4a, 0x19, 0x2a, 0x86, 0xa6, 0x01, 0x00, 0x00,
+}
+
+func (m *RateLimitProof) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RateLimitProof) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *RateLimitProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.Nullifier) > 0 {
+		i -= len(m.Nullifier)
+		copy(dAtA[i:], m.Nullifier)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.Nullifier)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if len(m.ShareY) > 0 {
+		i -= len(m.ShareY)
+		copy(dAtA[i:], m.ShareY)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.ShareY)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.ShareX) > 0 {
+		i -= len(m.ShareX)
+		copy(dAtA[i:], m.ShareX)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.ShareX)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.Epoch) > 0 {
+		i -= len(m.Epoch)
+		copy(dAtA[i:], m.Epoch)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.Epoch)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.MerkleRoot) > 0 {
+		i -= len(m.MerkleRoot)
+		copy(dAtA[i:], m.MerkleRoot)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.MerkleRoot)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Proof) > 0 {
+		i -= len(m.Proof)
+		copy(dAtA[i:], m.Proof)
+		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.Proof)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *WakuMessage) Marshal() (dAtA []byte, err error) {
@@ -147,10 +311,15 @@ func (m *WakuMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if len(m.Proof) > 0 {
-		i -= len(m.Proof)
-		copy(dAtA[i:], m.Proof)
-		i = encodeVarintWakuMessage(dAtA, i, uint64(len(m.Proof)))
+	if m.RateLimitProof != nil {
+		{
+			size, err := m.RateLimitProof.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintWakuMessage(dAtA, i, uint64(size))
+		}
 		i--
 		dAtA[i] = 0x1
 		i--
@@ -194,6 +363,42 @@ func encodeVarintWakuMessage(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *RateLimitProof) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Proof)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	l = len(m.MerkleRoot)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	l = len(m.Epoch)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	l = len(m.ShareX)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	l = len(m.ShareY)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	l = len(m.Nullifier)
+	if l > 0 {
+		n += 1 + l + sovWakuMessage(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *WakuMessage) Size() (n int) {
 	if m == nil {
 		return 0
@@ -214,8 +419,8 @@ func (m *WakuMessage) Size() (n int) {
 	if m.Timestamp != 0 {
 		n += 1 + sozWakuMessage(uint64(m.Timestamp))
 	}
-	l = len(m.Proof)
-	if l > 0 {
+	if m.RateLimitProof != nil {
+		l = m.RateLimitProof.Size()
 		n += 2 + l + sovWakuMessage(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -229,6 +434,261 @@ func sovWakuMessage(x uint64) (n int) {
 }
 func sozWakuMessage(x uint64) (n int) {
 	return sovWakuMessage(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *RateLimitProof) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowWakuMessage
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RateLimitProof: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RateLimitProof: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Proof", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Proof = append(m.Proof[:0], dAtA[iNdEx:postIndex]...)
+			if m.Proof == nil {
+				m.Proof = []byte{}
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MerkleRoot", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MerkleRoot = append(m.MerkleRoot[:0], dAtA[iNdEx:postIndex]...)
+			if m.MerkleRoot == nil {
+				m.MerkleRoot = []byte{}
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Epoch", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Epoch = append(m.Epoch[:0], dAtA[iNdEx:postIndex]...)
+			if m.Epoch == nil {
+				m.Epoch = []byte{}
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShareX", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShareX = append(m.ShareX[:0], dAtA[iNdEx:postIndex]...)
+			if m.ShareX == nil {
+				m.ShareX = []byte{}
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShareY", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ShareY = append(m.ShareY[:0], dAtA[iNdEx:postIndex]...)
+			if m.ShareY == nil {
+				m.ShareY = []byte{}
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nullifier", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowWakuMessage
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Nullifier = append(m.Nullifier[:0], dAtA[iNdEx:postIndex]...)
+			if m.Nullifier == nil {
+				m.Nullifier = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipWakuMessage(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthWakuMessage
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *WakuMessage) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -367,9 +827,9 @@ func (m *WakuMessage) Unmarshal(dAtA []byte) error {
 			m.Timestamp = int64(v)
 		case 21:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Proof", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RateLimitProof", wireType)
 			}
-			var byteLen int
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowWakuMessage
@@ -379,24 +839,26 @@ func (m *WakuMessage) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				byteLen |= int(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthWakuMessage
 			}
-			postIndex := iNdEx + byteLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthWakuMessage
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Proof = append(m.Proof[:0], dAtA[iNdEx:postIndex]...)
-			if m.Proof == nil {
-				m.Proof = []byte{}
+			if m.RateLimitProof == nil {
+				m.RateLimitProof = &RateLimitProof{}
+			}
+			if err := m.RateLimitProof.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
 			iNdEx = postIndex
 		default:

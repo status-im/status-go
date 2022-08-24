@@ -836,7 +836,6 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	}
 
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
-
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
@@ -1210,6 +1209,11 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching pending invitations", zap.String("community-id", id.String()))
 	return m.persistence.PendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
+	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {

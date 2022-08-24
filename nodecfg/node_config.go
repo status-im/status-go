@@ -272,6 +272,17 @@ func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
+func insertWakuV2StoreConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	_, err := tx.Exec(`
+	UPDATE wakuv2_config
+	SET enable_store = ?, store_capacity = ?, store_seconds = ?
+	WHERE synthetic_id = 'id'`,
+		c.WakuV2Config.EnableStore, c.WakuV2Config.StoreCapacity, c.WakuV2Config.StoreSeconds,
+	)
+
+	return err
+}
+
 func insertWakuConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO waku_config (
@@ -390,6 +401,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertWakuConfig,
 		insertWakuV2Config,
 		insertTorrentConfig,
+		insertWakuV2StoreConfig,
 	}
 }
 

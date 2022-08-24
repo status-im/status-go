@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/rand"
 	"testing"
 	"time"
 
@@ -22,6 +21,11 @@ func (s *PairingServerSuite) SetupSuite() {
 }
 
 func (s *PairingServerSuite) TestPairingServer_StartPairing() {
+	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
+	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralPK)
+	s.Require().NoError(err)
+	s.PS.PayloadManager = pm
+
 	modes := []Mode{
 		Receiving,
 		Sending,
@@ -30,13 +34,8 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 	for _, m := range modes {
 		s.PS.mode = m
 
-		// Random payload
-		data := make([]byte, 32)
-		_, err := rand.Read(data)
-		s.Require().NoError(err)
-
 		if m == Sending {
-			err := s.PS.MountPayload(data)
+			err := s.PS.Mount()
 			s.Require().NoError(err)
 		}
 
@@ -57,11 +56,15 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		err = ccp.FromString(qr)
 		s.Require().NoError(err)
 
-		c, err := NewPairingClient(ccp)
+		c, err := NewPairingClient(ccp, nil)
+		s.Require().NoError(err)
+
+		// Replace PairingClient.PayloadManager with a MockEncryptOnlyPayloadManager
+		c.PayloadManager, err = NewMockEncryptOnlyPayloadManager(s.EphemeralPK)
 		s.Require().NoError(err)
 
 		if m == Receiving {
-			err := c.MountPayload(data)
+			err := c.Mount()
 			s.Require().NoError(err)
 		}
 
@@ -70,18 +73,18 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 
 		switch m {
 		case Receiving:
-			s.Require().Equal(data, s.PS.payload.Received())
-			s.Require().Equal(s.PS.payload.received.encrypted, c.payload.toSend.encrypted)
-			s.Require().Nil(s.PS.payload.ToSend())
-			s.Require().Nil(c.payload.Received())
+			s.Require().Equal(c.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.toSend.plain, s.PS.Received())
+			s.Require().Equal(s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.received.encrypted, c.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.toSend.encrypted)
+			s.Require().Nil(s.PS.ToSend())
+			s.Require().Nil(c.Received())
 		case Sending:
-			s.Require().Equal(c.payload.Received(), data)
-			s.Require().Equal(c.payload.received.encrypted, s.PS.payload.toSend.encrypted)
-			s.Require().Nil(c.payload.ToSend())
-			s.Require().Nil(s.PS.payload.Received())
+			s.Require().Equal(c.Received(), s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.toSend.plain)
+			s.Require().Equal(c.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.received.encrypted, s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).pem.toSend.encrypted)
+			s.Require().Nil(c.ToSend())
+			s.Require().Nil(s.PS.Received())
 		}
 
-		// Reset the server's PayloadManager
-		s.PS.payload.ResetPayload()
+		// Reset the server's PayloadEncryptionManager
+		s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).ResetPayload()
 	}
 }

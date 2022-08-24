@@ -11,6 +11,43 @@ message Backup {
   repeated SyncCommunity communities = 4;
 }
 
+message MultiAccount {
+  string name = 1;
+  int64 timestamp = 2;
+  string identicon = 3;
+  repeated ColourHash color_hash = 4;
+  int64 colorId = 5;
+  string keycard_pairing = 6;
+  string key_uid = 7;
+  repeated IdentityImage images = 8;
+
+  message ColourHash {
+    repeated int64 index = 1;
+  }
+
+  message IdentityImage {
+    string key_uid = 1;
+    string name = 2;
+    bytes payload = 3;
+    int64 width = 4;
+    int64 height = 5;
+    int64 filesize = 6;
+    int64 resize_target = 7;
+    uint64 clock = 8;
+  }
+}
+
+message LocalPairingPayload {
+  repeated Key keys = 1;
+  MultiAccount multiaccount = 2;
+  string password = 3;
+
+  message Key {
+    string name = 1;
+    bytes data = 2;
+  }
+}
+
 message PairInstallation {
   uint64 clock = 1;
   string installation_id = 2;

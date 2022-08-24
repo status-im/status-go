@@ -176,3 +176,60 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 
 	require.Exactly(t, expected, string(accJSON))
 }
+
+func TestDatabase_GetAccount(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10}
+	require.NoError(t, db.SaveAccount(expected))
+
+	account, err := db.GetAccount(expected.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, &expected, account)
+}
+
+func TestDatabase_SaveAccountWithIdentityImages(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	expected := Account{
+		Name:      "string",
+		KeyUID:    keyUID,
+		ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
+		ColorID:   10,
+		Images:    images.SampleIdentityImages(),
+	}
+	require.NoError(t, db.SaveAccount(expected))
+
+	account, err := db.GetAccount(expected.KeyUID)
+	require.NoError(t, err)
+	require.Exactly(t, expected.ColorHash, account.ColorHash)
+	require.Exactly(t, expected.ColorID, account.ColorID)
+	require.Exactly(t, expected.Identicon, account.Identicon)
+	require.Exactly(t, expected.KeycardPairing, account.KeycardPairing)
+	require.Exactly(t, expected.KeyUID, account.KeyUID)
+	require.Exactly(t, expected.Name, account.Name)
+	require.Exactly(t, expected.Timestamp, account.Timestamp)
+	require.Len(t, expected.Images, 2)
+
+	matches := 0
+	for _, expImg := range expected.Images {
+		for _, accImg := range account.Images {
+			if expImg.Name != accImg.Name {
+				continue
+			}
+			matches++
+
+			require.Exactly(t, expImg.Clock, accImg.Clock)
+			require.Exactly(t, keyUID, accImg.KeyUID)
+			require.Exactly(t, expImg.Name, accImg.Name)
+			require.Exactly(t, expImg.ResizeTarget, accImg.ResizeTarget)
+			require.Exactly(t, expImg.Payload, accImg.Payload)
+			require.Exactly(t, expImg.Height, accImg.Height)
+			require.Exactly(t, expImg.Width, accImg.Width)
+			require.Exactly(t, expImg.FileSize, accImg.FileSize)
+		}
+	}
+	require.Equal(t, 2, matches)
+}

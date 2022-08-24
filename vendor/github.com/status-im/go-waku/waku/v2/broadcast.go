@@ -10,29 +10,33 @@ import (
 type doneCh chan struct{}
 
 type chOperation struct {
-	ch   chan<- *protocol.Envelope
-	done doneCh
+	ch    chan<- *protocol.Envelope
+	topic *string
+	done  doneCh
 }
+
+type broadcastOutputs map[chan<- *protocol.Envelope]struct{}
 
 type broadcaster struct {
 	input chan *protocol.Envelope
 	reg   chan chOperation
 	unreg chan chOperation
 
-	outputs map[chan<- *protocol.Envelope]bool
+	outputs         broadcastOutputs
+	outputsPerTopic map[string]broadcastOutputs
 }
 
 // The Broadcaster interface describes the main entry points to
 // broadcasters.
 type Broadcaster interface {
-	// Register a new channel to receive broadcasts
-	Register(chan<- *protocol.Envelope)
-	// Register a new channel to receive broadcasts and return a channel to wait until this operation is complete
-	WaitRegister(newch chan<- *protocol.Envelope) doneCh
-	// Unregister a channel so that it no longer receives broadcasts.
-	Unregister(chan<- *protocol.Envelope)
+	// Register a new channel to receive broadcasts from a pubsubtopic
+	Register(topic *string, newch chan<- *protocol.Envelope)
+	// Register a new channel to receive broadcasts from a pubsub topic and return a channel to wait until this operation is complete
+	WaitRegister(topic *string, newch chan<- *protocol.Envelope) doneCh
+	// Unregister a channel so that it no longer receives broadcasts from a pubsub topic
+	Unregister(topic *string, newch chan<- *protocol.Envelope)
 	// Unregister a subscriptor channel and return a channel to wait until this operation is done
-	WaitUnregister(newch chan<- *protocol.Envelope) doneCh
+	WaitUnregister(topic *string, newch chan<- *protocol.Envelope) doneCh
 	// Shut this broadcaster down.
 	Close()
 	// Submit a new object to all subscribers
@@ -41,6 +45,15 @@ type Broadcaster interface {
 
 func (b *broadcaster) broadcast(m *protocol.Envelope) {
 	for ch := range b.outputs {
+		ch <- m
+	}
+
+	outputs, ok := b.outputsPerTopic[m.PubsubTopic()]
+	if !ok {
+		return
+	}
+
+	for ch := range outputs {
 		ch <- m
 	}
 }
@@ -52,7 +65,18 @@ func (b *broadcaster) run() {
 			b.broadcast(m)
 		case broadcastee, ok := <-b.reg:
 			if ok {
-				b.outputs[broadcastee.ch] = true
+				if broadcastee.topic != nil {
+					topicOutputs, ok := b.outputsPerTopic[*broadcastee.topic]
+					if !ok {
+						b.outputsPerTopic[*broadcastee.topic] = make(broadcastOutputs)
+						topicOutputs = b.outputsPerTopic[*broadcastee.topic]
+					}
+
+					topicOutputs[broadcastee.ch] = struct{}{}
+					b.outputsPerTopic[*broadcastee.topic] = topicOutputs
+				} else {
+					b.outputs[broadcastee.ch] = struct{}{}
+				}
 				if broadcastee.done != nil {
 					broadcastee.done <- struct{}{}
 				}
@@ -63,7 +87,17 @@ func (b *broadcaster) run() {
 				return
 			}
 		case broadcastee := <-b.unreg:
-			delete(b.outputs, broadcastee.ch)
+			if broadcastee.topic != nil {
+				topicOutputs, ok := b.outputsPerTopic[*broadcastee.topic]
+				if !ok {
+					continue
+				}
+				delete(topicOutputs, broadcastee.ch)
+				b.outputsPerTopic[*broadcastee.topic] = topicOutputs
+			} else {
+				delete(b.outputs, broadcastee.ch)
+			}
+
 			if broadcastee.done != nil {
 				broadcastee.done <- struct{}{}
 			}
@@ -76,10 +110,11 @@ func (b *broadcaster) run() {
 // an Envelope containing a WakuMessage
 func NewBroadcaster(buflen int) Broadcaster {
 	b := &broadcaster{
-		input:   make(chan *protocol.Envelope, buflen),
-		reg:     make(chan chOperation),
-		unreg:   make(chan chOperation),
-		outputs: make(map[chan<- *protocol.Envelope]bool),
+		input:           make(chan *protocol.Envelope, buflen),
+		reg:             make(chan chOperation),
+		unreg:           make(chan chOperation),
+		outputs:         make(broadcastOutputs),
+		outputsPerTopic: make(map[string]broadcastOutputs),
 	}
 
 	go b.run()
@@ -88,38 +123,42 @@ func NewBroadcaster(buflen int) Broadcaster {
 }
 
 // Register a subscriptor channel and return a channel to wait until this operation is done
-func (b *broadcaster) WaitRegister(newch chan<- *protocol.Envelope) doneCh {
+func (b *broadcaster) WaitRegister(topic *string, newch chan<- *protocol.Envelope) doneCh {
 	d := make(doneCh)
 	b.reg <- chOperation{
-		ch:   newch,
-		done: d,
+		ch:    newch,
+		topic: topic,
+		done:  d,
 	}
 	return d
 }
 
 // Register a subscriptor channel
-func (b *broadcaster) Register(newch chan<- *protocol.Envelope) {
+func (b *broadcaster) Register(topic *string, newch chan<- *protocol.Envelope) {
 	b.reg <- chOperation{
-		ch:   newch,
-		done: nil,
+		ch:    newch,
+		topic: topic,
+		done:  nil,
 	}
 }
 
 // Unregister a subscriptor channel and return a channel to wait until this operation is done
-func (b *broadcaster) WaitUnregister(newch chan<- *protocol.Envelope) doneCh {
+func (b *broadcaster) WaitUnregister(topic *string, newch chan<- *protocol.Envelope) doneCh {
 	d := make(doneCh)
 	b.unreg <- chOperation{
-		ch:   newch,
-		done: d,
+		ch:    newch,
+		topic: topic,
+		done:  d,
 	}
 	return d
 }
 
 // Unregister a subscriptor channel
-func (b *broadcaster) Unregister(newch chan<- *protocol.Envelope) {
+func (b *broadcaster) Unregister(topic *string, newch chan<- *protocol.Envelope) {
 	b.unreg <- chOperation{
-		ch:   newch,
-		done: nil,
+		ch:    newch,
+		topic: topic,
+		done:  nil,
 	}
 }
 

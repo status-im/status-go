@@ -10,14 +10,16 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"github.com/status-im/go-waku/logging"
 	"go.uber.org/zap"
 )
 
+// ErrNoPeersAvailable is emitted when no suitable peers are found for
+// some protocol
 var ErrNoPeersAvailable = errors.New("no suitable peers found")
-var PingServiceNotAvailable = errors.New("ping service not available")
 
 // SelectPeer is used to return a random peer that supports a given protocol.
-func SelectPeer(host host.Host, protocolId string, log *zap.SugaredLogger) (*peer.ID, error) {
+func SelectPeer(host host.Host, protocolId string, log *zap.Logger) (*peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
 	// This will require us to check for various factors such as:
@@ -28,7 +30,7 @@ func SelectPeer(host host.Host, protocolId string, log *zap.SugaredLogger) (*pee
 	for _, peer := range host.Peerstore().Peers() {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
-			log.Error("error obtaining the protocols supported by peers", err)
+			log.Error("obtaining protocols supported by peers", zap.Error(err), logging.HostID("peer", peer))
 			return nil, err
 		}
 
@@ -50,12 +52,13 @@ type pingResult struct {
 	rtt time.Duration
 }
 
-func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, log *zap.SugaredLogger) (*peer.ID, error) {
+// SelectPeerWithLowestRTT will select a peer that supports a specific protocol with the lowest reply time
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, log *zap.Logger) (*peer.ID, error) {
 	var peers peer.IDSlice
 	for _, peer := range host.Peerstore().Peers() {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
-			log.Error("error obtaining the protocols supported by peers", err)
+			log.Error("error obtaining the protocols supported by peers", zap.Error(err))
 			return nil, err
 		}
 
@@ -104,9 +107,9 @@ func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId str
 		}
 		if min == nil {
 			return nil, ErrNoPeersAvailable
-		} else {
-			return &min.p, nil
 		}
+
+		return &min.p, nil
 	case <-ctx.Done():
 		return nil, ErrNoPeersAvailable
 	}

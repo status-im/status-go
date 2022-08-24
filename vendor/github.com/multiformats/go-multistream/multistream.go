@@ -5,9 +5,10 @@ package multistream
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
+	"os"
+	"runtime/debug"
 
 	"io"
 	"sync"
@@ -110,39 +111,6 @@ func delimWrite(w io.Writer, mes []byte) error {
 	return nil
 }
 
-// Ls is a Multistream muxer command which returns the list of handler names
-// available on a muxer.
-func Ls(rw io.ReadWriter) ([]string, error) {
-	err := handshake(rw)
-	if err != nil {
-		return nil, err
-	}
-	err = delimWriteBuffered(rw, []byte("ls"))
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := lpReadBuf(rw)
-	if err != nil {
-		return nil, err
-	}
-
-	r := bytes.NewReader(response)
-
-	var out []string
-	for {
-		val, err := lpReadBuf(r)
-		switch err {
-		default:
-			return nil, err
-		case io.EOF:
-			return out, nil
-		case nil:
-			out = append(out, string(val))
-		}
-	}
-}
-
 func fulltextMatch(s string) func(string) bool {
 	return func(a string) bool {
 		return a == s
@@ -220,103 +188,27 @@ func (msm *MultistreamMuxer) findHandler(proto string) *Handler {
 // a multistream, the protocol used, the handler and an error. It is lazy
 // because the write-handshake is performed on a subroutine, allowing this
 // to return before that handshake is completed.
-func (msm *MultistreamMuxer) NegotiateLazy(rwc io.ReadWriteCloser) (io.ReadWriteCloser, string, HandlerFunc, error) {
-	pval := make(chan string, 1)
-	writeErr := make(chan error, 1)
-	defer close(pval)
-
-	lzc := &lazyServerConn{
-		con: rwc,
-	}
-
-	started := make(chan struct{})
-	go lzc.waitForHandshake.Do(func() {
-		close(started)
-
-		defer close(writeErr)
-
-		if err := delimWriteBuffered(rwc, []byte(ProtocolID)); err != nil {
-			lzc.werr = err
-			writeErr <- err
-			return
-		}
-
-		for proto := range pval {
-			if err := delimWriteBuffered(rwc, []byte(proto)); err != nil {
-				lzc.werr = err
-				writeErr <- err
-				return
-			}
-		}
-	})
-	<-started
-
-	line, err := ReadNextToken(rwc)
-	if err != nil {
-		return nil, "", nil, err
-	}
-
-	if line != ProtocolID {
-		rwc.Close()
-		return nil, "", nil, ErrIncorrectVersion
-	}
-
-loop:
-	for {
-		// Now read and respond to commands until they send a valid protocol id
-		tok, err := ReadNextToken(rwc)
-		if err != nil {
-			rwc.Close()
-			return nil, "", nil, err
-		}
-
-		switch tok {
-		case "ls":
-			protos, err := msm.encodeLocalProtocols()
-			if err != nil {
-				rwc.Close()
-				return nil, "", nil, err
-			}
-			select {
-			case pval <- string(protos):
-			case err := <-writeErr:
-				rwc.Close()
-				return nil, "", nil, err
-			}
-		default:
-			h := msm.findHandler(tok)
-			if h == nil {
-				select {
-				case pval <- "na":
-				case err := <-writeErr:
-					rwc.Close()
-					return nil, "", nil, err
-				}
-				continue loop
-			}
-
-			select {
-			case pval <- tok:
-			case <-writeErr:
-				// explicitly ignore this error. It will be returned to any
-				// writers and if we don't plan on writing anything, we still
-				// want to complete the handshake
-			}
-
-			// hand off processing to the sub-protocol handler
-			return lzc, tok, h.Handle, nil
-		}
-	}
+// Deprecated: use Negotiate instead.
+func (msm *MultistreamMuxer) NegotiateLazy(rwc io.ReadWriteCloser) (rwc_ io.ReadWriteCloser, proto string, handler HandlerFunc, err error) {
+	proto, handler, err = msm.Negotiate(rwc)
+	return rwc, proto, handler, err
 }
 
 // Negotiate performs protocol selection and returns the protocol name and
 // the matching handler function for it (or an error).
-func (msm *MultistreamMuxer) Negotiate(rwc io.ReadWriteCloser) (string, HandlerFunc, error) {
-	// Send our protocol ID
-	err := delimWriteBuffered(rwc, []byte(ProtocolID))
-	if err != nil {
-		return "", nil, err
-	}
+func (msm *MultistreamMuxer) Negotiate(rwc io.ReadWriteCloser) (proto string, handler HandlerFunc, err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic in multistream negotiation: %s", rerr)
+		}
+	}()
+
+	// Send the multistream protocol ID
+	// Ignore the error here.  We want the handshake to finish, even if the
+	// other side has closed this rwc for writing. They may have sent us a
+	// message and closed. Future writers will get an error anyways.
+	_ = delimWriteBuffered(rwc, []byte(ProtocolID))
 
 	line, err := ReadNextToken(rwc)
 	if err != nil {
@@ -336,58 +228,23 @@ loop:
 			return "", nil, err
 		}
 
-		switch tok {
-		case "ls":
-			err := msm.Ls(rwc)
-			if err != nil {
+		h := msm.findHandler(tok)
+		if h == nil {
+			if err := delimWriteBuffered(rwc, []byte("na")); err != nil {
 				return "", nil, err
 			}
-		default:
-			h := msm.findHandler(tok)
-			if h == nil {
-				err := delimWriteBuffered(rwc, []byte("na"))
-				if err != nil {
-					return "", nil, err
-				}
-				continue loop
-			}
-
-			err := delimWriteBuffered(rwc, []byte(tok))
-			if err != nil {
-				return "", nil, err
-			}
-
-			// hand off processing to the sub-protocol handler
-			return tok, h.Handle, nil
+			continue loop
 		}
+
+		// Ignore the error here.  We want the handshake to finish, even if the
+		// other side has closed this rwc for writing. They may have sent us a
+		// message and closed. Future writers will get an error anyways.
+		_ = delimWriteBuffered(rwc, []byte(tok))
+
+		// hand off processing to the sub-protocol handler
+		return tok, h.Handle, nil
 	}
 
-}
-
-// Ls implements the "ls" command which writes the list of
-// supported protocols to the given Writer.
-func (msm *MultistreamMuxer) Ls(w io.Writer) error {
-	protos, err := msm.encodeLocalProtocols()
-	if err != nil {
-		return err
-	}
-	return delimWrite(w, protos)
-}
-
-// encodeLocalProtocols encodes the protocols this multistream-select router
-// handles, packed in a list of varint-delimited strings.
-func (msm *MultistreamMuxer) encodeLocalProtocols() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	msm.handlerlock.RLock()
-	for _, h := range msm.handlers {
-		err := delimWrite(buf, []byte(h.AddName))
-		if err != nil {
-			msm.handlerlock.RUnlock()
-			return nil, err
-		}
-	}
-	msm.handlerlock.RUnlock()
-	return buf.Bytes(), nil
 }
 
 // Handle performs protocol negotiation on a ReadWriteCloser
@@ -437,7 +294,7 @@ func lpReadBuf(r io.Reader) ([]byte, error) {
 		return nil, err
 	}
 
-	if length > 64*1024 {
+	if length > 1024 {
 		return nil, ErrTooLarge
 	}
 

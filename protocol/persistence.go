@@ -1374,3 +1374,58 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 	_, err = tx.Exec(`DELETE from bookmarks WHERE removed = 1 AND deleted_at < ?`, threshold)
 	return err
 }
+
+func (db *sqlitePersistence) InsertWalletConnectSession(session *WalletConnectSession) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_v1_sessions(peer_id, dapp_name, dapp_url, info) VALUES(?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer sessionInsertPreparedStatement.Close()
+	_, err = sessionInsertPreparedStatement.Exec(session.PeerID, session.DAppName, session.DAppURL, session.Info)
+	return err
+}
+
+func (db *sqlitePersistence) GetWalletConnectSession() ([]WalletConnectSession, error) {
+	var sessions []WalletConnectSession
+
+	rows, err := db.db.Query("SELECT peer_id, dapp_name, dapp_url, info FROM wallet_connect_v1_sessions ORDER BY dapp_name")
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		session := WalletConnectSession{}
+		err = rows.Scan(&session.PeerID, &session.DAppName, &session.DAppURL, &session.Info)
+		if err != nil {
+			return nil, err
+		}
+
+		sessions = append(sessions, session)
+	}
+
+	return sessions, nil
+}
+
+func (db *sqlitePersistence) DeleteWalletConnectSession(peerID string) error {
+	deleteStatement, err := db.db.Prepare("DELETE FROM wallet_connect_v1_sessions where peer_id=?")
+	if err != nil {
+		return err
+	}
+	defer deleteStatement.Close()
+	_, err = deleteStatement.Exec(peerID)
+	return err
+}

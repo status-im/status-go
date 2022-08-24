@@ -346,21 +346,17 @@ func GetDriveType(rootPathName string) (DriveType, error) {
 // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationw
 func GetFilesystemType(rootPathName string) (string, error) {
 	rootPathNamePtr, err := syscall.UTF16PtrFromString(rootPathName)
+	var systemType = "unavailable"
 	if err != nil {
 		return "", errors.Wrapf(err, "UTF16PtrFromString failed for rootPathName=%v", rootPathName)
 	}
-
 	buffer := make([]uint16, MAX_PATH+1)
+	// _GetVolumeInformation will fail for external drives like CD-ROM or other type with error codes as ERROR_NOT_READY. ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER, etc., these types of errors will be ignored
 	success, err := _GetVolumeInformation(rootPathNamePtr, nil, 0, nil, nil, nil, &buffer[0], MAX_PATH)
-	// check if CD-ROM or other type that is not supported in GetVolumeInformation function
-	if err == ERROR_NOT_READY || err == ERROR_INVALID_FUNCTION {
-		return "", nil
+	if success {
+		systemType = strings.ToLower(syscall.UTF16ToString(buffer))
 	}
-	if !success {
-		return "", errors.Wrap(err, "GetVolumeInformationW failed")
-	}
-
-	return strings.ToLower(syscall.UTF16ToString(buffer)), nil
+	return systemType, nil
 }
 
 // EnumProcesses retrieves the process identifier for each process object in the

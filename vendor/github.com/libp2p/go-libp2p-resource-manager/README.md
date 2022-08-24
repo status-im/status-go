@@ -281,64 +281,78 @@ aid understanding of applicable limits.  Note that the (wrapped) error
 implements `net.Error` and is marked as temporary, so that the
 programmer can handle by backoff retry.
 
-### Default Limits
+## Usage
 
-The provided default static limiters apply the following limits, where
-memoryCap is provided by the programmer, either as a fixed number (in
-bytes) or a fraction of total system memory:
+This package provides a limiter implementation that applies fixed limits:
+```go
+limiter := NewFixedLimiter(limits)
 ```
-DefaultSystemBaseLimit:
- StreamsInbound:  4096,
- StreamsOutbound: 16384,
- ConnsInbound:    256,
- ConnsOutbound:   512,
- FD:              512,
+The `limits` allows fine-grained control of resource usage on all scopes.
 
-DefaultTransientBaseLimit:
- StreamsInbound:  128,
- StreamsOutbound: 512,
- ConnsInbound:    32,
- ConnsOutbound:   128,
- FD:              128,
+### Scaling Limits
 
-DefaultProtocolBaseLimit:
- StreamsInbound:  1024,
- StreamsOutbound: 4096,
+When building software that is supposed to run on many different kind of machines,
+with various memory and CPU configurations, it is desireable to have limits that
+scale with the size of the machine.
 
-DefaultServiceBaseLimit:
- StreamsInbound:  2048,
- StreamsOutbound: 8192,
+This is done using the `ScalingLimitConfig`. For every scope, this configuration
+struct defines the absolutely bare minimum limits, and an (optional) increase of
+these limits, which will be applied on nodes that have sufficient memory.
 
-system:
- Memory:    memoryCap
- BaseLimit: DefaultSystemBaseLimit
+A `ScalingLimitConfig` can be converted into a `LimitConfig` (which can then be
+used to initialize a fixed limiter as shown above) by calling the `Scale` method.
+The `Scale` method takes two parameters: the amount of memory and the number of file
+descriptors that an application is willing to dedicate to libp2p.
 
-transient:
- Memory:    memoryCap / 16
- BaseLimit: DefaultTransientBaseLimit
+These amounts will differ between use cases: A blockchain node running on a dedicated
+server might have a lot of memory, and dedicate 1/4 of that memory to libp2p. On the
+other end of the spectrum, a desktop companion application running as a background
+task on a consumer laptop will probably dedicate significantly less than 1/4 of its system
+memory to libp2p.
 
-svc =
- Memory:    memoryCap / 2
- BaseLimit: DefaultServiceBaseLimit
+For convenience, the `ScalingLimitConfig` also provides an `AutoScale` method,
+which determines the amount of memory and file descriptors available on the
+system, and dedicates up to 1/8 of the memory and 1/2 of the file descriptors to libp2p.
 
-proto:
- Memory:    memoryCap / 4
- BaseLimit: DefaultProtocolBaseLimit
-
-peer:
- Memory:    memoryCap / 16
- BaseLimit: DefaultPeerBaseLimit
-
-conn:
- Memory:    16 << 20,
-
-stream:
- Memory:    16 << 20,
+For example, one might set:
+```go
+var scalingLimits = ScalingLimitConfig{
+  SystemBaseLimit: BaseLimit{
+    ConnsInbound:    64,
+    ConnsOutbound:   128,
+    Conns:           128,
+    StreamsInbound:  512,
+    StreamsOutbound: 1024,
+    Streams:         1024,
+    Memory:          128 << 20,
+    FD:              256,
+  },
+  SystemLimitIncrease: BaseLimitIncrease{
+    ConnsInbound:    32,
+    ConnsOutbound:   64,
+    Conns:           64,
+    StreamsInbound:  256,
+    StreamsOutbound: 512,
+    Streams:         512,
+    Memory:          256 << 20,
+    FDFraction:      1,
+  },
+}
 ```
 
-We also provide a dynamic limiter which uses the same base limits, but
-the memory limit is dynamically computed at each memory reservation check
-based on free memory.
+The base limit (`SystemBaseLimit`) here is the minimum configuration that any
+node will have, no matter how little memory it possesses. For every GB of memory
+passed into the `Scale` method, an increase  of (`SystemLimitIncrease`) is added.
+
+For Example, calling `Scale` with 4 GB of memory will result in a limit of 384 for
+`Conns` (128 + 4*64).
+
+The `FDFraction` defines how many of the file descriptors are allocated to this
+scope. In the example above, when called with a file descriptor value of 1000,
+this would result in a limit of 1256 file descriptors for the system scope.
+
+Note that we only showed the configuration for the system scope here, equivalent
+configuration options apply to all other scopes as well.
 
 ## Implementation Notes
 

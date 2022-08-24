@@ -71,7 +71,7 @@ func (s *GetOutboundIPSuite) TestGetOutboundIPWithFullServerE2e() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewPairingClient(ccp)
+	c, err := NewPairingClient(ccp, nil)
 	s.Require().NoError(err)
 
 	thing, err := makeThingToSay()

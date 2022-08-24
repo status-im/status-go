@@ -3,12 +3,14 @@ package rcmgr
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multiaddr"
 
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -21,8 +23,13 @@ type resourceManager struct {
 	trace   *trace
 	metrics *metrics
 
+	allowlist *Allowlist
+
 	system    *systemScope
 	transient *transientScope
+
+	allowlistedSystem    *systemScope
+	allowlistedTransient *transientScope
 
 	cancelCtx context.Context
 	cancel    func()
@@ -58,8 +65,8 @@ var _ network.ResourceScope = (*transientScope)(nil)
 type serviceScope struct {
 	*resourceScope
 
-	name  string
-	rcmgr *resourceManager
+	service string
+	rcmgr   *resourceManager
 
 	peers map[peer.ID]*resourceScope
 }
@@ -89,10 +96,12 @@ var _ network.PeerScope = (*peerScope)(nil)
 type connectionScope struct {
 	*resourceScope
 
-	dir   network.Direction
-	usefd bool
-	rcmgr *resourceManager
-	peer  *peerScope
+	dir           network.Direction
+	usefd         bool
+	isAllowlisted bool
+	rcmgr         *resourceManager
+	peer          *peerScope
+	endpoint      multiaddr.Multiaddr
 }
 
 var _ network.ConnScope = (*connectionScope)(nil)
@@ -117,11 +126,13 @@ var _ network.StreamManagementScope = (*streamScope)(nil)
 type Option func(*resourceManager) error
 
 func NewResourceManager(limits Limiter, opts ...Option) (network.ResourceManager, error) {
+	allowlist := newAllowlist()
 	r := &resourceManager{
-		limits: limits,
-		svc:    make(map[string]*serviceScope),
-		proto:  make(map[protocol.ID]*protocolScope),
-		peer:   make(map[peer.ID]*peerScope),
+		limits:    limits,
+		allowlist: &allowlist,
+		svc:       make(map[string]*serviceScope),
+		proto:     make(map[protocol.ID]*protocolScope),
+		peer:      make(map[peer.ID]*peerScope),
 	}
 
 	for _, opt := range opts {
@@ -134,10 +145,15 @@ func NewResourceManager(limits Limiter, opts ...Option) (network.ResourceManager
 		return nil, err
 	}
 
-	r.system = newSystemScope(limits.GetSystemLimits(), r)
+	r.system = newSystemScope(limits.GetSystemLimits(), r, "system")
 	r.system.IncRef()
-	r.transient = newTransientScope(limits.GetTransientLimits(), r)
+	r.transient = newTransientScope(limits.GetTransientLimits(), r, "transient", r.system.resourceScope)
 	r.transient.IncRef()
+
+	r.allowlistedSystem = newSystemScope(limits.GetAllowlistedSystemLimits(), r, "allowlistedSystem")
+	r.allowlistedSystem.IncRef()
+	r.allowlistedTransient = newTransientScope(limits.GetAllowlistedTransientLimits(), r, "allowlistedTransient", r.allowlistedSystem.resourceScope)
+	r.allowlistedTransient.IncRef()
 
 	r.cancelCtx, r.cancel = context.WithCancel(context.Background())
 
@@ -145,6 +161,22 @@ func NewResourceManager(limits Limiter, opts ...Option) (network.ResourceManager
 	go r.background()
 
 	return r, nil
+}
+
+func (r *resourceManager) GetAllowlist() *Allowlist {
+	return r.allowlist
+}
+
+// GetAllowlist tries to get the allowlist from the given resourcemanager
+// interface by checking to see if its concrete type is a resourceManager.
+// Returns nil if it fails to get the allowlist.
+func GetAllowlist(rcmgr network.ResourceManager) *Allowlist {
+	r, ok := rcmgr.(*resourceManager)
+	if !ok {
+		return nil
+	}
+
+	return r.allowlist
 }
 
 func (r *resourceManager) ViewSystem(f func(network.ResourceScope) error) error {
@@ -255,10 +287,23 @@ func (r *resourceManager) nextStreamId() int64 {
 	return r.streamId
 }
 
-func (r *resourceManager) OpenConnection(dir network.Direction, usefd bool) (network.ConnManagementScope, error) {
-	conn := newConnectionScope(dir, usefd, r.limits.GetConnLimits(), r)
+func (r *resourceManager) OpenConnection(dir network.Direction, usefd bool, endpoint multiaddr.Multiaddr) (network.ConnManagementScope, error) {
+	var conn *connectionScope
+	conn = newConnectionScope(dir, usefd, r.limits.GetConnLimits(), r, endpoint)
 
-	if err := conn.AddConn(dir, usefd); err != nil {
+	err := conn.AddConn(dir, usefd)
+	if err != nil {
+		// Try again if this is an allowlisted connection
+		// Failed to open connection, let's see if this was allowlisted and try again
+		allowed := r.allowlist.Allowed(endpoint)
+		if allowed {
+			conn.Done()
+			conn = newAllowListedConnectionScope(dir, usefd, r.limits.GetConnLimits(), r, endpoint)
+			err = conn.AddConn(dir, usefd)
+		}
+	}
+
+	if err != nil {
 		conn.Done()
 		r.metrics.BlockConn(dir, usefd)
 		return nil, err
@@ -363,28 +408,28 @@ func (r *resourceManager) gc() {
 	}
 }
 
-func newSystemScope(limit Limit, rcmgr *resourceManager) *systemScope {
+func newSystemScope(limit Limit, rcmgr *resourceManager, name string) *systemScope {
 	return &systemScope{
-		resourceScope: newResourceScope(limit, nil, "system", rcmgr.trace, rcmgr.metrics),
+		resourceScope: newResourceScope(limit, nil, name, rcmgr.trace, rcmgr.metrics),
 	}
 }
 
-func newTransientScope(limit Limit, rcmgr *resourceManager) *transientScope {
+func newTransientScope(limit Limit, rcmgr *resourceManager, name string, systemScope *resourceScope) *transientScope {
 	return &transientScope{
 		resourceScope: newResourceScope(limit,
-			[]*resourceScope{rcmgr.system.resourceScope},
-			"transient", rcmgr.trace, rcmgr.metrics),
+			[]*resourceScope{systemScope},
+			name, rcmgr.trace, rcmgr.metrics),
 		system: rcmgr.system,
 	}
 }
 
-func newServiceScope(name string, limit Limit, rcmgr *resourceManager) *serviceScope {
+func newServiceScope(service string, limit Limit, rcmgr *resourceManager) *serviceScope {
 	return &serviceScope{
 		resourceScope: newResourceScope(limit,
 			[]*resourceScope{rcmgr.system.resourceScope},
-			fmt.Sprintf("service:%s", name), rcmgr.trace, rcmgr.metrics),
-		name:  name,
-		rcmgr: rcmgr,
+			fmt.Sprintf("service:%s", service), rcmgr.trace, rcmgr.metrics),
+		service: service,
+		rcmgr:   rcmgr,
 	}
 }
 
@@ -402,20 +447,34 @@ func newPeerScope(p peer.ID, limit Limit, rcmgr *resourceManager) *peerScope {
 	return &peerScope{
 		resourceScope: newResourceScope(limit,
 			[]*resourceScope{rcmgr.system.resourceScope},
-			fmt.Sprintf("peer:%s", p), rcmgr.trace, rcmgr.metrics),
+			peerScopeName(p), rcmgr.trace, rcmgr.metrics),
 		peer:  p,
 		rcmgr: rcmgr,
 	}
 }
 
-func newConnectionScope(dir network.Direction, usefd bool, limit Limit, rcmgr *resourceManager) *connectionScope {
+func newConnectionScope(dir network.Direction, usefd bool, limit Limit, rcmgr *resourceManager, endpoint multiaddr.Multiaddr) *connectionScope {
 	return &connectionScope{
 		resourceScope: newResourceScope(limit,
 			[]*resourceScope{rcmgr.transient.resourceScope, rcmgr.system.resourceScope},
-			fmt.Sprintf("conn-%d", rcmgr.nextConnId()), rcmgr.trace, rcmgr.metrics),
-		dir:   dir,
-		usefd: usefd,
-		rcmgr: rcmgr,
+			connScopeName(rcmgr.nextConnId()), rcmgr.trace, rcmgr.metrics),
+		dir:      dir,
+		usefd:    usefd,
+		rcmgr:    rcmgr,
+		endpoint: endpoint,
+	}
+}
+
+func newAllowListedConnectionScope(dir network.Direction, usefd bool, limit Limit, rcmgr *resourceManager, endpoint multiaddr.Multiaddr) *connectionScope {
+	return &connectionScope{
+		resourceScope: newResourceScope(limit,
+			[]*resourceScope{rcmgr.allowlistedTransient.resourceScope, rcmgr.allowlistedSystem.resourceScope},
+			connScopeName(rcmgr.nextConnId()), rcmgr.trace, rcmgr.metrics),
+		dir:           dir,
+		usefd:         usefd,
+		rcmgr:         rcmgr,
+		endpoint:      endpoint,
+		isAllowlisted: true,
 	}
 }
 
@@ -423,15 +482,95 @@ func newStreamScope(dir network.Direction, limit Limit, peer *peerScope, rcmgr *
 	return &streamScope{
 		resourceScope: newResourceScope(limit,
 			[]*resourceScope{peer.resourceScope, rcmgr.transient.resourceScope, rcmgr.system.resourceScope},
-			fmt.Sprintf("stream-%d", rcmgr.nextStreamId()), rcmgr.trace, rcmgr.metrics),
+			streamScopeName(rcmgr.nextStreamId()), rcmgr.trace, rcmgr.metrics),
 		dir:   dir,
 		rcmgr: peer.rcmgr,
 		peer:  peer,
 	}
 }
 
+func IsSystemScope(name string) bool {
+	return name == "system"
+}
+
+func IsTransientScope(name string) bool {
+	return name == "transient"
+}
+
+func streamScopeName(streamId int64) string {
+	return fmt.Sprintf("stream-%d", streamId)
+}
+
+func IsStreamScope(name string) bool {
+	return strings.HasPrefix(name, "stream-") && !IsSpan(name)
+}
+
+func connScopeName(streamId int64) string {
+	return fmt.Sprintf("conn-%d", streamId)
+}
+
+func IsConnScope(name string) bool {
+	return strings.HasPrefix(name, "conn-") && !IsSpan(name)
+}
+
+func peerScopeName(p peer.ID) string {
+	return fmt.Sprintf("peer:%s", p)
+}
+
+// ParsePeerScopeName returns "" if name is not a peerScopeName
+func ParsePeerScopeName(name string) peer.ID {
+	if !strings.HasPrefix(name, "peer:") || IsSpan(name) {
+		return ""
+	}
+	parts := strings.SplitN(name, "peer:", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	p, err := peer.Decode(parts[1])
+	if err != nil {
+		return ""
+	}
+	return p
+}
+
+// ParseServiceScopeName returns the service name if name is a serviceScopeName.
+// Otherwise returns ""
+func ParseServiceScopeName(name string) string {
+	if strings.HasPrefix(name, "service:") && !IsSpan(name) {
+		if strings.Contains(name, "peer:") {
+			// This is a service peer scope
+			return ""
+		}
+		parts := strings.SplitN(name, ":", 2)
+		if len(parts) != 2 {
+			return ""
+		}
+
+		return parts[1]
+	}
+	return ""
+}
+
+// ParseProtocolScopeName returns the service name if name is a serviceScopeName.
+// Otherwise returns ""
+func ParseProtocolScopeName(name string) string {
+	if strings.HasPrefix(name, "protocol:") && !IsSpan(name) {
+		if strings.Contains(name, "peer:") {
+			// This is a protocol peer scope
+			return ""
+		}
+		parts := strings.SplitN(name, ":", 2)
+		if len(parts) != 2 {
+			return ("")
+		}
+
+		return parts[1]
+	}
+	return ""
+}
+
 func (s *serviceScope) Name() string {
-	return s.name
+	return s.service
 }
 
 func (s *serviceScope) getPeerScope(p peer.ID) *resourceScope {
@@ -444,7 +583,7 @@ func (s *serviceScope) getPeerScope(p peer.ID) *resourceScope {
 		return ps
 	}
 
-	l := s.rcmgr.limits.GetServicePeerLimits(s.name)
+	l := s.rcmgr.limits.GetServicePeerLimits(s.service)
 
 	if s.peers == nil {
 		s.peers = make(map[peer.ID]*resourceScope)
@@ -500,6 +639,49 @@ func (s *connectionScope) PeerScope() network.PeerScope {
 	return s.peer
 }
 
+// transferAllowedToStandard transfers this connection scope from being part of
+// the allowlist set of scopes to being part of the standard set of scopes.
+// Happens when we first allowlisted this connection due to its IP, but later
+// discovered that the peer id not what we expected.
+func (s *connectionScope) transferAllowedToStandard() (err error) {
+
+	systemScope := s.rcmgr.system.resourceScope
+	transientScope := s.rcmgr.transient.resourceScope
+
+	stat := s.resourceScope.rc.stat()
+
+	for _, scope := range s.edges {
+		scope.ReleaseForChild(stat)
+		scope.DecRef() // removed from edges
+	}
+	s.edges = nil
+
+	if err := systemScope.ReserveForChild(stat); err != nil {
+		return err
+	}
+	systemScope.IncRef()
+
+	// Undo this if we fail later
+	defer func() {
+		if err != nil {
+			systemScope.ReleaseForChild(stat)
+			systemScope.DecRef()
+		}
+	}()
+
+	if err := transientScope.ReserveForChild(stat); err != nil {
+		return err
+	}
+	transientScope.IncRef()
+
+	// Update edges
+	s.edges = []*resourceScope{
+		systemScope,
+		transientScope,
+	}
+	return nil
+}
+
 func (s *connectionScope) SetPeer(p peer.ID) error {
 	s.Lock()
 	defer s.Unlock()
@@ -507,6 +689,34 @@ func (s *connectionScope) SetPeer(p peer.ID) error {
 	if s.peer != nil {
 		return fmt.Errorf("connection scope already attached to a peer")
 	}
+
+	system := s.rcmgr.system
+	transient := s.rcmgr.transient
+
+	if s.isAllowlisted {
+		system = s.rcmgr.allowlistedSystem
+		transient = s.rcmgr.allowlistedTransient
+
+		if !s.rcmgr.allowlist.AllowedPeerAndMultiaddr(p, s.endpoint) {
+			s.isAllowlisted = false
+
+			// This is not an allowed peer + multiaddr combination. We need to
+			// transfer this connection to the general scope. We'll do this first by
+			// transferring the connection to the system and transient scopes, then
+			// continue on with this function. The idea is that a connection
+			// shouldn't get the benefit of evading the transient scope because it
+			// was _almost_ an allowlisted connection.
+			if err := s.transferAllowedToStandard(); err != nil {
+				// Failed to transfer this connection to the standard scopes
+				return err
+			}
+
+			// set the system and transient scopes to the non-allowlisted ones
+			system = s.rcmgr.system
+			transient = s.rcmgr.transient
+		}
+	}
+
 	s.peer = s.rcmgr.getPeerScope(p)
 
 	// juggle resources from transient scope to peer scope
@@ -518,13 +728,13 @@ func (s *connectionScope) SetPeer(p peer.ID) error {
 		return err
 	}
 
-	s.rcmgr.transient.ReleaseForChild(stat)
-	s.rcmgr.transient.DecRef() // removed from edges
+	transient.ReleaseForChild(stat)
+	transient.DecRef() // removed from edges
 
 	// update edges
 	edges := []*resourceScope{
 		s.peer.resourceScope,
-		s.rcmgr.system.resourceScope,
+		system.resourceScope,
 	}
 	s.resourceScope.edges = edges
 

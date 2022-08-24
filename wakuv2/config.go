@@ -43,6 +43,9 @@ type Config struct {
 	DiscoveryLimit       int      `toml:",omitempty"`
 	AutoUpdate           bool     `toml:",omitempty"`
 	UDPPort              int      `toml:",omitempty"`
+	EnableStore          bool     `toml:",omitempty"`
+	StoreCapacity        int      `toml:",omitempty"`
+	StoreSeconds         int      `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

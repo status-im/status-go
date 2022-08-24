@@ -18,13 +18,13 @@ const WakuSwapID_v200 = protocol.ID("/vac/waku/swap/2.0.0-beta1")
 type WakuSwap struct {
 	params *SwapParameters
 
-	log *zap.SugaredLogger
+	log *zap.Logger
 
 	Accounting      map[string]int
 	accountingMutex sync.RWMutex
 }
 
-func NewWakuSwap(log *zap.SugaredLogger, opts ...SwapOption) *WakuSwap {
+func NewWakuSwap(log *zap.Logger, opts ...SwapOption) *WakuSwap {
 	params := &SwapParameters{}
 
 	optList := DefaultOptions()
@@ -45,12 +45,13 @@ func (s *WakuSwap) sendCheque(peerId string) {
 }
 
 func (s *WakuSwap) applyPolicy(peerId string) {
+	logger := s.log.With(zap.String("peer", peerId))
 	if s.Accounting[peerId] <= s.params.disconnectThreshold {
-		s.log.Warnf("Disconnect threshhold has been reached for %s at %d", peerId, s.Accounting[peerId])
+		logger.Warn("disconnect threshold reached", zap.Int("value", s.Accounting[peerId]))
 	}
 
 	if s.Accounting[peerId] >= s.params.paymentThreshold {
-		s.log.Warnf("Disconnect threshhold has been reached for %s at %d", peerId, s.Accounting[peerId])
+		logger.Warn("payment threshold reached", zap.Int("value", s.Accounting[peerId]))
 		if s.params.mode != HardMode {
 			s.sendCheque(peerId)
 		}

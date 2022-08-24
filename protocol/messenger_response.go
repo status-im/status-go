@@ -39,7 +39,7 @@ type MessengerResponse struct {
 	Mailservers                   []mailservers.Mailserver
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
-	IdentityImages                []*images.IdentityImage
+	IdentityImages                []images.IdentityImage
 	Accounts                      []*accounts.Account
 	VerificationRequests          []*verification.Request
 	DiscordCategories             []*discord.Category
@@ -90,7 +90,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CurrentStatus                 *UserStatus                        `json:"currentStatus,omitempty"`
 		StatusUpdates                 []UserStatus                       `json:"statusUpdates,omitempty"`
 		Settings                      []*settings.SyncSettingField       `json:"settings,omitempty"`
-		IdentityImages                []*images.IdentityImage            `json:"identityImages,omitempty"`
+		IdentityImages                []images.IdentityImage             `json:"identityImages,omitempty"`
 		Accounts                      []*accounts.Account                `json:"accounts,omitempty"`
 		DiscordCategories             []*discord.Category                `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                 `json:"discordChannels,omitempty"`

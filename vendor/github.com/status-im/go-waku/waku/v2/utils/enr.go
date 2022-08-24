@@ -11,18 +11,22 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 )
 
+// WakuENRField is the name of the ENR field that contains information about which protocols are supported by the node
 const WakuENRField = "waku2"
+
+// MultiaddrENRField is the name of the ENR field that will contain multiaddresses that cannot be described using the
+// already available ENR fields (i.e. in the case of websocket connections)
 const MultiaddrENRField = "multiaddrs"
 
 // WakuEnrBitfield is a8-bit flag field to indicate Waku capabilities. Only the 4 LSBs are currently defined according to RFC31 (https://rfc.vac.dev/spec/31/).
 type WakuEnrBitfield = uint8
 
+// NewWakuEnrBitfield creates a WakuEnrBitField whose value will depend on which protocols are enabled in the node
 func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 	var v uint8 = 0
 
@@ -45,10 +49,22 @@ func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 	return v
 }
 
+// GetENRandIP returns a enr Node and TCP address obtained from a multiaddress. priv key and protocols supported
 func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, *net.TCPAddr, error) {
-	ip, err := addr.ValueForProtocol(ma.P_IP4)
+	var ip string
+
+	dns4, err := addr.ValueForProtocol(ma.P_DNS4)
 	if err != nil {
-		return nil, nil, err
+		ip, err = addr.ValueForProtocol(ma.P_IP4)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		netIP, err := net.ResolveIPAddr("ip4", dns4)
+		if err != nil {
+			return nil, nil, err
+		}
+		ip = netIP.String()
 	}
 
 	portStr, err := addr.ValueForProtocol(ma.P_TCP)
@@ -95,7 +111,7 @@ func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.Priv
 
 	p2pAddr, err := ma.NewMultiaddr("/p2p/" + p2p)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not create p2p addr: %w", err)
+		return nil, nil, fmt.Errorf("could not create p2p addr: %w", err)
 	}
 
 	var fieldRaw []byte
@@ -125,8 +141,9 @@ func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.Priv
 	return node, tcpAddr, err
 }
 
-func EnodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
-	pubKey := (*crypto.Secp256k1PublicKey)(node.Pubkey())
+// EnodeToMultiaddress converts an enode into a multiaddress
+func enodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
+	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return nil, err
@@ -135,8 +152,9 @@ func EnodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
 	return ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
 }
 
+// Multiaddress is used to extract all the multiaddresses that are part of a ENR record
 func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
-	pubKey := (*crypto.Secp256k1PublicKey)(node.Pubkey())
+	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return nil, err
@@ -145,8 +163,8 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 	var multiaddrRaw []byte
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
 		if enr.IsNotFound(err) {
-			Logger().Debug("Trying to convert enode to multiaddress, since I could not retrieve multiaddress field for node ", zap.Any("enode", node))
-			addr, err := EnodeToMultiAddr(node)
+			Logger().Debug("trying to convert enode to multiaddress, since I could not retrieve multiaddress field for node ", zap.Any("enode", node))
+			addr, err := enodeToMultiAddr(node)
 			if err != nil {
 				return nil, err
 			}
@@ -188,11 +206,17 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 	return result, nil
 }
 
+// EnodeToPeerInfo extracts the peer ID and multiaddresses defined in an ENR
 func EnodeToPeerInfo(node *enode.Node) (*peer.AddrInfo, error) {
-	address, err := EnodeToMultiAddr(node)
+	addresses, err := Multiaddress(node)
 	if err != nil {
 		return nil, err
 	}
 
-	return peer.AddrInfoFromP2pAddr(address)
+	res, err := peer.AddrInfosFromP2pAddrs(addresses...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res[0], nil
 }
