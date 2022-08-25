@@ -30,7 +30,7 @@ func NewService(
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
-	tokenManager := &TokenManager{db: db, RPCClient: rpcClient, networkManager: rpcClient.NetworkManager}
+	tokenManager := NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)

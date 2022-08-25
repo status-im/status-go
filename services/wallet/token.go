@@ -41,6 +41,35 @@ type TokenManager struct {
 	networkManager *network.Manager
 }
 
+func NewTokenManager(
+	db *sql.DB,
+	RPCClient *rpc.Client,
+	networkManager *network.Manager,
+) *TokenManager {
+	tokenManager := &TokenManager{db, RPCClient, networkManager}
+
+	// Check the networks' custom tokens to see if we must update the tokenStore
+	networks := networkManager.GetConfiguredNetworks()
+	for _, network := range networks {
+		if len(network.TokenOverrides) == 0 {
+			continue
+		}
+		for _, overrideToken := range network.TokenOverrides {
+			tokensMap, ok := tokenStore[network.ChainID]
+			if !ok {
+				continue
+			}
+			for _, token := range tokensMap {
+				if token.Symbol == overrideToken.Symbol {
+					token.Address = overrideToken.Address
+				}
+			}
+		}
+	}
+
+	return tokenManager
+}
+
 func (tm *TokenManager) findSNT(chainID uint64) *Token {
 	tokensMap, ok := tokenStore[chainID]
 	if !ok {

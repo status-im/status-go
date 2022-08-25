@@ -655,7 +655,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithAccount(account, password, nil)
+	return b.StartNodeWithAccount(account, password, nodecfg)
 }
 
 func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account) error {
