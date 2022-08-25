@@ -126,7 +126,7 @@ type Settings struct {
 	InstallationID            string           `json:"installation-id"`
 	KeyUID                    string           `json:"key-uid"`
 	KeycardInstanceUID        string           `json:"keycard-instance-uid,omitempty"`
-	KeycardPAiredOn           int64            `json:"keycard-paired-on,omitempty"`
+	KeycardPairedOn           int64            `json:"keycard-paired-on,omitempty"`
 	KeycardPairing            string           `json:"keycard-pairing,omitempty"`
 	LastUpdated               *int64           `json:"last-updated,omitempty"`
 	LatestDerivedPath         uint             `json:"latest-derived-path"`

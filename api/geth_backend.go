@@ -561,7 +561,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPAiredOn)
+	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
 	if err != nil {
 		return err
 	}
