@@ -3019,7 +3019,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 			Address:   acc.Address.Bytes(),
 			Wallet:    acc.Wallet,
 			Chat:      acc.Chat,
-			Type:      acc.Type,
+			Type:      acc.Type.String(),
 			Storage:   acc.Storage,
 			Path:      acc.Path,
 			PublicKey: acc.PublicKey,

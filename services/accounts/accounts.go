@@ -90,7 +90,7 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
 	account := &accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
-		Type:    "watch",
+		Type:    accounts.AccountTypeWatch,
 		Name:    name,
 		Emoji:   emoji,
 		Color:   color,

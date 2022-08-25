@@ -686,7 +686,7 @@ func TestConvertAccount(t *testing.T) {
 
 	keycardSettings := settings.Settings{
 		KeycardInstanceUID: "0xdeadbeef",
-		KeycardPAiredOn:    1,
+		KeycardPairedOn:    1,
 		KeycardPairing:     "pairing",
 	}
 

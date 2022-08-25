@@ -22,7 +22,7 @@ type Account struct {
 	Address     types.Address  `json:"address"`
 	Wallet      bool           `json:"wallet"`
 	Chat        bool           `json:"chat"`
-	Type        string         `json:"type,omitempty"`
+	Type        AccountType    `json:"type,omitempty"`
 	Storage     string         `json:"storage,omitempty"`
 	Path        string         `json:"path,omitempty"`
 	PublicKey   types.HexBytes `json:"public-key,omitempty"`
@@ -35,11 +35,17 @@ type Account struct {
 	Removed     bool           `json:"removed,omitempty"`
 }
 
+type AccountType string
+
+func (a AccountType) String() string {
+	return string(a)
+}
+
 const (
-	AccountTypeGenerated = "generated"
-	AccountTypeKey       = "key"
-	AccountTypeSeed      = "seed"
-	AccountTypeWatch     = "watch"
+	AccountTypeGenerated AccountType = "generated"
+	AccountTypeKey       AccountType = "key"
+	AccountTypeSeed      AccountType = "seed"
+	AccountTypeWatch     AccountType = "watch"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -55,7 +61,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		MixedcaseAddress string         `json:"mixedcase-address"`
 		Wallet           bool           `json:"wallet"`
 		Chat             bool           `json:"chat"`
-		Type             string         `json:"type,omitempty"`
+		Type             AccountType    `json:"type,omitempty"`
 		Storage          string         `json:"storage,omitempty"`
 		Path             string         `json:"path,omitempty"`
 		PublicKey        types.HexBytes `json:"public-key,omitempty"`

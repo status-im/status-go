@@ -2037,7 +2037,7 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 				Address:   types.BytesToAddress(message.Address),
 				Wallet:    message.Wallet,
 				Chat:      message.Chat,
-				Type:      message.Type,
+				Type:      accounts.AccountType(message.Type),
 				Storage:   message.Storage,
 				PublicKey: types.HexBytes(message.PublicKey),
 				Path:      message.Path,
