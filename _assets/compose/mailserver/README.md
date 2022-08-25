@@ -37,6 +37,7 @@ All settings are passed through environment variables:
 * `REGISTER_TOPIC` - Mynamic mailserver discovery topic. (default: `whispermail`)
 * `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (default: `status-offline-inbox`)
 * `LOG_LEVEL` - Set level of log messages to show. (valid: `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
+* `COMPOSE_UP_FLAGS` - Allows passing flags to `docker-compose up`
 
 The generated configuration file end up under `${DATA_PATH}/config.json`.
 

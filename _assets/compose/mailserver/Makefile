@@ -71,7 +71,7 @@ logs:
 
 start: config
 	@echo " * $(GRN)Starting '$(CONTAINER_NAME)' container...$(RST)"
-	docker-compose up -d
+	docker-compose $(COMPOSE_UP_FLAGS) up -d
 
 stop:
 	@echo " * $(YLW)Stopping '$(CONTAINER_NAME)' container...$(RST)"

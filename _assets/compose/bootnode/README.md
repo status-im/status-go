@@ -32,3 +32,4 @@ All settings are passed through environment variables:
 * `CONTAINER_TAG` - Tag of container image to use. (default: `v0.64.3`)
 * `CONTAINER_NAME` - Name of the container that will be created. (default: `status-go-bootnode`)
 * `LOG_LEVEL` - Set level of log messages to show. (valid: `1=ERROR`, `2=WARN`, `3=INFO`, `4=DEBUG`, `5=TRACE`)
+* `COMPOSE_UP_FLAGS` - Allows passing flags to `docker-compose up`
