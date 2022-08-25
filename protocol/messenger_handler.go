@@ -830,6 +830,10 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		chat.LastClockValue = message.Clock
 	}
 
+	if contact.ContactRequestState == ContactRequestStateMutual {
+		chat.Active = true
+	}
+
 	state.Response.AddChat(chat)
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	state.AllChats.Store(chat.ID, chat)
