@@ -3001,6 +3001,23 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	if err != nil {
 		return err
 	}
+
+	ids, err := m.persistence.LatestContactRequestIDs()
+
+	if err != nil {
+		return err
+	}
+
+	for id, state := range ids {
+		if state == common.ContactRequestStateAccepted || state == common.ContactRequestStateDismissed {
+			accepted := state == common.ContactRequestStateDismissed
+			err := m.syncContactRequestDecision(ctx, id, accepted)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return m.syncWallets(accounts)
 }
 
