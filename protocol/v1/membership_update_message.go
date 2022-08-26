@@ -506,7 +506,8 @@ func (g Group) validateEvent(event MembershipUpdateEvent) bool {
 	case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
 		return g.admins.Has(event.From) && len(event.Image) > 0
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
-		return g.admins.Has(event.From)
+		// Admins and members can add new members
+		return g.admins.Has(event.From) || g.members.Has(event.From)
 	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
 		return g.members.Has(event.From)
 	case protobuf.MembershipUpdateEvent_MEMBER_REMOVED:

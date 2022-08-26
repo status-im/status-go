@@ -153,6 +153,8 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 
+	s.Require().NoError(makeMutualContact(bob, &alice.identity.PublicKey))
+
 	chat := response.Chats()[0]
 	members := []string{types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))}
 	_, err = bob.AddMembersToGroupChat(context.Background(), chat.ID, members)

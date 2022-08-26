@@ -499,6 +499,9 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	chat := response.Chats()[0]
 	key, err := crypto.GenerateKey()
 	s.NoError(err)
+
+	s.Require().NoError(makeMutualContact(s.m, &key.PublicKey))
+
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&key.PublicKey))}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.NoError(err)
@@ -906,6 +909,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
 
+	s.Require().NoError(makeMutualContact(s.m, &theirMessenger.identity.PublicKey))
+
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
 	s.NoError(err)
@@ -972,6 +977,8 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
 
+	s.Require().NoError(makeMutualContact(s.m, &theirMessenger.identity.PublicKey))
+
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
 	s.NoError(err)
@@ -1026,6 +1033,8 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
+
+	s.Require().NoError(makeMutualContact(s.m, &theirMessenger.identity.PublicKey))
 
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
@@ -1486,6 +1495,11 @@ func (s *MessengerSuite) TestSharedSecretHandler() {
 
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
 	members := []string{testPK}
+
+	pubKey, err := common.HexToPubkey(testPK)
+	s.Require().NoError(err)
+	s.Require().NoError(makeMutualContact(s.m, pubKey))
+
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", members)
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -1509,6 +1523,8 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&key.PublicKey))}
+
+	s.Require().NoError(makeMutualContact(s.m, &key.PublicKey))
 
 	response, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.Require().NoError(err)
