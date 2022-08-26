@@ -70,6 +70,7 @@ message DiscordMessageAuthor {
   string discriminator = 3;
   string nickname = 4;
   string avatarUrl = 5;
+  string avatarImageBase64 = 8;
 }
 
 message DiscordMessageReference {
@@ -135,6 +136,7 @@ message ChatMessage {
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;
     DISCORD_MESSAGE = 12;
+    DISCORD_IMAGE_MESSAGE = 13;
   }
 
   

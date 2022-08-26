@@ -112,6 +112,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
     COALESCE(dm_author.discriminator, ""),
     COALESCE(dm_author.nickname, ""),
     COALESCE(dm_author.avatar_url, ""),
+    COALESCE(dm_author.avatar_image_base64, ""),
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -212,6 +213,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&discordMessage.Author.Discriminator,
 		&discordMessage.Author.Nickname,
 		&discordMessage.Author.AvatarUrl,
+		&discordMessage.Author.AvatarImageBase64,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -1547,6 +1549,36 @@ func (db sqlitePersistence) SetHideOnMessage(id string) error {
 	return err
 }
 
+func (db sqlitePersistence) DeleteMessagesByCommunityID(id string) error {
+	return db.deleteMessagesByCommunityID(id, nil)
+}
+
+func (db sqlitePersistence) deleteMessagesByCommunityID(id string, tx *sql.Tx) (err error) {
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE community_id = ?`, id)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE community_id = ?`, id)
+
+	return
+}
+
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
 	return db.deleteMessagesByChatID(id, nil)
 }
@@ -1885,7 +1917,7 @@ func (db sqlitePersistence) HasDiscordMessageAuthor(id string) (exists bool, err
 }
 
 func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
-	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url) VALUES (?,?,?,?,?)"
+	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_base64) VALUES (?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
@@ -1896,8 +1928,35 @@ func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMes
 		author.GetDiscriminator(),
 		author.GetNickname(),
 		author.GetAvatarUrl(),
+		author.GetAvatarImageBase64(),
 	)
 	return
+}
+
+func (db sqlitePersistence) UpdateDiscordMessageAuthorImage(authorID string, imageBase64 string) (err error) {
+	query := "UPDATE discord_message_authors SET avatar_image_base64 = ? WHERE id = ?"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(imageBase64, authorID)
+	return
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorByID(id string) (*protobuf.DiscordMessageAuthor, error) {
+
+	author := &protobuf.DiscordMessageAuthor{}
+
+	row := db.db.QueryRow("SELECT id, name, discriminator, nickname, avatar_url, avatar_image_base64 FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(
+		&author.Id,
+		&author.Name,
+		&author.Discriminator,
+		&author.Nickname,
+		&author.AvatarUrl,
+		&author.AvatarImageBase64)
+	return author, err
 }
 
 func (db sqlitePersistence) SaveDiscordMessage(message *protobuf.DiscordMessage) (err error) {

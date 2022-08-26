@@ -221,6 +221,10 @@ func (s *MessageSender) SendGroup(
 	return messageID, nil
 }
 
+func (s *MessageSender) GetMessageID(rawMessage *RawMessage) (types.HexBytes, error) {
+	return s.getMessageID(rawMessage)
+}
+
 func (s *MessageSender) getMessageID(rawMessage *RawMessage) (types.HexBytes, error) {
 	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {

@@ -336,6 +336,15 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	return community, nil
 }
 
+func (m *Manager) DeleteCommunity(id types.HexBytes) error {
+	err := m.persistence.DeleteCommunity(id)
+	if err != nil {
+		return err
+	}
+	err = m.persistence.DeleteCommunitySettings(id)
+	return err
+}
+
 // EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
