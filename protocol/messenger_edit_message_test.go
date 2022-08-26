@@ -379,6 +379,8 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
 
+	s.Require().NoError(makeMutualContact(s.m, &theirMessenger.identity.PublicKey))
+
 	members := []string{common.PubkeyToHex(&theirMessenger.identity.PublicKey)}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
 	s.NoError(err)

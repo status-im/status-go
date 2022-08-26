@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -15,7 +16,28 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
+var ErrGroupChatAddedContacts = errors.New("group-chat: can't add members who are not mutual contacts")
+
+func (m *Messenger) validateAddedGroupMembers(members []string) error {
+	for _, memberPubkey := range members {
+		contactID, err := contactIDFromPublicKeyString(memberPubkey)
+		if err != nil {
+			return err
+		}
+
+		contact, _ := m.allContacts.Load(contactID)
+		if contact == nil || !(contact.Added && contact.HasAddedUs) {
+			return ErrGroupChatAddedContacts
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
+	if err := m.validateAddedGroupMembers(members); err != nil {
+		return nil, err
+	}
+
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
@@ -147,6 +169,10 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 }
 
 func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
+	if err := m.validateAddedGroupMembers(members); err != nil {
+		return nil, err
+	}
+
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))

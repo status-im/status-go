@@ -255,3 +255,12 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }
+
+func contactIDFromPublicKeyString(key string) (string, error) {
+	pubKey, err := common.HexToPubkey(key)
+	if err != nil {
+		return "", err
+	}
+
+	return contactIDFromPublicKey(pubKey), nil
+}
