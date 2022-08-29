@@ -500,13 +500,12 @@ func (g Group) validateEvent(event MembershipUpdateEvent) bool {
 	case protobuf.MembershipUpdateEvent_CHAT_CREATED:
 		return g.admins.Empty() && g.members.Empty()
 	case protobuf.MembershipUpdateEvent_NAME_CHANGED:
-		return g.admins.Has(event.From) && len(event.Name) > 0
+		return (g.admins.Has(event.From) || g.members.Has(event.From)) && len(event.Name) > 0
 	case protobuf.MembershipUpdateEvent_COLOR_CHANGED:
-		return g.admins.Has(event.From) && len(event.Color) > 0
+		return (g.admins.Has(event.From) || g.members.Has(event.From)) && len(event.Color) > 0
 	case protobuf.MembershipUpdateEvent_IMAGE_CHANGED:
-		return g.admins.Has(event.From) && len(event.Image) > 0
+		return (g.admins.Has(event.From) || g.members.Has(event.From)) && len(event.Image) > 0
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
-		// Admins and members can add new members
 		return g.admins.Has(event.From) || g.members.Has(event.From)
 	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
 		return g.members.Has(event.From)

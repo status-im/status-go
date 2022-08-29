@@ -212,11 +212,11 @@ func TestGroupValidateEvent(t *testing.T) {
 			Result: true,
 		},
 		{
-			Name:   "name-changed not allowed for non-admins",
-			From:   "0xabc",
-			Group:  createGroup(nil, nil),
+			Name:   "name-changed allowed because from is member",
+			From:   "0x123",
+			Group:  createGroup([]string{"0xabc"}, []string{"0x123"}),
 			Event:  NewNameChangedEvent("new-name", 0),
-			Result: false,
+			Result: true,
 		},
 		{
 			Name:   "color-changed allowed because from is admin",
@@ -226,11 +226,11 @@ func TestGroupValidateEvent(t *testing.T) {
 			Result: true,
 		},
 		{
-			Name:   "color-changed not allowed for non-admins",
-			From:   "0xabc",
-			Group:  createGroup(nil, nil),
+			Name:   "color-changed allowed because from is member",
+			From:   "0x123",
+			Group:  createGroup([]string{"0xabc"}, []string{"0x123"}),
 			Event:  NewColorChangedEvent("#7cda00", 0),
-			Result: false,
+			Result: true,
 		},
 		{
 			Name:   "image-changed allowed because from is admin",
@@ -254,11 +254,11 @@ func TestGroupValidateEvent(t *testing.T) {
 			Result: true,
 		},
 		{
-			Name:   "members-added not allowed for non-admins",
-			From:   "0xabc",
-			Group:  createGroup(nil, nil),
+			Name:   "members-added not allowed because from is member",
+			From:   "0x123",
+			Group:  createGroup([]string{"0xabc"}, []string{"0x123"}),
 			Event:  NewMembersAddedEvent([]string{"0x123"}, 0),
-			Result: false,
+			Result: true,
 		},
 		{
 			Name:   "member-removed allowed because removing themselves",
@@ -270,15 +270,15 @@ func TestGroupValidateEvent(t *testing.T) {
 		{
 			Name:   "member-removed allowed because from is admin",
 			From:   "0xabc",
-			Group:  createGroup([]string{"0xabc"}, nil),
+			Group:  createGroup([]string{"0xabc"}, []string{"0x123"}),
 			Event:  NewMemberRemovedEvent("0x123", 0),
 			Result: true,
 		},
 		{
 			Name:   "member-removed not allowed for non-admins",
-			From:   "0xabc",
-			Group:  createGroup(nil, nil),
-			Event:  NewMemberRemovedEvent("0x123", 0),
+			From:   "0x123",
+			Group:  createGroup([]string{"0xabc"}, []string{"0x123", "0x456"}),
+			Event:  NewMemberRemovedEvent("0x456", 0),
 			Result: false,
 		},
 		{
