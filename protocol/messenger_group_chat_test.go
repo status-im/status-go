@@ -12,6 +12,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -105,6 +106,11 @@ func (s *MessengerGroupChatSuite) makeContact(origin *Messenger, toAdd *Messenge
 	s.Require().NoError(makeMutualContact(origin, &toAdd.identity.PublicKey))
 }
 
+func (s *MessengerGroupChatSuite) makeMutualContacts(lhs *Messenger, rhs *Messenger) {
+	s.makeContact(lhs, rhs)
+	s.makeContact(rhs, lhs)
+}
+
 func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 	testCases := []struct {
 		name                          string
@@ -163,8 +169,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 			s.Require().EqualError(err, "group-chat: can't add members who are not mutual contacts")
 		}
 
-		defer creator.Shutdown()
-		defer member.Shutdown()
+		defer s.NoError(creator.Shutdown())
+		defer s.NoError(member.Shutdown())
 	}
 }
 
@@ -239,12 +245,91 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 			}
 		}
 
-		defer admin.Shutdown()
-		defer inviter.Shutdown()
-		defer member.Shutdown()
+		defer s.NoError(admin.Shutdown())
+		defer s.NoError(inviter.Shutdown())
+		defer s.NoError(member.Shutdown())
 	}
 }
 
-func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
+func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
+	admin := s.startNewMessenger()
+	memberA := s.startNewMessenger()
+	memberB := s.startNewMessenger()
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
 
+	s.makeMutualContacts(admin, memberA)
+	s.makeMutualContacts(admin, memberB)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", members)
+	s.verifyGroupChatCreated(memberA, true)
+	s.verifyGroupChatCreated(memberB, true)
+
+	_, err := memberA.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	s.Require().Error(err)
+
+	// only admin can remove members from the group
+	_, err = admin.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	s.Require().NoError(err)
+
+	// ensure removal is propagated to other members
+	response, err := WaitOnMessengerResponse(
+		memberA,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().True(response.Chats()[0].Active)
+	s.Require().Len(response.Chats()[0].Members, 2)
+
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(memberA.Shutdown())
+	defer s.NoError(memberB.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
+	admin := s.startNewMessenger()
+	member := s.startNewMessenger()
+	s.makeMutualContacts(admin, member)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	s.verifyGroupChatCreated(member, true)
+
+	response, err := admin.EditGroupChat(context.Background(), groupChat.ID, "test_admin_group", "#FF00FF", userimage.CroppedImage{})
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal("test_admin_group", response.Chats()[0].Name)
+	s.Require().Equal("#FF00FF", response.Chats()[0].Color)
+	// TODO: handle image
+
+	// ensure group edit is propagated to other members
+	response, err = WaitOnMessengerResponse(
+		member,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal("test_admin_group", response.Chats()[0].Name)
+	s.Require().Equal("#FF00FF", response.Chats()[0].Color)
+
+	response, err = member.EditGroupChat(context.Background(), groupChat.ID, "test_member_group", "#F0F0F0", userimage.CroppedImage{})
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal("test_member_group", response.Chats()[0].Name)
+	s.Require().Equal("#F0F0F0", response.Chats()[0].Color)
+
+	// ensure group edit is propagated to other members
+	response, err = WaitOnMessengerResponse(
+		admin,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal("test_member_group", response.Chats()[0].Name)
+	s.Require().Equal("#F0F0F0", response.Chats()[0].Color)
+
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(member.Shutdown())
 }
