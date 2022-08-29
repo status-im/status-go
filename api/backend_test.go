@@ -699,6 +699,9 @@ func TestConvertAccount(t *testing.T) {
 
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
+
+	b := NewGethStatusBackend()
+	require.NoError(t, b.OpenAccounts())
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
