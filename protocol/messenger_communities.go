@@ -1919,6 +1919,10 @@ func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []s
 func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
 	go func() {
 
+		progressUpdates := make(chan *discord.ImportProgress)
+		done := make(chan struct{})
+		m.startPublishImportProgressInterval(progressUpdates, done)
+
 		importProgress := &discord.ImportProgress{}
 		importProgress.Init([]discord.ImportTask{
 			discord.CommunityCreationTask,
@@ -1928,13 +1932,14 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			discord.InitCommunityTask,
 		})
 		importProgress.CommunityName = request.Name
+		progressUpdates <- importProgress
 
 		exportData, errs := m.ExtractDiscordDataFromImportFiles(request.FilesToImport)
 		if len(errs) > 0 {
 			for _, err := range errs {
 				importProgress.AddTaskError(discord.CommunityCreationTask, err)
 			}
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		totalChannelsCount := len(exportData.ExportedData)
@@ -1947,7 +1952,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 			importProgress.AddTaskError(discord.CommunityCreationTask, importError)
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
@@ -1964,7 +1969,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		if err != nil {
 			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
@@ -1977,13 +1982,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
 		importProgress.CommunityID = discordCommunity.IDString()
 		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.75)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		//This is a map of discord category IDs <-> Status category IDs
 		processedCategoriesIds := make(map[string]string, 0)
@@ -2008,7 +2013,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				m.cleanUpFailedImport(discordCommunity)
 				importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 				importProgress.StopTask(discord.CommunityCreationTask)
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				return
 			}
 			discordCommunity = communityWithCategories
@@ -2018,7 +2023,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			for _, addedCategory := range changes.CategoriesAdded {
 				processedCategoriesIds[category.ID] = addedCategory.CategoryId
 			}
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 		}
 
 		processedChannelIds := make(map[string]string, 0)
@@ -2049,7 +2054,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				m.cleanUpFailedImport(discordCommunity)
 				importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(err.Error()))
 				importProgress.StopTask(discord.ChannelsCreationTask)
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				return
 			}
 			discordCommunity = communityWithChats
@@ -2064,7 +2069,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 
 			importProgress.UpdateTaskProgress(discord.ChannelsCreationTask, float32(len(processedChannelIds))/float32(totalChannelsCount))
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 
 			for _, discordMessage := range channel.Messages {
 
@@ -2163,7 +2168,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				processedMessages = append(processedMessages, messageToSave)
 			}
 			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, float32(len(processedMessages))/float32(totalMessageCount)*0.90)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 		}
 
 		err = m.persistence.SaveDiscordMessages(discordMessagesToSave)
@@ -2171,7 +2176,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.ImportMessagesTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 0.95)
@@ -2181,11 +2186,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.ImportMessagesTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		processedAvatars := 0
 
@@ -2196,30 +2201,30 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			if err != nil {
 				errmsg := fmt.Sprintf("Couldn't download %s: %s", avatarURL, err.Error())
 				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(errmsg))
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				continue
 			}
 
 			err = m.persistence.UpdateDiscordMessageAuthorImage(authorID, imageBase64)
 			if err != nil {
 				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				continue
 			}
 			processedAvatars++
 			importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, float32(processedAvatars)/float32(len(authorAvatarUrls)))
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 		}
 
 		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		err = m.publishOrg(discordCommunity)
 		if err != nil {
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.Stop()
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
@@ -2230,11 +2235,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.Stop()
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.15)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		// Init the community filter so we can receive messages on the community
 		_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{discordCommunity.PrivateKey()})
@@ -2242,11 +2247,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.25)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		filterChatIds := discordCommunity.DefaultFilters()
 		for _, chatID := range processedChannelIds {
@@ -2258,36 +2263,37 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.5)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		_, err = m.scheduleSyncFilters(filters)
 		if err != nil {
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.75)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		err = m.reregisterForPushNotifications()
 		if err != nil {
 			m.cleanUpFailedImport(discordCommunity)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		m.config.messengerSignalsHandler.DiscordCommunityImportFinished(discordCommunity.IDString())
+		close(done)
 		// TODO(pascal): trigger message archive
 	}()
 }
@@ -2305,4 +2311,32 @@ func (m *Messenger) cleanUpFailedImport(community *communities.Community) {
 
 func (m *Messenger) publishImportProgress(progress *discord.ImportProgress) {
 	m.config.messengerSignalsHandler.DiscordCommunityImportProgress(progress)
+}
+
+func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportProgress, done chan struct{}) {
+
+	var currentProgress *discord.ImportProgress
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+			case progressUpdate := <-c:
+				currentProgress = progressUpdate
+			case <-done:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+				return
+			case <-m.quit:
+				return
+			}
+		}
+	}()
 }
