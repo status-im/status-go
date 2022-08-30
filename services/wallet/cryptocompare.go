@@ -29,6 +29,7 @@ type MarketCoinValues struct {
 	CHANGEPCTHOUR   string `json:"CHANGEPCTHOUR"`
 	CHANGEPCTDAY    string `json:"CHANGEPCTDAY"`
 	CHANGEPCT24HOUR string `json:"CHANGEPCT24HOUR"`
+	CHANGE24HOUR    string `json:"CHANGE24HOUR"`
 }
 
 type CoinsContainer struct {
