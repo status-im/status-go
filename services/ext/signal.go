@@ -135,3 +135,7 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportProgress(importProgress 
 func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
 	signal.SendDiscordCommunityImportFinished(id)
 }
+
+func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
+	signal.SendDiscordCommunityImportCancelled(id)
+}

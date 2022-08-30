@@ -1144,6 +1144,10 @@ func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDisc
 	api.service.messenger.RequestImportDiscordCommunity(request)
 }
 
+func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
+	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
+}
+
 // -----
 // HELPER
 // -----

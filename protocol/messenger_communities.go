@@ -1919,6 +1919,11 @@ func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []s
 func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
 	go func() {
 
+		progressUpdates := make(chan *discord.ImportProgress)
+		done := make(chan struct{})
+		cancel := make(chan string)
+		m.startPublishImportProgressInterval(progressUpdates, cancel, done)
+
 		importProgress := &discord.ImportProgress{}
 		importProgress.Init([]discord.ImportTask{
 			discord.CommunityCreationTask,
@@ -1929,12 +1934,15 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		})
 		importProgress.CommunityName = request.Name
 
+		// initial progress immediately
+		m.publishImportProgress(importProgress)
+
 		exportData, errs := m.ExtractDiscordDataFromImportFiles(request.FilesToImport)
 		if len(errs) > 0 {
 			for _, err := range errs {
 				importProgress.AddTaskError(discord.CommunityCreationTask, err)
 			}
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		totalChannelsCount := len(exportData.ExportedData)
@@ -1947,12 +1955,12 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 			importProgress.AddTaskError(discord.CommunityCreationTask, importError)
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
 		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.5)
-		m.config.messengerSignalsHandler.DiscordCommunityImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		createCommunityRequest := request.ToCreateCommunityRequest()
 
@@ -1964,7 +1972,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		if err != nil {
 			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
@@ -1974,16 +1982,23 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 		err = m.communitiesManager.SaveCommunitySettings(communitySettings)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.CommunityCreationTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
 		importProgress.CommunityID = discordCommunity.IDString()
 		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.75)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		//This is a map of discord category IDs <-> Status category IDs
 		processedCategoriesIds := make(map[string]string, 0)
@@ -2005,10 +2020,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			// import has finished)
 			communityWithCategories, changes, err := m.communitiesManager.CreateCategory(createCommunityCategoryRequest, false)
 			if err != nil {
-				m.cleanUpFailedImport(discordCommunity)
+				m.cleanUpFailedImport(discordCommunity.IDString())
 				importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
 				importProgress.StopTask(discord.CommunityCreationTask)
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				return
 			}
 			discordCommunity = communityWithCategories
@@ -2018,7 +2033,14 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			for _, addedCategory := range changes.CategoriesAdded {
 				processedCategoriesIds[category.ID] = addedCategory.CategoryId
 			}
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
+		}
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
 		}
 
 		processedChannelIds := make(map[string]string, 0)
@@ -2046,10 +2068,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			// over whether we want to publish the updated community description.
 			communityWithChats, changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false)
 			if err != nil {
-				m.cleanUpFailedImport(discordCommunity)
+				m.cleanUpFailedImport(discordCommunity.IDString())
 				importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(err.Error()))
 				importProgress.StopTask(discord.ChannelsCreationTask)
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				return
 			}
 			discordCommunity = communityWithChats
@@ -2064,7 +2086,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 
 			importProgress.UpdateTaskProgress(discord.ChannelsCreationTask, float32(len(processedChannelIds))/float32(totalChannelsCount))
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 
 			for _, discordMessage := range channel.Messages {
 
@@ -2163,29 +2185,51 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				processedMessages = append(processedMessages, messageToSave)
 			}
 			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, float32(len(processedMessages))/float32(totalMessageCount)*0.90)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
+
+			if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				cancel <- discordCommunity.IDString()
+				return
+			}
 		}
 
 		err = m.persistence.SaveDiscordMessages(discordMessagesToSave)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.ImportMessagesTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 0.95)
 
-		err = m.persistence.SaveMessages(processedMessages)
-		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
-			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
 			importProgress.StopTask(discord.ImportMessagesTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
 			return
 		}
+
+		err = m.persistence.SaveMessages(processedMessages)
+		if err != nil {
+			m.cleanUpFailedImport(discordCommunity.IDString())
+			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.ImportMessagesTask)
+			progressUpdates <- importProgress
+			return
+		}
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.ImportMessagesTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
+
 		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		processedAvatars := 0
 
@@ -2196,30 +2240,44 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			if err != nil {
 				errmsg := fmt.Sprintf("Couldn't download %s: %s", avatarURL, err.Error())
 				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(errmsg))
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				continue
 			}
 
 			err = m.persistence.UpdateDiscordMessageAuthorImage(authorID, imageBase64)
 			if err != nil {
 				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
-				m.publishImportProgress(importProgress)
+				progressUpdates <- importProgress
 				continue
 			}
 			processedAvatars++
 			importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, float32(processedAvatars)/float32(len(authorAvatarUrls)))
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
+
+			if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+				importProgress.StopTask(discord.DownloadAssetsTask)
+				progressUpdates <- importProgress
+				cancel <- discordCommunity.IDString()
+				return
+			}
 		}
 
 		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
 
 		err = m.publishOrg(discordCommunity)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.Stop()
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
+			return
+		}
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
 			return
 		}
 
@@ -2227,26 +2285,40 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		// hence we make this part of the `InitCommunityTask`
 		err = m.saveChats(chatsToSave)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.Stop()
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.15)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		// Init the community filter so we can receive messages on the community
 		_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{discordCommunity.PrivateKey()})
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.25)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		filterChatIds := discordCommunity.DefaultFilters()
 		for _, chatID := range processedChannelIds {
@@ -2255,44 +2327,80 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		filters, err := m.transport.InitPublicFilters(filterChatIds)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.5)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		_, err = m.scheduleSyncFilters(filters)
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.75)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		err = m.reregisterForPushNotifications()
 		if err != nil {
-			m.cleanUpFailedImport(discordCommunity)
+			m.cleanUpFailedImport(discordCommunity.IDString())
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
 			importProgress.StopTask(discord.InitCommunityTask)
-			m.publishImportProgress(importProgress)
+			progressUpdates <- importProgress
 			return
 		}
 		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 1)
-		m.publishImportProgress(importProgress)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- discordCommunity.IDString()
+			return
+		}
 
 		m.config.messengerSignalsHandler.DiscordCommunityImportFinished(discordCommunity.IDString())
+		close(done)
 		// TODO(pascal): trigger message archive
 	}()
 }
 
-func (m *Messenger) cleanUpFailedImport(community *communities.Community) {
+func (m *Messenger) MarkDiscordCommunityImportAsCancelled(communityId string) {
+	m.cancelImportChannels[communityId] = true
+}
+
+func (m *Messenger) DiscordImportMarkedAsCancelled(communityId string) bool {
+	_, exists := m.cancelImportChannels[communityId]
+	return exists
+}
+
+func (m *Messenger) cleanUpFailedImport(communityID string) {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		m.logger.Error("clean up failed, couldn't delete community", zap.Error(err))
+		return
+	}
 	deleteErr := m.communitiesManager.DeleteCommunity(community.ID())
 	if deleteErr != nil {
 		m.logger.Error("clean up failed, couldn't delete community", zap.Error(deleteErr))
@@ -2305,4 +2413,39 @@ func (m *Messenger) cleanUpFailedImport(community *communities.Community) {
 
 func (m *Messenger) publishImportProgress(progress *discord.ImportProgress) {
 	m.config.messengerSignalsHandler.DiscordCommunityImportProgress(progress)
+}
+
+func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportProgress, cancel chan string, done chan struct{}) {
+
+	var currentProgress *discord.ImportProgress
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+			case progressUpdate := <-c:
+				currentProgress = progressUpdate
+			case <-done:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+				return
+			case communityId := <-cancel:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+				m.cleanUpFailedImport(communityId)
+				m.config.messengerSignalsHandler.DiscordCommunityImportCancelled(communityId)
+				return
+			case <-m.quit:
+				return
+			}
+		}
+	}()
 }

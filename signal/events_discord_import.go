@@ -17,6 +17,10 @@ const (
 	// EventDiscordCommunityImportFinished triggered when importing
 	// the discord community into status was successful
 	EventDiscordCommunityImportFinished = "community.discordCommunityImportFinished"
+
+	// EventDiscordCommunityImportCancelled triggered when importing
+	// the discord community was cancelled
+	EventDiscordCommunityImportCancelled = "community.discordCommunityImportCancelled"
 )
 
 type DiscordCategoriesAndChannelsExtractedSignal struct {
@@ -31,6 +35,10 @@ type DiscordCommunityImportProgressSignal struct {
 }
 
 type DiscordCommunityImportFinishedSignal struct {
+	CommunityID string `json:"communityId"`
+}
+
+type DiscordCommunityImportCancelledSignal struct {
 	CommunityID string `json:"communityId"`
 }
 
@@ -51,6 +59,12 @@ func SendDiscordCommunityImportProgress(importProgress *discord.ImportProgress) 
 
 func SendDiscordCommunityImportFinished(communityID string) {
 	send(EventDiscordCommunityImportFinished, DiscordCommunityImportFinishedSignal{
+		CommunityID: communityID,
+	})
+}
+
+func SendDiscordCommunityImportCancelled(communityID string) {
+	send(EventDiscordCommunityImportCancelled, DiscordCommunityImportCancelledSignal{
 		CommunityID: communityID,
 	})
 }

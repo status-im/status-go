@@ -135,6 +135,8 @@ type Messenger struct {
 	httpServer                 *server.MediaServer
 	quit                       chan struct{}
 
+	cancelImportChannels map[string]bool
+
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
 
@@ -446,6 +448,7 @@ func NewMessenger(
 		quit:                     make(chan struct{}),
 		requestedCommunitiesLock: sync.RWMutex{},
 		requestedCommunities:     make(map[string]*transport.Filter),
+		cancelImportChannels:     make(map[string]bool),
 		browserDatabase:          c.browserDatabase,
 		httpServer:               c.httpServer,
 		contractMaker: &contracts.ContractMaker{
