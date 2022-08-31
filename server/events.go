@@ -1,4 +1,4 @@
-package local_pairing
+package server
 
 // EventType type for event types.
 type EventType string
@@ -12,14 +12,13 @@ const (
 
 	EventTransferSuccess EventType = "transfer-success"
 
-	EventDecryptionError EventType = "decryption-error"
+	EventProcessSuccess EventType = "process-success"
 
-	EventInstallationError EventType = "installation-error"
-
-	EventSuccess EventType = "success"
+	EventProcessError EventType = "process-error"
 )
 
 // Event is a type for transfer events.
 type Event struct {
-	Type EventType `json:"type"`
+	Type  EventType `json:"type"`
+	Error error     `json:"error,omitempty"`
 }

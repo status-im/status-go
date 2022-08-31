@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/signal"
 )
 
 type PairingClient struct {
@@ -107,13 +108,16 @@ func (c *PairingClient) sendAccountData() error {
 	c.baseAddress.Path = pairingReceive
 	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
 	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 		return fmt.Errorf("status not ok, received '%s'", resp.Status)
 	}
 
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 	return nil
 }
 
@@ -139,15 +143,24 @@ func (c *PairingClient) receiveAccountData() error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 		return fmt.Errorf("status not ok, received '%s'", resp.Status)
 	}
 
 	payload, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 		return err
 	}
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 
-	return c.PayloadManager.Receive(payload)
+	err = c.PayloadManager.Receive(payload)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess})
+	return nil
 }
 
 func (c *PairingClient) getChallenge() error {
@@ -174,6 +187,9 @@ func StartUpPairingClient(db *multiaccounts.Database, cs, configJSON string) err
 
 	ccp := new(ConnectionParams)
 	err = ccp.FromString(cs)
+	if err != nil {
+		return err
+	}
 
 	c, err := NewPairingClient(ccp, &PairingPayloadManagerConfig{db, conf})
 	if err != nil {

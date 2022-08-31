@@ -15,6 +15,8 @@ import (
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/status-im/status-go/signal"
 )
 
 var globalCertificate *tls.Certificate = nil
@@ -212,9 +214,13 @@ func getServerCert(URL *url.URL) (*x509.Certificate, error) {
 
 	conn, err := tls.Dial("tcp", URL.Host, conf)
 	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err})
 		return nil, err
 	}
 	defer conn.Close()
+
+	// No error on the dial out then the URL.Host is accessible
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
 
 	certs := conn.ConnectionState().PeerCertificates
 	if len(certs) != 1 {
