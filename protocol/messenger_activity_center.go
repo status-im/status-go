@@ -243,6 +243,30 @@ func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*A
 	}, nil
 }
 
+func (m *Messenger) ReadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.ReadActivityCenterNotifications(cursor, limit, activityType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ActivityCenterPaginationResponse{
+		Cursor:        cursor,
+		Notifications: notifications,
+	}, nil
+}
+
+func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.UnreadActivityCenterNotifications(cursor, limit, activityType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ActivityCenterPaginationResponse{
+		Cursor:        cursor,
+		Notifications: notifications,
+	}, nil
+}
+
 func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
 

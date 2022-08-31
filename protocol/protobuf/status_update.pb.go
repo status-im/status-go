@@ -55,16 +55,16 @@ func (StatusUpdate_StatusType) EnumDescriptor() ([]byte, []int) {
 }
 
 // Specs:
-// :AUTOMATIC
-// To Send - "AUTOMATIC" status ping every 5 minutes
-// Display - Online for up to 5 minutes from the last clock, after that Offline
-// :ALWAYS_ONLINE
-// To Send - "ALWAYS_ONLINE" status ping every 5 minutes
-// Display - Online for up to 2 weeks from the last clock, after that Offline
-// :INACTIVE
-// To Send - A single "INACTIVE" status ping
-// Display - Offline forever
-// Note: Only send pings if the user interacted with the app in the last x minutes.
+//:AUTOMATIC
+//To Send - "AUTOMATIC" status ping every 5 minutes
+//Display - Online for up to 5 minutes from the last clock, after that Offline
+//:ALWAYS_ONLINE
+//To Send - "ALWAYS_ONLINE" status ping every 5 minutes
+//Display - Online for up to 2 weeks from the last clock, after that Offline
+//:INACTIVE
+//To Send - A single "INACTIVE" status ping
+//Display - Offline forever
+//Note: Only send pings if the user interacted with the app in the last x minutes.
 type StatusUpdate struct {
 	Clock                uint64                  `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
 	StatusType           StatusUpdate_StatusType `protobuf:"varint,2,opt,name=status_type,json=statusType,proto3,enum=protobuf.StatusUpdate_StatusType" json:"status_type,omitempty"`
