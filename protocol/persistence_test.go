@@ -1323,6 +1323,60 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	require.Equal(t, types.HexBytes(messageID1), messageID)
 }
 
+func TestActivityCenterBlah(t *testing.T) {
+	nID1 := types.HexBytes([]byte("1"))
+	nID2 := types.HexBytes([]byte("2"))
+	//	nID3 := types.HexBytes([]byte("3"))
+	//	nID4 := types.HexBytes([]byte("4"))
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	notification := &ActivityCenterNotification{
+		ID:        nID1,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		ChatID:    chat.ID,
+		Timestamp: 1,
+	}
+
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	notification = &ActivityCenterNotification{
+		ID:        nID2,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		ChatID:    chat.ID,
+		Timestamp: 1,
+	}
+
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	// Mark the notification as read
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
+	require.NoError(t, err)
+
+	cursor, notifications, err := p.UnreadActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	require.Empty(t, cursor)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID1, notifications[0].ID)
+
+	cursor, notifications, err = p.ReadActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	require.Empty(t, cursor)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID2, notifications[0].ID)
+}
+
 func TestActivityCenterPersistence(t *testing.T) {
 	nID1 := types.HexBytes([]byte("1"))
 	nID2 := types.HexBytes([]byte("2"))
