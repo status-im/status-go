@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/verification"
 )
 
 // The activity center is a place where we store incoming notifications before
@@ -25,6 +26,7 @@ const (
 	ActivityCenterNotificationTypeCommunityRequest
 	ActivityCenterNotificationTypeCommunityMembershipRequest
 	ActivityCenterNotificationTypeCommunityKicked
+	ActivityCenterNotificationTypeContactVerification
 )
 
 type ActivityCenterMembershipStatus int
@@ -53,6 +55,7 @@ type ActivityCenterNotification struct {
 	Read             bool                           `json:"read"`
 	Dismissed        bool                           `json:"dismissed"`
 	Accepted         bool                           `json:"accepted"`
+	ContactVerificationStatus verification.RequestStatus `json:"contactVerificationStatus"`
 }
 
 type ActivityCenterPaginationResponse struct {

@@ -34,6 +34,7 @@ func (s *PersistenceSuite) SetupTest() {
 
 func (s *PersistenceSuite) TestVerificationRequests() {
 	request := &Request{
+                ID:            "0xabc",
 		From:          "0x01",
 		To:            "0x02",
 		Challenge:     "ABC",
@@ -48,19 +49,14 @@ func (s *PersistenceSuite) TestVerificationRequests() {
 	s.NoError(err)
 
 	// Test Found
-	dbRequest, err := s.db.GetVerificationRequestFrom("0x01")
+	dbRequest, err := s.db.GetVerificationRequest("0xabc")
 	s.NoError(err)
 	s.Equal(request, dbRequest)
 
 	// Test Not Found
-	dbRequest2, err := s.db.GetVerificationRequestFrom("0x02")
+	dbRequest2, err := s.db.GetVerificationRequestFrom("0xdef")
 	s.NoError(err)
 	s.Nil(dbRequest2)
-
-	// Test Found
-	dbRequest3, err := s.db.GetVerificationRequestSentTo("0x02")
-	s.NoError(err)
-	s.Equal(request, dbRequest3)
 
 	// Test Accept
 	err = s.db.AcceptContactVerificationRequest("0x01", "XYZ")

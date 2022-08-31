@@ -777,12 +777,8 @@ func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (ver
 	return api.service.messenger.GetTrustStatus(contactID)
 }
 
-func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) error {
+func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
-}
-
-func (api *PublicAPI) GetVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
-	return api.service.messenger.GetVerificationRequestFrom(ctx, contactID)
 }
 
 func (api *PublicAPI) GetReceivedVerificationRequests(ctx context.Context) ([]*verification.Request, error) {
@@ -797,7 +793,7 @@ func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID s
 	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
 }
 
-func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) error {
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
 }
 
@@ -1060,6 +1056,14 @@ func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, id
 
 func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {
 	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
+}
+
+func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
+}
+
+func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

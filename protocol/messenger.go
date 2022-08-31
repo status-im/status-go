@@ -2815,6 +2815,7 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncVerificationRequest{
+		Id:                 vr.ID,
 		Clock:              clock,
 		From:               vr.From,
 		To:                 vr.To,
@@ -5725,16 +5726,12 @@ func ToVerificationRequest(message protobuf.SyncVerificationRequest) *verificati
 func (m *Messenger) handleSyncVerificationRequest(state *ReceivedMessageState, message protobuf.SyncVerificationRequest) error {
 	verificationRequest := ToVerificationRequest(message)
 
-	shouldSync, err := m.verificationDatabase.UpsertVerificationRequest(verificationRequest)
+	err := m.verificationDatabase.SaveVerificationRequest(verificationRequest)
 	if err != nil {
 		return err
 	}
 
 	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
-
-	if !shouldSync {
-		return nil
-	}
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, verificationRequest)
 

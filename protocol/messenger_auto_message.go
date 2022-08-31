@@ -15,7 +15,7 @@ import (
 // autoMessageInterval is how often we should send a message
 const autoMessageInterval = 120 * time.Second
 
-const chatID = "status-bot"
+const autoMessageChatID = "status-bot"
 
 func (m *Messenger) AutoMessageEnabled() (bool, error) {
 	return m.settings.AutoMessageEnabled()
@@ -44,8 +44,8 @@ func (m *Messenger) startAutoMessageLoop() error {
 
 				msg := &common.Message{}
 				msg.Text = fmt.Sprintf("%d\n%s", count, timestamp)
-				msg.ChatId = chatID
-				msg.LocalChatID = chatID
+				msg.ChatId = autoMessageChatID
+				msg.LocalChatID = autoMessageChatID
 				msg.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 				resp, err := m.SendChatMessage(context.Background(), msg)
 				if err != nil {
@@ -62,7 +62,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 
 				//send signal to client that message status updated
 				if m.config.messengerSignalsHandler != nil {
-					m.config.messengerSignalsHandler.MessageDelivered(chatID, msg.ID)
+					m.config.messengerSignalsHandler.MessageDelivered(autoMessageChatID, msg.ID)
 				}
 			case <-m.quit:
 				ticker.Stop()
