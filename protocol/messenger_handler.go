@@ -1045,7 +1045,7 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 }
 
 // handleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*communities.CommunityResponse, error) {
+func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*common.CommunityResponse, error) {
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 

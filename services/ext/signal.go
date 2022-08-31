@@ -3,7 +3,7 @@ package ext
 import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/signal"
 )
@@ -64,7 +64,7 @@ func (m MessengerSignalsHandler) BackupPerformed(lastBackup uint64) {
 }
 
 // MessageDelivered passes info about community that was requested before
-func (m MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
+func (m MessengerSignalsHandler) CommunityInfoFound(community *common.Community) {
 	signal.SendCommunityInfoFound(community)
 }
 

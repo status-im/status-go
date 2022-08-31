@@ -1,4 +1,4 @@
-package communities
+package common
 
 import (
 	"bytes"
@@ -14,13 +14,62 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
 )
 
 const signatureLength = 65
+
+type RequestToJoinState uint
+
+const (
+	RequestToJoinStatePending RequestToJoinState = iota + 1
+	RequestToJoinStateDeclined
+	RequestToJoinStateAccepted
+)
+
+type RequestToJoin struct {
+	ID          types.HexBytes     `json:"id"`
+	PublicKey   string             `json:"publicKey"`
+	Clock       uint64             `json:"clock"`
+	ENSName     string             `json:"ensName,omitempty"`
+	ChatID      string             `json:"chatId"`
+	CommunityID types.HexBytes     `json:"communityId"`
+	State       RequestToJoinState `json:"state"`
+	Our         bool               `json:"our"`
+}
+
+func (r *RequestToJoin) CalculateID() {
+	r.ID = CalculateRequestID(r.PublicKey, r.CommunityID)
+}
+
+func (r *RequestToJoin) ToSyncProtobuf() *protobuf.SyncCommunityRequestsToJoin {
+	return &protobuf.SyncCommunityRequestsToJoin{
+		Id:          r.ID,
+		PublicKey:   r.PublicKey,
+		Clock:       r.Clock,
+		EnsName:     r.ENSName,
+		ChatId:      r.ChatID,
+		CommunityId: r.CommunityID,
+		State:       uint64(r.State),
+	}
+}
+
+func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityRequestsToJoin) {
+	r.ID = proto.Id
+	r.PublicKey = proto.PublicKey
+	r.Clock = proto.Clock
+	r.ENSName = proto.EnsName
+	r.ChatID = proto.ChatId
+	r.CommunityID = proto.CommunityId
+	r.State = RequestToJoinState(proto.State)
+}
+
+func (r *RequestToJoin) Empty() bool {
+	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
+}
+
 
 type Config struct {
 	PrivateKey                    *ecdsa.PrivateKey
@@ -361,7 +410,7 @@ func (o *Community) GetMemberPubkeys() []*ecdsa.PublicKey {
 		pubkeys := make([]*ecdsa.PublicKey, len(o.config.CommunityDescription.Members))
 		i := 0
 		for hex := range o.config.CommunityDescription.Members {
-			pubkeys[i], _ = common.HexToPubkey(hex)
+			pubkeys[i], _ = HexToPubkey(hex)
 			i++
 		}
 		return pubkeys
@@ -572,7 +621,7 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 	if o.config.PrivateKey == nil {
 		return nil, ErrNotAdmin
 	}
-	memberKey := common.PubkeyToHex(pk)
+	memberKey := PubkeyToHex(pk)
 
 	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
 		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{}
@@ -609,7 +658,7 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 
 func (o *Community) getMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 	member := o.config.CommunityDescription.Members[key]
 	return member
 }
@@ -627,7 +676,7 @@ func (o *Community) IsBanned(pk *ecdsa.PublicKey) bool {
 }
 
 func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 
 	for _, k := range o.config.CommunityDescription.BanList {
 		if k == key {
@@ -674,7 +723,7 @@ func (o *Community) IsMemberInChat(pk *ecdsa.PublicKey, chatID string) bool {
 		return false
 	}
 
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 	_, ok = chat.Members[key]
 	return ok
 }
@@ -695,7 +744,7 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 		return o.config.CommunityDescription, nil
 	}
 
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 	delete(chat.Members, key)
 
 	return o.config.CommunityDescription, nil
@@ -711,7 +760,7 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	if !o.hasMember(pk) {
 		return o.config.CommunityDescription, nil
 	}
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 
 	// Remove from org
 	delete(o.config.CommunityDescription.Members, key)
@@ -733,7 +782,7 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	if o.config.PrivateKey == nil {
 		return nil, ErrNotAdmin
 	}
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 
 	for i, v := range o.config.CommunityDescription.BanList {
 		if v == key {
@@ -755,7 +804,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	if o.config.PrivateKey == nil {
 		return nil, ErrNotAdmin
 	}
-	key := common.PubkeyToHex(pk)
+	key := PubkeyToHex(pk)
 	if o.hasMember(pk) {
 		// Remove from org
 		delete(o.config.CommunityDescription.Members, key)
@@ -835,7 +884,7 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !common.IsPubKeyEqual(o.config.ID, signer) {
+	if !IsPubKeyEqual(o.config.ID, signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -1257,7 +1306,7 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(o.config.ID, extractedPublicKey) {
+	if !IsPubKeyEqual(o.config.ID, extractedPublicKey) {
 		return nil, ErrInvalidGrant
 	}
 
@@ -1277,7 +1326,7 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 	}
 
 	// creator can always post
-	if common.IsPubKeyEqual(pk, o.config.ID) {
+	if IsPubKeyEqual(pk, o.config.ID) {
 		return true, nil
 	}
 
@@ -1297,7 +1346,7 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 			return false, nil
 		}
 
-		_, ok := chat.Members[common.PubkeyToHex(pk)]
+		_, ok := chat.Members[PubkeyToHex(pk)]
 		// If member, we stop here
 		if ok {
 			return true, nil
@@ -1320,14 +1369,14 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 	}
 
 	// If member, they can post
-	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
+	_, ok = o.config.CommunityDescription.Members[PubkeyToHex(pk)]
 	if ok {
 		return true, nil
 	}
 
 	// Not a member and no grant, can't post
 	if !ok && grantBytes == nil {
-		o.config.Logger.Debug("canPost, not a member in org", zap.String("chat-id", chatID), zap.String("pubkey", common.PubkeyToHex(pk)))
+		o.config.Logger.Debug("canPost, not a member in org", zap.String("chat-id", chatID), zap.String("pubkey", PubkeyToHex(pk)))
 		return false, nil
 	}
 
@@ -1353,7 +1402,7 @@ func (o *Community) canPostWithGrant(pk *ecdsa.PublicKey, chatID string, grantBy
 		return false, nil
 	}
 
-	if !common.IsPubKeyEqual(grantPk, pk) {
+	if !IsPubKeyEqual(grantPk, pk) {
 		return false, nil
 	}
 
@@ -1468,7 +1517,7 @@ func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
 	roles := canManageUsersRolePermissions()
 	for pkString, member := range o.config.CommunityDescription.Members {
 		if o.hasMemberPermission(member, roles) {
-			pk, err := common.HexToPubkey(pkString)
+			pk, err := HexToPubkey(pkString)
 			if err != nil {
 				return nil, err
 			}
@@ -1493,7 +1542,7 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey) error {
 		return ErrNotAdmin
 	}
 
-	memberKey := common.PubkeyToHex(publicKey)
+	memberKey := PubkeyToHex(publicKey)
 
 	if o.config.CommunityDescription.Members == nil {
 		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)

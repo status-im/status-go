@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
@@ -109,6 +110,7 @@ type Messenger struct {
 	pushNotificationClient *pushnotificationclient.Client
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
+  importManager          *discord.ImportManager
 	logger                 *zap.Logger
 
 	outputCSV bool
@@ -401,6 +403,11 @@ func NewMessenger(
 		return nil, err
 	}
 
+  importManager, err := discord.NewImportManager(logger)
+	if err != nil {
+		return nil, err
+	}
+
 	settings, err := accounts.NewDB(database)
 	if err != nil {
 		return nil, err
@@ -422,6 +429,7 @@ func NewMessenger(
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
+    importManager:              importManager
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
@@ -1391,7 +1399,7 @@ func (m *Messenger) Init() error {
 		}
 
 		if !exists {
-			communitySettings := communities.CommunitySettings{
+			communitySettings := common.CommunitySettings{
 				CommunityID:                  org.IDString(),
 				HistoryArchiveSupportEnabled: true,
 			}
@@ -3302,7 +3310,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community) error {
+func (m *Messenger) syncCommunity(ctx context.Context, community *common.Community) error {
 	logger := m.logger.Named("syncCommunity")
 	if !m.hasPairedDevices() {
 		logger.Debug("device has no paired devices")

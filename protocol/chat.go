@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -414,7 +413,7 @@ func (c *Chat) DeepLink() string {
 	return ""
 }
 
-func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {
+func CreateCommunityChats(org *common.Community, timesource common.TimeSource) []*Chat {
 	var chats []*Chat
 	orgID := org.IDString()
 

@@ -7,7 +7,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
 
@@ -15,7 +14,7 @@ type NotificationBody struct {
 	Message   *common.Message        `json:"message"`
 	Contact   *Contact               `json:"contact"`
 	Chat      *Chat                  `json:"chat"`
-	Community *communities.Community `json:"community"`
+	Community *common.Community `json:"community"`
 }
 
 func showMessageNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) bool {
@@ -66,7 +65,7 @@ func DeletedMessageNotification(id string, chat *Chat) *localnotifications.Notif
 	}
 }
 
-func NewCommunityRequestToJoinNotification(id string, community *communities.Community, contact *Contact) *localnotifications.Notification {
+func NewCommunityRequestToJoinNotification(id string, community *common.Community, contact *Contact) *localnotifications.Notification {
 	body := &NotificationBody{
 		Community: community,
 		Contact:   contact,

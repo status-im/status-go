@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -83,14 +82,14 @@ type ChannelGroup struct {
 	Images         map[string]images.IdentityImage          `json:"images"`
 	Color          string                                   `json:"color"`
 	Chats          map[string]*Chat                         `json:"chats"`
-	Categories     map[string]communities.CommunityCategory `json:"categories"`
+	Categories     map[string]common.CommunityCategory `json:"categories"`
 	EnsName        string                                   `json:"ensName"`
 	Admin          bool                                     `json:"admin"`
 	Verified       bool                                     `json:"verified"`
 	Description    string                                   `json:"description"`
 	IntroMessage   string                                   `json:"introMessage"`
 	OutroMessage   string                                   `json:"outroMessage"`
-	Tags           []communities.CommunityTag               `json:"tags"`
+	Tags           []common.CommunityTag               `json:"tags"`
 	Permissions    *protobuf.CommunityPermissions           `json:"permissions"`
 	Members        map[string]*protobuf.CommunityMember     `json:"members"`
 	CanManageUsers bool                                     `json:"canManageUsers"`
@@ -126,14 +125,14 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		Images:       make(map[string]images.IdentityImage),
 		Color:        "",
 		Chats:        make(map[string]*Chat),
-		Categories:   make(map[string]communities.CommunityCategory),
+		Categories:   make(map[string]common.CommunityCategory),
 		EnsName:      "", // Not implemented yet in communities
 		Admin:        true,
 		Verified:     true,
 		Description:  "",
 		IntroMessage: "",
 		OutroMessage: "",
-		Tags:         []communities.CommunityTag{},
+		Tags:         []common.CommunityTag{},
 		Permissions:  &protobuf.CommunityPermissions{},
 		Muted:        false,
 	}
@@ -157,7 +156,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			Color:          community.Color(),
 			Images:         make(map[string]images.IdentityImage),
 			Chats:          make(map[string]*Chat),
-			Categories:     make(map[string]communities.CommunityCategory),
+			Categories:     make(map[string]common.CommunityCategory),
 			Admin:          community.IsAdmin(),
 			Verified:       community.Verified(),
 			Description:    community.DescriptionText(),
@@ -176,7 +175,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		}
 
 		for _, cat := range community.Categories() {
-			chGrp.Categories[cat.CategoryId] = communities.CommunityCategory{
+			chGrp.Categories[cat.CategoryId] = common.CommunityCategory{
 				ID:       cat.CategoryId,
 				Name:     cat.Name,
 				Position: int(cat.Position),
@@ -240,7 +239,7 @@ func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID
 	return api.toAPIChat(response.Chats()[0], nil, pubKey)
 }
 
-func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string) (*Chat, error) {
+func (api *API) toAPIChat(protocolChat *protocol.Chat, community *common.Community, pubKey string) (*Chat, error) {
 	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
 	if err != nil {
 		return nil, err
@@ -301,7 +300,7 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 	return chat, nil
 }
 
-func getChatMembers(sourceChat *protocol.Chat, community *communities.Community, userPubKey string) (map[string]Member, error) {
+func getChatMembers(sourceChat *protocol.Chat, community *common.Community, userPubKey string) (map[string]Member, error) {
 	result := make(map[string]Member)
 	if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
 		for _, m := range sourceChat.Members {
@@ -342,7 +341,7 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	return nil, nil
 }
 
-func (chat *Chat) populateCommunityFields(community *communities.Community) error {
+func (chat *Chat) populateCommunityFields(community *common.Community) error {
 	if community == nil {
 		return nil
 	}
@@ -369,7 +368,7 @@ func (chat *Chat) populateCommunityFields(community *communities.Community) erro
 	return nil
 }
 
-func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, chatID string) (*protocol.Chat, *communities.Community, error) {
+func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, chatID string) (*protocol.Chat, *common.Community, error) {
 	fullChatID := chatID
 
 	if string(communityID.Bytes()) == pubKey { // Obtaining chats from personal
@@ -385,7 +384,7 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 		return nil, nil, ErrChatNotFound
 	}
 
-	var community *communities.Community
+	var community *common.Community
 	if messengerChat.CommunityID != "" {
 		communityID, err := hexutil.Decode(messengerChat.CommunityID)
 		if err != nil {

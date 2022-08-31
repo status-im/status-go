@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -30,7 +29,7 @@ type MessageDeliveredHandler func(string, string)
 
 type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
-	CommunityInfoFound(community *communities.Community)
+	CommunityInfoFound(community *common.Community)
 	MessengerResponse(response *MessengerResponse)
 	HistoryRequestStarted(requestID string, numBatches int)
 	HistoryRequestBatchProcessed(requestID string, batchIndex int, batchNum int)

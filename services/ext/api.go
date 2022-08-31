@@ -353,12 +353,12 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 }
 
 // Communities returns a list of communities that are stored
-func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
+func (api *PublicAPI) Communities(parent context.Context) ([]*common.Community, error) {
 	return api.service.messenger.Communities()
 }
 
 // JoinedCommunities returns a list of communities that the user has joined
-func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.Community, error) {
+func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*common.Community, error) {
 	return api.service.messenger.JoinedCommunities()
 }
 
@@ -987,7 +987,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
+func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*common.Community, error) {
 	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
 }
 
@@ -1071,7 +1071,7 @@ func (api *PublicAPI) StopDiscV5() error {
 	return api.service.messenger.StopDiscV5()
 }
 
-func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
+func (api *PublicAPI) GetCommunitiesSettings() ([]common.CommunitySettings, error) {
 	return api.service.messenger.GetCommunitiesSettings()
 }
 

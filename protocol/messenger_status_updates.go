@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 )
@@ -119,7 +118,7 @@ func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 	}
 }
 
-func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, community *communities.Community) error {
+func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, community *common.Community) error {
 	logger := m.logger.Named("sendCurrentUserStatusToCommunity")
 
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()

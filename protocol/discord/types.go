@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/common"
 )
 
 type ErrorCodeType uint
@@ -28,17 +30,17 @@ const (
 	MessageTypeReply   MessageType = "Reply"
 )
 
-type ImportTask uint
+type ImportTaskType uint
 
 const (
-	CommunityCreationTask ImportTask = iota
+	CommunityCreationTask ImportTaskType = iota
 	ChannelsCreationTask
 	ImportMessagesTask
 	DownloadAssetsTask
 	InitCommunityTask
 )
 
-func (t ImportTask) String() string {
+func (t ImportTaskType) String() string {
 	switch t {
 	case CommunityCreationTask:
 		return "import.communityCreation"
@@ -114,6 +116,16 @@ func Warning(message string) *ImportError {
 	}
 }
 
+type ImportTaskParams struct {
+  FilesToImport []string
+  CreateCommunityRequest *requests.CreateCommunity
+  ProgressUpdates chan *ImportProgress
+  ImportProgress *ImportProgress
+  ExportedData []*ExportedData
+  ProcessedCategoriesIds map[string]string
+  DiscordCommunity *common.Community
+}
+
 type ImportTaskProgress struct {
 	Type     string         `json:"type"`
 	Progress float32        `json:"progress"`
@@ -121,23 +133,26 @@ type ImportTaskProgress struct {
 	Stopped  bool           `json:"stopped"`
 }
 
-type ImportTasks map[ImportTask]*ImportTaskProgress
-
 type ImportProgress struct {
 	CommunityID   string                `json:"communityId,omitempty"`
 	CommunityName string                `json:"communityName"`
-	Tasks         []*ImportTaskProgress `json:"tasks"`
+	TasksProgress         []*ImportTaskProgress `json:"tasks"`
 	Progress      float32               `json:"progress"`
 	ErrorsCount   uint                  `json:"errorsCount"`
 	WarningsCount uint                  `json:"warningsCount"`
 	Stopped       bool                  `json:"stopped"`
 }
 
-func (progress *ImportProgress) Init(tasks []ImportTask) {
+type ImportTask struct {
+  Type ImportTaskType
+  Task func(*ImportTaskParams) *ImportProgress
+}
+
+func (progress *ImportProgress) Init(tasks []ImportTaskType) {
 	progress.Progress = 0
-	progress.Tasks = make([]*ImportTaskProgress, 0)
+	progress.TasksProgress = make([]*ImportTaskProgress, 0)
 	for _, task := range tasks {
-		progress.Tasks = append(progress.Tasks, &ImportTaskProgress{
+		progress.TasksProgress = append(progress.TasksProgress, &ImportTaskProgress{
 			Type:     task.String(),
 			Progress: 0,
 			Errors:   []*ImportError{},
@@ -153,11 +168,11 @@ func (progress *ImportProgress) Stop() {
 	progress.Stopped = true
 }
 
-func (progress *ImportProgress) AddTaskError(task ImportTask, err *ImportError) {
-	for i, t := range progress.Tasks {
+func (progress *ImportProgress) AddTaskError(task ImportTaskType, err *ImportError) {
+	for i, t := range progress.TasksProgress {
 		if t.Type == task.String() {
-			errors := progress.Tasks[i].Errors
-			progress.Tasks[i].Errors = append(errors, err)
+			errors := progress.TasksProgress[i].Errors
+			progress.TasksProgress[i].Errors = append(errors, err)
 		}
 	}
 	if err.Code > WarningType {
@@ -169,25 +184,29 @@ func (progress *ImportProgress) AddTaskError(task ImportTask, err *ImportError) 
 	}
 }
 
-func (progress *ImportProgress) StopTask(task ImportTask) {
-	for i, t := range progress.Tasks {
+func (progress *ImportProgress) StopTask(task ImportTaskType) {
+	for i, t := range progress.TasksProgress {
 		if t.Type == task.String() {
-			progress.Tasks[i].Stopped = true
+			progress.TasksProgress[i].Stopped = true
 		}
 	}
 	progress.Stop()
 }
 
-func (progress *ImportProgress) UpdateTaskProgress(task ImportTask, value float32) {
-	for i, t := range progress.Tasks {
+func (progress *ImportProgress) UpdateTaskProgress(task ImportTaskType, value float32) {
+	for i, t := range progress.TasksProgress {
 		if t.Type == task.String() {
-			progress.Tasks[i].Progress = value
+			progress.TasksProgress[i].Progress = value
 		}
 	}
 	sum := float32(0)
-	for _, t := range progress.Tasks {
+	for _, t := range progress.TasksProgress {
 		sum = sum + t.Progress
 	}
 	// Update total progress now that sub progress has changed
-	progress.Progress = sum / float32(len(progress.Tasks))
+	progress.Progress = sum / float32(len(progress.TasksProgress))
+}
+
+type Subscription struct {
+  ImportProgress *ImportProgress
 }

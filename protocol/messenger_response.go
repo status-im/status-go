@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/verification"
@@ -33,8 +32,8 @@ type MessengerResponse struct {
 	Installations                 []*multidevice.Installation
 	EmojiReactions                []*EmojiReaction
 	Invitations                   []*GroupChatInvitation
-	CommunityChanges              []*communities.CommunityChanges
-	RequestsToJoinCommunity       []*communities.RequestToJoin
+	CommunityChanges              []*common.CommunityChanges
+	RequestsToJoinCommunity       []*common.RequestToJoin
 	AnonymousMetrics              []*appmetrics.AppMetric
 	Mailservers                   []mailservers.Mailserver
 	Bookmarks                     []*browsers.Bookmark
@@ -52,8 +51,8 @@ type MessengerResponse struct {
 	chats                       map[string]*Chat
 	removedChats                map[string]bool
 	removedMessages             map[string]*RemovedMessage
-	communities                 map[string]*communities.Community
-	communitiesSettings         map[string]*communities.CommunitySettings
+	communities                 map[string]*common.Community
+	communitiesSettings         map[string]*common.CommunitySettings
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
@@ -74,8 +73,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
-		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
-		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
+		CommunityChanges        []*common.CommunityChanges     `json:"communityChanges,omitempty"`
+		RequestsToJoinCommunity []*common.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
 		Mailservers             []mailservers.Mailserver            `json:"mailservers,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
@@ -84,8 +83,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
 		Notifications                 []*localnotifications.Notification `json:"notifications"`
-		Communities                   []*communities.Community           `json:"communities,omitempty"`
-		CommunitiesSettings           []*communities.CommunitySettings   `json:"communitiesSettings,omitempty"`
+		Communities                   []*common.Community           `json:"communities,omitempty"`
+		CommunitiesSettings           []*common.CommunitySettings   `json:"communitiesSettings,omitempty"`
 		ActivityCenterNotifications   []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
 		CurrentStatus                 *UserStatus                        `json:"currentStatus,omitempty"`
 		StatusUpdates                 []UserStatus                       `json:"statusUpdates,omitempty"`
@@ -162,16 +161,16 @@ func (r *MessengerResponse) ClearedHistories() []*ClearedHistory {
 	return clearedHistories
 }
 
-func (r *MessengerResponse) Communities() []*communities.Community {
-	var communities []*communities.Community
+func (r *MessengerResponse) Communities() []*common.Community {
+	var communities []*common.Community
 	for _, c := range r.communities {
 		communities = append(communities, c)
 	}
 	return communities
 }
 
-func (r *MessengerResponse) CommunitiesSettings() []*communities.CommunitySettings {
-	var settings []*communities.CommunitySettings
+func (r *MessengerResponse) CommunitiesSettings() []*common.CommunitySettings {
+	var settings []*common.CommunitySettings
 	for _, s := range r.communitiesSettings {
 		settings = append(settings, s)
 	}
@@ -276,23 +275,23 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	return nil
 }
 
-func (r *MessengerResponse) AddCommunities(communities []*communities.Community) {
+func (r *MessengerResponse) AddCommunities(communities []*common.Community) {
 	for _, overrideCommunity := range communities {
 		r.AddCommunity(overrideCommunity)
 	}
 }
 
-func (r *MessengerResponse) AddCommunity(c *communities.Community) {
+func (r *MessengerResponse) AddCommunity(c *common.Community) {
 	if r.communities == nil {
-		r.communities = make(map[string]*communities.Community)
+		r.communities = make(map[string]*common.Community)
 	}
 
 	r.communities[c.IDString()] = c
 }
 
-func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySettings) {
+func (r *MessengerResponse) AddCommunitySettings(c *common.CommunitySettings) {
 	if r.communitiesSettings == nil {
-		r.communitiesSettings = make(map[string]*communities.CommunitySettings)
+		r.communitiesSettings = make(map[string]*common.CommunitySettings)
 	}
 
 	r.communitiesSettings[c.CommunityID] = c

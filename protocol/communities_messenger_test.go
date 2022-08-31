@@ -437,7 +437,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.RemovedChats(), 3)
 }
 
-func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
+func (s *MessengerCommunitiesSuite) createCommunity() *common.Community {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -469,7 +469,7 @@ func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
 	return community
 }
 
-func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
+func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *common.Community, user *Messenger) {
 	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
 
 	inputMessage := &common.Message{}
@@ -496,7 +496,7 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 	s.Require().NoError(err)
 }
 
-func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
+func (s *MessengerCommunitiesSuite) joinCommunity(community *common.Community, user *Messenger) {
 	// Request to join the community
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	response, err := user.RequestToJoinCommunity(request)
@@ -1616,7 +1616,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 
 	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
-	var newCommunity *communities.Community
+	var newCommunity *common.Community
 	for _, com := range mr.Communities() {
 		if com.Name() == createCommunityReq.Name {
 			newCommunity = com
@@ -1677,7 +1677,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 
 	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
-	var newCommunity *communities.Community
+	var newCommunity *common.Community
 	for _, com := range mr.Communities() {
 		if com.Name() == createCommunityReq.Name {
 			newCommunity = com
@@ -1722,7 +1722,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 
 	mr, err = s.alice.EditCommunity(editCommunityReq)
 	s.Require().NoError(err, "s.alice.EditCommunity")
-	var editedCommunity *communities.Community
+	var editedCommunity *common.Community
 	for _, com := range mr.Communities() {
 		if com.Name() == createCommunityReq.Name {
 			editedCommunity = com
@@ -1778,7 +1778,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
-	var newCommunity *communities.Community
+	var newCommunity *common.Community
 	for _, com := range mr.Communities() {
 		if com.Name() == createCommunityReq.Name {
 			newCommunity = com
@@ -2205,7 +2205,7 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 
 	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
-	var newCommunity *communities.Community
+	var newCommunity *common.Community
 	for _, com := range mr.Communities() {
 		if com.Name() == createCommunityReq.Name {
 			newCommunity = com
