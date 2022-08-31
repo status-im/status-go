@@ -893,19 +893,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-
 	return cs
-}
-
-// SetConnectionStringForBootstrappingAnotherDevice starts a server.Receiving server.PairingClient
-// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
-//
-// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
-func SetConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
-	if configJSON != "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
-	}
-
 }
 
 // GetConnectionStringForBootstrappingAnotherDevice starts a server.Sending server.PairingServer
@@ -923,18 +911,27 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-
 	return cs
 }
 
-// InputQRCodeForBeingBootstrapped starts a server.Sending server.PairingClient
+// InputConnectionStringForBootstrapping starts a server.PairingClient
+// The given server.ConnectionParams string will determine the server.Mode
+//
+// server.Mode = server.Sending
+// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
+//
+// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
+//
+// server.Mode = server.Receiving
 // Used when the device is Logged out or has no Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
-func InputQRCodeForBeingBootstrapped(cs, configJSON string) string {
+func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON != "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
 	}
 
+	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
+	return makeJSONResponse(err)
 }
