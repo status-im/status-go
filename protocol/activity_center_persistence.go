@@ -271,8 +271,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 type activityCenterQueryParamsRead uint
 
 const (
-	activityCenterQueryParamsReadAll = iota
-	activityCenterQueryParamsReadRead
+	activityCenterQueryParamsReadRead = iota + 1
 	activityCenterQueryParamsReadUnread
 )
 
