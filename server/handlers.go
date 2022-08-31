@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -150,27 +151,37 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFun
 }
 
 func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := ioutil.ReadAll(r.Body)
 		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
 		}
+		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 
 		err = ps.PayloadManager.Receive(payload)
 		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
 			ps.logger.Error("ps.PayloadManager.Receive(payload)", zap.Error(err))
 		}
+		signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess})
 	}
 }
 
 func handlePairingSend(ps *PairingServer) http.HandlerFunc {
-	// TODO lock sending after one successful transfer
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
+
+	// TODO lock sending after one successful transfer, perhaps perform the lock on the PayloadManager level
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err := w.Write(ps.PayloadManager.ToSend())
 		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 			ps.logger.Error("w.Write(ps.PayloadManager.ToSend())", zap.Error(err))
 		}
+		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 	}
 }
 
