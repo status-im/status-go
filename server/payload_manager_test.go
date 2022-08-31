@@ -116,17 +116,21 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 	pms.Require().NoError(err)
 
 	pms.config1 = &PairingPayloadManagerConfig{
-		DB:           db1,
-		KeystorePath: keystore1,
-		KeyUID:       keyUID,
-		Password:     password,
+		DB: db1,
+		PairingPayloadSourceConfig: PairingPayloadSourceConfig{
+			KeystorePath: keystore1,
+			KeyUID:       keyUID,
+			Password:     password,
+		},
 	}
 
 	pms.config2 = &PairingPayloadManagerConfig{
-		DB:           db2,
-		KeystorePath: keystore2,
-		KeyUID:       keyUID,
-		Password:     password,
+		DB: db2,
+		PairingPayloadSourceConfig: PairingPayloadSourceConfig{
+			KeystorePath: keystore2,
+			KeyUID:       keyUID,
+			Password:     password,
+		},
 	}
 }
 
