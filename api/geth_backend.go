@@ -146,6 +146,10 @@ func (b *GethStatusBackend) UpdateRootDataDir(datadir string) {
 	b.rootDataDir = datadir
 }
 
+func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
+	return b.multiaccountsDB
+}
+
 func (b *GethStatusBackend) OpenAccounts() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -36,11 +36,6 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 	for _, m := range modes {
 		s.PS.mode = m
 
-		if m == Sending {
-			err := s.PS.Mount()
-			s.Require().NoError(err)
-		}
-
 		err = s.PS.StartPairing()
 		s.Require().NoError(err)
 
@@ -76,11 +71,6 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		c.PayloadManager, err = NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
 		s.Require().NoError(err)
 
-		if m == Receiving {
-			err := c.Mount()
-			s.Require().NoError(err)
-		}
-
 		err = c.PairAccount()
 		s.Require().NoError(err)
 
@@ -108,9 +98,6 @@ func (s *PairingServerSuite) sendingSetup() *PairingClient {
 	s.Require().NoError(err)
 	s.PS.PayloadManager = pm
 	s.PS.mode = Sending
-
-	err = s.PS.Mount()
-	s.Require().NoError(err)
 
 	err = s.PS.StartPairing()
 	s.Require().NoError(err)

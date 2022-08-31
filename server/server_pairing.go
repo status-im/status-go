@@ -5,12 +5,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/multiaccounts"
 	"net"
 	"time"
 
 	"github.com/gorilla/sessions"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PairingServer struct {
@@ -115,6 +117,11 @@ func (s *PairingServer) startReceivingAccountData() error {
 }
 
 func (s *PairingServer) startSendingAccountData() error {
+	err := s.Mount()
+	if err != nil {
+		return err
+	}
+
 	s.SetHandlers(HandlerPatternMap{
 		pairingSend:      challengeMiddleware(s, handlePairingSend(s)),
 		pairingChallenge: handlePairingChallenge(s),
@@ -162,4 +169,29 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig Pa
 			PairingPayloadSourceConfig: storeConfig,
 		},
 	})
+}
+
+func StartUpPairingServer(db *multiaccounts.Database, mode Mode, configJSON string) (string, error) {
+	var conf PairingPayloadSourceConfig
+	err := json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return "", err
+	}
+
+	ps, err := MakeFullPairingServer(db, mode, conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = ps.StartPairing()
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := ps.MakeConnectionParams()
+	if err != nil {
+		return "", err
+	}
+
+	return cp.ToString(), nil
 }
