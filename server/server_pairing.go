@@ -122,7 +122,7 @@ func (s *PairingServer) startSendingAccountData() error {
 	return s.Start()
 }
 
-func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, keystorePath, keyUID, password string) (*PairingServer, error) {
+func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig PairingPayloadSourceConfig) (*PairingServer, error) {
 	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -145,23 +145,21 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, keystorePath, 
 	}
 
 	return NewPairingServer(&Config{
-		// Things that can be generated
+		// Things that can be generated, and CANNOT come from the app client (well they could be this is better)
 		PK:       &tlsKey.PublicKey,
 		EK:       AESKey,
 		Cert:     &tlsCert,
 		Hostname: outboundIP.String(),
 
-		// Things that can't be generated, but do come from the client
+		// Things that can't be generated, but DO come from the app client
 		Mode: mode,
 
 		PairingPayloadManagerConfig: &PairingPayloadManagerConfig{
-			// Things that can't be generated, but can't come from client
+			// Things that can't be generated, but DO NOT come from app client
 			DB: db,
 
-			// Things that can't be generated, but do come from the client
-			KeystorePath: keystorePath,
-			KeyUID:       keyUID,
-			Password:     password,
+			// Things that can't be generated, but DO come from the app client
+			PairingPayloadSourceConfig: storeConfig,
 		},
 	})
 }

@@ -27,12 +27,18 @@ type PayloadManager interface {
 	EncryptPlain(plaintext []byte) ([]byte, error)
 }
 
+// PairingPayloadSourceConfig represents location and access data of the pairing payload
+// ONLY available from the application client
+type PairingPayloadSourceConfig struct {
+	KeystorePath string `json:"keystorePath"`
+	KeyUID       string `json:"keyUID"`
+	Password     string `json:"password"`
+}
+
 // PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
 type PairingPayloadManagerConfig struct {
-	DB           *multiaccounts.Database
-	KeystorePath string
-	KeyUID       string
-	Password     string
+	DB *multiaccounts.Database
+	PairingPayloadSourceConfig
 }
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
