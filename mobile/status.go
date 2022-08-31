@@ -884,15 +884,27 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 // and the device has no camera to read a QR code with
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
-func GetConnectionStringForBeingBootstrapped() string {
+func GetConnectionStringForBeingBootstrapped(configJSON string) string {
+	if configJSON != "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
 
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Receiving, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cs
 }
 
 // SetConnectionStringForBootstrappingAnotherDevice starts a server.Receiving server.PairingClient
-// Used when the devices is Logged in and therefore has Account keys and the has a camera to read a QR code
+// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
 //
 // Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
-func SetConnectionStringForBootstrappingAnotherDevice(cs string) string {
+func SetConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
+	if configJSON != "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
 
 }
 
@@ -902,15 +914,27 @@ func SetConnectionStringForBootstrappingAnotherDevice(cs string) string {
 //
 // Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
 // sending account data to a mobile (device with camera)
-func GetConnectionStringForBootstrappingAnotherDevice() string {
+func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
+	if configJSON != "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
 
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Sending, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cs
 }
 
 // InputQRCodeForBeingBootstrapped starts a server.Sending server.PairingClient
-// Used when the devices is Logged out or has no Account keys and has a camera to read a QR code
+// Used when the device is Logged out or has no Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
-func InputQRCodeForBeingBootstrapped(cs string) string {
+func InputQRCodeForBeingBootstrapped(cs, configJSON string) string {
+	if configJSON != "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
 
 }

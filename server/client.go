@@ -96,6 +96,11 @@ func (c *PairingClient) PairAccount() error {
 }
 
 func (c *PairingClient) sendAccountData() error {
+	err := c.Mount()
+	if err != nil {
+		return err
+	}
+
 	c.baseAddress.Path = pairingReceive
 	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
 	if err != nil {
