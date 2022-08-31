@@ -2,10 +2,13 @@ package server
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
+	"github.com/status-im/status-go/multiaccounts"
 	"net"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -117,4 +120,48 @@ func (s *PairingServer) startSendingAccountData() error {
 		pairingChallenge: handlePairingChallenge(s),
 	})
 	return s.Start()
+}
+
+func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, keystorePath, keyUID, password string) (*PairingServer, error) {
+	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	AESKey := make([]byte, 32)
+	_, err = rand.Read(AESKey)
+	if err != nil {
+		return nil, err
+	}
+
+	outboundIP, err := GetOutboundIP()
+	if err != nil {
+		return nil, err
+	}
+
+	tlsCert, _, err := GenerateCertFromKey(tlsKey, time.Now(), outboundIP.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return NewPairingServer(&Config{
+		// Things that can be generated
+		PK:       &tlsKey.PublicKey,
+		EK:       AESKey,
+		Cert:     &tlsCert,
+		Hostname: outboundIP.String(),
+
+		// Things that can't be generated, but do come from the client
+		Mode: mode,
+
+		PairingPayloadManagerConfig: &PairingPayloadManagerConfig{
+			// Things that can't be generated, but can't come from client
+			DB: db,
+
+			// Things that can't be generated, but do come from the client
+			KeystorePath: keystorePath,
+			KeyUID:       keyUID,
+			Password:     password,
+		},
+	})
 }

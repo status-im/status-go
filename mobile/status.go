@@ -878,3 +878,39 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 	}
 	return string(data)
 }
+
+// GetConnectionStringForBeingBootstrapped starts a server.Receiving server.PairingServer
+// then generates a server.ConnectionParams. Used when the device is Logged out or has no Account keys
+// and the device has no camera to read a QR code with
+//
+// Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
+func GetConnectionStringForBeingBootstrapped() string {
+
+}
+
+// SetConnectionStringForBootstrappingAnotherDevice starts a server.Receiving server.PairingClient
+// Used when the devices is Logged in and therefore has Account keys and the has a camera to read a QR code
+//
+// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
+func SetConnectionStringForBootstrappingAnotherDevice(cs string) string {
+
+}
+
+// GetConnectionStringForBootstrappingAnotherDevice starts a server.Sending server.PairingServer
+// then generates a server.ConnectionParams. Used when the device is Logged in and therefore has Account keys
+// and the device might not have a camera
+//
+// Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
+// sending account data to a mobile (device with camera)
+func GetConnectionStringForBootstrappingAnotherDevice() string {
+
+}
+
+// InputQRCodeForBeingBootstrapped starts a server.Sending server.PairingClient
+// Used when the devices is Logged out or has no Account keys and has a camera to read a QR code
+//
+// Example: A mobile device (device with a camera) receiving account data from
+// a device with a screen (mobile or desktop devices)
+func InputQRCodeForBeingBootstrapped(cs string) string {
+
+}
