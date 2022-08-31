@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -13,6 +14,8 @@ import (
 	"net/url"
 
 	"github.com/btcsuite/btcutil/base58"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PairingClient struct {
@@ -160,4 +163,22 @@ func (c *PairingClient) getChallenge() error {
 
 	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
 	return err
+}
+
+func StartUpPairingClient(db *multiaccounts.Database, cs, configJSON string) error {
+	var conf PairingPayloadSourceConfig
+	err := json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return err
+	}
+
+	ccp := new(ConnectionParams)
+	err = ccp.FromString(cs)
+
+	c, err := NewPairingClient(ccp, &PairingPayloadManagerConfig{db, conf})
+	if err != nil {
+		return err
+	}
+
+	return c.PairAccount()
 }

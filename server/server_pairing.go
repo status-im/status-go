@@ -129,6 +129,7 @@ func (s *PairingServer) startSendingAccountData() error {
 	return s.Start()
 }
 
+// MakeFullPairingServer generates a fully configured and randomly seeded PairingServer
 func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig PairingPayloadSourceConfig) (*PairingServer, error) {
 	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -171,6 +172,8 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig Pa
 	})
 }
 
+// StartUpPairingServer generates a PairingServer, starts the pairing server in the correct mode
+// and returns the ConnectionParams string to allow a PairingClient to make a successful connection.
 func StartUpPairingServer(db *multiaccounts.Database, mode Mode, configJSON string) (string, error) {
 	var conf PairingPayloadSourceConfig
 	err := json.Unmarshal([]byte(configJSON), &conf)
