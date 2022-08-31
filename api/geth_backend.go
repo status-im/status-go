@@ -576,23 +576,18 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	err = accountDB.DeleteSeedAndKeyAccounts()
-	if err != nil {
-		return err
-	}
-
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
-	if err != nil {
-		return err
-	}
-
 	err = b.closeAppDB()
 	if err != nil {
 		return err
 	}
 
-	return os.RemoveAll(keyStoreDir)
+	err = os.RemoveAll(keyStoreDir)
+	if err != nil {
+		return err
+	}
+
+	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
+	return appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
