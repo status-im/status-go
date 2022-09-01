@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -2234,33 +2235,40 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		processedAvatars := 0
 
 		// TODO(pascal): download avatars in parallel
+
+		var wg sync.WaitGroup
+
 		for authorID, avatarURL := range authorAvatarUrls {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, _, imageBase64, err := discord.DownloadAndEncodeAvatarAsset(avatarURL)
+				if err != nil {
+					errmsg := fmt.Sprintf("Couldn't download %s: %s", avatarURL, err.Error())
+					importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(errmsg))
+					progressUpdates <- importProgress
+					return
+				}
 
-			_, _, imageBase64, err := discord.DownloadAndEncodeAvatarAsset(avatarURL)
-			if err != nil {
-				errmsg := fmt.Sprintf("Couldn't download %s: %s", avatarURL, err.Error())
-				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(errmsg))
+				err = m.persistence.UpdateDiscordMessageAuthorImage(authorID, imageBase64)
+				if err != nil {
+					importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
+					progressUpdates <- importProgress
+					return
+				}
+				processedAvatars++
+				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, float32(processedAvatars)/float32(len(authorAvatarUrls)))
 				progressUpdates <- importProgress
-				continue
-			}
 
-			err = m.persistence.UpdateDiscordMessageAuthorImage(authorID, imageBase64)
-			if err != nil {
-				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
-				progressUpdates <- importProgress
-				continue
-			}
-			processedAvatars++
-			importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, float32(processedAvatars)/float32(len(authorAvatarUrls)))
-			progressUpdates <- importProgress
-
-			if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
-				importProgress.StopTask(discord.DownloadAssetsTask)
-				progressUpdates <- importProgress
-				cancel <- discordCommunity.IDString()
-				return
-			}
+				if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+					importProgress.StopTask(discord.DownloadAssetsTask)
+					progressUpdates <- importProgress
+					cancel <- discordCommunity.IDString()
+					return
+				}
+			}()
 		}
+		wg.Wait()
 
 		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, 1)
 		progressUpdates <- importProgress

@@ -3,6 +3,7 @@ package discord
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -131,6 +132,7 @@ type ImportProgress struct {
 	ErrorsCount   uint                  `json:"errorsCount"`
 	WarningsCount uint                  `json:"warningsCount"`
 	Stopped       bool                  `json:"stopped"`
+	m             sync.Mutex
 }
 
 func (progress *ImportProgress) Init(tasks []ImportTask) {
@@ -154,6 +156,7 @@ func (progress *ImportProgress) Stop() {
 }
 
 func (progress *ImportProgress) AddTaskError(task ImportTask, err *ImportError) {
+	progress.m.Lock()
 	for i, t := range progress.Tasks {
 		if t.Type == task.String() {
 			errors := progress.Tasks[i].Errors
@@ -167,18 +170,22 @@ func (progress *ImportProgress) AddTaskError(task ImportTask, err *ImportError) 
 	if err.Code > NoErrorType {
 		progress.WarningsCount++
 	}
+	progress.m.Unlock()
 }
 
 func (progress *ImportProgress) StopTask(task ImportTask) {
+	progress.m.Lock()
 	for i, t := range progress.Tasks {
 		if t.Type == task.String() {
 			progress.Tasks[i].Stopped = true
 		}
 	}
 	progress.Stop()
+	progress.m.Unlock()
 }
 
 func (progress *ImportProgress) UpdateTaskProgress(task ImportTask, value float32) {
+	progress.m.Lock()
 	for i, t := range progress.Tasks {
 		if t.Type == task.String() {
 			progress.Tasks[i].Progress = value
@@ -190,4 +197,5 @@ func (progress *ImportProgress) UpdateTaskProgress(task ImportTask, value float3
 	}
 	// Update total progress now that sub progress has changed
 	progress.Progress = sum / float32(len(progress.Tasks))
+	progress.m.Unlock()
 }
