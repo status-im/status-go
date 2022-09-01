@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/contracts/directory"
+	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
@@ -142,6 +143,23 @@ func (c *ContractMaker) NewDirectoryWithBackend(chainID uint64, backend *ethclie
 	}
 
 	return directory.NewDirectory(
+		contractAddr,
+		backend,
+	)
+}
+
+func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, error) {
+	contractAddr, err := ethscan.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ethscan.NewBalanceScanner(
 		contractAddr,
 		backend,
 	)
