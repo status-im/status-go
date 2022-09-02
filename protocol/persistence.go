@@ -138,8 +138,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -175,6 +175,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Joined,
 		chat.SyncedFrom,
 		chat.SyncedTo,
+		chat.FirstMessageTimestamp,
 		chat.Description,
 		chat.Highlight,
 		chat.ReadMessagesAtClockValue,
@@ -272,6 +273,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.joined,
 			chats.synced_from,
 			chats.synced_to,
+			chats.first_message_timestamp,
 		    chats.description,
 			contacts.alias,
 			chats.highlight,
@@ -292,6 +294,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			profile                  sql.NullString
 			syncedFrom               sql.NullInt64
 			syncedTo                 sql.NullInt64
+			firstMessageTimestamp    sql.NullInt64
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
@@ -321,6 +324,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Joined,
 			&syncedFrom,
 			&syncedTo,
+			&firstMessageTimestamp,
 			&chat.Description,
 			&alias,
 			&chat.Highlight,
@@ -362,6 +366,10 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat.SyncedTo = uint32(syncedTo.Int64)
 		}
 
+		if firstMessageTimestamp.Valid {
+			chat.FirstMessageTimestamp = uint32(firstMessageTimestamp.Int64)
+		}
+
 		if imagePayload != nil {
 			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
 			if err == nil {
@@ -395,6 +403,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		profile                  sql.NullString
 		syncedFrom               sql.NullInt64
 		syncedTo                 sql.NullInt64
+		firstMessageTimestamp    sql.NullInt64
 		imagePayload             []byte
 	)
 
@@ -425,6 +434,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			received_invitation_admin,
 			synced_from,
 			synced_to,
+			first_message_timestamp,
 			image_payload
 		FROM chats
 		WHERE id = ?
@@ -453,6 +463,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.ReceivedInvitationAdmin,
 		&syncedFrom,
 		&syncedTo,
+		&firstMessageTimestamp,
 		&imagePayload,
 	)
 	switch err {
@@ -464,6 +475,9 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		}
 		if syncedTo.Valid {
 			chat.SyncedTo = uint32(syncedTo.Int64)
+		}
+		if firstMessageTimestamp.Valid {
+			chat.FirstMessageTimestamp = uint32(firstMessageTimestamp.Int64)
 		}
 		if invitationAdmin.Valid {
 			chat.InvitationAdmin = invitationAdmin.String

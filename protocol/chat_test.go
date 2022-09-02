@@ -141,3 +141,23 @@ func (s *ChatTestSuite) TestSerializeJSON() {
 	s.Require().NoError(json.Unmarshal(encodedJSON, decodedChat))
 	s.Require().Equal(chat, decodedChat)
 }
+
+func (s *ChatTestSuite) TestUpdateFirstMessageTimestamp() {
+	chat := &Chat{
+		FirstMessageTimestamp: 0,
+	}
+
+	setAndCheck := func(newValue uint32, success bool, expectedValue uint32) {
+		s.Equal(success, chat.UpdateFirstMessageTimestamp(newValue))
+		s.Equal(expectedValue, chat.FirstMessageTimestamp)
+	}
+
+	setAndCheck(FirstMessageTimestampUndefined, false, FirstMessageTimestampUndefined)
+	setAndCheck(FirstMessageTimestampNoMessage, true, FirstMessageTimestampNoMessage)
+	setAndCheck(FirstMessageTimestampUndefined, false, FirstMessageTimestampNoMessage)
+	setAndCheck(FirstMessageTimestampNoMessage, false, FirstMessageTimestampNoMessage)
+	setAndCheck(200, true, 200)
+	setAndCheck(FirstMessageTimestampUndefined, false, 200)
+	setAndCheck(FirstMessageTimestampNoMessage, false, 200)
+	setAndCheck(100, true, 100)
+}

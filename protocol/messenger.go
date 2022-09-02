@@ -1450,6 +1450,11 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
+		if err = m.initChatFirstMessageTimestamp(chat); err != nil {
+			logger.Warn("failed to init first message timestamp", zap.Error(err))
+			continue
+		}
+
 		m.allChats.Store(chat.ID, chat)
 
 		if !chat.Active || chat.Timeline() {
@@ -1620,6 +1625,26 @@ func (m *Messenger) RemoveMailserver(id string) error {
 // NOT IMPLEMENTED
 func (m *Messenger) Mailservers() ([]string, error) {
 	return nil, ErrNotImplemented
+}
+
+func (m *Messenger) initChatFirstMessageTimestamp(chat *Chat) error {
+	if !chat.CommunityChat() || chat.FirstMessageTimestamp != FirstMessageTimestampUndefined {
+		return nil
+	}
+
+	oldestMessageTimestamp, hasAnyMessage, err := m.persistence.OldestMessageWhisperTimestampByChatID(chat.ID)
+	if err != nil {
+		return err
+	}
+
+	if hasAnyMessage {
+		if oldestMessageTimestamp == FirstMessageTimestampUndefined {
+			return nil
+		}
+		return m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(oldestMessageTimestamp), &MessengerResponse{})
+	}
+
+	return m.updateChatFirstMessageTimestamp(chat, FirstMessageTimestampNoMessage, &MessengerResponse{})
 }
 
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
@@ -2773,14 +2798,45 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	response.SetMessages(msg)
+	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(message.WhisperTimestamp), &response); err != nil {
+		return nil, err
+	}
 
+	response.SetMessages(msg)
 	response.AddChat(chat)
 
 	m.logger.Debug("sent message", zap.String("id", message.ID))
 	m.prepareMessages(response.messages)
 
 	return &response, m.saveChat(chat)
+}
+
+func whisperToUnixTimestamp(whisperTimestamp uint64) uint32 {
+	return uint32(whisperTimestamp / 1000)
+}
+
+func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32, response *MessengerResponse) error {
+	// Currently supported only for communities
+	if !chat.CommunityChat() {
+		return nil
+	}
+
+	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	if community.IsAdmin() && chat.UpdateFirstMessageTimestamp(timestamp) {
+		community, changes, err := m.communitiesManager.EditChatFirstMessageTimestamp(community.ID(), chat.ID, chat.FirstMessageTimestamp)
+		if err != nil {
+			return err
+		}
+
+		response.AddCommunity(community)
+		response.CommunityChanges = append(response.CommunityChanges, changes)
+	}
+
+	return nil
 }
 
 func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*MessengerResponse, error) {

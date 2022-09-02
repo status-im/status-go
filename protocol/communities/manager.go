@@ -599,6 +599,36 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	return community, changes, nil
 }
 
+func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chatID string, timestamp uint32) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	// Remove communityID prefix from chatID if exists
+	if strings.HasPrefix(chatID, communityID.String()) {
+		chatID = strings.TrimPrefix(chatID, communityID.String())
+	}
+
+	changes, err := community.UpdateChatFirstMessageTimestamp(chatID, timestamp)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
 func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
