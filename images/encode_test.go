@@ -90,3 +90,13 @@ func TestEncodeToBestSize(t *testing.T) {
 		}
 	}
 }
+
+func TestCompressToFileLimits(t *testing.T) {
+	img, err := Decode(path + "IMG_1205.HEIC.jpg")
+	require.NoError(t, err)
+
+	bb := bytes.NewBuffer([]byte{})
+	err = CompressToFileLimits(bb, img, FileSizeLimits{50000, 350000})
+	require.NoError(t, err)
+	require.Equal(t, 291645, bb.Len())
+}
