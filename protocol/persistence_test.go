@@ -200,6 +200,38 @@ func TestMessageByChatID(t *testing.T) {
 	)
 }
 
+func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	chatID := testPublicChatID
+
+	_, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	require.NoError(t, err)
+	require.False(t, hasMessage)
+
+	var messages []*common.Message
+	for i := 0; i < 10; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+			WhisperTimestamp: uint64(i + 10),
+			From:             "me",
+		})
+	}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	timestamp, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	require.NoError(t, err)
+	require.True(t, hasMessage)
+	require.Equal(t, uint64(10), timestamp)
+}
+
 func TestPinMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -1366,8 +1398,9 @@ func TestSaveCommunityChat(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	identity := &protobuf.ChatIdentity{
-		DisplayName: "community-chat-name",
-		Description: "community-chat-name-description",
+		DisplayName:           "community-chat-name",
+		Description:           "community-chat-name-description",
+		FirstMessageTimestamp: 1,
 	}
 	permissions := &protobuf.CommunityPermissions{
 		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,

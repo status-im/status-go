@@ -27,6 +27,11 @@ message ChatIdentity {
   string emoji = 7;
 
   repeated SocialLink social_links = 8;
+
+  // first known message timestamp in seconds (valid only for community chats for now)
+  // 0 - unknown
+  // 1 - no messages
+  uint32 first_message_timestamp = 9;
 }
 
 // ProfileImage represents data associated with a user's profile image

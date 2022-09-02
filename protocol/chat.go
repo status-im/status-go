@@ -35,6 +35,11 @@ const (
 	ChatTypeCommunityChat
 )
 
+const (
+	FirstMessageTimestampUndefined = 0
+	FirstMessageTimestampNoMessage = 1
+)
+
 const pkStringLength = 68
 
 // timelineChatID is a magic constant id for your own timeline
@@ -107,6 +112,12 @@ type Chat struct {
 
 	// SyncedFrom is the time from when it was synced with a mailserver
 	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
+
+	// FirstMessageTimestamp is the time when first message was sent/received on the chat
+	// valid only for community chats
+	// 0 - undefined
+	// 1 - no messages
+	FirstMessageTimestamp uint32 `json:"firstMessageTimestamp,omitempty"`
 
 	// Highlight is used for highlight chats
 	Highlight bool `json:"highlight,omitempty"`
@@ -328,6 +339,28 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 	return nil
 }
 
+func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {
+	if timestamp == c.FirstMessageTimestamp {
+		return false
+	}
+
+	// Do not allow to assign `Undefined`` or `NoMessage` to already set timestamp
+	if timestamp == FirstMessageTimestampUndefined ||
+		(timestamp == FirstMessageTimestampNoMessage &&
+			c.FirstMessageTimestamp != FirstMessageTimestampUndefined) {
+		return false
+	}
+
+	if c.FirstMessageTimestamp == FirstMessageTimestampUndefined ||
+		c.FirstMessageTimestamp == FirstMessageTimestampNoMessage ||
+		timestamp < c.FirstMessageTimestamp {
+		c.FirstMessageTimestamp = timestamp
+		return true
+	}
+
+	return false
+}
+
 // ChatMembershipUpdate represent an event on membership of the chat
 type ChatMembershipUpdate struct {
 	// Unique identifier for the event
@@ -405,6 +438,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		Joined:                   int64(timestamp),
 		ReadMessagesAtClockValue: 0,
 		ChatType:                 ChatTypeCommunityChat,
+		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
 	}
 }
 

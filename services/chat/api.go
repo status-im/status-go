@@ -72,6 +72,7 @@ type Chat struct {
 	Joined                   int64                              `json:"joined,omitempty"`
 	SyncedTo                 uint32                             `json:"syncedTo,omitempty"`
 	SyncedFrom               uint32                             `json:"syncedFrom,omitempty"`
+	FirstMessageTimestamp    uint32                             `json:"firstMessageTimestamp,omitempty"`
 	Highlight                bool                               `json:"highlight,omitempty"`
 	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
 	CanPost                  bool                               `json:"canPost"`
@@ -274,6 +275,7 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		Joined:                   protocolChat.Joined,
 		SyncedTo:                 protocolChat.SyncedTo,
 		SyncedFrom:               protocolChat.SyncedFrom,
+		FirstMessageTimestamp:    protocolChat.FirstMessageTimestamp,
 		Highlight:                protocolChat.Highlight,
 		Base64Image:              protocolChat.Base64Image,
 	}

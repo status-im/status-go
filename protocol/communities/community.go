@@ -382,11 +382,12 @@ type CommunitySettings struct {
 }
 
 type CommunityChatChanges struct {
-	ChatModified     *protobuf.CommunityChat
-	MembersAdded     map[string]*protobuf.CommunityMember
-	MembersRemoved   map[string]*protobuf.CommunityMember
-	CategoryModified string
-	PositionModified int
+	ChatModified                  *protobuf.CommunityChat
+	MembersAdded                  map[string]*protobuf.CommunityMember
+	MembersRemoved                map[string]*protobuf.CommunityMember
+	CategoryModified              string
+	PositionModified              int
+	FirstMessageTimestampModified uint32
 }
 
 type CommunityChanges struct {
@@ -928,6 +929,18 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 						response.ChatsModified[chatID].MembersRemoved[pk] = member
 					}
 				}
+
+				// check if first message timestamp was modified
+				if o.config.CommunityDescription.Chats[chatID].Identity.FirstMessageTimestamp !=
+					description.Chats[chatID].Identity.FirstMessageTimestamp {
+					if response.ChatsModified[chatID] == nil {
+						response.ChatsModified[chatID] = &CommunityChatChanges{
+							MembersAdded:   make(map[string]*protobuf.CommunityMember),
+							MembersRemoved: make(map[string]*protobuf.CommunityMember),
+						}
+					}
+					response.ChatsModified[chatID].FirstMessageTimestampModified = description.Chats[chatID].Identity.FirstMessageTimestamp
+				}
 			}
 		}
 
@@ -995,6 +1008,25 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 	o.config.MarshaledCommunityDescription = rawMessage
 
 	return response, nil
+}
+
+func (o *Community) UpdateChatFirstMessageTimestamp(chatID string, timestamp uint32) (*CommunityChanges, error) {
+	if !o.IsAdmin() {
+		return nil, ErrNotAdmin
+	}
+
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	chat.Identity.FirstMessageTimestamp = timestamp
+
+	communityChanges := o.emptyCommunityChanges()
+	communityChanges.ChatsModified[chatID] = &CommunityChatChanges{
+		FirstMessageTimestampModified: timestamp,
+	}
+	return communityChanges, nil
 }
 
 // ValidateRequestToJoin validates a request, checks that the right permissions are applied

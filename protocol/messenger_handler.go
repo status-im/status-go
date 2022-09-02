@@ -1263,6 +1263,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
 
+	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(receivedMessage.WhisperTimestamp), state.Response); err != nil {
+		return err
+	}
+
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		if !receivedMessage.Seen {

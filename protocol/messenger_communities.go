@@ -693,6 +693,8 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
+
+	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage
 	community, changes, err := m.communitiesManager.CreateChat(communityID, c, true)
 	if err != nil {
 		return nil, err
@@ -821,9 +823,10 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	if createDefaultChannel {
 		chatResponse, err := m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
 			Identity: &protobuf.ChatIdentity{
-				DisplayName: "general",
-				Description: "General channel for the community",
-				Color:       community.Description().Identity.Color,
+				DisplayName:           "general",
+				Description:           "General channel for the community",
+				Color:                 community.Description().Identity.Color,
+				FirstMessageTimestamp: FirstMessageTimestampNoMessage,
 			},
 			Permissions: &protobuf.CommunityPermissions{
 				Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -1423,7 +1426,8 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		} else if oldChat.Name != chat.Name ||
 			oldChat.Description != chat.Description ||
 			oldChat.Emoji != chat.Emoji ||
-			oldChat.Color != chat.Color {
+			oldChat.Color != chat.Color ||
+			oldChat.UpdateFirstMessageTimestamp(chat.FirstMessageTimestamp) {
 			oldChat.Name = chat.Name
 			oldChat.Description = chat.Description
 			oldChat.Emoji = chat.Emoji

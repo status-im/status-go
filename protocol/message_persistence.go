@@ -1063,6 +1063,28 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) OldestMessageWhisperTimestampByChatID(chatID string) (timestamp uint64, hasAnyMessage bool, err error) {
+	var whisperTimestamp uint64
+	err = db.db.QueryRow(
+		`
+			SELECT
+				whisper_timestamp
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ?
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC
+			LIMIT 1
+		`, chatID).Scan(&whisperTimestamp)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return whisperTimestamp, true, nil
+}
+
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
@@ -1474,7 +1496,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		return 0, 0, err
 	}
 
-	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats 
+	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats
 				WHERE id = ?`, id).Scan(&unViewedMessages, &unViewedMentions)
 
 	return
