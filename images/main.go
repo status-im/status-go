@@ -80,8 +80,7 @@ func GenerateBannerImage(filepath string, aX, aY, bX, bY int) (*IdentityImage, e
 		return nil, err
 	}
 
-	dimension := BannerDim
-	resizedImg := ShrinkOnly(dimension, croppedImg)
+	resizedImg := ShrinkOnly(BannerDim, croppedImg)
 
 	sizeLimits := GetBannerDimensionLimits()
 
@@ -97,7 +96,7 @@ func GenerateBannerImage(filepath string, aX, aY, bX, bY int) (*IdentityImage, e
 		Width:        resizedImg.Bounds().Dx(),
 		Height:       resizedImg.Bounds().Dy(),
 		FileSize:     bb.Len(),
-		ResizeTarget: int(dimension),
+		ResizeTarget: int(BannerDim),
 	}
 
 	return ii, nil

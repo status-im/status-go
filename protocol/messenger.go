@@ -2631,7 +2631,7 @@ func (m *Messenger) OpenAndAdjustImage(inputImage userimage.CroppedImage, crop b
 	}
 
 	bb := bytes.NewBuffer([]byte{})
-	err = userimage.EncodeToLimits(bb, img, userimage.DimensionLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
+	err = userimage.CompressToFileLimits(bb, img, userimage.FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
 
 	if err != nil {
 		return nil, err
