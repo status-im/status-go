@@ -28,6 +28,13 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 	return resize.Resize(width, height, img, resize.Bilinear)
 }
 
+func ResizeTo(percent int, img image.Image) image.Image {
+	width := uint(img.Bounds().Max.X * percent / 100)
+	height := uint(img.Bounds().Max.Y * percent / 100)
+
+	return resize.Resize(width, height, img, resize.Bilinear)
+}
+
 func ShrinkOnly(size ResizeDimension, img image.Image) image.Image {
 	finalSize := int(math.Min(float64(size), math.Min(float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))))
 	return Resize(ResizeDimension(finalSize), img)
@@ -50,9 +57,9 @@ func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 	})
 }
 
-// CropImage takes an image, usually downloaded from a URL
+// CropCenter takes an image, usually downloaded from a URL
 // If the image is square, the full image is returned
-// It the image is rectangular, the largest central square is returned
+// If the image is rectangular, the largest central square is returned
 // calculations at _docs/image-center-crop-calculations.png
 func CropCenter(img image.Image) (image.Image, error) {
 	var cropRect image.Rectangle
