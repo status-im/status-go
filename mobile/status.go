@@ -986,3 +986,49 @@ func HexToNumber(hex string) string {
 func NumberToHex(numString string) string {
 	return abi_spec.NumberToHex(numString)
 }
+
+func Sha3(str string) string {
+	return "0x" + abi_spec.Sha3(str)
+}
+
+func Utf8ToHex(str string) string {
+	hexString, err := abi_spec.Utf8ToHex(str)
+	if err != nil {
+		log.Error("failed to convert utf8 to hex", "str", str, "error", err)
+	}
+	return hexString
+}
+
+func HexToUtf8(hexString string) string {
+	str, err := abi_spec.HexToUtf8(hexString)
+	if err != nil {
+		log.Error("failed to convert hex to utf8", "hexString", hexString, "error", err)
+	}
+	return str
+}
+
+func CheckAddressChecksum(address string) string {
+	valid, err := abi_spec.CheckAddressChecksum(address)
+	if err != nil {
+		log.Error("failed to invoke check address checksum", "address", address, "error", err)
+	}
+	result, _ := json.Marshal(valid)
+	return string(result)
+}
+
+func IsAddress(address string) string {
+	valid, err := abi_spec.IsAddress(address)
+	if err != nil {
+		log.Error("failed to invoke IsAddress", "address", address, "error", err)
+	}
+	result, _ := json.Marshal(valid)
+	return string(result)
+}
+
+func ToChecksumAddress(address string) string {
+	address, err := abi_spec.ToChecksumAddress(address)
+	if err != nil {
+		log.Error("failed to convert to checksum address", "address", address, "error", err)
+	}
+	return address
+}
