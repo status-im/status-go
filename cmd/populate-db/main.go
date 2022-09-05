@@ -459,6 +459,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
+		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
 		Color:     "",
 		Wallet:    true,
@@ -469,6 +470,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	chatDerivedAccount := derivedAddresses[pathDefaultChat]
 	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
+		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      settings.Name,
 		Chat:      true,
