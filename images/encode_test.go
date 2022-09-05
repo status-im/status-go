@@ -60,7 +60,7 @@ func TestEncodeToBestSize(t *testing.T) {
 		{
 			"rose.webp",
 			8513,
-			errors.New("image size after processing exceeds max, expect < '5632', received < '8513'"),
+			errors.New("image size after processing exceeds max, expected < '5632', received < '8513'"),
 		},
 		{
 			"spin.gif",

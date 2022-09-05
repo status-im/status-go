@@ -29,6 +29,15 @@ func renderJpeg(w io.Writer, m image.Image, config EncodeConfig) error {
 	return jpeg.Encode(w, m, o)
 }
 
+type FileSizeError struct {
+	expected int
+	received int
+}
+
+func (e *FileSizeError) Error() string {
+	return fmt.Sprintf("image size after processing exceeds max, expected < '%d', received < '%d'", e.expected, e.received)
+}
+
 func EncodeToLimits(bb *bytes.Buffer, img image.Image, bounds FileSizeLimits) error {
 	q := MaxJpegQuality
 	for q > MinJpegQuality-1 {
@@ -46,11 +55,7 @@ func EncodeToLimits(bb *bytes.Buffer, img image.Image, bounds FileSizeLimits) er
 			if bounds.Max > bb.Len() {
 				return nil
 			}
-			return fmt.Errorf(
-				"image size after processing exceeds max, expect < '%d', received < '%d'",
-				bounds.Max,
-				bb.Len(),
-			)
+			return &FileSizeError{expected: bounds.Max, received: bb.Len()}
 		}
 
 		bb.Reset()
@@ -86,7 +91,8 @@ func CompressToFileLimits(bb *bytes.Buffer, img image.Image, bounds FileSizeLimi
 		if err == nil {
 			return nil
 		}
-		if err.Error()[:50] != "image size after processing exceeds max, expect < " {
+		// If error is not a FileSizeError then we need to return it up
+		if fse := (*FileSizeError)(nil); !errors.As(err, &fse) {
 			return err
 		}
 
