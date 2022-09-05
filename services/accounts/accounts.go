@@ -154,6 +154,7 @@ func (api *API) AddAccountWithPrivateKey(
 
 	account := &accounts.Account{
 		Address:   types.Address(common.HexToAddress(info.Address)),
+		KeyUID:    info.KeyUID,
 		PublicKey: types.HexBytes(info.PublicKey),
 		Type:      accounts.AccountTypeKey,
 		Name:      name,
@@ -252,6 +253,7 @@ func (api *API) addAccountWithMnemonic(
 
 	account := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
+		KeyUID:      generatedAccountInfo.KeyUID,
 		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
 		Type:        accounts.AccountTypeSeed,
 		Name:        name,
@@ -294,6 +296,7 @@ func (api *API) generateAccount(
 
 	acc := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(infos[path].Address)),
+		KeyUID:      info.KeyUID,
 		PublicKey:   types.HexBytes(infos[path].PublicKey),
 		Type:        accounts.AccountTypeGenerated,
 		Name:        name,

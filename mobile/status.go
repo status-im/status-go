@@ -280,7 +280,9 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		return makeJSONResponse(err)
 	}
 
-	for _, acc := range subaccs {
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+
 		if acc.Chat {
 			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
 			if err != nil {
@@ -760,8 +762,8 @@ func ImportUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(nil)
 }
 
-func ChangeDatabasePassword(keyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
+func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
+	err := statusBackend.ChangeDatabasePassword(KeyUID, password, newPassword)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
