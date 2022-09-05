@@ -728,5 +728,9 @@ func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, pa
 
 	decryptedPayload, err := crypto.DecryptSymmetric(hash, payload)
 
-	return decryptedPayload, err
+	if err != nil {
+		s.logger.Error("failed to decrypt hash", zap.Error(err))
+		return nil, err
+	}
+	return decryptedPayload, nil
 }
