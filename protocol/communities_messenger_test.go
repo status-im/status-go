@@ -729,6 +729,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
 
 	// check if response contains the chat we're interested in
 	// we use this instead of checking just the length of the chat because

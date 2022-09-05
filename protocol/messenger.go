@@ -1806,7 +1806,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
 
 			if err == nil {
-				_, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+				id, err = m.sender.SendCommunityMessage(ctx, rawMessage)
 			}
 		}
 		if err != nil {
