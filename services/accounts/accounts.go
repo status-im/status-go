@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/keypairs"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
@@ -315,4 +316,37 @@ func (api *API) VerifyPassword(password string) bool {
 		return false
 	}
 	return true
+}
+
+func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {
+	var addresses []types.Address
+	for _, addr := range accountAddresses {
+		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
+	}
+
+	return api.db.AddMigratedKeyPair(kcUID, kpName, keyUID, addresses)
+}
+
+func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {
+	return api.db.GetAllMigratedKeyPairs()
+}
+
+func (api *API) GetMigratedKeyPairByKeyUID(ctx context.Context, keyUID string) ([]*keypairs.KeyPair, error) {
+	return api.db.GetMigratedKeyPairByKeyUID(keyUID)
+}
+
+func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
+	return api.db.SetKeycardName(kcUID, kpName)
+}
+
+func (api *API) KeycardLocked(ctx context.Context, kcUID string) error {
+	return api.db.KeycardLocked(kcUID)
+}
+
+func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
+	return api.db.KeycardUnlocked(kcUID)
+}
+
+func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
+	return api.db.DeleteKeycard(kcUID)
 }

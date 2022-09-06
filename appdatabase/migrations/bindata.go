@@ -31,6 +31,7 @@
 // 1660134070_add_wakuv2_store.up.sql (269B)
 // 1660134072_waku2_store_messages.up.sql (497B)
 // 1662365868_add_key_uid_accounts.up.sql (68B)
+// 1662447680_add_keypairs_table.up.sql (218B)
 // 1662738097_add_base_fee_transaction.up.sql (112B)
 // doc.go (74B)
 
@@ -721,6 +722,26 @@ func _1662365868_add_key_uid_accountsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1662447680_add_keypairs_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\x08\x71\x74\xf2\x71\x55\xf0\x74\x53\xf0\xf3\x0f\x51\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\x4e\xad\x2c\x48\xcc\x2c\x2a\x56\xd0\xe0\x52\x50\x50\x00\x71\x93\x13\x8b\x52\xe2\x4b\x33\x53\x14\xc2\x1c\x83\x9c\x3d\x1c\x83\xc0\xaa\xfd\x42\x7d\x7c\x74\x50\x54\xe4\x25\xe6\xa6\x12\x50\x92\x93\x9f\x9c\x9d\x9a\xa2\xe0\xe4\xef\xef\xe3\xea\xe8\xa7\xe0\xe2\xea\xe6\x18\xea\x13\xa2\xe0\xe6\xe8\x13\xec\x0a\x51\x99\x98\x9c\x9c\x5f\x9a\x57\x12\x9f\x98\x92\x52\x94\x5a\x5c\x8c\xdb\x3c\xac\x0e\xe2\xd2\xb4\x06\x04\x00\x00\xff\xff\x6d\xd5\x43\xca\xda\x00\x00\x00")
+
+func _1662447680_add_keypairs_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1662447680_add_keypairs_tableUpSql,
+		"1662447680_add_keypairs_table.up.sql",
+	)
+}
+
+func _1662447680_add_keypairs_tableUpSql() (*asset, error) {
+	bytes, err := _1662447680_add_keypairs_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1662447680_add_keypairs_table.up.sql", size: 218, mode: os.FileMode(0644), modTime: time.Unix(1662964340, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0x25, 0xa9, 0xc7, 0x63, 0x27, 0x97, 0x35, 0x5f, 0x6b, 0xab, 0x26, 0xcb, 0xf9, 0xbd, 0x5e, 0xac, 0x3, 0xa0, 0x5e, 0xb9, 0x71, 0xa3, 0x1f, 0xb3, 0x4f, 0x7f, 0x79, 0x28, 0x48, 0xbe, 0xc}}
+	return a, nil
+}
+
 var __1662738097_add_base_fee_transactionUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x29\x4a\xcc\x2b\x4e\x4b\x2d\x2a\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x4a\x2c\x4e\x8d\x4f\x4f\x2c\x8e\x4f\x4b\x4d\x55\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\x0a\x0d\x70\x71\x0c\x41\x36\x22\xd8\x35\x04\x55\xaf\x2d\x58\x1d\x20\x00\x00\xff\xff\x3f\x07\xa7\xa2\x70\x00\x00\x00")
 
 func _1662738097_add_base_fee_transactionUpSqlBytes() ([]byte, error) {
@@ -736,7 +757,7 @@ func _1662738097_add_base_fee_transactionUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662738097_add_base_fee_transaction.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1662964111, 0)}
+	info := bindataFileInfo{name: "1662738097_add_base_fee_transaction.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1662964340, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0xfb, 0x10, 0xae, 0xfc, 0x77, 0x70, 0x98, 0x6f, 0xec, 0xaa, 0xcd, 0x7, 0xc7, 0x74, 0x23, 0xc, 0xd5, 0x1e, 0x82, 0xdd, 0xfe, 0xff, 0x3b, 0xd2, 0x49, 0x10, 0x5b, 0x30, 0xc, 0x2d, 0xb0}}
 	return a, nil
 }
@@ -914,6 +935,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1662365868_add_key_uid_accounts.up.sql": _1662365868_add_key_uid_accountsUpSql,
 
+	"1662447680_add_keypairs_table.up.sql": _1662447680_add_keypairs_tableUpSql,
+
 	"1662738097_add_base_fee_transaction.up.sql": _1662738097_add_base_fee_transactionUpSql,
 
 	"doc.go": docGo,
@@ -991,6 +1014,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1660134070_add_wakuv2_store.up.sql":                              &bintree{_1660134070_add_wakuv2_storeUpSql, map[string]*bintree{}},
 	"1660134072_waku2_store_messages.up.sql":                          &bintree{_1660134072_waku2_store_messagesUpSql, map[string]*bintree{}},
 	"1662365868_add_key_uid_accounts.up.sql":                          &bintree{_1662365868_add_key_uid_accountsUpSql, map[string]*bintree{}},
+	"1662447680_add_keypairs_table.up.sql":                            &bintree{_1662447680_add_keypairs_tableUpSql, map[string]*bintree{}},
 	"1662738097_add_base_fee_transaction.up.sql":                      &bintree{_1662738097_add_base_fee_transactionUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
