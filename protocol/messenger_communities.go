@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -208,20 +210,32 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
-	testNetworksEnabled, err := m.settings.TestNetworksEnabled()
+	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
+
+	chainID := uint64(69) // Optimism Kovan
+	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
 		return nil, err
 	}
-
-	chainID := uint64(10) // Optimism (mainnet)
-	if testNetworksEnabled {
-		chainID = 69 // Optimism (kovan)
-	}
-
-	directory, err := m.contractMaker.NewDirectory(chainID)
+	nodeConfig, err := sDB.GetNodeConfig()
 	if err != nil {
 		return nil, err
 	}
+	var backend *ethclient.Client
+	for _, n := range nodeConfig.Networks {
+		if n.ChainID == chainID {
+			b, err := ethclient.Dial(n.RPCURL)
+			if err != nil {
+				return nil, err
+			}
+			backend = b
+		}
+	}
+	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, backend)
+	if err != nil {
+		return nil, err
+	}
+	// --- end delete
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
