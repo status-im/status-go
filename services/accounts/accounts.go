@@ -312,10 +312,7 @@ func (api *API) generateAccount(
 
 func (api *API) VerifyPassword(password string) bool {
 	err := api.verifyPassword(password)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {

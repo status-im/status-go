@@ -95,9 +95,5 @@ func StringToTopic(s string) (t TopicType) {
 }
 
 func TopicTypeToByteArray(t TopicType) []byte {
-	topic := make([]byte, 4)
-	for i, b := range t {
-		topic[i] = b
-	}
-	return topic
+	return t[:]
 }

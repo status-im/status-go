@@ -198,7 +198,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 
 	// Because file-walk will pull files in an unpredictable order from a target dir
 	// there are 2 potential valid hashes, because there are 2 key files in the test dir
-	if bytes.Compare(hashA, h.Sum(nil)) != 0 {
+	if !bytes.Equal(hashA, h.Sum(nil)) {
 		pms.Require().Exactly(hashB, h.Sum(nil))
 	}
 }

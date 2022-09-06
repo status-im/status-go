@@ -936,7 +936,7 @@ func (s *MessengerContactRequestSuite) TestLegacyContactRequestNotifications() {
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	// Send contact request
-	resp, err = s.m.SendContactRequest(context.Background(), crRequest)
+	_, err = s.m.SendContactRequest(context.Background(), crRequest)
 	s.Require().NoError(err)
 
 	paginationResponse, err := theirMessenger.ActivityCenterNotifications("", 10)
