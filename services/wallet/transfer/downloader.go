@@ -46,7 +46,8 @@ type Transfer struct {
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`
 	// Log that was used to generate erc20 transfer. Nil for eth transfer.
-	Log *types.Log `json:"log"`
+	Log         *types.Log `json:"log"`
+	BaseGasFees string
 }
 
 // ETHDownloader downloads regular eth transfers.
@@ -162,6 +163,11 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 				transactionLog := getTokenLog(receipt.Logs)
 
+				baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(blk.Number())
+				if err != nil {
+					return nil, err
+				}
+
 				if transactionLog == nil {
 					rst = append(rst, Transfer{
 						Type:        ethTransfer,
@@ -173,7 +179,8 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 						Transaction: tx,
 						From:        from,
 						Receipt:     receipt,
-						Log:         transactionLog})
+						Log:         transactionLog,
+						BaseGasFees: baseGasFee})
 				}
 			}
 		}
@@ -237,6 +244,12 @@ func (d *ETHDownloader) transferFromLog(parent context.Context, ethlog types.Log
 	if err != nil {
 		return Transfer{}, err
 	}
+
+	baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(new(big.Int).SetUint64(ethlog.BlockNumber))
+	if err != nil {
+		return Transfer{}, err
+	}
+
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	blk, err := d.chainClient.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
@@ -254,6 +267,7 @@ func (d *ETHDownloader) transferFromLog(parent context.Context, ethlog types.Log
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
 		Log:         &ethlog,
+		BaseGasFees: baseGasFee,
 	}, nil
 }
 
@@ -274,6 +288,12 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 	if err != nil {
 		return Transfer{}, err
 	}
+
+	baseGasFee, err := d.client.GetBaseFeeFromBlock(new(big.Int).SetUint64(ethlog.BlockNumber))
+	if err != nil {
+		return Transfer{}, err
+	}
+
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	blk, err := d.client.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
@@ -294,6 +314,7 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
 		Log:         &ethlog,
+		BaseGasFees: baseGasFee,
 	}, nil
 }
 

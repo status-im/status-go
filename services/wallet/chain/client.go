@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/rpc"
@@ -13,8 +14,13 @@ import (
 )
 
 type Client struct {
-	eth     *ethclient.Client
-	ChainID uint64
+	eth       *ethclient.Client
+	ChainID   uint64
+	rpcClient *rpc.Client
+}
+
+type FeeHistory struct {
+	BaseFeePerGas []string `json:"baseFeePerGas"`
 }
 
 func NewClient(rpc *rpc.Client, chainID uint64) (*Client, error) {
@@ -22,7 +28,7 @@ func NewClient(rpc *rpc.Client, chainID uint64) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ethClient, chainID}, nil
+	return &Client{ethClient, chainID, rpc}, nil
 }
 
 func NewLegacyClient(rpc *rpc.Client) (*Client, error) {
@@ -97,4 +103,19 @@ func (cc *Client) CodeAt(ctx context.Context, contract common.Address, blockNumb
 func (cc *Client) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	rpcstats.CountCall("eth_call")
 	return cc.eth.CallContract(ctx, call, blockNumber)
+}
+
+func (cc *Client) GetBaseFeeFromBlock(blockNumber *big.Int) (string, error) {
+	var feeHistory FeeHistory
+	err := cc.rpcClient.Call(&feeHistory, cc.ChainID, "eth_feeHistory", "0x1", (*hexutil.Big)(blockNumber), nil)
+	if err != nil {
+		return "", err
+	}
+
+	var baseGasFee string = ""
+	if len(feeHistory.BaseFeePerGas) > 0 {
+		baseGasFee = feeHistory.BaseFeePerGas[0]
+	}
+
+	return baseGasFee, err
 }
