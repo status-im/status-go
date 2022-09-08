@@ -138,7 +138,7 @@ func TestResourceURL(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https", uri.Scheme)
 	require.Equal(t, "swarm-gateways.net", uri.Host)
-	require.Equal(t, "/bzz:/b00909fbabe78f57fda93218323db5721ce256fda442ce02b46813404c6d8958/", uri.Path)
+	require.Equal(t, "/bzz:/b7976f7fabd7ba88a897452a2860228dcefec427302a3dedae164b51c780a5b8/", uri.Path)
 
 	uri, err = api.ResourceURL(context.Background(), 1, "noahzinsmeister.eth")
 	require.NoError(t, err)

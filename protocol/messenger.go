@@ -3010,7 +3010,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 
 	for id, state := range ids {
 		if state == common.ContactRequestStateAccepted || state == common.ContactRequestStateDismissed {
-			accepted := state == common.ContactRequestStateDismissed
+			accepted := state == common.ContactRequestStateAccepted
 			err := m.syncContactRequestDecision(ctx, id, accepted)
 			if err != nil {
 				return err
