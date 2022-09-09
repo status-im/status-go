@@ -33,6 +33,7 @@ type View struct {
 	Contract             common.Address `json:"contract"`
 	NetworkID            uint64         `json:"networkId"`
 	MultiTransactionID   int64          `json:"multi_transaction_id"`
+	BaseGasFees          string         `json:"base_gas_fee"`
 }
 
 func castToTransferViews(transfers []Transfer) []View {
@@ -56,6 +57,7 @@ func CastToTransferView(t Transfer) View {
 	view.MaxPriorityFeePerGas = (*hexutil.Big)(t.Transaction.GasTipCap())
 	view.GasLimit = hexutil.Uint64(t.Transaction.Gas())
 	view.GasUsed = hexutil.Uint64(t.Receipt.GasUsed)
+	view.BaseGasFees = t.BaseGasFees
 	view.Nonce = hexutil.Uint64(t.Transaction.Nonce())
 	view.TxStatus = hexutil.Uint64(t.Receipt.Status)
 	view.Input = hexutil.Bytes(t.Transaction.Data())
