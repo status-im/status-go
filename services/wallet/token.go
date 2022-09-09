@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -20,6 +21,7 @@ import (
 )
 
 var requestTimeout = 20 * time.Second
+var nativeChainAddress = common.HexToAddress("0x")
 
 type Token struct {
 	Address common.Address `json:"address"`
@@ -279,7 +281,7 @@ func (tm *TokenManager) getChainBalance(ctx context.Context, client *chain.Clien
 }
 
 func (tm *TokenManager) getBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
-	if token == common.HexToAddress("0x") {
+	if token == nativeChainAddress {
 		return tm.getChainBalance(ctx, client, account)
 	}
 
@@ -292,42 +294,118 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 		mu       sync.Mutex
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)
+
+	updateBalance := func(account common.Address, token common.Address, balance *big.Int) {
+		mu.Lock()
+		if _, ok := response[account]; !ok {
+			response[account] = map[common.Address]*hexutil.Big{}
+		}
+
+		if _, ok := response[account][token]; !ok {
+			zeroHex := hexutil.Big(*big.NewInt(0))
+			response[account][token] = &zeroHex
+		}
+		sum := big.NewInt(0).Add(response[account][token].ToInt(), balance)
+		sumHex := hexutil.Big(*sum)
+		response[account][token] = &sumHex
+		mu.Unlock()
+	}
+
+	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
 	for clientIdx := range clients {
-		for tokenIdx := range tokens {
-			for accountIdx := range accounts {
-				// Below, we set account, token and client from idx on purpose to avoid override
-				account := accounts[accountIdx]
-				token := tokens[tokenIdx]
-				client := clients[clientIdx]
+		client := clients[clientIdx]
+		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
+
+		if err == nil {
+			fetchChainBalance := false
+			var tokenChunks [][]common.Address
+			chunkSize := 100
+			for i := 0; i < len(tokens); i += chunkSize {
+				end := i + chunkSize
+				if end > len(tokens) {
+					end = len(tokens)
+				}
+
+				tokenChunks = append(tokenChunks, tokens[i:end])
+			}
+
+			for _, token := range tokens {
+				if token == nativeChainAddress {
+					fetchChainBalance = true
+				}
+			}
+			if fetchChainBalance {
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-					balance, err := tm.getBalance(ctx, client, account, token)
-
-					// We don't want to return an error here and prevent
-					// the rest from completing
+					res, err := ethScanContract.EtherBalances(&bind.CallOpts{
+						Context: ctx,
+					}, accounts)
 					if err != nil {
-						log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
-
+						log.Error("can't fetch chain balance", err)
 						return nil
 					}
-					mu.Lock()
-					if _, ok := response[account]; !ok {
-						response[account] = map[common.Address]*hexutil.Big{}
+					for idx, account := range accounts {
+						balance := new(big.Int)
+						balance.SetBytes(res[idx].Data)
+						updateBalance(account, common.HexToAddress("0x"), balance)
 					}
 
-					if _, ok := response[account][token]; !ok {
-						zeroHex := hexutil.Big(*big.NewInt(0))
-						response[account][token] = &zeroHex
-					}
-					sum := big.NewInt(0).Add(response[account][token].ToInt(), balance)
-					sumHex := hexutil.Big(*sum)
-					response[account][token] = &sumHex
-					mu.Unlock()
 					return nil
 				})
 			}
+
+			for accountIdx := range accounts {
+				account := accounts[accountIdx]
+				for idx := range tokenChunks {
+					chunk := tokenChunks[idx]
+					group.Add(func(parent context.Context) error {
+						ctx, cancel := context.WithTimeout(parent, requestTimeout)
+						defer cancel()
+						res, err := ethScanContract.TokensBalance(&bind.CallOpts{
+							Context: ctx,
+						}, account, chunk)
+						if err != nil {
+							log.Error("can't fetch erc20 token balance", "account", account, "error", err)
+							return nil
+						}
+
+						for idx, token := range chunk {
+							if !res[idx].Success {
+								continue
+							}
+							balance := new(big.Int)
+							balance.SetBytes(res[idx].Data)
+							updateBalance(account, token, balance)
+						}
+						return nil
+					})
+				}
+			}
+		} else {
+			for tokenIdx := range tokens {
+				for accountIdx := range accounts {
+					// Below, we set account, token and client from idx on purpose to avoid override
+					account := accounts[accountIdx]
+					token := tokens[tokenIdx]
+					client := clients[clientIdx]
+					group.Add(func(parent context.Context) error {
+						ctx, cancel := context.WithTimeout(parent, requestTimeout)
+						defer cancel()
+						balance, err := tm.getBalance(ctx, client, account, token)
+
+						if err != nil {
+							log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
+
+							return nil
+						}
+						updateBalance(account, token, balance)
+						return nil
+					})
+				}
+			}
 		}
+
 	}
 	select {
 	case <-group.WaitAsync():
