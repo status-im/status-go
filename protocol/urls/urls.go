@@ -100,12 +100,12 @@ func LinkPreviewWhitelist() []Site {
 			Address:   "github.com",
 			ImageSite: false,
 		},
-		Site{
+		{
 			Title:     "tenor GIFs subdomain",
 			Address:   "media.tenor.com",
 			ImageSite: false,
 		},
-		Site{
+		{
 			Title:     "tenor GIFs",
 			Address:   "tenor.com",
 			ImageSite: false,
@@ -218,10 +218,10 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	return previewData, nil
 }
 
-// Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
+// GetGiphyLongURL Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
 // so we need to fetch the long url first
 func GetGiphyLongURL(shortURL string) (longURL string, err error) {
-	res, err := http.Get(shortURL)
+	res, err := httpClient.Get(shortURL)
 	if err != nil {
 		return longURL, fmt.Errorf("can't get bytes from Giphy's short url at %s", shortURL)
 	}
