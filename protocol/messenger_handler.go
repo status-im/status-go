@@ -1167,6 +1167,10 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
 		}
+
+		if chat.LastMessage != nil && chat.LastMessage.Seen == false && chat.OneToOne() && !chat.Active {
+			m.createMessageNotification(chat, state)
+		}
 	}
 
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})

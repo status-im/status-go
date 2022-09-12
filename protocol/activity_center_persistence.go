@@ -43,6 +43,10 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 	var ids []types.HexBytes
 
 	for _, notification := range notifications {
+		if notification.LastMessage != nil && notification.LastMessage.ID == messageID {
+			ids = append(ids, notification.ID)
+		}
+
 		if notification.Message != nil && notification.Message.ID == messageID {
 			ids = append(ids, notification.ID)
 		}
