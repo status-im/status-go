@@ -28,6 +28,7 @@ func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *
 		httpServer:      httpServer,
 		ctx:             ctx,
 		cancel:          cancel,
+		api:             NewAPI(ctx, acc, rpcClient, accountsManager, rpcFiltersSrvc, config.KeyStoreDir, downloader, httpServer),
 	}
 }
 
@@ -42,6 +43,7 @@ type Service struct {
 	httpServer      *server.MediaServer
 	ctx             context.Context
 	cancel          context.CancelFunc
+	api             *API
 }
 
 // Start a service.
@@ -55,13 +57,17 @@ func (s *Service) Stop() error {
 	return nil
 }
 
+func (s *Service) API() *API {
+	return s.api
+}
+
 // APIs returns list of available RPC APIs.
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{
 		{
 			Namespace: "stickers",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.ctx, s.accountsDB, s.rpcClient, s.accountsManager, s.rpcFiltersSrvc, s.keyStoreDir, s.downloader, s.httpServer),
+			Service:   s.api,
 		},
 	}
 }

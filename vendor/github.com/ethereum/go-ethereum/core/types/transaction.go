@@ -37,7 +37,7 @@ var (
 	ErrInvalidTxType        = errors.New("transaction type not valid in this context")
 	ErrTxTypeNotSupported   = errors.New("transaction type not supported")
 	ErrGasFeeCapTooLow      = errors.New("fee cap less than base fee")
-	errEmptyTypedTx         = errors.New("empty typed transaction bytes")
+	errShortTypedTx         = errors.New("typed transaction too short")
 )
 
 // Transaction types.
@@ -45,12 +45,22 @@ const (
 	LegacyTxType = iota
 	AccessListTxType
 	DynamicFeeTxType
+	ArbitrumDepositTxType         = 100
+	ArbitrumUnsignedTxType        = 101
+	ArbitrumContractTxType        = 102
+	ArbitrumRetryTxType           = 104
+	ArbitrumSubmitRetryableTxType = 105
+	ArbitrumInternalTxType        = 106
+	ArbitrumLegacyTxType          = 120
 )
 
 // Transaction is an Ethereum transaction.
 type Transaction struct {
 	inner TxData    // Consensus contents of a transaction
 	time  time.Time // Time first seen locally (spam avoidance)
+
+	// Arbitrum cache: must be atomically accessed
+	CalldataUnits uint64
 
 	// caches
 	hash atomic.Value
@@ -85,6 +95,8 @@ type TxData interface {
 
 	rawSignatureValues() (v, r, s *big.Int)
 	setSignatureValues(chainID, v, r, s *big.Int)
+
+	isFake() bool
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -134,19 +146,17 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 			tx.setDecoded(&inner, int(rlp.ListSize(size)))
 		}
 		return err
-	case kind == rlp.String:
+	default:
 		// It's an EIP-2718 typed TX envelope.
 		var b []byte
 		if b, err = s.Bytes(); err != nil {
 			return err
 		}
-		inner, err := tx.decodeTyped(b)
+		inner, err := tx.decodeTyped(b, true)
 		if err == nil {
 			tx.setDecoded(inner, len(b))
 		}
 		return err
-	default:
-		return rlp.ErrExpectedList
 	}
 }
 
@@ -164,7 +174,7 @@ func (tx *Transaction) UnmarshalBinary(b []byte) error {
 		return nil
 	}
 	// It's an EIP2718 typed transaction envelope.
-	inner, err := tx.decodeTyped(b)
+	inner, err := tx.decodeTyped(b, false)
 	if err != nil {
 		return err
 	}
@@ -173,9 +183,37 @@ func (tx *Transaction) UnmarshalBinary(b []byte) error {
 }
 
 // decodeTyped decodes a typed transaction from the canonical format.
-func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
-	if len(b) == 0 {
-		return nil, errEmptyTypedTx
+func (tx *Transaction) decodeTyped(b []byte, arbParsing bool) (TxData, error) {
+	if len(b) <= 1 {
+		return nil, errShortTypedTx
+	}
+	if arbParsing {
+		switch b[0] {
+		case ArbitrumDepositTxType:
+			var inner ArbitrumDepositTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		case ArbitrumInternalTxType:
+			var inner ArbitrumInternalTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		case ArbitrumUnsignedTxType:
+			var inner ArbitrumUnsignedTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		case ArbitrumContractTxType:
+			var inner ArbitrumContractTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		case ArbitrumRetryTxType:
+			var inner ArbitrumRetryTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		case ArbitrumSubmitRetryableTxType:
+			var inner ArbitrumSubmitRetryableTx
+			err := rlp.DecodeBytes(b[1:], &inner)
+			return &inner, err
+		}
 	}
 	switch b[0] {
 	case AccessListTxType:
@@ -184,6 +222,10 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		return &inner, err
 	case DynamicFeeTxType:
 		var inner DynamicFeeTx
+		err := rlp.DecodeBytes(b[1:], &inner)
+		return &inner, err
+	case ArbitrumLegacyTxType:
+		var inner ArbitrumLegacyTxData
 		err := rlp.DecodeBytes(b[1:], &inner)
 		return &inner, err
 	default:
@@ -250,6 +292,10 @@ func (tx *Transaction) Type() uint8 {
 	return tx.inner.txType()
 }
 
+func (tx *Transaction) GetInner() TxData {
+	return tx.inner.copy()
+}
+
 // ChainId returns the EIP155 chain ID of the transaction. The return value will always be
 // non-nil. For legacy transactions which are not replay-protected, the return value is
 // zero.
@@ -284,13 +330,7 @@ func (tx *Transaction) Nonce() uint64 { return tx.inner.nonce() }
 // To returns the recipient address of the transaction.
 // For contract-creation transactions, To returns nil.
 func (tx *Transaction) To() *common.Address {
-	// Copy the pointed-to address.
-	ito := tx.inner.to()
-	if ito == nil {
-		return nil
-	}
-	cpy := *ito
-	return &cpy
+	return copyAddressPtr(tx.inner.to())
 }
 
 // Cost returns gas * gasPrice + value.
@@ -373,6 +413,8 @@ func (tx *Transaction) Hash() common.Hash {
 	var h common.Hash
 	if tx.Type() == LegacyTxType {
 		h = rlpHash(tx.inner)
+	} else if tx.Type() == ArbitrumLegacyTxType {
+		h = tx.inner.(*ArbitrumLegacyTxData).HashOverride
 	} else {
 		h = prefixedRlpHash(tx.Type(), tx.inner)
 	}
@@ -417,6 +459,9 @@ func (s Transactions) EncodeIndex(i int, w *bytes.Buffer) {
 	tx := s[i]
 	if tx.Type() == LegacyTxType {
 		rlp.Encode(w, tx.inner)
+	} else if tx.Type() == ArbitrumLegacyTxType {
+		arbData := tx.inner.(*ArbitrumLegacyTxData)
+		arbData.EncodeOnlyLegacyInto(w)
 	} else {
 		tx.encodeTyped(w)
 	}
@@ -434,6 +479,24 @@ func TxDifference(a, b Transactions) Transactions {
 	for _, tx := range a {
 		if _, ok := remove[tx.Hash()]; !ok {
 			keep = append(keep, tx)
+		}
+	}
+
+	return keep
+}
+
+// HashDifference returns a new set which is the difference between a and b.
+func HashDifference(a, b []common.Hash) []common.Hash {
+	keep := make([]common.Hash, 0, len(a))
+
+	remove := make(map[common.Hash]struct{})
+	for _, hash := range b {
+		remove[hash] = struct{}{}
+	}
+
+	for _, hash := range a {
+		if _, ok := remove[hash]; !ok {
+			keep = append(keep, hash)
 		}
 	}
 
@@ -569,6 +632,9 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 //
 // NOTE: In a future PR this will be removed.
 type Message struct {
+	tx        *Transaction
+	TxRunMode MessageRunMode
+
 	to         *common.Address
 	from       common.Address
 	nonce      uint64
@@ -580,7 +646,16 @@ type Message struct {
 	data       []byte
 	accessList AccessList
 	checkNonce bool
+	isFake     bool
 }
+
+type MessageRunMode uint8
+
+const (
+	MessageCommitMode MessageRunMode = iota
+	MessageGasEstimationMode
+	MessageEthcallMode
+)
 
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, checkNonce bool) Message {
 	return Message{
@@ -595,12 +670,15 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		data:       data,
 		accessList: accessList,
 		checkNonce: checkNonce,
+		isFake:     false,
 	}
 }
 
 // AsMessage returns the transaction as a core.Message.
 func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 	msg := Message{
+		tx: tx,
+
 		nonce:      tx.Nonce(),
 		gasLimit:   tx.Gas(),
 		gasPrice:   new(big.Int).Set(tx.GasPrice()),
@@ -611,6 +689,7 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		data:       tx.Data(),
 		accessList: tx.AccessList(),
 		checkNonce: true,
+		isFake:     tx.inner.isFake(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -620,6 +699,9 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 	msg.from, err = Sender(s, tx)
 	return msg, err
 }
+
+func (m Message) UnderlyingTransaction() *Transaction { return m.tx }
+func (m Message) RunMode() MessageRunMode             { return m.TxRunMode }
 
 func (m Message) From() common.Address   { return m.from }
 func (m Message) To() *common.Address    { return m.to }
@@ -632,3 +714,13 @@ func (m Message) Nonce() uint64          { return m.nonce }
 func (m Message) Data() []byte           { return m.data }
 func (m Message) AccessList() AccessList { return m.accessList }
 func (m Message) CheckNonce() bool       { return m.checkNonce }
+func (m Message) IsFake() bool           { return m.isFake }
+
+// copyAddressPtr copies an address.
+func copyAddressPtr(a *common.Address) *common.Address {
+	if a == nil {
+		return nil
+	}
+	cpy := *a
+	return &cpy
+}

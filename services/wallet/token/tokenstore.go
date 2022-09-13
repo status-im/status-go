@@ -1,4 +1,4 @@
-package wallet
+package token
 
 import "github.com/ethereum/go-ethereum/common"
 
@@ -1450,6 +1450,14 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Decimals: 18,
 			ChainID:  5,
 		},
+		common.HexToAddress("0x98339d8c260052b7ad81c28c16c0b98420f2b46a"): &Token{
+			Address:  common.HexToAddress("0x98339d8c260052b7ad81c28c16c0b98420f2b46a"),
+			Name:     "USD Coin",
+			Symbol:   "USDC",
+			Color:    "#f8f8f8",
+			Decimals: 6,
+			ChainID:  5,
+		},
 		common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"): &Token{
 			Address:  common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"),
 			Name:     "Xeenus 💪",
@@ -1475,6 +1483,16 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			ChainID:  5,
 		},
 	},
+	10: {
+		common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"): &Token{
+			Address:  common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"),
+			Name:     "USD Coin",
+			Symbol:   "USDC",
+			Color:    "#f8f8f8",
+			Decimals: 6,
+			ChainID:  10,
+		},
+	},
 	100: {
 		common.HexToAddress("0x3e50bf6703fc132a94e4baff068db2055655f11b"): &Token{
 			Address:  common.HexToAddress("0x3e50bf6703fc132a94e4baff068db2055655f11b"),
@@ -1483,6 +1501,16 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  100,
+		},
+	},
+	420: {
+		common.HexToAddress("0xcb4ceefce514b2d910d3ac529076d18e3add3775"): &Token{
+			Address:  common.HexToAddress("0xcb4ceefce514b2d910d3ac529076d18e3add3775"),
+			Name:     "USD Coin",
+			Symbol:   "USDC",
+			Color:    "#f8f8f8",
+			Decimals: 6,
+			ChainID:  420,
 		},
 	},
 	42161: {
@@ -1499,7 +1527,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Name:     "USD Coin",
 			Symbol:   "USDC",
 			Color:    "#f8f8f8",
-			Decimals: 18,
+			Decimals: 6,
 			ChainID:  42161,
 		},
 		common.HexToAddress("0xda10009cbd5d07dd0cecc66161fc93d7c9000da1"): &Token{
@@ -1575,14 +1603,14 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			ChainID:  42161,
 		},
 	},
-	421611: {
-		common.HexToAddress("0x615fbe6372676474d9e6933d310469c9b68e9726"): &Token{
-			Address:  common.HexToAddress("0x615fbe6372676474d9e6933d310469c9b68e9726"),
-			Name:     "ChainLink Token",
-			Symbol:   "Link",
+	421613: {
+		common.HexToAddress("0x17078F231AA8dc256557b49a8f2F72814A71f633"): &Token{
+			Address:  common.HexToAddress("0x17078F231AA8dc256557b49a8f2F72814A71f633"),
+			Name:     "USD Coin",
+			Symbol:   "USDC",
 			Color:    "#f8f8f8",
-			Decimals: 18,
-			ChainID:  421611,
+			Decimals: 6,
+			ChainID:  421613,
 		},
 	},
 }

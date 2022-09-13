@@ -1,4 +1,4 @@
-package wallet
+package token
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/ierc20"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -33,6 +34,10 @@ type Token struct {
 	// to be traded.
 	Decimals uint   `json:"decimals"`
 	ChainID  uint64 `json:"chainId"`
+}
+
+func (t *Token) IsNative() bool {
+	return t.Address == nativeChainAddress
 }
 
 type TokenManager struct {
@@ -70,7 +75,34 @@ func NewTokenManager(
 	return tokenManager
 }
 
-func (tm *TokenManager) findSNT(chainID uint64) *Token {
+func (tm *TokenManager) FindToken(network *params.Network, tokenSymbol string) *Token {
+	if tokenSymbol == network.NativeCurrencySymbol {
+		return &Token{
+			Address:  common.HexToAddress("0x"),
+			Symbol:   network.NativeCurrencySymbol,
+			Decimals: uint(network.NativeCurrencyDecimals),
+			Name:     network.NativeCurrencyName,
+		}
+	}
+
+	tokens, err := tm.GetTokens(network.ChainID)
+	if err != nil {
+		return nil
+	}
+	customTokens, err := tm.GetCustomsByChainID(network.ChainID)
+	if err != nil {
+		return nil
+	}
+	allTokens := append(tokens, customTokens...)
+	for _, token := range allTokens {
+		if token.Symbol == tokenSymbol {
+			return token
+		}
+	}
+	return nil
+}
+
+func (tm *TokenManager) FindSNT(chainID uint64) *Token {
 	tokensMap, ok := tokenStore[chainID]
 	if !ok {
 		return nil
@@ -85,7 +117,7 @@ func (tm *TokenManager) findSNT(chainID uint64) *Token {
 	return nil
 }
 
-func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
+func (tm *TokenManager) GetTokens(chainID uint64) ([]*Token, error) {
 	tokensMap, ok := tokenStore[chainID]
 	if !ok {
 		return nil, errors.New("no tokens for this network")
@@ -100,7 +132,7 @@ func (tm *TokenManager) getTokens(chainID uint64) ([]*Token, error) {
 	return res, nil
 }
 
-func (tm *TokenManager) discoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
+func (tm *TokenManager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
 	backend, err := tm.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -139,7 +171,7 @@ func (tm *TokenManager) discoverToken(ctx context.Context, chainID uint64, addre
 	}, nil
 }
 
-func (tm *TokenManager) getCustoms() ([]*Token, error) {
+func (tm *TokenManager) GetCustoms() ([]*Token, error) {
 	rows, err := tm.db.Query("SELECT address, name, symbol, decimals, color, network_id FROM tokens")
 	if err != nil {
 		return nil, err
@@ -160,7 +192,7 @@ func (tm *TokenManager) getCustoms() ([]*Token, error) {
 	return rst, nil
 }
 
-func (tm *TokenManager) getCustomsByChainID(chainID uint64) ([]*Token, error) {
+func (tm *TokenManager) GetCustomsByChainID(chainID uint64) ([]*Token, error) {
 	rows, err := tm.db.Query("SELECT address, name, symbol, decimals, color, network_id FROM tokens where network_id=?", chainID)
 	if err != nil {
 		return nil, err
@@ -181,7 +213,7 @@ func (tm *TokenManager) getCustomsByChainID(chainID uint64) ([]*Token, error) {
 	return rst, nil
 }
 
-func (tm *TokenManager) isTokenVisible(chainID uint64, address common.Address) (bool, error) {
+func (tm *TokenManager) IsTokenVisible(chainID uint64, address common.Address) (bool, error) {
 	rows, err := tm.db.Query("SELECT chain_id, address FROM visible_tokens WHERE chain_id = ? AND address = ?", chainID, address)
 	if err != nil {
 		return false, err
@@ -191,8 +223,8 @@ func (tm *TokenManager) isTokenVisible(chainID uint64, address common.Address) (
 	return rows.Next(), nil
 }
 
-func (tm *TokenManager) toggle(chainID uint64, address common.Address) error {
-	isVisible, err := tm.isTokenVisible(chainID, address)
+func (tm *TokenManager) Toggle(chainID uint64, address common.Address) error {
+	isVisible, err := tm.IsTokenVisible(chainID, address)
 	if err != nil {
 		return err
 	}
@@ -212,8 +244,8 @@ func (tm *TokenManager) toggle(chainID uint64, address common.Address) error {
 	return err
 }
 
-func (tm *TokenManager) getVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
-	customTokens, err := tm.getCustoms()
+func (tm *TokenManager) GetVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
+	customTokens, err := tm.GetCustoms()
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +303,7 @@ func (tm *TokenManager) getVisible(chainIDs []uint64) (map[uint64][]*Token, erro
 
 	for _, chainID := range chainIDs {
 		if len(rst[chainID]) == 1 {
-			token := tm.findSNT(chainID)
+			token := tm.FindSNT(chainID)
 			if token != nil {
 				rst[chainID] = append(rst[chainID], token)
 			}
@@ -280,7 +312,7 @@ func (tm *TokenManager) getVisible(chainIDs []uint64) (map[uint64][]*Token, erro
 	return rst, nil
 }
 
-func (tm *TokenManager) upsertCustom(token Token) error {
+func (tm *TokenManager) UpsertCustom(token Token) error {
 	insert, err := tm.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
@@ -289,12 +321,12 @@ func (tm *TokenManager) upsertCustom(token Token) error {
 	return err
 }
 
-func (tm *TokenManager) deleteCustom(chainID uint64, address common.Address) error {
+func (tm *TokenManager) DeleteCustom(chainID uint64, address common.Address) error {
 	_, err := tm.db.Exec(`DELETE FROM TOKENS WHERE address = ? and network_id = ?`, address, chainID)
 	return err
 }
 
-func (tm *TokenManager) getTokenBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *TokenManager) GetTokenBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
 	caller, err := ierc20.NewIERC20Caller(token, client)
 	if err != nil {
 		return nil, err
@@ -305,19 +337,19 @@ func (tm *TokenManager) getTokenBalance(ctx context.Context, client *chain.Clien
 	}, account)
 }
 
-func (tm *TokenManager) getChainBalance(ctx context.Context, client *chain.Client, account common.Address) (*big.Int, error) {
+func (tm *TokenManager) GetChainBalance(ctx context.Context, client *chain.Client, account common.Address) (*big.Int, error) {
 	return client.BalanceAt(ctx, account, nil)
 }
 
-func (tm *TokenManager) getBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *TokenManager) GetBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
 	if token == nativeChainAddress {
-		return tm.getChainBalance(ctx, client, account)
+		return tm.GetChainBalance(ctx, client, account)
 	}
 
-	return tm.getTokenBalance(ctx, client, account, token)
+	return tm.GetTokenBalance(ctx, client, account, token)
 }
 
-func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *TokenManager) GetBalances(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
@@ -421,7 +453,7 @@ func (tm *TokenManager) getBalances(parent context.Context, clients []*chain.Cli
 					group.Add(func(parent context.Context) error {
 						ctx, cancel := context.WithTimeout(parent, requestTimeout)
 						defer cancel()
-						balance, err := tm.getBalance(ctx, client, account, token)
+						balance, err := tm.GetBalance(ctx, client, account, token)
 
 						if err != nil {
 							log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)

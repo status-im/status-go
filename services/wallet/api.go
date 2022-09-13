@@ -12,9 +12,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/transactions"
 )
 
 func NewAPI(s *Service) *API {
@@ -93,7 +94,7 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []com
 	if err != nil {
 		return nil, err
 	}
-	return api.s.tokenManager.getBalances(ctx, []*chain.Client{chainClient}, accounts, addresses)
+	return api.s.tokenManager.GetBalances(ctx, []*chain.Client{chainClient}, accounts, addresses)
 }
 
 func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
@@ -101,65 +102,65 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	if err != nil {
 		return nil, err
 	}
-	return api.s.tokenManager.getBalances(ctx, clients, accounts, addresses)
+	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
 }
 
-func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*Token, error) {
+func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
 	log.Debug("call to get tokens")
-	rst, err := api.s.tokenManager.getTokens(chainID)
+	rst, err := api.s.tokenManager.GetTokens(chainID)
 	log.Debug("result from token store", "len", len(rst))
 	return rst, err
 }
 
-func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
+func (api *API) GetCustomTokens(ctx context.Context) ([]*token.Token, error) {
 	log.Debug("call to get custom tokens")
-	rst, err := api.s.tokenManager.getCustoms()
+	rst, err := api.s.tokenManager.GetCustoms()
 	log.Debug("result from database for custom tokens", "len", len(rst))
 	return rst, err
 }
 
-func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
+func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*token.Token, error) {
 	log.Debug("call to get discover token")
-	token, err := api.s.tokenManager.discoverToken(ctx, chainID, address)
+	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
 }
 
-func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*Token, error) {
+func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*token.Token, error) {
 	log.Debug("call to get visible tokens")
-	rst, err := api.s.tokenManager.getVisible(chainIDs)
+	rst, err := api.s.tokenManager.GetVisible(chainIDs)
 	log.Debug("result from database for visible tokens", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) ToggleVisibleToken(ctx context.Context, chainID uint64, address common.Address) (bool, error) {
 	log.Debug("call to toggle visible tokens")
-	err := api.s.tokenManager.toggle(chainID, address)
+	err := api.s.tokenManager.Toggle(chainID, address)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (api *API) AddCustomToken(ctx context.Context, token Token) error {
+func (api *API) AddCustomToken(ctx context.Context, token token.Token) error {
 	log.Debug("call to create or edit custom token")
 	if token.ChainID == 0 {
 		token.ChainID = api.s.rpcClient.UpstreamChainID
 	}
-	err := api.s.tokenManager.upsertCustom(token)
+	err := api.s.tokenManager.UpsertCustom(token)
 	log.Debug("result from database for create or edit custom token", "err", err)
 	return err
 }
 
 func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove custom token")
-	err := api.s.tokenManager.deleteCustom(api.s.rpcClient.UpstreamChainID, address)
+	err := api.s.tokenManager.DeleteCustom(api.s.rpcClient.UpstreamChainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
 	return err
 }
 
 func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, address common.Address) error {
 	log.Debug("call to remove custom token")
-	err := api.s.tokenManager.deleteCustom(chainID, address)
+	err := api.s.tokenManager.DeleteCustom(chainID, address)
 	log.Debug("result from database for remove custom token", "err", err)
 	return err
 }
@@ -325,14 +326,14 @@ func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*Suggeste
 	return api.s.feesManager.suggestedFees(ctx, chainID)
 }
 
-func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas float64) (TransactionEstimation, error) {
+func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
 	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
 }
 
-func (api *API) GetSuggestedRoutes(ctx context.Context, account common.Address, amount float64, tokenSymbol string, disabledChainIDs []uint64) (*SuggestedRoutes, error) {
+func (api *API) GetSuggestedRoutes(ctx context.Context, sendType SendType, account common.Address, amountIn *hexutil.Big, tokenSymbol string, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs []uint64, gasFeeMode GasFeeMode) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, account, amount, tokenSymbol, disabledChainIDs)
+	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode)
 }
 
 func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
@@ -476,7 +477,7 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 	return address, nil
 }
 
-func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data map[uint64][]transactions.SendTxArgs, password string) (*MultiTransactionResult, error) {
+func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, password string) (*MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
-	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, password)
+	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
 }
