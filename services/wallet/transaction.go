@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/transactions"
 )
@@ -228,7 +229,7 @@ func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.
 	return watchTxCommand.Command()(commandContext)
 }
 
-func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data map[uint64][]transactions.SendTxArgs, password string) (*MultiTransactionResult, error) {
+func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
 	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
 	if err != nil {
 		return nil, err
@@ -260,29 +261,26 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 	}
 
 	hashes := make(map[uint64][]types.Hash)
-	for chainID, txs := range data {
-		for _, tx := range txs {
-			hash, err := tm.transactor.SendTransactionWithChainID(chainID, tx, selectedAccount)
-			if err != nil {
-				return nil, err
-			}
-
-			err = tm.addPending(PendingTransaction{
-				Hash:               common.Hash(hash),
-				Timestamp:          uint64(time.Now().Unix()),
-				Value:              bigint.BigInt{tx.Value.ToInt()},
-				From:               common.Address(tx.From),
-				To:                 common.Address(*tx.To),
-				Data:               tx.Data.String(),
-				Type:               WalletTransfer,
-				ChainID:            chainID,
-				MultiTransactionID: multiTransactionID,
-			})
-			if err != nil {
-				return nil, err
-			}
-			hashes[chainID] = append(hashes[chainID], hash)
+	for _, tx := range data {
+		hash, err := bridges[tx.BridgeName].Send(tx, selectedAccount)
+		if err != nil {
+			return nil, err
 		}
+		err = tm.addPending(PendingTransaction{
+			Hash:               common.Hash(hash),
+			Timestamp:          uint64(time.Now().Unix()),
+			Value:              bigint.BigInt{tx.Value()},
+			From:               common.Address(tx.From()),
+			To:                 common.Address(tx.To()),
+			Data:               tx.Data().String(),
+			Type:               WalletTransfer,
+			ChainID:            tx.ChainID,
+			MultiTransactionID: multiTransactionID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		hashes[tx.ChainID] = append(hashes[tx.ChainID], hash)
 	}
 
 	return &MultiTransactionResult{

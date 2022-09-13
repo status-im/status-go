@@ -346,12 +346,16 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 		return 0, err
 	}
 
-	return ethClient.EstimateGas(ctx, ethereum.CallMsg{
+	estimate, err := ethClient.EstimateGas(ctx, ethereum.CallMsg{
 		From:  common.Address(txArgs.From),
 		To:    &registryAddr,
 		Value: big.NewInt(0),
 		Data:  data,
 	})
+	if err != nil {
+		return 0, err
+	}
+	return estimate + 1000, nil
 }
 
 func (api *API) Register(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
@@ -465,7 +469,11 @@ func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs tra
 		return 0, err
 	}
 
-	return ethClient.EstimateGas(ctx, callMsg)
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + 1000, nil
 }
 
 func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
@@ -545,7 +553,11 @@ func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs tr
 		return 0, err
 	}
 
-	return ethClient.EstimateGas(ctx, callMsg)
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + 1000, nil
 }
 
 func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*URI, error) {
