@@ -455,14 +455,14 @@ func (s *MessageSender) EncodeMembershipUpdate(
 }
 
 // EncodeAbridgedMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// Only the events relevant to the sender are encoded
+// Only the events relevant to the current group are encoded
 func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 	group *v1protocol.Group,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
 	message := v1protocol.MembershipUpdateMessage{
 		ChatID: group.ChatID(),
-		Events: group.AbridgedEvents(&s.identity.PublicKey),
+		Events: group.AbridgedEvents(),
 	}
 	return s.encodeMembershipUpdate(message, chatEntity)
 }
