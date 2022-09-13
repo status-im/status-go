@@ -124,19 +124,52 @@ func insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error {
 }
 
 func insertNetworkConfigWithChainColorShortName(tx *sql.Tx, c *params.NodeConfig) error {
-	for _, network := range c.Networks {
-		_, err := tx.Exec(`
-        INSERT OR REPLACE INTO networks (
-                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
-		native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
-                chain_color, short_name
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
-			network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
-			network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
+	rows, err := tx.Query("SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks")
+	if err != nil {
+		return err
+	}
+	var currentNetworks []*params.Network
+	defer rows.Close()
+	for rows.Next() {
+		network := params.Network{}
+		err := rows.Scan(
+			&network.ChainID, &network.ChainName, &network.RPCURL, &network.BlockExplorerURL, &network.IconURL,
+			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
+			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
 		)
 		if err != nil {
 			return err
+		}
+		currentNetworks = append(currentNetworks, &network)
+	}
+
+	for _, network := range c.Networks {
+		found := false
+		for _, currentNetwork := range currentNetworks {
+			if currentNetwork.ChainID == network.ChainID {
+				found = true
+				_, err := tx.Exec(`UPDATE networks SET chain_color = ?, short_name = ? WHERE chain_id = ?`, network.ChainColor, network.ShortName, network.ChainID)
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+
+		if !found {
+			_, err := tx.Exec(`
+			INSERT OR REPLACE INTO networks (
+					chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
+			native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
+					chain_color, short_name
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
+				network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
+				network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
