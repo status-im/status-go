@@ -98,16 +98,6 @@ func LinkPreviewWhitelist() []Site {
 			Address:   "github.com",
 			ImageSite: false,
 		},
-		Site{
-			Title:     "tenor GIFs subdomain",
-			Address:   "media.tenor.com",
-			ImageSite: false,
-		},
-		Site{
-			Title:     "tenor GIFs",
-			Address:   "tenor.com",
-			ImageSite: false,
-		},
 		// Medium unfurling is failing - https://github.com/status-im/status-go/issues/2192
 		//
 		// Site{
@@ -213,16 +203,6 @@ func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err er
 	return previewData, nil
 }
 
-func GetGenericImageLinkPreviewData(title string, link string) (previewData LinkPreviewData, err error) {
-	url, _ := url.Parse(link)
-	previewData.Title = title
-	previewData.Site = strings.ToLower(url.Hostname())
-	previewData.ThumbnailURL = link
-	previewData.Height = 0
-	previewData.Width = 0
-	return previewData, nil
-}
-
 func GetGiphyOembed(url string) (data GiphyOembedData, err error) {
 	oembedLink := fmt.Sprintf(GiphyOembedLink, url)
 
@@ -303,8 +283,6 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetGiphyShortURLPreviewData(link)
 	case "twitter.com":
 		return GetTwitterPreviewData(link)
-	case "media.tenor.com", "tenor.com":
-		return GetGenericImageLinkPreviewData("Tenor", link)
 	default:
 		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 	}
