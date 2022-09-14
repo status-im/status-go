@@ -327,6 +327,22 @@ func (s *CommunitySuite) TestRemoveUserFormOrg() {
 	s.Require().False(ok)
 }
 
+func (s *CommunitySuite) TestRemoveOurselvesFormOrg() {
+	org := s.buildCommunity(&s.identity.PublicKey)
+
+	// We don't need to be an admin to remove ourselves from community
+	org.config.PrivateKey = nil
+
+	org.RemoveOurselvesFromOrg(&s.member1.PublicKey)
+
+	// Check member has been removed from org
+	s.Require().False(org.HasMember(&s.member1.PublicKey))
+
+	// Check member has been removed from chat
+	_, ok := org.config.CommunityDescription.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	s.Require().False(ok)
+}
+
 func (s *CommunitySuite) TestAcceptRequestToJoin() {
 	// WHAT TO DO WITH ENS
 	// TEST CASE 1: Not an admin

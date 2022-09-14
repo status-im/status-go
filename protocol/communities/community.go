@@ -702,16 +702,11 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	return o.config.CommunityDescription, nil
 }
 
-func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
-	}
+func (o *Community) removeMemberFromOrg(pk *ecdsa.PublicKey) {
 	if !o.hasMember(pk) {
-		return o.config.CommunityDescription, nil
+		return
 	}
+
 	key := common.PubkeyToHex(pk)
 
 	// Remove from org
@@ -723,7 +718,23 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	}
 
 	o.increaseClock()
+}
 
+func (o *Community) RemoveOurselvesFromOrg(pk *ecdsa.PublicKey) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	o.removeMemberFromOrg(pk)
+}
+
+func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	o.removeMemberFromOrg(pk)
 	return o.config.CommunityDescription, nil
 }
 

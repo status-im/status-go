@@ -1047,18 +1047,14 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	if community.IsAdmin() {
-		_, err = community.RemoveUserFromOrg(m.identity)
-		if err != nil {
-			return nil, err
-		}
-	}
-	community.Leave()
-	err = m.persistence.SaveCommunity(community)
 
-	if err != nil {
+	community.RemoveOurselvesFromOrg(m.identity)
+	community.Leave()
+
+	if err = m.persistence.SaveCommunity(community); err != nil {
 		return nil, err
 	}
+
 	return community, nil
 }
 
