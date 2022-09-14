@@ -60,6 +60,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/telemetry"
 )
 
@@ -144,6 +145,7 @@ type Messenger struct {
 	contractMaker                        *contracts.ContractMaker
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
+	savedAddressesManager                *wallet.SavedAddressesManager
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex               sync.Mutex
@@ -410,6 +412,8 @@ func NewMessenger(
 
 	mailservers := mailserversDB.NewDB(database)
 
+	savedAddressesManager := wallet.NewSavedAddressesManager(c.db)
+
 	messenger = &Messenger{
 		config:                     &c,
 		node:                       node,
@@ -466,7 +470,8 @@ func NewMessenger(
 			func() error { _ = logger.Sync; return nil },
 			database.Close,
 		},
-		logger: logger,
+		logger:                logger,
+		savedAddressesManager: savedAddressesManager,
 	}
 
 	if c.outputMessagesCSV {
@@ -713,6 +718,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	err = m.GarbageCollectRemovedBookmarks()
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.garbageCollectRemovedSavedAddresses()
 	if err != nil {
 		return nil, err
 	}
@@ -2337,7 +2347,25 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 	}
 
-	return m.syncWallets(accounts)
+	err = m.syncWallets(accounts)
+	if err != nil {
+		return err
+	}
+
+	savedAddresses, err := m.savedAddressesManager.GetRawSavedAddresses()
+	if err != nil {
+		return err
+	}
+
+	for i := range savedAddresses {
+		sa := savedAddresses[i]
+
+		err = m.syncSavedAddress(ctx, sa)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
@@ -3861,6 +3889,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err := m.HandleSyncContactRequestDecision(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncContactRequestDecisio", zap.Error(err))
+							continue
+						}
+					case protobuf.SyncSavedAddress:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncSavedAddress)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						err = m.handleSyncSavedAddress(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncSavedAddress", zap.Error(err))
+							allMessagesProcessed = false
 							continue
 						}
 					default:

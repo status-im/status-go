@@ -166,7 +166,7 @@ func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, 
 
 func (api *API) GetSavedAddresses(ctx context.Context) ([]SavedAddress, error) {
 	log.Debug("call to get saved addresses")
-	rst, err := api.s.savedAddressesManager.GetSavedAddresses(api.s.rpcClient.UpstreamChainID)
+	rst, err := api.s.savedAddressesManager.GetSavedAddressesForChainID(api.s.rpcClient.UpstreamChainID)
 	log.Debug("result from database for saved addresses", "len", len(rst))
 	return rst, err
 }
@@ -176,14 +176,14 @@ func (api *API) AddSavedAddress(ctx context.Context, sa SavedAddress) error {
 	if sa.ChainID == 0 {
 		sa.ChainID = api.s.rpcClient.UpstreamChainID
 	}
-	err := api.s.savedAddressesManager.AddSavedAddress(sa)
+	_, err := api.s.savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa)
 	log.Debug("result from database for create or edit saved address", "err", err)
 	return err
 }
 
 func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove saved address")
-	err := api.s.savedAddressesManager.DeleteSavedAddress(api.s.rpcClient.UpstreamChainID, address)
+	_, err := api.s.savedAddressesManager.DeleteSavedAddress(api.s.rpcClient.UpstreamChainID, address)
 	log.Debug("result from database for remove saved address", "err", err)
 	return err
 }

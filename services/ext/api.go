@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
@@ -858,6 +860,23 @@ func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.W
 
 func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
 	return api.service.messenger.DestroyWalletConnectSession(PeerID)
+}
+
+// Saved Addresses APIs
+func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
+	if sa.ChainID == 0 {
+		sa.ChainID = api.service.rpcClient.UpstreamChainID
+	}
+
+	return api.service.messenger.UpsertSavedAddress(ctx, sa)
+}
+
+func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, chainID uint64, address ethcommon.Address) error {
+	if chainID == 0 {
+		chainID = api.service.rpcClient.UpstreamChainID
+	}
+
+	return api.service.messenger.DeleteSavedAddress(ctx, chainID, address)
 }
 
 // PushNotifications server endpoints

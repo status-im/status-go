@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
@@ -45,6 +46,7 @@ type MessengerResponse struct {
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
+	SavedAddresses                []*wallet.SavedAddress
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -95,6 +97,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories             []*discord.Category                `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                 `json:"discordChannels,omitempty"`
 		DiscordOldestMessageTimestamp int                                `json:"discordOldestMessageTimestamp"`
+		SavedAddresses                []*wallet.SavedAddress             `json:"savedAddresses"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -109,6 +112,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		IdentityImages:          r.IdentityImages,
 		Accounts:                r.Accounts,
 		VerificationRequests:    r.VerificationRequests,
+		SavedAddresses:          r.SavedAddresses,
 
 		Messages:                      r.Messages(),
 		Notifications:                 r.Notifications(),
@@ -239,6 +243,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.trustStatus)+
 		len(r.VerificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
+		len(r.SavedAddresses) == 0 &&
 		r.currentStatus == nil
 }
 

@@ -186,7 +186,7 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 
 	savedAddressesMap := make(map[uint64][]SavedAddress)
 	for _, chainID := range chainIDs {
-		savedAddresses, err := r.s.savedAddressesManager.GetSavedAddresses(chainID)
+		savedAddresses, err := r.s.savedAddressesManager.GetSavedAddressesForChainID(chainID)
 		if err != nil {
 			return nil, err
 		}

@@ -2390,6 +2390,7 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
 
+// WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
 	var response *MessengerResponse
 	return response, tt.RetryWithBackOff(func() error {
