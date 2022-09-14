@@ -72,5 +72,6 @@ message ApplicationMetadataMessage {
     SYNC_CONTACT_REQUEST_DECISION = 56;
     COMMUNITY_REQUEST_TO_LEAVE = 57;
     SYNC_DELETE_FOR_ME_MESSAGE = 58;
+    SYNC_SAVED_ADDRESS = 59;
   }
 }

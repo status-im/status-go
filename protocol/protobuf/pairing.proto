@@ -197,6 +197,15 @@ message SyncWalletAccounts {
   repeated SyncWalletAccount accounts = 1;
 }
 
+message SyncSavedAddress {
+  bytes  address = 1;
+  string name = 2;
+  bool   favourite = 3;
+  uint64 chain_id = 4;
+  bool   removed = 5;
+  uint64 update_clock = 7;
+}
+
 message SyncCommunitySettings {
   uint64 clock = 1;
   string community_id = 2;
