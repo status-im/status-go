@@ -255,10 +255,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.Bookmarks)+
 		len(response.clearedHistories)+
 		len(response.VerificationRequests)+
-		len(response.trustStatus)+
 		len(response.DiscordChannels)+
-		len(response.DiscordCategories)+
-		len(response.CommunityChanges) != 0 {
+		len(response.DiscordCategories) != 0 {
 		return ErrNotImplemented
 	}
 
@@ -272,6 +270,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddVerificationRequests(response.VerificationRequests)
 	r.AddTrustStatuses(response.trustStatus)
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
+	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 
 	return nil
 }
