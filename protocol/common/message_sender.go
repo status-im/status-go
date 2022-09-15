@@ -275,53 +275,54 @@ func (s *MessageSender) sendCommunity(
 				return nil, err
 			}
 		}
-	} else {
-		wrappedMessage, err := s.wrapMessageV1(rawMessage)
+		return nil, nil
+	}
+
+	wrappedMessage, err := s.wrapMessageV1(rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// If it's a chat message, we send it on the community chat topic
+	if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
 		if err != nil {
 			return nil, err
 		}
 
-		// If it's a chat message, we send it on the community chat topic
-		if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
-			messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
-			if err != nil {
-				return nil, err
-			}
-
-			payload, err := proto.Marshal(messageSpec.Message)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to marshal")
-			}
-			hash, newMessage, err = s.sendCommunityChatMessage(ctx, rawMessage, payload)
-			if err != nil {
-				return nil, err
-			}
-
-			sentMessage := &SentMessage{
-				Spec:       messageSpec,
-				MessageIDs: messageIDs,
-			}
-
-			s.notifyOnSentMessage(sentMessage)
-
-		} else {
-
-			payload := wrappedMessage
-
-			pubkey, err := crypto.DecompressPubkey(rawMessage.CommunityID)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to decompress pubkey")
-			}
-			hash, newMessage, err = s.sendCommunityMessage(ctx, pubkey, payload, messageIDs)
-			if err != nil {
-				s.logger.Error("failed to send a community message", zap.Error(err))
-				return nil, errors.Wrap(err, "failed to send a message spec")
-			}
-
-			s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+		payload, err := proto.Marshal(messageSpec.Message)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal")
+		}
+		hash, newMessage, err = s.sendCommunityChatMessage(ctx, rawMessage, payload)
+		if err != nil {
+			return nil, err
 		}
 
+		sentMessage := &SentMessage{
+			Spec:       messageSpec,
+			MessageIDs: messageIDs,
+		}
+
+		s.notifyOnSentMessage(sentMessage)
+
+	} else {
+
+		payload := wrappedMessage
+
+		pubkey, err := crypto.DecompressPubkey(rawMessage.CommunityID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decompress pubkey")
+		}
+		hash, newMessage, err = s.sendCommunityMessage(ctx, pubkey, payload, messageIDs)
+		if err != nil {
+			s.logger.Error("failed to send a community message", zap.Error(err))
+			return nil, errors.Wrap(err, "failed to send a message spec")
+		}
+
+		s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 	}
+
 	s.transport.Track(messageIDs, hash, newMessage)
 	return messageID, nil
 }
