@@ -275,6 +275,7 @@ func (s *MessageSender) sendCommunity(
 				return nil, err
 			}
 		}
+                return nil, nil
 	} else {
 		wrappedMessage, err := s.wrapMessageV1(rawMessage)
 		if err != nil {
