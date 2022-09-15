@@ -2096,6 +2096,11 @@ func (m *Manager) LoadHistoryArchiveIndexFromFile(communityID types.HexBytes) (*
 	return wakuMessageArchiveIndexProto, nil
 }
 
+func (m *Manager) TorrentFileExists(communityID string) bool {
+	_, err := os.Stat(m.torrentFile(communityID))
+	return err == nil
+}
+
 func (m *Manager) torrentFile(communityID string) string {
 	return m.torrentConfig.TorrentDir + "/" + communityID + ".torrent"
 }

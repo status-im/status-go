@@ -1601,6 +1601,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
+			// Check if there's already a torrent file for this community and seed it
+			if m.communitiesManager.TorrentFileExists(c.IDString()) {
+				err = m.communitiesManager.SeedHistoryArchiveTorrent(c.ID())
+				if err != nil {
+					m.logger.Debug("failed to seed history archive", zap.Error(err))
+				}
+			}
+
 			filters, err := m.communitiesManager.GetCommunityChatsFilters(c.ID())
 			if err != nil {
 				m.logger.Debug("failed to get community chats filters", zap.Error(err))
