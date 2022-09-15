@@ -150,6 +150,14 @@ func TestDecodeFromURL(t *testing.T) {
 	}
 }
 
+func TestDecodeFromURL_WithErrors(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
+
+	_, err := DecodeFromURL("https://doesnt-exist.com")
+	require.Error(t, err)
+}
+
 func TestGetType(t *testing.T) {
 	cs := []struct {
 		Buf   []byte
