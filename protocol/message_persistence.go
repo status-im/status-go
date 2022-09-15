@@ -1760,8 +1760,13 @@ func (db sqlitePersistence) HasDiscordMessageAuthor(id string) (exists bool, err
 	return exists, err
 }
 
+func (db sqlitePersistence) HasDiscordMessageAuthorImagePayload(id string) (hasPayload bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_authors WHERE id = ? AND avatar_image_payload NOT NULL)`, id).Scan(&hasPayload)
+	return hasPayload, err
+}
+
 func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
-	query := "INSERT INTO discord_message_authors(id,name,discriminator,nickname,avatar_url) VALUES (?,?,?,?,?)"
+	query := "INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
@@ -1772,8 +1777,41 @@ func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMes
 		author.GetDiscriminator(),
 		author.GetNickname(),
 		author.GetAvatarUrl(),
+		author.GetAvatarImagePayload(),
 	)
 	return
+}
+
+func (db sqlitePersistence) UpdateDiscordMessageAuthorImage(authorID string, payload []byte) (err error) {
+	query := "UPDATE discord_message_authors SET avatar_image_payload = ? WHERE id = ?"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(payload, authorID)
+	return
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorImagePayloadByID(id string) ([]byte, error) {
+	payload := make([]byte, 0)
+	row := db.db.QueryRow("SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(&payload)
+	return payload, err
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorByID(id string) (*protobuf.DiscordMessageAuthor, error) {
+
+	author := &protobuf.DiscordMessageAuthor{}
+
+	row := db.db.QueryRow("SELECT id, name, discriminator, nickname, avatar_url FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(
+		&author.Id,
+		&author.Name,
+		&author.Discriminator,
+		&author.Nickname,
+		&author.AvatarUrl)
+	return author, err
 }
 
 func (db sqlitePersistence) SaveDiscordMessage(message *protobuf.DiscordMessage) (err error) {

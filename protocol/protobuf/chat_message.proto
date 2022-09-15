@@ -70,6 +70,8 @@ message DiscordMessageAuthor {
   string discriminator = 3;
   string nickname = 4;
   string avatarUrl = 5;
+  bytes avatarImagePayload = 6;
+  string localUrl = 7;
 }
 
 message DiscordMessageReference {
