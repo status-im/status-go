@@ -48,6 +48,10 @@ func DecodeFromURL(path string) (image.Image, error) {
 		}
 	}()
 
+	if res.StatusCode >= 400 {
+		return nil, errors.New(http.StatusText(res.StatusCode))
+	}
+
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
