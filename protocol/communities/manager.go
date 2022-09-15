@@ -108,14 +108,15 @@ func (md archiveMDSlice) Less(i, j int) bool {
 }
 
 type Subscription struct {
-	Community                      *Community
-	Invitations                    []*protobuf.CommunityInvitation
-	CreatingHistoryArchivesSignal  *signal.CreatingHistoryArchivesSignal
-	HistoryArchivesCreatedSignal   *signal.HistoryArchivesCreatedSignal
-	NoHistoryArchivesCreatedSignal *signal.NoHistoryArchivesCreatedSignal
-	HistoryArchivesSeedingSignal   *signal.HistoryArchivesSeedingSignal
-	HistoryArchivesUnseededSignal  *signal.HistoryArchivesUnseededSignal
-	HistoryArchiveDownloadedSignal *signal.HistoryArchiveDownloadedSignal
+	Community                                *Community
+	Invitations                              []*protobuf.CommunityInvitation
+	CreatingHistoryArchivesSignal            *signal.CreatingHistoryArchivesSignal
+	HistoryArchivesCreatedSignal             *signal.HistoryArchivesCreatedSignal
+	NoHistoryArchivesCreatedSignal           *signal.NoHistoryArchivesCreatedSignal
+	HistoryArchivesSeedingSignal             *signal.HistoryArchivesSeedingSignal
+	HistoryArchivesUnseededSignal            *signal.HistoryArchivesUnseededSignal
+	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
+	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 }
 
 type CommunityResponse struct {
