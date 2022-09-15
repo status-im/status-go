@@ -949,6 +949,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					signal.SendNewMessages(response)
 					localnotifications.PushMessages(notifications)
 				}
+				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 			}()
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
