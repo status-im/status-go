@@ -67,7 +67,7 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 func hasUDP(node *enode.Node) bool {
 	enrUDP := new(enr.UDP)
 	if err := node.Record().Load(enr.WithEntry(enrUDP.ENRKey(), enrUDP)); err != nil {
-		return err == nil
+		return false
 	}
-	return false
+	return true
 }

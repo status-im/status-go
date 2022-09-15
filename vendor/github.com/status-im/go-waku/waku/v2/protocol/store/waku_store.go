@@ -62,7 +62,7 @@ func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*pb.Wa
 		query.PagingInfo.PageSize = MaxPageSize
 	}
 
-	queryResult, err := msgProvider.Query(query)
+	cursor, queryResult, err := msgProvider.Query(query)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,10 +72,7 @@ func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*pb.Wa
 		return nil, newPagingInfo, nil
 	}
 
-	lastMsgIdx := len(queryResult) - 1
-	newCursor := protocol.NewEnvelope(queryResult[lastMsgIdx].Message, queryResult[lastMsgIdx].ReceiverTime, queryResult[lastMsgIdx].PubsubTopic).Index()
-
-	newPagingInfo := &pb.PagingInfo{PageSize: query.PagingInfo.PageSize, Cursor: newCursor, Direction: query.PagingInfo.Direction}
+	newPagingInfo := &pb.PagingInfo{PageSize: query.PagingInfo.PageSize, Cursor: cursor, Direction: query.PagingInfo.Direction}
 	if newPagingInfo.PageSize > uint64(len(queryResult)) {
 		newPagingInfo.PageSize = uint64(len(queryResult))
 	}
@@ -108,7 +105,7 @@ func (store *WakuStore) FindMessages(query *pb.HistoryQuery) *pb.HistoryResponse
 
 type MessageProvider interface {
 	GetAll() ([]persistence.StoredMessage, error)
-	Query(query *pb.HistoryQuery) ([]persistence.StoredMessage, error)
+	Query(query *pb.HistoryQuery) (*pb.Index, []persistence.StoredMessage, error)
 	Put(env *protocol.Envelope) error
 	MostRecentTimestamp() (int64, error)
 	Stop()
@@ -212,6 +209,10 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 	// Ensure that messages don't "jump" to the front of the queue with future timestamps
 	if env.Index().SenderTime-env.Index().ReceiverTime > int64(MaxTimeVariance) {
 		return ErrFutureMessage
+	}
+
+	if env.Message().Ephemeral {
+		return nil
 	}
 
 	err := store.msgProvider.Put(env)

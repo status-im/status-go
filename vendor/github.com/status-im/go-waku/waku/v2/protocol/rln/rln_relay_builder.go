@@ -85,6 +85,7 @@ func RlnRelayDynamic(
 	pubsubTopic string,
 	contentTopic string,
 	spamHandler SpamHandler,
+	registrationHandler RegistrationHandler,
 	log *zap.Logger,
 ) (*WakuRLNRelay, error) {
 	log = log.Named("rln-dynamic")
@@ -114,6 +115,7 @@ func RlnRelayDynamic(
 		contentTopic:              contentTopic,
 		log:                       log,
 		nullifierLog:              make(map[r.Epoch][]r.ProofMetadata),
+		registrationHandler:       registrationHandler,
 	}
 
 	// prepare rln membership key pair

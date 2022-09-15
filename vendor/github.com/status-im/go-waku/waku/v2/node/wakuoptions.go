@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -93,6 +94,7 @@ type WakuNodeParameters struct {
 	rlnETHPrivateKey             *ecdsa.PrivateKey
 	rlnETHClientAddress          string
 	rlnMembershipContractAddress common.Address
+	rlnRegistrationHandler       func(tx *types.Transaction)
 
 	keepAliveInterval time.Duration
 
@@ -119,6 +121,11 @@ func (w WakuNodeParameters) MultiAddresses() []multiaddr.Multiaddr {
 // Identity returns a libp2p option containing the identity used by the node
 func (w WakuNodeParameters) Identity() config.Option {
 	return libp2p.Identity(*w.GetPrivKey())
+}
+
+// TLSConfig returns the TLS config used for setting up secure websockets
+func (w WakuNodeParameters) TLSConfig() *tls.Config {
+	return w.tlsConfig
 }
 
 // AddressFactory returns the address factory used by the node's host
