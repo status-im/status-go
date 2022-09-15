@@ -1879,8 +1879,11 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 		if err != nil {
 			return nil, err
 		}
+                m.logger.Info("RESPONE", zap.Any("r", response))
+                m.logger.Info("RESPONE", zap.Any("r", messageResponse))
 		err = response.Merge(messageResponse)
 		if err != nil {
+                  m.logger.Error("ERROR MERGING")
 			return nil, err
 		}
 	}
