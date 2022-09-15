@@ -1437,17 +1437,46 @@ func TestSaveDiscordMessageAuthor(t *testing.T) {
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
 
-	require.NoError(t, p.SaveDiscordMessageAuthor(&protobuf.DiscordMessageAuthor{
-		Id:            "1",
-		Name:          "Testuser",
-		Discriminator: "1234",
-		Nickname:      "User",
-		AvatarUrl:     "http://example.com/profile.jpg",
-	}))
+	testAuthor := &protobuf.DiscordMessageAuthor{
+		Id:                 "1",
+		Name:               "Testuser",
+		Discriminator:      "1234",
+		Nickname:           "User",
+		AvatarUrl:          "http://example.com/profile.jpg",
+		AvatarImagePayload: []byte{1, 2, 3},
+	}
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(testAuthor))
 
 	exists, err := p.HasDiscordMessageAuthor("1")
 	require.NoError(t, err)
 	require.True(t, exists)
+	author, err := p.GetDiscordMessageAuthorByID("1")
+	require.NoError(t, err)
+	require.Equal(t, author.Id, testAuthor.Id)
+	require.Equal(t, author.Name, testAuthor.Name)
+}
+
+func TestGetDiscordMessageAuthorImagePayloadByID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	testAuthor := &protobuf.DiscordMessageAuthor{
+		Id:                 "1",
+		Name:               "Testuser",
+		Discriminator:      "1234",
+		Nickname:           "User",
+		AvatarUrl:          "http://example.com/profile.jpg",
+		AvatarImagePayload: []byte{1, 2, 3},
+	}
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(testAuthor))
+
+	payload, err := p.GetDiscordMessageAuthorImagePayloadByID("1")
+	require.NoError(t, err)
+
+	require.Equal(t, testAuthor.AvatarImagePayload, payload)
 }
 
 func TestSaveDiscordMessage(t *testing.T) {
