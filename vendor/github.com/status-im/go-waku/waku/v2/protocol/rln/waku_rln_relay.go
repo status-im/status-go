@@ -4,18 +4,20 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"math"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	proto "github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	r "github.com/status-im/go-rln/rln"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
+	"github.com/status-im/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -24,6 +26,8 @@ const MAX_CLOCK_GAP_SECONDS = 20
 
 // maximum allowed gap between the epochs of messages' RateLimitProofs
 const MAX_EPOCH_GAP = int64(MAX_CLOCK_GAP_SECONDS / r.EPOCH_UNIT_SECONDS)
+
+type RegistrationHandler = func(tx *types.Transaction)
 
 type WakuRLNRelay struct {
 	ctx context.Context
@@ -40,14 +44,23 @@ type WakuRLNRelay struct {
 	// TODO may need to erase this ethAccountPrivateKey when is not used
 	// TODO may need to make ethAccountPrivateKey mandatory
 	ethAccountPrivateKey *ecdsa.PrivateKey
-	RLN                  *r.RLN
+	ethClient            *ethclient.Client
+
+	RLN *r.RLN
 	// pubsubTopic is the topic for which rln relay is mounted
 	pubsubTopic  string
 	contentTopic string
 	// the log of nullifiers and Shamir shares of the past messages grouped per epoch
 	nullifierLog map[r.Epoch][]r.ProofMetadata
 
-	log *zap.Logger
+	registrationHandler RegistrationHandler
+	log                 *zap.Logger
+}
+
+func (rln *WakuRLNRelay) Stop() {
+	if rln.ethClient != nil {
+		rln.ethClient.Close()
+	}
 }
 
 func StaticSetup(rlnRelayMemIndex r.MembershipIndex) ([]r.IDCommitment, r.MembershipKeyPair, r.MembershipIndex, error) {
@@ -352,11 +365,11 @@ func toMembershipKeyPairs(groupKeys [][]string) ([]r.MembershipKeyPair, error) {
 
 	groupKeyPairs := []r.MembershipKeyPair{}
 	for _, pair := range groupKeys {
-		idKey, err := hex.DecodeString(pair[0])
+		idKey, err := utils.DecodeHexString(pair[0])
 		if err != nil {
 			return nil, err
 		}
-		idCommitment, err := hex.DecodeString(pair[1])
+		idCommitment, err := utils.DecodeHexString(pair[1])
 		if err != nil {
 			return nil, err
 		}

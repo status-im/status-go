@@ -19,6 +19,8 @@ var (
 	ChaChaPoly                           = WakuNoiseProtocolID(30)
 )
 
+const NoisePaddingBlockSize = 248
+
 var ErrorHandshakeComplete = errors.New("handshake complete")
 
 // All protocols share same cipher suite
@@ -121,8 +123,13 @@ func (hs *Handshake) Step(readPayloadV2 *PayloadV2, transportMessage []byte) (*H
 		// We initialize a payload v2 and we set proper protocol ID (if supported)
 		result.Payload2.ProtocolId = hs.protocolID
 
+		payload, err := PKCS7_Pad(transportMessage, NoisePaddingBlockSize)
+		if err != nil {
+			return nil, err
+		}
+
 		var noisePubKeys [][]byte
-		msg, cs1, cs2, err = hs.state.WriteMessageAndGetPK(hs.hsBuff, &noisePubKeys, transportMessage)
+		msg, cs1, cs2, err = hs.state.WriteMessageAndGetPK(hs.hsBuff, &noisePubKeys, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -149,8 +156,14 @@ func (hs *Handshake) Step(readPayloadV2 *PayloadV2, transportMessage []byte) (*H
 
 		hs.shouldWrite = true
 
-		// We retrieve and store the (decrypted) received transport message
-		result.TransportMessage = msg
+		// We retrieve, and store the (unpadded decrypted) received transport message
+
+		payload, err := PKCS7_Unpad(msg, NoisePaddingBlockSize)
+		if err != nil {
+			return nil, err
+		}
+
+		result.TransportMessage = payload
 	}
 
 	if cs1 != nil && cs2 != nil {
@@ -186,9 +199,12 @@ func (hs *Handshake) Encrypt(plaintext []byte) (*PayloadV2, error) {
 		return nil, errors.New("tried to encrypt empty plaintext")
 	}
 
-	// TODO: add padding (?)
+	paddedTransportMessage, err := PKCS7_Pad(plaintext, NoisePaddingBlockSize)
+	if err != nil {
+		return nil, err
+	}
 
-	cyphertext, err := hs.enc.Encrypt(nil, nil, plaintext)
+	cyphertext, err := hs.enc.Encrypt(nil, nil, paddedTransportMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +231,12 @@ func (hs *Handshake) Decrypt(payload *PayloadV2) ([]byte, error) {
 		return nil, errors.New("tried to decrypt empty ciphertext")
 	}
 
-	return hs.dec.Decrypt(nil, nil, payload.TransportMessage)
+	paddedMessage, err := hs.dec.Decrypt(nil, nil, payload.TransportMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	return PKCS7_Unpad(paddedMessage, NoisePaddingBlockSize)
 }
 
 // NewHandshake_XX_25519_ChaChaPoly_SHA256 creates a handshake where the initiator and receiver are not aware of each other static keys

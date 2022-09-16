@@ -156,7 +156,7 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 }
 
 // Query retrieves messages from the DB
-func (d *DBStore) Query(query *pb.HistoryQuery) ([]gowakuPersistence.StoredMessage, error) {
+func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.StoredMessage, error) {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
@@ -210,7 +210,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) ([]gowakuPersistence.StoredMessa
 		).Scan(&exists)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if exists {
@@ -222,7 +222,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) ([]gowakuPersistence.StoredMessa
 
 			parameters = append(parameters, cursorDBKey.Bytes())
 		} else {
-			return nil, ErrInvalidCursor
+			return nil, nil, ErrInvalidCursor
 		}
 	}
 
@@ -240,28 +240,41 @@ func (d *DBStore) Query(query *pb.HistoryQuery) ([]gowakuPersistence.StoredMessa
 
 	stmt, err := d.db.Prepare(sqlQuery)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer stmt.Close()
 
 	parameters = append(parameters, query.PagingInfo.PageSize)
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var result []gowakuPersistence.StoredMessage
 	for rows.Next() {
 		record, err := d.GetStoredMessage(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		result = append(result, record)
 	}
 
 	defer rows.Close()
 
-	return result, nil
+	cursor := &pb.Index{}
+	if len(result) != 0 {
+		lastMsgIdx := len(result) - 1
+		cursor = protocol.NewEnvelope(result[lastMsgIdx].Message, result[lastMsgIdx].ReceiverTime, result[lastMsgIdx].PubsubTopic).Index()
+	}
+
+	// The retrieved messages list should always be in chronological order
+	if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+		for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+			result[i], result[j] = result[j], result[i]
+		}
+	}
+
+	return cursor, result, nil
 }
 
 // MostRecentTimestamp returns an unix timestamp with the most recent senderTimestamp

@@ -77,7 +77,7 @@ import (
 )
 
 const messageQueueLimit = 1024
-const requestTimeout = 5 * time.Second
+const requestTimeout = 10 * time.Second
 
 const PeerStoreTable = "peerstore"
 
@@ -344,7 +344,9 @@ func (w *Waku) getDiscV5BootstrapNodes(addresses []string) ([]*enode.Node, error
 	retrieveENR := func(d dnsdisc.DiscoveredNode, protocol libp2pproto.ID) {
 		mu.Lock()
 		defer mu.Unlock()
-		result = append(result, d.ENR)
+		if d.ENR != nil {
+			result = append(result, d.ENR)
+		}
 	}
 
 	for _, addrString := range addresses {
@@ -373,23 +375,22 @@ func (w *Waku) getDiscV5BootstrapNodes(addresses []string) ([]*enode.Node, error
 }
 
 func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	w.dnsAddressCacheLock.RLock()
-	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
-	w.dnsAddressCacheLock.RUnlock()
+	w.dnsAddressCacheLock.Lock()
+	defer w.dnsAddressCacheLock.Unlock()
 
+	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
 	if !ok {
-		w.dnsAddressCacheLock.Lock()
-		var err error
 		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress)
-		w.dnsAddressCache[enrtreeAddress] = append(w.dnsAddressCache[enrtreeAddress], discoveredNodes...)
-		w.dnsAddressCacheLock.Unlock()
 		if err != nil {
 			log.Warn("dns discovery error ", err)
 			return
 		}
+
+		w.dnsAddressCache[enrtreeAddress] = append(w.dnsAddressCache[enrtreeAddress], discoveredNodes...)
+		discNodes = w.dnsAddressCache[enrtreeAddress]
 	}
 
 	for _, d := range discNodes {

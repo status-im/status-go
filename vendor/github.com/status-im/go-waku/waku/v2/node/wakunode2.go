@@ -57,6 +57,7 @@ type RLNRelay interface {
 	MembershipKeyPair() MembershipKeyPair
 	MembershipIndex() uint
 	AppendRLNProof(msg *pb.WakuMessage, senderEpochTime time.Time) error
+	Stop()
 }
 
 type WakuNode struct {
@@ -363,6 +364,7 @@ func (w *WakuNode) Stop() {
 	w.relay.Stop()
 	w.lightPush.Stop()
 	w.store.Stop()
+	_ = w.stopRlnRelay()
 
 	w.host.Close()
 

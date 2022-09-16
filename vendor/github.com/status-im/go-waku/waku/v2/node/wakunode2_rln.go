@@ -54,9 +54,6 @@ func (w *WakuNode) mountRlnRelay() error {
 
 		w.rlnRelay = rlnRelay
 
-		w.log.Info("membership id key", zap.String("IDKey", hex.EncodeToString(memKeyPair.IDKey[:])))
-		w.log.Info("membership id commitment key", zap.String("IDCommitment", hex.EncodeToString(memKeyPair.IDCommitment[:])))
-
 		// check the correct construction of the tree by comparing the calculated root against the expected root
 		// no error should happen as it is already captured in the unit tests
 		root, err := rlnRelay.RLN.GetMerkleRoot()
@@ -84,7 +81,7 @@ func (w *WakuNode) mountRlnRelay() error {
 
 		// mount the rln relay protocol in the on-chain/dynamic mode
 		var err error
-		w.rlnRelay, err = rln.RlnRelayDynamic(context.Background(), w.relay, w.opts.rlnETHClientAddress, w.opts.rlnETHPrivateKey, w.opts.rlnMembershipContractAddress, memKeyPair, w.opts.rlnRelayMemIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.log)
+		w.rlnRelay, err = rln.RlnRelayDynamic(context.Background(), w.relay, w.opts.rlnETHClientAddress, w.opts.rlnETHPrivateKey, w.opts.rlnMembershipContractAddress, memKeyPair, w.opts.rlnRelayMemIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.opts.rlnRegistrationHandler, w.log)
 		if err != nil {
 			return err
 		}
@@ -92,5 +89,12 @@ func (w *WakuNode) mountRlnRelay() error {
 
 	w.log.Info("mounted waku RLN relay", zap.String("pubsubTopic", w.opts.rlnRelayPubsubTopic), zap.String("contentTopic", w.opts.rlnRelayContentTopic))
 
+	return nil
+}
+
+func (w *WakuNode) stopRlnRelay() error {
+	if w.rlnRelay != nil {
+		w.rlnRelay.Stop()
+	}
 	return nil
 }
