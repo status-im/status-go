@@ -141,6 +141,7 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
 		SigningPhrase:             "yurt joey vibe",
 		SendPushNotifications:     true,
+		ProfilePicturesShowTo:     1,
 		ProfilePicturesVisibility: 1,
 		DefaultSyncPeriod:         86400,
 		UseMailservers:            true,

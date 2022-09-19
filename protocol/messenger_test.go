@@ -131,7 +131,10 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
-		WithAppSettings(settings.Settings{}, params.NodeConfig{}),
+		WithAppSettings(settings.Settings{
+			ProfilePicturesShowTo:     1,
+			ProfilePicturesVisibility: 1,
+		}, params.NodeConfig{}),
 		WithBrowserDatabase(nil),
 	}
 
