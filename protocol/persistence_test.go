@@ -60,6 +60,30 @@ func TestMessagesByIDs(t *testing.T) {
 	require.Len(t, m, 10)
 }
 
+func TestMessagesByIDs_WithDiscordMessagesPayload(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		err = insertMinimalDiscordMessage(p, id, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+
+	m, err := p.MessagesByIDs(ids)
+	require.NoError(t, err)
+	require.Len(t, m, 10)
+
+	for _, _m := range m {
+		require.NotNil(t, _m.GetDiscordMessage())
+	}
+}
+
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -91,6 +115,29 @@ func TestMessageByID_WithDiscordMessagePayload(t *testing.T) {
 	require.NotNil(t, m.GetDiscordMessage())
 	require.EqualValues(t, discordMessageID, m.GetDiscordMessage().Id)
 	require.EqualValues(t, "2", m.GetDiscordMessage().Author.Id)
+}
+
+func TestMessageByID_WithDiscordMessageAttachmentPayload(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	id := "1"
+	discordMessageID := "2"
+
+	err = insertDiscordMessageWithAttachments(p, id, discordMessageID)
+	require.NoError(t, err)
+
+	m, err := p.MessageByID(id)
+	require.NoError(t, err)
+	require.EqualValues(t, id, m.ID)
+
+	dm := m.GetDiscordMessage()
+	require.NotNil(t, dm)
+	require.EqualValues(t, discordMessageID, dm.Id)
+
+	require.NotNil(t, dm.Attachments)
+	require.Len(t, dm.Attachments, 2)
 }
 
 func TestMessagesExist(t *testing.T) {
@@ -732,6 +779,32 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
 	}})
+}
+
+func insertDiscordMessageWithAttachments(p *sqlitePersistence, id string, discordMessageID string) error {
+	err := insertMinimalDiscordMessage(p, id, discordMessageID)
+	if err != nil {
+		return err
+	}
+
+	attachment := &protobuf.DiscordMessageAttachment{
+		Id:        "1",
+		MessageId: discordMessageID,
+		Url:       "https://does-not-exist.com",
+		Payload:   []byte{1, 2, 3, 4},
+	}
+
+	attachment2 := &protobuf.DiscordMessageAttachment{
+		Id:        "2",
+		MessageId: discordMessageID,
+		Url:       "https://does-not-exist.com",
+		Payload:   []byte{5, 6, 7, 8},
+	}
+
+	return p.SaveDiscordMessageAttachments([]*protobuf.DiscordMessageAttachment{
+		attachment,
+		attachment2,
+	})
 }
 
 func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessageID string) error {

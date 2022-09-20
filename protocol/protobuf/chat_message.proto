@@ -67,6 +67,7 @@ message DiscordMessage {
   string content = 5;
   DiscordMessageAuthor author = 6;
   DiscordMessageReference reference = 7;
+  repeated DiscordMessageAttachment attachments = 8;
 }
 
 message DiscordMessageAuthor {
@@ -83,6 +84,17 @@ message DiscordMessageReference {
   string messageId = 1;
   string channelId = 2;
   string guildId = 3;
+}
+
+message DiscordMessageAttachment {
+  string id = 1;
+  string messageId = 2;
+  string url = 3;
+  string fileName = 4;
+  uint64 fileSizeBytes = 5;
+  string contentType = 6;
+  bytes payload = 7;
+  string localUrl = 8;
 }
 
 message ChatMessage {
