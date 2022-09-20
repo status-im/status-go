@@ -209,6 +209,10 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Joined()
 }
 
+func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
+	return m.communitiesManager.Spectated()
+}
+
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
 	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
 
@@ -258,51 +262,14 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	return response, nil
 }
 
-func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
-	mr, err := m.joinCommunity(ctx, communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	communitySettings := communities.CommunitySettings{
-		CommunityID:                  communityID.String(),
-		HistoryArchiveSupportEnabled: true,
-	}
-
-	err = m.communitiesManager.SaveCommunitySettings(communitySettings)
-	if err != nil {
-		return nil, err
-	}
-
-	mr.AddCommunitySettings(&communitySettings)
-
-	if com, ok := mr.communities[communityID.String()]; ok {
-		err = m.syncCommunity(context.Background(), com)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return mr, nil
-}
-
-func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
-	logger := m.logger.Named("joinCommunity")
-
-	response := &MessengerResponse{}
-
-	community, err := m.communitiesManager.JoinCommunity(communityID)
-	if err != nil {
-		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
-		return nil, err
-	}
+func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
+	logger := m.logger.Named("initCommunityChats")
 
 	chatIDs := community.DefaultFilters()
 
 	chats := CreateCommunityChats(community, m.getTimesource())
-	response.AddChats(chats)
 
-	for _, chat := range response.Chats() {
+	for _, chat := range chats {
 		chatIDs = append(chatIDs, chat.ID)
 	}
 
@@ -342,28 +309,123 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		}
 	}
 
-	response.AddCommunity(community)
-
 	if err = m.saveChats(chats); err != nil {
 		logger.Debug("m.saveChats error", zap.Error(err))
 		return nil, err
 	}
 
-	err = m.reregisterForPushNotifications()
+	return chats, nil
+}
+
+func (m *Messenger) initCommunitySettings(communityID types.HexBytes) (*communities.CommunitySettings, error) {
+	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if communitySettings != nil {
+		return communitySettings, nil
+	}
+
+	communitySettings = &communities.CommunitySettings{
+		CommunityID:                  communityID.String(),
+		HistoryArchiveSupportEnabled: true,
+	}
+
+	if err := m.communitiesManager.SaveCommunitySettings(*communitySettings); err != nil {
+		return nil, err
+	}
+
+	return communitySettings, nil
+}
+
+func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+	mr, err := m.joinCommunity(ctx, communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.sendCurrentUserStatusToCommunity(ctx, community)
+	if com, ok := mr.communities[communityID.String()]; ok {
+		err = m.syncCommunity(context.Background(), com)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return mr, nil
+}
+
+func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+	logger := m.logger.Named("joinCommunity")
+
+	response := &MessengerResponse{}
+
+	community, err := m.communitiesManager.JoinCommunity(communityID)
 	if err != nil {
+		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
+		return nil, err
+	}
+
+	// chats and settings are already initialized for spectated communities
+	if !community.Spectated() {
+		chats, err := m.initCommunityChats(community)
+		if err != nil {
+			return nil, err
+		}
+		response.AddChats(chats)
+
+		if _, err = m.initCommunitySettings(communityID); err != nil {
+			return nil, err
+		}
+	}
+
+	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddCommunity(community)
+	response.AddCommunitySettings(communitySettings)
+
+	if err = m.reregisterForPushNotifications(); err != nil {
+		return nil, err
+	}
+
+	if err = m.sendCurrentUserStatusToCommunity(ctx, community); err != nil {
 		logger.Debug("m.sendCurrentUserStatusToCommunity error", zap.Error(err))
 		return nil, err
 	}
 
-	err = m.PublishIdentityImage()
+	if err = m.PublishIdentityImage(); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+	logger := m.logger.Named("SpectateCommunity")
+
+	response := &MessengerResponse{}
+
+	community, err := m.communitiesManager.SpectateCommunity(communityID)
+	if err != nil {
+		logger.Debug("SpectateCommunity error", zap.Error(err))
+		return nil, err
+	}
+
+	chats, err := m.initCommunityChats(community)
 	if err != nil {
 		return nil, err
 	}
+	response.AddChats(chats)
+
+	settings, err := m.initCommunitySettings(communityID)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunitySettings(settings)
+
+	response.AddCommunity(community)
 
 	return response, nil
 }

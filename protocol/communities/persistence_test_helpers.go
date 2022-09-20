@@ -11,6 +11,7 @@ type RawCommunityRow struct {
 	PrivateKey  []byte
 	Description []byte
 	Joined      bool
+	Spectated   bool
 	Verified    bool
 	SyncedAt    uint64
 	Muted       bool
@@ -22,6 +23,7 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommuni
 		PrivateKey:  syncCommProto.PrivateKey,
 		Description: syncCommProto.Description,
 		Joined:      syncCommProto.Joined,
+		Spectated:   syncCommProto.Spectated,
 		Verified:    syncCommProto.Verified,
 		SyncedAt:    syncCommProto.Clock,
 		Muted:       syncCommProto.Muted,
@@ -40,6 +42,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Verified,
 		&rcr.Muted,
 		&syncedAt,
+		&rcr.Spectated,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())

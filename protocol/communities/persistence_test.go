@@ -42,6 +42,36 @@ func (s *PersistenceSuite) SetupTest() {
 	s.db = &Persistence{db: db}
 }
 
+func (s *PersistenceSuite) TestSaveCommunity() {
+	id, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// there is one community inserted by default
+	communities, err := s.db.AllCommunities(&id.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	community := Community{
+		config: &Config{
+			PrivateKey:           id,
+			ID:                   &id.PublicKey,
+			Joined:               true,
+			Spectated:            true,
+			Verified:             true,
+			CommunityDescription: &protobuf.CommunityDescription{},
+		},
+	}
+	s.Require().NoError(s.db.SaveCommunity(&community))
+
+	communities, err = s.db.AllCommunities(&id.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 2)
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&id.PublicKey)), communities[1].ID())
+	s.Equal(true, communities[1].Joined())
+	s.Equal(true, communities[1].Spectated())
+	s.Equal(true, communities[1].Verified())
+}
+
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 	sc := &protobuf.SyncCommunity{
 		Id:          []byte("0x123456"),
@@ -244,6 +274,7 @@ func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
 		Description: []byte("this is a description"),
 		Joined:      true,
 		Verified:    true,
+		Spectated:   true,
 	}
 
 	// add a new community to the db
