@@ -374,6 +374,12 @@ func (api *PublicAPI) CuratedCommunities(parent context.Context) (*communities.K
 	return api.service.messenger.CuratedCommunities()
 }
 
+// SpectateCommunity spectates community with the given ID
+// Meaning user is only a spectator, not a member
+func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SpectateCommunity(communityID)
+}
+
 // JoinCommunity joins a community with the given ID
 func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.JoinCommunity(parent, communityID)

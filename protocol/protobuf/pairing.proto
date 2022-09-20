@@ -104,6 +104,7 @@ message SyncCommunity {
   repeated SyncCommunityRequestsToJoin requests_to_join = 8;
   SyncCommunitySettings settings = 9;
   bool encrypted = 10;
+  bool spectated = 11;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -166,7 +167,7 @@ message SyncProfilePicture {
   string name = 1;
   bytes  payload = 2;
 	uint32 width = 3;
-	uint32 height = 4;      
+	uint32 height = 4;
 	uint32 file_size = 5;
 	uint32 resize_target = 6;
   uint64 clock = 7;

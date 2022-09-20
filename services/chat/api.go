@@ -110,8 +110,23 @@ type API struct {
 	s *Service
 }
 
+func unique(communities []*communities.Community) (result []*communities.Community) {
+	inResult := make(map[string]bool)
+	for _, community := range communities {
+		if _, ok := inResult[community.IDString()]; !ok {
+			inResult[community.IDString()] = true
+			result = append(result, community)
+		}
+	}
+	return result
+}
+
 func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 	joinedCommunities, err := api.s.messenger.JoinedCommunities()
+	if err != nil {
+		return nil, err
+	}
+	spectatedCommunities, err := api.s.messenger.SpectatedCommunities()
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +167,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		result[pubKey].Chats[chat.ID] = c
 	}
 
-	for _, community := range joinedCommunities {
+	for _, community := range unique(append(joinedCommunities, spectatedCommunities...)) {
 		chGrp := ChannelGroup{
 			Type:           Community,
 			Name:           community.Name(),

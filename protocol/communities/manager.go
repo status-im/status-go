@@ -274,6 +274,10 @@ func (m *Manager) Joined() ([]*Community, error) {
 	return m.persistence.JoinedCommunities(m.identity)
 }
 
+func (m *Manager) Spectated() ([]*Community, error) {
+	return m.persistence.SpectatedCommunities(m.identity)
+}
+
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
 	return m.persistence.JoinedAndPendingCommunitiesWithRequests(m.identity)
 }
@@ -1018,6 +1022,21 @@ func (m *Manager) JoinCommunity(id types.HexBytes) (*Community, error) {
 	community.Join()
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
+		return nil, err
+	}
+	return community, nil
+}
+
+func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	community.Spectate()
+	if err = m.persistence.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 	return community, nil

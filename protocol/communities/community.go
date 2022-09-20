@@ -30,6 +30,7 @@ type Config struct {
 	Joined                        bool
 	Requested                     bool
 	Verified                      bool
+	Spectated                     bool
 	Muted                         bool
 	Logger                        *zap.Logger
 	RequestedToJoinAt             uint64
@@ -186,6 +187,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Admin                  bool                                 `json:"admin"`
 		Verified               bool                                 `json:"verified"`
 		Joined                 bool                                 `json:"joined"`
+		Spectated              bool                                 `json:"spectated"`
 		RequestedAccessAt      int                                  `json:"requestedAccessAt"`
 		Name                   string                               `json:"name"`
 		Description            string                               `json:"description"`
@@ -214,6 +216,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Chats:             make(map[string]CommunityChat),
 		Categories:        make(map[string]CommunityCategory),
 		Joined:            o.config.Joined,
+		Spectated:         o.config.Spectated,
 		CanRequestAccess:  o.CanRequestAccess(o.config.MemberIdentity),
 		CanJoin:           o.canJoin(),
 		CanManageUsers:    o.CanManageUsers(o.config.MemberIdentity),
@@ -820,6 +823,11 @@ func (o *Community) Join() {
 
 func (o *Community) Leave() {
 	o.config.Joined = false
+	o.config.Spectated = false
+}
+
+func (o *Community) Spectate() {
+	o.config.Spectated = true
 }
 
 func (o *Community) Encrypted() bool {
@@ -832,6 +840,10 @@ func (o *Community) Encrypt() {
 
 func (o *Community) Joined() bool {
 	return o.config.Joined
+}
+
+func (o *Community) Spectated() bool {
+	return o.config.Spectated
 }
 
 func (o *Community) Verified() bool {
@@ -869,8 +881,8 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 		return response, nil
 	}
 
-	// We only calculate changes if we joined the community or we requested access, otherwise not interested
-	if o.config.Joined || o.config.RequestedToJoinAt > 0 {
+	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
+	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
 		// Check for new members at the org level
 		for pk, member := range description.Members {
 			if _, ok := o.config.CommunityDescription.Members[pk]; !ok {
