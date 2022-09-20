@@ -350,3 +350,7 @@ func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
 func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
 	return api.db.DeleteKeycard(kcUID)
 }
+
+func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
+	return api.db.UpdateKeycardUID(oldKcUID, newKcUID)
+}

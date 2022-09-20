@@ -196,6 +196,7 @@ func TestKeypairs(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
+	keycardUID := "00000000000000000000000000000000"
 	keyPair1 := keypairs.KeyPair{
 		KeycardUID:        "00000000000000000000000000000001",
 		KeycardName:       "Card01",
@@ -270,8 +271,12 @@ func TestKeypairs(t *testing.T) {
 	}
 	require.Equal(t, true, locked)
 
+	// Test update keycard uid
+	err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID)
+	require.NoError(t, err)
+
 	// Test unlocking a locked keycard
-	err = db.KeycardUnlocked(keyPair1.KeycardUID)
+	err = db.KeycardUnlocked(keycardUID)
 	require.NoError(t, err)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
@@ -284,7 +289,7 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, false, locked)
 
 	// Test detleting a keycard
-	err = db.DeleteKeycard(keyPair1.KeycardUID)
+	err = db.DeleteKeycard(keycardUID)
 	require.NoError(t, err)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)

@@ -2,6 +2,7 @@ package keypairs
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -161,31 +162,32 @@ func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string) (err error) {
 	return err
 }
 
-func (kp *KeyPairs) updateKeycardLocked(kcUID string, locked bool) (err error) {
-	update, err := kp.db.Prepare(`
-		UPDATE 
-			keypairs 
-		SET 
-			keycard_locked = ?
-		WHERE 
-			keycard_uid = ?
-	`)
+func (kp *KeyPairs) execUpdateQuery(kcUID string, field string, value interface{}) (err error) {
+	var sql string
+	sql = fmt.Sprintf(`UPDATE keypairs SET %s = ? WHERE keycard_uid = ?`, field)
+
+	update, err := kp.db.Prepare(sql)
+
 	if err != nil {
 		return err
 	}
 	defer update.Close()
 
-	_, err = update.Exec(locked, kcUID)
+	_, err = update.Exec(value, kcUID)
 
 	return err
 }
 
 func (kp *KeyPairs) KeycardLocked(kcUID string) (err error) {
-	return kp.updateKeycardLocked(kcUID, true)
+	return kp.execUpdateQuery(kcUID, "keycard_locked", true)
 }
 
 func (kp *KeyPairs) KeycardUnlocked(kcUID string) (err error) {
-	return kp.updateKeycardLocked(kcUID, false)
+	return kp.execUpdateQuery(kcUID, "keycard_locked", false)
+}
+
+func (kp *KeyPairs) UpdateKeycardUID(oldKcUID string, newKcUID string) (err error) {
+	return kp.execUpdateQuery(oldKcUID, "keycard_uid", newKcUID)
 }
 
 func (kp *KeyPairs) DeleteKeycard(kcUID string) (err error) {
