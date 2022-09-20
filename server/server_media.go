@@ -33,12 +33,14 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		multiaccountsDB: multiaccountsDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
-		imagesPath:        handleImage(s.db, s.logger),
-		audioPath:         handleAudio(s.db, s.logger),
-		identiconsPath:    handleIdenticon(s.logger),
-		ipfsPath:          handleIPFS(s.downloader, s.logger),
-		accountImagesPath: handleAccountImages(s.multiaccountsDB, s.logger),
-		contactImagesPath: handleContactImages(s.db, s.logger),
+		imagesPath:             handleImage(s.db, s.logger),
+		audioPath:              handleAudio(s.db, s.logger),
+		identiconsPath:         handleIdenticon(s.logger),
+		ipfsPath:               handleIPFS(s.downloader, s.logger),
+		accountImagesPath:      handleAccountImages(s.multiaccountsDB, s.logger),
+		contactImagesPath:      handleContactImages(s.db, s.logger),
+		discordAuthorsPath:     handleDiscordAuthorAvatar(s.db, s.logger),
+		discordAttachmentsPath: handleDiscordAttachment(s.db, s.logger),
 	})
 
 	return s, nil
@@ -62,6 +64,22 @@ func (s *MediaServer) MakeImageURL(id string) string {
 	u := s.MakeBaseURL()
 	u.Path = imagesPath
 	u.RawQuery = url.Values{"messageId": {id}}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeDiscordAuthorAvatarURL(authorID string) string {
+	u := s.MakeBaseURL()
+	u.Path = discordAuthorsPath
+	u.RawQuery = url.Values{"authorId": {authorID}}.Encode()
+
+	return u.String()
+}
+
+func (s *MediaServer) MakeDiscordAttachmentURL(messageID string, id string) string {
+	u := s.MakeBaseURL()
+	u.Path = discordAttachmentsPath
+	u.RawQuery = url.Values{"messageId": {messageID}, "attachmentId": {id}}.Encode()
 
 	return u.String()
 }

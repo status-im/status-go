@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -4163,6 +4164,35 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	}
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
+	}
+	if msg.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+
+		dm := msg.GetDiscordMessage()
+		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
+		if err != nil {
+			return
+		}
+
+		if exists {
+			dm.Author.LocalUrl = s.MakeDiscordAuthorAvatarURL(dm.Author.Id)
+		}
+
+		for idx, attachment := range dm.Attachments {
+			if strings.Contains(attachment.ContentType, "image") {
+				hasPayload, err := m.persistence.HasDiscordMessageAttachmentPayload(attachment.Id)
+				if err != nil {
+					m.logger.Error("failed to check if message attachment exist", zap.Error(err))
+					continue
+				}
+				if hasPayload {
+					localURL := s.MakeDiscordAttachmentURL(dm.Id, attachment.Id)
+					dm.Attachments[idx].LocalUrl = localURL
+				}
+			}
+		}
+		msg.Payload = &protobuf.ChatMessage_DiscordMessage{
+			DiscordMessage: dm,
+		}
 	}
 	if msg.ContentType == protobuf.ChatMessage_AUDIO {
 		msg.AudioLocalURL = s.MakeAudioURL(msg.ID)
