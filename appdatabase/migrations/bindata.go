@@ -820,7 +820,7 @@ func _1664392661_add_third_party_id_to_waku_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1664392661_add_third_party_id_to_waku_messages.up.sql", size: 70, mode: os.FileMode(0664), modTime: time.Unix(1664392691, 0)}
+	info := bindataFileInfo{name: "1664392661_add_third_party_id_to_waku_messages.up.sql", size: 70, mode: os.FileMode(0664), modTime: time.Unix(1664438057, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfd, 0x67, 0x66, 0x9e, 0x66, 0x74, 0xce, 0x1c, 0xb, 0x1b, 0x9d, 0xd5, 0xfc, 0x65, 0xe, 0x83, 0x90, 0x4c, 0x61, 0x4e, 0x6b, 0xe7, 0x86, 0xbe, 0x36, 0x4f, 0x91, 0x36, 0x4, 0x47, 0x7b, 0x82}}
 	return a, nil
 }

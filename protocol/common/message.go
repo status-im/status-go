@@ -91,6 +91,12 @@ const (
 	OutgoingStatusDelivered = "delivered"
 )
 
+type Messages []*Message
+
+func (m Messages) GetClock(i int) uint64 {
+	return m[i].Clock
+}
+
 // Message represents a message record in the database,
 // more specifically in user_messages table.
 type Message struct {
