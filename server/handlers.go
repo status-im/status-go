@@ -25,11 +25,13 @@ import (
 )
 
 const (
-	basePath       = "/messages"
-	identiconsPath = basePath + "/identicons"
-	imagesPath     = basePath + "/images"
-	audioPath      = basePath + "/audio"
-	ipfsPath       = "/ipfs"
+	basePath               = "/messages"
+	identiconsPath         = basePath + "/identicons"
+	imagesPath             = basePath + "/images"
+	audioPath              = basePath + "/audio"
+	ipfsPath               = "/ipfs"
+	discordAuthorsPath     = "/discord/authors"
+	discordAttachmentsPath = basePath + "/discord/attachments"
 
 	// Handler routes for pairing
 	pairingBase      = "/pairing"
@@ -228,6 +230,79 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "max-age:290304000, public")
 		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authorIDs, ok := r.URL.Query()["authorId"]
+		if !ok || len(authorIDs) == 0 {
+			logger.Error("no authorIDs")
+			return
+		}
+		authorID := authorIDs[0]
+
+		var image []byte
+		err := db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, authorID).Scan(&image)
+		if err != nil {
+			logger.Error("failed to find image", zap.Error(err))
+			return
+		}
+		if len(image) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.ImageMime(image)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(image)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		messageIDs, ok := r.URL.Query()["messageId"]
+		if !ok || len(messageIDs) == 0 {
+			logger.Error("no messageID")
+			return
+		}
+		attachmentIDs, ok := r.URL.Query()["attachmentId"]
+		if !ok || len(attachmentIDs) == 0 {
+			logger.Error("no attachmentID")
+			return
+		}
+		messageID := messageIDs[0]
+		attachmentID := attachmentIDs[0]
+		var image []byte
+		err := db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, messageID, attachmentID).Scan(&image)
+		if err != nil {
+			logger.Error("failed to find image", zap.Error(err))
+			return
+		}
+		if len(image) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.ImageMime(image)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
 
 		_, err = w.Write(image)
 		if err != nil {
