@@ -888,7 +888,7 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
-	if configJSON != "" {
+	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
 	}
 
@@ -906,7 +906,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
-	if configJSON != "" {
+	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
 	}
 
@@ -931,7 +931,7 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
-	if configJSON != "" {
+	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
 	}
 
