@@ -54,6 +54,9 @@ type StatusMessage struct {
 	Installations []*multidevice.Installation
 	// SharedSecret is the shared secret returned by the encryption layer
 	SharedSecrets []*sharedsecret.Secret
+
+	// HashRatchetInfo is the information about a new hash ratchet group/key pair
+	HashRatchetInfo []*encryption.HashRatchetInfo
 }
 
 // Temporary JSON marshaling for those messages that are not yet processed
@@ -133,6 +136,14 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 		m.Hash,
 	)
 
+	if err == encryption.ErrHashRatchetGroupIDNotFound {
+
+		if response != nil {
+			m.HashRatchetInfo = response.HashRatchetInfo
+		}
+		return err
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "failed to handle Encryption message")
 	}
@@ -140,6 +151,7 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 	m.DecryptedPayload = response.DecryptedMessage
 	m.Installations = response.Installations
 	m.SharedSecrets = response.SharedSecrets
+	m.HashRatchetInfo = response.HashRatchetInfo
 	return nil
 }
 

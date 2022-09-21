@@ -1615,3 +1615,42 @@ func TestUpdateDiscordMessageAuthorImage(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte{0, 1, 2, 3}, payload)
 }
+
+func TestSaveHashRatchetMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	groupID1 := []byte("group-id-1")
+	groupID2 := []byte("group-id-2")
+	var keyID uint32 = 3
+
+	message1 := &types.Message{
+		Hash:      []byte{1},
+		Sig:       []byte{2},
+		TTL:       1,
+		Timestamp: 2,
+		Payload:   []byte{3},
+	}
+
+	require.NoError(t, p.SaveHashRatchetMessage(groupID1, keyID, message1))
+
+	message2 := &types.Message{
+		Hash:      []byte{2},
+		Sig:       []byte{2},
+		TTL:       1,
+		Topic:     types.BytesToTopic([]byte{5}),
+		Timestamp: 2,
+		Payload:   []byte{3},
+		Dst:       []byte{4},
+		P2P:       true,
+	}
+
+	require.NoError(t, p.SaveHashRatchetMessage(groupID2, keyID, message2))
+
+	fetchedMessages, err := p.GetHashRatchetMessages(groupID1, keyID)
+	require.NoError(t, err)
+	require.NotNil(t, fetchedMessages)
+	require.Len(t, fetchedMessages, 1)
+	require.Equal(t, fetchedMessages[0], message1)
+}

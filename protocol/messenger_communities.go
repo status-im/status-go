@@ -641,12 +641,18 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
+	err = m.SendKeyExchangeMessage(community.ID(), []*ecdsa.PublicKey{pk}, common.KeyExMsgReuse)
+	if err != nil {
+		return nil, err
+	}
+
 	rawMessage := &common.RawMessage{
 		Payload:        payload,
 		Sender:         community.PrivateKey(),
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 	}
+
 	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 	if err != nil {
 		return nil, err

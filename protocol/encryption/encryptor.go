@@ -25,8 +25,9 @@ var (
 	// but from a device that has not been paired.
 	// This should not happen because the protocol forbids sending a message to
 	// non-paired devices, however, in theory it is possible to receive such a message.
-	ErrNotPairedDevice         = errors.New("received a message from not paired device")
-	ErrHashRatchetSeqNoTooHigh = errors.New("Hash ratchet seq no is too high")
+	ErrNotPairedDevice            = errors.New("received a message from not paired device")
+	ErrHashRatchetSeqNoTooHigh    = errors.New("Hash ratchet seq no is too high")
+	ErrHashRatchetGroupIDNotFound = errors.New("Hash ratchet group id not found")
 )
 
 // If we have no bundles, we use a constant so that the message can reach any device.
@@ -237,15 +238,20 @@ func (s *encryptor) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bund
 	return s.persistence.AddPublicBundle(b)
 }
 
+func (s *encryptor) GetMessage(msgs map[string]*EncryptedMessageProtocol) *EncryptedMessageProtocol {
+	msg := msgs[s.config.InstallationID]
+	if msg == nil {
+		msg = msgs[noInstallationID]
+	}
+	return msg
+}
+
 // DecryptPayload decrypts the payload of a EncryptedMessageProtocol, given an identity private key and the sender's public key
 func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	msg := msgs[s.config.InstallationID]
-	if msg == nil {
-		msg = msgs[noInstallationID]
-	}
+	msg := s.GetMessage(msgs)
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil && !samePublicKeys(*theirIdentityKey, myIdentityKey.PublicKey) {
@@ -697,6 +703,10 @@ func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, pa
 	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, seqNo)
 	if err != nil {
 		return nil, err
+	}
+
+	if hrCache == nil {
+		return nil, ErrHashRatchetGroupIDNotFound
 	}
 
 	// Handle mesages with seqNo less than the one in db

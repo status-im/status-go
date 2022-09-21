@@ -816,6 +816,35 @@ func (s *sqlitePersistence) GetCurrentKeyForGroup(groupID []byte) (uint32, error
 	}
 }
 
+// GetKeyIDsForGroup retrieves all key IDs for given group ID
+func (s *sqlitePersistence) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
+
+	var keyIDs []uint32
+	stmt, err := s.DB.Prepare(`SELECT key_id
+				   FROM hash_ratchet_encryption
+				     WHERE group_id = ? order by key_id desc`)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var keyID uint32
+		err := rows.Scan(&keyID)
+		if err != nil {
+			return nil, err
+		}
+		keyIDs = append(keyIDs, keyID)
+	}
+
+	return keyIDs, nil
+}
+
 // SaveHashRachetKeyHash saves a hash ratchet key cache data
 func (s *sqlitePersistence) SaveHashRatchetKeyHash(
 	groupID []byte,
