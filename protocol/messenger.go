@@ -62,7 +62,7 @@ import (
 	"github.com/status-im/status-go/telemetry"
 )
 
-//todo: kozieiev: get rid of wakutransp word
+// todo: kozieiev: get rid of wakutransp word
 type chatContext string
 
 const (
@@ -3161,6 +3161,29 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleDeleteMessage(messageState, deleteMessage)
 						if err != nil {
 							logger.Warn("failed to handle DeleteMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.DeleteForMeMessage:
+						logger.Debug("Handling DeleteForMeMessage")
+						deleteForMeProto := msg.ParsedMessage.Interface().(protobuf.DeleteForMeMessage)
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteForMeProto)
+						deleteForMeMessage := DeleteForMeMessage{
+							DeleteForMeMessage: deleteForMeProto,
+							From:               contact.ID,
+							ID:                 messageID,
+							SigPubKey:          publicKey,
+						}
+
+						err = m.HandleDeleteForMeMessage(messageState, deleteForMeMessage)
+						if err != nil {
+							logger.Warn("failed to handle DeleteForMeMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

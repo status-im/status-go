@@ -78,6 +78,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replace_message,
 		edited_at,
 		deleted,
+		deleted_for_me,
 		rtl,
 		line_count,
 		response_to,
@@ -122,6 +123,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.replace_message,
 		m1.edited_at,
 		m1.deleted,
+		m1.deleted_for_me,
 		m1.rtl,
 		m1.line_count,
 		m1.response_to,
@@ -177,6 +179,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
 	var deleted sql.NullBool
+	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
@@ -222,6 +225,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Replace,
 		&editedAt,
 		&deleted,
+		&deletedForMe,
 		&message.RTL,
 		&message.LineCount,
 		&message.ResponseTo,
@@ -262,6 +266,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if deleted.Valid {
 		message.Deleted = deleted.Bool
+	}
+
+	if deletedForMe.Valid {
+		message.DeletedForMe = deletedForMe.Bool
 	}
 
 	if contactRequestState.Valid {
@@ -422,6 +430,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Replace,
 		int64(message.EditedAt),
 		message.Deleted,
+		message.DeletedForMe,
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,
@@ -608,6 +617,49 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	if len(result) > limit {
 		newCursor = cursors[limit]
 		result = result[:limit]
+	}
+	return result, newCursor, nil
+}
+
+func (db sqlitePersistence) LatestMessageByChatID(chatID string) ([]*common.Message, string, error) {
+	args := []interface{}{chatID}
+	where := fmt.Sprintf(`
+            WHERE
+                NOT(m1.hide) AND NOT(m1.deleted_for_me) AND m1.local_chat_id = ?
+            ORDER BY cursor DESC
+            LIMIT ?`)
+
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
+
+	rows, err := db.db.Query(
+		query,
+		append(args, 2)...,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.Message
+		cursors []string
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, "", err
+		}
+		result = append(result, &message)
+		cursors = append(cursors, cursor)
+	}
+
+	var newCursor string
+	if len(result) > 1 {
+		newCursor = cursors[1]
+		result = result[:1]
 	}
 	return result, newCursor, nil
 }

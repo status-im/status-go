@@ -247,6 +247,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.EditMessage))
 	case protobuf.ApplicationMetadataMessage_DELETE_MESSAGE:
 		return m.unmarshalProtobufData(new(protobuf.DeleteMessage))
+	case protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.DeleteForMeMessage))
 	case protobuf.ApplicationMetadataMessage_STATUS_UPDATE:
 		return m.unmarshalProtobufData(new(protobuf.StatusUpdate))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
