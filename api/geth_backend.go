@@ -296,6 +296,15 @@ func (b *GethStatusBackend) setupLogSettings() error {
 // TODO: we should use a proper struct with optional values instead of duplicating the regular functions
 // with small variants for keycard, this created too many bugs
 func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	if acc.KDFIterations == 0 {
+		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
+		if err != nil {
+			return err
+		}
+
+		acc.KDFIterations = kdfIterations
+	}
+
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
