@@ -908,7 +908,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = community.AddMember(pk)
+	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{})
 	if err != nil {
 		return nil, err
 	}
@@ -1202,7 +1202,7 @@ func (m *Manager) InviteUsersToCommunity(communityID types.HexBytes, pks []*ecds
 	return m.inviteUsersToCommunity(community, pks)
 }
 
-func (m *Manager) AddMemberToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1211,7 +1211,7 @@ func (m *Manager) AddMemberToCommunity(communityID types.HexBytes, pk *ecdsa.Pub
 		return nil, ErrOrgNotFound
 	}
 
-	err = community.AddMember(pk)
+	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL})
 	if err != nil {
 		return nil, err
 	}

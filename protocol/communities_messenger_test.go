@@ -826,6 +826,51 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().NoError(err)
 }
 
+func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
+	ctx := context.Background()
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create a community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().True(response.Communities()[0].IsAdmin())
+	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.bob.identity.PublicKey))
+	s.Require().False(response.Communities()[0].IsMemberAdmin(&s.alice.identity.PublicKey))
+
+	community := response.Communities()[0]
+	communitySettings := response.CommunitiesSettings()[0]
+
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
+
+	category := &requests.CreateCommunityCategory{
+		CommunityID:  community.ID(),
+		CategoryName: "category-name",
+		ChatIDs:      []string{},
+	}
+
+	response, err = s.bob.CreateCommunityCategory(category)
+	s.Require().NoError(err)
+	community = response.Communities()[0]
+
+	privateKey, err := s.bob.ExportCommunity(community.ID())
+	s.Require().NoError(err)
+
+	response, err = s.alice.ImportCommunity(ctx, privateKey)
+	s.Require().NoError(err)
+	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.alice.identity.PublicKey))
+}
+
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	ctx := context.Background()
 

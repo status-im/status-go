@@ -1120,12 +1120,16 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	//request info already stored on mailserver, but its success is not crucial
-	// for import
-	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString(), false)
+	_, err = m.RequestCommunityInfoFromMailserver(community.IDString(), false)
+	if err != nil {
+		// TODO In the future we should add a mechanism to re-apply next steps (adding owner, joining)
+		// if there is no connection with mailserver. Otherwise changes will be overwritten.
+		// Do not return error to make tests pass.
+		m.logger.Error("Can't request community info from mailserver")
+	}
 
 	// We add ourselves
-	community, err = m.communitiesManager.AddMemberToCommunity(community.ID(), &m.identity.PublicKey)
+	community, err = m.communitiesManager.AddMemberOwnerToCommunity(community.ID(), &m.identity.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1390,6 +1394,7 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string, useDa
 			return community, nil
 		}
 	}
+
 	return m.requestCommunityInfoFromMailserver(communityID, true)
 }
 

@@ -550,7 +550,7 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 		return nil, ErrNotAdmin
 	}
 
-	err := o.AddMember(pk)
+	err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
 	if err != nil {
 		return nil, err
 	}
@@ -1630,7 +1630,7 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
 }
 
-func (o *Community) AddMember(publicKey *ecdsa.PublicKey) error {
+func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) error {
 	if o.config.PrivateKey == nil {
 		return ErrNotAdmin
 	}
@@ -1642,7 +1642,7 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey) error {
 	}
 
 	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
-		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{}
+		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
 	}
 	o.increaseClock()
 	return nil
