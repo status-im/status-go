@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/gen2brain/aac-go"
 	"github.com/stretchr/testify/require"
+	"github.com/youpy/go-wav"
 )
 
 func TestEncode(t *testing.T) {
@@ -121,38 +124,49 @@ func Test(t *testing.T) {
 func TestWavToAAC(t *testing.T) {
 	file, err := os.Open(path + "BabyElephantWalk60.wav")
 	if err != nil {
-		panic(err)
+		require.NoError(t, err)
 	}
 
 	wreader := wav.NewReader(file)
 	f, err := wreader.Format()
 	if err != nil {
-		panic(err)
+		require.NoError(t, err)
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0))
 
-	opts := &aac.Options{}
-	opts.SampleRate = int(f.SampleRate)
-	opts.NumChannels = int(f.NumChannels)
+	spew.Dump(f)
 
-	enc, err := aac.NewEncoder(buf, opts)
-	if err != nil {
-		panic(err)
+	for i := 0; i < 10; i++ {
+		opts := &aac.Options{
+			SampleRate:  int(f.SampleRate * uint32((10-i)/100)),
+			BitRate:     int(f.ByteRate), // Yes BitRate == ByteRate, don't know why
+			NumChannels: int(f.NumChannels),
+		}
+
+		spew.Dump(opts)
+
+		enc, err := aac.NewEncoder(buf, opts)
+		if err != nil {
+			require.NoError(t, err)
+		}
+
+		err = enc.Encode(wreader)
+		if err != nil {
+			require.NoError(t, err)
+		}
+
+		err = enc.Close()
+		if err != nil {
+			require.NoError(t, err)
+		}
+
+		fn := fmt.Sprintf(path+"test_test_%d_%d.aac", opts.SampleRate, opts.BitRate)
+
+		err = ioutil.WriteFile(fn, buf.Bytes(), 0644)
+		if err != nil {
+			require.NoError(t, err)
+		}
 	}
 
-	err = enc.Encode(wreader)
-	if err != nil {
-		panic(err)
-	}
-
-	err = enc.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	err = ioutil.WriteFile("test.aac", buf.Bytes(), 0644)
-	if err != nil {
-		panic(err)
-	}
 }

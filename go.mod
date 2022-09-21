@@ -80,7 +80,11 @@ require (
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3
 )
 
-require github.com/gorilla/sessions v1.2.1
+require (
+	github.com/gen2brain/aac-go v0.0.0-20180306134136-400c68157565
+	github.com/gorilla/sessions v1.2.1
+	github.com/youpy/go-wav v0.3.2
+)
 
 require (
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect
@@ -246,6 +250,8 @@ require (
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	github.com/youpy/go-riff v0.1.0 // indirect
+	github.com/zaf/g711 v0.0.0-20190814101024-76a4a538f52b // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect

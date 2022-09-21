@@ -287,6 +287,10 @@ github.com/fsnotify/fsnotify
 # github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 ## explicit
 github.com/gballet/go-libpcsclite
+# github.com/gen2brain/aac-go v0.0.0-20180306134136-400c68157565
+## explicit
+github.com/gen2brain/aac-go
+github.com/gen2brain/aac-go/aacenc
 # github.com/go-ole/go-ole v1.2.5
 ## explicit; go 1.12
 github.com/go-ole/go-ole
@@ -1066,6 +1070,15 @@ github.com/xeipuuv/gojsonreference
 # github.com/xeipuuv/gojsonschema v1.2.0
 ## explicit
 github.com/xeipuuv/gojsonschema
+# github.com/youpy/go-riff v0.1.0
+## explicit
+github.com/youpy/go-riff
+# github.com/youpy/go-wav v0.3.2
+## explicit; go 1.14
+github.com/youpy/go-wav
+# github.com/zaf/g711 v0.0.0-20190814101024-76a4a538f52b
+## explicit
+github.com/zaf/g711
 # github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 ## explicit; go 1.14
 github.com/zenthangplus/goccm
