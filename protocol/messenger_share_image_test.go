@@ -119,6 +119,17 @@ func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(response.Messages()[0].Text, "An image")
+
 	shareResponse, err := s.m.ShareImageMessage(
 		&requests.ShareImageMessage{
 			MessageID: MessageID,
@@ -135,8 +146,9 @@ func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
 		"no messages",
 	)
+
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages(), 2)
-
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(response.Messages()[0].Text, "This message has been shared with you")
 }
