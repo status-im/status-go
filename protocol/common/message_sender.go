@@ -294,7 +294,7 @@ func (s *MessageSender) sendCommunity(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to marshal")
 		}
-		hash, newMessage, err = s.sendCommunityChatMessage(ctx, rawMessage, payload)
+		hash, newMessage, err = s.dispatchCommunityChatMessage(ctx, rawMessage, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +314,7 @@ func (s *MessageSender) sendCommunity(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
-		hash, newMessage, err = s.sendCommunityMessage(ctx, pubkey, payload, messageIDs)
+		hash, newMessage, err = s.dispatchCommunityMessage(ctx, pubkey, payload, messageIDs)
 		if err != nil {
 			s.logger.Error("failed to send a community message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
@@ -493,7 +493,7 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 	return s.encodeMembershipUpdate(message, chatEntity)
 }
 
-func (s *MessageSender) sendCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte) ([]byte, *types.NewMessage, error) {
 
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
@@ -610,6 +610,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message, applicationLay
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
 	var statusMessages []*v1protocol.StatusMessage
+	var acks [][]byte
 
 	err := statusMessage.HandleTransport(shhMessage)
 	if err != nil {
@@ -622,11 +623,48 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message, applicationLay
 		hlogger.Debug("failed to handle an encryption message", zap.Error(err))
 	}
 
-	statusMessages, acks, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
+	// Hash ratchet with a group id not found yet
+	if err == encryption.ErrHashRatchetGroupIDNotFound && len(statusMessage.HashRatchetInfo) == 1 {
+		info := statusMessage.HashRatchetInfo[0]
+		err := s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, shhMessage)
+		return nil, nil, err
+	}
+
+	// Check if there are undecrypted message
+	for _, hashRatchetInfo := range statusMessage.HashRatchetInfo {
+		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.GroupID, hashRatchetInfo.KeyID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for _, message := range messages {
+			var statusMessage v1protocol.StatusMessage
+			err := statusMessage.HandleTransport(message)
+			if err != nil {
+				hlogger.Error("failed to handle transport layer message", zap.Error(err))
+				return nil, nil, err
+			}
+			stms, as, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
+			if err != nil {
+				hlogger.Debug("failed to handle datasync message", zap.Error(err))
+				//that wasn't a datasync message, so use the original payload
+				statusMessages = append(stms, &statusMessage)
+
+			} else {
+				statusMessages = append(statusMessages, stms...)
+				acks = append(acks, as...)
+			}
+		}
+	}
+
+	stms, as, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
 	if err != nil {
 		hlogger.Debug("failed to handle datasync message", zap.Error(err))
 		//that wasn't a datasync message, so use the original payload
-		statusMessages = append(statusMessages, &statusMessage)
+		statusMessages = append(stms, &statusMessage)
+	} else {
+		statusMessages = append(statusMessages, stms...)
+		acks = append(acks, as...)
 	}
 
 	for _, statusMessage := range statusMessages {
@@ -805,7 +843,7 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 
 // sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) sendCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,

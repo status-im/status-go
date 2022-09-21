@@ -105,7 +105,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 
 	s.logger.Info("Hash ratchet key exchange 1")
 	keyID1, _ := s.alice.encryptor.GenerateHashRatchetKey(communityID)
-	hashRatchetKeyExMsg1, _ := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, communityID, keyID1)
+	hashRatchetKeyExMsg1, _ := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, communityID, []uint32{keyID1})
 
 	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg1)
@@ -146,7 +146,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	// Re-generate hash ratchet key. Bob generates a new key and sends it to Alice
 
 	keyID2, _ := s.bob.encryptor.GenerateHashRatchetKey(communityID)
-	hashRatchetKeyExMsg2, _ := s.bob.BuildHashRatchetKeyExchangeMessage(bobKey, &aliceKey.PublicKey, communityID, keyID2)
+	hashRatchetKeyExMsg2, _ := s.bob.BuildHashRatchetKeyExchangeMessage(bobKey, &aliceKey.PublicKey, communityID, []uint32{keyID2})
 
 	s.logger.Info("Hash ratchet key exchange 2", zap.Any("msg", hashRatchetKeyExMsg2.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg2)

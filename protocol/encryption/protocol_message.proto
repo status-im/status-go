@@ -64,6 +64,15 @@ message HRHeader {
   bytes group_id = 3;
 }
 
+message HRKeys {
+  repeated HRKey keys = 1;
+}
+
+message HRKey {
+  uint32 key_id = 1;
+  bytes key = 2;
+}
+
 // Direct message value
 message EncryptedMessageProtocol {
   X3DHHeader X3DH_header = 1;
