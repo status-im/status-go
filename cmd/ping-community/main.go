@@ -145,7 +145,7 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID)
+	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, true)
 	if err != nil {
 
 		logger.Error("community error", "error", err)

@@ -1114,7 +1114,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 
 	//request info already stored on mailserver, but its success is not crucial
 	// for import
-	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString())
+	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString(), false)
 
 	// We add ourselves
 	community, err = m.communitiesManager.AddMemberToCommunity(community.ID(), &m.identity.PublicKey)
@@ -1342,14 +1342,17 @@ func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Co
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
-// from mailserver. It waits until it  has the community before returning it
-func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	community, err := m.findCommunityInfoFromDB(communityID)
-	if err != nil {
-		return nil, err
-	}
-	if community != nil {
-		return community, nil
+// from mailserver. It waits until it has the community before returning it.
+// If useDatabase is true, it searches for community in database and does not request mailserver.
+func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string, useDatabase bool) (*communities.Community, error) {
+	if useDatabase {
+		community, err := m.findCommunityInfoFromDB(communityID)
+		if err != nil {
+			return nil, err
+		}
+		if community != nil {
+			return community, nil
+		}
 	}
 	return m.requestCommunityInfoFromMailserver(communityID, true)
 }

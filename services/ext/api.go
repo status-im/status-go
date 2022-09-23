@@ -1032,7 +1032,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, true)
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
