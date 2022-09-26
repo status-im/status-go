@@ -115,6 +115,11 @@ func getTransferByHash(ctx context.Context, client *chain.Client, signer types.S
 		return nil, err
 	}
 
+	baseGasFee, err := client.GetBaseFeeFromBlock(big.NewInt(int64(transactionLog.BlockNumber)))
+	if err != nil {
+		return nil, err
+	}
+
 	transfer := &Transfer{Type: transferType,
 		ID:          hash,
 		Address:     address,
@@ -124,7 +129,9 @@ func getTransferByHash(ctx context.Context, client *chain.Client, signer types.S
 		Transaction: transaction,
 		From:        from,
 		Receipt:     receipt,
-		Log:         transactionLog}
+		Log:         transactionLog,
+		BaseGasFees: baseGasFee,
+	}
 
 	return transfer, nil
 }
@@ -355,6 +362,11 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		binary.BigEndian.PutUint32(index[:], uint32(l.Index))
 		id := crypto.Keccak256Hash(l.TxHash.Bytes(), index[:])
 
+		baseGasFee, err := d.client.GetBaseFeeFromBlock(new(big.Int).SetUint64(l.BlockNumber))
+		if err != nil {
+			return nil, err
+		}
+
 		header := &DBHeader{
 			Number: big.NewInt(int64(l.BlockNumber)),
 			Hash:   l.BlockHash,
@@ -366,7 +378,9 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 				From:        address,
 				Loaded:      false,
 				Type:        erc20Transfer,
-				Log:         &l}}}
+				Log:         &l,
+				BaseGasFees: baseGasFee,
+			}}}
 
 		concurrent.Add(func(ctx context.Context) error {
 			concurrent.PushHeader(header)

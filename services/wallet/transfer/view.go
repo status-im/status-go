@@ -21,6 +21,8 @@ type View struct {
 	GasPrice             *hexutil.Big   `json:"gasPrice"`
 	MaxFeePerGas         *hexutil.Big   `json:"maxFeePerGas"`
 	MaxPriorityFeePerGas *hexutil.Big   `json:"maxPriorityFeePerGas"`
+	EffectiveTip         *hexutil.Big   `json:"effectiveTip"`
+	EffectiveGasPrice    *hexutil.Big   `json:"effectiveGasPrice"`
 	GasLimit             hexutil.Uint64 `json:"gasLimit"`
 	GasUsed              hexutil.Uint64 `json:"gasUsed"`
 	Nonce                hexutil.Uint64 `json:"nonce"`
@@ -53,6 +55,15 @@ func CastToTransferView(t Transfer) View {
 	view.BlockHash = t.BlockHash
 	view.Timestamp = hexutil.Uint64(t.Timestamp)
 	view.GasPrice = (*hexutil.Big)(t.Transaction.GasPrice())
+	if t.BaseGasFees != "" {
+		baseFee := new(big.Int)
+		baseFee.SetString(t.BaseGasFees[2:], 16)
+		tip := t.Transaction.EffectiveGasTipValue(baseFee)
+
+		view.EffectiveTip = (*hexutil.Big)(tip)
+		price := new(big.Int).Add(baseFee, tip)
+		view.EffectiveGasPrice = (*hexutil.Big)(price)
+	}
 	view.MaxFeePerGas = (*hexutil.Big)(t.Transaction.GasFeeCap())
 	view.MaxPriorityFeePerGas = (*hexutil.Big)(t.Transaction.GasTipCap())
 	view.GasLimit = hexutil.Uint64(t.Transaction.Gas())
