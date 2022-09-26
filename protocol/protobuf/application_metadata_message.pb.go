@@ -219,8 +219,7 @@ func (ApplicationMetadataMessage_Type) EnumDescriptor() ([]byte, []int) {
 type ApplicationMetadataMessage struct {
 	// Signature of the payload field
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
-	// This is the encoded protobuf of the application level message, i.e
-	// ChatMessage
+	// This is the encoded protobuf of the application level message, i.e ChatMessage
 	Payload []byte `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
 	// The type of protobuf message sent
 	Type                 ApplicationMetadataMessage_Type `protobuf:"varint,3,opt,name=type,proto3,enum=protobuf.ApplicationMetadataMessage_Type" json:"type,omitempty"`

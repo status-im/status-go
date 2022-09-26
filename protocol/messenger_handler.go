@@ -1193,7 +1193,11 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		var err error
 		originalMessage, err = m.persistence.MessageByID(messageID)
 
-		if err != nil && err != common.ErrRecordNotFound {
+		if err == common.ErrRecordNotFound {
+			return m.persistence.SaveDeleteForMe(deleteForMeMessage)
+		}
+
+		if err != nil {
 			return err
 		}
 	}
@@ -1212,17 +1216,11 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 	}
 
 	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteForMeMessage.MessageId))
-	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteForMeMessage.MessageId)
 
+	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteForMeMessage.MessageId)
 	if err != nil {
 		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
 		return err
-	}
-
-	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-		if err := m.updateLastMessage(chat); err != nil {
-			return err
-		}
 	}
 
 	state.Response.AddMessage(originalMessage)
@@ -1232,8 +1230,8 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 }
 
 func (m *Messenger) updateLastMessage(chat *Chat) error {
-	// Get last message that is not hidden or deletedForMe
-	messages, _, err := m.persistence.LatestMessageByChatID(chat.ID)
+	// Get last message that is not hidden
+	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
 	if err != nil {
 		return err
 	}
@@ -1360,6 +1358,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	err = m.checkForDeletes(receivedMessage)
+	if err != nil {
+		return err
+	}
+
+	err = m.checkForDeleteForMes(receivedMessage)
 	if err != nil {
 		return err
 	}
@@ -2051,6 +2054,21 @@ func (m *Messenger) checkForDeletes(message *common.Message) error {
 	}
 
 	return m.applyDeleteMessage(messageDeletes, message)
+}
+
+func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
+	// Check for any pending delete for mes
+	// If any pending deletes are available and valid, apply them
+	messageDeleteForMes, err := m.persistence.GetDeleteForMes(message.ID, message.From)
+	if err != nil {
+		return err
+	}
+
+	if len(messageDeleteForMes) == 0 {
+		return nil
+	}
+
+	return m.applyDeleteForMeMessage(messageDeleteForMes, message)
 }
 
 func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {

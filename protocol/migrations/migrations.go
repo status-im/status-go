@@ -61,7 +61,7 @@
 // 1662044232_add_chat_image.up.sql (49B)
 // 1662106895_add_chat_first_message_timestamp.up.sql (113B)
 // 1662723928_add_discord_author_image_fields.up.sql (75B)
-// 1663730361_add_deleted_for_me_column_in_user_messages.up.sql (72B)
+// 1664195977_add_deleted_for_mes.up.sql (352B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1347,28 +1347,28 @@ func _1662723928_add_discord_author_image_fieldsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662723928_add_discord_author_image_fields.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1663658247, 0)}
+	info := bindataFileInfo{name: "1662723928_add_discord_author_image_fields.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1664174288, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1e, 0x5b, 0x48, 0x57, 0x98, 0x55, 0x9a, 0xf1, 0x75, 0xf7, 0xb5, 0x41, 0x5e, 0x96, 0xc5, 0xce, 0xfc, 0x30, 0x5c, 0x15, 0x35, 0x9e, 0x4e, 0x4a, 0x3b, 0x38, 0x42, 0xc4, 0x27, 0x3c, 0x87, 0xbf}}
 	return a, nil
 }
 
-var __1663730361_add_deleted_for_me_column_in_user_messagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x49\xcd\x49\x2d\x49\x4d\x89\x4f\xcb\x07\xc9\x2b\x38\xf9\xfb\xfb\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\xb8\x39\xfa\x04\xbb\x5a\x73\x01\x02\x00\x00\xff\xff\xdc\x7e\x59\x9c\x48\x00\x00\x00")
+var __1664195977_add_deleted_for_mesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\x8e\x41\x6a\xc3\x30\x10\x45\xf7\x3a\xc5\x5f\xda\x90\x1b\x64\x35\xb1\x26\xad\xe9\x44\x2a\xaa\x5c\x9a\x95\x28\xd6\xb4\x98\xa6\x18\xa2\xf8\xfe\xa5\x60\x30\x2e\x6e\xd6\x6f\xde\xfc\x47\x12\x39\x20\xd2\x41\x18\x53\xd1\x6b\xfa\xd6\x52\xde\x3f\xb5\x80\xac\x45\xe3\xa5\x3b\x39\x64\xbd\xe8\x4d\x73\xfa\x18\x7f\x39\x0e\xde\x0b\x2c\x1f\xa9\x93\x88\x23\xc9\x0b\xef\x8d\x69\x02\x53\xe4\xad\x4f\x69\xad\x17\x54\x06\xe8\x2f\x63\xff\x85\xd6\x45\x7e\xe0\x00\xe7\x23\x5c\x27\xb2\x33\xc0\xac\xa5\x21\xe3\x95\x42\xf3\x48\x6b\x5c\xc6\xe9\xda\xeb\x26\xfa\xc7\x78\x0e\xed\x89\xc2\x19\x4f\x7c\xae\x86\x5c\x9b\x7a\xa9\x6d\x9d\xe5\xb7\xfb\xb5\x69\xe9\x49\xf3\xb6\x77\x7f\x14\xcd\xc3\xad\x54\xcb\xe1\x6e\xae\xac\xf7\xe6\x27\x00\x00\xff\xff\x2f\xc2\xbe\x8e\x60\x01\x00\x00")
 
-func _1663730361_add_deleted_for_me_column_in_user_messagesUpSqlBytes() ([]byte, error) {
+func _1664195977_add_deleted_for_mesUpSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__1663730361_add_deleted_for_me_column_in_user_messagesUpSql,
-		"1663730361_add_deleted_for_me_column_in_user_messages.up.sql",
+		__1664195977_add_deleted_for_mesUpSql,
+		"1664195977_add_deleted_for_mes.up.sql",
 	)
 }
 
-func _1663730361_add_deleted_for_me_column_in_user_messagesUpSql() (*asset, error) {
-	bytes, err := _1663730361_add_deleted_for_me_column_in_user_messagesUpSqlBytes()
+func _1664195977_add_deleted_for_mesUpSql() (*asset, error) {
+	bytes, err := _1664195977_add_deleted_for_mesUpSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1663730361_add_deleted_for_me_column_in_user_messages.up.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1663730420, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x91, 0x1e, 0x3d, 0x84, 0x6a, 0x78, 0xc0, 0xf6, 0xf7, 0x7e, 0xc, 0x57, 0xbc, 0x94, 0x70, 0xc, 0xc5, 0xf8, 0xb8, 0x4, 0x27, 0x96, 0x71, 0xad, 0xd5, 0x91, 0x4c, 0xb0, 0xbf, 0x95, 0x62, 0xa4}}
+	info := bindataFileInfo{name: "1664195977_add_deleted_for_mes.up.sql", size: 352, mode: os.FileMode(0644), modTime: time.Unix(1664195981, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7d, 0x9d, 0x13, 0x9, 0xaa, 0x44, 0x14, 0x93, 0xe2, 0xf5, 0x53, 0xb7, 0x79, 0xa8, 0x18, 0xf0, 0x6c, 0xa4, 0x9c, 0x73, 0xc1, 0xaa, 0xc5, 0x2e, 0xc5, 0x41, 0xd7, 0x24, 0xb0, 0xd7, 0xb8, 0xdf}}
 	return a, nil
 }
 
@@ -1625,7 +1625,7 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1662723928_add_discord_author_image_fields.up.sql": _1662723928_add_discord_author_image_fieldsUpSql,
 
-	"1663730361_add_deleted_for_me_column_in_user_messages.up.sql": _1663730361_add_deleted_for_me_column_in_user_messagesUpSql,
+	"1664195977_add_deleted_for_mes.up.sql": _1664195977_add_deleted_for_mesUpSql,
 
 	"README.md": readmeMd,
 
@@ -1734,9 +1734,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1662044232_add_chat_image.up.sql":                                        &bintree{_1662044232_add_chat_imageUpSql, map[string]*bintree{}},
 	"1662106895_add_chat_first_message_timestamp.up.sql":                      &bintree{_1662106895_add_chat_first_message_timestampUpSql, map[string]*bintree{}},
 	"1662723928_add_discord_author_image_fields.up.sql":                       &bintree{_1662723928_add_discord_author_image_fieldsUpSql, map[string]*bintree{}},
-	"1663730361_add_deleted_for_me_column_in_user_messages.up.sql":            &bintree{_1663730361_add_deleted_for_me_column_in_user_messagesUpSql, map[string]*bintree{}},
-	"README.md": &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":    &bintree{docGo, map[string]*bintree{}},
+	"1664195977_add_deleted_for_mes.up.sql":                                   &bintree{_1664195977_add_deleted_for_mesUpSql, map[string]*bintree{}},
+	"README.md":                                                               &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                  &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

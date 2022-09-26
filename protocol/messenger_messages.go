@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -159,7 +161,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	return response, nil
 }
 
-func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, messageID string, chatID string) (*MessengerResponse, error) {
+func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string, messageID string) (*MessengerResponse, error) {
 	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err
@@ -186,12 +188,6 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		if err := m.updateLastMessage(chat); err != nil {
-			return nil, err
-		}
-	}
-
 	response := &MessengerResponse{}
 	response.AddMessage(message)
 	response.AddChat(chat)
@@ -201,11 +197,10 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, messageID str
 
 		deletedForMeMessage := &DeleteForMeMessage{}
 
-		deletedForMeMessage.ChatId = message.ChatId
 		deletedForMeMessage.MessageId = messageID
 		deletedForMeMessage.Clock = clock
 
-		encodedMessage, err := m.encodeChatEntity(chat, deletedForMeMessage)
+		encodedMessage, err := proto.Marshal(deletedForMeMessage.GetProtobuf())
 
 		if err != nil {
 			return response, err
@@ -274,4 +269,20 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	}
 
 	return m.persistence.HideMessage(message.ID)
+}
+
+func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {
+	message.DeletedForMe = true
+
+	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveMessages([]*common.Message{message})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

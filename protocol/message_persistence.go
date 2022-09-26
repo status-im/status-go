@@ -621,49 +621,6 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) LatestMessageByChatID(chatID string) ([]*common.Message, string, error) {
-	args := []interface{}{chatID}
-	where := fmt.Sprintf(`
-            WHERE
-                NOT(m1.hide) AND NOT(m1.deleted_for_me) AND m1.local_chat_id = ?
-            ORDER BY cursor DESC
-            LIMIT ?`)
-
-	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
-
-	rows, err := db.db.Query(
-		query,
-		append(args, 2)...,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-	defer rows.Close()
-
-	var (
-		result  []*common.Message
-		cursors []string
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, "", err
-		}
-		result = append(result, &message)
-		cursors = append(cursors, cursor)
-	}
-
-	var newCursor string
-	if len(result) > 1 {
-		newCursor = cursors[1]
-		result = result[:1]
-	}
-	return result, newCursor, nil
-}
-
 func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, error) {
 	var clock uint64
 	err := db.db.QueryRow(
@@ -2168,6 +2125,31 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 	for rows.Next() {
 		d := &DeleteMessage{}
 		err := rows.Scan(&d.Clock, &d.ChatId, &d.MessageId, &d.From, &d.ID)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, d)
+
+	}
+	return messages, nil
+}
+
+func (db sqlitePersistence) SaveDeleteForMe(deleteForMeMessage DeleteForMeMessage) error {
+	_, err := db.db.Exec(`INSERT INTO user_messages_deleted_for_mes (clock, message_id, source, id) VALUES(?,?,?,?)`, deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.From, deleteForMeMessage.ID)
+	return err
+}
+
+func (db sqlitePersistence) GetDeleteForMes(messageID string, from string) ([]*DeleteForMeMessage, error) {
+	rows, err := db.db.Query(`SELECT clock, message_id, source, id FROM user_messages_deleted_for_mes WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []*DeleteForMeMessage
+
+	for rows.Next() {
+		d := &DeleteForMeMessage{}
+		err := rows.Scan(&d.Clock, &d.MessageId, &d.From, &d.ID)
 		if err != nil {
 			return nil, err
 		}

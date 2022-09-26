@@ -56,15 +56,7 @@ message DeleteMessage {
 
 message DeleteForMeMessage {
   uint64 clock = 1;
-
-  string chat_id = 2;
-  string message_id = 3;
-
-  // Grant for community delete messages
-  bytes grant = 4;
-
-  // The type of message (public/one-to-one/private-group-chat)
-  MessageType message_type = 5;
+  string message_id = 2;
 }
 
 message DiscordMessage {

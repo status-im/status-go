@@ -8,8 +8,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-// DeleteMessage represents a delete of a message from a user in the application layer, used for persistence, querying and
-// signaling
+// DeleteForMeMessage represents a delete of a message from a user in the
+// application layer, used for persistence, querying and signaling
 type DeleteForMeMessage struct {
 	protobuf.DeleteForMeMessage
 
@@ -36,12 +36,6 @@ func (e DeleteForMeMessage) GetSigPubKey() *ecdsa.PublicKey {
 // this function is required to implement the ChatEntity interface
 func (e DeleteForMeMessage) GetProtobuf() proto.Message {
 	return &e.DeleteForMeMessage
-}
-
-// SetMessageType a setter for the MessageType field
-// this function is required to implement the ChatEntity interface
-func (e *DeleteForMeMessage) SetMessageType(messageType protobuf.MessageType) {
-	e.MessageType = messageType
 }
 
 // WrapGroupMessage indicates whether we should wrap this in membership information

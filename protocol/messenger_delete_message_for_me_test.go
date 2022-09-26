@@ -159,7 +159,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 	s.Require().False(alice1Msg.DeletedForMe)
 
-	response, err = s.alice1.DeleteMessageForMeAndSync(context.Background(), messageID, chatID)
+	response, err = s.alice1.DeleteMessageForMeAndSync(context.Background(), chatID, messageID)
 	s.Require().NoError(err)
 	s.Require().True(response.Messages()[0].DeletedForMe)
 
@@ -187,10 +187,6 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	deletedForMeMessage, err := s.alice2.MessageByID(messageID)
 	s.Require().NoError(err)
 	s.Require().True(deletedForMeMessage.DeletedForMe)
-
-	// no DeletedForMe message as last message
-	alice2Chat := s.alice2.Chat(chatID)
-	s.Require().Nil(alice2Chat.LastMessage)
 
 	// no DeletedForMe in others' message
 	otherMessage, err := otherMessenger.MessageByID(messageID)
