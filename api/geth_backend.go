@@ -529,17 +529,22 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
 	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID))
 	config := b.StatusNode().Config()
-	keyDir := config.KeyStoreDir
 
-	err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
-	if err != nil {
-		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
+	if config != nil {
+		keyDir := config.KeyStoreDir
+		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
+		if err != nil {
+			return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
+		}
 	}
 
-	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	err := appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
 	if err != nil {
-		// couldn't change db password so undo keystore changes to mainitain consistency
-		_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		if config != nil {
+			keyDir := config.KeyStoreDir
+			// couldn't change db password so undo keystore changes to mainitain consistency
+			_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		}
 		return err
 	}
 	return nil
@@ -585,13 +590,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	err = os.RemoveAll(keyStoreDir)
-	if err != nil {
-		return err
-	}
-
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-	return appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	return b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
