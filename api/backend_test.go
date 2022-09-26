@@ -690,12 +690,13 @@ func TestConvertAccount(t *testing.T) {
 		KeycardPairing:     "pairing",
 	}
 
+	_, keyStoreErrBefore := os.Stat(keyStoreDir)
+
 	err = backend.ConvertToKeycardAccount(keyStoreDir, keycardAccount, keycardSettings, password, keycardPassword)
 	require.NoError(t, err)
 
-	_, err = os.Stat(keyStoreDir)
-	require.Error(t, err)
-	require.True(t, os.IsNotExist(err))
+	_, keyStoreErrAfter := os.Stat(keyStoreDir)
+	require.True(t, keyStoreErrBefore == keyStoreErrAfter)
 
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
