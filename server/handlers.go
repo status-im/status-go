@@ -396,7 +396,7 @@ func challengeMiddleware(ps *PairingServer, next http.Handler) http.HandlerFunc 
 
 		// Only if we have both a challenge in the session store and in the request header
 		// do we entertain blocking the client. Because then we know someone is trying to be sneaky.
-		if bytes.Compare(c, challenge) != 0 {
+		if !bytes.Equal(c, challenge) {
 			s.Values[sessionBlocked] = true
 			err = s.Save(r, w)
 			if err != nil {

@@ -66,12 +66,8 @@ func ValidateTags(input []string) bool {
 		}
 	}
 
-	if len(unique(input)) != len(input) {
-		// Contains duplicates. Shouldn't have happened
-		return false
-	}
-
-	return true
+	// False if contains duplicates. Shouldn't have happened
+	return len(unique(input)) == len(input)
 }
 
 func RemoveUnknownAndDeduplicateTags(input []string) []string {

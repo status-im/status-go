@@ -118,5 +118,5 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 }
 
 func isNilOrEmpty(bytes types.HexBytes) bool {
-	return bytes == nil || len(bytes) == 0
+	return len(bytes) == 0
 }
