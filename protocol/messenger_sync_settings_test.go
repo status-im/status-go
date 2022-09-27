@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/waku"
@@ -165,7 +166,7 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithKey(shh types.Waku, private
 
 	options := []Option{
 		WithCustomLogger(s.logger),
-		WithDatabaseConfig(tmpFile.Name(), ""),
+		WithDatabaseConfig(tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber),
 		WithDatasync(),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)

@@ -14,16 +14,11 @@ import (
 	mvdsmigrations "github.com/vacp2p/mvds/persistenceutil"
 )
 
-// The default number of kdf iterations in sqlcipher (from version 3.0.0)
-// https://github.com/sqlcipher/sqlcipher/blob/fda4c68bb474da7e955be07a2b807bda1bb19bd2/CHANGELOG.md#300---2013-11-05
-// https://www.zetetic.net/sqlcipher/sqlcipher-api/#kdf_iter
-const defaultKdfIterationsNumber = 64000 // nolint: deadcode,varcheck,unused
-
 // The reduced number of kdf iterations (for performance reasons) which is
 // currently used for derivation of the database key
 // https://github.com/status-im/status-go/pull/1343
 // https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
-const reducedKdfIterationsNumber = 3200
+const ReducedKDFIterationsNumber = 3200
 
 const InMemoryPath = ":memory:"
 
@@ -37,8 +32,8 @@ type MigrationConfig struct {
 
 // Open opens or initializes a new database for a given file path.
 // MigrationConfig is optional but if provided migrations are applied automatically.
-func Open(path, key string) (*sql.DB, error) {
-	return openAndMigrate(path, key, reducedKdfIterationsNumber)
+func Open(path, key string, kdfIterationNumber int) (*sql.DB, error) {
+	return openAndMigrate(path, key, kdfIterationNumber)
 }
 
 // OpenInMemory opens an in memory SQLite database.

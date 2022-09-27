@@ -29,7 +29,7 @@ func (s *SQLLitePersistenceTestSuite) SetupTest() {
 	dir, err := ioutil.TempDir("", "sqlite-persistence")
 	s.Require().NoError(err)
 
-	db, err := sqlite.Open(filepath.Join(dir, "db.sql"), "test-key")
+	db, err := sqlite.Open(filepath.Join(dir, "db.sql"), "test-key", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 
 	s.service = newSQLitePersistence(db)

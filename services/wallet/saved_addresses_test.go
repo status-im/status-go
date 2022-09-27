@@ -10,12 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestSavedAddressesDB(t *testing.T) (*SavedAddressesManager, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-saved_addresses-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-saved_addresses-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-saved_addresses-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return &SavedAddressesManager{db}, func() {
 		require.NoError(t, db.Close())

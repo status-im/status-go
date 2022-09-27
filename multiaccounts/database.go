@@ -22,6 +22,7 @@ type Account struct {
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
 	Images         []images.IdentityImage `json:"images"`
+	KDFIterations  int                    `json:"kdfIterations,omitempty"`
 }
 
 func (a *Account) ToProtobuf() *protobuf.MultiAccount {
@@ -106,8 +107,16 @@ func (db *Database) Close() error {
 	return db.db.Close()
 }
 
+func (db *Database) GetAccountKDFIterationsNumber(keyUID string) (kdfIterationsNumber int, err error) {
+	err = db.db.QueryRow("SELECT  kdfIterations FROM accounts WHERE keyUid = ?", keyUID).Scan(&kdfIterationsNumber)
+	if err != nil {
+		return -1, err
+	}
+	return
+}
+
 func (db *Database) GetAccounts() (rst []Account, err error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, a.kdfIterations, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +147,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 			&accColorID,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
+			&acc.KDFIterations,
 			&iiName,
 			&ii.Payload,
 			&iiWidth,
@@ -275,7 +285,11 @@ func (db *Database) SaveAccount(account Account) error {
 		return err
 	}
 
-	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
+	if account.KDFIterations <= 0 {
+		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID, account.KDFIterations)
 	if err != nil {
 		return err
 	}
@@ -292,7 +306,12 @@ func (db *Database) UpdateAccount(account Account) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
+
+	if account.KDFIterations <= 0 {
+		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KDFIterations, account.KeyUID)
 	return err
 }
 

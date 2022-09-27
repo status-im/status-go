@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/sqlite"
 )
 
 type TestServiceAPI struct{}
@@ -26,7 +27,7 @@ func setupTestDB() (*sql.DB, func() error, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "tests", sqlite.ReducedKDFIterationsNumber)
 	if err != nil {
 		return nil, nil, err
 	}

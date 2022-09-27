@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -134,7 +135,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateK
 
 	options := []Option{
 		WithCustomLogger(s.logger),
-		WithDatabaseConfig(":memory:", "somekey"),
+		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),

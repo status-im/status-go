@@ -13,7 +13,7 @@ func TestGetENSToBeVerified(t *testing.T) {
 	name := "test.eth"
 	updatedName := "test2.eth"
 
-	db, err := sqlite.Open(sqlite.InMemoryPath, "")
+	db, err := sqlite.Open(sqlite.InMemoryPath, "", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	err = sqlite.Migrate(db)

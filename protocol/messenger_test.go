@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
@@ -125,7 +126,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 
 	options := []Option{
 		WithCustomLogger(logger),
-		WithDatabaseConfig(":memory:", "somekey"),
+		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),

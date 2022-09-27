@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/sqlite"
 
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Name: "string", KeyUID: "string", ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10}
+	expected := Account{Name: "string", KeyUID: "string", ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
@@ -36,7 +37,7 @@ func TestAccounts(t *testing.T) {
 func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{KeyUID: "string", ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10}
+	expected := Account{KeyUID: "string", ColorHash: [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.Name = "chars"
 	require.NoError(t, db.UpdateAccount(expected))
@@ -50,7 +51,7 @@ func TestLoginUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	accounts := []Account{{Name: "first", KeyUID: "0x1"}, {Name: "second", KeyUID: "0x2"}}
+	accounts := []Account{{Name: "first", KeyUID: "0x1", KDFIterations: sqlite.ReducedKDFIterationsNumber}, {Name: "second", KeyUID: "0x2", KDFIterations: sqlite.ReducedKDFIterationsNumber}}
 	for _, acc := range accounts {
 		require.NoError(t, db.SaveAccount(acc))
 	}
@@ -154,7 +155,7 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 		{Name: "string", KeyUID: keyUID2 + "2"},
 		{Name: "string", KeyUID: keyUID2 + "3"},
 	}
-	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]}]`
+	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200}]`
 
 	for _, a := range testAccs {
 		require.NoError(t, db.SaveAccount(a))

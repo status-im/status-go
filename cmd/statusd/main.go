@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/sqlite"
 )
 
 const (
@@ -206,7 +207,7 @@ func main() {
 			return
 		}
 
-		db, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "")
+		db, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "", sqlite.ReducedKDFIterationsNumber)
 		if err != nil {
 			logger.Error("failed to initialize app db", "error", err)
 			return
