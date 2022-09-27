@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const cryptocompareURL = "https://min-api.cryptocompare.com"
+
 type Coin struct {
 	ID                   string  `json:"Id"`
 	Name                 string  `json:"Name"`
@@ -32,6 +34,24 @@ type MarketCoinValues struct {
 	CHANGE24HOUR    string `json:"CHANGE24HOUR"`
 }
 
+type TokenHistoricalPairs struct {
+	Timestamp  int64   `json:"time"`
+	Value      float64 `json:"close"`
+	Volumefrom float64 `json:"volumefrom"`
+	Volumeto   float64 `json:"volumeto"`
+}
+
+type HistoricalValuesContainer struct {
+	Aggregated     bool                   `json:"Aggregated"`
+	TimeFrom       int64                  `json:"TimeFrom"`
+	TimeTo         int64                  `json:"TimeTo"`
+	HistoricalData []TokenHistoricalPairs `json:"Data"`
+}
+
+type HistoricalValuesData struct {
+	Data HistoricalValuesContainer `json:"Data"`
+}
+
 type CoinsContainer struct {
 	Data map[string]Coin `json:"Data"`
 }
@@ -43,7 +63,7 @@ type MarketValuesContainer struct {
 func fetchCryptoComparePrices(symbols []string, currency string) (map[string]float64, error) {
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("https://min-api.cryptocompare.com/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", strings.Join(symbols, ","), currency)
+	url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(symbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -71,7 +91,7 @@ func fetchCryptoComparePrices(symbols []string, currency string) (map[string]flo
 func fetchCryptoCompareTokenDetails(symbols []string) (map[string]Coin, error) {
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := "https://min-api.cryptocompare.com/data/all/coinlist"
+	url := fmt.Sprintf("%s/data/all/coinlist", cryptocompareURL)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -102,7 +122,7 @@ func fetchTokenMarketValues(symbols []string, currency string) (map[string]Marke
 	item := map[string]MarketCoinValues{}
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("https://min-api.cryptocompare.com/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", strings.Join(symbols, ","), currency)
+	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(symbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return item, err
@@ -126,4 +146,58 @@ func fetchTokenMarketValues(symbols []string, currency string) (map[string]Marke
 
 	return item, nil
 
+}
+
+func fetchHourlyMarketValues(symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
+	item := []TokenHistoricalPairs{}
+	httpClient := http.Client{Timeout: time.Minute}
+
+	url := fmt.Sprintf("%s/data/v2/histohour?fsym=%s&tsym=%s&aggregate=%d&limit=%d&extraParams=Status.im", cryptocompareURL, symbol, currency, aggregate, limit)
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return item, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return item, err
+	}
+
+	container := HistoricalValuesData{}
+	err = json.Unmarshal(body, &container)
+	if err != nil {
+		return item, err
+	}
+
+	item = container.Data.HistoricalData
+
+	return item, nil
+}
+
+func fetchDailyMarketValues(symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
+	item := []TokenHistoricalPairs{}
+	httpClient := http.Client{Timeout: time.Minute}
+
+	url := fmt.Sprintf("%s/data/v2/histoday?fsym=%s&tsym=%s&aggregate=%d&limit=%d&allData=%v&extraParams=Status.im", cryptocompareURL, symbol, currency, aggregate, limit, allData)
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return item, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return item, err
+	}
+
+	container := HistoricalValuesData{}
+	err = json.Unmarshal(body, &container)
+	if err != nil {
+		return item, err
+	}
+
+	item = container.Data.HistoricalData
+
+	return item, nil
 }
