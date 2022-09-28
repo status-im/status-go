@@ -30,7 +30,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -38,7 +38,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -274,7 +274,7 @@ func _1660238799_accounts_kdfUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660238799_accounts_kdf.up.sql", size: 115, mode: os.FileMode(0664), modTime: time.Unix(1661173104, 0)}
+	info := bindataFileInfo{name: "1660238799_accounts_kdf.up.sql", size: 115, mode: os.FileMode(0664), modTime: time.Unix(1664364156, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdf, 0xe6, 0x7a, 0x69, 0x25, 0x42, 0x3b, 0x9c, 0x20, 0xf5, 0xcb, 0xae, 0xb0, 0xb3, 0x1b, 0x66, 0xc2, 0x5d, 0xd0, 0xc1, 0x59, 0xe8, 0xa9, 0xc5, 0x69, 0x58, 0x8f, 0xae, 0xe6, 0xd1, 0x4c, 0x53}}
 	return a, nil
 }
@@ -390,21 +390,28 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"0001_accounts.down.sql":                            _0001_accountsDownSql,
-	"0001_accounts.up.sql":                              _0001_accountsUpSql,
-	"1605007189_identity_images.down.sql":               _1605007189_identity_imagesDownSql,
-	"1605007189_identity_images.up.sql":                 _1605007189_identity_imagesUpSql,
-	"1606224181_drop_photo_path_from_accounts.down.sql": _1606224181_drop_photo_path_from_accountsDownSql,
-	"1606224181_drop_photo_path_from_accounts.up.sql":   _1606224181_drop_photo_path_from_accountsUpSql,
-	"1648646095_image_clock.down.sql":                   _1648646095_image_clockDownSql,
-	"1648646095_image_clock.up.sql":                     _1648646095_image_clockUpSql,
-	"1649317600_add_color_hash.up.sql":                  _1649317600_add_color_hashUpSql,
-	"1660238799_accounts_kdf.up.sql":                    _1660238799_accounts_kdfUpSql,
-	"doc.go":                                            docGo,
-}
+	"0001_accounts.down.sql": _0001_accountsDownSql,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"0001_accounts.up.sql": _0001_accountsUpSql,
+
+	"1605007189_identity_images.down.sql": _1605007189_identity_imagesDownSql,
+
+	"1605007189_identity_images.up.sql": _1605007189_identity_imagesUpSql,
+
+	"1606224181_drop_photo_path_from_accounts.down.sql": _1606224181_drop_photo_path_from_accountsDownSql,
+
+	"1606224181_drop_photo_path_from_accounts.up.sql": _1606224181_drop_photo_path_from_accountsUpSql,
+
+	"1648646095_image_clock.down.sql": _1648646095_image_clockDownSql,
+
+	"1648646095_image_clock.up.sql": _1648646095_image_clockUpSql,
+
+	"1649317600_add_color_hash.up.sql": _1649317600_add_color_hashUpSql,
+
+	"1660238799_accounts_kdf.up.sql": _1660238799_accounts_kdfUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
@@ -447,17 +454,17 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_accounts.down.sql": {_0001_accountsDownSql, map[string]*bintree{}},
-	"0001_accounts.up.sql": {_0001_accountsUpSql, map[string]*bintree{}},
-	"1605007189_identity_images.down.sql": {_1605007189_identity_imagesDownSql, map[string]*bintree{}},
-	"1605007189_identity_images.up.sql": {_1605007189_identity_imagesUpSql, map[string]*bintree{}},
-	"1606224181_drop_photo_path_from_accounts.down.sql": {_1606224181_drop_photo_path_from_accountsDownSql, map[string]*bintree{}},
-	"1606224181_drop_photo_path_from_accounts.up.sql": {_1606224181_drop_photo_path_from_accountsUpSql, map[string]*bintree{}},
-	"1648646095_image_clock.down.sql": {_1648646095_image_clockDownSql, map[string]*bintree{}},
-	"1648646095_image_clock.up.sql": {_1648646095_image_clockUpSql, map[string]*bintree{}},
-	"1649317600_add_color_hash.up.sql": {_1649317600_add_color_hashUpSql, map[string]*bintree{}},
-	"1660238799_accounts_kdf.up.sql": {_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
-	"doc.go": {docGo, map[string]*bintree{}},
+	"0001_accounts.down.sql":                            &bintree{_0001_accountsDownSql, map[string]*bintree{}},
+	"0001_accounts.up.sql":                              &bintree{_0001_accountsUpSql, map[string]*bintree{}},
+	"1605007189_identity_images.down.sql":               &bintree{_1605007189_identity_imagesDownSql, map[string]*bintree{}},
+	"1605007189_identity_images.up.sql":                 &bintree{_1605007189_identity_imagesUpSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.down.sql": &bintree{_1606224181_drop_photo_path_from_accountsDownSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.up.sql":   &bintree{_1606224181_drop_photo_path_from_accountsUpSql, map[string]*bintree{}},
+	"1648646095_image_clock.down.sql":                   &bintree{_1648646095_image_clockDownSql, map[string]*bintree{}},
+	"1648646095_image_clock.up.sql":                     &bintree{_1648646095_image_clockUpSql, map[string]*bintree{}},
+	"1649317600_add_color_hash.up.sql":                  &bintree{_1649317600_add_color_hashUpSql, map[string]*bintree{}},
+	"1660238799_accounts_kdf.up.sql":                    &bintree{_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
+	"doc.go":                                            &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
