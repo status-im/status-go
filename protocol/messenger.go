@@ -662,7 +662,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
-	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
@@ -691,17 +690,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	err = m.StartMailserverCycle()
 	if err != nil {
 		return nil, err
-	}
-
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
-		adminCommunities, err := m.communitiesManager.Created()
-		if err == nil && len(adminCommunities) > 0 {
-			available := m.SubscribeMailserverAvailable()
-			go func() {
-				<-available
-				m.InitHistoryArchiveTasks(adminCommunities)
-			}()
-		}
 	}
 
 	if m.httpServer != nil {
@@ -4471,18 +4459,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle CommunityRequestToLeave", zap.Error(err))
 							continue
 						}
-
-					case protobuf.CommunityMessageArchiveMagnetlink:
-						logger.Debug("Handling CommunityMessageArchiveMagnetlink")
-						magnetlinkMessage := msg.ParsedMessage.Interface().(protobuf.CommunityMessageArchiveMagnetlink)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, magnetlinkMessage)
-						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
-						if err != nil {
-							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
 					case protobuf.AnonymousMetricBatch:
 						logger.Debug("Handling AnonymousMetricBatch")
 						if m.anonMetricsServer == nil {
