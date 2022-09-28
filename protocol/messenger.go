@@ -142,7 +142,6 @@ type Messenger struct {
 	connectionState                      connection.State
 	telemetryClient                      *telemetry.Client
 	contractMaker                        *contracts.ContractMaker
-	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
@@ -1514,7 +1513,6 @@ func (m *Messenger) Init() error {
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
-	m.downloadHistoryArchiveTasksWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
