@@ -2016,12 +2016,13 @@ func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes,
 			filter := m.transport.FilterByTopic(message.Topic)
 			if filter != nil {
 				shhMessage := &types.Message{
-					Sig:       message.Sig,
-					Timestamp: uint32(message.Timestamp),
-					Topic:     types.BytesToTopic(message.Topic),
-					Payload:   message.Payload,
-					Padding:   message.Padding,
-					Hash:      message.Hash,
+					Sig:          message.Sig,
+					Timestamp:    uint32(message.Timestamp),
+					Topic:        types.BytesToTopic(message.Topic),
+					Payload:      message.Payload,
+					Padding:      message.Padding,
+					Hash:         message.Hash,
+					ThirdPartyID: message.ThirdPartyId,
 				}
 				messages[*filter] = append(messages[*filter], shhMessage)
 			}
@@ -2053,12 +2054,13 @@ func (m *Manager) createWakuMessageArchive(from time.Time, to time.Time, message
 	for _, msg := range messages {
 		topic := types.TopicTypeToByteArray(msg.Topic)
 		wakuMessage := &protobuf.WakuMessage{
-			Sig:       msg.Sig,
-			Timestamp: uint64(msg.Timestamp),
-			Topic:     topic,
-			Payload:   msg.Payload,
-			Padding:   msg.Padding,
-			Hash:      msg.Hash,
+			Sig:          msg.Sig,
+			Timestamp:    uint64(msg.Timestamp),
+			Topic:        topic,
+			Payload:      msg.Payload,
+			Padding:      msg.Padding,
+			Hash:         msg.Hash,
+			ThirdPartyId: msg.ThirdPartyID,
 		}
 		wakuMessages = append(wakuMessages, wakuMessage)
 	}

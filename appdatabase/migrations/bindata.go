@@ -35,6 +35,7 @@
 // 1662460056_move_favourites_to_saved_addresses.up.sql (233B)
 // 1662738097_add_base_fee_transaction.up.sql (112B)
 // 1662972194_add_keypairs_table.up.sql (345B)
+// 1664392661_add_third_party_id_to_waku_messages.up.sql (70B)
 // doc.go (74B)
 
 package migrations
@@ -739,7 +740,7 @@ func _1662447680_add_keypairs_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662447680_add_keypairs_table.up.sql", size: 218, mode: os.FileMode(0664), modTime: time.Unix(1663585108, 0)}
+	info := bindataFileInfo{name: "1662447680_add_keypairs_table.up.sql", size: 218, mode: os.FileMode(0664), modTime: time.Unix(1663586599, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0x25, 0xa9, 0xc7, 0x63, 0x27, 0x97, 0x35, 0x5f, 0x6b, 0xab, 0x26, 0xcb, 0xf9, 0xbd, 0x5e, 0xac, 0x3, 0xa0, 0x5e, 0xb9, 0x71, 0xa3, 0x1f, 0xb3, 0x4f, 0x7f, 0x79, 0x28, 0x48, 0xbe, 0xc}}
 	return a, nil
 }
@@ -799,8 +800,28 @@ func _1662972194_add_keypairs_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662972194_add_keypairs_table.up.sql", size: 345, mode: os.FileMode(0664), modTime: time.Unix(1663585108, 0)}
+	info := bindataFileInfo{name: "1662972194_add_keypairs_table.up.sql", size: 345, mode: os.FileMode(0664), modTime: time.Unix(1663586599, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xab, 0x76, 0xf2, 0x86, 0xe1, 0x7e, 0xe9, 0x47, 0x32, 0x48, 0xd5, 0x6b, 0xe5, 0xd, 0xab, 0xb7, 0xf1, 0xd4, 0xf1, 0xad, 0x38, 0xa6, 0x11, 0xe7, 0xce, 0x5c, 0x11, 0x11, 0xf, 0x47, 0xb2, 0x4}}
+	return a, nil
+}
+
+var __1664392661_add_third_party_id_to_waku_messagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4f\xcc\x2e\x8d\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\xc9\xc8\x2c\x4a\x89\x2f\x48\x2c\x2a\xa9\x8c\xcf\x4c\x51\x08\x71\x8d\x08\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x52\xb2\xe6\xe2\x02\x04\x00\x00\xff\xff\xdd\x01\xff\x71\x46\x00\x00\x00")
+
+func _1664392661_add_third_party_id_to_waku_messagesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1664392661_add_third_party_id_to_waku_messagesUpSql,
+		"1664392661_add_third_party_id_to_waku_messages.up.sql",
+	)
+}
+
+func _1664392661_add_third_party_id_to_waku_messagesUpSql() (*asset, error) {
+	bytes, err := _1664392661_add_third_party_id_to_waku_messagesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1664392661_add_third_party_id_to_waku_messages.up.sql", size: 70, mode: os.FileMode(0664), modTime: time.Unix(1664392691, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfd, 0x67, 0x66, 0x9e, 0x66, 0x74, 0xce, 0x1c, 0xb, 0x1b, 0x9d, 0xd5, 0xfc, 0x65, 0xe, 0x83, 0x90, 0x4c, 0x61, 0x4e, 0x6b, 0xe7, 0x86, 0xbe, 0x36, 0x4f, 0x91, 0x36, 0x4, 0x47, 0x7b, 0x82}}
 	return a, nil
 }
 
@@ -985,6 +1006,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1662972194_add_keypairs_table.up.sql": _1662972194_add_keypairs_tableUpSql,
 
+	"1664392661_add_third_party_id_to_waku_messages.up.sql": _1664392661_add_third_party_id_to_waku_messagesUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1064,7 +1087,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1662460056_move_favourites_to_saved_addresses.up.sql":            &bintree{_1662460056_move_favourites_to_saved_addressesUpSql, map[string]*bintree{}},
 	"1662738097_add_base_fee_transaction.up.sql":                      &bintree{_1662738097_add_base_fee_transactionUpSql, map[string]*bintree{}},
 	"1662972194_add_keypairs_table.up.sql":                            &bintree{_1662972194_add_keypairs_tableUpSql, map[string]*bintree{}},
-	"doc.go":                                                          &bintree{docGo, map[string]*bintree{}},
+	"1664392661_add_third_party_id_to_waku_messages.up.sql":           &bintree{_1664392661_add_third_party_id_to_waku_messagesUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

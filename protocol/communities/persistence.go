@@ -426,14 +426,51 @@ func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error 
 	return err
 }
 
+func (p *Persistence) SaveWakuMessages(messages []*types.Message) (err error) {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	query := `INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	for _, msg := range messages {
+		_, err = stmt.Exec(
+			msg.Sig,
+			msg.Timestamp,
+			msg.Topic.String(),
+			msg.Payload,
+			msg.Padding,
+			types.Bytes2Hex(msg.Hash),
+			msg.ThirdPartyID,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (p *Persistence) SaveWakuMessage(message *types.Message) error {
-	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash) VALUES (?, ?, ?, ?, ?, ?)`,
+	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		message.Sig,
 		message.Timestamp,
 		message.Topic.String(),
 		message.Payload,
 		message.Padding,
 		types.Bytes2Hex(message.Hash),
+		message.ThirdPartyID,
 	)
 	return err
 }
@@ -467,7 +504,7 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (u
 
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
 
-	query := "SELECT sig, timestamp, topic, payload, padding, hash FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
+	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
 
 	for i, topic := range topics {
 		query += `topic = "` + topic.String() + `"`
@@ -488,7 +525,7 @@ func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, fro
 		msg := types.Message{}
 		var topicStr string
 		var hashStr string
-		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr)
+		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr, &msg.ThirdPartyID)
 		if err != nil {
 			return nil, err
 		}
