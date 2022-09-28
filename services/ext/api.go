@@ -705,6 +705,10 @@ func (api *PublicAPI) DeleteMessageAndSend(ctx context.Context, messageID string
 	return api.service.messenger.DeleteMessageAndSend(ctx, messageID)
 }
 
+func (api *PublicAPI) DeleteMessageForMeAndSync(ctx context.Context, chatID string, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteMessageForMeAndSync(ctx, chatID, messageID)
+}
+
 func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPinMessage(ctx, message)
 }

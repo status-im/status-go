@@ -90,6 +90,14 @@ func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
 	return nil
 }
 
+func ValidateDeleteForMeMessage(message protobuf.DeleteForMeMessage) error {
+	if len(message.MessageId) == 0 {
+		return errors.New("message-id can't be empty")
+	}
+
+	return nil
+}
+
 func ValidateReceivedPairInstallation(message *protobuf.PairInstallation, whisperTimestamp uint64) error {
 	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err

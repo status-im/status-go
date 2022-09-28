@@ -1,4 +1,4 @@
-version: "2"         # required to adjust maintainability checks
+version: "2" # required to adjust maintainability checks
 checks:
   # Methods or functions defined with a high number of arguments
   argument-count:
@@ -43,6 +43,7 @@ exclude_patterns:
   - "t/"
   - "mailserver/migrations"
   - "**/*/bindata.go"
+  - "protocol/protobuf/*.pb.go"
   - "protocol/communities/migrations/migrations.go"
   - "protocol/encryption/migrations/migrations.go"
   - "protocol/internal/sqlite/migrations.go"

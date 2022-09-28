@@ -78,6 +78,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replace_message,
 		edited_at,
 		deleted,
+		deleted_for_me,
 		rtl,
 		line_count,
 		response_to,
@@ -122,6 +123,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.replace_message,
 		m1.edited_at,
 		m1.deleted,
+		m1.deleted_for_me,
 		m1.rtl,
 		m1.line_count,
 		m1.response_to,
@@ -177,6 +179,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
 	var deleted sql.NullBool
+	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
@@ -222,6 +225,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Replace,
 		&editedAt,
 		&deleted,
+		&deletedForMe,
 		&message.RTL,
 		&message.LineCount,
 		&message.ResponseTo,
@@ -262,6 +266,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if deleted.Valid {
 		message.Deleted = deleted.Bool
+	}
+
+	if deletedForMe.Valid {
+		message.DeletedForMe = deletedForMe.Bool
 	}
 
 	if contactRequestState.Valid {
@@ -422,6 +430,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Replace,
 		int64(message.EditedAt),
 		message.Deleted,
+		message.DeletedForMe,
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,
@@ -2116,6 +2125,31 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 	for rows.Next() {
 		d := &DeleteMessage{}
 		err := rows.Scan(&d.Clock, &d.ChatId, &d.MessageId, &d.From, &d.ID)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, d)
+
+	}
+	return messages, nil
+}
+
+func (db sqlitePersistence) SaveDeleteForMe(deleteForMeMessage DeleteForMeMessage) error {
+	_, err := db.db.Exec(`INSERT INTO user_messages_deleted_for_mes (clock, message_id, source, id) VALUES(?,?,?,?)`, deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.From, deleteForMeMessage.ID)
+	return err
+}
+
+func (db sqlitePersistence) GetDeleteForMes(messageID string, from string) ([]*DeleteForMeMessage, error) {
+	rows, err := db.db.Query(`SELECT clock, message_id, source, id FROM user_messages_deleted_for_mes WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []*DeleteForMeMessage
+
+	for rows.Next() {
+		d := &DeleteForMeMessage{}
+		err := rows.Scan(&d.Clock, &d.MessageId, &d.From, &d.ID)
 		if err != nil {
 			return nil, err
 		}

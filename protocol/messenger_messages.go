@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -159,6 +161,67 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	return response, nil
 }
 
+func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string, messageID string) (*MessengerResponse, error) {
+	message, err := m.persistence.MessageByID(messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// A valid added chat is required.
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return nil, errors.New("Chat not found")
+	}
+
+	// Only certain types of messages can be deleted
+	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN &&
+		message.ContentType != protobuf.ChatMessage_STICKER &&
+		message.ContentType != protobuf.ChatMessage_EMOJI &&
+		message.ContentType != protobuf.ChatMessage_IMAGE &&
+		message.ContentType != protobuf.ChatMessage_AUDIO {
+		return nil, ErrInvalidDeleteTypeAuthor
+	}
+
+	message.DeletedForMe = true
+	err = m.persistence.SaveMessages([]*common.Message{message})
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddMessage(message)
+	response.AddChat(chat)
+
+	if m.hasPairedDevices() {
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+		deletedForMeMessage := &DeleteForMeMessage{}
+
+		deletedForMeMessage.MessageId = messageID
+		deletedForMeMessage.Clock = clock
+
+		encodedMessage, err := proto.Marshal(deletedForMeMessage.GetProtobuf())
+
+		if err != nil {
+			return response, err
+		}
+
+		rawMessage := common.RawMessage{
+			LocalChatID:          chat.ID,
+			Payload:              encodedMessage,
+			MessageType:          protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+			SkipGroupMessageWrap: true,
+			ResendAutomatically:  true,
+		}
+		_, err = m.dispatchMessage(ctx, rawMessage)
+		if err != nil {
+			return response, err
+		}
+	}
+
+	return response, nil
+}
+
 func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message *common.Message) error {
 	if err := ValidateText(editMessage.Text); err != nil {
 		return err
@@ -206,4 +269,20 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	}
 
 	return m.persistence.HideMessage(message.ID)
+}
+
+func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {
+	message.DeletedForMe = true
+
+	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveMessages([]*common.Message{message})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
