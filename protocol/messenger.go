@@ -136,6 +136,8 @@ type Messenger struct {
 	httpServer                 *server.MediaServer
 	quit                       chan struct{}
 
+	importingCommunities map[string]bool
+
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
 
@@ -448,6 +450,7 @@ func NewMessenger(
 		quit:                     make(chan struct{}),
 		requestedCommunitiesLock: sync.RWMutex{},
 		requestedCommunities:     make(map[string]*transport.Filter),
+		importingCommunities:     make(map[string]bool),
 		browserDatabase:          c.browserDatabase,
 		httpServer:               c.httpServer,
 		contractMaker: &contracts.ContractMaker{
@@ -3007,6 +3010,92 @@ func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from
 		m.logger.Error("could not write to csv", zap.Error(err))
 		return
 	}
+}
+
+func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter][]*types.Message) error {
+
+	m.handleMessagesMutex.Lock()
+	defer m.handleMessagesMutex.Unlock()
+
+	messageState := m.buildMessageState()
+
+	logger := m.logger.With(zap.String("site", "handleImportedMessages"))
+
+	for filter, messages := range messagesToHandle {
+		for _, shhMessage := range messages {
+
+			statusMessages, _, err := m.sender.HandleMessages(shhMessage, true)
+			if err != nil {
+				logger.Info("failed to decode messages", zap.Error(err))
+				continue
+			}
+
+			for _, msg := range statusMessages {
+				logger := logger.With(zap.String("message-id", msg.ID.String()))
+				logger.Debug("processing message")
+
+				publicKey := msg.SigPubKey()
+				senderID := contactIDFromPublicKey(publicKey)
+
+				// Don't process duplicates
+				messageID := msg.TransportMessage.ThirdPartyID
+				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
+				if err != nil {
+					logger.Warn("failed to check message exists", zap.Error(err))
+				}
+				if exists {
+					logger.Debug("messageExists", zap.String("messageID", messageID))
+					continue
+				}
+
+				var contact *Contact
+				if c, ok := messageState.AllContacts.Load(senderID); ok {
+					contact = c
+				} else {
+					c, err := buildContact(senderID, publicKey)
+					if err != nil {
+						logger.Info("failed to build contact", zap.Error(err))
+						continue
+					}
+					contact = c
+					messageState.AllContacts.Store(senderID, contact)
+				}
+				messageState.CurrentMessageState = &CurrentMessageState{
+					MessageID:        messageID,
+					WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
+					Contact:          contact,
+					PublicKey:        publicKey,
+				}
+
+				if msg.ParsedMessage != nil {
+
+					logger.Debug("Handling parsed message")
+
+					switch msg.ParsedMessage.Interface().(type) {
+
+					case protobuf.ChatMessage:
+						logger.Debug("Handling ChatMessage")
+						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
+						err = m.HandleChatMessage(messageState)
+						if err != nil {
+							logger.Warn("failed to handle ChatMessage", zap.Error(err))
+							continue
+						}
+					}
+				}
+			}
+		}
+	}
+
+	messagesToSave := messageState.Response.Messages()
+	if len(messageState.Response.messages) > 0 {
+		err := m.SaveMessages(messagesToSave)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {

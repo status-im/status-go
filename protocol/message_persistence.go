@@ -1354,6 +1354,36 @@ func (db sqlitePersistence) SetHideOnMessage(id string) error {
 	return err
 }
 
+func (db sqlitePersistence) DeleteMessagesByCommunityID(id string) error {
+	return db.deleteMessagesByCommunityID(id, nil)
+}
+
+func (db sqlitePersistence) deleteMessagesByCommunityID(id string, tx *sql.Tx) (err error) {
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE community_id = ?`, id)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE community_id = ?`, id)
+
+	return
+}
+
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
 	return db.deleteMessagesByChatID(id, nil)
 }

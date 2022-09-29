@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -948,7 +949,26 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					return
 				}
 
-				response, err := m.handleRetrievedMessages(messagesToHandle, false)
+				importedMessages := make(map[transport.Filter][]*types.Message, 0)
+				otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+				for filter, messages := range messagesToHandle {
+					for _, message := range messages {
+						if message.ThirdPartyID != "" {
+							importedMessages[filter] = append(importedMessages[filter], message)
+						} else {
+							otherMessages[filter] = append(otherMessages[filter], message)
+						}
+					}
+				}
+
+				err = m.handleImportedMessages(importedMessages)
+				if err != nil {
+					log.Println("failed to handle imported messages", err)
+					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+				}
+
+				response, err := m.handleRetrievedMessages(otherMessages, false)
 				if err != nil {
 					log.Println("failed to write history archive messages to database", err)
 					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
@@ -1361,6 +1381,34 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
+	}
+
+	if receivedMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+		discordMessage := receivedMessage.GetDiscordMessage()
+		discordMessageAuthor := discordMessage.GetAuthor()
+		discordMessageAttachments := discordMessage.GetAttachments()
+
+		err := m.persistence.SaveDiscordMessage(discordMessage)
+		if err != nil {
+			return err
+		}
+
+		exists, err := m.persistence.HasDiscordMessageAuthor(discordMessageAuthor.Id)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			err = m.persistence.SaveDiscordMessageAuthor(discordMessageAuthor)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = m.persistence.SaveDiscordMessageAttachments(discordMessageAttachments)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = m.checkForEdits(receivedMessage)

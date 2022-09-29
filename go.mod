@@ -73,7 +73,7 @@ require (
 	go.uber.org/zap v1.22.0
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -82,7 +82,10 @@ require (
 
 require github.com/fogleman/gg v1.3.0
 
-require github.com/gorilla/sessions v1.2.1
+require (
+	github.com/gorilla/sessions v1.2.1
+	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
+)
 
 require (
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect
