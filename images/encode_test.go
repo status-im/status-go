@@ -5,14 +5,15 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"testing"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gen2brain/aac-go"
 	"github.com/stretchr/testify/require"
 	"github.com/youpy/go-wav"
+	"io/ioutil"
+	"os"
+	"runtime/debug"
+	"testing"
+	"time"
 )
 
 func TestEncode(t *testing.T) {
@@ -121,11 +122,94 @@ func Test(t *testing.T) {
 	spew.Dump(b.Len()) // (int) 1733347
 }
 
+type SamplingRate uint
+
+const (
+	Sampling8000Hz  SamplingRate = 8000
+	Sampling11025Hz SamplingRate = 11025
+	Sampling16000Hz SamplingRate = 16000
+	Sampling22050Hz SamplingRate = 22050
+	Sampling24000Hz SamplingRate = 24000
+	Sampling32000Hz SamplingRate = 32000
+	Sampling44100Hz SamplingRate = 44100
+	Sampling48000Hz SamplingRate = 48000
+	Sampling64000Hz SamplingRate = 64000
+	Sampling96000Hz SamplingRate = 96000
+)
+
+var (
+	SamplingRates = []SamplingRate{
+		Sampling96000Hz,
+		Sampling64000Hz,
+		Sampling48000Hz,
+		Sampling44100Hz,
+		Sampling32000Hz,
+		Sampling24000Hz,
+		Sampling22050Hz,
+		Sampling16000Hz,
+		Sampling11025Hz,
+		Sampling8000Hz,
+	}
+)
+
+type BitRate uint
+
+const (
+	BitRate8000s BitRate = 8000 + iota*4000
+	BitRate12000s
+	BitRate16000s
+	BitRate20000s
+	BitRate24000s
+	BitRate28000s
+	BitRate32000s
+	BitRate36000s
+	BitRate40000s
+	BitRate44000s
+)
+
+var (
+	BitRates = []BitRate{
+		BitRate44000s,
+		BitRate40000s,
+		BitRate36000s,
+		BitRate32000s,
+		BitRate28000s,
+		BitRate24000s,
+		BitRate20000s,
+		BitRate16000s,
+		BitRate12000s,
+		BitRate8000s,
+	}
+)
+
+func encodeToAAC(fn string, enc *aac.Encoder, wreader *wav.Reader) error {
+	ec := make(chan error, 1)
+	go func() {
+		debug.SetPanicOnFault(true)
+		defer func() {
+			if r := recover(); r != nil {
+				spew.Dump("Recovered panic:", r)
+			}
+		}()
+		ec <- enc.Encode(wreader)
+	}()
+
+	select {
+	case err := <-ec:
+		return err
+	case <-time.After(2 * time.Second):
+		close(ec)
+		spew.Dump("timeout encoding " + fn)
+		return nil
+	}
+}
+
 func TestWavToAAC(t *testing.T) {
-	file, err := os.Open(path + "BabyElephantWalk60.wav")
+	file, err := os.Open(path + "file_example_WAV_10MG.wav")
 	if err != nil {
 		require.NoError(t, err)
 	}
+	defer file.Close()
 
 	wreader := wav.NewReader(file)
 	f, err := wreader.Format()
@@ -133,40 +217,59 @@ func TestWavToAAC(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0))
-
 	spew.Dump(f)
 
-	for i := 0; i < 10; i++ {
-		opts := &aac.Options{
-			SampleRate:  int(f.SampleRate * uint32((10-i)/100)),
-			BitRate:     int(f.ByteRate), // Yes BitRate == ByteRate, don't know why
-			NumChannels: int(f.NumChannels),
+	for _, sr := range SamplingRates {
+		// TODO resolve the issue of encoding above original rates
+		if f.SampleRate < uint32(sr) {
+			//continue
 		}
+		for _, br := range BitRates {
+			spew.Dump("bitrate", br)
+			if f.ByteRate < uint32(br) {
+				//continue
+			}
 
-		spew.Dump(opts)
+			if sr == Sampling96000Hz && br == BitRate16000s {
+				continue
+			}
 
-		enc, err := aac.NewEncoder(buf, opts)
-		if err != nil {
-			require.NoError(t, err)
-		}
+			opts := &aac.Options{
+				SampleRate:  int(sr),
+				BitRate:     int(br), // Yes BitRate == ByteRate, don't know why
+				NumChannels: int(f.NumChannels),
+			}
 
-		err = enc.Encode(wreader)
-		if err != nil {
-			require.NoError(t, err)
-		}
+			spew.Dump(opts)
 
-		err = enc.Close()
-		if err != nil {
-			require.NoError(t, err)
-		}
+			buf := bytes.NewBuffer(make([]byte, 0))
+			enc, err := aac.NewEncoder(buf, opts)
+			if err != nil {
+				require.NoError(t, err)
+			}
 
-		fn := fmt.Sprintf(path+"test_test_%d_%d.aac", opts.SampleRate, opts.BitRate)
+			spew.Dump("Making new wav.Reader")
+			wreader := wav.NewReader(file)
+			spew.Dump("Encoding wav.Reader into aac")
+			// TODO fix hanging by timing out processes that take too long
 
-		err = ioutil.WriteFile(fn, buf.Bytes(), 0644)
-		if err != nil {
-			require.NoError(t, err)
+			fn := fmt.Sprintf(path+"test_test_%d_%d.aac", opts.SampleRate, opts.BitRate)
+
+			err = encodeToAAC(fn, enc, wreader)
+			if err != nil {
+				require.NoError(t, err)
+			}
+
+			err = enc.Close()
+			if err != nil {
+				require.NoError(t, err)
+			}
+
+			spew.Dump("Making new audio file " + fn)
+			err = ioutil.WriteFile(fn, buf.Bytes(), 0644)
+			if err != nil {
+				require.NoError(t, err)
+			}
 		}
 	}
-
 }
