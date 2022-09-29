@@ -64,6 +64,9 @@ import (
 	"github.com/status-im/status-go/telemetry"
 )
 
+const maxChunkSizeMessages = 1000
+const maxChunkSizeBytes = 1500000
+
 // todo: kozieiev: get rid of wakutransp word
 type chatContext string
 
@@ -136,6 +139,8 @@ type Messenger struct {
 	browserDatabase            *browsers.Database
 	httpServer                 *server.MediaServer
 	quit                       chan struct{}
+
+	importingCommunities map[string]bool
 
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
@@ -452,6 +457,7 @@ func NewMessenger(
 		quit:                     make(chan struct{}),
 		requestedCommunitiesLock: sync.RWMutex{},
 		requestedCommunities:     make(map[string]*transport.Filter),
+		importingCommunities:     make(map[string]bool),
 		browserDatabase:          c.browserDatabase,
 		httpServer:               c.httpServer,
 		contractMaker: &contracts.ContractMaker{
@@ -3039,6 +3045,167 @@ func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from
 	}
 }
 
+func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter][]*types.Message) error {
+
+	messageState := m.buildMessageState()
+
+	logger := m.logger.With(zap.String("site", "handleImportedMessages"))
+
+	for filter, messages := range messagesToHandle {
+		for _, shhMessage := range messages {
+
+			statusMessages, _, err := m.sender.HandleMessages(shhMessage, true)
+			if err != nil {
+				logger.Info("failed to decode messages", zap.Error(err))
+				continue
+			}
+
+			for _, msg := range statusMessages {
+				logger := logger.With(zap.String("message-id", msg.ID.String()))
+				logger.Debug("processing message")
+
+				publicKey := msg.SigPubKey()
+				senderID := contactIDFromPublicKey(publicKey)
+
+				// Don't process duplicates
+				messageID := msg.TransportMessage.ThirdPartyID
+				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
+				if err != nil {
+					logger.Warn("failed to check message exists", zap.Error(err))
+				}
+				if exists {
+					logger.Debug("messageExists", zap.String("messageID", messageID))
+					continue
+				}
+
+				var contact *Contact
+				if c, ok := messageState.AllContacts.Load(senderID); ok {
+					contact = c
+				} else {
+					c, err := buildContact(senderID, publicKey)
+					if err != nil {
+						logger.Info("failed to build contact", zap.Error(err))
+						continue
+					}
+					contact = c
+					messageState.AllContacts.Store(senderID, contact)
+				}
+				messageState.CurrentMessageState = &CurrentMessageState{
+					MessageID:        messageID,
+					WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
+					Contact:          contact,
+					PublicKey:        publicKey,
+				}
+
+				if msg.ParsedMessage != nil {
+
+					logger.Debug("Handling parsed message")
+
+					switch msg.ParsedMessage.Interface().(type) {
+
+					case protobuf.ChatMessage:
+						logger.Debug("Handling ChatMessage")
+						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
+						err = m.HandleChatMessage(messageState)
+						if err != nil {
+							logger.Warn("failed to handle ChatMessage", zap.Error(err))
+							continue
+						}
+					}
+				}
+			}
+		}
+	}
+
+	importMessageAuthors := messageState.Response.DiscordMessageAuthors()
+	if len(importMessageAuthors) > 0 {
+		err := m.persistence.SaveDiscordMessageAuthors(importMessageAuthors)
+		if err != nil {
+			return err
+		}
+	}
+
+	importMessagesToSave := messageState.Response.DiscordMessages()
+	importMessagesCount := len(importMessagesToSave)
+	if importMessagesCount > 0 {
+		if importMessagesCount <= maxChunkSizeMessages {
+			err := m.persistence.SaveDiscordMessages(importMessagesToSave)
+			if err != nil {
+				return err
+			}
+		} else {
+			// We need to process the messages in chunks otherwise we'll
+			// block the database for too long
+			chunks := chunkSlice(importMessagesToSave, maxChunkSizeMessages)
+			chunksCount := len(chunks)
+			for i, msgs := range chunks {
+				// We can't defer Unlock here because we want to
+				// unlock after every iteration to leave room for
+				// other processes to access the database
+				m.handleMessagesMutex.Lock()
+				err := m.persistence.SaveDiscordMessages(msgs)
+				if err != nil {
+					m.handleMessagesMutex.Unlock()
+					return err
+				}
+				m.handleMessagesMutex.Unlock()
+				// We slow down the saving of message chunks to keep the database responsive
+				if i < chunksCount-1 {
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}
+	}
+
+	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
+	if len(messageAttachmentsToSave) > 0 {
+		chunks := chunkAttachmentsByByteSize(messageAttachmentsToSave, maxChunkSizeBytes)
+		chunksCount := len(chunks)
+		for i, attachments := range chunks {
+			m.handleMessagesMutex.Lock()
+			err := m.persistence.SaveDiscordMessageAttachments(attachments)
+			if err != nil {
+				m.handleMessagesMutex.Unlock()
+				return err
+			}
+			// We slow down the saving of message chunks to keep the database responsive
+			m.handleMessagesMutex.Unlock()
+			if i < chunksCount-1 {
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}
+
+	messagesToSave := messageState.Response.Messages()
+	messagesCount := len(messagesToSave)
+	if messagesCount > 0 {
+		if messagesCount <= maxChunkSizeMessages {
+			err := m.SaveMessages(messagesToSave)
+			if err != nil {
+				return err
+			}
+		} else {
+			chunks := chunkSlice(messagesToSave, maxChunkSizeMessages)
+			chunksCount := len(chunks)
+			for i, msgs := range chunks {
+				m.handleMessagesMutex.Lock()
+				err := m.SaveMessages(msgs)
+				if err != nil {
+					m.handleMessagesMutex.Unlock()
+					return err
+				}
+				m.handleMessagesMutex.Unlock()
+				// We slow down the saving of message chunks to keep the database responsive
+				if i < chunksCount-1 {
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
@@ -4040,10 +4207,28 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	messagesToSave := messageState.Response.Messages()
-	if len(messageState.Response.messages) > 0 {
-		err = m.SaveMessages(messagesToSave)
-		if err != nil {
-			return nil, err
+	messagesCount := len(messagesToSave)
+	if messagesCount > 0 {
+		if messagesCount <= maxChunkSizeMessages {
+			err = m.SaveMessages(messagesToSave)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			messageChunks := chunkSlice(messagesToSave, maxChunkSizeMessages)
+			chunksCount := len(messageChunks)
+			for i, msgs := range messageChunks {
+				err := m.SaveMessages(msgs)
+				if err != nil {
+					return nil, err
+				}
+				// We slow down the saving of message chunks to keep the database responsive
+				// this is important when messages from history archives are handled,
+				// which could result in handling several thousand messages per archive
+				if i < chunksCount-1 {
+					time.Sleep(2 * time.Second)
+				}
+			}
 		}
 	}
 
@@ -5758,4 +5943,43 @@ func (m *Messenger) handleSyncVerificationRequest(state *ReceivedMessageState, m
 	//}
 
 	return nil
+}
+
+func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(slice); i += chunkSize {
+		end := i + chunkSize
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if end > len(slice) {
+			end = len(slice)
+		}
+
+		chunks = append(chunks, slice[i:end])
+	}
+
+	return chunks
+}
+
+func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxFileSizeBytes uint64) [][]*protobuf.DiscordMessageAttachment {
+	var chunks [][]*protobuf.DiscordMessageAttachment
+
+	currentChunkSize := uint64(0)
+	currentChunk := make([]*protobuf.DiscordMessageAttachment, 0)
+
+	for i, attachment := range slice {
+		payloadBytes := attachment.GetFileSizeBytes()
+		if currentChunkSize+payloadBytes > maxFileSizeBytes && len(currentChunk) > 0 {
+			chunks = append(chunks, currentChunk)
+			currentChunk = make([]*protobuf.DiscordMessageAttachment, 0)
+			currentChunkSize = uint64(0)
+		}
+		currentChunk = append(currentChunk, attachment)
+		currentChunkSize = currentChunkSize + payloadBytes
+		if i == len(slice)-1 {
+			chunks = append(chunks, currentChunk)
+		}
+	}
+	return chunks
 }

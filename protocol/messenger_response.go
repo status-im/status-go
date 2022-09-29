@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
@@ -59,6 +60,9 @@ type MessengerResponse struct {
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
+	discordMessages             map[string]*protobuf.DiscordMessage
+	discordMessageAttachments   map[string]*protobuf.DiscordMessageAttachment
+	discordMessageAuthors       map[string]*protobuf.DiscordMessageAuthor
 	currentStatus               *UserStatus
 	statusUpdates               map[string]UserStatus
 	clearedHistories            map[string]*ClearedHistory
@@ -85,19 +89,21 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
-		Notifications                 []*localnotifications.Notification `json:"notifications"`
-		Communities                   []*communities.Community           `json:"communities,omitempty"`
-		CommunitiesSettings           []*communities.CommunitySettings   `json:"communitiesSettings,omitempty"`
-		ActivityCenterNotifications   []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
-		CurrentStatus                 *UserStatus                        `json:"currentStatus,omitempty"`
-		StatusUpdates                 []UserStatus                       `json:"statusUpdates,omitempty"`
-		Settings                      []*settings.SyncSettingField       `json:"settings,omitempty"`
-		IdentityImages                []images.IdentityImage             `json:"identityImages,omitempty"`
-		Accounts                      []*accounts.Account                `json:"accounts,omitempty"`
-		DiscordCategories             []*discord.Category                `json:"discordCategories,omitempty"`
-		DiscordChannels               []*discord.Channel                 `json:"discordChannels,omitempty"`
-		DiscordOldestMessageTimestamp int                                `json:"discordOldestMessageTimestamp"`
-		SavedAddresses                []*wallet.SavedAddress             `json:"savedAddresses,omitempty"`
+		Notifications                 []*localnotifications.Notification   `json:"notifications"`
+		Communities                   []*communities.Community             `json:"communities,omitempty"`
+		CommunitiesSettings           []*communities.CommunitySettings     `json:"communitiesSettings,omitempty"`
+		ActivityCenterNotifications   []*ActivityCenterNotification        `json:"activityCenterNotifications,omitempty"`
+		CurrentStatus                 *UserStatus                          `json:"currentStatus,omitempty"`
+		StatusUpdates                 []UserStatus                         `json:"statusUpdates,omitempty"`
+		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
+		IdentityImages                []images.IdentityImage               `json:"identityImages,omitempty"`
+		Accounts                      []*accounts.Account                  `json:"accounts,omitempty"`
+		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
+		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
+		DiscordOldestMessageTimestamp int                                  `json:"discordOldestMessageTimestamp"`
+		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
+		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
+		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -477,12 +483,63 @@ func (r *MessengerResponse) AddStatusUpdate(upd UserStatus) {
 	r.statusUpdates[upd.PublicKey] = upd
 }
 
+func (r *MessengerResponse) DiscordMessages() []*protobuf.DiscordMessage {
+	var ms []*protobuf.DiscordMessage
+	for _, m := range r.discordMessages {
+		ms = append(ms, m)
+	}
+	return ms
+}
+
+func (r *MessengerResponse) DiscordMessageAuthors() []*protobuf.DiscordMessageAuthor {
+	var authors []*protobuf.DiscordMessageAuthor
+	for _, author := range r.discordMessageAuthors {
+		authors = append(authors, author)
+	}
+	return authors
+}
+
+func (r *MessengerResponse) DiscordMessageAttachments() []*protobuf.DiscordMessageAttachment {
+	var attachments []*protobuf.DiscordMessageAttachment
+	for _, a := range r.discordMessageAttachments {
+		attachments = append(attachments, a)
+	}
+	return attachments
+}
+
 func (r *MessengerResponse) Messages() []*common.Message {
 	var ms []*common.Message
 	for _, m := range r.messages {
 		ms = append(ms, m)
 	}
 	return ms
+}
+
+func (r *MessengerResponse) AddDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) {
+	if r.discordMessageAuthors == nil {
+		r.discordMessageAuthors = make(map[string]*protobuf.DiscordMessageAuthor)
+	}
+	r.discordMessageAuthors[author.Id] = author
+}
+
+func (r *MessengerResponse) AddDiscordMessageAttachment(attachment *protobuf.DiscordMessageAttachment) {
+	if r.discordMessageAttachments == nil {
+		r.discordMessageAttachments = make(map[string]*protobuf.DiscordMessageAttachment)
+	}
+	r.discordMessageAttachments[attachment.Id] = attachment
+}
+
+func (r *MessengerResponse) AddDiscordMessageAttachments(attachments []*protobuf.DiscordMessageAttachment) {
+	for _, attachment := range attachments {
+		r.AddDiscordMessageAttachment(attachment)
+	}
+}
+
+func (r *MessengerResponse) AddDiscordMessage(message *protobuf.DiscordMessage) {
+	if r.discordMessages == nil {
+		r.discordMessages = make(map[string]*protobuf.DiscordMessage)
+	}
+	r.discordMessages[message.Id] = message
 }
 
 func (r *MessengerResponse) AddMessages(ms []*common.Message) {

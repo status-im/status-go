@@ -27,6 +27,8 @@ LEFT JOIN discord_message_attachments dm_attachment
 ON        dm.id = dm_attachment.discord_message_id
 `
 
+var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
+
 var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
 var cursorField = cursor + " as cursor"
 
@@ -1363,6 +1365,34 @@ func (db sqlitePersistence) SetHideOnMessage(id string) error {
 	return err
 }
 
+func (db sqlitePersistence) DeleteMessagesByCommunityID(id string) error {
+	return db.deleteMessagesByCommunityID(id)
+}
+
+func (db sqlitePersistence) deleteMessagesByCommunityID(id string) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE community_id = ?`, id)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE community_id = ?`, id)
+
+	return
+}
+
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
 	return db.deleteMessagesByChatID(id, nil)
 }
@@ -1706,8 +1736,7 @@ func (db sqlitePersistence) HasDiscordMessageAuthorImagePayload(id string) (hasP
 }
 
 func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
-	query := "INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)"
-	stmt, err := db.db.Prepare(query)
+	stmt, err := db.db.Prepare(basicInsertDiscordMessageAuthorQuery)
 	if err != nil {
 		return
 	}
@@ -1719,6 +1748,42 @@ func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMes
 		author.GetAvatarUrl(),
 		author.GetAvatarImagePayload(),
 	)
+	return
+}
+
+func (db sqlitePersistence) SaveDiscordMessageAuthors(authors []*protobuf.DiscordMessageAuthor) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	stmt, err := tx.Prepare(basicInsertDiscordMessageAuthorQuery)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+
+	for _, author := range authors {
+		_, err = stmt.Exec(
+			author.GetId(),
+			author.GetName(),
+			author.GetDiscriminator(),
+			author.GetNickname(),
+			author.GetAvatarUrl(),
+			author.GetAvatarImagePayload(),
+		)
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
@@ -1834,8 +1899,7 @@ func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobu
 		_ = tx.Rollback()
 	}()
 
-	query := "INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, content_type) VALUES (?,?,?,?,?,?,?)"
-	stmt, err := tx.Prepare(query)
+	stmt, err := tx.Prepare("INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, content_type) VALUES (?,?,?,?,?,?,?)")
 	if err != nil {
 		return
 	}

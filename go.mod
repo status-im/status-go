@@ -82,7 +82,10 @@ require (
 
 require github.com/fogleman/gg v1.3.0
 
-require github.com/gorilla/sessions v1.2.1
+require (
+	github.com/gorilla/sessions v1.2.1
+	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
+)
 
 require (
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect

@@ -39,6 +39,11 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	return err
 }
 
+func (p *Persistence) DeleteCommunity(id types.HexBytes) error {
+	_, err := p.db.Exec("DELETE FROM communities_communities WHERE id = ?", id)
+	return err
+}
+
 func (p *Persistence) ShouldHandleSyncCommunitySettings(settings *protobuf.SyncCommunitySettings) (bool, error) {
 
 	qr := p.db.QueryRow(`SELECT * FROM communities_settings WHERE community_id = ? AND clock > ?`, settings.CommunityId, settings.Clock)
