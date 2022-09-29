@@ -1169,6 +1169,14 @@ func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string
 	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
 }
 
+func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
+	api.service.messenger.RequestImportDiscordCommunity(request)
+}
+
+func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
+	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
+}
+
 // -----
 // HELPER
 // -----

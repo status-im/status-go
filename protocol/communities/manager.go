@@ -358,6 +358,14 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	return community, nil
 }
 
+func (m *Manager) DeleteCommunity(id types.HexBytes) error {
+	err := m.persistence.DeleteCommunity(id)
+	if err != nil {
+		return err
+	}
+	return m.persistence.DeleteCommunitySettings(id)
+}
+
 // EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
@@ -1475,6 +1483,10 @@ func (m *Manager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.T
 
 func (m *Manager) StoreWakuMessage(message *types.Message) error {
 	return m.persistence.SaveWakuMessage(message)
+}
+
+func (m *Manager) StoreWakuMessages(messages []*types.Message) error {
+	return m.persistence.SaveWakuMessages(messages)
 }
 
 func (m *Manager) GetLatestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
