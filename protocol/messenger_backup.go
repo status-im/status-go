@@ -131,37 +131,38 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 
 	cs := append(joinedCs, deletedCs...)
 	for _, c := range cs {
+		_, beingImported := m.importingCommunities[c.IDString()]
+		if !beingImported {
+			settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
+			if err != nil {
+				return 0, err
+			}
 
-		settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
-		if err != nil {
-			return 0, err
+			syncMessage, err := c.ToSyncCommunityProtobuf(clock, settings)
+			if err != nil {
+				return 0, err
+			}
+
+			backupMessage := &protobuf.Backup{
+				Communities: []*protobuf.SyncCommunity{syncMessage},
+			}
+
+			encodedMessage, err := proto.Marshal(backupMessage)
+			if err != nil {
+				return 0, err
+			}
+
+			_, err = m.dispatchMessage(ctx, common.RawMessage{
+				LocalChatID:         chat.ID,
+				Payload:             encodedMessage,
+				SkipEncryption:      true,
+				SendOnPersonalTopic: true,
+				MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
+			})
+			if err != nil {
+				return 0, err
+			}
 		}
-
-		syncMessage, err := c.ToSyncCommunityProtobuf(clock, settings)
-		if err != nil {
-			return 0, err
-		}
-
-		backupMessage := &protobuf.Backup{
-			Communities: []*protobuf.SyncCommunity{syncMessage},
-		}
-
-		encodedMessage, err := proto.Marshal(backupMessage)
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = m.dispatchMessage(ctx, common.RawMessage{
-			LocalChatID:         chat.ID,
-			Payload:             encodedMessage,
-			SkipEncryption:      true,
-			SendOnPersonalTopic: true,
-			MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
-		})
-		if err != nil {
-			return 0, err
-		}
-
 	}
 
 	chat.LastClockValue = clock

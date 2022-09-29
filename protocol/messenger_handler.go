@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -925,6 +926,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
 			m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 			go func() {
+				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
 				downloadedArchiveIDs, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
 				if err != nil {
 					logMsg := "failed to download history archive data"
@@ -948,12 +950,30 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					return
 				}
 
-				response, err := m.handleRetrievedMessages(messagesToHandle, false)
+				importedMessages := make(map[transport.Filter][]*types.Message, 0)
+				otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+				for filter, messages := range messagesToHandle {
+					for _, message := range messages {
+						if message.ThirdPartyID != "" {
+							importedMessages[filter] = append(importedMessages[filter], message)
+						} else {
+							otherMessages[filter] = append(otherMessages[filter], message)
+						}
+					}
+				}
+
+				err = m.handleImportedMessages(importedMessages)
+				if err != nil {
+					log.Println("failed to handle imported messages", err)
+					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+				}
+
+				response, err := m.handleRetrievedMessages(otherMessages, false)
 				if err != nil {
 					log.Println("failed to write history archive messages to database", err)
 					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
 				}
-				m.downloadHistoryArchiveTasksWaitGroup.Done()
 				if !response.IsEmpty() {
 					notifications := response.Notifications()
 					response.ClearNotifications()
@@ -1436,6 +1456,19 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
+	}
+
+	if receivedMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+		discordMessage := receivedMessage.GetDiscordMessage()
+		discordMessageAuthor := discordMessage.GetAuthor()
+		discordMessageAttachments := discordMessage.GetAttachments()
+
+		state.Response.AddDiscordMessage(discordMessage)
+		state.Response.AddDiscordMessageAuthor(discordMessageAuthor)
+
+		if len(discordMessageAttachments) > 0 {
+			state.Response.AddDiscordMessageAttachments(discordMessageAttachments)
+		}
 	}
 
 	err = m.checkForEdits(receivedMessage)

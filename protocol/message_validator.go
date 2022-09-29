@@ -233,8 +233,10 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("timestamp can't be 0")
 	}
 
-	if err := ValidateText(message.Text); err != nil {
-		return err
+	if message.ContentType != protobuf.ChatMessage_DISCORD_MESSAGE {
+		if err := ValidateText(message.Text); err != nil {
+			return err
+		}
 	}
 
 	if len(message.ChatId) == 0 {
