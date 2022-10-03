@@ -2,6 +2,8 @@
 // sources:
 // 1_messages.down.sql (124B)
 // 1_messages.up.sql (464B)
+// 2_messages_index.down.sql (60B)
+// 2_messages_index.up.sql (226B)
 // doc.go (74B)
 
 package migrations
@@ -22,7 +24,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -30,7 +32,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -86,7 +88,7 @@ func _1_messagesDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1_messages.down.sql", size: 124, mode: os.FileMode(0664), modTime: time.Unix(1654113991, 0)}
+	info := bindataFileInfo{name: "1_messages.down.sql", size: 124, mode: os.FileMode(0664), modTime: time.Unix(1663712987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xff, 0x4a, 0x8e, 0xa9, 0xd9, 0xa8, 0xa4, 0x73, 0x3a, 0x54, 0xe4, 0x35, 0xfd, 0xea, 0x87, 0x4c, 0xa, 0x5c, 0xc0, 0xc9, 0xe7, 0x8, 0x8c, 0x6f, 0x60, 0x9e, 0x54, 0x77, 0x59, 0xd0, 0x2b, 0xfe}}
 	return a, nil
 }
@@ -106,8 +108,48 @@ func _1_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1_messages.up.sql", size: 464, mode: os.FileMode(0664), modTime: time.Unix(1654113991, 0)}
+	info := bindataFileInfo{name: "1_messages.up.sql", size: 464, mode: os.FileMode(0664), modTime: time.Unix(1663712987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4, 0xd8, 0x47, 0x7b, 0xe, 0x47, 0x2a, 0x4b, 0x48, 0x36, 0x23, 0x93, 0x28, 0xb3, 0x1e, 0x5, 0x76, 0x64, 0x73, 0xb, 0x2b, 0x5b, 0x10, 0x62, 0x36, 0x21, 0x6f, 0xa3, 0x3c, 0xdd, 0xe2, 0xcf}}
+	return a, nil
+}
+
+var __2_messages_indexDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\x8c\xcf\x2d\x4e\x8f\x37\xb4\xe6\xc2\x23\x6b\x64\xcd\x05\x08\x00\x00\xff\xff\x53\x77\x9e\x4d\x3c\x00\x00\x00")
+
+func _2_messages_indexDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__2_messages_indexDownSql,
+		"2_messages_index.down.sql",
+	)
+}
+
+func _2_messages_indexDownSql() (*asset, error) {
+	bytes, err := _2_messages_indexDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "2_messages_index.down.sql", size: 60, mode: os.FileMode(0664), modTime: time.Unix(1663763599, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6e, 0xcb, 0x70, 0x82, 0x33, 0x13, 0x70, 0xd5, 0xbd, 0x3e, 0x68, 0x9, 0x4f, 0x78, 0xa9, 0xc, 0xd6, 0xf4, 0x64, 0xa0, 0x8c, 0xe4, 0x0, 0x15, 0x71, 0xf0, 0x5, 0xdb, 0xa6, 0xf2, 0x12, 0x60}}
+	return a, nil
+}
+
+var __2_messages_indexUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\xf0\xf3\x0f\x51\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\x8c\xcf\x2d\x4e\x8f\x37\x54\xf0\xf7\x53\xc8\x4d\x2d\x2e\x4e\x4c\x4f\xd5\x48\xce\xcf\x2b\x49\xcd\x2b\x09\xc9\x2f\xc8\x4c\x56\x70\x0c\x76\xd6\x51\x28\x28\x4d\x2a\x2e\x4d\x42\x12\x28\x4e\xcd\x4b\x49\x2d\x0a\xc9\xcc\x4d\x2d\x2e\x49\xcc\x2d\x80\x08\x66\xa6\x80\x68\x4d\x6b\x2e\x82\xd6\x19\xe1\xb4\xce\xc5\x15\xdd\x3e\x88\x08\xba\x85\x10\xd1\xcc\x14\x30\x43\xd3\x9a\x0b\x10\x00\x00\xff\xff\x2a\x3b\xab\xf4\xe2\x00\x00\x00")
+
+func _2_messages_indexUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__2_messages_indexUpSql,
+		"2_messages_index.up.sql",
+	)
+}
+
+func _2_messages_indexUpSql() (*asset, error) {
+	bytes, err := _2_messages_indexUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "2_messages_index.up.sql", size: 226, mode: os.FileMode(0664), modTime: time.Unix(1663763514, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xce, 0xb1, 0xc8, 0x2d, 0xa8, 0x6f, 0x83, 0xfb, 0xf2, 0x40, 0x30, 0xe9, 0xd, 0x18, 0x54, 0xe8, 0xf5, 0xf5, 0xc4, 0x5b, 0xf5, 0xa4, 0x94, 0x50, 0x56, 0x4a, 0xc8, 0x73, 0x3f, 0xf1, 0x56, 0xce}}
 	return a, nil
 }
 
@@ -126,7 +168,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1654113991, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1663712987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -223,12 +265,15 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"1_messages.down.sql": _1_messagesDownSql,
-	"1_messages.up.sql":   _1_messagesUpSql,
-	"doc.go":              docGo,
-}
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"1_messages.up.sql": _1_messagesUpSql,
+
+	"2_messages_index.down.sql": _2_messages_indexDownSql,
+
+	"2_messages_index.up.sql": _2_messages_indexUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
@@ -271,9 +316,11 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1_messages.down.sql": {_1_messagesDownSql, map[string]*bintree{}},
-	"1_messages.up.sql": {_1_messagesUpSql, map[string]*bintree{}},
-	"doc.go": {docGo, map[string]*bintree{}},
+	"1_messages.down.sql":       &bintree{_1_messagesDownSql, map[string]*bintree{}},
+	"1_messages.up.sql":         &bintree{_1_messagesUpSql, map[string]*bintree{}},
+	"2_messages_index.down.sql": &bintree{_2_messages_indexDownSql, map[string]*bintree{}},
+	"2_messages_index.up.sql":   &bintree{_2_messages_indexUpSql, map[string]*bintree{}},
+	"doc.go":                    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

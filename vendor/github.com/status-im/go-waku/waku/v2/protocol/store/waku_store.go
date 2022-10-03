@@ -131,6 +131,10 @@ func (r *Result) Cursor() *pb.Index {
 	return r.cursor
 }
 
+func (r *Result) IsComplete() bool {
+	return len(r.cursor.Digest) == 0
+}
+
 func (r *Result) PeerID() peer.ID {
 	return r.peerId
 }
@@ -480,6 +484,15 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 // This function is useful for iterating over results without having to manually
 // specify the cursor and pagination order and max number of results
 func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
+	if r.IsComplete() {
+		return &Result{
+			Messages: []*pb.WakuMessage{},
+			cursor:   &pb.Index{},
+			query:    r.query,
+			peerId:   r.PeerID(),
+		}, nil
+	}
+
 	q := &pb.HistoryQuery{
 		PubsubTopic:    r.Query().PubsubTopic,
 		ContentFilters: r.Query().ContentFilters,

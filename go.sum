@@ -2109,8 +2109,8 @@ github.com/status-im/go-multiaddr-ethv4 v1.2.3 h1:EdMt0rCVcue9zQ3TZoUVrKel0HG+Rf
 github.com/status-im/go-multiaddr-ethv4 v1.2.3/go.mod h1:xgjMcsI3pNezwNVlUnUmaDLVmtT871/OOqnEUublHKQ=
 github.com/status-im/go-rln v0.1.1 h1:Evbma0GZ0dgzbKcm92SWzHMZ4pOlVBxH1+z9eQAd1i4=
 github.com/status-im/go-rln v0.1.1/go.mod h1:t8Bf4nNAuQh9VlEiz/rgFVtEz7sjEfcd62MIuEnZn8U=
-github.com/status-im/go-waku v0.2.3-0.20220915230805-448f5a2e0ef6 h1:9BB5PtaKOJJbpj+GKc/2ixRXHLdc0MCRbj2ZszP0+tU=
-github.com/status-im/go-waku v0.2.3-0.20220915230805-448f5a2e0ef6/go.mod h1:yHFOjS30GLuCiS+UqblYd46McaorFlwMQ3tM32aofSU=
+github.com/status-im/go-waku v0.2.3-0.20221003200721-1b3e23cf4e0b h1:fdqbDyjjdTw2WVPuNtywTtrhg0KjBmuyEuXsCcjkjyc=
+github.com/status-im/go-waku v0.2.3-0.20221003200721-1b3e23cf4e0b/go.mod h1:yHFOjS30GLuCiS+UqblYd46McaorFlwMQ3tM32aofSU=
 github.com/status-im/go-waku-rendezvous v0.0.0-20220817210730-9b9b02b1e880 h1:Ggyf88sYbHV3q/qVNMNsq+JMiar1WRkiDTr+VdTPyVk=
 github.com/status-im/go-waku-rendezvous v0.0.0-20220817210730-9b9b02b1e880/go.mod h1:lYUCd41Gzh6bw8RYlbADWe+LQCvhxnq2e19QWxdDM0k=
 github.com/status-im/go-watchdog v1.2.0-ios-nolibproc h1:BJwZEF7OVKaXc2zErBUAolFSGzwrTBbWnN8e/6MER5E=
