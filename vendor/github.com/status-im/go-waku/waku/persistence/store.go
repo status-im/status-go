@@ -246,7 +246,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	sqlQuery := `SELECT id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version 
 					 FROM message 
 					 %s
-					 ORDER BY senderTimestamp %s, pubsubTopic, id %s
+					 ORDER BY senderTimestamp %s, id %s, pubsubTopic %s, receiverTimestamp %s
 					 LIMIT ?`
 
 	var conditions []string
@@ -316,7 +316,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		orderDirection = "DESC"
 	}
 
-	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection)
+	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection, orderDirection, orderDirection)
 
 	stmt, err := d.db.Prepare(sqlQuery)
 	if err != nil {
@@ -324,7 +324,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	}
 	defer stmt.Close()
 
-	parameters = append(parameters, query.PagingInfo.PageSize)
+	pageSize := query.PagingInfo.PageSize + 1
+
+	parameters = append(parameters, pageSize)
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
 		return nil, nil, err
@@ -338,13 +340,15 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		}
 		result = append(result, record)
 	}
-
 	defer rows.Close()
 
 	cursor := &pb.Index{}
 	if len(result) != 0 {
-		lastMsgIdx := len(result) - 1
-		cursor = protocol.NewEnvelope(result[lastMsgIdx].Message, result[lastMsgIdx].ReceiverTime, result[lastMsgIdx].PubsubTopic).Index()
+		if len(result) > int(query.PagingInfo.PageSize) {
+			result = result[0:query.PagingInfo.PageSize]
+			lastMsgIdx := len(result) - 1
+			cursor = protocol.NewEnvelope(result[lastMsgIdx].Message, result[lastMsgIdx].ReceiverTime, result[lastMsgIdx].PubsubTopic).Index()
+		}
 	}
 
 	// The retrieved messages list should always be in chronological order

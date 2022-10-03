@@ -956,7 +956,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 		}
 	}
 
-	if len(result.Messages) != 0 {
+	if !result.IsComplete() {
 		cursor = result.Cursor()
 	}
 
