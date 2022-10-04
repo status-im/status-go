@@ -252,7 +252,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 			relayOpts = append(relayOpts, pubsub.WithPeerExchange(true))
 		}
 
-		opts = append(opts, node.WithWakuRelay(relayOpts...))
+		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.settings.MinPeersForRelay, relayOpts...))
 	}
 
 	if cfg.EnableStore {
@@ -856,11 +856,6 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
-func (w *Waku) notEnoughPeers() bool {
-	numPeers := len(w.node.Relay().PubSub().ListPeers(relay.DefaultWakuTopic))
-	return numPeers <= w.settings.MinPeersForRelay
-}
-
 func (w *Waku) broadcast() {
 	for {
 		select {
@@ -872,7 +867,7 @@ func (w *Waku) broadcast() {
 				continue
 			}
 
-			if w.settings.LightClient || w.notEnoughPeers() {
+			if w.settings.LightClient {
 				log.Debug("publishing message via lightpush", zap.Any("hash", hexutil.Encode(hash)))
 				_, err = w.node.Lightpush().Publish(context.Background(), msg)
 			} else {
