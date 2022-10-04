@@ -1323,7 +1323,7 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	require.Equal(t, types.HexBytes(messageID1), messageID)
 }
 
-func TestActivityCenterBlah(t *testing.T) {
+func TestActivityCenterReadUnread(t *testing.T) {
 	nID1 := types.HexBytes([]byte("1"))
 	nID2 := types.HexBytes([]byte("2"))
 	//	nID3 := types.HexBytes([]byte("3"))
