@@ -480,21 +480,23 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 	return notification, err
 }
 
-func (db sqlitePersistence) UnreadActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
-		cursor: currCursor,
-		read:   activityCenterQueryParamsReadUnread,
-		limit:  limit,
+		activityCenterType: activityType,
+		cursor:             cursor,
+		limit:              limit,
+		read:               activityCenterQueryParamsReadUnread,
 	}
 
 	return db.activityCenterNotifications(params)
 }
 
-func (db sqlitePersistence) ReadActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
-		cursor: currCursor,
-		read:   activityCenterQueryParamsReadRead,
-		limit:  limit,
+		activityCenterType: activityType,
+		cursor:             cursor,
+		limit:              limit,
+		read:               activityCenterQueryParamsReadRead,
 	}
 
 	return db.activityCenterNotifications(params)
@@ -519,7 +521,6 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 		_ = tx.Rollback()
 	}()
 
-	params.activityCenterType = ActivityCenterNotificationNoType
 	params.limit = uint64(incrementedLimit)
 	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, params)
 	if err != nil {

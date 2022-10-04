@@ -1364,13 +1364,13 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
 	require.NoError(t, err)
 
-	cursor, notifications, err := p.UnreadActivityCenterNotifications("", 2)
+	cursor, notifications, err := p.UnreadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 
-	cursor, notifications, err = p.ReadActivityCenterNotifications("", 2)
+	cursor, notifications, err = p.ReadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)

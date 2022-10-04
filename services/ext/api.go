@@ -1037,12 +1037,12 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
 }
 
-func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit)
+func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
 }
 
-func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit)
+func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

@@ -243,8 +243,8 @@ func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*A
 	}, nil
 }
 
-func (m *Messenger) ReadActivityCenterNotifications(cursor string, limit uint64) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ReadActivityCenterNotifications(cursor, limit)
+func (m *Messenger) ReadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.ReadActivityCenterNotifications(cursor, limit, activityType)
 	if err != nil {
 		return nil, err
 	}
@@ -255,8 +255,8 @@ func (m *Messenger) ReadActivityCenterNotifications(cursor string, limit uint64)
 	}, nil
 }
 
-func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint64) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.UnreadActivityCenterNotifications(cursor, limit)
+func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.UnreadActivityCenterNotifications(cursor, limit, activityType)
 	if err != nil {
 		return nil, err
 	}
