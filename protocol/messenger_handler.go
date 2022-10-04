@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -1009,6 +1010,29 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
 	}
+
+	// Activity Center notification
+	message := &common.Message{}
+	message.ID = requestToJoin.ID.String()
+	message.WhisperTimestamp = uint64(time.Now().Unix())
+	message.From = contact.ID
+	message.CommunityID = community.IDString()
+	message.Text = "Wants to join"
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(message.ID),
+		Message:   message,
+		Type:      ActivityCenterNotificationTypeCommunityMembershipRequest,
+		Timestamp: message.WhisperTimestamp,
+		Author:    message.From,
+	}
+
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return saveErr
+	}
+	state.Response.AddActivityCenterNotification(notification)
 
 	return nil
 }

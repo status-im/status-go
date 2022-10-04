@@ -21,6 +21,10 @@ const (
 	ActivityCenterNotificationTypeMention
 	ActivityCenterNotificationTypeReply
 	ActivityCenterNotificationTypeContactRequest
+	ActivityCenterNotificationTypeCommunityInvitation
+	ActivityCenterNotificationTypeCommunityRequest
+	ActivityCenterNotificationTypeCommunityMembershipRequest
+	ActivityCenterNotificationTypeCommunityKicked
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")

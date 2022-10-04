@@ -520,6 +520,27 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		}
 	}()
 
+	// Activity Center notification
+	message := &common.Message{}
+	message.ID = requestToJoin.ID.String()
+	message.WhisperTimestamp = uint64(time.Now().Unix())
+	message.CommunityID = community.IDString()
+	message.Text = "Request to join"
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(message.ID),
+		Message:   message,
+		Type:      ActivityCenterNotificationTypeCommunityRequest,
+		Timestamp: message.WhisperTimestamp,
+	}
+
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return nil, saveErr
+	}
+	response.AddActivityCenterNotification(notification)
+
 	return response, nil
 }
 
