@@ -504,6 +504,7 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	var tx *sql.Tx
 	var err error
 	// We fetch limit + 1 to check for pagination
+	nonIncrementedLimit := params.limit
 	incrementedLimit := int(params.limit) + 1
 	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -519,14 +520,14 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	}()
 
 	params.activityCenterType = ActivityCenterNotificationNoType
-
+	params.limit = uint64(incrementedLimit)
 	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, params)
 	if err != nil {
 		return "", nil, err
 	}
 
 	if len(notifications) == incrementedLimit {
-		notifications = notifications[0:incrementedLimit]
+		notifications = notifications[0:nonIncrementedLimit]
 	} else {
 		latestCursor = ""
 	}

@@ -765,7 +765,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 }
 
 func openTestDB() (*sql.DB, error) {
-	dbPath, err := ioutil.TempFile("", "")
+	dbPath, err := ioutil.TempFile("", "status-go-test-db")
 	if err != nil {
 		return nil, err
 	}
