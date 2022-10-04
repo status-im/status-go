@@ -348,6 +348,26 @@ func (ppr *PairingPayloadRepository) validateKeys(password string) error {
 }
 
 func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
+	if keyStorePath == "" {
+		return fmt.Errorf("keyStorePath can not be empty")
+	}
+
+	_, lastDir := filepath.Split(keyStorePath)
+
+	// If lastDir == "keystore" we presume we need to create the rest of the keystore path
+	// else we presume the provided keystore is valid
+	if lastDir == "keystore" {
+		if ppr.multiaccount == nil || ppr.multiaccount.KeyUID == "" {
+			return fmt.Errorf("no known Key UID")
+		}
+		keyStorePath = filepath.Join(keyStorePath, ppr.multiaccount.KeyUID)
+
+		err := os.MkdirAll(keyStorePath, 0777)
+		if err != nil {
+			return err
+		}
+	}
+
 	for name, data := range ppr.keys {
 		accountKey := new(keystore.EncryptedKeyJSONV3)
 		if err := json.Unmarshal(data, &accountKey); err != nil {
