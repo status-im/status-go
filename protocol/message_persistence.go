@@ -1746,7 +1746,7 @@ func (db sqlitePersistence) GetDiscordMessageAuthorByID(id string) (*protobuf.Di
 }
 
 func (db sqlitePersistence) SaveDiscordMessage(message *protobuf.DiscordMessage) (err error) {
-	query := "INSERT INTO discord_messages(id,type,timestamp,timestamp_edited,content,author_id, reference_message_id, reference_channel_id, reference_guild_id) VALUES (?,?,?,?,?,?,?,?,?)"
+	query := "INSERT OR REPLACE INTO discord_messages(id,type,timestamp,timestamp_edited,content,author_id, reference_message_id, reference_channel_id, reference_guild_id) VALUES (?,?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
