@@ -39,6 +39,8 @@ message EditMessage {
 
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 6;
+
+  ContentType content_type = 7;
 }
 
 message DeleteMessage {
