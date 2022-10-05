@@ -277,7 +277,9 @@ func (m *Messenger) timeoutStatusUpdates(fromClock uint64, tillClock uint64) {
 
 	// Send deactivatedStatusUpdates to Client
 	if err == nil {
-		m.config.messengerSignalsHandler.StatusUpdatesTimedOut(&deactivatedStatusUpdates)
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.StatusUpdatesTimedOut(&deactivatedStatusUpdates)
+		}
 	} else {
 		m.logger.Debug("Unable to get deactivated automatic status updates from db", zap.Error(err))
 	}

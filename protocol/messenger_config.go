@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -44,7 +45,9 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	DownloadingHistoryArchivesFinished(communityID string)
 	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
+	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError)
 }
 
 type config struct {
@@ -86,6 +89,8 @@ type config struct {
 
 	logger *zap.Logger
 
+	outputMessagesCSV bool
+
 	messengerSignalsHandler MessengerSignalsHandler
 
 	telemetryServerURL string
@@ -109,9 +114,9 @@ func WithCustomLogger(logger *zap.Logger) Option {
 	}
 }
 
-func WithDatabaseConfig(dbPath, dbKey string) Option {
+func WithDatabaseConfig(dbPath string, dbKey string, dbKDFIterations int) Option {
 	return func(c *config) error {
-		c.dbConfig = dbConfig{dbPath: dbPath, dbKey: dbKey}
+		c.dbConfig = dbConfig{dbPath: dbPath, dbKey: dbKey, dbKDFIterations: dbKDFIterations}
 		return nil
 	}
 }
@@ -291,6 +296,13 @@ func WithHTTPServer(s *server.MediaServer) Option {
 func WithRPCClient(r *rpc.Client) Option {
 	return func(c *config) error {
 		c.rpcClient = r
+		return nil
+	}
+}
+
+func WithMessageCSV(enabled bool) Option {
+	return func(c *config) error {
+		c.outputMessagesCSV = enabled
 		return nil
 	}
 }

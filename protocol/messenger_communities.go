@@ -3,10 +3,14 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -15,8 +19,10 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -204,20 +210,32 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
-	testNetworksEnabled, err := m.settings.TestNetworksEnabled()
+	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
+
+	chainID := uint64(69) // Optimism Kovan
+	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
 		return nil, err
 	}
-
-	chainID := uint64(10) // Optimism (mainnet)
-	if testNetworksEnabled {
-		chainID = 69 // Optimism (kovan)
-	}
-
-	directory, err := m.contractMaker.NewDirectory(chainID)
+	nodeConfig, err := sDB.GetNodeConfig()
 	if err != nil {
 		return nil, err
 	}
+	var backend *ethclient.Client
+	for _, n := range nodeConfig.Networks {
+		if n.ChainID == chainID {
+			b, err := ethclient.Dial(n.RPCURL)
+			if err != nil {
+				return nil, err
+			}
+			backend = b
+		}
+	}
+	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, backend)
+	if err != nil {
+		return nil, err
+	}
+	// --- end delete
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
@@ -449,7 +467,7 @@ func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCat
 	}
 
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateCategory(request)
+	community, changes, err := m.communitiesManager.CreateCategory(request, true)
 	if err != nil {
 		return nil, err
 	}
@@ -610,6 +628,34 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 	}
 
+	isAdmin, err := m.communitiesManager.IsAdminCommunityByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isAdmin {
+		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
+			Clock:       uint64(time.Now().Unix()),
+			CommunityId: communityID,
+		}
+
+		payload, err := proto.Marshal(requestToLeaveProto)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage := common.RawMessage{
+			Payload:        payload,
+			CommunityID:    communityID,
+			SkipEncryption: true,
+			MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+		}
+		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return mr, nil
 }
 
@@ -647,7 +693,9 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateChat(communityID, c)
+
+	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage
+	community, changes, err := m.communitiesManager.CreateChat(communityID, c, true)
 	if err != nil {
 		return nil, err
 	}
@@ -746,7 +794,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 
 	response := &MessengerResponse{}
 
-	community, err := m.communitiesManager.CreateCommunity(request)
+	community, err := m.communitiesManager.CreateCommunity(request, true)
 	if err != nil {
 		return nil, err
 	}
@@ -775,9 +823,10 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	if createDefaultChannel {
 		chatResponse, err := m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
 			Identity: &protobuf.ChatIdentity{
-				DisplayName: "general",
-				Description: "General channel for the community",
-				Color:       community.Description().Identity.Color,
+				DisplayName:           "general",
+				Description:           "General channel for the community",
+				Color:                 community.Description().Identity.Color,
+				FirstMessageTimestamp: FirstMessageTimestampNoMessage,
 			},
 			Permissions: &protobuf.CommunityPermissions{
 				Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -983,6 +1032,9 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 		message.ChatId = pk.String()
 		message.CommunityID = request.CommunityID.String()
 		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())
+		if request.InviteMessage != "" {
+			message.Text = request.InviteMessage
+		}
 		messages = append(messages, message)
 		r, err := m.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: pk})
 		if err != nil {
@@ -1012,6 +1064,10 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
@@ -1370,7 +1426,8 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		} else if oldChat.Name != chat.Name ||
 			oldChat.Description != chat.Description ||
 			oldChat.Emoji != chat.Emoji ||
-			oldChat.Color != chat.Color {
+			oldChat.Color != chat.Color ||
+			oldChat.UpdateFirstMessageTimestamp(chat.FirstMessageTimestamp) {
 			oldChat.Name = chat.Name
 			oldChat.Description = chat.Description
 			oldChat.Emoji = chat.Emoji
@@ -1542,6 +1599,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 			if !settings.HistoryArchiveSupportEnabled {
 				continue
+			}
+
+			// Check if there's already a torrent file for this community and seed it
+			if m.communitiesManager.TorrentFileExists(c.IDString()) {
+				err = m.communitiesManager.SeedHistoryArchiveTorrent(c.ID())
+				if err != nil {
+					m.logger.Debug("failed to seed history archive", zap.Error(err))
+				}
 			}
 
 			filters, err := m.communitiesManager.GetCommunityChatsFilters(c.ID())
@@ -1777,4 +1842,108 @@ func (m *Messenger) SyncCommunitySettings(ctx context.Context, settings *communi
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*discord.ExtractedData, map[string]*discord.ImportError) {
+
+	extractedData := &discord.ExtractedData{
+		Categories:             map[string]*discord.Category{},
+		ExportedData:           make([]*discord.ExportedData, 0),
+		OldestMessageTimestamp: 0,
+	}
+
+	errors := map[string]*discord.ImportError{}
+
+	for _, fileToImport := range filesToImport {
+		filePath := strings.Replace(fileToImport, "file://", "", -1)
+		bytes, err := os.ReadFile(filePath)
+		if err != nil {
+			errors[fileToImport] = &discord.ImportError{
+				Code:    2,
+				Message: err.Error(),
+			}
+			continue
+		}
+
+		var discordExportedData discord.ExportedData
+
+		err = json.Unmarshal(bytes, &discordExportedData)
+		if err != nil {
+			errors[fileToImport] = &discord.ImportError{
+				Code:    2,
+				Message: err.Error(),
+			}
+			continue
+		}
+
+		if len(discordExportedData.Messages) == 0 {
+			errors[fileToImport] = &discord.ImportError{
+				Code:    2,
+				Message: "No messages to import",
+			}
+			continue
+		}
+
+		discordExportedData.Channel.FilePath = filePath
+		categoryID := discordExportedData.Channel.CategoryID
+
+		discordCategory := discord.Category{
+			ID:   categoryID,
+			Name: discordExportedData.Channel.CategoryName,
+		}
+
+		_, ok := extractedData.Categories[categoryID]
+		if !ok {
+			extractedData.Categories[categoryID] = &discordCategory
+		}
+
+		extractedData.ExportedData = append(extractedData.ExportedData, &discordExportedData)
+
+		if len(discordExportedData.Messages) > 0 {
+			layout := "2006-01-02T15:04:05+00:00"
+			msgTime, err := time.Parse(layout, discordExportedData.Messages[0].Timestamp)
+			if err != nil {
+				m.logger.Error("failed to parse discord message timestamp", zap.Error(err))
+				continue
+			}
+
+			if extractedData.OldestMessageTimestamp == 0 || int(msgTime.Unix()) <= extractedData.OldestMessageTimestamp {
+				// Exported discord channel data already comes with `messages` being
+				// sorted, starting with the oldest, so we can safely rely on the first
+				// message
+				extractedData.OldestMessageTimestamp = int(msgTime.Unix())
+			}
+		}
+	}
+	return extractedData, errors
+}
+
+func (m *Messenger) ExtractDiscordChannelsAndCategories(filesToImport []string) (*MessengerResponse, map[string]*discord.ImportError) {
+
+	response := &MessengerResponse{}
+
+	extractedData, errs := m.ExtractDiscordDataFromImportFiles(filesToImport)
+
+	for _, category := range extractedData.Categories {
+		response.AddDiscordCategory(category)
+	}
+	for _, export := range extractedData.ExportedData {
+		response.AddDiscordChannel(&export.Channel)
+	}
+	if extractedData.OldestMessageTimestamp != 0 {
+		response.DiscordOldestMessageTimestamp = extractedData.OldestMessageTimestamp
+	}
+
+	return response, errs
+}
+
+func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
+	go func() {
+		response, errors := m.ExtractDiscordChannelsAndCategories(filesToImport)
+		m.config.messengerSignalsHandler.DiscordCategoriesAndChannelsExtracted(
+			response.DiscordCategories,
+			response.DiscordChannels,
+			int64(response.DiscordOldestMessageTimestamp),
+			errors)
+	}()
 }

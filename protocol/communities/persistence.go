@@ -22,6 +22,7 @@ type Persistence struct {
 }
 
 var ErrOldRequestToJoin = errors.New("old request to join")
+var ErrOldRequestToLeave = errors.New("old request to leave")
 
 const OR = " OR "
 const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.verified,c.muted,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
@@ -309,6 +310,37 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	return err
 }
 
+func (p *Persistence) SaveRequestToLeave(request *RequestToLeave) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	var clock uint64
+	// Fetch any existing request to leave
+	err = tx.QueryRow(`SELECT clock FROM communities_requests_to_leave WHERE public_key = ? AND community_id = ?`, request.PublicKey, request.CommunityID).Scan(&clock)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	// This is already processed
+	if clock >= request.Clock {
+		return ErrOldRequestToLeave
+	}
+
+	_, err = tx.Exec(`INSERT INTO communities_requests_to_leave(id,public_key,clock,community_id) VALUES (?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.CommunityID)
+	return err
+}
+
 func (p *Persistence) PendingRequestsToJoinForUser(pk string) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
 	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, RequestToJoinStatePending, pk)
@@ -337,9 +369,9 @@ func (p *Persistence) HasPendingRequestsToJoinForUserAndCommunity(userPk string,
 	return count > 0, nil
 }
 
-func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+func (p *Persistence) RequestsToJoinForCommunityWithState(id []byte, state RequestToJoinState) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
-	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND community_id = ?`, RequestToJoinStatePending, id)
+	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND community_id = ?`, state, id)
 	if err != nil {
 		return nil, err
 	}
@@ -354,6 +386,14 @@ func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestTo
 		requests = append(requests, request)
 	}
 	return requests, nil
+}
+
+func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStatePending)
+}
+
+func (p *Persistence) DeclinedRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateDeclined)
 }
 
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
@@ -386,14 +426,51 @@ func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error 
 	return err
 }
 
+func (p *Persistence) SaveWakuMessages(messages []*types.Message) (err error) {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	query := `INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	for _, msg := range messages {
+		_, err = stmt.Exec(
+			msg.Sig,
+			msg.Timestamp,
+			msg.Topic.String(),
+			msg.Payload,
+			msg.Padding,
+			types.Bytes2Hex(msg.Hash),
+			msg.ThirdPartyID,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (p *Persistence) SaveWakuMessage(message *types.Message) error {
-	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash) VALUES (?, ?, ?, ?, ?, ?)`,
+	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		message.Sig,
 		message.Timestamp,
 		message.Topic.String(),
 		message.Payload,
 		message.Padding,
 		types.Bytes2Hex(message.Hash),
+		message.ThirdPartyID,
 	)
 	return err
 }
@@ -427,7 +504,7 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (u
 
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
 
-	query := "SELECT sig, timestamp, topic, payload, padding, hash FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
+	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
 
 	for i, topic := range topics {
 		query += `topic = "` + topic.String() + `"`
@@ -448,7 +525,7 @@ func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, fro
 		msg := types.Message{}
 		var topicStr string
 		var hashStr string
-		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr)
+		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr, &msg.ThirdPartyID)
 		if err != nil {
 			return nil, err
 		}

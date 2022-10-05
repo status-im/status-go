@@ -256,20 +256,6 @@ func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, t
 	return api.s.transactionManager.watch(ctx, transactionHash, chainClient)
 }
 
-func (api *API) GetFavourites(ctx context.Context) ([]Favourite, error) {
-	log.Debug("call to get favourites")
-	rst, err := api.s.favouriteManager.GetFavourites()
-	log.Debug("result from database for favourites", "len", len(rst))
-	return rst, err
-}
-
-func (api *API) AddFavourite(ctx context.Context, favourite Favourite) error {
-	log.Debug("call to create or update favourites")
-	err := api.s.favouriteManager.AddFavourite(favourite)
-	log.Debug("result from database for create or update favourites", "err", err)
-	return err
-}
-
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
@@ -312,6 +298,16 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 func (api *API) FetchPrices(ctx context.Context, symbols []string, currency string) (map[string]float64, error) {
 	log.Debug("call to FetchPrices")
 	return fetchCryptoComparePrices(symbols, currency)
+}
+
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]MarketCoinValues, error) {
+	log.Debug("call to FetchMarketValues")
+	return fetchTokenMarketValues(symbols, currency)
+}
+
+func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
+	log.Debug("call to FetchTokenDetails")
+	return fetchCryptoCompareTokenDetails(symbols)
 }
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

@@ -241,10 +241,14 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoin))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoinResponse))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE:
+		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToLeave))
 	case protobuf.ApplicationMetadataMessage_EDIT_MESSAGE:
 		return m.unmarshalProtobufData(new(protobuf.EditMessage))
 	case protobuf.ApplicationMetadataMessage_DELETE_MESSAGE:
 		return m.unmarshalProtobufData(new(protobuf.DeleteMessage))
+	case protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.DeleteForMeMessage))
 	case protobuf.ApplicationMetadataMessage_STATUS_UPDATE:
 		return m.unmarshalProtobufData(new(protobuf.StatusUpdate))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
@@ -296,6 +300,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData((new(protobuf.SyncTrustedUser)))
 	case protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST:
 		return m.unmarshalProtobufData((new(protobuf.SyncVerificationRequest)))
+	case protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION:
+		return m.unmarshalProtobufData((new(protobuf.SyncContactRequestDecision)))
 	}
 	return nil
 }

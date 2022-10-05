@@ -8,6 +8,12 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+type PinnedMessages []*PinnedMessage
+
+func (m PinnedMessages) GetClock(i int) uint64 {
+	return m[i].Message.Clock
+}
+
 type PinMessage struct {
 	protobuf.PinMessage
 

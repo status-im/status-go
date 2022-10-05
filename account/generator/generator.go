@@ -100,6 +100,23 @@ func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccou
 	return acc.ToIdentifiedAccountInfo(id), nil
 }
 
+func (g *Generator) CreateAccountFromMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
+	mnemonic := extkeys.NewMnemonic()
+	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
+	if err != nil {
+		return GeneratedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
+	}
+
+	acc := &Account{
+		privateKey:  masterExtendedKey.ToECDSA(),
+		extendedKey: masterExtendedKey,
+	}
+
+	id := uuid.NewRandom().String()
+
+	return acc.ToGeneratedAccountInfo(id, mnemonicPhrase), nil
+}
+
 func (g *Generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
 	mnemonic := extkeys.NewMnemonic()
 	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))

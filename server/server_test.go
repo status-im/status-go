@@ -14,9 +14,8 @@ type ServerURLSuite struct {
 	suite.Suite
 	TestKeyComponents
 
-	server        *MediaServer
-	serverNoPort  *MediaServer
-	pairingServer *PairingServer
+	server       *MediaServer
+	serverNoPort *MediaServer
 }
 
 func (s *ServerURLSuite) SetupSuite() {

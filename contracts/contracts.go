@@ -2,7 +2,9 @@ package contracts
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/contracts/directory"
+	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
@@ -40,12 +42,7 @@ func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *commo
 	return resolver.NewPublicResolver(*resolverAddress, backend)
 }
 
-func (c *ContractMaker) NewUsernameRegistrar(chainID uint64) (*registrar.UsernameRegistrar, error) {
-	contractAddr, err := registrar.ContractAddress(chainID)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common.Address) (*registrar.UsernameRegistrar, error) {
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -134,6 +131,35 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 	}
 
 	return directory.NewDirectory(
+		contractAddr,
+		backend,
+	)
+}
+
+func (c *ContractMaker) NewDirectoryWithBackend(chainID uint64, backend *ethclient.Client) (*directory.Directory, error) {
+	contractAddr, err := directory.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return directory.NewDirectory(
+		contractAddr,
+		backend,
+	)
+}
+
+func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, error) {
+	contractAddr, err := ethscan.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ethscan.NewBalanceScanner(
 		contractAddr,
 		backend,
 	)

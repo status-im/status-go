@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/status-im/status-go/server"
+
 	logging "github.com/ipfs/go-log"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -59,7 +61,7 @@ var (
 	OpenseaKeyFromEnv string
 )
 
-func (b *StatusNode) initServices(config *params.NodeConfig) error {
+func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
 	accountsFeed := &event.Feed{}
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -78,7 +80,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig) error {
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
-	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB))
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
@@ -287,6 +289,9 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Rendezvous:           nodeConfig.Rendezvous,
 			WakuRendezvousNodes:  nodeConfig.ClusterConfig.WakuRendezvousNodes,
 			PeerExchange:         nodeConfig.WakuV2Config.PeerExchange,
+			EnableStore:          nodeConfig.WakuV2Config.EnableStore,
+			StoreCapacity:        nodeConfig.WakuV2Config.StoreCapacity,
+			StoreSeconds:         nodeConfig.WakuV2Config.StoreSeconds,
 			DiscoveryLimit:       nodeConfig.WakuV2Config.DiscoveryLimit,
 			PersistPeers:         nodeConfig.WakuV2Config.PersistPeers,
 			DiscV5BootstrapNodes: nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
@@ -368,7 +373,7 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 	return b.rpcStatsSrvc
 }
 
-func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.Database) *accountssvc.Service {
+func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.Database, mediaServer *server.MediaServer) *accountssvc.Service {
 	if b.accountsSrvc == nil {
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,
@@ -376,6 +381,7 @@ func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.D
 			b.gethAccountManager,
 			b.config,
 			accountsFeed,
+			mediaServer,
 		)
 	}
 
@@ -579,6 +585,11 @@ func (b *StatusNode) Cleanup() error {
 				}
 			}
 		}
+	}
+
+	err := b.ensSrvc.Stop()
+	if err != nil {
+		return err
 	}
 
 	return nil

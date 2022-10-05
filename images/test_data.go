@@ -9,8 +9,8 @@ var (
 	testAacBytes  = []byte{0xff, 0xf1, 0x50, 0x80, 0x1c, 0x3f, 0xfc, 0xda, 0x00, 0x4c, 0x61, 0x76, 0x63, 0x35}
 )
 
-func SampleIdentityImages() []*IdentityImage {
-	return []*IdentityImage{
+func SampleIdentityImages() []IdentityImage {
+	return []IdentityImage{
 		{
 			Name:         SmallDimName,
 			Payload:      testJpegBytes,

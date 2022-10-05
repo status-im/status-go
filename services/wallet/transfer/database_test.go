@@ -12,12 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*Database, *Block, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return NewDB(db), &Block{db}, func() {
 		require.NoError(t, db.Close())
@@ -140,7 +141,7 @@ func TestDBReorgTransfers(t *testing.T) {
 	}
 	require.NoError(t, db.ProcessBlocks(777, original.Address, original.Number, lastBlock, []*DBHeader{original}))
 	require.NoError(t, db.ProcessTranfers(777, []Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil},
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100"},
 	}, []*DBHeader{}))
 	nonce = int64(0)
 	lastBlock = &LastKnownBlock{
@@ -150,7 +151,7 @@ func TestDBReorgTransfers(t *testing.T) {
 	}
 	require.NoError(t, db.ProcessBlocks(777, replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
 	require.NoError(t, db.ProcessTranfers(777, []Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil},
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, "2100"},
 	}, []*DBHeader{original}))
 
 	all, err := db.GetTransfers(777, big.NewInt(0), nil)

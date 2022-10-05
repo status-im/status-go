@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -32,6 +33,11 @@ const (
 	ChatTypeProfile
 	ChatTypeTimeline
 	ChatTypeCommunityChat
+)
+
+const (
+	FirstMessageTimestampUndefined = 0
+	FirstMessageTimestampNoMessage = 1
 )
 
 const pkStringLength = 68
@@ -107,8 +113,17 @@ type Chat struct {
 	// SyncedFrom is the time from when it was synced with a mailserver
 	SyncedFrom uint32 `json:"syncedFrom,omitempty"`
 
+	// FirstMessageTimestamp is the time when first message was sent/received on the chat
+	// valid only for community chats
+	// 0 - undefined
+	// 1 - no messages
+	FirstMessageTimestamp uint32 `json:"firstMessageTimestamp,omitempty"`
+
 	// Highlight is used for highlight chats
 	Highlight bool `json:"highlight,omitempty"`
+
+	// Image of the chat in Base64 format
+	Base64Image string `json:"image,omitempty"`
 }
 
 type ChatPreview struct {
@@ -267,6 +282,18 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 	// Name
 	c.Name = g.Name()
 
+	// Color
+	color := g.Color()
+	if color != "" {
+		c.Color = g.Color()
+	}
+
+	// Image
+	base64Image, err := userimage.GetPayloadDataURI(g.Image())
+	if err == nil {
+		c.Base64Image = base64Image
+	}
+
 	// Members
 	members := g.Members()
 	admins := g.Admins()
@@ -310,6 +337,28 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 		c.LastClockValue = message.Clock
 	}
 	return nil
+}
+
+func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {
+	if timestamp == c.FirstMessageTimestamp {
+		return false
+	}
+
+	// Do not allow to assign `Undefined`` or `NoMessage` to already set timestamp
+	if timestamp == FirstMessageTimestampUndefined ||
+		(timestamp == FirstMessageTimestampNoMessage &&
+			c.FirstMessageTimestamp != FirstMessageTimestampUndefined) {
+		return false
+	}
+
+	if c.FirstMessageTimestamp == FirstMessageTimestampUndefined ||
+		c.FirstMessageTimestamp == FirstMessageTimestampNoMessage ||
+		timestamp < c.FirstMessageTimestamp {
+		c.FirstMessageTimestamp = timestamp
+		return true
+	}
+
+	return false
 }
 
 // ChatMembershipUpdate represent an event on membership of the chat
@@ -389,6 +438,7 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		Joined:                   int64(timestamp),
 		ReadMessagesAtClockValue: 0,
 		ChatType:                 ChatTypeCommunityChat,
+		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
 	}
 }
 

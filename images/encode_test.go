@@ -60,7 +60,7 @@ func TestEncodeToBestSize(t *testing.T) {
 		{
 			"rose.webp",
 			8513,
-			errors.New("image size after processing exceeds max, expect < '5632', received < '8513'"),
+			errors.New("image size after processing exceeds max, expected < '5632', received < '8513'"),
 		},
 		{
 			"spin.gif",
@@ -89,4 +89,14 @@ func TestEncodeToBestSize(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func TestCompressToFileLimits(t *testing.T) {
+	img, err := Decode(path + "IMG_1205.HEIC.jpg")
+	require.NoError(t, err)
+
+	bb := bytes.NewBuffer([]byte{})
+	err = CompressToFileLimits(bb, img, FileSizeLimits{50000, 350000})
+	require.NoError(t, err)
+	require.Equal(t, 291645, bb.Len())
 }

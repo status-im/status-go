@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/keypairs"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
@@ -90,7 +91,7 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
 	account := &accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
-		Type:    "watch",
+		Type:    accounts.AccountTypeWatch,
 		Name:    name,
 		Emoji:   emoji,
 		Color:   color,
@@ -154,6 +155,7 @@ func (api *API) AddAccountWithPrivateKey(
 
 	account := &accounts.Account{
 		Address:   types.Address(common.HexToAddress(info.Address)),
+		KeyUID:    info.KeyUID,
 		PublicKey: types.HexBytes(info.PublicKey),
 		Type:      accounts.AccountTypeKey,
 		Name:      name,
@@ -252,6 +254,7 @@ func (api *API) addAccountWithMnemonic(
 
 	account := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
+		KeyUID:      generatedAccountInfo.KeyUID,
 		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
 		Type:        accounts.AccountTypeSeed,
 		Name:        name,
@@ -294,6 +297,7 @@ func (api *API) generateAccount(
 
 	acc := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(infos[path].Address)),
+		KeyUID:      info.KeyUID,
 		PublicKey:   types.HexBytes(infos[path].PublicKey),
 		Type:        accounts.AccountTypeGenerated,
 		Name:        name,
@@ -304,4 +308,46 @@ func (api *API) generateAccount(
 	}
 
 	return api.SaveAccounts(ctx, []*accounts.Account{acc})
+}
+
+func (api *API) VerifyPassword(password string) bool {
+	err := api.verifyPassword(password)
+	return err == nil
+}
+
+func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {
+	var addresses []types.Address
+	for _, addr := range accountAddresses {
+		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
+	}
+
+	return api.db.AddMigratedKeyPair(kcUID, kpName, keyUID, addresses)
+}
+
+func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {
+	return api.db.GetAllMigratedKeyPairs()
+}
+
+func (api *API) GetMigratedKeyPairByKeyUID(ctx context.Context, keyUID string) ([]*keypairs.KeyPair, error) {
+	return api.db.GetMigratedKeyPairByKeyUID(keyUID)
+}
+
+func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
+	return api.db.SetKeycardName(kcUID, kpName)
+}
+
+func (api *API) KeycardLocked(ctx context.Context, kcUID string) error {
+	return api.db.KeycardLocked(kcUID)
+}
+
+func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
+	return api.db.KeycardUnlocked(kcUID)
+}
+
+func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
+	return api.db.DeleteKeycard(kcUID)
+}
+
+func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
+	return api.db.UpdateKeycardUID(oldKcUID, newKcUID)
 }

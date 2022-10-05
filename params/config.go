@@ -15,6 +15,7 @@ import (
 
 	validator "gopkg.in/go-playground/validator.v9"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
@@ -203,6 +204,15 @@ type WakuV2Config struct {
 
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
+
+	// EnableStore indicates if WakuStore protocol should be enabled or not
+	EnableStore bool
+
+	// StoreCapacity indicates the max number of messages to store
+	StoreCapacity int
+
+	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
+	StoreSeconds int
 }
 
 // ----------
@@ -489,22 +499,30 @@ type NodeConfig struct {
 
 	// PushNotificationServerConfig is the config for the push notification server
 	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
+
+	OutputMessageCSVEnabled bool
+}
+
+type TokenOverride struct {
+	Symbol  string         `json:"symbol"`
+	Address common.Address `json:"address"`
 }
 
 type Network struct {
-	ChainID                uint64 `json:"chainId"`
-	ChainName              string `json:"chainName"`
-	RPCURL                 string `json:"rpcUrl"`
-	BlockExplorerURL       string `json:"blockExplorerUrl,omitempty"`
-	IconURL                string `json:"iconUrl,omitempty"`
-	NativeCurrencyName     string `json:"nativeCurrencyName,omitempty"`
-	NativeCurrencySymbol   string `json:"nativeCurrencySymbol,omitempty"`
-	NativeCurrencyDecimals uint64 `json:"nativeCurrencyDecimals"`
-	IsTest                 bool   `json:"isTest"`
-	Layer                  uint64 `json:"layer"`
-	Enabled                bool   `json:"enabled"`
-	ChainColor             string `json:"chainColor"`
-	ShortName              string `json:"shortName"`
+	ChainID                uint64          `json:"chainId"`
+	ChainName              string          `json:"chainName"`
+	RPCURL                 string          `json:"rpcUrl"`
+	BlockExplorerURL       string          `json:"blockExplorerUrl,omitempty"`
+	IconURL                string          `json:"iconUrl,omitempty"`
+	NativeCurrencyName     string          `json:"nativeCurrencyName,omitempty"`
+	NativeCurrencySymbol   string          `json:"nativeCurrencySymbol,omitempty"`
+	NativeCurrencyDecimals uint64          `json:"nativeCurrencyDecimals"`
+	IsTest                 bool            `json:"isTest"`
+	Layer                  uint64          `json:"layer"`
+	Enabled                bool            `json:"enabled"`
+	ChainColor             string          `json:"chainColor"`
+	ShortName              string          `json:"shortName"`
+	TokenOverrides         []TokenOverride `json:"tokenOverrides"`
 }
 
 // WalletConfig extra configuration for wallet.Service.

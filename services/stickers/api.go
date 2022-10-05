@@ -285,6 +285,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 			stickerPack, err := api.fetchPackData(stickerType, packID, true)
 			if err != nil {
 				log.Warn("Could not retrieve stickerpack data", "packID", packID, "error", err)
+				errChan <- err
 				return
 			}
 

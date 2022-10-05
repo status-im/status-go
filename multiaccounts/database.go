@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/migrations"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -21,6 +22,63 @@ type Account struct {
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
 	Images         []images.IdentityImage `json:"images"`
+	KDFIterations  int                    `json:"kdfIterations,omitempty"`
+}
+
+func (a *Account) ToProtobuf() *protobuf.MultiAccount {
+	var colourHashes []*protobuf.MultiAccount_ColourHash
+	for _, index := range a.ColorHash {
+		var i []int64
+		for _, is := range index {
+			i = append(i, int64(is))
+		}
+
+		colourHashes = append(colourHashes, &protobuf.MultiAccount_ColourHash{Index: i})
+	}
+
+	var identityImages []*protobuf.MultiAccount_IdentityImage
+	for _, ii := range a.Images {
+		identityImages = append(identityImages, ii.ToProtobuf())
+	}
+
+	return &protobuf.MultiAccount{
+		Name:           a.Name,
+		Timestamp:      a.Timestamp,
+		Identicon:      a.Identicon,
+		ColorHash:      colourHashes,
+		ColorId:        a.ColorID,
+		KeycardPairing: a.KeycardPairing,
+		KeyUid:         a.KeyUID,
+		Images:         identityImages,
+	}
+}
+
+func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
+	var colourHash [][]int
+	for _, index := range ma.ColorHash {
+		var i []int
+		for _, is := range index.Index {
+			i = append(i, int(is))
+		}
+
+		colourHash = append(colourHash, i)
+	}
+
+	var identityImages []images.IdentityImage
+	for _, ii := range ma.Images {
+		iii := images.IdentityImage{}
+		iii.FromProtobuf(ii)
+		identityImages = append(identityImages, iii)
+	}
+
+	a.Name = ma.Name
+	a.Timestamp = ma.Timestamp
+	a.Identicon = ma.Identicon
+	a.ColorHash = colourHash
+	a.ColorID = ma.ColorId
+	a.KeycardPairing = ma.KeycardPairing
+	a.KeyUID = ma.KeyUid
+	a.Images = identityImages
 }
 
 type MultiAccountMarshaller interface {
@@ -49,8 +107,16 @@ func (db *Database) Close() error {
 	return db.db.Close()
 }
 
+func (db *Database) GetAccountKDFIterationsNumber(keyUID string) (kdfIterationsNumber int, err error) {
+	err = db.db.QueryRow("SELECT  kdfIterations FROM accounts WHERE keyUid = ?", keyUID).Scan(&kdfIterationsNumber)
+	if err != nil {
+		return -1, err
+	}
+	return
+}
+
 func (db *Database) GetAccounts() (rst []Account, err error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, a.kdfIterations, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +147,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 			&accColorID,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
+			&acc.KDFIterations,
 			&iiName,
 			&ii.Payload,
 			&iiWidth,
@@ -138,13 +205,100 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 	return rst, nil
 }
 
+func (db *Database) GetAccount(keyUID string) (*Account, error) {
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.keycardPairing, a.keyUid, ii.key_uid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		errClose := rows.Close()
+		err = valueOr(err, errClose)
+	}()
+
+	acc := new(Account)
+
+	for rows.Next() {
+		accLoginTimestamp := sql.NullInt64{}
+		accIdenticon := sql.NullString{}
+		accColorHash := sql.NullString{}
+		accColorID := sql.NullInt64{}
+		ii := &images.IdentityImage{}
+		iiKeyUID := sql.NullString{}
+		iiName := sql.NullString{}
+		iiWidth := sql.NullInt64{}
+		iiHeight := sql.NullInt64{}
+		iiFileSize := sql.NullInt64{}
+		iiResizeTarget := sql.NullInt64{}
+		iiClock := sql.NullInt64{}
+
+		err = rows.Scan(
+			&acc.Name,
+			&accLoginTimestamp,
+			&accIdenticon,
+			&accColorHash,
+			&accColorID,
+			&acc.KeycardPairing,
+			&acc.KeyUID,
+			&iiKeyUID,
+			&iiName,
+			&ii.Payload,
+			&iiWidth,
+			&iiHeight,
+			&iiFileSize,
+			&iiResizeTarget,
+			&iiClock,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		acc.Timestamp = accLoginTimestamp.Int64
+		acc.Identicon = accIdenticon.String
+		acc.ColorID = accColorID.Int64
+		if len(accColorHash.String) != 0 {
+			err = json.Unmarshal([]byte(accColorHash.String), &acc.ColorHash)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		ii.KeyUID = iiKeyUID.String
+		ii.Name = iiName.String
+		ii.Width = int(iiWidth.Int64)
+		ii.Height = int(iiHeight.Int64)
+		ii.FileSize = int(iiFileSize.Int64)
+		ii.ResizeTarget = int(iiResizeTarget.Int64)
+		ii.Clock = uint64(iiClock.Int64)
+
+		// Don't process empty identity images
+		if !ii.IsEmpty() {
+			acc.Images = append(acc.Images, *ii)
+		}
+	}
+
+	return acc, nil
+}
+
 func (db *Database) SaveAccount(account Account) error {
 	colorHash, err := json.Marshal(account.ColorHash)
 	if err != nil {
 		return err
 	}
-	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
-	return err
+
+	if account.KDFIterations <= 0 {
+		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID, account.KDFIterations)
+	if err != nil {
+		return err
+	}
+
+	if account.Images == nil {
+		return nil
+	}
+
+	return db.StoreIdentityImages(account.KeyUID, account.Images, false)
 }
 
 func (db *Database) UpdateAccount(account Account) error {
@@ -152,7 +306,12 @@ func (db *Database) UpdateAccount(account Account) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KeyUID)
+
+	if account.KDFIterations <= 0 {
+		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.KeycardPairing, account.KDFIterations, account.KeyUID)
 	return err
 }
 
@@ -207,7 +366,7 @@ func (db *Database) GetIdentityImage(keyUID, it string) (*images.IdentityImage, 
 	return &ii, nil
 }
 
-func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityImage, publish bool) (err error) {
+func (db *Database) StoreIdentityImages(keyUID string, iis []images.IdentityImage, publish bool) (err error) {
 	// Because SQL INSERTs are triggered in a loop use a tx to ensure a single call to the DB.
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -223,15 +382,14 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityIma
 		err = valueOr(err, errRollback)
 	}()
 
-	for _, ii := range iis {
-		if ii == nil {
+	for i, ii := range iis {
+		if ii.IsEmpty() {
 			continue
 		}
-
-		ii.KeyUID = keyUID
+		iis[i].KeyUID = keyUID
 		_, err := tx.Exec(
 			"INSERT INTO identity_images (key_uid, name, image_payload, width, height, file_size, resize_target, clock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			ii.KeyUID,
+			keyUID,
 			ii.Name,
 			ii.Payload,
 			ii.Width,

@@ -686,19 +686,23 @@ func TestConvertAccount(t *testing.T) {
 
 	keycardSettings := settings.Settings{
 		KeycardInstanceUID: "0xdeadbeef",
-		KeycardPAiredOn:    1,
+		KeycardPairedOn:    1,
 		KeycardPairing:     "pairing",
 	}
+
+	_, keyStoreErrBefore := os.Stat(keyStoreDir)
 
 	err = backend.ConvertToKeycardAccount(keyStoreDir, keycardAccount, keycardSettings, password, keycardPassword)
 	require.NoError(t, err)
 
-	_, err = os.Stat(keyStoreDir)
-	require.Error(t, err)
-	require.True(t, os.IsNotExist(err))
+	_, keyStoreErrAfter := os.Stat(keyStoreDir)
+	require.True(t, keyStoreErrBefore == keyStoreErrAfter)
 
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
+
+	b := NewGethStatusBackend()
+	require.NoError(t, b.OpenAccounts())
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {

@@ -158,6 +158,30 @@ func MultiAccountImportPrivateKey(paramsJSON string) string {
 	return string(out)
 }
 
+// CreateAccountFromMnemonic returns an account derived from the mnemonic phrase and the Bip39Passphrase without storing it.
+func CreateAccountFromMnemonic(paramsJSON string) string {
+	var p MultiAccountImportMnemonicParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	// remove any duplicate whitespaces
+	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
 // MultiAccountImportMnemonic imports an account derived from the mnemonic phrase and the Bip39Passphrase storing it.
 func MultiAccountImportMnemonic(paramsJSON string) string {
 	var p MultiAccountImportMnemonicParams

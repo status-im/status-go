@@ -16,7 +16,7 @@ func TestNewTransport(t *testing.T) {
 	dbPath, err := ioutil.TempFile("", "transport.sql")
 	require.NoError(t, err)
 	defer os.Remove(dbPath.Name())
-	db, err := sqlite.Open(dbPath.Name(), "some-key")
+	db, err := sqlite.Open(dbPath.Name(), "some-key", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	logger := tt.MustCreateTestLogger()

@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/sqlite"
 )
 
 type testTimeSource struct{}
@@ -444,7 +445,8 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	}
 
 	account := multiaccounts.Account{
-		KeyUID: generatedAccountInfo.KeyUID,
+		KeyUID:        generatedAccountInfo.KeyUID,
+		KDFIterations: sqlite.ReducedKDFIterationsNumber,
 	}
 	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
 	if err != nil {
@@ -459,6 +461,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
+		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
 		Color:     "",
 		Wallet:    true,
@@ -469,6 +472,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	chatDerivedAccount := derivedAddresses[pathDefaultChat]
 	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
+		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      settings.Name,
 		Chat:      true,

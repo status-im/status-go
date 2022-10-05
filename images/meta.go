@@ -31,7 +31,7 @@ var (
 
 	// DimensionSizeLimit the size limits imposed on each resize dimension
 	// Figures are based on the following sample data https://github.com/status-im/status-mobile/issues/11047#issuecomment-694970473
-	DimensionSizeLimit = map[ResizeDimension]DimensionLimits{
+	DimensionSizeLimit = map[ResizeDimension]FileSizeLimits{
 		SmallDim: {
 			Ideal: 2560, // Base on the largest sample image at quality 60% (2,554 bytes ∴ 1024 * 2.5)
 			Max:   5632, // Base on the largest sample image at quality 80% + 50% margin (3,683 bytes * 1.5 ≈ 5500 ∴ 1024 * 5.5)
@@ -55,7 +55,7 @@ var (
 	}
 )
 
-type DimensionLimits struct {
+type FileSizeLimits struct {
 	Ideal int
 	Max   int
 }
@@ -63,8 +63,8 @@ type DimensionLimits struct {
 type ImageType uint
 type ResizeDimension uint
 
-func GetBannerDimensionLimits() DimensionLimits {
-	return DimensionLimits{
+func GetBannerDimensionLimits() FileSizeLimits {
+	return FileSizeLimits{
 		Ideal: 307200, // We want to save space and traffic but keep to maximum compression
 		Max:   460800, // Can't go bigger than 450 KB
 	}

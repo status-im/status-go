@@ -60,6 +60,30 @@ func TestMessagesByIDs(t *testing.T) {
 	require.Len(t, m, 10)
 }
 
+func TestMessagesByIDs_WithDiscordMessagesPayload(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		err = insertMinimalDiscordMessage(p, id, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+
+	m, err := p.MessagesByIDs(ids)
+	require.NoError(t, err)
+	require.Len(t, m, 10)
+
+	for _, _m := range m {
+		require.NotNil(t, _m.GetDiscordMessage())
+	}
+}
+
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -72,6 +96,48 @@ func TestMessageByID(t *testing.T) {
 	m, err := p.MessageByID(id)
 	require.NoError(t, err)
 	require.EqualValues(t, id, m.ID)
+}
+
+func TestMessageByID_WithDiscordMessagePayload(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	id := "1"
+	discordMessageID := "2"
+
+	err = insertMinimalDiscordMessage(p, id, discordMessageID)
+	require.NoError(t, err)
+
+	m, err := p.MessageByID(id)
+	require.NoError(t, err)
+	require.EqualValues(t, id, m.ID)
+	require.NotNil(t, m.GetDiscordMessage())
+	require.EqualValues(t, discordMessageID, m.GetDiscordMessage().Id)
+	require.EqualValues(t, "2", m.GetDiscordMessage().Author.Id)
+}
+
+func TestMessageByID_WithDiscordMessageAttachmentPayload(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	id := "1"
+	discordMessageID := "2"
+
+	err = insertDiscordMessageWithAttachments(p, id, discordMessageID)
+	require.NoError(t, err)
+
+	m, err := p.MessageByID(id)
+	require.NoError(t, err)
+	require.EqualValues(t, id, m.ID)
+
+	dm := m.GetDiscordMessage()
+	require.NotNil(t, dm)
+	require.EqualValues(t, discordMessageID, dm.Id)
+
+	require.NotNil(t, dm.Attachments)
+	require.Len(t, dm.Attachments, 2)
 }
 
 func TestMessagesExist(t *testing.T) {
@@ -179,6 +245,38 @@ func TestMessageByChatID(t *testing.T) {
 			return result[i].Clock > result[j].Clock
 		}),
 	)
+}
+
+func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	chatID := testPublicChatID
+
+	_, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	require.NoError(t, err)
+	require.False(t, hasMessage)
+
+	var messages []*common.Message
+	for i := 0; i < 10; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+			WhisperTimestamp: uint64(i + 10),
+			From:             "me",
+		})
+	}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	timestamp, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	require.NoError(t, err)
+	require.True(t, hasMessage)
+	require.Equal(t, uint64(10), timestamp)
 }
 
 func TestPinMessageByChatID(t *testing.T) {
@@ -671,7 +769,7 @@ func openTestDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sqlite.Open(dbPath.Name(), "")
+	return sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 }
 
 func insertMinimalMessage(p *sqlitePersistence, id string) error {
@@ -680,6 +778,64 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
+	}})
+}
+
+func insertDiscordMessageWithAttachments(p *sqlitePersistence, id string, discordMessageID string) error {
+	err := insertMinimalDiscordMessage(p, id, discordMessageID)
+	if err != nil {
+		return err
+	}
+
+	attachment := &protobuf.DiscordMessageAttachment{
+		Id:        "1",
+		MessageId: discordMessageID,
+		Url:       "https://does-not-exist.com",
+		Payload:   []byte{1, 2, 3, 4},
+	}
+
+	attachment2 := &protobuf.DiscordMessageAttachment{
+		Id:        "2",
+		MessageId: discordMessageID,
+		Url:       "https://does-not-exist.com",
+		Payload:   []byte{5, 6, 7, 8},
+	}
+
+	return p.SaveDiscordMessageAttachments([]*protobuf.DiscordMessageAttachment{
+		attachment,
+		attachment2,
+	})
+}
+
+func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessageID string) error {
+	discordMessage := &protobuf.DiscordMessage{
+		Id:        discordMessageID,
+		Type:      "Default",
+		Timestamp: "123456",
+		Content:   "This is the message",
+		Author: &protobuf.DiscordMessageAuthor{
+			Id: "2",
+		},
+		Reference: &protobuf.DiscordMessageReference{},
+	}
+
+	err := p.SaveDiscordMessage(discordMessage)
+	if err != nil {
+		return err
+	}
+
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		LocalChatID: testPublicChatID,
+		From:        "me",
+		ChatMessage: protobuf.ChatMessage{
+			Text:        "some-text",
+			ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			ChatId:      testPublicChatID,
+			Payload: &protobuf.ChatMessage_DiscordMessage{
+				DiscordMessage: discordMessage,
+			},
+		},
 	}})
 }
 
@@ -785,7 +941,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
-func TestSaveContactIdentityImage(t *testing.T) {
+func TestSaveContactChatIdentity(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -812,25 +968,58 @@ func TestSaveContactIdentityImage(t *testing.T) {
 		ImageType:  protobuf.ImageType_PNG,
 	}
 
-	images := &protobuf.ChatIdentity{
-		Clock:  1,
-		Images: identityImages,
+	toArrayOfPointers := func(array []protobuf.SocialLink) (result []*protobuf.SocialLink) {
+		result = make([]*protobuf.SocialLink, len(array))
+		for i := range array {
+			result[i] = &array[i]
+		}
+		return
 	}
 
-	result, err := p.SaveContactChatIdentity(contactID, images)
-	require.NoError(t, err)
-	require.True(t, result)
+	chatIdentity := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: identityImages,
+		SocialLinks: toArrayOfPointers([]protobuf.SocialLink{
+			{
+				Text: "Personal Site",
+				Url:  "status.im",
+			},
+			{
+				Text: "Twitter",
+				Url:  "Status_ico",
+			},
+		}),
+	}
 
-	// Save again same clock, it should return false
-	result, err = p.SaveContactChatIdentity(contactID, images)
+	clockUpdated, imagesUpdated, err := p.SaveContactChatIdentity(contactID, chatIdentity)
 	require.NoError(t, err)
-	require.False(t, result)
+	require.True(t, clockUpdated)
+	require.True(t, imagesUpdated)
+
+	// Save again same clock and data
+	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.False(t, clockUpdated)
+	require.False(t, imagesUpdated)
+
+	// Save again newer clock and no images
+	chatIdentity.Clock = 2
+	chatIdentity.Images = make(map[string]*protobuf.IdentityImage)
+	clockUpdated, imagesUpdated, err = p.SaveContactChatIdentity(contactID, chatIdentity)
+	require.NoError(t, err)
+	require.True(t, clockUpdated)
+	require.False(t, imagesUpdated)
 
 	contacts, err := p.Contacts()
 	require.NoError(t, err)
 	require.Len(t, contacts, 1)
 
 	require.Len(t, contacts[0].Images, 2)
+	require.Len(t, contacts[0].SocialLinks, 2)
+	require.Equal(t, "Personal Site", contacts[0].SocialLinks[0].Text)
+	require.Equal(t, "status.im", contacts[0].SocialLinks[0].URL)
+	require.Equal(t, "Twitter", contacts[0].SocialLinks[1].Text)
+	require.Equal(t, "Status_ico", contacts[0].SocialLinks[1].URL)
 }
 
 func TestSaveLinks(t *testing.T) {
@@ -1282,8 +1471,9 @@ func TestSaveCommunityChat(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	identity := &protobuf.ChatIdentity{
-		DisplayName: "community-chat-name",
-		Description: "community-chat-name-description",
+		DisplayName:           "community-chat-name",
+		Description:           "community-chat-name-description",
+		FirstMessageTimestamp: 1,
 	}
 	permissions := &protobuf.CommunityPermissions{
 		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -1312,4 +1502,116 @@ func TestHasPendingNotificationsForChatSanityCheck(t *testing.T) {
 	result, err := p.HasPendingNotificationsForChat("test-chat-id")
 	require.NoError(t, err)
 	require.False(t, result)
+}
+
+func TestSaveDiscordMessageAuthor(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	testAuthor := &protobuf.DiscordMessageAuthor{
+		Id:                 "1",
+		Name:               "Testuser",
+		Discriminator:      "1234",
+		Nickname:           "User",
+		AvatarUrl:          "http://example.com/profile.jpg",
+		AvatarImagePayload: []byte{1, 2, 3},
+	}
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(testAuthor))
+
+	exists, err := p.HasDiscordMessageAuthor("1")
+	require.NoError(t, err)
+	require.True(t, exists)
+	author, err := p.GetDiscordMessageAuthorByID("1")
+	require.NoError(t, err)
+	require.Equal(t, author.Id, testAuthor.Id)
+	require.Equal(t, author.Name, testAuthor.Name)
+}
+
+func TestGetDiscordMessageAuthorImagePayloadByID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	testAuthor := &protobuf.DiscordMessageAuthor{
+		Id:                 "1",
+		Name:               "Testuser",
+		Discriminator:      "1234",
+		Nickname:           "User",
+		AvatarUrl:          "http://example.com/profile.jpg",
+		AvatarImagePayload: []byte{1, 2, 3},
+	}
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(testAuthor))
+
+	payload, err := p.GetDiscordMessageAuthorImagePayloadByID("1")
+	require.NoError(t, err)
+
+	require.Equal(t, testAuthor.AvatarImagePayload, payload)
+}
+
+func TestSaveDiscordMessage(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.SaveDiscordMessage(&protobuf.DiscordMessage{
+		Id:        "1",
+		Type:      "Default",
+		Timestamp: "123456",
+		Content:   "This is the message",
+		Author: &protobuf.DiscordMessageAuthor{
+			Id: "2",
+		},
+		Reference: &protobuf.DiscordMessageReference{},
+	}))
+
+	require.NoError(t, err)
+}
+
+func TestSaveDiscordMessages(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalDiscordMessage(p, id, id)
+		require.NoError(t, err)
+
+		m, err := p.MessageByID(id)
+		require.NoError(t, err)
+		dm := m.GetDiscordMessage()
+		require.NotNil(t, dm)
+		require.EqualValues(t, id, dm.Id)
+		require.EqualValues(t, "2", dm.Author.Id)
+	}
+}
+
+func TestUpdateDiscordMessageAuthorImage(t *testing.T) {
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.SaveDiscordMessageAuthor(&protobuf.DiscordMessageAuthor{
+		Id:            "1",
+		Name:          "Testuser",
+		Discriminator: "1234",
+		Nickname:      "User",
+		AvatarUrl:     "http://example.com/profile.jpg",
+	}))
+
+	exists, err := p.HasDiscordMessageAuthor("1")
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	err = p.UpdateDiscordMessageAuthorImage("1", []byte{0, 1, 2, 3})
+	require.NoError(t, err)
+	payload, err := p.GetDiscordMessageAuthorImagePayloadByID("1")
+	require.NoError(t, err)
+	require.Equal(t, []byte{0, 1, 2, 3}, payload)
 }

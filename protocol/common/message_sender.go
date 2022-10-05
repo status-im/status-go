@@ -232,12 +232,19 @@ func (s *MessageSender) getMessageID(rawMessage *RawMessage) (types.HexBytes, er
 	return messageID, nil
 }
 
-// sendCommunity sends data to the recipient identifying with a given public key.
+// sendCommunity sends a message that's to be sent in a community
+// If it's a chat message, it will go to the respective topic derived by the
+// chat id, if it's not a chat message, it will go to the community topic.
 func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
 	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+
+	// Set sender
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = s.identity
+	}
 
 	messageID, err := s.getMessageID(rawMessage)
 	if err != nil {
@@ -250,6 +257,11 @@ func (s *MessageSender) sendCommunity(
 	// earlier than the scheduled
 	s.notifyOnScheduledMessage(nil, rawMessage)
 
+	var hash []byte
+	var newMessage *types.NewMessage
+
+	// Check if it's a key exchange message. In this case we send it
+	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
 		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.CommunityID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
 		if err != nil {
@@ -263,41 +275,55 @@ func (s *MessageSender) sendCommunity(
 				return nil, err
 			}
 		}
-	} else {
-		wrappedMessage, err := s.wrapMessageV1(rawMessage)
+		return nil, nil
+	}
+
+	wrappedMessage, err := s.wrapMessageV1(rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// If it's a chat message, we send it on the community chat topic
+	if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
 		if err != nil {
 			return nil, err
 		}
 
-		var payload []byte
-		if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
-			messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
-			if err != nil {
-				return nil, err
-			}
-
-			payload, err = proto.Marshal(messageSpec.Message)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to marshal")
-			}
-		} else {
-			payload = wrappedMessage
+		payload, err := proto.Marshal(messageSpec.Message)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal")
 		}
+		hash, newMessage, err = s.sendCommunityChatMessage(ctx, rawMessage, payload)
+		if err != nil {
+			return nil, err
+		}
+
+		sentMessage := &SentMessage{
+			Spec:       messageSpec,
+			MessageIDs: messageIDs,
+		}
+
+		s.notifyOnSentMessage(sentMessage)
+
+	} else {
+
+		payload := wrappedMessage
 
 		pubkey, err := crypto.DecompressPubkey(rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
-		hash, newMessage, err := s.sendCommunityRawMessage(ctx, pubkey, payload, messageIDs)
+		hash, newMessage, err = s.sendCommunityMessage(ctx, pubkey, payload, messageIDs)
 		if err != nil {
 			s.logger.Error("failed to send a community message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
 		s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
-
-		s.transport.Track(messageIDs, hash, newMessage)
 	}
+
+	s.transport.Track(messageIDs, hash, newMessage)
 	return messageID, nil
 }
 
@@ -465,6 +491,26 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 		Events: group.AbridgedEvents(&s.identity.PublicKey),
 	}
 	return s.encodeMembershipUpdate(message, chatEntity)
+}
+
+func (s *MessageSender) sendCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte) ([]byte, *types.NewMessage, error) {
+
+	newMessage := &types.NewMessage{
+		TTL:       whisperTTL,
+		Payload:   wrappedMessage,
+		PowTarget: calculatePoW(wrappedMessage),
+		PowTime:   whisperPoWTime,
+	}
+
+	// notify before dispatching
+	s.notifyOnScheduledMessage(nil, rawMessage)
+
+	hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.LocalChatID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return hash, newMessage, nil
 }
 
 // SendPublic takes encoded data, encrypts it and sends through the wire.
@@ -757,9 +803,9 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 	return hash, newMessage, nil
 }
 
-// sendCommunityRawMessage sends a message not wrapped in an encryption layer
+// sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) sendCommunityRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) sendCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,

@@ -46,7 +46,8 @@ type Transfer struct {
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`
 	// Log that was used to generate erc20 transfer. Nil for eth transfer.
-	Log *types.Log `json:"log"`
+	Log         *types.Log `json:"log"`
+	BaseGasFees string
 }
 
 // ETHDownloader downloads regular eth transfers.
@@ -114,6 +115,11 @@ func getTransferByHash(ctx context.Context, client *chain.Client, signer types.S
 		return nil, err
 	}
 
+	baseGasFee, err := client.GetBaseFeeFromBlock(big.NewInt(int64(transactionLog.BlockNumber)))
+	if err != nil {
+		return nil, err
+	}
+
 	transfer := &Transfer{Type: transferType,
 		ID:          hash,
 		Address:     address,
@@ -123,7 +129,9 @@ func getTransferByHash(ctx context.Context, client *chain.Client, signer types.S
 		Transaction: transaction,
 		From:        from,
 		Receipt:     receipt,
-		Log:         transactionLog}
+		Log:         transactionLog,
+		BaseGasFees: baseGasFee,
+	}
 
 	return transfer, nil
 }
@@ -162,6 +170,11 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 				transactionLog := getTokenLog(receipt.Logs)
 
+				baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(blk.Number())
+				if err != nil {
+					return nil, err
+				}
+
 				if transactionLog == nil {
 					rst = append(rst, Transfer{
 						Type:        ethTransfer,
@@ -173,7 +186,8 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 						Transaction: tx,
 						From:        from,
 						Receipt:     receipt,
-						Log:         transactionLog})
+						Log:         transactionLog,
+						BaseGasFees: baseGasFee})
 				}
 			}
 		}
@@ -237,6 +251,12 @@ func (d *ETHDownloader) transferFromLog(parent context.Context, ethlog types.Log
 	if err != nil {
 		return Transfer{}, err
 	}
+
+	baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(new(big.Int).SetUint64(ethlog.BlockNumber))
+	if err != nil {
+		return Transfer{}, err
+	}
+
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	blk, err := d.chainClient.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
@@ -254,6 +274,7 @@ func (d *ETHDownloader) transferFromLog(parent context.Context, ethlog types.Log
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
 		Log:         &ethlog,
+		BaseGasFees: baseGasFee,
 	}, nil
 }
 
@@ -274,6 +295,12 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 	if err != nil {
 		return Transfer{}, err
 	}
+
+	baseGasFee, err := d.client.GetBaseFeeFromBlock(new(big.Int).SetUint64(ethlog.BlockNumber))
+	if err != nil {
+		return Transfer{}, err
+	}
+
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	blk, err := d.client.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
@@ -294,6 +321,7 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
 		Log:         &ethlog,
+		BaseGasFees: baseGasFee,
 	}, nil
 }
 
@@ -334,6 +362,11 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		binary.BigEndian.PutUint32(index[:], uint32(l.Index))
 		id := crypto.Keccak256Hash(l.TxHash.Bytes(), index[:])
 
+		baseGasFee, err := d.client.GetBaseFeeFromBlock(new(big.Int).SetUint64(l.BlockNumber))
+		if err != nil {
+			return nil, err
+		}
+
 		header := &DBHeader{
 			Number: big.NewInt(int64(l.BlockNumber)),
 			Hash:   l.BlockHash,
@@ -345,7 +378,9 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 				From:        address,
 				Loaded:      false,
 				Type:        erc20Transfer,
-				Log:         &l}}}
+				Log:         &l,
+				BaseGasFees: baseGasFee,
+			}}}
 
 		concurrent.Add(func(ctx context.Context) error {
 			concurrent.PushHeader(header)

@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/verification"
@@ -100,6 +101,11 @@ type Contact struct {
 
 	// Display name of the contact
 	DisplayName string `json:"displayName"`
+
+	// Bio - description of the contact (tell us about yourself)
+	Bio string `json:"bio"`
+
+	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
 	Images map[string]images.IdentityImage `json:"images"`
 
@@ -248,4 +254,13 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
+}
+
+func contactIDFromPublicKeyString(key string) (string, error) {
+	pubKey, err := common.HexToPubkey(key)
+	if err != nil {
+		return "", err
+	}
+
+	return contactIDFromPublicKey(pubKey), nil
 }

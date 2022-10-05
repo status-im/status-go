@@ -14,7 +14,7 @@ type (
 	FilterSubscribeParameters struct {
 		host         host.Host
 		selectedPeer peer.ID
-		log          *zap.SugaredLogger
+		log          *zap.Logger
 	}
 
 	FilterSubscribeOption func(*FilterSubscribeParameters)
@@ -44,7 +44,7 @@ func WithAutomaticPeerSelection() FilterSubscribeOption {
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
-			params.log.Info("Error selecting peer: ", err)
+			params.log.Info("selecting peer", zap.Error(err))
 		}
 	}
 }
@@ -55,7 +55,7 @@ func WithFastestPeerSelection(ctx context.Context) FilterSubscribeOption {
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
-			params.log.Info("Error selecting peer: ", err)
+			params.log.Info("selecting peer", zap.Error(err))
 		}
 	}
 }

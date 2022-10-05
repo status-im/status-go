@@ -20,6 +20,7 @@ import (
 var (
 	ErrChatNotFound            = errors.New("can't find chat")
 	ErrCommunitiesNotSupported = errors.New("communities are not supported")
+	ErrChatTypeNotSupported    = errors.New("chat type not supported")
 )
 
 type ChannelGroupType string
@@ -71,9 +72,11 @@ type Chat struct {
 	Joined                   int64                              `json:"joined,omitempty"`
 	SyncedTo                 uint32                             `json:"syncedTo,omitempty"`
 	SyncedFrom               uint32                             `json:"syncedFrom,omitempty"`
+	FirstMessageTimestamp    uint32                             `json:"firstMessageTimestamp,omitempty"`
 	Highlight                bool                               `json:"highlight,omitempty"`
 	PinnedMessages           *PinnedMessages                    `json:"pinnedMessages,omitempty"`
 	CanPost                  bool                               `json:"canPost"`
+	Base64Image              string                             `json:"image,omitempty"`
 }
 
 type ChannelGroup struct {
@@ -272,7 +275,9 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		Joined:                   protocolChat.Joined,
 		SyncedTo:                 protocolChat.SyncedTo,
 		SyncedFrom:               protocolChat.SyncedFrom,
+		FirstMessageTimestamp:    protocolChat.FirstMessageTimestamp,
 		Highlight:                protocolChat.Highlight,
+		Base64Image:              protocolChat.Base64Image,
 	}
 
 	if protocolChat.OneToOne() {
@@ -398,4 +403,27 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 	}
 
 	return messengerChat, community, nil
+}
+
+func (api *API) EditChat(ctx context.Context, communityID types.HexBytes, chatID string, name string, color string, image images.CroppedImage) (*Chat, error) {
+	if len(communityID) != 0 {
+		return nil, ErrCommunitiesNotSupported
+	}
+
+	chatToEdit := api.s.messenger.Chat(chatID)
+	if chatToEdit == nil {
+		return nil, ErrChatNotFound
+	}
+
+	if chatToEdit.ChatType != protocol.ChatTypePrivateGroupChat {
+		return nil, ErrChatTypeNotSupported
+	}
+
+	response, err := api.s.messenger.EditGroupChat(ctx, chatID, name, color, image)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	return api.toAPIChat(response.Chats()[0], nil, pubKey)
 }

@@ -73,6 +73,10 @@ var (
 		reactFieldName: "display-name",
 		dBColumnName:   "display_name",
 	}
+	Bio = SettingField{
+		reactFieldName: "bio",
+		dBColumnName:   "bio",
+	}
 	EIP1581Address = SettingField{
 		reactFieldName: "eip1581-address",
 		dBColumnName:   "eip1581_address",

@@ -8,11 +8,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
+	"net/url"
 	"time"
+
+	"github.com/status-im/status-go/signal"
 )
 
 var globalCertificate *tls.Certificate = nil
@@ -145,4 +149,83 @@ func ToECDSA(d []byte) *ecdsa.PrivateKey {
 
 	k.PublicKey.X, k.PublicKey.Y = k.PublicKey.Curve.ScalarBaseMult(d)
 	return k
+}
+
+// verifyCertPublicKey checks that the ecdsa.PublicKey using in a x509.Certificate matches a known ecdsa.PublicKey
+func verifyCertPublicKey(cert *x509.Certificate, publicKey *ecdsa.PublicKey) error {
+	certKey, ok := cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("unexpected public key type, expected ecdsa.PublicKey")
+	}
+
+	if !certKey.Equal(publicKey) {
+		return fmt.Errorf("server certificate MUST match the given public key")
+	}
+	return nil
+}
+
+// verifyCertSig checks that a x509.Certificate's Signature verifies against x509.Certificate's PublicKey
+// If the x509.Certificate's PublicKey is not an ecdsa.PublicKey an error will be thrown
+func verifyCertSig(cert *x509.Certificate) (bool, error) {
+	var esig struct {
+		R, S *big.Int
+	}
+	if _, err := asn1.Unmarshal(cert.Signature, &esig); err != nil {
+		return false, err
+	}
+
+	hash := sha256.New()
+	hash.Write(cert.RawTBSCertificate)
+
+	ecKey, ok := cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return false, fmt.Errorf("certificate public is not an ecdsa.PublicKey")
+	}
+
+	verified := ecdsa.Verify(ecKey, hash.Sum(nil), esig.R, esig.S)
+	return verified, nil
+}
+
+// verifyCert verifies an x509.Certificate against a known ecdsa.PublicKey
+// combining the checks of verifyCertPublicKey and verifyCertSig.
+// If an x509.Certificate fails to verify an error is also thrown
+func verifyCert(cert *x509.Certificate, publicKey *ecdsa.PublicKey) error {
+	err := verifyCertPublicKey(cert, publicKey)
+	if err != nil {
+		return err
+	}
+
+	verified, err := verifyCertSig(cert)
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return fmt.Errorf("server certificate signature MUST verify")
+	}
+	return nil
+}
+
+// getServerCert pings a given tls host, extracts and returns its x509.Certificate
+// the function expects there to be only 1 certificate
+func getServerCert(URL *url.URL) (*x509.Certificate, error) {
+	conf := &tls.Config{
+		InsecureSkipVerify: true, // nolint: gosec // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
+	}
+
+	conn, err := tls.Dial("tcp", URL.Host, conf)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err})
+		return nil, err
+	}
+	defer conn.Close()
+
+	// No error on the dial out then the URL.Host is accessible
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
+
+	certs := conn.ConnectionState().PeerCertificates
+	if len(certs) != 1 {
+		return nil, fmt.Errorf("expected 1 TLS certificate, received '%d'", len(certs))
+	}
+
+	return certs[0], nil
 }

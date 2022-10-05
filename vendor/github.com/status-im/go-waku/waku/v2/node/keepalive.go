@@ -2,12 +2,13 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"github.com/status-im/go-waku/logging"
+	"go.uber.org/zap"
 )
 
 const maxAllowedPingFailures = 2
@@ -19,19 +20,15 @@ const maxPublishAttempt = 5
 func (w *WakuNode) startKeepAlive(t time.Duration) {
 	go func() {
 		defer w.wg.Done()
-		w.log.Info("Setting up ping protocol with duration of ", t)
+		w.log.Info("setting up ping protocol", zap.Duration("duration", t))
 		ticker := time.NewTicker(t)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				// Compared to Network's peers collection,
-				// Peerstore contains all peers ever connected to,
-				// thus if a host goes down and back again,
-				// pinging a peer will trigger identification process,
-				// which is not possible when iterating
-				// through Network's peer collection, as it will be empty
-				for _, p := range w.host.Peerstore().Peers() {
+				// Network's peers collection,
+				// contains only currently active peers
+				for _, p := range w.host.Network().Peers() {
 					if p != w.host.ID() {
 						w.wg.Add(1)
 						go w.pingPeer(p)
@@ -52,25 +49,26 @@ func (w *WakuNode) pingPeer(peer peer.ID) {
 	ctx, cancel := context.WithTimeout(w.ctx, 3*time.Second)
 	defer cancel()
 
-	w.log.Debug("Pinging ", peer)
+	logger := w.log.With(logging.HostID("peer", peer))
+	logger.Debug("pinging")
 	pr := ping.Ping(ctx, w.host, peer)
 	select {
 	case res := <-pr:
 		if res.Error != nil {
 			w.keepAliveFails[peer]++
-			w.log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, res.Error.Error()))
+			logger.Debug("could not ping", zap.Error(res.Error))
 		} else {
 			w.keepAliveFails[peer] = 0
 		}
 	case <-ctx.Done():
 		w.keepAliveFails[peer]++
-		w.log.Debug(fmt.Sprintf("Could not ping %s: %s", peer, ctx.Err()))
+		logger.Debug("could not ping (context done)", zap.Error(ctx.Err()))
 	}
 
 	if w.keepAliveFails[peer] > maxAllowedPingFailures && w.host.Network().Connectedness(peer) == network.Connected {
-		w.log.Info("Disconnecting peer ", peer)
+		logger.Info("disconnecting peer")
 		if err := w.host.Network().ClosePeer(peer); err != nil {
-			w.log.Debug(fmt.Sprintf("Could not close conn to peer %s: %s", peer, err))
+			logger.Debug("closing conn to peer", zap.Error(err))
 		}
 		w.keepAliveFails[peer] = 0
 	}

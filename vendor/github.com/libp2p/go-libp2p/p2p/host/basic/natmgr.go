@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
+
 	"github.com/libp2p/go-libp2p-core/network"
-	inat "github.com/libp2p/go-libp2p-nat"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -37,7 +39,7 @@ func NewNATManager(net network.Network) NATManager {
 //  * closing the natManager closes the nat and its mappings.
 type natManager struct {
 	net   network.Network
-	natmu sync.RWMutex
+	natMx sync.RWMutex
 	nat   *inat.NAT
 
 	ready    chan struct{} // closed once the nat is ready to process port mappings
@@ -77,6 +79,14 @@ func (nmgr *natManager) Ready() <-chan struct{} {
 func (nmgr *natManager) background(ctx context.Context) {
 	defer nmgr.refCount.Done()
 
+	defer func() {
+		nmgr.natMx.Lock()
+		if nmgr.nat != nil {
+			nmgr.nat.Close()
+		}
+		nmgr.natMx.Unlock()
+	}()
+
 	discoverCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	natInstance, err := inat.DiscoverNAT(discoverCtx)
@@ -86,9 +96,9 @@ func (nmgr *natManager) background(ctx context.Context) {
 		return
 	}
 
-	nmgr.natmu.Lock()
+	nmgr.natMx.Lock()
 	nmgr.nat = natInstance
-	nmgr.natmu.Unlock()
+	nmgr.natMx.Unlock()
 	close(nmgr.ready)
 
 	// sign natManager up for network notifications
@@ -207,8 +217,8 @@ func (nmgr *natManager) doSync() {
 // (a) the search process is still ongoing, or (b) the search process
 // found no nat. Clients must check whether the return value is nil.
 func (nmgr *natManager) NAT() *inat.NAT {
-	nmgr.natmu.Lock()
-	defer nmgr.natmu.Unlock()
+	nmgr.natMx.Lock()
+	defer nmgr.natMx.Unlock()
 	return nmgr.nat
 }
 
@@ -226,7 +236,5 @@ func (nn *nmgrNetNotifiee) ListenClose(n network.Network, addr ma.Multiaddr) {
 	nn.natManager().sync()
 }
 
-func (nn *nmgrNetNotifiee) Connected(network.Network, network.Conn)      {}
-func (nn *nmgrNetNotifiee) Disconnected(network.Network, network.Conn)   {}
-func (nn *nmgrNetNotifiee) OpenedStream(network.Network, network.Stream) {}
-func (nn *nmgrNetNotifiee) ClosedStream(network.Network, network.Stream) {}
+func (nn *nmgrNetNotifiee) Connected(network.Network, network.Conn)    {}
+func (nn *nmgrNetNotifiee) Disconnected(network.Network, network.Conn) {}

@@ -15,6 +15,10 @@ message MembershipUpdateEvent {
   string name = 3;
   // The type of the event
   EventType type = 4;
+  // Color of the chat for the CHAT_CREATED/COLOR_CHANGED event types
+  string color = 5;
+  // Chat image
+  bytes image = 6;
 
   enum EventType {
     UNKNOWN = 0;
@@ -25,6 +29,8 @@ message MembershipUpdateEvent {
     MEMBER_REMOVED = 5;
     ADMINS_ADDED = 6;
     ADMIN_REMOVED = 7;
+    COLOR_CHANGED = 8;
+    IMAGE_CHANGED = 9;
   }
 }
 

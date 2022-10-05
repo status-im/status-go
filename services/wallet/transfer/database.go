@@ -427,21 +427,21 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 
 func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers []Transfer) error {
 	update, err := creator.Prepare(`UPDATE transfers
-	SET tx = ?, sender = ?, receipt = ?, timestamp = ?, loaded = 1
+        SET tx = ?, sender = ?, receipt = ?, timestamp = ?, loaded = 1, base_gas_fee = ?
 	WHERE address =?  AND hash = ?`)
 	if err != nil {
 		return err
 	}
 
 	insert, err := creator.Prepare(`INSERT OR IGNORE INTO transfers
-	(network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded)
+        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee)
 	VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`)
 	if err != nil {
 		return err
 	}
 	for _, t := range transfers {
-		res, err := update.Exec(&JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, t.Timestamp, t.Address, t.ID)
+		res, err := update.Exec(&JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, t.Timestamp, t.BaseGasFees, t.Address, t.ID)
 
 		if err != nil {
 			return err
@@ -454,7 +454,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 			continue
 		}
 
-		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
+		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees)
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)
 			return err

@@ -10,8 +10,6 @@ import (
 )
 
 const (
-	cryptoOnRampsData = "https://raw.githubusercontent.com/status-im/crypto-on-ramps/master/ramps.json"
-
 	DataSourceHTTP DataSourceType = iota + 1
 	DataSourceStatic
 )

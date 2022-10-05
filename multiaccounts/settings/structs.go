@@ -119,13 +119,14 @@ type Settings struct {
 	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
 	DappsAddress              types.Address    `json:"dapps-address"`
 	DisplayName               string           `json:"display-name"`
+	Bio                       string           `json:"bio,omitempty"`
 	EIP1581Address            types.Address    `json:"eip1581-address"`
 	Fleet                     *string          `json:"fleet,omitempty"`
 	HideHomeTooltip           bool             `json:"hide-home-tooltip?,omitempty"`
 	InstallationID            string           `json:"installation-id"`
 	KeyUID                    string           `json:"key-uid"`
 	KeycardInstanceUID        string           `json:"keycard-instance-uid,omitempty"`
-	KeycardPAiredOn           int64            `json:"keycard-paired-on,omitempty"`
+	KeycardPairedOn           int64            `json:"keycard-paired-on,omitempty"`
 	KeycardPairing            string           `json:"keycard-pairing,omitempty"`
 	LastUpdated               *int64           `json:"last-updated,omitempty"`
 	LatestDerivedPath         uint             `json:"latest-derived-path"`

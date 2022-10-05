@@ -80,21 +80,23 @@ type PendingTransaction struct {
 	MultiTransactionID int64          `json:"multi_transaction_id"`
 }
 
-func arrayToString(a []uint64, delim string) string {
-	res := make([]string, len(a))
-	for i, v := range a {
-		res[i] = fmt.Sprint(v)
+func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTransaction, error) {
+	if len(chainIDs) == 0 {
+		return nil, errors.New("at least 1 chainID is required")
 	}
 
-	return strings.Join(res, ",")
-}
+	inVector := strings.Repeat("?, ", len(chainIDs)-1) + "?"
+	var parameters []interface{}
+	for _, c := range chainIDs {
+		parameters = append(parameters, c)
+	}
 
-func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTransaction, error) {
-	rows, err := tm.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
+	rows, err := tm.db.Query(fmt.Sprintf(`SELECT hash, timestamp, value, from_address, to_address, data,
                                          symbol, gas_price, gas_limit, type, additional_data,
 										 network_id
                                   FROM pending_transactions
-                                  WHERE network_id in (?)`, arrayToString(chainIDs, ","))
+                                  WHERE network_id in (%s)`, inVector), parameters...)
+
 	if err != nil {
 		return nil, err
 	}
@@ -131,11 +133,23 @@ func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTrans
 }
 
 func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address common.Address) ([]*PendingTransaction, error) {
-	rows, err := tm.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
+	if len(chainIDs) == 0 {
+		return nil, errors.New("at least 1 chainID is required")
+	}
+
+	inVector := strings.Repeat("?, ", len(chainIDs)-1) + "?"
+	var parameters []interface{}
+	for _, c := range chainIDs {
+		parameters = append(parameters, c)
+	}
+
+	parameters = append(parameters, address)
+
+	rows, err := tm.db.Query(fmt.Sprintf(`SELECT hash, timestamp, value, from_address, to_address, data,
                                          symbol, gas_price, gas_limit, type, additional_data,
 										 network_id
                                   FROM pending_transactions
-                                  WHERE network_id in (?) AND from_address = ?`, arrayToString(chainIDs, ","), address)
+                                  WHERE network_id in (%s) AND from_address = ?`, inVector), parameters...)
 	if err != nil {
 		return nil, err
 	}

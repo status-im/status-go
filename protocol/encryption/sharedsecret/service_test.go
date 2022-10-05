@@ -32,7 +32,7 @@ func (s *SharedSecretTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.path = dbFile.Name()
 
-	db, err := sqlite.Open(s.path, "")
+	db, err := sqlite.Open(s.path, "", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 
 	s.service = New(db, s.logger)

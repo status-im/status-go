@@ -41,7 +41,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	bobDBKey := "bob"
 
-	db, err := sqlite.Open(s.aliceDBPath.Name(), aliceDBKey)
+	db, err := sqlite.Open(s.aliceDBPath.Name(), aliceDBKey, sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	s.alice = New(
 		db,
@@ -49,7 +49,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		s.logger.With(zap.String("user", "alice")),
 	)
 
-	db, err = sqlite.Open(s.bobDBPath.Name(), bobDBKey)
+	db, err = sqlite.Open(s.bobDBPath.Name(), bobDBKey, sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	s.bob = New(
 		db,

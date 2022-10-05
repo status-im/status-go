@@ -382,11 +382,12 @@ type CommunitySettings struct {
 }
 
 type CommunityChatChanges struct {
-	ChatModified     *protobuf.CommunityChat
-	MembersAdded     map[string]*protobuf.CommunityMember
-	MembersRemoved   map[string]*protobuf.CommunityMember
-	CategoryModified string
-	PositionModified int
+	ChatModified                  *protobuf.CommunityChat
+	MembersAdded                  map[string]*protobuf.CommunityMember
+	MembersRemoved                map[string]*protobuf.CommunityMember
+	CategoryModified              string
+	PositionModified              int
+	FirstMessageTimestampModified uint32
 }
 
 type CommunityChanges struct {
@@ -647,6 +648,10 @@ func (o *Community) hasMemberPermission(member *protobuf.CommunityMember, permis
 }
 
 func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.CommunityMember_Roles]bool) bool {
+	if common.IsPubKeyEqual(pk, o.config.ID) {
+		return true
+	}
+
 	member := o.getMember(pk)
 	if member == nil {
 		return false
@@ -701,16 +706,11 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	return o.config.CommunityDescription, nil
 }
 
-func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
-	}
+func (o *Community) removeMemberFromOrg(pk *ecdsa.PublicKey) {
 	if !o.hasMember(pk) {
-		return o.config.CommunityDescription, nil
+		return
 	}
+
 	key := common.PubkeyToHex(pk)
 
 	// Remove from org
@@ -722,7 +722,23 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	}
 
 	o.increaseClock()
+}
 
+func (o *Community) RemoveOurselvesFromOrg(pk *ecdsa.PublicKey) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	o.removeMemberFromOrg(pk)
+}
+
+func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	o.removeMemberFromOrg(pk)
 	return o.config.CommunityDescription, nil
 }
 
@@ -928,6 +944,18 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 						response.ChatsModified[chatID].MembersRemoved[pk] = member
 					}
 				}
+
+				// check if first message timestamp was modified
+				if o.config.CommunityDescription.Chats[chatID].Identity.FirstMessageTimestamp !=
+					description.Chats[chatID].Identity.FirstMessageTimestamp {
+					if response.ChatsModified[chatID] == nil {
+						response.ChatsModified[chatID] = &CommunityChatChanges{
+							MembersAdded:   make(map[string]*protobuf.CommunityMember),
+							MembersRemoved: make(map[string]*protobuf.CommunityMember),
+						}
+					}
+					response.ChatsModified[chatID].FirstMessageTimestampModified = description.Chats[chatID].Identity.FirstMessageTimestamp
+				}
 			}
 		}
 
@@ -995,6 +1023,25 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 	o.config.MarshaledCommunityDescription = rawMessage
 
 	return response, nil
+}
+
+func (o *Community) UpdateChatFirstMessageTimestamp(chatID string, timestamp uint32) (*CommunityChanges, error) {
+	if !o.IsAdmin() {
+		return nil, ErrNotAdmin
+	}
+
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	chat.Identity.FirstMessageTimestamp = timestamp
+
+	communityChanges := o.emptyCommunityChanges()
+	communityChanges.ChatsModified[chatID] = &CommunityChatChanges{
+		FirstMessageTimestampModified: timestamp,
+	}
+	return communityChanges, nil
 }
 
 // ValidateRequestToJoin validates a request, checks that the right permissions are applied

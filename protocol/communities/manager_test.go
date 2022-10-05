@@ -38,7 +38,7 @@ type ManagerSuite struct {
 func (s *ManagerSuite) SetupTest() {
 	dbPath, err := ioutil.TempFile("", "")
 	s.NoError(err, "creating temp file for db")
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "")
+	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")
@@ -60,7 +60,7 @@ func (s *ManagerSuite) TestCreateCommunity() {
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
-	community, err := s.manager.CreateCommunity(request)
+	community, err := s.manager.CreateCommunity(request, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
@@ -104,7 +104,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 		},
 	}
 
-	community, err := s.manager.CreateCommunity(request)
+	community, err := s.manager.CreateCommunity(request, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
@@ -126,7 +126,7 @@ func (s *ManagerSuite) TestEditCommunity() {
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
-	community, err := s.manager.CreateCommunity(createRequest)
+	community, err := s.manager.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
@@ -551,7 +551,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		Description: "status community description",
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
-	community, err := s.manager.CreateCommunity(createRequest)
+	community, err := s.manager.CreateCommunity(createRequest, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -565,7 +565,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
-	_, changes, err := s.manager.CreateChat(community.ID(), chat)
+	_, changes, err := s.manager.CreateChat(community.ID(), chat, true)
 	if err != nil {
 		return nil, "", err
 	}

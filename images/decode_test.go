@@ -3,6 +3,8 @@ package images
 import (
 	"errors"
 	"image"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -85,13 +87,16 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecodeFromURL(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
+
 	cs := []struct {
 		Filepath string
 		Nil      bool
 		Bounds   image.Rectangle
 	}{
 		{
-			"https://via.placeholder.com/2x1.png",
+			s.URL + "/2x1.png",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -99,7 +104,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			"https://via.placeholder.com/1.jpg",
+			s.URL + "/1.jpg",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -107,7 +112,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			"https://via.placeholder.com/1.gif",
+			s.URL + "/1.gif",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -115,7 +120,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			"https://via.placeholder.com/1.webp",
+			s.URL + "/1.webp",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -123,7 +128,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			"https://via.placeholder.com/1.webp",
+			s.URL + "/1.webp",
 			true,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -143,6 +148,14 @@ func TestDecodeFromURL(t *testing.T) {
 		}
 
 	}
+}
+
+func TestDecodeFromURL_WithErrors(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir(path)))
+	defer s.Close()
+
+	_, err := DecodeFromURL("https://doesnt-exist.com")
+	require.Error(t, err)
 }
 
 func TestGetType(t *testing.T) {

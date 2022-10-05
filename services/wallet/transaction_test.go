@@ -12,12 +12,13 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-transactions-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return &TransactionManager{db, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())

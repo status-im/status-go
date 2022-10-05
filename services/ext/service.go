@@ -416,6 +416,7 @@ func buildMessengerOptions(
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
+		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

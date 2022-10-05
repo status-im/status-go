@@ -56,7 +56,7 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 		if err != nil {
 			return err
 		}
-		db, err := sqlite.Open(dbPath.Name(), "some-key")
+		db, err := sqlite.Open(dbPath.Name(), "some-key", sqlite.ReducedKDFIterationsNumber)
 		if err != nil {
 			return err
 		}

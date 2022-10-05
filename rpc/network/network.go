@@ -70,7 +70,8 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 }
 
 type Manager struct {
-	db *sql.DB
+	db       *sql.DB
+	networks []params.Network
 }
 
 func NewManager(db *sql.DB) *Manager {
@@ -92,6 +93,7 @@ func (nm *Manager) Init(networks []params.Network) error {
 	if networks == nil {
 		return nil
 	}
+	nm.networks = networks
 
 	var errors string
 	currentNetworks, _ := nm.Get(false)
@@ -174,4 +176,8 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 	}
 
 	return query.exec(nm.db)
+}
+
+func (nm *Manager) GetConfiguredNetworks() []params.Network {
+	return nm.networks
 }

@@ -6,24 +6,25 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/appdatabase"
@@ -44,6 +45,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/ens"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
@@ -53,7 +55,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -62,7 +63,7 @@ import (
 	"github.com/status-im/status-go/telemetry"
 )
 
-//todo: kozieiev: get rid of wakutransp word
+// todo: kozieiev: get rid of wakutransp word
 type chatContext string
 
 const (
@@ -94,22 +95,26 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	node                       types.Node
-	server                     *p2p.Server
-	peerStore                  *mailservers.PeerStore
-	config                     *config
-	identity                   *ecdsa.PrivateKey
-	persistence                *sqlitePersistence
-	transport                  *transport.Transport
-	encryptor                  *encryption.Protocol
-	sender                     *common.MessageSender
-	ensVerifier                *ens.Verifier
-	anonMetricsClient          *anonmetrics.Client
-	anonMetricsServer          *anonmetrics.Server
-	pushNotificationClient     *pushnotificationclient.Client
-	pushNotificationServer     *pushnotificationserver.Server
-	communitiesManager         *communities.Manager
-	logger                     *zap.Logger
+	node                   types.Node
+	server                 *p2p.Server
+	peerStore              *mailservers.PeerStore
+	config                 *config
+	identity               *ecdsa.PrivateKey
+	persistence            *sqlitePersistence
+	transport              *transport.Transport
+	encryptor              *encryption.Protocol
+	sender                 *common.MessageSender
+	ensVerifier            *ens.Verifier
+	anonMetricsClient      *anonmetrics.Client
+	anonMetricsServer      *anonmetrics.Server
+	pushNotificationClient *pushnotificationclient.Client
+	pushNotificationServer *pushnotificationserver.Server
+	communitiesManager     *communities.Manager
+	logger                 *zap.Logger
+
+	outputCSV bool
+	csvFile   *os.File
+
 	verifyTransactionClient    EthClient
 	featureFlags               common.FeatureFlags
 	shutdownTasks              []func() error
@@ -170,8 +175,9 @@ type mailserverCycle struct {
 }
 
 type dbConfig struct {
-	dbPath string
-	dbKey  string
+	dbPath          string
+	dbKey           string
+	dbKDFIterations int
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -256,9 +262,9 @@ func NewMessenger(
 		return nil, errors.New("database instance or database path needs to be provided")
 	}
 	if c.db == nil {
-		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath))
+		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath), zap.Int("KDFIterations", c.dbConfig.dbKDFIterations))
 		var err error
-		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey)
+		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey, c.dbConfig.dbKDFIterations)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize database from the db config")
 		}
@@ -461,6 +467,22 @@ func NewMessenger(
 			database.Close,
 		},
 		logger: logger,
+	}
+
+	if c.outputMessagesCSV {
+		messenger.outputCSV = c.outputMessagesCSV
+		csvFile, err := os.Create("messages-" + fmt.Sprint(time.Now().Unix()) + ".csv")
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = csvFile.Write([]byte("timestamp\tmessageID\tfrom\ttopic\tchatID\tmessageType\tmessage\n"))
+		if err != nil {
+			return nil, err
+		}
+
+		messenger.csvFile = csvFile
+		messenger.shutdownTasks = append(messenger.shutdownTasks, csvFile.Close)
 	}
 
 	if anonMetricsClient != nil {
@@ -864,7 +886,22 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, m.getIdentityHash(displayName, img))
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return err
+	}
+
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, identityHash)
 	if err != nil {
 		return err
 	}
@@ -929,7 +966,22 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, m.getIdentityHash(displayName, img))
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return err
+	}
+
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, identityHash)
 	if err != nil {
 		return err
 	}
@@ -937,11 +989,15 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName string, img *userimage.IdentityImage) []byte {
-	if img == nil {
-		return crypto.Keccak256([]byte(displayName))
+func (m *Messenger) getIdentityHash(displayName, bio string, img *userimage.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+	socialLinksData, err := socialLinks.Serialize()
+	if err != nil {
+		return []byte{}, err
 	}
-	return crypto.Keccak256(img.Payload, []byte(displayName))
+	if img == nil {
+		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData), nil
+	}
+	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -970,7 +1026,22 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	if !bytes.Equal(hash, m.getIdentityHash(displayName, img)) {
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return false, err
+	}
+
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return false, err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	if err != nil {
+		return false, err
+	}
+
+	if !bytes.Equal(hash, identityHash) {
 		return true, nil
 	}
 
@@ -990,10 +1061,22 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		return nil, err
 	}
 
+	bio, err := m.settings.Bio()
+	if err != nil {
+		return nil, err
+	}
+
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return nil, err
+	}
+
 	ci := &protobuf.ChatIdentity{
 		Clock:       m.transport.GetCurrentTime(),
 		EnsName:     "", // TODO add ENS name handling to dedicate PR
 		DisplayName: displayName,
+		Description: bio,
+		SocialLinks: socialLinks.ToProtobuf(),
 	}
 
 	err = m.attachIdentityImagesToChatIdentity(context, ci)
@@ -1368,6 +1451,11 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
+		if err = m.initChatFirstMessageTimestamp(chat); err != nil {
+			logger.Warn("failed to init first message timestamp", zap.Error(err))
+			continue
+		}
+
 		m.allChats.Store(chat.ID, chat)
 
 		if !chat.Active || chat.Timeline() {
@@ -1540,67 +1628,24 @@ func (m *Messenger) Mailservers() ([]string, error) {
 	return nil, ErrNotImplemented
 }
 
-func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
-	var response MessengerResponse
-	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
-	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
-	chat := CreateGroupChat(m.getTimesource())
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-	group, err := v1protocol.NewGroupWithCreator(name, clock, m.identity)
-	if err != nil {
-		return nil, err
+func (m *Messenger) initChatFirstMessageTimestamp(chat *Chat) error {
+	if !chat.CommunityChat() || chat.FirstMessageTimestamp != FirstMessageTimestampUndefined {
+		return nil
 	}
-	chat.LastClockValue = clock
 
-	chat.updateChatFromGroupMembershipChanges(group)
-	chat.Joined = int64(m.getTimesource().GetCurrentTime())
+	oldestMessageTimestamp, hasAnyMessage, err := m.persistence.OldestMessageWhisperTimestampByChatID(chat.ID)
+	if err != nil {
+		return err
+	}
 
-	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
-
-	// Add members
-	if len(members) > 0 {
-		event := v1protocol.NewMembersAddedEvent(members, clock)
-		event.ChatID = chat.ID
-		err = event.Sign(m.identity)
-		if err != nil {
-			return nil, err
+	if hasAnyMessage {
+		if oldestMessageTimestamp == FirstMessageTimestampUndefined {
+			return nil
 		}
-
-		err = group.ProcessEvent(event)
-		if err != nil {
-			return nil, err
-		}
+		return m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(oldestMessageTimestamp), &MessengerResponse{})
 	}
 
-	recipients, err := stringSliceToPublicKeys(group.Members())
-
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	m.allChats.Store(chat.ID, &chat)
-
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-
-	return m.addMessagesAndChat(&chat, buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations), &response)
+	return m.updateChatFirstMessageTimestamp(chat, FirstMessageTimestampNoMessage, &MessengerResponse{})
 }
 
 func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, response *MessengerResponse) (*MessengerResponse, error) {
@@ -1612,584 +1657,6 @@ func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, r
 	}
 
 	return response, m.saveChat(chat)
-}
-
-func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*MessengerResponse, error) {
-	var response MessengerResponse
-	logger := m.logger.With(zap.String("site", "CreateGroupChatFromInvitation"))
-	logger.Info("Creating group chat from invitation", zap.String("name", name))
-	chat := CreateGroupChat(m.getTimesource())
-	chat.ID = chatID
-	chat.Name = name
-	chat.InvitationAdmin = adminPK
-
-	response.AddChat(&chat)
-
-	return &response, m.saveChat(&chat)
-}
-
-func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*MessengerResponse, error) {
-	var response MessengerResponse
-	logger := m.logger.With(zap.String("site", "RemoveMemberFromGroupChat"))
-	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	// We save the initial recipients as we want to send updates to also
-	// the members kicked out
-	oldRecipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	// Remove member
-	event := v1protocol.NewMemberRemovedEvent(member, clock)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  oldRecipients,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-
-	return m.addMessagesAndChat(chat, buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations), &response)
-}
-
-func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	var response MessengerResponse
-	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
-	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	// Add members
-	event := v1protocol.NewMembersAddedEvent(members, clock)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	//approve invitations
-	for _, member := range members {
-		logger.Info("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
-
-		groupChatInvitation := &GroupChatInvitation{
-			GroupChatInvitation: protobuf.GroupChatInvitation{
-				ChatId: chat.ID,
-			},
-			From: member,
-		}
-
-		groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
-		if err != nil && err != common.ErrRecordNotFound {
-			return nil, err
-		}
-		if groupChatInvitation != nil {
-			groupChatInvitation.State = protobuf.GroupChatInvitation_APPROVED
-
-			err := m.persistence.SaveInvitation(groupChatInvitation)
-			if err != nil {
-				return nil, err
-			}
-			response.Invitations = append(response.Invitations, groupChatInvitation)
-		}
-	}
-
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
-
-	recipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-
-	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
-}
-
-func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*MessengerResponse, error) {
-	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
-	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	// Add members
-	event := v1protocol.NewNameChangedEvent(name, clock)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update in-memory group
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
-
-	recipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-
-	var response MessengerResponse
-
-	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
-}
-
-func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string,
-	message string) (*MessengerResponse, error) {
-	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRequest"))
-	logger.Info("Sending group chat invitation request", zap.String("chatID", chatID),
-		zap.String("adminPK", adminPK), zap.String("message", message))
-
-	var response MessengerResponse
-
-	// Get chat and clock
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-	invitationR := &GroupChatInvitation{
-		GroupChatInvitation: protobuf.GroupChatInvitation{
-			Clock:               clock,
-			ChatId:              chatID,
-			IntroductionMessage: message,
-			State:               protobuf.GroupChatInvitation_REQUEST,
-		},
-		From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
-	}
-
-	encodedMessage, err := proto.Marshal(invitationR.GetProtobuf())
-	if err != nil {
-		return nil, err
-	}
-
-	spec := common.RawMessage{
-		LocalChatID:         adminPK,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendAutomatically: true,
-	}
-
-	pkey, err := hex.DecodeString(adminPK[2:])
-	if err != nil {
-		return nil, err
-	}
-	// Safety check, make sure is well formed
-	adminpk, err := crypto.UnmarshalPubkey(pkey)
-	if err != nil {
-		return nil, err
-	}
-
-	id, err := m.sender.SendPrivate(ctx, adminpk, &spec)
-	if err != nil {
-		return nil, err
-	}
-
-	spec.ID = types.EncodeHex(id)
-	spec.SendCount++
-	err = m.persistence.SaveRawMessage(&spec)
-	if err != nil {
-		return nil, err
-	}
-
-	response.Invitations = []*GroupChatInvitation{invitationR}
-
-	err = m.persistence.SaveInvitation(invitationR)
-	if err != nil {
-		return nil, err
-	}
-
-	return &response, nil
-}
-
-func (m *Messenger) GetGroupChatInvitations() ([]*GroupChatInvitation, error) {
-	return m.persistence.GetGroupChatInvitations()
-}
-
-func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invitationRequestID string) (*MessengerResponse, error) {
-	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRejection"))
-	logger.Info("Sending group chat invitation reject", zap.String("invitationRequestID", invitationRequestID))
-
-	invitationR, err := m.persistence.InvitationByID(invitationRequestID)
-	if err != nil {
-		return nil, err
-	}
-
-	invitationR.State = protobuf.GroupChatInvitation_REJECTED
-
-	// Get chat and clock
-	chat, ok := m.allChats.Load(invitationR.ChatId)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-	invitationR.Clock = clock
-
-	encodedMessage, err := proto.Marshal(invitationR.GetProtobuf())
-	if err != nil {
-		return nil, err
-	}
-
-	spec := common.RawMessage{
-		LocalChatID:         invitationR.From,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendAutomatically: true,
-	}
-
-	pkey, err := hex.DecodeString(invitationR.From[2:])
-	if err != nil {
-		return nil, err
-	}
-	// Safety check, make sure is well formed
-	userpk, err := crypto.UnmarshalPubkey(pkey)
-	if err != nil {
-		return nil, err
-	}
-
-	id, err := m.sender.SendPrivate(ctx, userpk, &spec)
-	if err != nil {
-		return nil, err
-	}
-
-	spec.ID = types.EncodeHex(id)
-	spec.SendCount++
-	err = m.persistence.SaveRawMessage(&spec)
-	if err != nil {
-		return nil, err
-	}
-
-	var response MessengerResponse
-
-	response.Invitations = []*GroupChatInvitation{invitationR}
-
-	err = m.persistence.SaveInvitation(invitationR)
-	if err != nil {
-		return nil, err
-	}
-
-	return &response, nil
-}
-
-func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	var response MessengerResponse
-	logger := m.logger.With(zap.String("site", "AddAdminsToGroupChat"))
-	logger.Info("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	// Add members
-	event := v1protocol.NewAdminsAddedEvent(members, clock)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
-
-	recipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
-}
-
-// Kept only for backward compatibility (auto-join), explicit join has been removed
-func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*MessengerResponse, error) {
-	var response MessengerResponse
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	_, err := m.Join(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	event := v1protocol.NewMemberJoinedEvent(
-		clock,
-	)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
-
-	recipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
-
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	chat.updateChatFromGroupMembershipChanges(group)
-	chat.Joined = int64(m.getTimesource().GetCurrentTime())
-
-	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
-}
-
-func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerResponse, chatID string, remove bool, shouldBeSynced bool) (*MessengerResponse, error) {
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	amIMember := chat.HasMember(common.PubkeyToHex(&m.identity.PublicKey))
-
-	if amIMember {
-		chat.RemoveMember(common.PubkeyToHex(&m.identity.PublicKey))
-
-		group, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return nil, err
-		}
-		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-		event := v1protocol.NewMemberRemovedEvent(
-			contactIDFromPublicKey(&m.identity.PublicKey),
-			clock,
-		)
-		event.ChatID = chat.ID
-		err = event.Sign(m.identity)
-		if err != nil {
-			return nil, err
-		}
-
-		err = group.ProcessEvent(event)
-		if err != nil {
-			return nil, err
-		}
-
-		recipients, err := stringSliceToPublicKeys(group.Members())
-		if err != nil {
-			return nil, err
-		}
-
-		encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		// shouldBeSynced is false if we got here because a synced client has already
-		// sent the leave group message. In that case we don't need to send it again.
-		if shouldBeSynced {
-			_, err = m.dispatchMessage(ctx, common.RawMessage{
-				LocalChatID: chat.ID,
-				Payload:     encodedMessage,
-				MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-				Recipients:  recipients,
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		chat.updateChatFromGroupMembershipChanges(group)
-		response.AddMessages(buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations))
-		err = m.persistence.SaveMessages(response.Messages())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if remove {
-		chat.Active = false
-	}
-
-	if remove && shouldBeSynced {
-		err := m.syncChatRemoving(ctx, chat.ID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	response.AddChat(chat)
-
-	return response, m.saveChat(chat)
-}
-
-func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	var response MessengerResponse
-	return m.leaveGroupChat(ctx, &response, chatID, remove, true)
-}
-
-// Decline all pending group invites from a user
-func (m *Messenger) DeclineAllPendingGroupInvitesFromUser(response *MessengerResponse, userPublicKey string) (*MessengerResponse, error) {
-
-	// Decline group invites from active chats
-	chats, err := m.persistence.Chats()
-	var ctx context.Context
-	if err != nil {
-		return nil, err
-	}
-
-	for _, chat := range chats {
-		if chat.ChatType == ChatTypePrivateGroupChat &&
-			chat.ReceivedInvitationAdmin == userPublicKey &&
-			chat.Joined == 0 && chat.Active {
-			response, err = m.leaveGroupChat(ctx, response, chat.ID, true, true)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Decline group invites from activity center notifications
-	notifications, err := m.persistence.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, notification := range notifications {
-		response, err = m.leaveGroupChat(ctx, response, notification.ChatID, true, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return response, nil
 }
 
 func (m *Messenger) reregisterForPushNotifications() error {
@@ -2341,7 +1808,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
 
 			if err == nil {
-				_, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+				id, err = m.sender.SendCommunityMessage(ctx, rawMessage)
 			}
 		}
 		if err != nil {
@@ -2423,6 +1890,53 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
+func (m *Messenger) OpenAndAdjustImage(inputImage userimage.CroppedImage, crop bool) ([]byte, error) {
+	file, err := os.Open(inputImage.ImagePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	payload, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	img, err := userimage.Decode(inputImage.ImagePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if crop {
+		cropRect := image.Rectangle{
+			Min: image.Point{X: inputImage.X, Y: inputImage.Y},
+			Max: image.Point{X: inputImage.X + inputImage.Width, Y: inputImage.Y + inputImage.Height},
+		}
+		img, err = userimage.Crop(img, cropRect)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bb := bytes.NewBuffer([]byte{})
+	err = userimage.CompressToFileLimits(bb, img, userimage.FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// We keep the smallest one
+	if len(payload) > len(bb.Bytes()) {
+		payload = bb.Bytes()
+	}
+
+	if len(payload) > maxChatMessageImageSize {
+		return nil, errors.New("image too large")
+	}
+
+	return payload, nil
+}
+
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
@@ -2433,36 +1947,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	message.DisplayName = displayName
 	if len(message.ImagePath) != 0 {
 
-		file, err := os.Open(message.ImagePath)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		payload, err := ioutil.ReadAll(file)
-		if err != nil {
-			return nil, err
-		}
-
-		img, err := userimage.Decode(message.ImagePath)
-		if err != nil {
-			return nil, err
-		}
-
-		bb := bytes.NewBuffer([]byte{})
-		err = userimage.EncodeToLimits(bb, img, userimage.DimensionLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
+		payload, err := m.OpenAndAdjustImage(userimage.CroppedImage{ImagePath: message.ImagePath}, false)
 
 		if err != nil {
 			return nil, err
-		}
-
-		// We keep the smallest one
-		if len(payload) > len(bb.Bytes()) {
-			payload = bb.Bytes()
-		}
-
-		if len(payload) > maxChatMessageImageSize {
-			return nil, errors.New("image too large")
 		}
 
 		image := protobuf.ImageMessage{
@@ -2573,14 +2061,45 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	response.SetMessages(msg)
+	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(message.WhisperTimestamp), &response); err != nil {
+		return nil, err
+	}
 
+	response.SetMessages(msg)
 	response.AddChat(chat)
 
 	m.logger.Debug("sent message", zap.String("id", message.ID))
 	m.prepareMessages(response.messages)
 
 	return &response, m.saveChat(chat)
+}
+
+func whisperToUnixTimestamp(whisperTimestamp uint64) uint32 {
+	return uint32(whisperTimestamp / 1000)
+}
+
+func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32, response *MessengerResponse) error {
+	// Currently supported only for communities
+	if !chat.CommunityChat() {
+		return nil
+	}
+
+	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	if community.IsAdmin() && chat.UpdateFirstMessageTimestamp(timestamp) {
+		community, changes, err := m.communitiesManager.EditChatFirstMessageTimestamp(community.ID(), chat.ID, chat.FirstMessageTimestamp)
+		if err != nil {
+			return err
+		}
+
+		response.AddCommunity(community)
+		response.CommunityChanges = append(response.CommunityChanges, changes)
+	}
+
+	return nil
 }
 
 func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*MessengerResponse, error) {
@@ -2703,7 +2222,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 			}
 		}
 
-		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active {
+		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active && chat.DeletedAtClockValue > 0 {
 			pending, err := m.persistence.HasPendingNotificationsForChat(chat.ID)
 			if err != nil {
 				return false
@@ -2801,6 +2320,23 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	if err != nil {
 		return err
 	}
+
+	ids, err := m.persistence.LatestContactRequestIDs()
+
+	if err != nil {
+		return err
+	}
+
+	for id, state := range ids {
+		if state == common.ContactRequestStateAccepted || state == common.ContactRequestStateDismissed {
+			accepted := state == common.ContactRequestStateAccepted
+			err := m.syncContactRequestDecision(ctx, id, accepted)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return m.syncWallets(accounts)
 }
 
@@ -2857,7 +2393,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 			Address:   acc.Address.Bytes(),
 			Wallet:    acc.Wallet,
 			Chat:      acc.Chat,
-			Type:      acc.Type,
+			Type:      acc.Type.String(),
 			Storage:   acc.Storage,
 			Path:      acc.Path,
 			PublicKey: acc.PublicKey,
@@ -2890,6 +2426,45 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool) error {
+	m.logger.Info("syncContactRequestDecision", zap.Any("from", requestID))
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	var status protobuf.SyncContactRequestDecision_DecisionStatus
+	if accepted {
+		status = protobuf.SyncContactRequestDecision_ACCEPTED
+	} else {
+		status = protobuf.SyncContactRequestDecision_DECLINED
+	}
+
+	message := &protobuf.SyncContactRequestDecision{
+		RequestId:      requestID,
+		Clock:          clock,
+		DecisionStatus: status,
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
@@ -3415,6 +2990,25 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
+func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic types.TopicType, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+	if !m.outputCSV {
+		return
+	}
+
+	msgJSON, err := json.Marshal(parsedMessage)
+	if err != nil {
+		m.logger.Error("could not marshall message", zap.Error(err))
+		return
+	}
+
+	line := fmt.Sprintf("%d\t%s\t%s\t%s\t%s\t%s\t%s\n", timestamp, messageID.String(), from, topic.String(), chatID, msgType, msgJSON)
+	_, err = m.csvFile.Write([]byte(line))
+	if err != nil {
+		m.logger.Error("could not write to csv", zap.Error(err))
+		return
+	}
+}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
@@ -3470,8 +3064,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					logger.Warn("failed to handle shared secrets")
 				}
 
-				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
+
+				// Check for messages from blocked users
 				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
 					continue
 				}
@@ -3510,10 +3105,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if msg.ParsedMessage != nil {
 
 					logger.Debug("Handling parsed message")
+
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
 						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, rawMembershipUpdate)
 
 						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
 						err = m.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
@@ -3526,6 +3123,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.ChatMessage:
 						logger.Debug("Handling ChatMessage")
 						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
 						err = m.HandleChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
@@ -3536,6 +3134,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.EditMessage:
 						logger.Debug("Handling EditMessage")
 						editProto := msg.ParsedMessage.Interface().(protobuf.EditMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, editProto)
 						editMessage := EditMessage{
 							EditMessage: editProto,
 							From:        contact.ID,
@@ -3552,6 +3151,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.DeleteMessage:
 						logger.Debug("Handling DeleteMessage")
 						deleteProto := msg.ParsedMessage.Interface().(protobuf.DeleteMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteProto)
 						deleteMessage := DeleteMessage{
 							DeleteMessage: deleteProto,
 							From:          contact.ID,
@@ -3566,8 +3166,32 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.DeleteForMeMessage:
+						logger.Debug("Handling DeleteForMeMessage")
+						deleteForMeProto := msg.ParsedMessage.Interface().(protobuf.DeleteForMeMessage)
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteForMeProto)
+						deleteForMeMessage := DeleteForMeMessage{
+							DeleteForMeMessage: deleteForMeProto,
+							From:               contact.ID,
+							ID:                 messageID,
+							SigPubKey:          publicKey,
+						}
+
+						err = m.HandleDeleteForMeMessage(messageState, deleteForMeMessage)
+						if err != nil {
+							logger.Warn("failed to handle DeleteForMeMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.PinMessage:
 						pinMessage := msg.ParsedMessage.Interface().(protobuf.PinMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, pinMessage)
 						err = m.HandlePinMessage(messageState, pinMessage)
 						if err != nil {
 							logger.Warn("failed to handle PinMessage", zap.Error(err))
@@ -3581,6 +3205,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						p := msg.ParsedMessage.Interface().(protobuf.PairInstallation)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling PairInstallation", zap.Any("message", p))
 						err = m.HandlePairInstallation(messageState, p)
 						if err != nil {
@@ -3591,6 +3216,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.StatusUpdate:
 						p := msg.ParsedMessage.Interface().(protobuf.StatusUpdate)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling StatusUpdate", zap.Any("message", p))
 						err = m.HandleStatusUpdate(messageState, p)
 						if err != nil {
@@ -3601,6 +3227,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.SyncInstallationContact:
 						logger.Warn("SyncInstallationContact is not supported")
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, msg.ParsedMessage.Interface().(protobuf.SyncInstallationContact))
 						continue
 
 					case protobuf.SyncInstallationContactV2:
@@ -3610,6 +3237,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContactV2)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncInstallationContact", zap.Any("message", p))
 						err = m.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
@@ -3625,6 +3253,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncProfilePictures)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncProfilePicture", zap.Any("message", p))
 						err = m.HandleSyncProfilePictures(messageState, p)
 						if err != nil {
@@ -3640,6 +3269,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncBookmark)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncBookmark", zap.Any("message", p))
 						err = m.handleSyncBookmark(messageState, p)
 						if err != nil {
@@ -3655,6 +3285,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncClearHistory)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncClearHistory", zap.Any("message", p))
 						err = m.handleSyncClearHistory(messageState, p)
 						if err != nil {
@@ -3668,6 +3299,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						p := msg.ParsedMessage.Interface().(protobuf.SyncCommunitySettings)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncCommunitySettings", zap.Any("message", p))
 						err = m.handleSyncCommunitySettings(messageState, p)
 						if err != nil {
@@ -3713,6 +3345,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.Backup)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling Backup", zap.Any("message", p))
 						err = m.HandleBackup(messageState, p)
 						if err != nil {
@@ -3728,6 +3361,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
 						addedChat := m.HandleSyncInstallationPublicChat(messageState, p)
 
@@ -3748,6 +3382,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncChatRemoved)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncChatRemoved", zap.Any("message", p))
 						err := m.HandleSyncChatRemoved(messageState, p)
 						if err != nil {
@@ -3762,6 +3397,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncChatMessagesRead)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncChatMessagesRead", zap.Any("message", p))
 						err := m.HandleSyncChatMessagesRead(messageState, p)
 						if err != nil {
@@ -3776,6 +3412,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						community := msg.ParsedMessage.Interface().(protobuf.SyncCommunity)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, community)
 						logger.Debug("Handling SyncCommunity", zap.Any("message", community))
 
 						err = m.handleSyncCommunity(messageState, community)
@@ -3792,6 +3429,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterRead)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
 						logger.Debug("Handling SyncActivityCenterRead", zap.Any("message", a))
 
 						err = m.handleActivityCenterRead(messageState, a)
@@ -3808,6 +3446,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterAccepted)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
 						logger.Debug("Handling SyncActivityCenterAccepted", zap.Any("message", a))
 
 						err = m.handleActivityCenterAccepted(messageState, a)
@@ -3824,6 +3463,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterDismissed)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
 						logger.Debug("Handling SyncActivityCenterDismissed", zap.Any("message", a))
 
 						err = m.handleActivityCenterDismissed(messageState, a)
@@ -3840,6 +3480,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						ss := msg.ParsedMessage.Interface().(protobuf.SyncSetting)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, ss)
 						logger.Debug("Handling SyncSetting", zap.Any("message", ss))
 
 						err := m.handleSyncSetting(messageState.Response, &ss)
@@ -3851,6 +3492,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.RequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
 						err = m.HandleRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -3861,6 +3503,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.SendTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.SendTransaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling SendTransaction", zap.Any("message", command))
 						err = m.HandleSendTransaction(messageState, command)
 						if err != nil {
@@ -3871,6 +3514,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.AcceptRequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.AcceptRequestAddressForTransaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling AcceptRequestAddressForTransaction")
 						err = m.HandleAcceptRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -3881,6 +3525,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.DeclineRequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestAddressForTransaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling DeclineRequestAddressForTransaction")
 						err = m.HandleDeclineRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -3891,6 +3536,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.DeclineRequestTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestTransaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling DeclineRequestTransaction")
 						err = m.HandleDeclineRequestTransaction(messageState, command)
 						if err != nil {
@@ -3901,7 +3547,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.RequestTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
-
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
 						logger.Debug("Handling RequestTransaction")
 						err = m.HandleRequestTransaction(messageState, command)
 						if err != nil {
@@ -3917,6 +3563,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, contactUpdate)
 						err = m.HandleContactUpdate(messageState, contactUpdate)
 						if err != nil {
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
@@ -3926,6 +3573,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.AcceptContactRequest:
 						logger.Debug("Handling AcceptContactRequest")
 						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
 						err = m.HandleAcceptContactRequest(messageState, message)
 						if err != nil {
 							logger.Warn("failed to handle AcceptContactRequest", zap.Error(err))
@@ -3936,6 +3584,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						logger.Debug("Handling RetractContactRequest")
 						message := msg.ParsedMessage.Interface().(protobuf.RetractContactRequest)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
 						err = m.HandleRetractContactRequest(messageState, message)
 						if err != nil {
 							logger.Warn("failed to handle RetractContactRequest", zap.Error(err))
@@ -3948,8 +3597,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						if m.pushNotificationServer == nil {
 							continue
 						}
+						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationQuery)
 						logger.Debug("Handling PushNotificationQuery")
-						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationQuery)); err != nil {
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, message); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
 						}
@@ -3961,7 +3612,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRegistrationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRegistrationResponse)); err != nil {
+						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationRegistrationResponse)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, message); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
 						}
@@ -3971,6 +3624,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Received ContactCodeAdvertisement")
 
 						cca := msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, cca)
 						logger.Debug("protobuf.ContactCodeAdvertisement received", zap.Any("cca", cca))
 						if cca.ChatIdentity != nil {
 
@@ -4001,7 +3655,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationResponse)); err != nil {
+						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationResponse)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, message); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
 						}
@@ -4014,7 +3670,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQueryResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationQueryResponse)); err != nil {
+						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationQueryResponse)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, message); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
 						}
@@ -4027,7 +3685,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
+						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, message); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
@@ -4035,7 +3695,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					case protobuf.EmojiReaction:
 						logger.Debug("Handling EmojiReaction")
-						err = m.HandleEmojiReaction(messageState, msg.ParsedMessage.Interface().(protobuf.EmojiReaction))
+						message := msg.ParsedMessage.Interface().(protobuf.EmojiReaction)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.HandleEmojiReaction(messageState, message)
 						if err != nil {
 							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
 							allMessagesProcessed = false
@@ -4043,14 +3705,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 					case protobuf.GroupChatInvitation:
 						logger.Debug("Handling GroupChatInvitation")
-						err = m.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation))
+						message := msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.HandleGroupChatInvitation(messageState, message)
 						if err != nil {
 							logger.Warn("failed to handle GroupChatInvitation", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
 					case protobuf.ChatIdentity:
-						err = m.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(protobuf.ChatIdentity))
+						message := msg.ParsedMessage.Interface().(protobuf.ChatIdentity)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.HandleChatIdentity(messageState, message)
 						if err != nil {
 							logger.Warn("failed to handle ChatIdentity", zap.Error(err))
 							allMessagesProcessed = false
@@ -4059,7 +3725,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.CommunityDescription:
 						logger.Debug("Handling CommunityDescription")
-						err = m.handleCommunityDescription(messageState, publicKey, msg.ParsedMessage.Interface().(protobuf.CommunityDescription), msg.DecryptedPayload)
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityDescription)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityDescription(messageState, publicKey, message, msg.DecryptedPayload)
 						if err != nil {
 							logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 							allMessagesProcessed = false
@@ -4112,6 +3780,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.CommunityInvitation:
 						logger.Debug("Handling CommunityInvitation")
 						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, invitation)
 						err = m.HandleCommunityInvitation(messageState, publicKey, invitation, invitation.CommunityDescription)
 						if err != nil {
 							logger.Warn("failed to handle CommunityInvitation", zap.Error(err))
@@ -4121,6 +3790,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.CommunityRequestToJoin:
 						logger.Debug("Handling CommunityRequestToJoin")
 						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoin)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
 						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
@@ -4135,10 +3805,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+					case protobuf.CommunityRequestToLeave:
+						logger.Debug("Handling CommunityRequestToLeave")
+						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToLeave)
+						err = m.HandleCommunityRequestToLeave(messageState, publicKey, request)
+						if err != nil {
+							logger.Warn("failed to handle CommunityRequestToLeave", zap.Error(err))
+							continue
+						}
 
 					case protobuf.CommunityMessageArchiveMagnetlink:
 						logger.Debug("Handling CommunityMessageArchiveMagnetlink")
 						magnetlinkMessage := msg.ParsedMessage.Interface().(protobuf.CommunityMessageArchiveMagnetlink)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, magnetlinkMessage)
 						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
 						if err != nil {
 							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
@@ -4152,8 +3831,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("unable to handle AnonymousMetricBatch, anonMetricsServer is nil")
 							continue
 						}
-
-						ams, err := m.anonMetricsServer.StoreMetrics(msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch))
+						message := msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						ams, err := m.anonMetricsServer.StoreMetrics(message)
 						if err != nil {
 							logger.Warn("failed to store AnonymousMetricBatch", zap.Error(err))
 							continue
@@ -4167,11 +3847,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccounts)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
 						err = m.HandleSyncWalletAccount(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
 							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncContactRequestDecision:
+						logger.Info("SyncContactRequestDecision")
+						p := msg.ParsedMessage.Interface().(protobuf.SyncContactRequestDecision)
+						err := m.HandleSyncContactRequestDecision(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncContactRequestDecisio", zap.Error(err))
 							continue
 						}
 					default:
@@ -4470,8 +4159,6 @@ func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 }
 
 func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
-	msg.Identicon = s.MakeIdenticonURL(msg.From)
-
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 	}
@@ -4483,6 +4170,35 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	}
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
+	}
+	if msg.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+
+		dm := msg.GetDiscordMessage()
+		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
+		if err != nil {
+			return
+		}
+
+		if exists {
+			dm.Author.LocalUrl = s.MakeDiscordAuthorAvatarURL(dm.Author.Id)
+		}
+
+		for idx, attachment := range dm.Attachments {
+			if strings.Contains(attachment.ContentType, "image") {
+				hasPayload, err := m.persistence.HasDiscordMessageAttachmentPayload(attachment.Id)
+				if err != nil {
+					m.logger.Error("failed to check if message attachment exist", zap.Error(err))
+					continue
+				}
+				if hasPayload {
+					localURL := s.MakeDiscordAttachmentURL(dm.Id, attachment.Id)
+					dm.Attachments[idx].LocalUrl = localURL
+				}
+			}
+		}
+		msg.Payload = &protobuf.ChatMessage_DiscordMessage{
+			DiscordMessage: dm,
+		}
 	}
 	if msg.ContentType == protobuf.ChatMessage_AUDIO {
 		msg.AudioLocalURL = s.MakeAudioURL(msg.ID)

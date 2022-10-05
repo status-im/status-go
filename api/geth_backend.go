@@ -83,7 +83,7 @@ type GethStatusBackend struct {
 
 // NewGethStatusBackend create a new GethStatusBackend instance
 func NewGethStatusBackend() *GethStatusBackend {
-	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit)
+	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit, "IpfsGatewayURL", params.IpfsGatewayURL)
 
 	backend := &GethStatusBackend{}
 	backend.initialize()
@@ -144,6 +144,10 @@ func (b *GethStatusBackend) UpdateRootDataDir(datadir string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.rootDataDir = datadir
+}
+
+func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
+	return b.multiaccountsDB
 }
 
 func (b *GethStatusBackend) OpenAccounts() error {
@@ -262,7 +266,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
 	}
 
-	b.appDB, err = appdatabase.InitializeDB(newPath, password)
+	b.appDB, err = appdatabase.InitializeDB(newPath, password, account.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -292,6 +296,15 @@ func (b *GethStatusBackend) setupLogSettings() error {
 // TODO: we should use a proper struct with optional values instead of duplicating the regular functions
 // with small variants for keycard, this created too many bugs
 func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	if acc.KDFIterations == 0 {
+		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
+		if err != nil {
+			return err
+		}
+
+		acc.KDFIterations = kdfIterations
+	}
+
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
@@ -494,7 +507,7 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
 	}
 
-	err = appdatabase.DecryptDatabase(newPath, directory, password)
+	err = appdatabase.DecryptDatabase(newPath, directory, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -514,7 +527,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 
 	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
 
-	err := appdatabase.EncryptDatabase(databasePath, path, password)
+	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -525,17 +538,26 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
 	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID))
 	config := b.StatusNode().Config()
-	keyDir := config.KeyStoreDir
 
-	err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
-	if err != nil {
-		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
+	if config != nil {
+		keyDir := config.KeyStoreDir
+		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
+		if err != nil {
+			return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
+		}
 	}
 
-	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
 	if err != nil {
-		// couldn't change db password so undo keystore changes to mainitain consistency
-		_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		return err
+	}
+	err = appdatabase.ChangeDatabasePassword(dbPath, password, kdfIterations, newPassword)
+	if err != nil {
+		if config != nil {
+			keyDir := config.KeyStoreDir
+			// couldn't change db password so undo keystore changes to mainitain consistency
+			_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		}
 		return err
 	}
 	return nil
@@ -561,7 +583,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPAiredOn)
+	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
 	if err != nil {
 		return err
 	}
@@ -576,27 +598,21 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
-	err = accountDB.DeleteSeedAndKeyAccounts()
-	if err != nil {
-		return err
-	}
-
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-	err = appdatabase.ChangeDatabasePassword(dbPath, password, newPassword)
-	if err != nil {
-		return err
-	}
-
 	err = b.closeAppDB()
 	if err != nil {
 		return err
 	}
 
-	return os.RemoveAll(keyStoreDir)
+	return b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
-	err := b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID}, password)
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
 	if err != nil {
 		return err
 	}
@@ -656,7 +672,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithAccount(account, password, nil)
+	return b.StartNodeWithAccount(account, password, nodecfg)
 }
 
 func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account) error {

@@ -11,14 +11,13 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/multiformats/go-multibase"
 	"github.com/wealdtech/go-multicodec"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/params"
 )
 
-const infuraAPIURL = "https://ipfs.infura.io:5001/api/v0/cat?arg="
 const maxRequestsPerSecond = 3
 
 type taskResponse struct {
@@ -133,7 +132,7 @@ func hashToCid(hash []byte) (string, error) {
 		return "", err
 	}
 
-	return thisCID.StringOfBase(multibase.Base32)
+	return thisCID.Hash().B58String(), nil
 }
 
 func decodeStringHash(input string) (string, error) {
@@ -198,7 +197,7 @@ func (d *Downloader) exists(cid string) (bool, []byte, error) {
 func (d *Downloader) download(cid string, download bool) ([]byte, error) {
 	path := filepath.Join(d.ipfsDir, cid)
 
-	req, err := http.NewRequest(http.MethodPost, infuraAPIURL+cid, nil)
+	req, err := http.NewRequest(http.MethodGet, params.IpfsGatewayURL+cid, nil)
 	if err != nil {
 		return nil, err
 	}

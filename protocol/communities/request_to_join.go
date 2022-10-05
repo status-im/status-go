@@ -1,9 +1,6 @@
 package communities
 
 import (
-	"fmt"
-
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -28,8 +25,7 @@ type RequestToJoin struct {
 }
 
 func (r *RequestToJoin) CalculateID() {
-	idString := fmt.Sprintf("%s-%s", r.PublicKey, r.CommunityID)
-	r.ID = crypto.Keccak256([]byte(idString))
+	r.ID = CalculateRequestID(r.PublicKey, r.CommunityID)
 }
 
 func (r *RequestToJoin) ToSyncProtobuf() *protobuf.SyncCommunityRequestsToJoin {

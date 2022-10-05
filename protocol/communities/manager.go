@@ -108,14 +108,15 @@ func (md archiveMDSlice) Less(i, j int) bool {
 }
 
 type Subscription struct {
-	Community                      *Community
-	Invitations                    []*protobuf.CommunityInvitation
-	CreatingHistoryArchivesSignal  *signal.CreatingHistoryArchivesSignal
-	HistoryArchivesCreatedSignal   *signal.HistoryArchivesCreatedSignal
-	NoHistoryArchivesCreatedSignal *signal.NoHistoryArchivesCreatedSignal
-	HistoryArchivesSeedingSignal   *signal.HistoryArchivesSeedingSignal
-	HistoryArchivesUnseededSignal  *signal.HistoryArchivesUnseededSignal
-	HistoryArchiveDownloadedSignal *signal.HistoryArchiveDownloadedSignal
+	Community                                *Community
+	Invitations                              []*protobuf.CommunityInvitation
+	CreatingHistoryArchivesSignal            *signal.CreatingHistoryArchivesSignal
+	HistoryArchivesCreatedSignal             *signal.HistoryArchivesCreatedSignal
+	NoHistoryArchivesCreatedSignal           *signal.NoHistoryArchivesCreatedSignal
+	HistoryArchivesSeedingSignal             *signal.HistoryArchivesSeedingSignal
+	HistoryArchivesUnseededSignal            *signal.HistoryArchivesUnseededSignal
+	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
+	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 }
 
 type CommunityResponse struct {
@@ -286,7 +287,7 @@ func (m *Manager) Created() ([]*Community, error) {
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
-func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community, error) {
+func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish bool) (*Community, error) {
 
 	description, err := request.ToCommunityDescription()
 	if err != nil {
@@ -329,7 +330,9 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity) (*Community
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, nil
 }
@@ -444,7 +447,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -464,7 +467,9 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, changes, nil
 }
@@ -528,7 +533,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	return community, description, nil
 }
 
-func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publish bool) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -556,7 +561,9 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory) (*Co
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
 
 	return community, changes, nil
 }
@@ -578,6 +585,36 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	}
 
 	changes, err := community.EditCategory(request.CategoryID, request.CategoryName, request.ChatIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
+func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chatID string, timestamp uint32) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	// Remove communityID prefix from chatID if exists
+	if strings.HasPrefix(chatID, communityID.String()) {
+		chatID = strings.TrimPrefix(chatID, communityID.String())
+	}
+
+	changes, err := community.UpdateChatFirstMessageTimestamp(chatID, timestamp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -836,7 +873,6 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	}
 
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
-
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
@@ -846,11 +882,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 	if community == nil {
 		return nil, ErrOrgNotFound
-	}
-
-	// If they are already a member, ignore
-	if community.HasMember(signer) {
-		return nil, ErrAlreadyMember
 	}
 
 	if err := community.ValidateRequestToJoin(signer, request); err != nil {
@@ -871,7 +902,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
-	if community.AcceptRequestToJoinAutomatically() {
+	// If user is already a member, then accept request automatically
+	// It may happen when member removes itself from community and then tries to rejoin
+	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
+	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
+	if acceptAutomatically {
 		err = m.markRequestToJoin(signer, community)
 		if err != nil {
 			return nil, err
@@ -926,6 +961,24 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return m.markRequestToJoin(m.identity, community)
 	}
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(m.identity), community.ID(), RequestToJoinStateDeclined)
+}
+
+func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *protobuf.CommunityRequestToLeave) error {
+	requestToLeave := NewRequestToLeave(common.PubkeyToHex(signer), proto)
+	if err := m.persistence.SaveRequestToLeave(requestToLeave); err != nil {
+		return err
+	}
+
+	// Ensure corresponding requestToJoin clock is older than requestToLeave
+	requestToJoin, err := m.persistence.GetRequestToJoin(requestToLeave.ID)
+	if err != nil {
+		return err
+	}
+	if requestToJoin.Clock > requestToLeave.Clock {
+		return ErrOldRequestToLeave
+	}
+
+	return nil
 }
 
 func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*CommunityResponse, error) {
@@ -995,18 +1048,14 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	if community.IsAdmin() {
-		_, err = community.RemoveUserFromOrg(m.identity)
-		if err != nil {
-			return nil, err
-		}
-	}
-	community.Leave()
-	err = m.persistence.SaveCommunity(community)
 
-	if err != nil {
+	community.RemoveOurselvesFromOrg(m.identity)
+	community.Leave()
+
+	if err = m.persistence.SaveCommunity(community); err != nil {
 		return nil, err
 	}
+
 	return community, nil
 }
 
@@ -1173,9 +1222,9 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 		return nil, nil, err
 	}
 
-	// We don't allow requesting access if already a member
-	if community.HasMember(m.identity) {
-		return nil, nil, ErrAlreadyMember
+	// We don't allow requesting access if already joined
+	if community.Joined() {
+		return nil, nil, ErrAlreadyJoined
 	}
 
 	clock := uint64(time.Now().Unix())
@@ -1210,6 +1259,11 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching pending invitations", zap.String("community-id", id.String()))
 	return m.persistence.PendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
+	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
@@ -1323,6 +1377,14 @@ func (m *Manager) GetAdminCommunitiesChatIDs() (map[string]bool, error) {
 		}
 	}
 	return chatIDs, nil
+}
+
+func (m *Manager) IsAdminCommunityByID(communityID types.HexBytes) (bool, error) {
+	pubKey, err := crypto.DecompressPubkey(communityID)
+	if err != nil {
+		return false, err
+	}
+	return m.IsAdminCommunity(pubKey)
 }
 
 func (m *Manager) IsAdminCommunity(pubKey *ecdsa.PublicKey) (bool, error) {
@@ -1954,12 +2016,13 @@ func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes,
 			filter := m.transport.FilterByTopic(message.Topic)
 			if filter != nil {
 				shhMessage := &types.Message{
-					Sig:       message.Sig,
-					Timestamp: uint32(message.Timestamp),
-					Topic:     types.BytesToTopic(message.Topic),
-					Payload:   message.Payload,
-					Padding:   message.Padding,
-					Hash:      message.Hash,
+					Sig:          message.Sig,
+					Timestamp:    uint32(message.Timestamp),
+					Topic:        types.BytesToTopic(message.Topic),
+					Payload:      message.Payload,
+					Padding:      message.Padding,
+					Hash:         message.Hash,
+					ThirdPartyID: message.ThirdPartyId,
 				}
 				messages[*filter] = append(messages[*filter], shhMessage)
 			}
@@ -1991,12 +2054,13 @@ func (m *Manager) createWakuMessageArchive(from time.Time, to time.Time, message
 	for _, msg := range messages {
 		topic := types.TopicTypeToByteArray(msg.Topic)
 		wakuMessage := &protobuf.WakuMessage{
-			Sig:       msg.Sig,
-			Timestamp: uint64(msg.Timestamp),
-			Topic:     topic,
-			Payload:   msg.Payload,
-			Padding:   msg.Padding,
-			Hash:      msg.Hash,
+			Sig:          msg.Sig,
+			Timestamp:    uint64(msg.Timestamp),
+			Topic:        topic,
+			Payload:      msg.Payload,
+			Padding:      msg.Padding,
+			Hash:         msg.Hash,
+			ThirdPartyId: msg.ThirdPartyID,
 		}
 		wakuMessages = append(wakuMessages, wakuMessage)
 	}
@@ -2028,6 +2092,11 @@ func (m *Manager) LoadHistoryArchiveIndexFromFile(communityID types.HexBytes) (*
 		return nil, err
 	}
 	return wakuMessageArchiveIndexProto, nil
+}
+
+func (m *Manager) TorrentFileExists(communityID string) bool {
+	_, err := os.Stat(m.torrentFile(communityID))
+	return err == nil
 }
 
 func (m *Manager) torrentFile(communityID string) string {

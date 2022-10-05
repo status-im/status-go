@@ -16,7 +16,9 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
 )
@@ -136,12 +138,20 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, description, highlight, read_messages_at_clock_value, received_invitation_admin)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
+
+	var imagePayload []byte
+	if len(chat.Base64Image) > 0 {
+		imagePayload, err = userimage.GetPayloadFromURI(chat.Base64Image)
+		if err != nil {
+			return err
+		}
+	}
 
 	_, err = stmt.Exec(
 		chat.ID,
@@ -165,10 +175,12 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Joined,
 		chat.SyncedFrom,
 		chat.SyncedTo,
+		chat.FirstMessageTimestamp,
 		chat.Description,
 		chat.Highlight,
 		chat.ReadMessagesAtClockValue,
 		chat.ReceivedInvitationAdmin,
+		imagePayload,
 	)
 
 	if err != nil {
@@ -247,7 +259,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.type,
 			chats.timestamp,
 			chats.deleted_at_clock_value,
-                        chats.read_messages_at_clock_value,
+			chats.read_messages_at_clock_value,
 			chats.unviewed_message_count,
 			chats.unviewed_mentions_count,
 			chats.last_clock_value,
@@ -261,10 +273,12 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.joined,
 			chats.synced_from,
 			chats.synced_to,
+			chats.first_message_timestamp,
 		    chats.description,
 			contacts.alias,
-                        chats.highlight,
-                        chats.received_invitation_admin
+			chats.highlight,
+			chats.received_invitation_admin,
+			chats.image_payload
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
 	`)
@@ -280,10 +294,12 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			profile                  sql.NullString
 			syncedFrom               sql.NullInt64
 			syncedTo                 sql.NullInt64
+			firstMessageTimestamp    sql.NullInt64
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
 			lastMessageBytes         []byte
+			imagePayload             []byte
 		)
 		err = rows.Scan(
 			&chat.ID,
@@ -308,10 +324,12 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Joined,
 			&syncedFrom,
 			&syncedTo,
+			&firstMessageTimestamp,
 			&chat.Description,
 			&alias,
 			&chat.Highlight,
 			&chat.ReceivedInvitationAdmin,
+			&imagePayload,
 		)
 
 		if err != nil {
@@ -348,6 +366,17 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat.SyncedTo = uint32(syncedTo.Int64)
 		}
 
+		if firstMessageTimestamp.Valid {
+			chat.FirstMessageTimestamp = uint32(firstMessageTimestamp.Int64)
+		}
+
+		if imagePayload != nil {
+			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			if err == nil {
+				chat.Base64Image = base64Image
+			}
+		}
+
 		// Restore last message
 		if lastMessageBytes != nil {
 			message := &common.Message{}
@@ -374,6 +403,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		profile                  sql.NullString
 		syncedFrom               sql.NullInt64
 		syncedTo                 sql.NullInt64
+		firstMessageTimestamp    sql.NullInt64
+		imagePayload             []byte
 	)
 
 	err := db.db.QueryRow(`
@@ -397,12 +428,14 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			invitation_admin,
 			profile,
 			community_id,
-            joined,
-		    description,
-                    highlight,
-                    received_invitation_admin,
-                    synced_from,
-                    synced_to
+			joined,
+			description,
+			highlight,
+			received_invitation_admin,
+			synced_from,
+			synced_to,
+			first_message_timestamp,
+			image_payload
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -430,6 +463,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.ReceivedInvitationAdmin,
 		&syncedFrom,
 		&syncedTo,
+		&firstMessageTimestamp,
+		&imagePayload,
 	)
 	switch err {
 	case sql.ErrNoRows:
@@ -440,6 +475,9 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		}
 		if syncedTo.Valid {
 			chat.SyncedTo = uint32(syncedTo.Int64)
+		}
+		if firstMessageTimestamp.Valid {
+			chat.FirstMessageTimestamp = uint32(firstMessageTimestamp.Int64)
 		}
 		if invitationAdmin.Valid {
 			chat.InvitationAdmin = invitationAdmin.String
@@ -470,6 +508,13 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			chat.LastMessage = message
 		}
 
+		if imagePayload != nil {
+			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			if err == nil {
+				chat.Base64Image = base64Image
+			}
+		}
+
 		return &chat, nil
 	}
 
@@ -496,14 +541,15 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.removed,
 			c.has_added_us,
 			c.local_nickname,
-                        c.contact_request_state,
-                        c.contact_request_clock,
+			c.contact_request_state,
+			c.contact_request_clock,
 			i.image_type,
 			i.payload,
+                        i.clock_value,
 			COALESCE(c.verification_status, 0) as verification_status,
 			COALESCE(t.trust_status, 0) as trust_status
-		FROM contacts c 
-		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id 
+		FROM contacts c
+		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id
 		LEFT JOIN ens_verification_records v ON c.id = v.public_key
 		LEFT JOIN trusted_users t ON c.id = t.id;
 	`)
@@ -528,6 +574,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			removed             sql.NullBool
 			hasAddedUs          sql.NullBool
 			lastUpdatedLocally  sql.NullInt64
+			identityImageClock  sql.NullInt64
 			imagePayload        []byte
 		)
 
@@ -552,6 +599,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contactRequestClock,
 			&imageType,
 			&imagePayload,
+			&identityImageClock,
 			&contact.VerificationStatus,
 			&contact.TrustStatus,
 		)
@@ -606,15 +654,46 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		previousContact, ok := allContacts[contact.ID]
 		if !ok {
 			if imageType.Valid {
-				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			}
 
 			allContacts[contact.ID] = &contact
 
 		} else if imageType.Valid {
-			previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+			previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload, Clock: uint64(identityImageClock.Int64)}
 			allContacts[contact.ID] = previousContact
 
+		}
+	}
+
+	// Read social links
+	for _, contact := range allContacts {
+		rows, err := db.db.Query(`SELECT link_text, link_url FROM chat_identity_social_links WHERE chat_id = ?`, contact.ID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var (
+				text sql.NullString
+				url  sql.NullString
+			)
+			err := rows.Scan(
+				&text, &url,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			link := identity.SocialLink{}
+			if text.Valid {
+				link.Text = text.String
+			}
+			if url.Valid {
+				link.URL = url.String
+			}
+			contact.SocialLinks = append(contact.SocialLinks, link)
 		}
 	}
 
@@ -626,14 +705,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (updated bool, err error) {
+func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (clockUpdated, imagesUpdated bool, err error) {
 	if chatIdentity.Clock == 0 {
-		return false, errors.New("clock value unset")
+		return false, false, errors.New("clock value unset")
 	}
 
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	defer func() {
 		if err == nil {
@@ -644,11 +723,42 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		_ = tx.Rollback()
 	}()
 
+	updateClock := func() (updated bool, err error) {
+		var newerClockEntryExists bool
+		err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_last_received WHERE chat_id = ? AND clock_value >= ?)`, contactID, chatIdentity.Clock).Scan(&newerClockEntryExists)
+		if err != nil {
+			return false, err
+		}
+		if newerClockEntryExists {
+			return false, nil
+		}
+
+		stmt, err := tx.Prepare("INSERT INTO chat_identity_last_received (chat_id, clock_value) VALUES (?, ?)")
+		if err != nil {
+			return false, err
+		}
+		defer stmt.Close()
+		_, err = stmt.Exec(
+			contactID,
+			chatIdentity.Clock,
+		)
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
+
+	clockUpdated, err = updateClock()
+	if err != nil {
+		return false, false, err
+	}
+
 	for imageType, image := range chatIdentity.Images {
 		var exists bool
 		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ? AND image_type = ? AND clock_value >= ?)`, contactID, imageType, chatIdentity.Clock).Scan(&exists)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 
 		if exists {
@@ -657,7 +767,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 
 		stmt, err := tx.Prepare(`INSERT INTO chat_identity_contacts (contact_id, image_type, clock_value, payload) VALUES (?, ?, ?, ?)`)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 		defer stmt.Close()
 		if image.Payload == nil {
@@ -668,7 +778,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 		// Validate image URI to make sure it's serializable
 		_, err = images.GetPayloadDataURI(image.Payload)
 		if err != nil {
-			return false, err
+			return clockUpdated, false, err
 		}
 
 		_, err = stmt.Exec(
@@ -678,9 +788,28 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 			image.Payload,
 		)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
-		updated = true
+		imagesUpdated = true
+	}
+
+	if clockUpdated && chatIdentity.SocialLinks != nil {
+		stmt, err := tx.Prepare(`INSERT INTO chat_identity_social_links (chat_id, link_text, link_url) VALUES (?, ?, ?)`)
+		if err != nil {
+			return clockUpdated, imagesUpdated, err
+		}
+		defer stmt.Close()
+
+		for _, link := range chatIdentity.SocialLinks {
+			_, err = stmt.Exec(
+				contactID,
+				link.Text,
+				link.Url,
+			)
+			if err != nil {
+				return clockUpdated, imagesUpdated, err
+			}
+		}
 	}
 
 	return
@@ -1094,6 +1223,87 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 	return bookmark, err
 }
 
+func (db *sqlitePersistence) AddBrowser(browser browsers.Browser) (err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+	insert, err := tx.Prepare("INSERT OR REPLACE INTO browsers(id, name, timestamp, dapp, historyIndex) VALUES(?, ?, ?, ?, ?)")
+	if err != nil {
+		return
+	}
+
+	_, err = insert.Exec(browser.ID, browser.Name, browser.Timestamp, browser.Dapp, browser.HistoryIndex)
+	insert.Close()
+	if err != nil {
+		return
+	}
+
+	if len(browser.History) == 0 {
+		return
+	}
+	bhInsert, err := tx.Prepare("INSERT INTO browsers_history(browser_id, history) VALUES(?, ?)")
+	if err != nil {
+		return
+	}
+	defer bhInsert.Close()
+	for _, history := range browser.History {
+		_, err = bhInsert.Exec(browser.ID, history)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (db *sqlitePersistence) InsertBrowser(browser browsers.Browser) (err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	bInsert, err := tx.Prepare("INSERT OR REPLACE INTO browsers(id, name, timestamp, dapp, historyIndex) VALUES(?, ?, ?, ?, ?)")
+	if err != nil {
+		return
+	}
+	_, err = bInsert.Exec(browser.ID, browser.Name, browser.Timestamp, browser.Dapp, browser.HistoryIndex)
+	bInsert.Close()
+	if err != nil {
+		return
+	}
+
+	if len(browser.History) == 0 {
+		return
+	}
+	bhInsert, err := tx.Prepare("INSERT INTO browsers_history(browser_id, history) VALUES(?, ?)")
+	if err != nil {
+		return
+	}
+	defer bhInsert.Close()
+	for _, history := range browser.History {
+		_, err = bhInsert.Exec(browser.ID, history)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (db *sqlitePersistence) RemoveBookmark(url string, deletedAt uint64) error {
 	tx, err := db.db.Begin()
 	if err != nil {
@@ -1108,6 +1318,61 @@ func (db *sqlitePersistence) RemoveBookmark(url string, deletedAt uint64) error 
 	}()
 
 	_, err = tx.Exec(`UPDATE bookmarks SET removed = 1, deleted_at = ? WHERE url = ?`, deletedAt, url)
+	return err
+}
+
+func (db *sqlitePersistence) GetBrowsers() (rst []*browsers.Browser, err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	// FULL and RIGHT joins are not supported
+	bRows, err := tx.Query("SELECT id, name, timestamp, dapp, historyIndex FROM browsers ORDER BY timestamp DESC")
+	if err != nil {
+		return
+	}
+	defer bRows.Close()
+	browsersArr := map[string]*browsers.Browser{}
+	for bRows.Next() {
+		browser := browsers.Browser{}
+		err = bRows.Scan(&browser.ID, &browser.Name, &browser.Timestamp, &browser.Dapp, &browser.HistoryIndex)
+		if err != nil {
+			return nil, err
+		}
+		browsersArr[browser.ID] = &browser
+		rst = append(rst, &browser)
+	}
+
+	bhRows, err := tx.Query("SELECT browser_id, history from browsers_history")
+	if err != nil {
+		return
+	}
+	defer bhRows.Close()
+	var (
+		id      string
+		history string
+	)
+	for bhRows.Next() {
+		err = bhRows.Scan(&id, &history)
+		if err != nil {
+			return
+		}
+		browsersArr[id].History = append(browsersArr[id].History, history)
+	}
+
+	return rst, nil
+}
+
+func (db *sqlitePersistence) DeleteBrowser(id string) error {
+	_, err := db.db.Exec("DELETE from browsers WHERE id = ?", id)
 	return err
 }
 
@@ -1154,5 +1419,60 @@ func (db *sqlitePersistence) DeleteSoftRemovedBookmarks(threshold uint64) error 
 		_ = tx.Rollback()
 	}()
 	_, err = tx.Exec(`DELETE from bookmarks WHERE removed = 1 AND deleted_at < ?`, threshold)
+	return err
+}
+
+func (db *sqlitePersistence) InsertWalletConnectSession(session *WalletConnectSession) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	sessionInsertPreparedStatement, err := tx.Prepare("INSERT OR REPLACE INTO wallet_connect_v1_sessions(peer_id, dapp_name, dapp_url, info) VALUES(?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer sessionInsertPreparedStatement.Close()
+	_, err = sessionInsertPreparedStatement.Exec(session.PeerID, session.DAppName, session.DAppURL, session.Info)
+	return err
+}
+
+func (db *sqlitePersistence) GetWalletConnectSession() ([]WalletConnectSession, error) {
+	var sessions []WalletConnectSession
+
+	rows, err := db.db.Query("SELECT peer_id, dapp_name, dapp_url, info FROM wallet_connect_v1_sessions ORDER BY dapp_name")
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		session := WalletConnectSession{}
+		err = rows.Scan(&session.PeerID, &session.DAppName, &session.DAppURL, &session.Info)
+		if err != nil {
+			return nil, err
+		}
+
+		sessions = append(sessions, session)
+	}
+
+	return sessions, nil
+}
+
+func (db *sqlitePersistence) DeleteWalletConnectSession(peerID string) error {
+	deleteStatement, err := db.db.Prepare("DELETE FROM wallet_connect_v1_sessions where peer_id=?")
+	if err != nil {
+		return err
+	}
+	defer deleteStatement.Close()
+	_, err = deleteStatement.Exec(peerID)
 	return err
 }

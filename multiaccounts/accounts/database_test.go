@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/multiaccounts/keypairs"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -189,4 +190,116 @@ func TestAddressDoesntExist(t *testing.T) {
 	exists, err := db.AddressExists(types.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+func TestKeypairs(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	keycardUID := "00000000000000000000000000000000"
+	keyPair1 := keypairs.KeyPair{
+		KeycardUID:        "00000000000000000000000000000001",
+		KeycardName:       "Card01",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}},
+		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000001",
+	}
+	keyPair2 := keypairs.KeyPair{
+		KeycardUID:        "00000000000000000000000000000002",
+		KeycardName:       "Card02",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x01}, {0x02}},
+		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
+	}
+
+	// Test adding key pairs
+	err := db.AddMigratedKeyPair(keyPair1.KeycardUID, keyPair1.KeycardName, keyPair1.KeyUID, keyPair1.AccountsAddresses)
+	require.NoError(t, err)
+	err = db.AddMigratedKeyPair(keyPair2.KeycardUID, keyPair2.KeycardName, keyPair2.KeyUID, keyPair2.AccountsAddresses)
+	require.NoError(t, err)
+
+	// Test reading migrated key pairs
+	rows, err := db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(rows))
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair1.KeyUID {
+			require.Equal(t, keyPair1.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair1.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair1.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair1.AccountsAddresses), len(kp.AccountsAddresses))
+		} else {
+			require.Equal(t, keyPair2.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair2.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair2.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair2.AccountsAddresses), len(kp.AccountsAddresses))
+		}
+	}
+
+	rows, err = db.GetMigratedKeyPairByKeyUID(keyPair1.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rows))
+	require.Equal(t, keyPair1.KeyUID, rows[0].KeyUID)
+	require.Equal(t, keyPair1.KeycardUID, rows[0].KeycardUID)
+	require.Equal(t, keyPair1.KeycardName, rows[0].KeycardName)
+	require.Equal(t, keyPair1.KeycardLocked, rows[0].KeycardLocked)
+	require.Equal(t, len(keyPair1.AccountsAddresses), len(rows[0].AccountsAddresses))
+
+	// Test seting a new keycard name
+	err = db.SetKeycardName(keyPair1.KeycardUID, "Card101")
+	require.NoError(t, err)
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	newKeycardName := ""
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair1.KeyUID {
+			newKeycardName = kp.KeycardName
+		}
+	}
+	require.Equal(t, "Card101", newKeycardName)
+
+	// Test locking a keycard
+	err = db.KeycardLocked(keyPair1.KeycardUID)
+	require.NoError(t, err)
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	locked := false
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair1.KeyUID {
+			locked = kp.KeycardLocked
+		}
+	}
+	require.Equal(t, true, locked)
+
+	// Test update keycard uid
+	err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID)
+	require.NoError(t, err)
+
+	// Test unlocking a locked keycard
+	err = db.KeycardUnlocked(keycardUID)
+	require.NoError(t, err)
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	locked = true
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair1.KeyUID {
+			locked = kp.KeycardLocked
+		}
+	}
+	require.Equal(t, false, locked)
+
+	// Test detleting a keycard
+	err = db.DeleteKeycard(keycardUID)
+	require.NoError(t, err)
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rows))
+	// Test if correct keycard is deleted
+	deletedKeyPair1 := true
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair1.KeyUID {
+			deletedKeyPair1 = false
+		}
+	}
+	require.Equal(t, true, deletedKeyPair1)
 }

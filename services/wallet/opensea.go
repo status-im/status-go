@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -165,7 +166,13 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 			return nil, err
 		}
 
-		assets = append(assets, container.Assets...)
+		for _, asset := range container.Assets {
+			for i := range asset.Traits {
+				asset.Traits[i].TraitType = strings.Replace(strings.ToUpper(asset.Traits[i].TraitType), "_", " ", 1)
+				asset.Traits[i].Value = TraitValue(strings.Title(string(asset.Traits[i].Value)))
+			}
+			assets = append(assets, asset)
+		}
 
 		if len(container.Assets) < AssetLimit {
 			break

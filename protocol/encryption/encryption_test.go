@@ -47,7 +47,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 	s.bobDBPath, err = ioutil.TempFile("", "bob.db.sql")
 	s.Require().NoError(err)
 
-	db, err := sqlite.Open(s.aliceDBPath.Name(), "alice-key")
+	db, err := sqlite.Open(s.aliceDBPath.Name(), "alice-key", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	config.InstallationID = aliceInstallationID
 	s.alice = NewWithEncryptorConfig(
@@ -57,7 +57,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		s.logger.With(zap.String("user", "alice")),
 	)
 
-	db, err = sqlite.Open(s.bobDBPath.Name(), "bob-key")
+	db, err = sqlite.Open(s.bobDBPath.Name(), "bob-key", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	config.InstallationID = bobInstallationID
 	s.bob = NewWithEncryptorConfig(

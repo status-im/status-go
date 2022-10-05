@@ -47,7 +47,7 @@ type CreateCommunity struct {
 	Tags                         []string                             `json:"tags,omitempty"`
 }
 
-func adaptIdentityImageToProtobuf(img *userimages.IdentityImage) *protobuf.IdentityImage {
+func adaptIdentityImageToProtobuf(img userimages.IdentityImage) *protobuf.IdentityImage {
 	return &protobuf.IdentityImage{
 		Payload:    img.Payload,
 		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
@@ -103,8 +103,8 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			if err != nil {
 				return nil, err
 			}
-			for _, img := range imgs {
-				ciis[img.Name] = adaptIdentityImageToProtobuf(img)
+			for i := range imgs {
+				ciis[imgs[i].Name] = adaptIdentityImageToProtobuf(imgs[i])
 			}
 		}
 		if c.Banner.ImagePath != "" {
@@ -113,7 +113,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			if err != nil {
 				return nil, err
 			}
-			ciis[img.Name] = adaptIdentityImageToProtobuf(img)
+			ciis[img.Name] = adaptIdentityImageToProtobuf(*img)
 		}
 		ci.Images = ciis
 		log.Info("set images", "images", ci)

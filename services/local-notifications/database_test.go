@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 )
 
 func setupAppTestDb(t *testing.T) (*sql.DB, func()) {
 	tmpfile, err := ioutil.TempFile("", "local-notifications-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "local-notifications-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "local-notifications-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, os.Remove(tmpfile.Name()))

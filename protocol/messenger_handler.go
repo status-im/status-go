@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -542,14 +543,14 @@ func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, messa
 	for _, img := range dbImages {
 		dbImageMap[img.Name] = img
 	}
-	idImages := make([]*images.IdentityImage, len(message.Pictures))
+	idImages := make([]images.IdentityImage, len(message.Pictures))
 	i := 0
 	for _, message := range message.Pictures {
 		dbImg := dbImageMap[message.Name]
 		if dbImg != nil && message.Clock <= dbImg.Clock {
 			continue
 		}
-		image := &images.IdentityImage{
+		image := images.IdentityImage{
 			Name:         message.Name,
 			Payload:      message.Payload,
 			Width:        int(message.Width),
@@ -601,6 +602,10 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 	}
 
 	if chat.Joined > int64(message.Clock) {
+		return nil
+	}
+
+	if chat.DeletedAtClockValue > message.Clock {
 		return nil
 	}
 
@@ -825,6 +830,10 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		chat.LastClockValue = message.Clock
 	}
 
+	if contact.ContactRequestState == ContactRequestStateMutual {
+		chat.Active = true
+	}
+
 	state.Response.AddChat(chat)
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	state.AllChats.Store(chat.ID, chat)
@@ -940,6 +949,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					signal.SendNewMessages(response)
 					localnotifications.PushMessages(notifications)
 				}
+				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 			}()
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
@@ -1014,6 +1024,28 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
 		}
 	}
+	return nil
+}
+
+func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToLeaveProto protobuf.CommunityRequestToLeave) error {
+	if requestToLeaveProto.CommunityId == nil {
+		return errors.New("invalid community id")
+	}
+
+	err := m.communitiesManager.HandleCommunityRequestToLeave(signer, &requestToLeaveProto)
+	if err != nil {
+		return err
+	}
+
+	response, err := m.RemoveUserFromCommunity(requestToLeaveProto.CommunityId, common.PubkeyToHex(signer))
+	if err != nil {
+		return err
+	}
+
+	if len(response.Communities()) > 0 {
+		state.Response.AddCommunity(response.Communities()[0])
+	}
+
 	return nil
 }
 
@@ -1135,11 +1167,64 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		if err := m.updateLastMessage(chat); err != nil {
 			return err
 		}
+
+		if chat.LastMessage != nil && chat.LastMessage.Seen == false && chat.OneToOne() && !chat.Active {
+			m.createMessageNotification(chat, state)
+		}
 	}
 
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
+
+	return nil
+}
+
+func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage DeleteForMeMessage) error {
+	if err := ValidateDeleteForMeMessage(deleteForMeMessage.DeleteForMeMessage); err != nil {
+		return err
+	}
+
+	messageID := deleteForMeMessage.MessageId
+	// Check if it's already in the response
+	originalMessage := state.Response.GetMessage(messageID)
+	// otherwise pull from database
+	if originalMessage == nil {
+		var err error
+		originalMessage, err = m.persistence.MessageByID(messageID)
+
+		if err == common.ErrRecordNotFound {
+			return m.persistence.SaveDeleteForMe(deleteForMeMessage)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	// Update message and return it
+	originalMessage.DeletedForMe = true
+
+	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
+	if err != nil {
+		return err
+	}
+
+	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteForMeMessage.MessageId))
+
+	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteForMeMessage.MessageId)
+	if err != nil {
+		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
+		return err
+	}
+
+	state.Response.AddMessage(originalMessage)
+	state.Response.AddChat(chat)
 
 	return nil
 }
@@ -1232,6 +1317,10 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
 
+	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(receivedMessage.WhisperTimestamp), state.Response); err != nil {
+		return err
+	}
+
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		if !receivedMessage.Seen {
@@ -1269,6 +1358,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	err = m.checkForDeletes(receivedMessage)
+	if err != nil {
+		return err
+	}
+
+	err = m.checkForDeleteForMes(receivedMessage)
 	if err != nil {
 		return err
 	}
@@ -1816,17 +1910,6 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	}
 
 	contact := state.CurrentMessageState.Contact
-
-	if err = ValidateDisplayName(&ci.DisplayName); err != nil {
-		return err
-	}
-
-	if contact.DisplayName != ci.DisplayName && len(ci.DisplayName) != 0 {
-		contact.DisplayName = ci.DisplayName
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-	}
-
 	viewFromContacts := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly
 	viewFromNoOne := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityNone
 
@@ -1870,18 +1953,54 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		}
 	}
 
-	newImages, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
+	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
 	if err != nil {
 		return err
 	}
-	if newImages {
+	contactModified := false
+
+	if imagesChanged {
 		for imageType, image := range ci.Images {
 			if contact.Images == nil {
 				contact.Images = make(map[string]images.IdentityImage)
 			}
-			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
+			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
 
 		}
+		contactModified = true
+	}
+
+	if clockChanged {
+		if err = ValidateDisplayName(&ci.DisplayName); err != nil {
+			return err
+		}
+
+		if contact.DisplayName != ci.DisplayName && len(ci.DisplayName) != 0 {
+			contact.DisplayName = ci.DisplayName
+			contactModified = true
+		}
+
+		if err = ValidateBio(&ci.Description); err != nil {
+			return err
+		}
+
+		if contact.Bio != ci.Description {
+			contact.Bio = ci.Description
+			contactModified = true
+		}
+
+		socialLinks := identity.NewSocialLinks(ci.SocialLinks)
+		if err = ValidateSocialLinks(socialLinks); err != nil {
+			return err
+		}
+
+		if !contact.SocialLinks.Equals(*socialLinks) {
+			contact.SocialLinks = *socialLinks
+			contactModified = true
+		}
+	}
+
+	if contactModified {
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
@@ -1935,6 +2054,21 @@ func (m *Messenger) checkForDeletes(message *common.Message) error {
 	}
 
 	return m.applyDeleteMessage(messageDeletes, message)
+}
+
+func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
+	// Check for any pending delete for mes
+	// If any pending deletes are available and valid, apply them
+	messageDeleteForMes, err := m.persistence.GetDeleteForMes(message.ID, message.From)
+	if err != nil {
+		return err
+	}
+
+	if len(messageDeleteForMes) == 0 {
+		return nil
+	}
+
+	return m.applyDeleteForMeMessage(messageDeleteForMes, message)
 }
 
 func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {
@@ -2007,7 +2141,7 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 				Address:   types.BytesToAddress(message.Address),
 				Wallet:    message.Wallet,
 				Chat:      message.Chat,
-				Type:      message.Type,
+				Type:      accounts.AccountType(message.Type),
 				Storage:   message.Storage,
 				PublicKey: types.HexBytes(message.PublicKey),
 				Path:      message.Path,
@@ -2043,8 +2177,36 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 
 	if err == nil {
 		state.Response.Accounts = accs
-		state.Response.Settings = []*settings.SyncSettingField{{settings.LatestDerivedPath, newPath}}
+		if state.Response.Settings == nil {
+			state.Response.Settings = []*settings.SyncSettingField{}
+		}
+
+		state.Response.Settings = append(
+			state.Response.Settings,
+			&settings.SyncSettingField{
+				SettingField: settings.LatestDerivedPath,
+				Value:        newPath,
+			})
 	}
 
 	return err
+}
+
+func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message protobuf.SyncContactRequestDecision) error {
+	var err error
+	var response *MessengerResponse
+	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
+		response, err = m.updateAcceptedContactRequest(nil, message.RequestId)
+
+	} else {
+		response, err = m.dismissContactRequest(message.RequestId, true)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	state.Response = response
+
+	return nil
 }

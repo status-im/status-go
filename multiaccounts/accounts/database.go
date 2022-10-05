@@ -6,8 +6,10 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/multiaccounts/keypairs"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
+	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -19,9 +21,10 @@ const (
 
 type Account struct {
 	Address     types.Address  `json:"address"`
+	KeyUID      string         `json:"key-uid"`
 	Wallet      bool           `json:"wallet"`
 	Chat        bool           `json:"chat"`
-	Type        string         `json:"type,omitempty"`
+	Type        AccountType    `json:"type,omitempty"`
 	Storage     string         `json:"storage,omitempty"`
 	Path        string         `json:"path,omitempty"`
 	PublicKey   types.HexBytes `json:"public-key,omitempty"`
@@ -34,11 +37,17 @@ type Account struct {
 	Removed     bool           `json:"removed,omitempty"`
 }
 
+type AccountType string
+
+func (a AccountType) String() string {
+	return string(a)
+}
+
 const (
-	AccountTypeGenerated = "generated"
-	AccountTypeKey       = "key"
-	AccountTypeSeed      = "seed"
-	AccountTypeWatch     = "watch"
+	AccountTypeGenerated AccountType = "generated"
+	AccountTypeKey       AccountType = "key"
+	AccountTypeSeed      AccountType = "seed"
+	AccountTypeWatch     AccountType = "watch"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -52,9 +61,10 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
 		Address          types.Address  `json:"address"`
 		MixedcaseAddress string         `json:"mixedcase-address"`
+		KeyUID           string         `json:"key-uid"`
 		Wallet           bool           `json:"wallet"`
 		Chat             bool           `json:"chat"`
-		Type             string         `json:"type,omitempty"`
+		Type             AccountType    `json:"type,omitempty"`
 		Storage          string         `json:"storage,omitempty"`
 		Path             string         `json:"path,omitempty"`
 		PublicKey        types.HexBytes `json:"public-key,omitempty"`
@@ -68,6 +78,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 	}{
 		Address:          a.Address,
 		MixedcaseAddress: a.Address.Hex(),
+		KeyUID:           a.KeyUID,
 		Wallet:           a.Wallet,
 		Chat:             a.Chat,
 		Type:             a.Type,
@@ -90,6 +101,8 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 type Database struct {
 	*settings.Database
 	*notificationssettings.NotificationsSettings
+	*sociallinkssettings.SocialLinksSettings
+	*keypairs.KeyPairs
 	db *sql.DB
 }
 
@@ -100,8 +113,10 @@ func NewDB(db *sql.DB) (*Database, error) {
 		return nil, err
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
+	ssl := sociallinkssettings.NewSocialLinksSettings(db)
+	kp := keypairs.NewKeyPairs(db)
 
-	return &Database{sDB, sn, db}, nil
+	return &Database{sDB, sn, ssl, kp, db}, nil
 }
 
 // DB Gets db sql.DB
@@ -115,7 +130,8 @@ func (db Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]*Account, error) {
-	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock FROM accounts ORDER BY created_at")
+	rows, err := db.db.Query(`SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock, key_uid 
+		FROM accounts ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +142,7 @@ func (db *Database) GetAccounts() ([]*Account, error) {
 		acc := &Account{}
 		err := rows.Scan(
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock)
+			&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID)
 		if err != nil {
 			return nil, err
 		}
@@ -140,13 +156,14 @@ func (db *Database) GetAccounts() ([]*Account, error) {
 }
 
 func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, err error) {
-	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock FROM accounts  WHERE address = ? COLLATE NOCASE", address)
+	row := db.db.QueryRow(`SELECT address, wallet, chat, type, storage, pubkey, path, name, emoji, color, hidden, derived_from, clock, key_uid 
+		FROM accounts  WHERE address = ? COLLATE NOCASE`, address)
 
 	acc := &Account{}
 	pubkey := []byte{}
 	err = row.Scan(
 		&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-		&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock)
+		&pubkey, &acc.Path, &acc.Name, &acc.Emoji, &acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID)
 
 	if err != nil {
 		return nil, err
@@ -180,7 +197,24 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 		return err
 	}
 	delete, err = tx.Prepare("DELETE FROM accounts WHERE address = ?")
-	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?,  emoji = ?, color = ?, hidden = ?, derived_from = ?, updated_at = datetime('now'), clock = ? WHERE address = ?")
+	update, err = tx.Prepare(`UPDATE accounts 
+		SET 
+			wallet = ?, 
+			chat = ?, 
+			type = ?, 
+			storage = ?, 
+			pubkey = ?, 
+			path = ?, 
+			name = ?,  
+			emoji = ?, 
+			color = ?, 
+			hidden = ?, 
+			derived_from = ?, 
+			key_uid = ?, 
+			updated_at = datetime('now'), 
+			clock = ? 
+		WHERE 
+			address = ?`)
 	if err != nil {
 		return err
 	}
@@ -197,7 +231,8 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color, acc.Hidden, acc.DerivedFrom, acc.Clock, acc.Address)
+		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color,
+			acc.Hidden, acc.DerivedFrom, acc.KeyUID, acc.Clock, acc.Address)
 		if err != nil {
 			switch err.Error() {
 			case uniqueChatConstraint:

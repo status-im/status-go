@@ -3,6 +3,8 @@ package accounts
 import (
 	"errors"
 
+	"github.com/status-im/status-go/server"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 )
@@ -12,13 +14,14 @@ var (
 	ErrUpdatingWrongAccount = errors.New("failed to update wrong account. Please login with that account first")
 )
 
-func NewMultiAccountsAPI(db *multiaccounts.Database) *MultiAccountsAPI {
-	return &MultiAccountsAPI{db: db}
+func NewMultiAccountsAPI(db *multiaccounts.Database, mediaServer *server.MediaServer) *MultiAccountsAPI {
+	return &MultiAccountsAPI{db: db, mediaServer: mediaServer}
 }
 
 // MultiAccountsAPI is class with methods available over RPC.
 type MultiAccountsAPI struct {
-	db *multiaccounts.Database
+	db          *multiaccounts.Database
+	mediaServer *server.MediaServer
 }
 
 func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error {
@@ -43,7 +46,7 @@ func (api *MultiAccountsAPI) GetIdentityImage(keyUID, name string) (*images.Iden
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
-func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) ([]*images.IdentityImage, error) {
+func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) ([]images.IdentityImage, error) {
 	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return nil, err
@@ -57,7 +60,7 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 	return iis, err
 }
 
-func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]*images.IdentityImage, error) {
+func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]images.IdentityImage, error) {
 	iis, err := images.GenerateIdentityImagesFromURL(url)
 	if err != nil {
 		return nil, err

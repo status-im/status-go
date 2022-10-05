@@ -130,7 +130,6 @@ func (self *FileSystemList) Get() error {
 	if err != nil {
 		return errors.Wrap(err, "GetAccessPaths failed")
 	}
-
 	for _, drive := range drives {
 		dt, err := windows.GetDriveType(drive)
 		if err != nil {
@@ -140,14 +139,12 @@ func (self *FileSystemList) Get() error {
 		if err != nil {
 			return errors.Wrapf(err, "GetFilesystemType failed")
 		}
-		if fsType != "" {
-			self.List = append(self.List, FileSystem{
-				DirName:     drive,
-				DevName:     drive,
-				TypeName:    dt.String(),
-				SysTypeName: fsType,
-			})
-		}
+		self.List = append(self.List, FileSystem{
+			DirName:     drive,
+			DevName:     drive,
+			TypeName:    dt.String(),
+			SysTypeName: fsType,
+		})
 	}
 	return nil
 }

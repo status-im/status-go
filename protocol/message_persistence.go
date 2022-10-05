@@ -5,11 +5,43 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+var basicMessagesSelectQuery = `
+SELECT    %s %s
+FROM      user_messages m1
+LEFT JOIN user_messages m2
+ON        m1.response_to = m2.id
+LEFT JOIN contacts c
+ON        m1.source = c.id
+LEFT JOIN discord_messages dm
+ON        m1.discord_message_id = dm.id
+LEFT JOIN discord_message_authors dm_author
+ON        dm.author_id = dm_author.id
+LEFT JOIN discord_message_attachments dm_attachment
+ON        dm.id = dm_attachment.discord_message_id
+`
+
+var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
+var cursorField = cursor + " as cursor"
+
+func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	if additionalSelectFields != "" {
+		additionalSelectFields = "," + additionalSelectFields
+	}
+	base := fmt.Sprintf(basicMessagesSelectQuery, allFields, additionalSelectFields)
+	return base + " " + whereAndTheRest
+}
+
+func (db sqlitePersistence) buildMessagesQuery(whereAndTheRest string) string {
+	return db.buildMessagesQueryWithAdditionalFields("", whereAndTheRest)
+}
 
 func (db sqlitePersistence) tableUserMessagesAllFields() string {
 	return `id,
@@ -49,13 +81,15 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replace_message,
 		edited_at,
 		deleted,
+		deleted_for_me,
 		rtl,
 		line_count,
 		response_to,
 		gap_from,
 		gap_to,
 		contact_request_state,
-		mentioned`
+		mentioned,
+    discord_message_id`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -92,6 +126,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.replace_message,
 		m1.edited_at,
 		m1.deleted,
+		m1.deleted_for_me,
 		m1.rtl,
 		m1.line_count,
 		m1.response_to,
@@ -99,6 +134,23 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.gap_to,
 		m1.contact_request_state,
 		m1.mentioned,
+    COALESCE(m1.discord_message_id, ""),
+    COALESCE(dm.author_id, ""),
+    COALESCE(dm.type, ""),
+    COALESCE(dm.timestamp, ""),
+    COALESCE(dm.timestamp_edited, ""),
+    COALESCE(dm.content, ""),
+    COALESCE(dm.reference_message_id, ""),
+    COALESCE(dm.reference_channel_id, ""),
+    COALESCE(dm_author.name, ""),
+    COALESCE(dm_author.discriminator, ""),
+    COALESCE(dm_author.nickname, ""),
+    COALESCE(dm_author.avatar_url, ""),
+    COALESCE(dm_attachment.id, ""),
+    COALESCE(dm_attachment.discord_message_id, ""),
+    COALESCE(dm_attachment.url, ""),
+    COALESCE(dm_attachment.file_name, ""),
+    COALESCE(dm_attachment.content_type, ""),
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -135,12 +187,20 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
 	var deleted sql.NullBool
+	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
 	audio := &protobuf.AudioMessage{}
 	image := &protobuf.ImageMessage{}
+	discordMessage := &protobuf.DiscordMessage{
+		Author:      &protobuf.DiscordMessageAuthor{},
+		Reference:   &protobuf.DiscordMessageReference{},
+		Attachments: []*protobuf.DiscordMessageAttachment{},
+	}
+
+	attachment := &protobuf.DiscordMessageAttachment{}
 
 	args := []interface{}{
 		&message.ID,
@@ -176,6 +236,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Replace,
 		&editedAt,
 		&deleted,
+		&deletedForMe,
 		&message.RTL,
 		&message.LineCount,
 		&message.ResponseTo,
@@ -183,6 +244,23 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&gapTo,
 		&contactRequestState,
 		&message.Mentioned,
+		&discordMessage.Id,
+		&discordMessage.Author.Id,
+		&discordMessage.Type,
+		&discordMessage.Timestamp,
+		&discordMessage.TimestampEdited,
+		&discordMessage.Content,
+		&discordMessage.Reference.MessageId,
+		&discordMessage.Reference.ChannelId,
+		&discordMessage.Author.Name,
+		&discordMessage.Author.Discriminator,
+		&discordMessage.Author.Nickname,
+		&discordMessage.Author.AvatarUrl,
+		&attachment.Id,
+		&attachment.MessageId,
+		&attachment.Url,
+		&attachment.FileName,
+		&attachment.ContentType,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -204,6 +282,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if deleted.Valid {
 		message.Deleted = deleted.Bool
+	}
+
+	if deletedForMe.Valid {
+		message.DeletedForMe = deletedForMe.Bool
 	}
 
 	if contactRequestState.Valid {
@@ -247,6 +329,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		}
 	}
 
+	if attachment.Id != "" {
+		discordMessage.Attachments = append(discordMessage.Attachments, attachment)
+	}
+
 	switch message.ContentType {
 	case protobuf.ChatMessage_STICKER:
 		message.Payload = &protobuf.ChatMessage_Sticker{Sticker: sticker}
@@ -263,6 +349,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			Type:    image.Type,
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
+
+	case protobuf.ChatMessage_DISCORD_MESSAGE:
+		message.Payload = &protobuf.ChatMessage_DiscordMessage{
+			DiscordMessage: discordMessage,
+		}
 	}
 
 	return nil
@@ -289,6 +380,15 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 	command := message.CommandParameters
 	if command == nil {
 		command = &common.CommandParameters{}
+	}
+
+	discordMessage := message.GetDiscordMessage()
+	if discordMessage == nil {
+		discordMessage = &protobuf.DiscordMessage{
+			Author:      &protobuf.DiscordMessageAuthor{},
+			Reference:   &protobuf.DiscordMessageReference{},
+			Attachments: make([]*protobuf.DiscordMessageAttachment, 0),
+		}
 	}
 
 	if message.GapParameters != nil {
@@ -351,6 +451,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Replace,
 		int64(message.EditedAt),
 		message.Deleted,
+		message.DeletedForMe,
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,
@@ -358,6 +459,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		gapTo,
 		message.ContactRequestState,
 		message.Mentioned,
+		discordMessage.Id,
 	}, nil
 }
 
@@ -378,79 +480,30 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message,
 		}()
 	}
 
-	var message common.Message
-
-	allFields := db.tableUserMessagesAllFieldsJoin()
-	row := tx.QueryRow(
-		fmt.Sprintf(`
-			SELECT
-				%s
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			        contacts c
-		        ON
-			m1.source = c.id
-			WHERE
-				m1.id = ?
-		`, allFields),
-		id,
-	)
-	err = db.tableUserMessagesScanAllFields(row, &message)
-	switch err {
-	case sql.ErrNoRows:
-		return nil, common.ErrRecordNotFound
-	case nil:
-		return &message, nil
-	default:
+	query := db.buildMessagesQuery("WHERE m1.id = ?")
+	rows, err := tx.Query(query, id)
+	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+	return getMessageFromScanRows(db, rows)
 }
 
 func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Message, error) {
 
-	var message common.Message
-
-	allFields := db.tableUserMessagesAllFieldsJoin()
-	row := db.db.QueryRow(
-		fmt.Sprintf(`
-			SELECT
-				%s
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			        contacts c
-		        ON
-			m1.source = c.id
-			WHERE
-				m1.command_id = ?
-				AND
-				m1.local_chat_id = ?
-				ORDER BY m1.clock_value DESC
-				LIMIT 1
-		`, allFields),
-		id,
-		chatID,
-	)
-	err := db.tableUserMessagesScanAllFields(row, &message)
-	switch err {
-	case sql.ErrNoRows:
-		return nil, common.ErrRecordNotFound
-	case nil:
-		return &message, nil
-	default:
+	where := `WHERE
+			m1.command_id = ?
+			AND
+			m1.local_chat_id = ?
+			ORDER BY m1.clock_value DESC
+			LIMIT 1`
+	query := db.buildMessagesQuery(where)
+	rows, err := db.db.Query(query, id, chatID)
+	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+	return getMessageFromScanRows(db, rows)
 }
 
 func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
@@ -498,41 +551,17 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 		idsArgs = append(idsArgs, id)
 	}
 
-	allFields := db.tableUserMessagesAllFieldsJoin()
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 
 	// nolint: gosec
-	rows, err := db.db.Query(fmt.Sprintf(`
-			SELECT
-				%s
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			      contacts c
-			ON
-
-			m1.source = c.id
-			WHERE NOT(m1.hide) AND m1.id IN (%s)`, allFields, inVector), idsArgs...)
+	where := fmt.Sprintf("WHERE NOT(m1.hide) AND m1.id IN (%s)", inVector)
+	query := db.buildMessagesQuery(where)
+	rows, err := db.db.Query(query, idsArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	var result []*common.Message
-	for rows.Next() {
-		var message common.Message
-		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
-			return nil, err
-		}
-		result = append(result, &message)
-	}
-
-	return result, nil
+	return getMessagesFromScanRows(db, rows)
 }
 
 // MessageByChatID returns all messages for a given chatID in descending order.
@@ -543,7 +572,6 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
-	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := []interface{}{chatID}
 	if currCursor != "" {
 		args = append(args, currCursor)
@@ -551,28 +579,16 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
+	where := fmt.Sprintf(`
+            WHERE
+                NOT(m1.hide) AND m1.local_chat_id = ? %s
+            ORDER BY cursor DESC
+            LIMIT ?`, cursorWhere)
+
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
+
 	rows, err := db.db.Query(
-		fmt.Sprintf(`
-			SELECT
-				%s,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			      contacts c
-			ON
-
-			m1.source = c.id
-			WHERE
-				NOT(m1.hide) AND m1.local_chat_id = ? %s
-			ORDER BY cursor DESC
-			LIMIT ?
-		`, allFields, cursorWhere),
+		query,
 		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
@@ -580,20 +596,9 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	}
 	defer rows.Close()
 
-	var (
-		result  []*common.Message
-		cursors []string
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, "", err
-		}
-		result = append(result, &message)
-		cursors = append(cursors, cursor)
+	result, cursors, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var newCursor string
@@ -607,16 +612,18 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, error) {
 	var clock uint64
 	err := db.db.QueryRow(
-		`
+		fmt.Sprintf(
+			`
 			SELECT
                 clock_value
 			FROM
 				user_messages m1
 			WHERE
 				m1.local_chat_id = ? AND m1.outgoing_status = ''
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id DESC
+			%s DESC
 			LIMIT 1
-		`, chatID).Scan(&clock)
+		`, cursor),
+		chatID).Scan(&clock)
 	if err != nil {
 		return 0, err
 	}
@@ -628,7 +635,6 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
-	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := []interface{}{protobuf.ChatMessage_CONTACT_REQUEST}
 	if currCursor != "" {
 		args = append(args, currCursor)
@@ -636,28 +642,15 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
+	where := fmt.Sprintf(`
+            WHERE
+                NOT(m1.hide) AND NOT(m1.seen) AND m1.content_type = ? %s
+            ORDER BY cursor DESC
+            LIMIT ?`, cursorWhere)
+
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
 	rows, err := db.db.Query(
-		fmt.Sprintf(`
-			SELECT
-				%s,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			      contacts c
-			ON
-
-			m1.source = c.id
-			WHERE
-				NOT(m1.hide) AND NOT(m1.seen) AND m1.content_type = ? %s
-			ORDER BY cursor DESC
-			LIMIT ?
-		`, allFields, cursorWhere),
+		query,
 		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
@@ -665,20 +658,9 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 	}
 	defer rows.Close()
 
-	var (
-		result  []*common.Message
-		cursors []string
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, "", err
-		}
-		result = append(result, &message)
-		cursors = append(cursors, cursor)
+	result, cursors, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var newCursor string
@@ -692,16 +674,18 @@ func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int)
 func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID string) (string, error) {
 	var id string
 	err := db.db.QueryRow(
-		`
+		fmt.Sprintf(
+			`
 			SELECT
                                 id
 			FROM
 				user_messages m1
 			WHERE
 				m1.local_chat_id = ? AND m1.content_type = ?
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id DESC
+			ORDER BY %s DESC
 			LIMIT 1
-		`, contactID, protobuf.ChatMessage_CONTACT_REQUEST).Scan(&id)
+		`, cursor),
+		contactID, protobuf.ChatMessage_CONTACT_REQUEST).Scan(&id)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -710,6 +694,41 @@ func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID st
 		return "", err
 	}
 	return id, nil
+}
+
+func (db sqlitePersistence) LatestContactRequestIDs() (map[string]common.ContactRequestState, error) {
+	res := map[string]common.ContactRequestState{}
+	rows, err := db.db.Query(
+		fmt.Sprintf(
+			`
+			SELECT
+                                id, contact_request_state
+			FROM
+				user_messages m1
+			WHERE
+				m1.content_type = ?
+			ORDER BY %s DESC
+			LIMIT 20
+		`, cursor), protobuf.ChatMessage_CONTACT_REQUEST)
+
+	defer rows.Close()
+
+	if err != nil {
+		return res, err
+	}
+
+	for rows.Next() {
+		var id string
+		var contactRequestState sql.NullInt64
+		err := rows.Scan(&id, &contactRequestState)
+
+		if err != nil {
+			return nil, err
+		}
+		res[id] = common.ContactRequestState(contactRequestState.Int64)
+	}
+
+	return res, nil
 }
 
 // AllMessageByChatIDWhichMatchPattern returns all messages which match the search
@@ -728,29 +747,14 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 		searchCond = "AND LOWER(m1.text) LIKE LOWER('%' || ? || '%')"
 	}
 
-	allFields := db.tableUserMessagesAllFieldsJoin()
+	where := fmt.Sprintf(`
+            WHERE
+                NOT(m1.hide) AND m1.local_chat_id = ? %s
+            ORDER BY cursor DESC`, searchCond)
 
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
 	rows, err := db.db.Query(
-		fmt.Sprintf(`
-			SELECT
-				%s,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			      contacts c
-			ON
-
-			m1.source = c.id
-			WHERE
-				NOT(m1.hide) AND m1.local_chat_id = ? %s
-			ORDER BY cursor DESC
-		`, allFields, searchCond),
+		query,
 		chatID, searchTerm,
 	)
 
@@ -758,22 +762,7 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 		return nil, err
 	}
 	defer rows.Close()
-
-	var (
-		result []*common.Message
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, err
-		}
-		result = append(result, &message)
-	}
-
-	return result, nil
+	return getMessagesFromScanRows(db, rows)
 }
 
 // AllMessagesFromChatsAndCommunitiesWhichMatchTerm returns all messages which match the search
@@ -829,52 +818,19 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 		idsArgs = append(idsArgs, param)
 	}
 
-	allFields := db.tableUserMessagesAllFieldsJoin()
+	where := fmt.Sprintf(`
+            WHERE
+                NOT(m1.hide) %s
+            ORDER BY cursor DESC`, finalCond)
 
-	finalQuery := fmt.Sprintf( // nolint: gosec
-		`
-		SELECT
-			%s,
-			substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-		FROM
-			user_messages m1
-		LEFT JOIN
-			user_messages m2
-		ON
-		m1.response_to = m2.id
-
-		LEFT JOIN
-			contacts c
-		ON
-
-		m1.source = c.id
-		WHERE
-			NOT(m1.hide) %s
-		ORDER BY cursor DESC
-	`, allFields, finalCond)
-
+	finalQuery := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
 	rows, err := db.db.Query(finalQuery, idsArgs...)
 
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	var (
-		result []*common.Message
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, err
-		}
-		result = append(result, &message)
-	}
-
-	return result, nil
+	return getMessagesFromScanRows(db, rows)
 }
 
 func (db sqlitePersistence) AllChatIDsByCommunity(communityID string) ([]string, error) {
@@ -907,7 +863,6 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
-	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := make([]interface{}, len(chatIDs))
 	for i, v := range chatIDs {
 		args[i] = v
@@ -923,33 +878,50 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
+	allFields := db.tableUserMessagesAllFieldsJoin()
 	rows, err := db.db.Query(
 		fmt.Sprintf(`
-			SELECT
-				%s,
-				pm.clock_value as pinnedAt,
-				pm.pinned_by as pinnedBy,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-			FROM
-				pin_messages pm
-			JOIN
-				user_messages m1
-			ON
-				pm.message_id = m1.id
-			LEFT JOIN
-				user_messages m2
-			ON
-				m1.response_to = m2.id
-			LEFT JOIN
-				contacts c
-			ON
-				m1.source = c.id
-			WHERE
-				pm.pinned = 1
-				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
-			ORDER BY cursor DESC
-			%s
-		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr),
+ 			SELECT
+ 				%s,
+ 				pm.clock_value as pinnedAt,
+ 				pm.pinned_by as pinnedBy,
+                                %s
+ 			FROM
+ 				pin_messages pm
+ 			JOIN
+ 				user_messages m1
+ 			ON
+ 				pm.message_id = m1.id
+ 			LEFT JOIN
+ 				user_messages m2
+ 			ON
+ 				m1.response_to = m2.id
+ 			LEFT JOIN
+ 				contacts c
+ 			ON
+ 				m1.source = c.id
+
+       LEFT JOIN
+             discord_messages dm
+       ON
+       m1.discord_message_id = dm.id
+
+       LEFT JOIN
+             discord_message_authors dm_author
+       ON
+       dm.author_id = dm_author.id
+
+      LEFT JOIN 
+              discord_message_attachments dm_attachment
+      ON        
+      dm.id = dm_attachment.discord_message_id
+
+ 			WHERE
+ 				pm.pinned = 1
+ 				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
+ 			ORDER BY cursor DESC
+ 			%s
+ 		`, allFields, cursorField, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr),
 		args..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
@@ -957,27 +929,9 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	}
 	defer rows.Close()
 
-	var (
-		result  []*common.PinnedMessage
-		cursors []string
-	)
-	for rows.Next() {
-		var (
-			message  common.Message
-			pinnedAt uint64
-			pinnedBy string
-			cursor   string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &pinnedAt, &pinnedBy, &cursor); err != nil {
-			return nil, "", err
-		}
-		pinnedMessage := &common.PinnedMessage{
-			Message:  &message,
-			PinnedAt: pinnedAt,
-			PinnedBy: pinnedBy,
-		}
-		result = append(result, pinnedMessage)
-		cursors = append(cursors, cursor)
+	result, cursors, err := getPinnedMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var newCursor string
@@ -1001,7 +955,6 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
-	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := make([]interface{}, len(chatIDs))
 	for i, v := range chatIDs {
 		args[i] = v
@@ -1012,28 +965,15 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
-	rows, err := db.db.Query(
-		fmt.Sprintf(`
-			SELECT
-				%s,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
-			FROM
-				user_messages m1
-			LEFT JOIN
-				user_messages m2
-			ON
-			m1.response_to = m2.id
-
-			LEFT JOIN
-			      contacts c
-			ON
-
-			m1.source = c.id
+	where := fmt.Sprintf(`
 			WHERE
 				NOT(m1.hide) AND m1.local_chat_id IN %s %s
 			ORDER BY cursor DESC
 			LIMIT ?
-		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere),
+		`, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere)
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
+	rows, err := db.db.Query(
+		query,
 		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
 	)
 	if err != nil {
@@ -1041,20 +981,9 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	}
 	defer rows.Close()
 
-	var (
-		result  []*common.Message
-		cursors []string
-	)
-	for rows.Next() {
-		var (
-			message common.Message
-			cursor  string
-		)
-		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
-			return nil, "", err
-		}
-		result = append(result, &message)
-		cursors = append(cursors, cursor)
+	result, cursors, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var newCursor string
@@ -1065,13 +994,34 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) OldestMessageWhisperTimestampByChatID(chatID string) (timestamp uint64, hasAnyMessage bool, err error) {
+	var whisperTimestamp uint64
+	err = db.db.QueryRow(
+		`
+			SELECT
+				whisper_timestamp
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ?
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC
+			LIMIT 1
+		`, chatID).Scan(&whisperTimestamp)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return whisperTimestamp, true, nil
+}
+
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?" //nolint: goconst
-
+		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
 	}
 	args := []interface{}{chatID, chatID}
 	if currCursor != "" {
@@ -1105,10 +1055,10 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			e.local_chat_id = ?
 			AND
 			e.message_id IN
-			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id = ? %s
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
+			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s
+			ORDER BY %s DESC LIMIT ?)
 			LIMIT 1000
-		`, cursorWhere)
+		`, cursorWhere, cursor)
 
 	rows, err := db.db.Query(
 		query,
@@ -1194,8 +1144,7 @@ func (db sqlitePersistence) EmojiReactionsByChatIDMessageID(chatID string, messa
 func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor string, limit int) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?" //nolint: goconst
-
+		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
 	}
 	chatsLen := len(chatIDs)
 	args := make([]interface{}, chatsLen*2)
@@ -1237,9 +1186,9 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 			AND
 			e.message_id IN
 			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id IN %s %s
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
+			ORDER BY %s DESC LIMIT ?)
 			LIMIT 1000
-		`, "(?"+strings.Repeat(",?", chatsLen-1)+")", "(?"+strings.Repeat(",?", chatsLen-1)+")", cursorWhere)
+		`, "(?"+strings.Repeat(",?", chatsLen-1)+")", "(?"+strings.Repeat(",?", chatsLen-1)+")", cursorWhere, cursor)
 
 	rows, err := db.db.Query(
 		query,
@@ -1478,7 +1427,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		return 0, 0, err
 	}
 
-	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats 
+	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats
 				WHERE id = ?`, id).Scan(&unViewedMessages, &unViewedMentions)
 
 	return
@@ -1737,6 +1686,172 @@ func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) (
 	return chats, err
 }
 
+func (db sqlitePersistence) HasDiscordMessageAuthor(id string) (exists bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_authors WHERE id = ?)`, id).Scan(&exists)
+	return exists, err
+}
+
+func (db sqlitePersistence) HasDiscordMessageAuthorImagePayload(id string) (hasPayload bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_authors WHERE id = ? AND avatar_image_payload NOT NULL)`, id).Scan(&hasPayload)
+	return hasPayload, err
+}
+
+func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) (err error) {
+	query := "INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	_, err = stmt.Exec(
+		author.GetId(),
+		author.GetName(),
+		author.GetDiscriminator(),
+		author.GetNickname(),
+		author.GetAvatarUrl(),
+		author.GetAvatarImagePayload(),
+	)
+	return
+}
+
+func (db sqlitePersistence) UpdateDiscordMessageAuthorImage(authorID string, payload []byte) (err error) {
+	query := "UPDATE discord_message_authors SET avatar_image_payload = ? WHERE id = ?"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(payload, authorID)
+	return
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorImagePayloadByID(id string) ([]byte, error) {
+	payload := make([]byte, 0)
+	row := db.db.QueryRow("SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(&payload)
+	return payload, err
+}
+
+func (db sqlitePersistence) GetDiscordMessageAuthorByID(id string) (*protobuf.DiscordMessageAuthor, error) {
+
+	author := &protobuf.DiscordMessageAuthor{}
+
+	row := db.db.QueryRow("SELECT id, name, discriminator, nickname, avatar_url FROM discord_message_authors WHERE id = ?", id)
+	err := row.Scan(
+		&author.Id,
+		&author.Name,
+		&author.Discriminator,
+		&author.Nickname,
+		&author.AvatarUrl)
+	return author, err
+}
+
+func (db sqlitePersistence) SaveDiscordMessage(message *protobuf.DiscordMessage) (err error) {
+	query := "INSERT INTO discord_messages(id,type,timestamp,timestamp_edited,content,author_id, reference_message_id, reference_channel_id, reference_guild_id) VALUES (?,?,?,?,?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(
+		message.GetId(),
+		message.GetType(),
+		message.GetTimestamp(),
+		message.GetTimestampEdited(),
+		message.GetContent(),
+		message.Author.GetId(),
+		message.Reference.GetMessageId(),
+		message.Reference.GetChannelId(),
+		message.Reference.GetGuildId(),
+	)
+	return
+}
+
+func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMessage) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	query := "INSERT OR REPLACE INTO discord_messages(id, author_id, type, timestamp, timestamp_edited, content, reference_message_id, reference_channel_id, reference_guild_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+
+	for _, msg := range messages {
+		_, err = stmt.Exec(
+			msg.GetId(),
+			msg.Author.GetId(),
+			msg.GetType(),
+			msg.GetTimestamp(),
+			msg.GetTimestampEdited(),
+			msg.GetContent(),
+			msg.Reference.GetMessageId(),
+			msg.Reference.GetChannelId(),
+			msg.Reference.GetGuildId(),
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (db sqlitePersistence) HasDiscordMessageAttachmentPayload(id string) (hasPayload bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_attachments WHERE id = ? AND payload NOT NULL)`, id).Scan(&hasPayload)
+	return hasPayload, err
+}
+
+func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobuf.DiscordMessageAttachment) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	query := "INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, content_type) VALUES (?,?,?,?,?,?,?)"
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	if err != nil {
+		return
+	}
+
+	for _, attachment := range attachments {
+		_, err = stmt.Exec(
+			attachment.GetId(),
+			attachment.GetMessageId(),
+			attachment.GetUrl(),
+			attachment.GetFileName(),
+			attachment.GetFileSizeBytes(),
+			attachment.GetPayload(),
+			attachment.GetContentType(),
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
 	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
@@ -1987,6 +2102,31 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 	return messages, nil
 }
 
+func (db sqlitePersistence) SaveDeleteForMe(deleteForMeMessage DeleteForMeMessage) error {
+	_, err := db.db.Exec(`INSERT INTO user_messages_deleted_for_mes (clock, message_id, source, id) VALUES(?,?,?,?)`, deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.From, deleteForMeMessage.ID)
+	return err
+}
+
+func (db sqlitePersistence) GetDeleteForMes(messageID string, from string) ([]*DeleteForMeMessage, error) {
+	rows, err := db.db.Query(`SELECT clock, message_id, source, id FROM user_messages_deleted_for_mes WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []*DeleteForMeMessage
+
+	for rows.Next() {
+		d := &DeleteForMeMessage{}
+		err := rows.Scan(&d.Clock, &d.MessageId, &d.From, &d.ID)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, d)
+
+	}
+	return messages, nil
+}
+
 func (db sqlitePersistence) SaveEdit(editMessage EditMessage) error {
 	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
 	return err
@@ -2068,4 +2208,156 @@ func (db sqlitePersistence) clearHistoryFromSyncMessage(chat *Chat, clearedAt ui
 func (db sqlitePersistence) SetContactRequestState(id string, state common.ContactRequestState) error {
 	_, err := db.db.Exec(`UPDATE user_messages SET contact_request_state = ? WHERE id = ?`, state, id)
 	return err
+}
+
+func getUpdatedChatMessagePayload(originalMessage *protobuf.DiscordMessage, attachmentMessage *protobuf.DiscordMessage) *protobuf.ChatMessage_DiscordMessage {
+	originalMessage.Attachments = append(originalMessage.Attachments, attachmentMessage.Attachments...)
+	return &protobuf.ChatMessage_DiscordMessage{
+		DiscordMessage: originalMessage,
+	}
+}
+
+func getMessageFromScanRows(db sqlitePersistence, rows *sql.Rows) (*common.Message, error) {
+	var msg *common.Message
+
+	for rows.Next() {
+		// There's a possibility of multiple rows per message if the
+		// message has a discordMessage and the discordMessage has multiple
+		// attachments
+		//
+		// Hence, we make sure we're aggregating all attachments on a single
+		// common.Message
+		var message common.Message
+		err := db.tableUserMessagesScanAllFields(rows, &message)
+		if err != nil {
+			return nil, err
+		}
+
+		if msg == nil {
+			msg = &message
+		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
+			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
+		}
+	}
+	if msg == nil {
+		return nil, common.ErrRecordNotFound
+	}
+	return msg, nil
+}
+
+type HasClocks interface {
+	GetClock(i int) uint64
+}
+
+func SortByClock(msgs HasClocks) {
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs.GetClock(j) < msgs.GetClock(i)
+	})
+}
+
+func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Message, error) {
+	messageIdx := make(map[string]*common.Message, 0)
+	for rows.Next() {
+		// There's a possibility of multiple rows per message if the
+		// message has a discordMessage and the discordMessage has multiple
+		// attachments
+		//
+		// Hence, we make sure we're aggregating all attachments on a single
+		// common.Message
+		var message common.Message
+		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
+			return nil, err
+		}
+
+		if msg, ok := messageIdx[message.ID]; !ok {
+			messageIdx[message.ID] = &message
+		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
+			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
+			messageIdx[message.ID] = msg
+		}
+	}
+
+	var messages common.Messages
+	for _, message := range messageIdx {
+		messages = append(messages, message)
+	}
+	SortByClock(messages)
+
+	return messages, nil
+}
+
+func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Message, []string, error) {
+
+	var cursors []string
+	messageIdx := make(map[string]*common.Message, 0)
+
+	for rows.Next() {
+		// There's a possibility of multiple rows per message if the
+		// message has a discordMessage and the discordMessage has multiple
+		// attachments
+		//
+		// Hence, we make sure we're aggregating all attachments on a single
+		// common.Message
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, nil, err
+		}
+
+		if msg, ok := messageIdx[message.ID]; !ok {
+			messageIdx[message.ID] = &message
+			cursors = append(cursors, cursor)
+		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
+			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
+			messageIdx[message.ID] = msg
+		}
+	}
+
+	var messages common.Messages
+	for _, message := range messageIdx {
+		messages = append(messages, message)
+	}
+	SortByClock(messages)
+
+	return messages, cursors, nil
+}
+
+func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.PinnedMessage, []string, error) {
+
+	var cursors []string
+	messageIdx := make(map[string]*common.PinnedMessage, 0)
+
+	for rows.Next() {
+		var (
+			message  common.Message
+			pinnedAt uint64
+			pinnedBy string
+			cursor   string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &pinnedAt, &pinnedBy, &cursor); err != nil {
+			return nil, nil, err
+		}
+		if msg, ok := messageIdx[message.ID]; !ok {
+			pinnedMessage := &common.PinnedMessage{
+				Message:  &message,
+				PinnedAt: pinnedAt,
+				PinnedBy: pinnedBy,
+			}
+			messageIdx[message.ID] = pinnedMessage
+			cursors = append(cursors, cursor)
+		} else if discordMessage := msg.Message.GetDiscordMessage(); discordMessage != nil {
+			msg.Message.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
+			messageIdx[message.ID] = msg
+		}
+	}
+
+	var messages common.PinnedMessages
+	for _, message := range messageIdx {
+		messages = append(messages, message)
+	}
+	SortByClock(messages)
+
+	return messages, cursors, nil
 }

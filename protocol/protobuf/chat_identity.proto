@@ -19,12 +19,19 @@ message ChatIdentity {
   // display name is the user set identity
   string display_name = 4;
 
-  // description is the user set description, valid only for organisations
+  // description is the user set description
   string description = 5;
 
   string color = 6;
 
   string emoji = 7;
+
+  repeated SocialLink social_links = 8;
+
+  // first known message timestamp in seconds (valid only for community chats for now)
+  // 0 - unknown
+  // 1 - no messages
+  uint32 first_message_timestamp = 9;
 }
 
 // ProfileImage represents data associated with a user's profile image
@@ -59,4 +66,10 @@ message IdentityImage {
     // The parent `ChatMessageIdentity` must have a valid `ens_name` set
     ENS_AVATAR = 2;
   }
+}
+
+// SocialLinks represents social link assosiated with given chat identity (personal/community)
+message SocialLink {
+  string text = 1;
+  string url = 2;
 }

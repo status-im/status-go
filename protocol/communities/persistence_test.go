@@ -33,7 +33,7 @@ func (s *PersistenceSuite) SetupTest() {
 	dbPath, err := ioutil.TempFile("", "")
 	s.NoError(err, "creating temp file for db")
 
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "")
+	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
 	s.NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)
@@ -200,6 +200,23 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 			s.Equal(rtjs[0], rtj, "RequestToJoin should match the Request stored in the db")
 		}
 	}
+}
+
+func (s *PersistenceSuite) TestSaveRequestToLeave() {
+	rtl := &RequestToLeave{
+		ID:          []byte("0x123456"),
+		PublicKey:   "0xffffff",
+		Clock:       2,
+		CommunityID: []byte("0x654321"),
+	}
+
+	err := s.db.SaveRequestToLeave(rtl)
+	s.NoError(err)
+
+	// older clocks should not be saved
+	rtl.Clock = 1
+	err = s.db.SaveRequestToLeave(rtl)
+	s.Error(err)
 }
 
 func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Community {

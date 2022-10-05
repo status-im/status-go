@@ -27,6 +27,9 @@ const (
 	// EventHistoryArchiveDownloaded is triggered when the community member node
 	// has downloaded an individual community archive
 	EventHistoryArchiveDownloaded = "community.historyArchiveDownloaded"
+	// EventDownloadingHistoryArchivesFinished is triggered when the community member node
+	// has downloaded all archives
+	EventDownloadingHistoryArchivesFinished = "community.downloadingHistoryArchivesFinished"
 )
 
 type CreatingHistoryArchivesSignal struct {
@@ -57,6 +60,10 @@ type HistoryArchiveDownloadedSignal struct {
 	CommunityID string `json:"communityId"`
 	From        int    `json:"from"`
 	To          int    `json:"to"`
+}
+
+type DownloadingHistoryArchivesFinishedSignal struct {
+	CommunityID string `json:"communityId"`
 }
 
 func SendHistoryArchivesProtocolEnabled() {
@@ -100,5 +107,11 @@ func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
 		CommunityID: communityID,
 		From:        from,
 		To:          to,
+	})
+}
+
+func SendDownloadingHistoryArchivesFinished(communityID string) {
+	send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
+		CommunityID: communityID,
 	})
 }

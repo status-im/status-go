@@ -34,6 +34,8 @@ type Options struct {
 	// Initial delay before GC processes start. Intended to give the system breathing room to fully boot
 	// before starting GC.
 	GCInitialDelay time.Duration
+
+	Clock clock
 }
 
 // DefaultOpts returns the default options for a persistent peerstore, with the full-purge GC algorithm:
@@ -50,6 +52,7 @@ func DefaultOpts() Options {
 		GCPurgeInterval:     2 * time.Hour,
 		GCLookaheadInterval: 0,
 		GCInitialDelay:      60 * time.Second,
+		Clock:               realclock{},
 	}
 }
 

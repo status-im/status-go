@@ -199,7 +199,9 @@ func init() {
 	proto.RegisterType((*DeclineContactVerification)(nil), "protobuf.DeclineContactVerification")
 }
 
-func init() { proto.RegisterFile("contact_verification.proto", fileDescriptor_d6997df64de39454) }
+func init() {
+	proto.RegisterFile("contact_verification.proto", fileDescriptor_d6997df64de39454)
+}
 
 var fileDescriptor_d6997df64de39454 = []byte{
 	// 182 bytes of a gzipped FileDescriptorProto

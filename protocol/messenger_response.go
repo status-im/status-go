@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -28,19 +29,22 @@ type ClearedHistory struct {
 }
 
 type MessengerResponse struct {
-	Contacts                []*Contact
-	Installations           []*multidevice.Installation
-	EmojiReactions          []*EmojiReaction
-	Invitations             []*GroupChatInvitation
-	CommunityChanges        []*communities.CommunityChanges
-	RequestsToJoinCommunity []*communities.RequestToJoin
-	AnonymousMetrics        []*appmetrics.AppMetric
-	Mailservers             []mailservers.Mailserver
-	Bookmarks               []*browsers.Bookmark
-	Settings                []*settings.SyncSettingField
-	IdentityImages          []*images.IdentityImage
-	Accounts                []*accounts.Account
-	VerificationRequests    []*verification.Request
+	Contacts                      []*Contact
+	Installations                 []*multidevice.Installation
+	EmojiReactions                []*EmojiReaction
+	Invitations                   []*GroupChatInvitation
+	CommunityChanges              []*communities.CommunityChanges
+	RequestsToJoinCommunity       []*communities.RequestToJoin
+	AnonymousMetrics              []*appmetrics.AppMetric
+	Mailservers                   []mailservers.Mailserver
+	Bookmarks                     []*browsers.Bookmark
+	Settings                      []*settings.SyncSettingField
+	IdentityImages                []images.IdentityImage
+	Accounts                      []*accounts.Account
+	VerificationRequests          []*verification.Request
+	DiscordCategories             []*discord.Category
+	DiscordChannels               []*discord.Channel
+	DiscordOldestMessageTimestamp int
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -79,15 +83,18 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
-		Notifications               []*localnotifications.Notification `json:"notifications"`
-		Communities                 []*communities.Community           `json:"communities,omitempty"`
-		CommunitiesSettings         []*communities.CommunitySettings   `json:"communitiesSettings,omitempty"`
-		ActivityCenterNotifications []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
-		CurrentStatus               *UserStatus                        `json:"currentStatus,omitempty"`
-		StatusUpdates               []UserStatus                       `json:"statusUpdates,omitempty"`
-		Settings                    []*settings.SyncSettingField       `json:"settings,omitempty"`
-		IdentityImages              []*images.IdentityImage            `json:"identityImages,omitempty"`
-		Accounts                    []*accounts.Account                `json:"accounts,omitempty"`
+		Notifications                 []*localnotifications.Notification `json:"notifications"`
+		Communities                   []*communities.Community           `json:"communities,omitempty"`
+		CommunitiesSettings           []*communities.CommunitySettings   `json:"communitiesSettings,omitempty"`
+		ActivityCenterNotifications   []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
+		CurrentStatus                 *UserStatus                        `json:"currentStatus,omitempty"`
+		StatusUpdates                 []UserStatus                       `json:"statusUpdates,omitempty"`
+		Settings                      []*settings.SyncSettingField       `json:"settings,omitempty"`
+		IdentityImages                []images.IdentityImage             `json:"identityImages,omitempty"`
+		Accounts                      []*accounts.Account                `json:"accounts,omitempty"`
+		DiscordCategories             []*discord.Category                `json:"discordCategories,omitempty"`
+		DiscordChannels               []*discord.Channel                 `json:"discordChannels,omitempty"`
+		DiscordOldestMessageTimestamp int                                `json:"discordOldestMessageTimestamp"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -103,17 +110,20 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Accounts:                r.Accounts,
 		VerificationRequests:    r.VerificationRequests,
 
-		Messages:                    r.Messages(),
-		Notifications:               r.Notifications(),
-		Chats:                       r.Chats(),
-		Communities:                 r.Communities(),
-		CommunitiesSettings:         r.CommunitiesSettings(),
-		RemovedChats:                r.RemovedChats(),
-		RemovedMessages:             r.RemovedMessages(),
-		ClearedHistories:            r.ClearedHistories(),
-		ActivityCenterNotifications: r.ActivityCenterNotifications(),
-		PinMessages:                 r.PinMessages(),
-		StatusUpdates:               r.StatusUpdates(),
+		Messages:                      r.Messages(),
+		Notifications:                 r.Notifications(),
+		Chats:                         r.Chats(),
+		Communities:                   r.Communities(),
+		CommunitiesSettings:           r.CommunitiesSettings(),
+		RemovedChats:                  r.RemovedChats(),
+		RemovedMessages:               r.RemovedMessages(),
+		ClearedHistories:              r.ClearedHistories(),
+		ActivityCenterNotifications:   r.ActivityCenterNotifications(),
+		PinMessages:                   r.PinMessages(),
+		StatusUpdates:                 r.StatusUpdates(),
+		DiscordCategories:             r.DiscordCategories,
+		DiscordChannels:               r.DiscordChannels,
+		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -245,8 +255,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.Bookmarks)+
 		len(response.clearedHistories)+
 		len(response.VerificationRequests)+
-		len(response.trustStatus)+
-		len(response.CommunityChanges) != 0 {
+		len(response.DiscordChannels)+
+		len(response.DiscordCategories) != 0 {
 		return ErrNotImplemented
 	}
 
@@ -260,6 +270,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddVerificationRequests(response.VerificationRequests)
 	r.AddTrustStatuses(response.trustStatus)
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
+	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 
 	return nil
 }
@@ -507,4 +518,44 @@ func (r *MessengerResponse) GetMessage(messageID string) *common.Message {
 		return nil
 	}
 	return r.messages[messageID]
+}
+
+func (r *MessengerResponse) AddDiscordCategory(dc *discord.Category) {
+	for idx, c := range r.DiscordCategories {
+		if dc.ID == c.ID {
+			r.DiscordCategories[idx] = dc
+			return
+		}
+	}
+
+	r.DiscordCategories = append(r.DiscordCategories, dc)
+}
+
+func (r *MessengerResponse) AddDiscordChannel(dc *discord.Channel) {
+	for idx, c := range r.DiscordChannels {
+		if dc.ID == c.ID {
+			r.DiscordChannels[idx] = dc
+			return
+		}
+	}
+
+	r.DiscordChannels = append(r.DiscordChannels, dc)
+}
+
+func (r *MessengerResponse) HasDiscordCategory(id string) bool {
+	for _, c := range r.DiscordCategories {
+		if id == c.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *MessengerResponse) HasDiscordChannel(id string) bool {
+	for _, c := range r.DiscordChannels {
+		if id == c.ID {
+			return true
+		}
+	}
+	return false
 }

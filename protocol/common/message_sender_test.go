@@ -60,7 +60,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := sqlite.Open(filepath.Join(s.tmpDir, "sender-test.sql"), "some-key")
+	database, err := sqlite.Open(filepath.Join(s.tmpDir, "sender-test.sql"), "some-key", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
@@ -196,7 +196,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := sqlite.Open(filepath.Join(s.tmpDir, "sender.db.sql"), "")
+	senderDatabase, err := sqlite.Open(filepath.Join(s.tmpDir, "sender.db.sql"), "", sqlite.ReducedKDFIterationsNumber)
 	s.Require().NoError(err)
 	senderEncryptionProtocol := encryption.New(
 		senderDatabase,

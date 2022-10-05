@@ -376,7 +376,7 @@ func (oas *ObservedAddrManager) maybeRecordObservation(conn network.Conn, observ
 	}
 
 	local := conn.LocalMultiaddr()
-	if !addrInAddrs(local, ifaceaddrs) && !addrInAddrs(local, oas.host.Network().ListenAddresses()) {
+	if !ma.Contains(ifaceaddrs, local) && !ma.Contains(oas.host.Network().ListenAddresses(), local) {
 		// not in our list
 		return
 	}
@@ -588,5 +588,3 @@ func (on *obsAddrNotifiee) Connected(n network.Network, v network.Conn)   {}
 func (on *obsAddrNotifiee) Disconnected(n network.Network, v network.Conn) {
 	(*ObservedAddrManager)(on).removeConn(v)
 }
-func (on *obsAddrNotifiee) OpenedStream(n network.Network, s network.Stream) {}
-func (on *obsAddrNotifiee) ClosedStream(n network.Network, s network.Stream) {}

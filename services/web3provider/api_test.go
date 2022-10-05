@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/permissions"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 
@@ -27,7 +28,7 @@ import (
 func createDB(t *testing.T) (*sql.DB, func()) {
 	tmpfile, err := ioutil.TempFile("", "provider-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "provider-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "provider-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, db.Close())

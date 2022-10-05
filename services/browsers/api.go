@@ -15,18 +15,6 @@ type API struct {
 	db *Database
 }
 
-func (api *API) AddBrowser(ctx context.Context, browser Browser) error {
-	return api.db.InsertBrowser(browser)
-}
-
-func (api *API) GetBrowsers(ctx context.Context) ([]*Browser, error) {
-	return api.db.GetBrowsers()
-}
-
-func (api *API) DeleteBrowser(ctx context.Context, id string) error {
-	return api.db.DeleteBrowser(id)
-}
-
 func (api *API) GetBookmarks(ctx context.Context) ([]*Bookmark, error) {
 	log.Debug("call to get bookmarks")
 	rst, err := api.db.GetBookmarks()

@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 )
@@ -21,7 +22,7 @@ import (
 func createDB(t *testing.T) (*sql.DB, func()) {
 	tmpfile, err := ioutil.TempFile("", "service-ens-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "service-ens-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "service-ens-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, db.Close())
@@ -131,14 +132,14 @@ func TestResourceURL(t *testing.T) {
 	uri, err := api.ResourceURL(context.Background(), 1, "simpledapp.eth")
 	require.NoError(t, err)
 	require.Equal(t, "https", uri.Scheme)
-	require.Equal(t, "bafybeidzlqpkbtvpjtxnzgew6ffxhozq5f4ojbk64iq3tjl7lkjue2biby.ipfs.infura-ipfs.io/", uri.Host)
+	require.Equal(t, "bafybeidzlqpkbtvpjtxnzgew6ffxhozq5f4ojbk64iq3tjl7lkjue2biby", uri.Host)
 	require.Equal(t, "", uri.Path)
 
 	uri, err = api.ResourceURL(context.Background(), 1, "swarm.eth")
 	require.NoError(t, err)
 	require.Equal(t, "https", uri.Scheme)
 	require.Equal(t, "swarm-gateways.net", uri.Host)
-	require.Equal(t, "/bzz:/b00909fbabe78f57fda93218323db5721ce256fda442ce02b46813404c6d8958/", uri.Path)
+	require.Equal(t, "/bzz:/b7976f7fabd7ba88a897452a2860228dcefec427302a3dedae164b51c780a5b8/", uri.Path)
 
 	uri, err = api.ResourceURL(context.Background(), 1, "noahzinsmeister.eth")
 	require.NoError(t, err)

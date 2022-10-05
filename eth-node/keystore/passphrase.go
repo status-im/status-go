@@ -25,7 +25,7 @@ const (
 	keyHeaderKDF = "scrypt"
 )
 
-type encryptedKeyJSONV3 struct {
+type EncryptedKeyJSONV3 struct {
 	Address         string     `json:"address"`
 	Crypto          CryptoJSON `json:"crypto"`
 	Id              string     `json:"id"`
@@ -86,7 +86,7 @@ func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
 
 		extKey, err = extkeys.NewKeyFromString(extkeys.EmptyExtendedKeyString)
 	} else {
-		k := new(encryptedKeyJSONV3)
+		k := new(EncryptedKeyJSONV3)
 		if err := json.Unmarshal(keyjson, k); err != nil {
 			return nil, err
 		}
@@ -157,7 +157,7 @@ func DecryptDataV3(cryptoJson CryptoJSON, auth string) ([]byte, error) {
 	return plainText, err
 }
 
-func decryptKeyV3(keyProtected *encryptedKeyJSONV3, auth string) (keyBytes []byte, keyId []byte, err error) {
+func decryptKeyV3(keyProtected *EncryptedKeyJSONV3, auth string) (keyBytes []byte, keyId []byte, err error) {
 	if keyProtected.Version != version {
 		return nil, nil, fmt.Errorf("Version not supported: %v", keyProtected.Version)
 	}
@@ -212,7 +212,7 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
 	return plainText, keyId, err
 }
 
-func decryptExtendedKey(keyProtected *encryptedKeyJSONV3, auth string) (plainText []byte, err error) {
+func decryptExtendedKey(keyProtected *EncryptedKeyJSONV3, auth string) (plainText []byte, err error) {
 	if len(keyProtected.ExtendedKey.CipherText) == 0 {
 		return []byte(extkeys.EmptyExtendedKeyString), nil
 	}
@@ -344,7 +344,7 @@ func pkcs7Unpad(in []byte) []byte {
 }
 
 func RawKeyToCryptoJSON(rawKeyFile []byte) (cj CryptoJSON, e error) {
-	var keyJSON encryptedKeyJSONV3
+	var keyJSON EncryptedKeyJSONV3
 	if e := json.Unmarshal(rawKeyFile, &keyJSON); e != nil {
 		return cj, fmt.Errorf("failed to read key file: %s", e)
 	}

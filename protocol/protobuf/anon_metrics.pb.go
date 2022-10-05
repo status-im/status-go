@@ -162,7 +162,9 @@ func init() {
 	proto.RegisterType((*AnonymousMetricBatch)(nil), "protobuf.AnonymousMetricBatch")
 }
 
-func init() { proto.RegisterFile("anon_metrics.proto", fileDescriptor_4be044a92fa0408c) }
+func init() {
+	proto.RegisterFile("anon_metrics.proto", fileDescriptor_4be044a92fa0408c)
+}
 
 var fileDescriptor_4be044a92fa0408c = []byte{
 	// 269 bytes of a gzipped FileDescriptorProto

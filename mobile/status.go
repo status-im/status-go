@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
 
+	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
@@ -280,7 +281,9 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		return makeJSONResponse(err)
 	}
 
-	for _, acc := range subaccs {
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+
 		if acc.Chat {
 			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
 			if err != nil {
@@ -760,8 +763,8 @@ func ImportUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(nil)
 }
 
-func ChangeDatabasePassword(keyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
+func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
+	err := statusBackend.ChangeDatabasePassword(KeyUID, password, newPassword)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -877,4 +880,109 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
 	}
 	return string(data)
+}
+
+// GetConnectionStringForBeingBootstrapped starts a server.Receiving server.PairingServer
+// then generates a server.ConnectionParams. Used when the device is Logged out or has no Account keys
+// and the device has no camera to read a QR code with
+//
+// Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
+func GetConnectionStringForBeingBootstrapped(configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
+
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Receiving, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return cs
+}
+
+// GetConnectionStringForBootstrappingAnotherDevice starts a server.Sending server.PairingServer
+// then generates a server.ConnectionParams. Used when the device is Logged in and therefore has Account keys
+// and the device might not have a camera
+//
+// Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
+// sending account data to a mobile (device with camera)
+func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
+
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Sending, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return cs
+}
+
+// InputConnectionStringForBootstrapping starts a server.PairingClient
+// The given server.ConnectionParams string will determine the server.Mode
+//
+// server.Mode = server.Sending
+// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
+//
+// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
+//
+// server.Mode = server.Receiving
+// Used when the device is Logged out or has no Account keys and has a camera to read a QR code
+//
+// Example: A mobile device (device with a camera) receiving account data from
+// a device with a screen (mobile or desktop devices)
+func InputConnectionStringForBootstrapping(cs, configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	}
+
+	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
+	return makeJSONResponse(err)
+}
+
+func EncodeTransfer(to string, value string) string {
+	result, err := abi_spec.EncodeTransfer(to, value)
+	if err != nil {
+		log.Error("failed to encode transfer", "to", to, "value", value, "error", err)
+		return ""
+	}
+	return result
+}
+
+func EncodeFunctionCall(method string, paramsJSON string) string {
+	result, err := abi_spec.Encode(method, paramsJSON)
+	if err != nil {
+		log.Error("failed to encode function call", "method", method, "paramsJSON", paramsJSON, "error", err)
+	}
+	return result
+}
+
+func DecodeParameters(decodeParamJSON string) string {
+	decodeParam := struct {
+		BytesString string   `json:"bytesString"`
+		Types       []string `json:"types"`
+	}{}
+	err := json.Unmarshal([]byte(decodeParamJSON), &decodeParam)
+	if err != nil {
+		log.Error("failed to unmarshal json when decoding parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	result, err := abi_spec.Decode(decodeParam.BytesString, decodeParam.Types)
+	if err != nil {
+		log.Error("failed to decode parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	bytes, err := json.Marshal(result)
+	if err != nil {
+		log.Error("failed to marshal result", "result", result, "decodeParamJSON", decodeParamJSON, "error", err)
+		return ""
+	}
+	return string(bytes)
+}
+
+func HexToNumber(hex string) string {
+	return abi_spec.HexToNumber(hex)
+}
+
+func NumberToHex(numString string) string {
+	return abi_spec.NumberToHex(numString)
 }

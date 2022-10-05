@@ -5,17 +5,18 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type IdentityImage struct {
-	KeyUID       string
-	Name         string
-	Payload      []byte
-	Width        int
-	Height       int
-	FileSize     int
-	ResizeTarget int
-	Clock        uint64
+	KeyUID       string `json:"keyUID"`
+	Name         string `json:"name"`
+	Payload      []byte `json:"payload"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	FileSize     int    `json:"fileSize"`
+	ResizeTarget int    `json:"resizeTarget"`
+	Clock        uint64 `json:"clock"`
 }
 
 func (i IdentityImage) GetType() (ImageType, error) {
@@ -62,4 +63,32 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(temp)
+}
+
+func (i *IdentityImage) ToProtobuf() *protobuf.MultiAccount_IdentityImage {
+	return &protobuf.MultiAccount_IdentityImage{
+		KeyUid:       i.KeyUID,
+		Name:         i.Name,
+		Payload:      i.Payload,
+		Width:        int64(i.Width),
+		Height:       int64(i.Height),
+		Filesize:     int64(i.FileSize),
+		ResizeTarget: int64(i.ResizeTarget),
+		Clock:        i.Clock,
+	}
+}
+
+func (i *IdentityImage) FromProtobuf(ii *protobuf.MultiAccount_IdentityImage) {
+	i.KeyUID = ii.KeyUid
+	i.Name = ii.Name
+	i.Payload = ii.Payload
+	i.Width = int(ii.Width)
+	i.Height = int(ii.Height)
+	i.FileSize = int(ii.Filesize)
+	i.ResizeTarget = int(ii.ResizeTarget)
+	i.Clock = ii.Clock
+}
+
+func (i IdentityImage) IsEmpty() bool {
+	return i.KeyUID == "" && i.Name == "" && len(i.Payload) == 0 && i.Width == 0 && i.Height == 0 && i.FileSize == 0 && i.ResizeTarget == 0 && i.Clock == 0
 }

@@ -92,6 +92,11 @@ message CommunityRequestToJoinResponse {
   bytes community_id = 5;
 }
 
+message CommunityRequestToLeave {
+  uint64 clock = 1;
+  bytes community_id = 2;
+}
+
 message CommunityMessageArchiveMagnetlink {
   uint64 clock = 1;
   string magnet_uri = 2;
@@ -104,6 +109,7 @@ message WakuMessage {
   bytes payload = 4;
   bytes padding = 5;
   bytes hash = 6;
+  string thirdPartyId = 7;
 }
 
 message WakuMessageArchiveMetadata {

@@ -14,17 +14,18 @@ import (
 )
 
 type Server struct {
-	run      bool
-	server   *http.Server
-	logger   *zap.Logger
-	cert     *tls.Certificate
-	hostname string
-	port     int
-	handlers HandlerPatternMap
+	run              bool
+	server           *http.Server
+	logger           *zap.Logger
+	cert             *tls.Certificate
+	hostname         string
+	port             int
+	handlers         HandlerPatternMap
+	afterPortChanged func(port int)
 }
 
-func NewServer(cert *tls.Certificate, hostname string) Server {
-	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname}
+func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int)) Server {
+	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname, afterPortChanged: afterPortChanged}
 }
 
 func (s *Server) getHost() string {
@@ -48,6 +49,9 @@ func (s *Server) listenAndServe() {
 	}
 
 	s.port = listener.Addr().(*net.TCPAddr).Port
+	if s.afterPortChanged != nil {
+		s.afterPortChanged(s.port)
+	}
 	s.run = true
 
 	err = s.server.Serve(listener)
@@ -115,6 +119,16 @@ func (s *Server) ToBackground() {
 
 func (s *Server) SetHandlers(handlers HandlerPatternMap) {
 	s.handlers = handlers
+}
+
+func (s *Server) AddHandlers(handlers HandlerPatternMap) {
+	if s.handlers == nil {
+		s.handlers = make(HandlerPatternMap)
+	}
+
+	for name := range handlers {
+		s.handlers[name] = handlers[name]
+	}
 }
 
 func (s *Server) MakeBaseURL() *url.URL {

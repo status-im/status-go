@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -473,6 +474,11 @@ func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*c
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
 }
 
+// DeclinedRequestsToJoinForCommunity returns the declined requests to join for a given community
+func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
+}
+
 // AcceptRequestToJoinCommunity accepts a pending request to join a community
 func (api *PublicAPI) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptRequestToJoinCommunity(request)
@@ -699,6 +705,10 @@ func (api *PublicAPI) DeleteMessageAndSend(ctx context.Context, messageID string
 	return api.service.messenger.DeleteMessageAndSend(ctx, messageID)
 }
 
+func (api *PublicAPI) DeleteMessageForMeAndSync(ctx context.Context, chatID string, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteMessageForMeAndSync(ctx, chatID, messageID)
+}
+
 func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendPinMessage(ctx, message)
 }
@@ -807,6 +817,18 @@ func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmar
 	return api.service.messenger.AddBookmark(ctx, bookmark)
 }
 
+func (api *PublicAPI) AddBrowser(ctx context.Context, browser browsers.Browser) error {
+	return api.service.messenger.AddBrowser(ctx, browser)
+}
+
+func (api *PublicAPI) GetBrowsers(ctx context.Context) (browsers []*browsers.Browser, err error) {
+	return api.service.messenger.GetBrowsers(ctx)
+}
+
+func (api *PublicAPI) DeleteBrowser(ctx context.Context, id string) error {
+	return api.service.messenger.DeleteBrowser(ctx, id)
+}
+
 func (api *PublicAPI) RemoveBookmark(ctx context.Context, url string) error {
 	return api.service.messenger.RemoveBookmark(ctx, url)
 }
@@ -819,8 +841,20 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 	return api.service.messenger.SignMessage(message)
 }
 
-// PushNotifications server endpoints
+// wallet connect session apis
+func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
+	return api.service.messenger.AddWalletConnectSession(request)
+}
 
+func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.WalletConnectSession, error) {
+	return api.service.messenger.GetWalletConnectSession()
+}
+
+func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
+	return api.service.messenger.DestroyWalletConnectSession(PeerID)
+}
+
+// PushNotifications server endpoints
 func (api *PublicAPI) StartPushNotificationsServer() error {
 	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
 	if err != nil {
@@ -1100,6 +1134,14 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 
 func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) error {
 	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
+}
+
+func (api *PublicAPI) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
+	api.service.messenger.RequestExtractDiscordChannelsAndCategories(filesToImport)
+}
+
+func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string) (*protocol.MessengerResponse, map[string]*discord.ImportError) {
+	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
 }
 
 // -----

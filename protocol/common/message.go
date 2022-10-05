@@ -95,6 +95,12 @@ const (
 	OutgoingStatusDelivered = "delivered"
 )
 
+type Messages []*Message
+
+func (m Messages) GetClock(i int) uint64 {
+	return m[i].Clock
+}
+
 // Message represents a message record in the database,
 // more specifically in user_messages table.
 type Message struct {
@@ -173,8 +179,12 @@ type Message struct {
 	// Deleted indicates if a message was deleted
 	Deleted bool `json:"deleted"`
 
+	DeletedForMe bool `json:"deletedForMe"`
+
 	// ContactRequestState is the state of the contact request message
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
+
+	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -219,7 +229,9 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Links               []string                         `json:"links,omitempty"`
 		EditedAt            uint64                           `json:"editedAt,omitempty"`
 		Deleted             bool                             `json:"deleted,omitempty"`
+		DeletedForMe        bool                             `json:"deletedForMe,omitempty"`
 		ContactRequestState ContactRequestState              `json:"contactRequestState,omitempty"`
+		DiscordMessage      *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
 	}{
 		ID:                  m.ID,
 		WhisperTimestamp:    m.WhisperTimestamp,
@@ -254,6 +266,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		GapParameters:       m.GapParameters,
 		EditedAt:            m.EditedAt,
 		Deleted:             m.Deleted,
+		DeletedForMe:        m.DeletedForMe,
 		ContactRequestState: m.ContactRequestState,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
@@ -266,6 +279,10 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 
 	if audio := m.GetAudio(); audio != nil {
 		item.AudioDurationMs = audio.DurationMs
+	}
+
+	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
+		item.DiscordMessage = discordMessage
 	}
 
 	return json.Marshal(item)

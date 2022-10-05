@@ -15,8 +15,8 @@ import (
 const nodeCfgMigrationDate = 1640111208
 
 // InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(path, password)
+func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -61,18 +61,18 @@ func InitializeDB(path, password string) (*sql.DB, error) {
 
 // DecryptDatabase creates an unencrypted copy of the database and copies it
 // over to the given directory
-func DecryptDatabase(oldPath, newPath, password string) error {
-	return sqlite.DecryptDB(oldPath, newPath, password)
+func DecryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int) error {
+	return sqlite.DecryptDB(oldPath, newPath, password, kdfIterationsNumber)
 }
 
 // EncryptDatabase creates an encrypted copy of the database and copies it to the
 // user path
-func EncryptDatabase(oldPath, newPath, password string) error {
-	return sqlite.EncryptDB(oldPath, newPath, password)
+func EncryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int) error {
+	return sqlite.EncryptDB(oldPath, newPath, password, kdfIterationsNumber)
 }
 
-func ChangeDatabasePassword(path, password, newPassword string) error {
-	return sqlite.ChangeEncryptionKey(path, password, newPassword)
+func ChangeDatabasePassword(path string, password string, kdfIterationsNumber int, newPassword string) error {
+	return sqlite.ChangeEncryptionKey(path, password, kdfIterationsNumber, newPassword)
 }
 
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database

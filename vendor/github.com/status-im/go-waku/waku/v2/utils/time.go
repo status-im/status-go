@@ -2,7 +2,7 @@ package utils
 
 import "time"
 
-// GetUnixEpoch converts a time into a unix timestamp with nanoseconds
+// GetUnixEpochFrom converts a time into a unix timestamp with nanoseconds
 func GetUnixEpochFrom(now time.Time) int64 {
 	return now.UnixNano()
 }
