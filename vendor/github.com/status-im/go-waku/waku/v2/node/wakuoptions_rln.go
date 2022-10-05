@@ -7,8 +7,8 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
-	r "github.com/status-im/go-rln/rln"
 	"github.com/status-im/go-waku/waku/v2/protocol/rln"
+	r "github.com/status-im/go-zerokit-rln/rln"
 )
 
 // WithStaticRLNRelay enables the Waku V2 RLN protocol in offchain mode

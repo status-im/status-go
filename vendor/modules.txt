@@ -932,10 +932,7 @@ github.com/status-im/go-discover/discover/v5wire
 # github.com/status-im/go-multiaddr-ethv4 v1.2.3
 ## explicit; go 1.11
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-rln v0.1.1
-## explicit; go 1.17
-github.com/status-im/go-rln/rln
-# github.com/status-im/go-waku v0.2.3-0.20221003200721-1b3e23cf4e0b
+# github.com/status-im/go-waku v0.2.3-0.20221005220914-22c049dfd68b
 ## explicit; go 1.17
 github.com/status-im/go-waku/logging
 github.com/status-im/go-waku/waku/persistence
@@ -961,6 +958,10 @@ github.com/status-im/go-waku/waku/v2/utils
 ## explicit; go 1.17
 github.com/status-im/go-waku-rendezvous
 github.com/status-im/go-waku-rendezvous/pb
+# github.com/status-im/go-zerokit-rln v0.1.3
+## explicit; go 1.17
+github.com/status-im/go-zerokit-rln/rln
+github.com/status-im/go-zerokit-rln/rln/resources
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 ## explicit
 github.com/status-im/keycard-go/derivationpath

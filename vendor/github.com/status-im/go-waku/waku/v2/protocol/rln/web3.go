@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	r "github.com/status-im/go-rln/rln"
 	"github.com/status-im/go-waku/waku/v2/protocol/rln/contracts"
+	r "github.com/status-im/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 
@@ -77,8 +77,7 @@ func register(ctx context.Context, idComm r.IDCommitment, ethAccountPrivateKey *
 		return nil, err
 	}
 
-	var eventIdComm r.IDCommitment
-	copy(eventIdComm[:], evt.Pubkey.Bytes())
+	var eventIdComm r.IDCommitment = r.Bytes32(evt.Pubkey.Bytes())
 
 	log.Debug("the identity commitment key extracted from tx log", zap.Binary("eventIdComm", eventIdComm[:]))
 
@@ -111,8 +110,7 @@ func processLogs(evt *contracts.RLNMemberRegistered, handler RegistrationEventHa
 		return nil
 	}
 
-	var pubkey r.IDCommitment
-	copy(pubkey[:], evt.Pubkey.Bytes())
+	var pubkey r.IDCommitment = r.Bytes32(evt.Pubkey.Bytes())
 
 	index := r.MembershipIndex(uint(evt.Index.Int64()))
 

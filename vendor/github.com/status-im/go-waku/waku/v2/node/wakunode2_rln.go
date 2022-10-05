@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 
-	r "github.com/status-im/go-rln/rln"
 	"github.com/status-im/go-waku/waku/v2/protocol/rln"
+	r "github.com/status-im/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 

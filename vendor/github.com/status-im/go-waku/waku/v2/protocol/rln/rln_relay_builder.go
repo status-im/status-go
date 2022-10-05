@@ -6,8 +6,8 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	r "github.com/status-im/go-rln/rln"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
+	r "github.com/status-im/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 
@@ -31,21 +31,15 @@ func RlnRelayStatic(
 		return nil, errors.New("peer's IDCommitment does not match commitment in group")
 	}
 
-	// create an RLN instance
-	parameters, err := parametersKeyBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	rlnInstance, err := r.NewRLN(parameters)
+	rlnInstance, err := r.NewRLN()
 	if err != nil {
 		return nil, err
 	}
 
 	// add members to the Merkle tree
 	for _, member := range group {
-		if !rlnInstance.InsertMember(member) {
-			return nil, errors.New("could not add member")
+		if err := rlnInstance.InsertMember(member); err != nil {
+			return nil, err
 		}
 	}
 
@@ -92,13 +86,7 @@ func RlnRelayDynamic(
 
 	log.Info("mounting rln-relay in onchain/dynamic mode")
 
-	// create an RLN instance
-	parameters, err := parametersKeyBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	rlnInstance, err := r.NewRLN(parameters)
+	rlnInstance, err := r.NewRLN()
 	if err != nil {
 		return nil, err
 	}
@@ -144,10 +132,7 @@ func RlnRelayDynamic(
 	handler := func(pubkey r.IDCommitment, index r.MembershipIndex) error {
 		log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]))
 		// assuming all the members arrive in order
-		if !rlnInstance.InsertMember(pubkey) {
-			return errors.New("couldn't insert member")
-		}
-		return nil
+		return rlnInstance.InsertMember(pubkey)
 	}
 
 	errChan := make(chan error)
