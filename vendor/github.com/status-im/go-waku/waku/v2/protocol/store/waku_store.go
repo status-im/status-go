@@ -411,6 +411,9 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 
 	if historyResponseRPC.Response == nil {
 		historyResponseRPC.Response = new(pb.HistoryResponse)
+	}
+
+	if historyResponseRPC.Response.PagingInfo == nil {
 		historyResponseRPC.Response.PagingInfo = new(pb.PagingInfo)
 		historyResponseRPC.Response.PagingInfo.Cursor = new(pb.Index)
 	}
@@ -471,12 +474,14 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 		return nil, errors.New("invalid cursor")
 	}
 
-	return &Result{
+	result := &Result{
 		Messages: response.Messages,
-		cursor:   response.PagingInfo.Cursor,
 		query:    q,
+		cursor:   response.PagingInfo.Cursor,
 		peerId:   params.selectedPeer,
-	}, nil
+	}
+
+	return result, nil
 }
 
 // Next is used with to retrieve the next page of rows from a query response.

@@ -9,6 +9,7 @@ message RateLimitProof {
   bytes share_x = 4;
   bytes share_y = 5;
   bytes nullifier = 6;
+  bytes rln_identifier = 7;
 }
 
 message WakuMessage {

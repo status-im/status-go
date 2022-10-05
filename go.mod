@@ -54,7 +54,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.2.3-0.20221003200721-1b3e23cf4e0b
+	github.com/status-im/go-waku v0.2.3-0.20221005220914-22c049dfd68b
 	github.com/status-im/go-waku-rendezvous v0.0.0-20220817210730-9b9b02b1e880
 	github.com/status-im/markdown v0.0.0-20220622180305-7ee4aa8bbc3f
 	github.com/status-im/migrate/v4 v4.6.2-status.2
@@ -241,7 +241,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/status-im/go-discover v0.0.0-20220406135310-85a2ce36f63e // indirect
 	github.com/status-im/go-multiaddr-ethv4 v1.2.3 // indirect
-	github.com/status-im/go-rln v0.1.1 // indirect
+	github.com/status-im/go-zerokit-rln v0.1.3 // indirect
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 // indirect
 	github.com/tklauser/go-sysconf v0.3.6 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
