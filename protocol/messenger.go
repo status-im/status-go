@@ -4185,7 +4185,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 
 		for idx, attachment := range dm.Attachments {
 			if strings.Contains(attachment.ContentType, "image") {
-				hasPayload, err := m.persistence.HasDiscordMessageAttachmentPayload(attachment.Id)
+				hasPayload, err := m.persistence.HasDiscordMessageAttachmentPayload(attachment.Id, dm.Id)
 				if err != nil {
 					m.logger.Error("failed to check if message attachment exist", zap.Error(err))
 					continue
