@@ -109,10 +109,12 @@ INSERT INTO settings (
   signing_phrase,
   wallet_root_address,
   synthetic_id,
-  current_user_status
+  current_user_status,
+  profile_pictures_show_to,
+  profile_pictures_visibility
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -135,6 +137,8 @@ INSERT INTO settings (
 		s.SigningPhrase,
 		s.WalletRootAddress,
 		s.CurrentUserStatus,
+		s.ProfilePicturesShowTo,
+		s.ProfilePicturesVisibility,
 	)
 	if err != nil {
 		return err
