@@ -1806,8 +1806,8 @@ func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMess
 	return
 }
 
-func (db sqlitePersistence) HasDiscordMessageAttachmentPayload(id string) (hasPayload bool, err error) {
-	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_attachments WHERE id = ? AND payload NOT NULL)`, id).Scan(&hasPayload)
+func (db sqlitePersistence) HasDiscordMessageAttachmentPayload(id string, messageID string) (hasPayload bool, err error) {
+	err = db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM discord_message_attachments WHERE id = ? AND discord_message_id = ? AND payload NOT NULL)`, id, messageID).Scan(&hasPayload)
 	return hasPayload, err
 }
 
