@@ -1953,7 +1953,9 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 								break
 							}
 							done = torrent.PieceState(i).Complete
-							i++
+							if done {
+								i++
+							}
 						}
 						if done {
 							psc.Close()
