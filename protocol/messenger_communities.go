@@ -1667,7 +1667,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			if m.communitiesManager.TorrentFileExists(c.IDString()) {
 				err = m.communitiesManager.SeedHistoryArchiveTorrent(c.ID())
 				if err != nil {
-					m.logger.Debug("failed to seed history archive", zap.Error(err))
+					m.communitiesManager.LogStdout("failed to seed history archive", zap.Error(err))
 				}
 			}
 
@@ -1678,7 +1678,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			if len(filters) == 0 {
-				m.logger.Debug("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
+				m.communitiesManager.LogStdout("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
 				go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				continue
 			}
@@ -1694,7 +1694,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// possibly missed since then
 			latestWakuMessageTimestamp, err := m.communitiesManager.GetLatestWakuMessageTimestamp(topics)
 			if err != nil {
-				m.logger.Debug("failed to get Latest waku message timestamp", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to get Latest waku message timestamp", zap.Error(err))
 				continue
 			}
 
@@ -1711,7 +1711,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// Request possibly missed waku messages for community
 			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
-				m.logger.Debug("failed to request missing messages", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to request missing messages", zap.Error(err))
 				continue
 			}
 
@@ -1720,7 +1720,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// If the last end date is at least `interval` ago, we create an archive immediately first
 			lastArchiveEndDateTimestamp, err := m.communitiesManager.GetHistoryArchivePartitionStartTimestamp(c.ID())
 			if err != nil {
-				m.logger.Debug("failed to get archive partition start timestamp", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to get archive partition start timestamp", zap.Error(err))
 				continue
 			}
 
@@ -1738,15 +1738,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Seed current archive in the meantime
 				err := m.communitiesManager.SeedHistoryArchiveTorrent(c.ID())
 				if err != nil {
-					m.logger.Debug("failed to seed history archive", zap.Error(err))
+					m.communitiesManager.LogStdout("failed to seed history archive", zap.Error(err))
 				}
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
-				m.logger.Debug("Starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
+				m.communitiesManager.LogStdout("Starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
 				time.AfterFunc(timeToNextInterval, func() {
 					err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval)
 					if err != nil {
-						m.logger.Debug("failed to get create and seed history archive", zap.Error(err))
+						m.communitiesManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
 					}
 					go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				})
@@ -1756,7 +1756,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// creation loop
 				err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to, messageArchiveInterval)
 				if err != nil {
-					m.logger.Debug("failed to get create and seed history archive", zap.Error(err))
+					m.communitiesManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
 				}
 
 				go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
