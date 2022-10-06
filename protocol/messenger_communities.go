@@ -34,7 +34,9 @@ import (
 
 // 7 days interval
 var messageArchivePartition = 10 * 7 * 24 * time.Hour
-var messageArchiveInterval = messageArchivePartition
+
+// var messageArchiveInterval = messageArchivePartition
+var messageArchiveInterval = 2 * time.Minute
 
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
 
@@ -139,7 +141,11 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 				}
 
 				if sub.DownloadingHistoryArchivesFinishedSignal != nil {
-					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.HistoryArchiveDownloadedSignal.CommunityID)
+					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(
+						sub.HistoryArchiveDownloadedSignal.CommunityID,
+						sub.HistoryArchiveDownloadedSignal.From,
+						sub.HistoryArchiveDownloadedSignal.To,
+					)
 				}
 			case <-m.quit:
 				return
@@ -1665,6 +1671,7 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
 
+	fmt.Println(">>> InitHistoryArchiveTasks")
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -1674,29 +1681,37 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 			if !settings.HistoryArchiveSupportEnabled {
+				fmt.Println("ERROR: ARCHIVES UPPORT DISTABLED")
 				continue
 			}
 
 			// Check if there's already a torrent file for this community and seed it
 			if m.communitiesManager.TorrentFileExists(c.IDString()) {
+				fmt.Println(">>> Torrent for ", c.IDString(), " exists, start seeding.")
 				err = m.communitiesManager.SeedHistoryArchiveTorrent(c.ID())
 				if err != nil {
+					fmt.Println("ERROR: FAILED SEEDING")
 					m.logger.Debug("failed to seed history archive", zap.Error(err))
 				}
 			}
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE")
 
 			filters, err := m.communitiesManager.GetCommunityChatsFilters(c.ID())
 			if err != nil {
+				fmt.Println("ERROR failed to filters: ", err)
 				m.logger.Debug("failed to get community chats filters", zap.Error(err))
 				continue
 			}
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 2")
 
 			if len(filters) == 0 {
+				fmt.Println("ERROR: NO FILTERS!")
 				m.logger.Debug("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
 				go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				continue
 			}
 
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 3")
 			topics := []types.TopicType{}
 
 			for _, filter := range filters {
@@ -1708,45 +1723,65 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			// possibly missed since then
 			latestWakuMessageTimestamp, err := m.communitiesManager.GetLatestWakuMessageTimestamp(topics)
 			if err != nil {
+				fmt.Println("ERROR failed to get latest waku message timestamp: ", err)
 				m.logger.Debug("failed to get Latest waku message timestamp", zap.Error(err))
 				continue
 			}
 
-			if latestWakuMessageTimestamp == 0 {
-				// This means we don't have any waku messages for this community
+			thirtyDaysAgoTimestamp := uint64(time.Now().AddDate(0, 0, -30).Unix())
+
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 4")
+			if latestWakuMessageTimestamp == 0 || latestWakuMessageTimestamp < thirtyDaysAgoTimestamp {
+				// This means we either
+				//
+				// 1. don't have any waku messages for this community
 				// yet, either because no messages were sent in the community so far,
-				// or because messages haven't reached this node
+				// or because messages haven't reached this node, or
+				//
+				// 2. the latest waku message originates from imported messages and
+				// can therefore be older than 30 days
 				//
 				// In this case we default to requesting messages from the store nodes
 				// for the past 30 days
-				latestWakuMessageTimestamp = uint64(time.Now().AddDate(0, 0, -30).Unix())
+				latestWakuMessageTimestamp = thirtyDaysAgoTimestamp
 			}
 
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 5")
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 5: ", time.Unix(int64(latestWakuMessageTimestamp), 0))
+
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
+			// _, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
+			_, err = m.syncFiltersFrom(filters, uint32(0))
 			if err != nil {
+				fmt.Println("ERROR failed to request missing messages: ", err)
 				m.logger.Debug("failed to request missing messages", zap.Error(err))
 				continue
 			}
 
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 6")
 			// We figure out the end date of the last created archive and schedule
 			// the interval for creating future archives
 			// If the last end date is at least `interval` ago, we create an archive immediately first
 			lastArchiveEndDateTimestamp, err := m.communitiesManager.GetHistoryArchivePartitionStartTimestamp(c.ID())
 			if err != nil {
+				fmt.Println("FAILED TO GET PARTITION START THING")
 				m.logger.Debug("failed to get archive partition start timestamp", zap.Error(err))
 				continue
 			}
 
+			fmt.Println(">>>>>>>>>>>> MAKING IT HERE 7")
 			to := time.Now()
 			lastArchiveEndDate := time.Unix(int64(lastArchiveEndDateTimestamp), 0)
 			durationSinceLastArchive := to.Sub(lastArchiveEndDate)
 
+			fmt.Println("AM I MAKING IT HERE?")
 			if lastArchiveEndDateTimestamp == 0 {
-				// No prior messages to be archived, so we just kick off the archive creation loop
+				fmt.Println("STARTING INTERVAL NOW")
+				// No prior messages to be archived, just kick off the archive creation loop
 				// for future archives
 				go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 			} else if durationSinceLastArchive < messageArchiveInterval {
+				fmt.Println("HERE 1")
 				// Last archive is less than `interval` old, wait until `interval` is complete,
 				// then create archive and kick off archive creation loop for future archives
 				// Seed current archive in the meantime
@@ -1756,15 +1791,19 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				}
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
+				fmt.Println("TIME TO NEXT INTERVAL: ", timeToNextInterval)
 				m.logger.Debug("Starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
 				time.AfterFunc(timeToNextInterval, func() {
+					fmt.Println("CREATE AND SEED AGAIN")
 					err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval)
 					if err != nil {
 						m.logger.Debug("failed to get create and seed history archive", zap.Error(err))
 					}
+					fmt.Println("START TASK INTERVAL")
 					go m.communitiesManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
 				})
 			} else {
+				fmt.Println("HERE 2")
 				// Looks like the last archive was generated more than `interval`
 				// ago, so lets create a new archive now and then schedule the archive
 				// creation loop
@@ -2481,6 +2520,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						progressUpdates <- importProgress
 						continue
 					}
+
+					fmt.Println("DOWNLOADED ASSET: ", attachment.Url)
+					fmt.Println("AND PAYLOAD: ", len(assetPayload))
+					fmt.Println("HASH: ", crypto.Keccak256Hash(assetPayload))
 
 					attachment.Payload = assetPayload
 					attachment.ContentType = contentType

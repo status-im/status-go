@@ -272,6 +272,7 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 // For public filters, chat name is used as an ID as well as
 // a topic.
 func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
+	fmt.Println("SENDING PUBLIC MESSAGE")
 	if err := t.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -348,6 +349,7 @@ func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 }
 
 func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	fmt.Println("SENDING COMMUNITY MESSAGE")
 	if err := t.addSig(newMessage); err != nil {
 		return nil, err
 	}

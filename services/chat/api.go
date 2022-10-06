@@ -3,7 +3,11 @@ package chat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -122,6 +126,8 @@ func unique(communities []*communities.Community) (result []*communities.Communi
 }
 
 func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
+	fmt.Println(">>> GETTING CHATS")
+	fmt.Println(">>>>> messenger.JoinedCommunities")
 	joinedCommunities, err := api.s.messenger.JoinedCommunities()
 	if err != nil {
 		return nil, err
@@ -131,6 +137,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		return nil, err
 	}
 
+	fmt.Println(">>>>> messenger.Chats")
 	channels := api.s.messenger.Chats()
 
 	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
@@ -155,6 +162,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		Muted:        false,
 	}
 
+	fmt.Println(">>>>> iterating channels")
 	for _, chat := range channels {
 		if !chat.Active || (!chat.OneToOne() && !chat.PrivateGroupChat() && !chat.Public()) || chat.CommunityID != "" {
 			continue
@@ -167,6 +175,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 		result[pubKey].Chats[chat.ID] = c
 	}
 
+	fmt.Println(">>>>> iterating joinedCommunities")
 	for _, community := range unique(append(joinedCommunities, spectatedCommunities...)) {
 		chGrp := ChannelGroup{
 			Type:           Community,
@@ -188,10 +197,12 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			BanList:        community.Description().BanList,
 		}
 
+		fmt.Println(">>>>> iterating community.Images")
 		for t, i := range community.Images() {
 			chGrp.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
 		}
 
+		fmt.Println(">>>>> iterating community.Categories")
 		for _, cat := range community.Categories() {
 			chGrp.Categories[cat.CategoryId] = communities.CommunityCategory{
 				ID:       cat.CategoryId,
@@ -200,20 +211,33 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			}
 		}
 
-		for _, chat := range channels {
-			if chat.CommunityID == community.IDString() && chat.Active {
-				c, err := api.toAPIChat(chat, community, pubKey)
-				if err != nil {
-					return nil, err
-				}
+		fmt.Println(">>>>> iterating community.channels")
 
-				chGrp.Chats[c.ID] = c
-			}
+		var wg sync.WaitGroup
+
+		for _, chat := range channels {
+			wg.Add(1)
+			go func(chat *protocol.Chat) {
+				defer wg.Done()
+				if chat.CommunityID == community.IDString() && chat.Active {
+					fmt.Println(">>>>>>>> toAPIChat: ", chat.Name)
+					c, err := api.toAPIChat(chat, community, pubKey)
+					if err != nil {
+						api.s.messenger.Logger().Error("failed to create API chat", zap.Error(err))
+						// return nil, err
+						return
+					}
+
+					chGrp.Chats[c.ID] = c
+				}
+			}(chat)
 		}
+		wg.Wait()
 
 		result[community.IDString()] = chGrp
 	}
 
+	fmt.Println(">>>> GETTING CHATS DONE")
 	return result, nil
 }
 
@@ -258,10 +282,15 @@ func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID
 }
 
 func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string) (*Chat, error) {
-	pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
-	if err != nil {
-		return nil, err
-	}
+
+	// fmt.Println(">>>>>>>>>> PInnedMessageByChatID: ", protocolChat.ID)
+	// pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
+	// if err != nil {
+	// return nil, err
+	// }
+	pinnedMessages := make([]*common.PinnedMessage, 0)
+	cursor := ""
+	fmt.Println(">>>>>>>>>> PInnedMessageByChatID -- DONE")
 
 	chat := &Chat{
 		ID:                       strings.TrimPrefix(protocolChat.ID, protocolChat.CommunityID),
@@ -306,15 +335,17 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		}
 	}
 
-	err = chat.populateCommunityFields(community)
+	err := chat.populateCommunityFields(community)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>>>>>>>> getChatMembers")
 	chatMembers, err := getChatMembers(protocolChat, community, pubKey)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(">>>>>>>>>> getChatMembers -- DONE")
 	chat.Members = chatMembers
 
 	return chat, nil

@@ -64,6 +64,8 @@ type HistoryArchiveDownloadedSignal struct {
 
 type DownloadingHistoryArchivesFinishedSignal struct {
 	CommunityID string `json:"communityId"`
+	From        int    `json:"from"`
+	To          int    `json:"to"`
 }
 
 func SendHistoryArchivesProtocolEnabled() {
@@ -110,8 +112,10 @@ func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
 	})
 }
 
-func SendDownloadingHistoryArchivesFinished(communityID string) {
+func SendDownloadingHistoryArchivesFinished(communityID string, from int, to int) {
 	send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
 		CommunityID: communityID,
+		From:        from,
+		To:          to,
 	})
 }

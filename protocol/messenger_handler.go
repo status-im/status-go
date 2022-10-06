@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 
+	// "time"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -493,6 +495,8 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 				if err != nil {
 					return err
 				}
+
+				fmt.Println("MERGE  handle sync installation contact")
 				err = state.Response.Merge(response)
 				if err != nil {
 					return err
@@ -622,6 +626,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 		return err
 	}
 
+	fmt.Println("MERGE handle sync removed")
 	return state.Response.Merge(response)
 }
 
@@ -899,6 +904,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
 	if err != nil {
+		fmt.Println("ERROR: ", err)
 		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
 		return err
 	}
@@ -924,12 +930,12 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
 			m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 			go func() {
-				downloadedArchiveIDs, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
+				downloadedArchiveIDs, oldestFrom, latestTo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
 				if err != nil {
 					logMsg := "failed to download history archive data"
 					if err == communities.ErrTorrentTimedout {
 						m.communitiesManager.ArchiveLogger().Info("torrent has timed out, trying once more...")
-						downloadedArchiveIDs, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
+						downloadedArchiveIDs, oldestFrom, latestTo, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
 						if err != nil {
 							m.communitiesManager.ArchiveLogger().Info(logMsg, zap.Error(err))
 							m.logger.Debug(logMsg, zap.Error(err))
@@ -974,13 +980,15 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
 				}
 				m.downloadHistoryArchiveTasksWaitGroup.Done()
+				fmt.Println("FINISHED")
 				if !response.IsEmpty() {
 					notifications := response.Notifications()
 					response.ClearNotifications()
 					signal.SendNewMessages(response)
 					localnotifications.PushMessages(notifications)
 				}
-				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+				fmt.Println("EMITTING FINISHED SIGNAL")
+				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id), oldestFrom, latestTo)
 			}()
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
@@ -1383,13 +1391,16 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		chat.Highlight = true
 	}
 
+	fmt.Println("SANITY CHECK")
 	if receivedMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+		fmt.Println("HANDLING DISCORD MESSAGE")
 		discordMessage := receivedMessage.GetDiscordMessage()
 		discordMessageAuthor := discordMessage.GetAuthor()
 		discordMessageAttachments := discordMessage.GetAttachments()
 
 		err := m.persistence.SaveDiscordMessage(discordMessage)
 		if err != nil {
+			fmt.Println("ERROR: ", err)
 			return err
 		}
 
@@ -1403,6 +1414,21 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			if err != nil {
 				return err
 			}
+		}
+
+		// attachmentsToSave := make([]*protobuf.DiscordMessageAttachment, 0)
+		for _, a := range discordMessageAttachments {
+			// exists, err := m.persistence.HasDiscordMessageAttachmentPayload(a.Id, discordMessage.Id)
+			// if err != nil {
+			//   return err
+			// }
+
+			// if !exists {
+			//   attachmentsToSave = append(attachmentsToSave, a)
+			// }
+			fmt.Println("EXTRACTED ASSET: ", a.Url)
+			fmt.Println("AND PAYLOAD: ", len(a.Payload))
+			fmt.Println("HASH: ", crypto.Keccak256Hash(a.Payload))
 		}
 
 		err = m.persistence.SaveDiscordMessageAttachments(discordMessageAttachments)

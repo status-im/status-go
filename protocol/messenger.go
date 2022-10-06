@@ -1884,6 +1884,7 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("MERGE  SandChatMessages")
 		err = response.Merge(messageResponse)
 		if err != nil {
 			return nil, err
@@ -3031,6 +3032,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 			}
 
 			for _, msg := range statusMessages {
+				fmt.Println("HANDLING STATUS MESSAGE")
 				logger := logger.With(zap.String("message-id", msg.ID.String()))
 				logger.Debug("processing message")
 
@@ -3215,6 +3217,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
 						err = m.HandleChatMessage(messageState)
 						if err != nil {
+							fmt.Println("FAILED TO HANDLE CHAT MESSAGE: ", err)
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
@@ -3972,6 +3975,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					}
 				} else {
+					fmt.Println("PARSED MESSAGE IS NIL!")
 					logger.Debug("parsed message is nil")
 				}
 			}
@@ -3985,6 +3989,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 
+					fmt.Println("MERGE  HandleRetrievedMessages")
 					if err := messageState.Response.Merge(response); err != nil {
 						logger.Error("cannot merge join community response", zap.Error(err))
 						continue
@@ -3997,6 +4002,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 
+					fmt.Println("MERGE  HandleRetrievedMessages 2")
 					if err := messageState.Response.Merge(response); err != nil {
 						logger.Error("cannot merge join community response", zap.Error(err))
 						continue
@@ -4086,6 +4092,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	messagesToSave := messageState.Response.Messages()
 	if len(messageState.Response.messages) > 0 {
+		fmt.Println(">>>>>>>>>>>>> Saving messages")
 		err = m.SaveMessages(messagesToSave)
 		if err != nil {
 			return nil, err
@@ -4280,6 +4287,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 					continue
 				}
 				if hasPayload {
+					fmt.Println("HAS PAYLOAD: ", attachment.Url)
 					localURL := s.MakeDiscordAttachmentURL(dm.Id, attachment.Id)
 					dm.Attachments[idx].LocalUrl = localURL
 				}
@@ -5768,6 +5776,9 @@ func ToVerificationRequest(message protobuf.SyncVerificationRequest) *verificati
 	}
 }
 
+func (m *Messenger) Logger() *zap.Logger {
+	return m.logger
+}
 func (m *Messenger) handleSyncVerificationRequest(state *ReceivedMessageState, message protobuf.SyncVerificationRequest) error {
 	verificationRequest := ToVerificationRequest(message)
 

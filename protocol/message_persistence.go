@@ -879,8 +879,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
 	allFields := db.tableUserMessagesAllFieldsJoin()
-	rows, err := db.db.Query(
-		fmt.Sprintf(`
+	q := fmt.Sprintf(`
  			SELECT
  				%s,
  				pm.clock_value as pinnedAt,
@@ -921,9 +920,8 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
  				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
  			ORDER BY cursor DESC
  			%s
- 		`, allFields, cursorField, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr),
-		args..., // take one more to figure our whether a cursor should be returned
-	)
+ 		`, allFields, cursorField, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr)
+	rows, err := db.db.Query(q, args...) // take one more to figure our whether a cursor should be returned
 	if err != nil {
 		return nil, "", err
 	}

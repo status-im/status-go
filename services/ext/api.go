@@ -550,6 +550,7 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 		return nil, err
 	}
 
+	fmt.Println("FOUND MESSAGES: ", len(messages))
 	return &ApplicationMessagesResponse{
 		Messages: messages,
 		Cursor:   cursor,

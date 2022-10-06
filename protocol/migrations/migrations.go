@@ -1410,7 +1410,7 @@ func _1665079662_add_spectated_column_in_communitiesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665079662_add_spectated_column_in_communities.up.sql", size: 86, mode: os.FileMode(0664), modTime: time.Unix(1665139184, 0)}
+	info := bindataFileInfo{name: "1665079662_add_spectated_column_in_communities.up.sql", size: 86, mode: os.FileMode(0664), modTime: time.Unix(1665141126, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa0, 0x5d, 0xfe, 0xe2, 0xbe, 0xdf, 0xba, 0x45, 0xe9, 0xfc, 0xa7, 0x5f, 0xda, 0x19, 0xdb, 0x40, 0x96, 0x59, 0x78, 0xa, 0xd7, 0x4a, 0xca, 0x1a, 0x93, 0xfb, 0xae, 0x6d, 0x74, 0x7, 0x36, 0xdd}}
 	return a, nil
 }
@@ -1430,7 +1430,7 @@ func _1665139265_add_discord_messages_and_authors_indicesUpSql() (*asset, error)
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665139265_add_discord_messages_and_authors_indices.up.sql", size: 289, mode: os.FileMode(0664), modTime: time.Unix(1665140542, 0)}
+	info := bindataFileInfo{name: "1665139265_add_discord_messages_and_authors_indices.up.sql", size: 289, mode: os.FileMode(0664), modTime: time.Unix(1665141126, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x78, 0x63, 0x4a, 0x97, 0x2f, 0x3, 0x7a, 0x3f, 0x5f, 0xe5, 0x47, 0x7c, 0xe1, 0x5b, 0xde, 0x2f, 0x6a, 0xbc, 0x63, 0x99, 0xf9, 0xa8, 0x30, 0x10, 0x76, 0xfc, 0x15, 0x7c, 0x7, 0xf3, 0xa4, 0xda}}
 	return a, nil
 }

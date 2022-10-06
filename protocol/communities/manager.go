@@ -1636,6 +1636,10 @@ type EncodedArchiveData struct {
 	bytes   []byte
 }
 
+func (m *Manager) GetWakuMessagesByFilterTopicAll(topics []types.TopicType) ([]types.Message, error) {
+	return m.persistence.GetWakuMessagesByFilterTopicAll(topics)
+}
+
 func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration) ([]string, error) {
 
 	from := startDate
@@ -1944,33 +1948,37 @@ func (m *Manager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) boo
 	return ok && torrent.Seeding()
 }
 
-func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string) ([]string, error) {
+func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string) ([]string, int, int, error) {
 
+	oldestFrom := 0
+	latestTo := 0
 	id := communityID.String()
+
 	ml, err := metainfo.ParseMagnetUri(magnetlink)
 	if err != nil {
-		return nil, err
+		return nil, oldestFrom, latestTo, err
 	}
 
 	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
 	torrent, err := m.torrentClient.AddMagnet(magnetlink)
 	if err != nil {
-		return nil, err
+		return nil, oldestFrom, latestTo, err
 	}
+
 	m.torrentTasks[id] = ml.InfoHash
 	timeout := time.After(20 * time.Second)
 
 	m.archiveLogger.Info("fetching torrent info", zap.String("magnetlink", magnetlink))
 	select {
 	case <-timeout:
-		return nil, ErrTorrentTimedout
+		return nil, oldestFrom, latestTo, ErrTorrentTimedout
 	case <-torrent.GotInfo():
 		files := torrent.Files()
 
 		i, ok := findIndexFile(files)
 		if !ok {
 			// We're dealing with a malformed torrent, so don't do anything
-			return nil, errors.New("malformed torrent data")
+			return nil, oldestFrom, latestTo, errors.New("malformed torrent data")
 		}
 
 		indexFile := files[i]
@@ -1988,7 +1996,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 			if indexFile.BytesCompleted() == indexFile.Length() {
 				index, err := m.LoadHistoryArchiveIndexFromFile(communityID)
 				if err != nil {
-					return nil, err
+					return nil, oldestFrom, latestTo, err
 				}
 
 				var archiveIDs []string
@@ -2011,6 +2019,14 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 					}
 					if hasArchive {
 						continue
+					}
+
+					if int(metadata.Metadata.From) < oldestFrom {
+						oldestFrom = int(metadata.Metadata.From)
+					}
+
+					if int(metadata.Metadata.To) > latestTo {
+						latestTo = int(metadata.Metadata.To)
 					}
 
 					startIndex := int(metadata.Offset) / pieceLength
@@ -2060,7 +2076,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 						CommunityID: communityID.String(),
 					},
 				})
-				return archiveIDs, nil
+				return archiveIDs, oldestFrom, latestTo, nil
 			}
 		}
 	}

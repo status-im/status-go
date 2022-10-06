@@ -84,6 +84,32 @@ func TestMessagesByIDs_WithDiscordMessagesPayload(t *testing.T) {
 	}
 }
 
+// func TestMessagesByIDs_WithDiscordMessageAttachmentsPayload(t *testing.T) {
+// 	db, err := openTestDB()
+// 	require.NoError(t, err)
+// 	p := newSQLitePersistence(db)
+
+// 	var ids []string
+// 	for i := 0; i < 10; i++ {
+// 		id := strconv.Itoa(i)
+// 		err := insertMinimalMessage(p, id)
+// 		require.NoError(t, err)
+// 	  err = insertDiscordMessageWithAttachments(p, id, id)
+// 		require.NoError(t, err)
+// 		ids = append(ids, id)
+// 	}
+
+// 	m, err := p.MessagesByIDs(ids)
+// 	require.NoError(t, err)
+// 	require.Len(t, m, 10)
+
+//   for _, _m := range m {
+//     dm := _m.GetDiscordMessage()
+//     require.NotNil(t, dm)
+//     require.Len(t, dm.Attachments, 2)
+//   }
+// }
+
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

@@ -23,6 +23,8 @@ func validateClockValue(clock uint64, whisperTimestamp uint64) error {
 	}
 
 	if clock > whisperTimestamp && clock-whisperTimestamp > maxWhisperFutureDriftMs {
+		fmt.Println("CLOCK: ", clock)
+		fmt.Println("WHISPER: ", whisperTimestamp)
 		return errors.New("clock value too high")
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"database/sql"
+	"fmt"
 	"image"
 	"io/ioutil"
 	"net/http"
@@ -306,8 +307,11 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 		_, err = w.Write(image)
 		if err != nil {
+			fmt.Println("FAILED TO WRITE IMAGE: ", err)
 			logger.Error("failed to write image", zap.Error(err))
+			return
 		}
+		fmt.Println("NO ERROR WRITING IMAGE: ", r.URL)
 	}
 }
 

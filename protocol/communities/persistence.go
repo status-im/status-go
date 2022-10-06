@@ -514,6 +514,40 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types.TopicType) (u
 	return uint64(timestamp.Int64), err
 }
 
+func (p *Persistence) GetWakuMessagesByFilterTopicAll(topics []types.TopicType) ([]types.Message, error) {
+	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE ("
+
+	for i, topic := range topics {
+		query += `topic = "` + topic.String() + `"`
+		if i < len(topics)-1 {
+			query += OR
+		}
+	}
+	query += ")"
+
+	rows, err := p.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	messages := []types.Message{}
+
+	for rows.Next() {
+		msg := types.Message{}
+		var topicStr string
+		var hashStr string
+		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr, &msg.ThirdPartyID)
+		if err != nil {
+			return nil, err
+		}
+		msg.Topic = types.StringToTopic(topicStr)
+		msg.Hash = types.Hex2Bytes(hashStr)
+		messages = append(messages, msg)
+	}
+
+	return messages, nil
+
+}
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types.TopicType, from uint64, to uint64) ([]types.Message, error) {
 
 	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND ("
