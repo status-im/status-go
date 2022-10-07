@@ -98,6 +98,7 @@ type ChannelGroup struct {
 	CanManageUsers bool                                     `json:"canManageUsers"`
 	Muted          bool                                     `json:"muted"`
 	BanList        []string                                 `json:"banList"`
+	Encrypted      bool                                     `json:"encrypted"`
 }
 
 func NewAPI(service *Service) *API {
@@ -186,6 +187,7 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),
 			Muted:          community.Muted(),
 			BanList:        community.Description().BanList,
+			Encrypted:      community.Encrypted(),
 		}
 
 		for t, i := range community.Images() {
