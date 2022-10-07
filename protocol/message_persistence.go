@@ -561,7 +561,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 		return nil, err
 	}
 	defer rows.Close()
-	return getMessagesFromScanRows(db, rows)
+	return getMessagesFromScanRows(db, rows, false)
 }
 
 // MessageByChatID returns all messages for a given chatID in descending order.
@@ -762,7 +762,7 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 		return nil, err
 	}
 	defer rows.Close()
-	return getMessagesFromScanRows(db, rows)
+	return getMessagesFromScanRows(db, rows, true)
 }
 
 // AllMessagesFromChatsAndCommunitiesWhichMatchTerm returns all messages which match the search
@@ -830,7 +830,7 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 		return nil, err
 	}
 	defer rows.Close()
-	return getMessagesFromScanRows(db, rows)
+	return getMessagesFromScanRows(db, rows, true)
 }
 
 func (db sqlitePersistence) AllChatIDsByCommunity(communityID string) ([]string, error) {
@@ -2255,7 +2255,7 @@ func SortByClock(msgs HasClocks) {
 	})
 }
 
-func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Message, error) {
+func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bool) ([]*common.Message, error) {
 	messageIdx := make(map[string]*common.Message, 0)
 	for rows.Next() {
 		// There's a possibility of multiple rows per message if the
@@ -2265,8 +2265,16 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Me
 		// Hence, we make sure we're aggregating all attachments on a single
 		// common.Message
 		var message common.Message
-		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
-			return nil, err
+
+		if withCursor {
+			var cursor string
+			if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
+				return nil, err
+			}
 		}
 
 		if msg, ok := messageIdx[message.ID]; !ok {
