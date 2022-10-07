@@ -36,6 +36,8 @@ var defaultAnnounceList = [][]string{
 }
 var pieceLength = 100 * 1024
 
+var ErrTorrentTimedout = errors.New("torrent has timed out")
+
 type Manager struct {
 	persistence                  *Persistence
 	ensSubscription              chan []*ens.VerificationRecord
@@ -1929,7 +1931,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	m.LogStdout("fetching torrent info", zap.String("magnetlink", magnetlink))
 	select {
 	case <-timeout:
-		return nil, errors.New("torrent has timed out")
+		return nil, ErrTorrentTimedout
 	case <-torrent.GotInfo():
 		files := torrent.Files()
 
