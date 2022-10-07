@@ -224,6 +224,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		IsMember:          o.isMember(),
 		Muted:             o.config.Muted,
 		Tags:              o.Tags(),
+		Encrypted:         o.Encrypted(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
