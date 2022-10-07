@@ -925,9 +925,18 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			go func() {
 				downloadedArchiveIDs, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
 				if err != nil {
-					log.Println("failed to download history archive data", err)
-					m.logger.Debug("failed to download history archive data", zap.Error(err))
-					return
+					logMsg := "failed to download history archive data"
+					if err == communities.ErrTorrentTimedout {
+						m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
+						downloadedArchiveIDs, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
+						if err != nil {
+							m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+							return
+						}
+					} else {
+						m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+						return
+					}
 				}
 
 				messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, downloadedArchiveIDs)
