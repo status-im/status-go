@@ -19,8 +19,10 @@ var (
 	// archival request.
 	binanceChainMaxInitialRange       = big.NewInt(500000)
 	binanceChainErc20BatchSize        = big.NewInt(5000)
-	erc20BatchSize                    = big.NewInt(100000)
+	goerliErc20BatchSize              = big.NewInt(100000)
+	erc20BatchSize                    = big.NewInt(500000)
 	binancChainID                     = uint64(56)
+	goerliChainID                     = uint64(5)
 	binanceTestChainID                = uint64(97)
 	numberOfBlocksCheckedPerIteration = 40
 )
@@ -101,6 +103,10 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 		return binanceChainErc20BatchSize
 	}
 
+	if chainID == goerliChainID {
+		return goerliErc20BatchSize
+	}
+
 	return erc20BatchSize
 }
 
@@ -109,7 +115,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.iterator == nil {
 		c.iterator, err = SetupIterativeDownloader(
 			c.db, c.chainClient, c.address,
-			c.erc20, getErc20BatchSize(c.chainClient.ChainID), c.to, c.from, !isBinanceChain(c.chainClient.ChainID))
+			c.erc20, getErc20BatchSize(c.chainClient.ChainID), c.to, c.from)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
 			return err

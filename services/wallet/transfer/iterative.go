@@ -12,16 +12,12 @@ import (
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
 	db *Database, client HeaderReader, address common.Address,
-	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int, isBatchSizeAdjustable bool) (*IterativeDownloader, error) {
+	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int) (*IterativeDownloader, error) {
 
 	if to == nil || from == nil {
 		return nil, errors.New("to or from cannot be nil")
 	}
 
-	adjustedSize := big.NewInt(0).Div(big.NewInt(0).Sub(to, from), big.NewInt(10))
-	if isBatchSizeAdjustable && adjustedSize.Cmp(size) == 1 {
-		size = adjustedSize
-	}
 	log.Info("iterative downloader", "address", address, "from", from, "to", to, "size", size)
 	d := &IterativeDownloader{
 		client:     client,
@@ -68,7 +64,7 @@ func (d *IterativeDownloader) Next(parent context.Context) ([]*DBHeader, *big.In
 	if from.Cmp(d.from) == -1 {
 		from = d.from
 	}
-	log.Info("load erc20 transfers in range", "from", from, "to", to)
+	log.Info("load erc20 transfers in range", "from", from, "to", to, "batchSize", d.batchSize)
 	headers, err := d.downloader.GetHeadersInRange(parent, from, to)
 	if err != nil {
 		log.Error("failed to get transfer in between two bloks", "from", from, "to", to, "error", err)
