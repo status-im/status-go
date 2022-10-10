@@ -305,6 +305,16 @@ func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currenc
 	return fetchTokenMarketValues(symbols, currency)
 }
 
+func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
+	log.Debug("call to GetHourlyMarketValues")
+	return fetchHourlyMarketValues(symbol, currency, limit, aggregate)
+}
+
+func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
+	log.Debug("call to GetDailyMarketValues")
+	return fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
+}
+
 func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
 	log.Debug("call to FetchTokenDetails")
 	return fetchCryptoCompareTokenDetails(symbols)
