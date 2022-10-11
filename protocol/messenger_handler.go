@@ -227,6 +227,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		Author:      messageState.CurrentMessageState.Contact.ID,
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
+		CommunityID: chat.CommunityID,
 	}
 
 	err := m.addActivityCenterNotification(messageState, notification)
@@ -1012,19 +1013,12 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	}
 
 	// Activity Center notification
-	message := &common.Message{}
-	message.ID = requestToJoin.ID.String()
-	message.WhisperTimestamp = uint64(time.Now().Unix())
-	message.From = contact.ID
-	message.CommunityID = community.IDString()
-	message.Text = "Wants to join"
-
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(message.ID),
-		Message:   message,
-		Type:      ActivityCenterNotificationTypeCommunityMembershipRequest,
-		Timestamp: message.WhisperTimestamp,
-		Author:    message.From,
+		ID:          types.FromHex(requestToJoin.ID.String()),
+		Type:        ActivityCenterNotificationTypeCommunityMembershipRequest,
+		Timestamp:   uint64(time.Now().Unix()),
+		Author:      contact.ID,
+		CommunityID: community.IDString(),
 	}
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)

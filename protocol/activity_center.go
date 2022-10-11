@@ -32,6 +32,7 @@ var ErrInvalidActivityCenterNotification = errors.New("invalid activity center n
 type ActivityCenterNotification struct {
 	ID           types.HexBytes     `json:"id"`
 	ChatID       string             `json:"chatId"`
+	CommunityID  string             `json:"communityId"`
 	Name         string             `json:"name"`
 	Author       string             `json:"author"`
 	Type         ActivityCenterType `json:"type"`
