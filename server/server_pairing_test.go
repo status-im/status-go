@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -18,7 +17,7 @@ type PairingServerSuite struct {
 	TestPairingServerComponents
 }
 
-func (s *PairingServerSuite) SetupSuite() {
+func (s *PairingServerSuite) SetupTest() {
 	s.SetupPairingServerComponents(s.T())
 }
 
@@ -38,9 +37,6 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 
 		err = s.PS.StartPairing()
 		s.Require().NoError(err)
-
-		// Give time for the sever to be ready, hacky I know, I'll iron this out
-		time.Sleep(10 * time.Millisecond)
 
 		cp, err := s.PS.MakeConnectionParams()
 		s.Require().NoError(err)
@@ -89,6 +85,7 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 
 		// Reset the server's PayloadEncryptionManager
 		s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).ResetPayload()
+		s.PS.ResetPort()
 	}
 }
 
@@ -101,9 +98,6 @@ func (s *PairingServerSuite) sendingSetup() *PairingClient {
 
 	err = s.PS.StartPairing()
 	s.Require().NoError(err)
-
-	// Give time for the sever to be ready, hacky I know, I'll iron this out
-	time.Sleep(10 * time.Millisecond)
 
 	cp, err := s.PS.MakeConnectionParams()
 	s.Require().NoError(err)

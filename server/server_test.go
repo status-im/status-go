@@ -22,9 +22,12 @@ func (s *ServerURLSuite) SetupSuite() {
 	s.SetupKeyComponents(s.T())
 
 	s.server = &MediaServer{Server: Server{
-		hostname: defaultIP.String(),
-		port:     1337,
+		hostname:   defaultIP.String(),
+		portManger: newPortManager(nil),
 	}}
+	err := s.server.SetPort(1337)
+	s.Require().NoError(err)
+
 	s.serverNoPort = &MediaServer{Server: Server{
 		hostname: defaultIP.String(),
 	}}

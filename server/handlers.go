@@ -407,6 +407,7 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 
@@ -414,6 +415,7 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
 			ps.logger.Error("ps.PayloadManager.Receive(payload)", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess})
 	}
@@ -429,6 +431,7 @@ func handlePairingSend(ps *PairingServer) http.HandlerFunc {
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
 			ps.logger.Error("w.Write(ps.PayloadManager.ToSend())", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 	}
@@ -440,6 +443,7 @@ func challengeMiddleware(ps *PairingServer, next http.Handler) http.HandlerFunc 
 		if err != nil {
 			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
+			return
 		}
 
 		blocked, ok := s.Values[sessionBlocked].(bool)
@@ -491,6 +495,7 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 		s, err := ps.cookieStore.Get(r, sessionChallenge)
 		if err != nil {
 			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
+			return
 		}
 
 		var challenge []byte
@@ -500,12 +505,14 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 			_, err = rand.Read(challenge)
 			if err != nil {
 				ps.logger.Error("_, err = rand.Read(auth)", zap.Error(err))
+				return
 			}
 
 			s.Values[sessionChallenge] = challenge
 			err = s.Save(r, w)
 			if err != nil {
 				ps.logger.Error("err = s.Save(r, w)", zap.Error(err))
+				return
 			}
 		}
 
@@ -513,6 +520,7 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 		_, err = w.Write(challenge)
 		if err != nil {
 			ps.logger.Error("_, err = w.Write(challenge)", zap.Error(err))
+			return
 		}
 	}
 }
