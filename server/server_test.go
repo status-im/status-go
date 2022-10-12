@@ -40,13 +40,16 @@ func (s *ServerURLSuite) SetupTest() {
 	}}
 	go func() {
 		time.Sleep(waitTime)
-		s.serverNoPort.port = 0
 		s.serverNoPort.portWait.Unlock()
 	}()
 
 	s.testStart = time.Now()
 }
 
+// testNoPort takes two strings and compares expects them both to be equal
+// then compares ServerURLSuite.testStart to the current time
+// the difference must be greater than waitTime.
+// This is caused by the ServerURLSuite.SetupTest waiting waitTime before unlocking the portWait sync.Mutex
 func (s *ServerURLSuite) testNoPort(expected string, actual string) {
 	s.Require().Equal(expected, actual)
 	s.Require().Greater(time.Now().Sub(s.testStart), waitTime)
