@@ -36,6 +36,10 @@ func (p *portManger) ResetPort() {
 	}
 }
 
+func (p *portManger) GetPort() int {
+	return p.port
+}
+
 func (p *portManger) MustGetPort() int {
 	p.portWait.Lock()
 	defer p.portWait.Unlock()

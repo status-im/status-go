@@ -33,8 +33,11 @@ func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int
 }
 
 func (s *Server) getHost() string {
-	// TODO consider returning an error if s.getPort returns `0`, as this means that the listener is not ready
-	return fmt.Sprintf("%s:%d", s.hostname, s.port)
+	return fmt.Sprintf("%s:%d", s.hostname, s.GetPort())
+}
+
+func (s *Server) mustGetHost() string {
+	return fmt.Sprintf("%s:%d", s.hostname, s.MustGetPort())
 }
 
 func (s *Server) listenAndServe() {
@@ -145,6 +148,6 @@ func (s *Server) AddHandlers(handlers HandlerPatternMap) {
 func (s *Server) MakeBaseURL() *url.URL {
 	return &url.URL{
 		Scheme: "https",
-		Host:   s.getHost(),
+		Host:   s.mustGetHost(),
 	}
 }
