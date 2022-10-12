@@ -20,6 +20,7 @@ const CollectionLimit = 300
 var BaseURLs = map[uint64]string{
 	1: "https://api.opensea.io/api/v1",
 	4: "https://rinkeby-api.opensea.io/api/v1",
+	5: "https://testnets-api.opensea.io/api/v1",
 }
 
 type TraitValue string
