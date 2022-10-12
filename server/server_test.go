@@ -40,7 +40,7 @@ func (s *ServerURLSuite) SetupTest() {
 	}}
 	go func() {
 		time.Sleep(waitTime)
-		s.serverNoPort.portWait.Unlock()
+		s.serverNoPort.mustRead.Unlock()
 	}()
 
 	s.testStart = time.Now()

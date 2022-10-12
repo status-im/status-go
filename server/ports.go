@@ -5,31 +5,34 @@ import (
 	"sync"
 )
 
-// portManager is responsible for maintaining segregated access to the port field via the use of portWait sync.Mutex
+// portManager is responsible for maintaining segregated access to the port field
+// via the use of rwLock sync.RWMutex and mustRead sync.Mutex
+// rwLock establishes a standard read write mutex that allows consecutive reads and exclusive writes
+// mustRead forces MustGetPort to wait until port has a none 0 value
 type portManger struct {
 	port             int
 	afterPortChanged func(port int)
-	portWait         *sync.Mutex
+	rwLock           *sync.RWMutex
+	mustRead         *sync.Mutex
 }
 
-// newPortManager returns a newly initialised portManager with a pre-Locked portManger.portWait sync.Mutex
+// newPortManager returns a newly initialised portManager with a pre-Locked portManger.mustRead sync.Mutex
 func newPortManager(afterPortChanged func(int)) portManger {
 	pm := portManger{
 		afterPortChanged: afterPortChanged,
-		portWait:         new(sync.Mutex),
+		rwLock:           new(sync.RWMutex),
+		mustRead:         new(sync.Mutex),
 	}
-	pm.portWait.Lock()
+	pm.mustRead.Lock()
 	return pm
 }
 
-// SetPort sets the internal portManger.port field to the given port value
+// SetPort sets portManger.port field to the given port value
 // next triggers any given portManger.afterPortChanged function
-// additionally portManger.portWait.Unlock() is called, releasing any calls to MustGetPort
+// additionally portManger.mustRead.Unlock() is called, releasing any calls to MustGetPort
 func (p *portManger) SetPort(port int) error {
-	// TryLock, multiple portManager.SetPort calls trigger `fatal error: sync: unlock of unlocked mutex`
-	// In the case of concurrent
-	// TODO fix this horrible thing
-	p.portWait.TryLock()
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
 
 	if port == 0 {
 		return fmt.Errorf("port can not be `0`, use ResetPort() instead")
@@ -39,29 +42,40 @@ func (p *portManger) SetPort(port int) error {
 	if p.afterPortChanged != nil {
 		p.afterPortChanged(port)
 	}
-	p.portWait.Unlock()
+	p.mustRead.Unlock()
 	return nil
 }
 
 // ResetPort attempts to reset portManger.port to 0
-// if portManger.portWait is already locked the function returns after doing nothing
+// if portManger.mustRead is already locked the function returns after doing nothing
+// portManger.mustRead.TryLock() is called because ResetPort may be called multiple times in a row
+// and calling multiple times must not cause a deadlock or an infinite hang, but the lock needs to be
+// reapplied if it is not present.
 func (p *portManger) ResetPort() {
-	if p.portWait.TryLock() {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+
+	if p.mustRead.TryLock() {
 		p.port = 0
 	}
 }
 
 // GetPort gets the current value of portManager.port without any concern for the state of its value
-// and therefore does not block until portManager.portWait.Unlock() is called
+// and therefore does not block until portManager.mustRead.Unlock() is called
 func (p *portManger) GetPort() int {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
 	return p.port
 }
 
-// MustGetPort only returns portManager.port if portManager.portWait is unlocked.
-// This presupposes that portManger.portWait has a default state of locked and SetPort unlock portManager.portWait
+// MustGetPort only returns portManager.port if portManager.mustRead is unlocked.
+// This presupposes that portManger.mustRead has a default state of locked and SetPort unlock portManager.mustRead
 func (p *portManger) MustGetPort() int {
-	p.portWait.Lock()
-	defer p.portWait.Unlock()
+	p.mustRead.Lock()
+	defer p.mustRead.Unlock()
+
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
 
 	return p.port
 }
