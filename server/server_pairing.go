@@ -91,11 +91,7 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 		netIP = netIP4
 	}
 
-	if s.port == 0 {
-		return nil, fmt.Errorf("port is 0, listener is not yet set")
-	}
-
-	return NewConnectionParams(netIP, s.port, s.pk, s.ek, s.mode), nil
+	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek, s.mode), nil
 }
 
 func (s *PairingServer) StartPairing() error {

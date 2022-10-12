@@ -14,18 +14,22 @@ import (
 )
 
 type Server struct {
-	run              bool
-	server           *http.Server
-	logger           *zap.Logger
-	cert             *tls.Certificate
-	hostname         string
-	port             int
-	handlers         HandlerPatternMap
-	afterPortChanged func(port int)
+	isRunning bool
+	server    *http.Server
+	logger    *zap.Logger
+	cert      *tls.Certificate
+	hostname  string
+	handlers  HandlerPatternMap
+	portManger
 }
 
 func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int)) Server {
-	return Server{logger: logutils.ZapLogger(), cert: cert, hostname: hostname, afterPortChanged: afterPortChanged}
+	return Server{
+		logger:     logutils.ZapLogger(),
+		cert:       cert,
+		hostname:   hostname,
+		portManger: newPortManager(afterPortChanged),
+	}
 }
 
 func (s *Server) getHost() string {
@@ -40,7 +44,7 @@ func (s *Server) listenAndServe() {
 	listener, err := tls.Listen("tcp", s.getHost(), cfg)
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
-		s.port = 0
+		s.ResetPort()
 		err = s.Start()
 		if err != nil {
 			s.logger.Error("server start failed, giving up", zap.Error(err))
@@ -48,11 +52,17 @@ func (s *Server) listenAndServe() {
 		return
 	}
 
-	s.port = listener.Addr().(*net.TCPAddr).Port
-	if s.afterPortChanged != nil {
-		s.afterPortChanged(s.port)
+	err = s.SetPort(listener.Addr().(*net.TCPAddr).Port)
+	if err != nil {
+		s.logger.Error("failed to set Server.port", zap.Error(err))
+		return
 	}
-	s.run = true
+
+	if s.afterPortChanged != nil {
+		s.afterPortChanged(s.MustGetPort())
+	}
+
+	s.isRunning = true
 
 	err = s.server.Serve(listener)
 	if err != http.ErrServerClosed {
@@ -64,11 +74,12 @@ func (s *Server) listenAndServe() {
 		return
 	}
 
-	s.run = false
+	s.isRunning = false
 }
 
 func (s *Server) resetServer() {
 	s.server = new(http.Server)
+	s.ResetPort()
 }
 
 func (s *Server) applyHandlers() {
@@ -100,7 +111,7 @@ func (s *Server) Stop() error {
 }
 
 func (s *Server) ToForeground() {
-	if !s.run && (s.server != nil) {
+	if !s.isRunning && (s.server != nil) {
 		err := s.Start()
 		if err != nil {
 			s.logger.Error("server start failed during foreground transition", zap.Error(err))
@@ -109,7 +120,7 @@ func (s *Server) ToForeground() {
 }
 
 func (s *Server) ToBackground() {
-	if s.run {
+	if s.isRunning {
 		err := s.Stop()
 		if err != nil {
 			s.logger.Error("server stop failed during background transition", zap.Error(err))

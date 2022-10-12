@@ -30,7 +30,8 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	bs := NewServer(&cert, defaultIP.String(), func(int) {})
-	bs.port = 1337
+	err = bs.SetPort(1337)
+	s.Require().NoError(err)
 
 	s.server = &PairingServer{
 		Server: bs,
