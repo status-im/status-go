@@ -61,10 +61,6 @@ func (s *Server) listenAndServe() {
 		return
 	}
 
-	if s.afterPortChanged != nil {
-		s.afterPortChanged(s.MustGetPort())
-	}
-
 	s.isRunning = true
 
 	err = s.server.Serve(listener)
