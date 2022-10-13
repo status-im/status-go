@@ -423,6 +423,16 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 	return request, nil
 }
 
+func (p *Persistence) GetRequestToJoinIdByPkAndCommunityID(pk string, communityID []byte) ([]byte, error) {
+	var id []byte
+	err := p.db.QueryRow(`SELECT id WHERE community_id = ? AND public_key = ?`, communityID, pk).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+
+	return id, nil
+}
+
 func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
 	_, err := p.db.Exec(`UPDATE communities_communities SET synced_at = ? WHERE id = ? AND synced_at < ?`, clock, id, clock)
 	return err

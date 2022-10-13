@@ -116,7 +116,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, message, reply_message, author) VALUES (?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, encodedMessage, encodedReplyMessage, notification.Author)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author) VALUES (?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author)
 	return err
 }
 
@@ -135,6 +135,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&notification.Type,
 		&chatID,
 		&communityID,
+		&notification.MembershipStatus,
 		&notification.Read,
 		&notification.Accepted,
 		&notification.Dismissed,
@@ -213,6 +214,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.Type,
 			&chatID,
 			&communityID,
+			&notification.MembershipStatus,
 			&notification.Read,
 			&notification.Accepted,
 			&notification.Dismissed,
@@ -322,6 +324,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.notification_type,
   a.chat_id,
   a.community_id,
+  a.membership_status,
   a.read,
   a.accepted,
   a.dismissed,
@@ -439,6 +442,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
     a.notification_type,
     a.chat_id,
     a.community_id,
+    a.membership_status,
     a.read,
     a.accepted,
     a.dismissed,
@@ -704,6 +708,7 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
     a.notification_type,
     a.chat_id,
     a.community_id,
+    a.membership_status,
     a.read,
     a.accepted,
     a.dismissed,

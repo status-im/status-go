@@ -64,8 +64,12 @@
 // 1664195977_add_deleted_for_mes.up.sql (352B)
 // 1664367420_add_discord_attachments_table.up.sql (350B)
 // 1665079662_add_spectated_column_in_communities.up.sql (86B)
+<<<<<<< HEAD
 // 1665479047_add_community_id_in_notifications.up.sql (74B)
 // 1665484435_add_encrypted_messages.up.sql (402B)
+=======
+// 1665479047_add_community_id_in_notifications.up.sql (169B)
+>>>>>>> 08991c6f8 (feat(ActivityCenter): Add membership status for community membership AC notifications)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1416,7 +1420,7 @@ func _1665079662_add_spectated_column_in_communitiesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1665479047_add_community_id_in_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x2e\xc9\x2c\xcb\x2c\xa9\x8c\x4f\x4e\xcd\x2b\x49\x2d\x8a\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x2b\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xce\xcf\xcd\x2d\xcd\x03\xa9\xcc\x4c\x51\x08\x73\x0c\x72\xf6\x70\x0c\xb2\x06\x04\x00\x00\xff\xff\xf3\x05\x82\x0a\x4a\x00\x00\x00")
+var __1665479047_add_community_id_in_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\xcc\x41\x0a\xc2\x30\x10\x05\xd0\xbd\xa7\xf8\x47\x70\xdf\xd5\xd8\x56\x14\xc6\x14\x42\xe2\x36\xc4\x18\x71\x16\x49\xa4\x99\x0a\xde\x5e\xbc\x82\xfb\xc7\x23\x76\xb3\x85\xa3\x03\xcf\x88\x49\xe5\x2d\xfa\x09\x29\x57\xcd\x6b\xa8\x4d\xe5\x21\x29\xaa\xb4\xda\x41\xd3\x84\x71\x61\x7f\x31\x48\xad\x94\xad\xfe\xa4\xdc\x71\x25\x3b\x9e\xc8\x0e\xbb\xbf\xaa\x92\xcb\x2d\xaf\xfd\x29\xaf\xd0\x35\xea\xd6\x71\x36\x0e\x66\x71\x30\x9e\x19\xd3\x7c\x24\xcf\x0e\xfb\xe1\x1b\x00\x00\xff\xff\x4a\xec\x5a\x0b\xa9\x00\x00\x00")
 
 func _1665479047_add_community_id_in_notificationsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -1431,8 +1435,13 @@ func _1665479047_add_community_id_in_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1666354658, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa5, 0xa3, 0xfd, 0xf0, 0x62, 0x77, 0x1b, 0x7a, 0xc7, 0xad, 0xb8, 0x44, 0x9c, 0x12, 0xe6, 0xdc, 0x8c, 0x2e, 0xef, 0x3f, 0x4c, 0x4a, 0x86, 0x43, 0xeb, 0xae, 0xed, 0x75, 0x55, 0x9f, 0x7a, 0xa5}}
+=======
+	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1665677520, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd9, 0x8f, 0x8b, 0x1c, 0xaa, 0x6a, 0x56, 0xd6, 0xa5, 0x88, 0x57, 0x13, 0x8f, 0xea, 0xb9, 0x23, 0x82, 0x50, 0xb7, 0x65, 0x1f, 0xab, 0xfa, 0x23, 0x6f, 0x0, 0x7, 0xb6, 0x6e, 0xb5, 0x85, 0x44}}
+>>>>>>> 08991c6f8 (feat(ActivityCenter): Add membership status for community membership AC notifications)
 	return a, nil
 }
 

@@ -27,22 +27,32 @@ const (
 	ActivityCenterNotificationTypeCommunityKicked
 )
 
+type ActivityCenterMembershipStatus int
+
+const (
+	ActivityCenterMembershipStatusIdle ActivityCenterMembershipStatus = iota
+	ActivityCenterMembershipStatusPending
+	ActivityCenterMembershipStatusAccepted
+	ActivityCenterMembershipStatusDeclined
+)
+
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
 
 type ActivityCenterNotification struct {
-	ID           types.HexBytes     `json:"id"`
-	ChatID       string             `json:"chatId"`
-	CommunityID  string             `json:"communityId"`
-	Name         string             `json:"name"`
-	Author       string             `json:"author"`
-	Type         ActivityCenterType `json:"type"`
-	LastMessage  *common.Message    `json:"lastMessage"`
-	Message      *common.Message    `json:"message"`
-	ReplyMessage *common.Message    `json:"replyMessage"`
-	Timestamp    uint64             `json:"timestamp"`
-	Read         bool               `json:"read"`
-	Dismissed    bool               `json:"dismissed"`
-	Accepted     bool               `json:"accepted"`
+	ID               types.HexBytes                 `json:"id"`
+	ChatID           string                         `json:"chatId"`
+	CommunityID      string                         `json:"communityId"`
+	MembershipStatus ActivityCenterMembershipStatus `json:"membershipStatus"`
+	Name             string                         `json:"name"`
+	Author           string                         `json:"author"`
+	Type             ActivityCenterType             `json:"type"`
+	LastMessage      *common.Message                `json:"lastMessage"`
+	Message          *common.Message                `json:"message"`
+	ReplyMessage     *common.Message                `json:"replyMessage"`
+	Timestamp        uint64                         `json:"timestamp"`
+	Read             bool                           `json:"read"`
+	Dismissed        bool                           `json:"dismissed"`
+	Accepted         bool                           `json:"accepted"`
 }
 
 type ActivityCenterPaginationResponse struct {

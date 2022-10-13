@@ -520,11 +520,13 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		}
 	}()
 
+	// Activity center notification
 	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(requestToJoin.ID.String()),
-		Type:        ActivityCenterNotificationTypeCommunityRequest,
-		Timestamp:   uint64(time.Now().Unix()),
-		CommunityID: community.IDString(),
+		ID:               types.FromHex(requestToJoin.ID.String()),
+		Type:             ActivityCenterNotificationTypeCommunityRequest,
+		Timestamp:        uint64(time.Now().Unix()),
+		CommunityID:      community.IDString(),
+		MembershipStatus: ActivityCenterMembershipStatusPending,
 	}
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
@@ -674,15 +676,50 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+
+	// Activity Center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return nil, saveErr
+	}
+	response.AddActivityCenterNotification(notification)
+
 	return response, nil
 }
 
-func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) error {
+func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return m.communitiesManager.DeclineRequestToJoin(request)
+	err := m.communitiesManager.DeclineRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Activity Center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return nil, saveErr
+	}
+	response := &MessengerResponse{}
+	response.AddActivityCenterNotification(notification)
+
+	return response, nil
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {

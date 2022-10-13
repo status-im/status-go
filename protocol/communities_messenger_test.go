@@ -1350,8 +1350,9 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	// Decline request
 	declinedRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: requestToJoin1.ID}
-	err = s.bob.DeclineRequestToJoinCommunity(declinedRequestToJoin)
+	response, err = s.bob.DeclineRequestToJoinCommunity(declinedRequestToJoin)
 	s.Require().NoError(err)
+	s.Require().NotNil(response)
 
 	// Check if admin sees requests correctly
 	requestsToJoin, err = s.bob.PendingRequestsToJoinForCommunity(community.ID())
