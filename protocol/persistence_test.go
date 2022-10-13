@@ -765,7 +765,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 }
 
 func openTestDB() (*sql.DB, error) {
-	dbPath, err := ioutil.TempFile("", "status-go-test-db")
+	dbPath, err := ioutil.TempFile("", "status-go-test-db-")
 	if err != nil {
 		return nil, err
 	}
@@ -1375,6 +1375,179 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
+}
+
+func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	initialCursor := ""
+	limit := uint64(3)
+
+	nID1 := types.HexBytes([]byte("1"))
+	nID2 := types.HexBytes([]byte("2"))
+	nID3 := types.HexBytes([]byte("3"))
+
+	allNotifications := []*ActivityCenterNotification{
+		{
+			ID:        nID1,
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID2,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID3,
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+	}
+
+	for _, notification := range allNotifications {
+		err = p.SaveActivityCenterNotification(notification)
+		require.NoError(t, err)
+	}
+
+	_, notifications, err := p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID2, notifications[0].ID)
+
+	_, notifications, err = p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	require.NoError(t, err)
+	require.Len(t, notifications, 2)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID1, notifications[1].ID)
+
+	// Mark all notifications as read.
+	for _, notification := range allNotifications {
+		err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{notification.ID})
+		require.NoError(t, err)
+	}
+
+	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID2, notifications[0].ID)
+
+	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	require.NoError(t, err)
+	require.Len(t, notifications, 2)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID1, notifications[1].ID)
+}
+
+func TestActivityCenterReadUnreadPagination(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	initialOrFinalCursor := ""
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	nID1 := types.HexBytes([]byte("1"))
+	nID2 := types.HexBytes([]byte("2"))
+	nID3 := types.HexBytes([]byte("3"))
+	nID4 := types.HexBytes([]byte("4"))
+	nID5 := types.HexBytes([]byte("5"))
+
+	allNotifications := []*ActivityCenterNotification{
+		{
+			ID:        nID1,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID2,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID3,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID4,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        nID5,
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+	}
+
+	for _, notification := range allNotifications {
+		err = p.SaveActivityCenterNotification(notification)
+		require.NoError(t, err)
+	}
+
+	// Mark the notification as read
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
+	require.NoError(t, err)
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID4})
+	require.NoError(t, err)
+
+	// Fetch UNREAD notifications, first page.
+	cursor, notifications, err := p.UnreadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID5, notifications[0].ID)
+	require.NotEmpty(t, cursor)
+
+	// Fetch next pages.
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.NotEmpty(t, cursor)
+
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID1, notifications[0].ID)
+	require.Empty(t, cursor)
+
+	// Fetch READ notifications, first page.
+	cursor, notifications, err = p.ReadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID4, notifications[0].ID)
+	require.NotEmpty(t, cursor)
+
+	// Fetch next page.
+	cursor, notifications, err = p.ReadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Equal(t, nID2, notifications[0].ID)
+	require.Empty(t, cursor)
 }
 
 func TestActivityCenterPersistence(t *testing.T) {
