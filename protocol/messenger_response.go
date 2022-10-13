@@ -97,7 +97,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories             []*discord.Category                `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                 `json:"discordChannels,omitempty"`
 		DiscordOldestMessageTimestamp int                                `json:"discordOldestMessageTimestamp"`
-		SavedAddresses                []*wallet.SavedAddress             `json:"savedAddresses"`
+		SavedAddresses                []*wallet.SavedAddress             `json:"savedAddresses,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
