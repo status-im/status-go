@@ -275,6 +275,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EditedAt:                  m.EditedAt,
 		Deleted:                   m.Deleted,
 		DeletedForMe:              m.DeletedForMe,
+		ContactRequestState:       m.ContactRequestState,
 		IdentityVerificationState: m.IdentityVerificationState,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
