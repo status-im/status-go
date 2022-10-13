@@ -300,7 +300,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.IdentityVerificationState = common.IdentityVerificationState(identityVerificationState.Int64)
 	}
 
-
 	if quotedText.Valid {
 		message.QuotedMessage = &common.QuotedMessage{
 			ID:          quotedID.String,

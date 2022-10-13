@@ -22,7 +22,6 @@ import (
 const minContactVerificationMessageLen = 1
 const maxContactVerificationMessageLen = 280
 
-
 func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) (*MessengerResponse, error) {
 	if len(challenge) < minContactVerificationMessageLen || len(challenge) > maxContactVerificationMessageLen {
 		return nil, errors.New("invalid verification request challenge length")
@@ -33,13 +32,13 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, errors.New("must be a mutual contact")
 	}
 
-        verifRequest := &verification.Request{
-          From:          common.PubkeyToHex(&m.identity.PublicKey),
-          To:            contact.ID,
-          Challenge:     challenge,
-          RequestStatus: verification.RequestStatusPENDING,
-          RepliedAt:     0,
-        }
+	verifRequest := &verification.Request{
+		From:          common.PubkeyToHex(&m.identity.PublicKey),
+		To:            contact.ID,
+		Challenge:     challenge,
+		RequestStatus: verification.RequestStatusPENDING,
+		RepliedAt:     0,
+	}
 
 	chat, ok := m.allChats.Load(contactID)
 	if !ok {
@@ -65,7 +64,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, err
 	}
 
-        rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_CONTACT_VERIFICATION,
@@ -93,39 +92,38 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	m.allContacts.Store(contact.ID, contact)
 
 	verifRequest.RequestedAt = clock
-        verifRequest.ID = rawMessage.ID
+	verifRequest.ID = rawMessage.ID
 
 	err = m.verificationDatabase.SaveVerificationRequest(verifRequest)
 	if err != nil {
 		return nil, err
 	}
 
-        err = m.SyncVerificationRequest(context.Background(), verifRequest)
-        if err != nil {
-          return nil, err
-        }
+	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	if err != nil {
+		return nil, err
+	}
 
-          chatMessage, err := m.createLocalIdentityVerificationMessage(request.Challenge, chat, rawMessage.ID, common.IdentityVerificationStatePending)
-          if err != nil {
-                  return nil, err
-          }
+	chatMessage, err := m.createLocalIdentityVerificationMessage(request.Challenge, chat, rawMessage.ID, common.IdentityVerificationStatePending)
+	if err != nil {
+		return nil, err
+	}
 
-          err = m.persistence.SaveMessages([]*common.Message{chatMessage})
-          if err != nil {
-                  return nil, err
-          }
+	err = m.persistence.SaveMessages([]*common.Message{chatMessage})
+	if err != nil {
+		return nil, err
+	}
 
-          response := &MessengerResponse{
-            VerificationRequests: []*verification.Request{verifRequest},
-          }
+	response := &MessengerResponse{
+		VerificationRequests: []*verification.Request{verifRequest},
+	}
 
-          response.AddMessage(chatMessage)
+	response.AddMessage(chatMessage)
 
-          m.prepareMessages(response.messages)
+	m.prepareMessages(response.messages)
 
-          return response, nil
-  }
-
+	return response, nil
+}
 
 func (m *Messenger) GetVerificationRequestSentTo(ctx context.Context, contactID string) (*verification.Request, error) {
 	_, ok := m.allContacts.Load(contactID)
@@ -191,20 +189,19 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, contactID str
 
 func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id string, response string) (*MessengerResponse, error) {
 
-
-        m.logger.Info("SAVED 2", zap.String("id", id))
+	m.logger.Info("SAVED 2", zap.String("id", id))
 	verifRequest, err := m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
 		return nil, err
 	}
 
-        if verifRequest == nil {
-          m.logger.Error("could not find verification request with id", zap.String("id", id))
-          return nil, verification.ErrVerificationRequestNotFound
-        }
+	if verifRequest == nil {
+		m.logger.Error("could not find verification request with id", zap.String("id", id))
+		return nil, verification.ErrVerificationRequestNotFound
+	}
 
-        m.logger.Info("HEERe")
-        contactID := verifRequest.From
+	m.logger.Info("HEERe")
+	contactID := verifRequest.From
 
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok || !contact.Added || !contact.HasAddedUs {
@@ -230,7 +227,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		return nil, err
 	}
 
-        m.logger.Info("GETTING")
+	m.logger.Info("GETTING")
 	verifRequest, err = m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
 		return nil, err
@@ -243,7 +240,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 
 	request := &protobuf.AcceptContactVerification{
 		Clock:    clock,
-                Id: verifRequest.ID,
+		Id:       verifRequest.ID,
 		Response: response,
 	}
 
@@ -252,7 +249,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		return nil, err
 	}
 
-        rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_VERIFICATION,
@@ -263,41 +260,39 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		return nil, err
 	}
 
-        // Pull one from the db if there
-        notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(id))
-        if err != nil {
-          return nil, err
-        }
-        resp := &MessengerResponse{
-          VerificationRequests: []*verification.Request{verifRequest},
-        }
+	// Pull one from the db if there
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(id))
+	if err != nil {
+		return nil, err
+	}
+	resp := &MessengerResponse{
+		VerificationRequests: []*verification.Request{verifRequest},
+	}
 
-        chatMessage, err := m.createLocalIdentityVerificationMessage(response, chat, rawMessage.ID, common.IdentityVerificationStateAccepted)
-        if err != nil {
-          return nil, err
-        }
+	chatMessage, err := m.createLocalIdentityVerificationMessage(response, chat, rawMessage.ID, common.IdentityVerificationStateAccepted)
+	if err != nil {
+		return nil, err
+	}
 
-        err = m.persistence.SaveMessages([]*common.Message{chatMessage})
-        if err != nil {
-          return nil, err
-        }
-        
-        resp.AddMessage(chatMessage)
+	err = m.persistence.SaveMessages([]*common.Message{chatMessage})
+	if err != nil {
+		return nil, err
+	}
 
+	resp.AddMessage(chatMessage)
 
-        if notification != nil {
-          message := notification.Message
-          message.IdentityVerificationState = common.IdentityVerificationStateAccepted
+	if notification != nil {
+		message := notification.Message
+		message.IdentityVerificationState = common.IdentityVerificationStateAccepted
 		err := m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
-                if err != nil {
-                  return nil, err
-                }
-                resp.AddActivityCenterNotification(notification)
+		if err != nil {
+			return nil, err
+		}
+		resp.AddActivityCenterNotification(notification)
 
-        }
+	}
 
-
-        return resp, nil
+	return resp, nil
 }
 
 func (m *Messenger) VerifiedTrusted(ctx context.Context, contactID string) error {
@@ -423,10 +418,10 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		return err
 	}
 
-        if verifRequest == nil {
-          m.logger.Error("could not find verification request with id", zap.String("id", id))
-          return verification.ErrVerificationRequestNotFound
-        }
+	if verifRequest == nil {
+		m.logger.Error("could not find verification request with id", zap.String("id", id))
+		return verification.ErrVerificationRequestNotFound
+	}
 
 	contact, ok := m.allContacts.Load(verifRequest.From)
 	if !ok || !contact.Added || !contact.HasAddedUs {
@@ -464,7 +459,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	}
 
 	request := &protobuf.DeclineContactVerification{
-                Id: id,
+		Id:    id,
 		Clock: clock,
 	}
 
@@ -533,7 +528,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 		return err
 	}
 
-        id := state.CurrentMessageState.MessageID
+	id := state.CurrentMessageState.MessageID
 
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
@@ -561,15 +556,15 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 	if persistedVR == nil {
 		// This is a new verification request, and we have not received its acceptance/decline before
 		persistedVR = &verification.Request{}
-                persistedVR.ID = id
+		persistedVR.ID = id
 		persistedVR.From = contactID
 		persistedVR.To = myPubKey
 		persistedVR.RequestStatus = verification.RequestStatusPENDING
 	}
 
-        if persistedVR.From != contactID {
-          return errors.New("mismatch contactID and ID")
-        }
+	if persistedVR.From != contactID {
+		return errors.New("mismatch contactID and ID")
+	}
 
 	persistedVR.Challenge = request.Challenge
 	persistedVR.RequestedAt = request.Clock
@@ -579,7 +574,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 		m.logger.Debug("Error storing verification request", zap.Error(err))
 		return err
 	}
-        m.logger.Info("SAVED", zap.String("id", persistedVR.ID))
+	m.logger.Info("SAVED", zap.String("id", persistedVR.ID))
 
 	err = m.SyncVerificationRequest(context.Background(), persistedVR)
 	if err != nil {
@@ -604,7 +599,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 		return err
 	}
 
-        state.Response.AddMessage(chatMessage)
+	state.Response.AddMessage(chatMessage)
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
 
@@ -645,7 +640,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		m.logger.Debug("Error obtaining verification request", zap.Error(err))
 		return err
 	}
-        m.logger.Info("PAST 1")
+	m.logger.Info("PAST 1")
 
 	if persistedVR != nil && persistedVR.RepliedAt > request.Clock {
 		return nil // older message, ignore it
@@ -654,13 +649,13 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	if persistedVR.RequestStatus == verification.RequestStatusCANCELED {
 		return nil // Do nothing, We have already cancelled the verification request
 	}
-        m.logger.Info("PAST 2")
+	m.logger.Info("PAST 2")
 
 	if persistedVR == nil {
-        m.logger.Info("PAST 3")
+		m.logger.Info("PAST 3")
 		// This is a response for which we have not received its request before
 		persistedVR = &verification.Request{}
-                persistedVR.ID = request.Id
+		persistedVR.ID = request.Id
 		persistedVR.From = contactID
 		persistedVR.To = myPubKey
 	}
@@ -674,14 +669,14 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		m.logger.Debug("Error storing verification request", zap.Error(err))
 		return err
 	}
-        m.logger.Info("PAST 4")
+	m.logger.Info("PAST 4")
 
 	err = m.SyncVerificationRequest(context.Background(), persistedVR)
 	if err != nil {
 		return err
 	}
 
-        m.logger.Info("PAST 5")
+	m.logger.Info("PAST 5")
 
 	chat, ok := m.allChats.Load(contactID)
 	if !ok {
@@ -696,19 +691,17 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 
 	m.allChats.Store(chat.ID, chat)
 
-
 	chatMessage, err := m.createIdentityVerificationMessage(request.Response, chat, state, common.IdentityVerificationStateAccepted)
 	if err != nil {
 		return err
 	}
 
-        state.Response.AddMessage(chatMessage)
+	state.Response.AddMessage(chatMessage)
 
-
-        err = m.createContactVerificationNotification(contact, state, persistedVR, chatMessage)
-        if err != nil {
-          return err
-        }
+	err = m.createContactVerificationNotification(contact, state, persistedVR, chatMessage)
+	if err != nil {
+		return err
+	}
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
 
@@ -778,9 +771,9 @@ func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState
 		return nil // Is ours, do nothing
 	}
 
-        if len(request.Id) == 0 {
-          return errors.New("invalid ContactVerificationTrusted")
-        }
+	if len(request.Id) == 0 {
+		return errors.New("invalid ContactVerificationTrusted")
+	}
 
 	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
@@ -859,64 +852,62 @@ func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState
 
 func (m *Messenger) createContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(vr.ID),
-		Name:      contact.CanonicalName(),
-		Type:      ActivityCenterNotificationTypeContactVerification,
-		Author:    messageState.CurrentMessageState.Contact.ID,
-                Message:   chatMessage,
-		Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
-		ChatID:    contact.ID,
-                ContactVerificationStatus: vr.RequestStatus,
+		ID:                        types.FromHex(vr.ID),
+		Name:                      contact.CanonicalName(),
+		Type:                      ActivityCenterNotificationTypeContactVerification,
+		Author:                    messageState.CurrentMessageState.Contact.ID,
+		Message:                   chatMessage,
+		Timestamp:                 messageState.CurrentMessageState.WhisperTimestamp,
+		ChatID:                    contact.ID,
+		ContactVerificationStatus: vr.RequestStatus,
 	}
 
 	return m.addActivityCenterNotification(messageState, notification)
 }
 
-  func (m *Messenger) createIdentityVerificationMessage(challenge string, chat *Chat, state *ReceivedMessageState, verificationStatus common.IdentityVerificationState) (*common.Message, error) {
+func (m *Messenger) createIdentityVerificationMessage(challenge string, chat *Chat, state *ReceivedMessageState, verificationStatus common.IdentityVerificationState) (*common.Message, error) {
 
-    chatMessage := &common.Message{}
-    chatMessage.ID =               state.CurrentMessageState.MessageID
-    chatMessage.From =            state.CurrentMessageState.Contact.ID
-    chatMessage.Alias =           state.CurrentMessageState.Contact.Alias
-    chatMessage.SigPubKey  =      state.CurrentMessageState.PublicKey
-    chatMessage.Identicon =        state.CurrentMessageState.Contact.Identicon
-    chatMessage.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
+	chatMessage := &common.Message{}
+	chatMessage.ID = state.CurrentMessageState.MessageID
+	chatMessage.From = state.CurrentMessageState.Contact.ID
+	chatMessage.Alias = state.CurrentMessageState.Contact.Alias
+	chatMessage.SigPubKey = state.CurrentMessageState.PublicKey
+	chatMessage.Identicon = state.CurrentMessageState.Contact.Identicon
+	chatMessage.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
-          chatMessage.ChatId = chat.ID
-          chatMessage.Text = challenge
-          chatMessage.ContentType = protobuf.ChatMessage_IDENTITY_VERIFICATION
-          chatMessage.IdentityVerificationState = verificationStatus
+	chatMessage.ChatId = chat.ID
+	chatMessage.Text = challenge
+	chatMessage.ContentType = protobuf.ChatMessage_IDENTITY_VERIFICATION
+	chatMessage.IdentityVerificationState = verificationStatus
 
-          err := chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
-        return chatMessage, nil
+	return chatMessage, nil
 }
-
 
 func (m *Messenger) createLocalIdentityVerificationMessage(challenge string, chat *Chat, id string, status common.IdentityVerificationState) (*common.Message, error) {
 
-  chatMessage := &common.Message{}
-  chatMessage.ID =               id
-  err := extendMessageFromChat(chatMessage, chat, &m.identity.PublicKey, m.getTimesource())
-  if err != nil {
-    return nil, err
-  }
+	chatMessage := &common.Message{}
+	chatMessage.ID = id
+	err := extendMessageFromChat(chatMessage, chat, &m.identity.PublicKey, m.getTimesource())
+	if err != nil {
+		return nil, err
+	}
 
-  chatMessage.ChatId = chat.ID
-  chatMessage.Text = challenge
-  chatMessage.ContentType = protobuf.ChatMessage_IDENTITY_VERIFICATION
-  chatMessage.IdentityVerificationState = status
-  err = extendMessageFromChat(chatMessage, chat, &m.identity.PublicKey, m.getTimesource())
-  if err != nil {
-    return nil, err
-  }
+	chatMessage.ChatId = chat.ID
+	chatMessage.Text = challenge
+	chatMessage.ContentType = protobuf.ChatMessage_IDENTITY_VERIFICATION
+	chatMessage.IdentityVerificationState = status
+	err = extendMessageFromChat(chatMessage, chat, &m.identity.PublicKey, m.getTimesource())
+	if err != nil {
+		return nil, err
+	}
 
-  err = chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
-  if err != nil {
-    return nil, err
-  }
-  return chatMessage, nil
+	err = chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	if err != nil {
+		return nil, err
+	}
+	return chatMessage, nil
 }
-

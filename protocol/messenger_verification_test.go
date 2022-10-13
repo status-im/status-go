@@ -7,9 +7,9 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/waku"
 
@@ -49,10 +49,8 @@ func (s *MessengerVerificationRequests) SetupTest() {
 	s.Require().NoError(err)
 }
 
-
 func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger) {
 	messageText := "hello!"
-
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
@@ -169,73 +167,73 @@ func (s *MessengerVerificationRequests) TestVerificationRequests() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
-        s.mutualContact(theirMessenger)
+	s.mutualContact(theirMessenger)
 
 	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
-        challenge := "challenge"
+	challenge := "challenge"
 
-        resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
-        s.Require().NoError(err)
-        s.Require().Len(resp.VerificationRequests, 1)
-        verificationRequestID := resp.VerificationRequests[0].ID
+	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	verificationRequestID := resp.VerificationRequests[0].ID
 
-        s.Require().Len(resp.Messages(), 1)
-        s.Require().Equal(challenge, resp.Messages()[0].Text)
-        s.Require().Equal(common.IdentityVerificationStatePending, resp.Messages()[0].IdentityVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.IdentityVerificationStatePending, resp.Messages()[0].IdentityVerificationState)
 
 	// Wait for the message to reach its destination
-        resp, err = WaitOnMessengerResponse(
+	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-                        return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
 		},
 		"no messages",
 	)
-        s.Require().NoError(err)
-        s.Require().Len(resp.VerificationRequests, 1)
-        s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-        s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
-        s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
-        s.Require().Equal(challenge, resp.ActivityCenterNotifications()[0].Message.Text)
-        s.Require().Equal(common.IdentityVerificationStatePending, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
-        s.Require().Len(resp.Messages(), 1)
-        s.Require().Equal(challenge, resp.Messages()[0].Text)
-        s.Require().Equal(common.IdentityVerificationStatePending, resp.Messages()[0].IdentityVerificationState)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(challenge, resp.ActivityCenterNotifications()[0].Message.Text)
+	s.Require().Equal(common.IdentityVerificationStatePending, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.IdentityVerificationStatePending, resp.Messages()[0].IdentityVerificationState)
 
-        resp, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "hello back")
+	resp, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "hello back")
 
-        s.Require().NoError(err)
+	s.Require().NoError(err)
 
-        s.Require().NoError(err)
-        s.Require().Len(resp.VerificationRequests, 1)
-        s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-        s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
-        s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
+	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
 
-        s.Require().Len(resp.ActivityCenterNotifications(), 1)
-        s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
-        s.Require().Equal(common.IdentityVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
-        s.Require().Len(resp.Messages(), 1)
-        s.Require().Equal(common.IdentityVerificationStateAccepted, resp.Messages()[0].IdentityVerificationState)
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(common.IdentityVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.IdentityVerificationStateAccepted, resp.Messages()[0].IdentityVerificationState)
 
 	// Wait for the message to reach its destination
-        resp, err = WaitOnMessengerResponse(
+	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-                        return len(r.VerificationRequests) > 0
+			return len(r.VerificationRequests) > 0
 		},
 		"no messages",
 	)
-        s.Require().NoError(err)
-        s.Require().Len(resp.VerificationRequests, 1)
-        s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
 
-        s.Require().Len(resp.Messages(), 1)
-        s.Require().Equal(common.IdentityVerificationStateAccepted, resp.Messages()[0].IdentityVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.IdentityVerificationStateAccepted, resp.Messages()[0].IdentityVerificationState)
 
-        s.Require().Len(resp.ActivityCenterNotifications(), 1)
-        s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
-        s.Require().Equal(common.IdentityVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(common.IdentityVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.IdentityVerificationState)
 }
 
 func (s *MessengerVerificationRequests) TearDownTest() {

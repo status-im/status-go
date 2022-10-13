@@ -769,12 +769,8 @@ func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (ver
 	return api.service.messenger.GetTrustStatus(contactID)
 }
 
-func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) error {
+func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
-}
-
-func (api *PublicAPI) GetVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
-	return api.service.messenger.GetVerificationRequestFrom(ctx, contactID)
 }
 
 func (api *PublicAPI) GetReceivedVerificationRequests(ctx context.Context) ([]*verification.Request, error) {
@@ -789,7 +785,7 @@ func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID s
 	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
 }
 
-func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) error {
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
 }
 

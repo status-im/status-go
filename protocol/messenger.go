@@ -2787,7 +2787,7 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	syncMessage := &protobuf.SyncVerificationRequest{
-                Id:                 vr.ID,
+		Id:                 vr.ID,
 		Clock:              clock,
 		From:               vr.From,
 		To:                 vr.To,
