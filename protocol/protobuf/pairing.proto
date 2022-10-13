@@ -223,6 +223,7 @@ message SyncVerificationRequest {
   string response = 6;
   uint64 replied_at = 7;
   VerificationStatus verification_status = 8;
+  string id = 9;
 
   enum VerificationStatus {
     UNKNOWN = 0;

@@ -88,6 +88,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		gap_from,
 		gap_to,
 		contact_request_state,
+		identity_verification_state,
 		mentioned,
     discord_message_id`
 }
@@ -133,6 +134,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.gap_from,
 		m1.gap_to,
 		m1.contact_request_state,
+		m1.identity_verification_state,
 		m1.mentioned,
     COALESCE(m1.discord_message_id, ""),
     COALESCE(dm.author_id, ""),
@@ -189,6 +191,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var deleted sql.NullBool
 	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
+	var identityVerificationState sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -243,6 +246,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&gapFrom,
 		&gapTo,
 		&contactRequestState,
+		&identityVerificationState,
 		&message.Mentioned,
 		&discordMessage.Id,
 		&discordMessage.Author.Id,
@@ -291,6 +295,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	if contactRequestState.Valid {
 		message.ContactRequestState = common.ContactRequestState(contactRequestState.Int64)
 	}
+
+	if identityVerificationState.Valid {
+		message.IdentityVerificationState = common.IdentityVerificationState(identityVerificationState.Int64)
+	}
+
 
 	if quotedText.Valid {
 		message.QuotedMessage = &common.QuotedMessage{
@@ -458,6 +467,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		gapFrom,
 		gapTo,
 		message.ContactRequestState,
+		message.IdentityVerificationState,
 		message.Mentioned,
 		discordMessage.Id,
 	}, nil

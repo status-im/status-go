@@ -55,6 +55,14 @@ const (
 	ContactRequestStateDismissed
 )
 
+type IdentityVerificationState int
+
+const (
+	IdentityVerificationStatePending IdentityVerificationState = iota + 1
+	IdentityVerificationStateAccepted
+	IdentityVerificationStateDismissed
+)
+
 type CommandParameters struct {
 	// ID is the ID of the initial message
 	ID string `json:"id"`
@@ -180,6 +188,9 @@ type Message struct {
 	// ContactRequestState is the state of the contact request message
 	ContactRequestState ContactRequestState `json:"contactRequestState,omitempty"`
 
+	// IdentityVerificationState is the state of the identity verification process
+	IdentityVerificationState IdentityVerificationState `json:"identityVerificationState,omitempty"`
+
 	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 
@@ -227,6 +238,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Deleted             bool                             `json:"deleted,omitempty"`
 		DeletedForMe        bool                             `json:"deletedForMe,omitempty"`
 		ContactRequestState ContactRequestState              `json:"contactRequestState,omitempty"`
+		IdentityVerificationState IdentityVerificationState              `json:"identityVerificationState,omitempty"`
 		DiscordMessage      *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
 	}{
 		ID:                  m.ID,
@@ -263,7 +275,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EditedAt:            m.EditedAt,
 		Deleted:             m.Deleted,
 		DeletedForMe:        m.DeletedForMe,
-		ContactRequestState: m.ContactRequestState,
+		IdentityVerificationState: m.IdentityVerificationState,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{

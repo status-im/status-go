@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -21,6 +22,7 @@ const (
 	ActivityCenterNotificationTypeMention
 	ActivityCenterNotificationTypeReply
 	ActivityCenterNotificationTypeContactRequest
+	ActivityCenterNotificationTypeContactVerification
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
@@ -38,6 +40,7 @@ type ActivityCenterNotification struct {
 	Read         bool               `json:"read"`
 	Dismissed    bool               `json:"dismissed"`
 	Accepted     bool               `json:"accepted"`
+        ContactVerificationStatus verification.RequestStatus `json:"contactVerificationStatus"`
 }
 
 type ActivityCenterPaginationResponse struct {

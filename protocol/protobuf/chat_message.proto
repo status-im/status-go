@@ -155,6 +155,7 @@ message ChatMessage {
     SYSTEM_MESSAGE_GAP = 10;
     CONTACT_REQUEST = 11;
     DISCORD_MESSAGE = 12;
+    IDENTITY_VERIFICATION = 13;
   }
 }
 
