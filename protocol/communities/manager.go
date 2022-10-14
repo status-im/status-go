@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -40,10 +41,11 @@ var ErrTorrentTimedout = errors.New("torrent has timed out")
 
 type Manager struct {
 	persistence                  *Persistence
+	encryptor                    *encryption.Protocol
 	ensSubscription              chan []*ens.VerificationRecord
 	subscriptions                []chan *Subscription
 	ensVerifier                  *ens.Verifier
-	identity                     *ecdsa.PublicKey
+	identity                     *ecdsa.PrivateKey
 	logger                       *zap.Logger
 	stdoutLogger                 *zap.Logger
 	transport                    *transport.Transport
@@ -55,7 +57,7 @@ type Manager struct {
 	torrentTasks                 map[string]metainfo.Hash
 }
 
-func NewManager(identity *ecdsa.PublicKey, db *sql.DB, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {
+func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -75,6 +77,7 @@ func NewManager(identity *ecdsa.PublicKey, db *sql.DB, logger *zap.Logger, verif
 	manager := &Manager{
 		logger:              logger,
 		stdoutLogger:        stdoutLogger,
+		encryptor:           encryptor,
 		identity:            identity,
 		quit:                make(chan struct{}),
 		transport:           transport,
@@ -250,7 +253,7 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	return m.persistence.AllCommunities(m.identity)
+	return m.persistence.AllCommunities(&m.identity.PublicKey)
 }
 
 type KnownCommunitiesResponse struct {
@@ -285,23 +288,23 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 }
 
 func (m *Manager) Joined() ([]*Community, error) {
-	return m.persistence.JoinedCommunities(m.identity)
+	return m.persistence.JoinedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) Spectated() ([]*Community, error) {
-	return m.persistence.SpectatedCommunities(m.identity)
+	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
-	return m.persistence.JoinedAndPendingCommunitiesWithRequests(m.identity)
+	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
 }
 
 func (m *Manager) DeletedCommunities() ([]*Community, error) {
-	return m.persistence.DeletedCommunities(m.identity)
+	return m.persistence.DeletedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) Created() ([]*Community, error) {
-	return m.persistence.CreatedCommunities(m.identity)
+	return m.persistence.CreatedCommunities(&m.identity.PublicKey)
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
@@ -313,7 +316,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	}
 
 	description.Members = make(map[string]*protobuf.CommunityMember)
-	description.Members[common.PubkeyToHex(m.identity)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
+	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
 
 	err = ValidateCommunityDescription(description)
 	if err != nil {
@@ -332,7 +335,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		PrivateKey:           key,
 		Logger:               m.logger,
 		Joined:               true,
-		MemberIdentity:       m.identity,
+		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 	}
 	community, err := New(config)
@@ -430,7 +433,7 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	communityID := crypto.CompressPubkey(&key.PublicKey)
 
-	community, err := m.persistence.GetByID(m.identity, communityID)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +448,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 			PrivateKey:           key,
 			Logger:               m.logger,
 			Joined:               true,
-			MemberIdentity:       m.identity,
+			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
 		}
 		community, err = New(config)
@@ -730,7 +733,7 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
 	id := crypto.CompressPubkey(signer)
-	community, err := m.persistence.GetByID(m.identity, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +743,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			CommunityDescription:          description,
 			Logger:                        m.logger,
 			MarshaledCommunityDescription: payload,
-			MemberIdentity:                m.identity,
+			MemberIdentity:                &m.identity.PublicKey,
 			ID:                            signer,
 		}
 
@@ -779,7 +782,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	pkString := common.PubkeyToHex(m.identity)
+	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 
 	// If the community require membership, we set whether we should leave/join the community after a state change
 	if community.InvitationOnly() || community.OnRequest() || community.AcceptRequestToJoinAutomatically() {
@@ -806,7 +809,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	// We mark our requests as completed, though maybe we should mark
 	// any request for any user that has been added as completed
-	if err := m.markRequestToJoin(m.identity, community); err != nil {
+	if err := m.markRequestToJoin(&m.identity.PublicKey, community); err != nil {
 		return nil, err
 	}
 	// Check if there's a change and we should be joining
@@ -894,7 +897,7 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
-	community, err := m.persistence.GetByID(m.identity, request.CommunityId)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -937,7 +940,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) error {
 
-	community, err := m.persistence.GetByID(m.identity, request.CommunityId)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
 		return err
 	}
@@ -976,9 +979,9 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 	}
 
 	if request.Accepted {
-		return m.markRequestToJoin(m.identity, community)
+		return m.markRequestToJoin(&m.identity.PublicKey, community)
 	}
-	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(m.identity), community.ID(), RequestToJoinStateDeclined)
+	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(&m.identity.PublicKey), community.ID(), RequestToJoinStateDeclined)
 }
 
 func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *protobuf.CommunityRequestToLeave) error {
@@ -1082,7 +1085,7 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 		return nil, ErrOrgNotFound
 	}
 
-	community.RemoveOurselvesFromOrg(m.identity)
+	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
 
 	if err = m.persistence.SaveCommunity(community); err != nil {
@@ -1238,7 +1241,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	return m.persistence.GetByID(m.identity, id)
+	return m.persistence.GetByID(&m.identity.PublicKey, id)
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
@@ -1250,7 +1253,7 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 }
 
 func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
-	community, err := m.persistence.GetByID(m.identity, request.CommunityID)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1533,9 +1536,9 @@ func (m *Manager) GetHistoryArchivePartitionStartTimestamp(communityID types.Hex
 	return lastArchiveEndDateTimestamp, nil
 }
 
-func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration) error {
+func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	m.UnseedHistoryArchiveTorrent(communityID)
-	_, err := m.CreateHistoryArchiveTorrent(communityID, topics, startDate, endDate, partition)
+	_, err := m.CreateHistoryArchiveTorrent(communityID, topics, startDate, endDate, partition, encrypt)
 	if err != nil {
 		return err
 	}
@@ -1586,7 +1589,7 @@ func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interva
 			to := time.Unix(ts, 0)
 			lastArchiveEndDate := time.Unix(int64(lastArchiveEndDateTimestamp), 0)
 
-			err = m.CreateAndSeedHistoryArchive(community.ID(), topics, lastArchiveEndDate, to, interval)
+			err = m.CreateAndSeedHistoryArchive(community.ID(), topics, lastArchiveEndDate, to, interval, community.Encrypted())
 			if err != nil {
 				m.LogStdout("failed to create and seed history archive", zap.Error(err))
 				continue
@@ -1623,7 +1626,7 @@ type EncodedArchiveData struct {
 	bytes   []byte
 }
 
-func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration) ([]string, error) {
+func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	from := startDate
 	to := from.Add(partition)
@@ -1655,7 +1658,7 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics
 
 	_, err := os.Stat(indexPath)
 	if err == nil {
-		wakuMessageArchiveIndexProto, err = m.LoadHistoryArchiveIndexFromFile(communityID)
+		wakuMessageArchiveIndexProto, err = m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -1709,6 +1712,18 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics
 		encodedArchive, err := proto.Marshal(wakuMessageArchive)
 		if err != nil {
 			return archiveIDs, err
+		}
+
+		if encrypt {
+			messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, encodedArchive)
+			if err != nil {
+				return archiveIDs, err
+			}
+
+			encodedArchive, err = proto.Marshal(messageSpec.Message)
+			if err != nil {
+				return archiveIDs, err
+			}
 		}
 
 		rawSize := len(encodedArchive)
@@ -1768,6 +1783,17 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics
 			return archiveIDs, err
 		}
 
+		if encrypt {
+			messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, indexBytes)
+			if err != nil {
+				return archiveIDs, err
+			}
+			indexBytes, err = proto.Marshal(messageSpec.Message)
+			if err != nil {
+				return archiveIDs, err
+			}
+		}
+
 		err = os.WriteFile(indexPath, indexBytes, 0644) // nolint: gosec
 		if err != nil {
 			return archiveIDs, err
@@ -1782,7 +1808,7 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics
 			AnnounceList: defaultAnnounceList,
 		}
 		metaInfo.SetDefaults()
-		metaInfo.CreatedBy = common.PubkeyToHex(m.identity)
+		metaInfo.CreatedBy = common.PubkeyToHex(&m.identity.PublicKey)
 
 		info := metainfo.Info{
 			PieceLength: int64(pieceLength),
@@ -1951,7 +1977,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		for {
 			<-ticker.C
 			if indexFile.BytesCompleted() == indexFile.Length() {
-				index, err := m.LoadHistoryArchiveIndexFromFile(communityID)
+				index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 				if err != nil {
 					return nil, err
 				}
@@ -1964,7 +1990,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 					archiveHashes = append(archiveHashes, &archiveMetadata{hash: hash, from: metadata.Metadata.From})
 				}
 
-				sort.Sort(archiveHashes)
+				sort.Sort(sort.Reverse(archiveHashes))
 
 				for _, hd := range archiveHashes {
 					hash := hd.hash
@@ -2034,7 +2060,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes, archiveIDs []string) (map[transport.Filter][]*types.Message, error) {
 	id := communityID.String()
 
-	index, err := m.LoadHistoryArchiveIndexFromFile(communityID)
+	index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -2053,8 +2079,29 @@ func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes,
 
 		err := proto.Unmarshal(data, archive)
 		if err != nil {
-			m.logger.Debug("Failed to unmarshal WakuMessageArchive", zap.Error(err))
-			continue
+			// The archive data might eb encrypted so we try to decrypt instead first
+			var protocolMessage encryption.ProtocolMessage
+			err := proto.Unmarshal(data, &protocolMessage)
+			if err != nil {
+				m.LogStdout("failed to unmarshal protocol message", zap.Error(err))
+				continue
+			}
+
+			pk, err := crypto.DecompressPubkey(communityID)
+			if err != nil {
+				m.logger.Debug("failed to decompress community pubkey", zap.Error(err))
+				continue
+			}
+			decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
+			if err != nil {
+				m.LogStdout("failed to decrypt message archive", zap.Error(err))
+				continue
+			}
+			err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
+			if err != nil {
+				m.LogStdout("failed to unmarshal message archive data", zap.Error(err))
+				return nil, err
+			}
 		}
 
 		for _, message := range archive.Messages {
@@ -2123,7 +2170,7 @@ func (m *Manager) createWakuMessageArchive(from time.Time, to time.Time, message
 	return wakuMessageArchive
 }
 
-func (m *Manager) LoadHistoryArchiveIndexFromFile(communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
+func (m *Manager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
 	wakuMessageArchiveIndexProto := &protobuf.WakuMessageArchiveIndex{}
 
 	indexPath := m.archiveIndexFile(communityID.String())
@@ -2136,6 +2183,28 @@ func (m *Manager) LoadHistoryArchiveIndexFromFile(communityID types.HexBytes) (*
 	if err != nil {
 		return nil, err
 	}
+
+	if len(wakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
+		// This means we're dealing with an encrypted index file, so we have to decrypt it first
+		var protocolMessage encryption.ProtocolMessage
+		err := proto.Unmarshal(indexData, &protocolMessage)
+		if err != nil {
+			return nil, err
+		}
+		pk, err := crypto.DecompressPubkey(communityID)
+		if err != nil {
+			return nil, err
+		}
+		decryptedBytes, err := m.encryptor.HandleMessage(myKey, pk, &protocolMessage, make([]byte, 0))
+		if err != nil {
+			return nil, err
+		}
+		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, wakuMessageArchiveIndexProto)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return wakuMessageArchiveIndexProto, nil
 }
 
