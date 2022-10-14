@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	stdlog "log"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -20,7 +18,6 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -28,19 +25,10 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
-	wakuextn "github.com/status-im/status-go/services/wakuext"
+	waku2extn "github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/sqlite"
 )
-
-type testTimeSource struct{}
-
-func (t *testTimeSource) GetCurrentTime() uint64 {
-	return uint64(time.Now().Unix()) * 1000
-}
 
 const (
 	serverClientName = "Statusd"
@@ -48,18 +36,10 @@ const (
 
 var (
 	configFiles      configFlags
-	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logLevel         = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
-	ipcEnabled       = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
-	ipcFile          = flag.String("ipcfile", "", "Set IPC file path")
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
-	nAddedContacts   = flag.Int("added-contacts", 100, "Number of added contacts to create")
-	nContacts        = flag.Int("contacts", 100, "Number of contacts to create")
-	nPublicChats     = flag.Int("public-chats", 5, "Number of public chats")
-	nCommunities     = flag.Int("communities", 5, "Number of communities")
-	nMessages        = flag.Int("number-of-messages", 0, "Number of messages for each chat")
-	nOneToOneChats   = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	networkID = flag.Int(
@@ -115,10 +95,8 @@ func main() {
 		config.ListenAddr = *listenAddr
 	}
 
-	// enable IPC RPC
-	if *ipcEnabled {
-		config.IPCEnabled = true
-		config.IPCFile = *ipcFile
+	if *logLevel != "" {
+		config.LogLevel = *logLevel
 	}
 
 	// set up logging options
@@ -139,13 +117,13 @@ func main() {
 		return
 	}
 
-	wakuextservice := backend.StatusNode().WakuExtService()
+	wakuextservice := backend.StatusNode().WakuV2ExtService()
 	if wakuextservice == nil {
 		logger.Error("wakuext not available")
 		return
 	}
 
-	wakuext := wakuextn.NewPublicAPI(wakuextservice)
+	wakuext := waku2extn.NewPublicAPI(wakuextservice)
 
 	// This will start the push notification server as well as
 	// the config is set to Enabled
@@ -155,114 +133,8 @@ func main() {
 		return
 	}
 
-	logger.Info("Creating added contacts")
+	retrieveMessagesLoop(wakuext.Messenger(), 300*time.Millisecond)
 
-	for i := 0; i < *nAddedContacts; i++ {
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			logger.Error("failed generate key", err)
-			return
-		}
-
-		keyString := common.PubkeyToHex(&key.PublicKey)
-		_, err = wakuext.AddContact(context.Background(), &requests.AddContact{ID: keyString})
-		if err != nil {
-			logger.Error("failed Add contact", "err", err)
-			return
-		}
-	}
-
-	logger.Info("Creating contacts")
-
-	for i := 0; i < *nContacts; i++ {
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return
-		}
-
-		contact, err := protocol.BuildContactFromPublicKey(&key.PublicKey)
-		if err != nil {
-			return
-		}
-
-		_, err = wakuext.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
-		if err != nil {
-			return
-		}
-	}
-
-	logger.Info("Creating public chats")
-
-	for i := 0; i < *nPublicChats; i++ {
-		chat := protocol.CreatePublicChat(randomString(10), &testTimeSource{})
-		chat.SyncedTo = 0
-		chat.SyncedFrom = 0
-
-		err = wakuext.SaveChat(context.Background(), chat)
-		if err != nil {
-			return
-		}
-
-		var messages []*common.Message
-
-		for i := 0; i < *nMessages; i++ {
-			messages = append(messages, buildMessage(chat, i))
-
-		}
-
-		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
-				return
-			}
-		}
-
-	}
-
-	logger.Info("Creating communities", "num", *nCommunities)
-	for i := 0; i < *nCommunities; i++ {
-		request := requests.CreateCommunity{
-			Name:        randomString(10),
-			Description: randomString(30),
-			Color:       "#ffffff",
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
-		}
-		_, err = wakuext.CreateCommunity(&request)
-		if err != nil {
-			logger.Error("failed to create community", "error", err)
-			return
-		}
-	}
-
-	logger.Info("Creating one to one chats")
-
-	for i := 0; i < *nOneToOneChats; i++ {
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return
-		}
-
-		keyString := common.PubkeyToHex(&key.PublicKey)
-		chat := protocol.CreateOneToOneChat(keyString, &key.PublicKey, &testTimeSource{})
-		chat.SyncedTo = 0
-		chat.SyncedFrom = 0
-		err = wakuext.SaveChat(context.Background(), chat)
-		if err != nil {
-			return
-		}
-		var messages []*common.Message
-
-		for i := 0; i < *nMessages; i++ {
-			messages = append(messages, buildMessage(chat, i))
-
-		}
-
-		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
-				return
-			}
-		}
-
-	}
 }
 
 func getDefaultDataDir() string {
@@ -273,10 +145,6 @@ func getDefaultDataDir() string {
 }
 
 func setupLogging(config *params.NodeConfig) {
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
-	}
-
 	logSettings := logutils.LogSettings{
 		Enabled:         config.LogEnabled,
 		MobileSystem:    config.LogMobileSystem,
@@ -388,8 +256,16 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
-	nodeConfig.LogLevel = "ERROR"
+	nodeConfig.LogLevel = "DEBUG"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
+	nodeConfig.HTTPEnabled = true
+	nodeConfig.HTTPPort = 8545
+	// FIXME: This should be taken from CLI flags.
+	nodeConfig.HTTPHost = "0.0.0.0"
+	// FIXME: This should be taken from CLI flags.
+	nodeConfig.HTTPVirtualHosts = []string{"localhost", "wakunode"}
+	nodeConfig.APIModules = "wakuext,ext,waku"
+
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
 		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
@@ -408,11 +284,16 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
+	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
+	nodeConfig.ClusterConfig.WakuNodes = nodes
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
+
 	nodeConfig.EnableNTPSync = true
-	nodeConfig.WakuConfig = params.WakuConfig{
-		Enabled:     true,
-		LightClient: true,
-		MinimumPoW:  0.000001,
+	nodeConfig.WakuV2Config = params.WakuV2Config{
+		Enabled:        true,
+		EnableDiscV5:   true,
+		DiscoveryLimit: 20,
+		UDPPort:        9002,
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
@@ -447,16 +328,22 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	generator := manager.AccountsGenerator()
 	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
 	if err != nil {
+		logger.Error("failed import mnemonic", err)
 		return err
 	}
 
 	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
 	if err != nil {
+		logger.Error("failed derive", err)
 		return err
 	}
 
+	var exist bool
 	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
-	if err != nil {
+	if err != nil && err.Error() == "account already exists" {
+		exist = true
+	} else if err != nil {
+		logger.Error("failed store derive", err)
 		return err
 	}
 
@@ -497,54 +384,24 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	fmt.Println(nodeConfig)
 	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
-	if err != nil {
-		logger.Error("start node", err)
-		return err
+	if !exist {
+		return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
 	}
-
-	return nil
+	return backend.StartNodeWithAccount(account, "", nodeConfig)
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration) {
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
 
-func buildMessage(chat *protocol.Chat, count int) *common.Message {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		logger.Error("failed build message", err)
-		return nil
+	for { //nolint: gosimple
+		select {
+		case <-ticker.C:
+			_, err := messenger.RetrieveAll()
+			if err != nil {
+				logger.Error("failed to retrieve raw messages", "err", err)
+				continue
+			}
+		}
 	}
-
-	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	clock += uint64(count)
-	message := &common.Message{}
-	message.Text = fmt.Sprintf("test message %d", count)
-	message.ChatId = chat.ID
-	message.Clock = clock
-	message.Timestamp = timestamp
-	message.From = common.PubkeyToHex(&key.PublicKey)
-	data := []byte(uuid.New().String())
-	message.ID = types.HexBytes(crypto.Keccak256(data)).String()
-	message.WhisperTimestamp = clock
-	message.LocalChatID = chat.ID
-	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	switch chat.ChatType {
-	case protocol.ChatTypePublic, protocol.ChatTypeProfile:
-		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
-	case protocol.ChatTypeOneToOne:
-		message.MessageType = protobuf.MessageType_ONE_TO_ONE
-	case protocol.ChatTypePrivateGroupChat:
-		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
-	}
-
-	_ = message.PrepareContent("")
-	return message
-}
-
-func randomString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))] // nolint: gosec
-	}
-	return string(b)
 }

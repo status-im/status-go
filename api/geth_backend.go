@@ -876,6 +876,11 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	}
 
 	if inputNodeCfg != nil {
+		// If an installationID is provided, we override it
+		if conf != nil && conf.ShhextConfig.InstallationID != "" {
+			inputNodeCfg.ShhextConfig.InstallationID = conf.ShhextConfig.InstallationID
+		}
+
 		conf, err = b.OverwriteNodeConfigValues(conf, inputNodeCfg)
 		if err != nil {
 			return err

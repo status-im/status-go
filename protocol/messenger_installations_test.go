@@ -106,7 +106,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
+	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Contacts, 1)
@@ -179,7 +179,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.m.allContacts.Store(contact.ID, contact)
 
 	contact.LocalNickname = "Test Nickname"
-	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
 	s.Require().NoError(err)
 	_, err = s.m.SetContactLocalNickname(&requests.SetContactLocalNickname{ID: types.Hex2Bytes(contact.ID), Nickname: contact.LocalNickname})
 	s.Require().NoError(err)

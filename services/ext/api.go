@@ -771,6 +771,14 @@ func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.M
 	return api.service.messenger.SendChatMessages(ctx, messages)
 }
 
+func (api *PublicAPI) SendOneToOneMessage(request *requests.SendOneToOneMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendOneToOneMessage(request)
+}
+
+func (api *PublicAPI) SendGroupChatMessage(request *requests.SendGroupChatMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendGroupChatMessage(request)
+}
+
 func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditMessage(ctx, request)
 }
@@ -1270,6 +1278,10 @@ func (api *PublicAPI) ToggleCollapsedCommunityCategory(request *requests.ToggleC
 
 func (api *PublicAPI) CollapsedCommunityCategories() ([]protocol.CollapsedCommunityCategory, error) {
 	return api.service.messenger.CollapsedCommunityCategories()
+}
+
+func (api *PublicAPI) Messenger() *protocol.Messenger {
+	return api.service.messenger
 }
 
 // -----

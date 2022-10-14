@@ -54,7 +54,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 

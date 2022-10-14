@@ -70,7 +70,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	s.Require().NoError(err)
 
 	r := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(s.m.myHexIdentity()),
+		ID:      s.m.myHexIdentity(),
 		Message: "hello",
 	}
 	sendResponse, err := theirMessenger.SendContactRequest(context.Background(), r)

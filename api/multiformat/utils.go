@@ -78,6 +78,20 @@ func SerializeLegacyKey(key string) (string, error) {
 	return SerializePublicKey(keyWithPrefix, "z")
 }
 
+// DeserializeCompressedKey converts a base58 compressed key to
+// a secp251k1 uncompressed key
+func DeserializeCompressedKey(key string) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("invalid key length")
+	}
+	deserialisedKey, err := DeserializePublicKey(key, "f")
+	if err != nil {
+		return "", err
+	}
+
+	return "0x" + deserialisedKey[5:], nil
+}
+
 // getPublicKeyType wrapper for the `varint.FromUvarint()` func
 func getPublicKeyType(key []byte) (uint64, int, error) {
 	return varint.FromUvarint(key)

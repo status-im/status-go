@@ -187,7 +187,10 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		return nil, err
 	}
 
-	chatID := request.ID.String()
+	chatID, err := request.HexID()
+	if err != nil {
+		return nil, err
+	}
 
 	response, err := m.addContact(
 		chatID,
@@ -530,8 +533,13 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
+	id, err := request.HexID()
+	if err != nil {
+		return nil, err
+	}
+
 	return m.addContact(
-		request.ID.String(),
+		id,
 		request.ENSName,
 		request.Nickname,
 		request.DisplayName,
