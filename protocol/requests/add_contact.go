@@ -2,17 +2,15 @@ package requests
 
 import (
 	"errors"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 var ErrAddContactInvalidID = errors.New("add-contact: invalid id")
 
 type AddContact struct {
-	ID          types.HexBytes `json:"id"`
-	Nickname    string         `json:"nickname"`
-	DisplayName string         `json:"displayName"`
-	ENSName     string         `json:"ensName"`
+	ID          string `json:"id"`
+	Nickname    string `json:"nickname"`
+	DisplayName string `json:"displayName"`
+	ENSName     string `json:"ensName"`
 }
 
 func (a *AddContact) Validate() error {
@@ -21,4 +19,8 @@ func (a *AddContact) Validate() error {
 	}
 
 	return nil
+}
+
+func (a *AddContact) HexID() (string, error) {
+	return ConvertCompressedToLegacyKey(a.ID)
 }

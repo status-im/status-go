@@ -71,7 +71,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -219,7 +219,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -314,7 +314,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -525,7 +525,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -675,7 +675,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -805,7 +805,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	request := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
+		ID:      contactID,
 		Message: messageText,
 	}
 
@@ -880,7 +880,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptLegacyContactRequest(
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(contactID),
+		ID: contactID,
 	}
 
 	// Send contact request
@@ -952,7 +952,7 @@ func (s *MessengerContactRequestSuite) TestLegacyContactRequestNotifications() {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(contactID),
+		ID: contactID,
 	}
 
 	// Send legacy contact request
@@ -1003,7 +1003,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(contactID),
+		ID: contactID,
 	}
 
 	// Send legacy contact request
@@ -1103,7 +1103,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestLegacyContactRequestForCo
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(contactID),
+		ID: contactID,
 	}
 
 	// Send contact request
@@ -1188,7 +1188,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(contactID),
+		ID: contactID,
 	}
 
 	// Send contact request
@@ -1347,7 +1347,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)
@@ -1400,7 +1400,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 
 	// adds bob again to her device
 	request = &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice2.AddContact(context.Background(), request)
@@ -1454,7 +1454,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)
@@ -1565,7 +1565,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)
@@ -1614,7 +1614,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 
 	// adds bob again to her device
 	request = &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)
@@ -1651,7 +1651,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
 
 	request := &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)
@@ -1700,7 +1700,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 
 	// adds bob again to her device
 	request = &requests.AddContact{
-		ID: types.Hex2Bytes(bobID),
+		ID: bobID,
 	}
 
 	_, err = alice1.AddContact(context.Background(), request)

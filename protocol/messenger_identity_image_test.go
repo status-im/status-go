@@ -320,7 +320,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("bob add contact before")
 						if bc {
 							s.logger.Debug("bob has contact to add")
-							_, err = s.bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(s.generateKeyUID(&s.alice.identity.PublicKey))})
+							_, err = s.bob.AddContact(context.Background(), &requests.AddContact{ID: s.generateKeyUID(&s.alice.identity.PublicKey)})
 							s.Require().NoError(err)
 							s.logger.Debug("bob add contact after")
 						}
@@ -367,7 +367,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 						s.logger.Debug("alice add contact before")
 						if ac {
 							s.logger.Debug("alice has contact to add")
-							_, err = s.alice.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(s.generateKeyUID(&s.bob.identity.PublicKey))})
+							_, err = s.alice.AddContact(context.Background(), &requests.AddContact{ID: s.generateKeyUID(&s.bob.identity.PublicKey)})
 							s.Require().NoError(err)
 							s.logger.Debug("alice add contact after")
 						}

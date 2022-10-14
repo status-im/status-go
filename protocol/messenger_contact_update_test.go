@@ -74,7 +74,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
-	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -136,7 +136,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
-	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -171,7 +171,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 
 	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))
 
-	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
+	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Contacts, 1)

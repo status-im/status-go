@@ -359,3 +359,61 @@ func (m *Messenger) addContactRequestPropagatedState(message *common.Message) er
 	message.ContactRequestPropagatedState = contact.ContactRequestPropagatedState()
 	return nil
 }
+
+func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	chatID, err := request.HexID()
+	if err != nil {
+		return nil, err
+	}
+
+	_, ok := m.allChats.Load(chatID)
+	if !ok {
+		// Only one to one chan be muted when it's not in the database
+		publicKey, err := common.HexToPubkey(chatID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a one to one chat
+		chat := CreateOneToOneChat(chatID, publicKey, m.getTimesource())
+		err = m.initChatSyncFields(chat)
+		if err != nil {
+			return nil, err
+		}
+		err = m.saveChat(chat)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	message := &common.Message{}
+	message.Text = request.Message
+	message.ChatId = chatID
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+
+	return m.sendChatMessage(context.Background(), message)
+}
+
+func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	chatID := request.ID
+
+	_, ok := m.allChats.Load(chatID)
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	message := &common.Message{}
+	message.Text = request.Message
+	message.ChatId = chatID
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+
+	return m.sendChatMessage(context.Background(), message)
+}

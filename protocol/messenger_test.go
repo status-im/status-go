@@ -156,7 +156,7 @@ func (s *MessengerSuite) TestInit() {
 			Prep: func() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
-				_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)))})
+				_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))})
 				s.Require().NoError(err)
 			},
 			AddedFilters: 2,
@@ -1289,7 +1289,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(s.m.SaveChat(chat2))
 	s.Require().NoError(s.m.SaveChat(chat3))
 
-	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID})
 	s.Require().NoError(err)
 
 	messages := []*common.Message{
@@ -1418,7 +1418,7 @@ func (s *MessengerSuite) TestBlockContact() {
 }
 
 func (s *MessengerSuite) TestContactPersistence() {
-	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(testPK)})
+	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: testPK})
 	s.Require().NoError(err)
 	savedContacts := s.m.Contacts()
 

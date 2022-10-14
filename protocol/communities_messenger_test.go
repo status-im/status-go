@@ -1828,7 +1828,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	// Add bob to contacts so it does not go on activity center
 	bobPk := common.PubkeyToHex(&s.alice.identity.PublicKey)
-	request := &requests.AddContact{ID: types.Hex2Bytes(bobPk)}
+	request := &requests.AddContact{ID: bobPk}
 	_, err = s.alice.AddContact(context.Background(), request)
 	s.Require().NoError(err)
 
