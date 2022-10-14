@@ -1750,7 +1750,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 				m.communitiesManager.LogStdout("Starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
 				time.AfterFunc(timeToNextInterval, func() {
-					err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval)
+					err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval, c.Encrypted())
 					if err != nil {
 						m.communitiesManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
 					}
@@ -1760,7 +1760,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Looks like the last archive was generated more than `interval`
 				// ago, so lets create a new archive now and then schedule the archive
 				// creation loop
-				err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to, messageArchiveInterval)
+				err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to, messageArchiveInterval, c.Encrypted())
 				if err != nil {
 					m.communitiesManager.LogStdout("failed to get create and seed history archive", zap.Error(err))
 				}
