@@ -736,6 +736,11 @@ func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.M
 	return api.service.messenger.SendChatMessages(ctx, messages)
 }
 
+func (api *PublicAPI) SendOneToOneMessage(request *requests.SendOneToOneMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendOneToOneMessage(request)
+}
+
+
 func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditMessage(ctx, request)
 }
@@ -1223,6 +1228,11 @@ func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDisc
 func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
 	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
 }
+
+func (api *PublicAPI) Messenger() *protocol.Messenger {
+	return api.service.messenger
+}
+
 
 // -----
 // HELPER
