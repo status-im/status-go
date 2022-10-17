@@ -520,6 +520,7 @@ func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit
 
 func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	log.Info("[ISSUE]", "activityCenterNotifications -> params", params)
+	log.Info("[ISSUE]", "Received bytes cursor", []byte(params.cursor))
 	var tx *sql.Tx
 	var err error
 	// We fetch limit + 1 to check for pagination
@@ -544,15 +545,15 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	if err != nil {
 		return "", nil, err
 	}
+	log.Info("[ISSUE]", "Latest cursor from query", []byte(latestCursor))
 
-	log.Info("[ISSUE]", "buildActivityCenterQuery result -> latestCursor", latestCursor)
 	log.Info("[ISSUE]", "buildActivityCenterQuery result -> len(notifications)", len(notifications))
 	if len(notifications) == incrementedLimit {
 		notifications = notifications[0:nonIncrementedLimit]
 	} else {
 		latestCursor = ""
 	}
-	log.Info("[ISSUE]", "final, modified latestCursor=", latestCursor)
+	log.Info("[ISSUE]", "final, modified latestCursor=", []byte(latestCursor))
 
 	return latestCursor, notifications, nil
 }
