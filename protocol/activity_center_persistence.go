@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 )
@@ -196,6 +197,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Rows) (string, []*ActivityCenterNotification, error) {
 	var notifications []*ActivityCenterNotification
 	latestCursor := ""
+
 	for rows.Next() {
 		var chatID sql.NullString
 		var lastMessageBytes []byte
@@ -218,6 +220,8 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&name,
 			&author,
 			&latestCursor)
+		log.Info("[ISSUE]", "unmarshall -> notification ID", notification.ID)
+
 		if err != nil {
 			return "", nil, err
 		}
@@ -264,8 +268,11 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		notifications = append(notifications, notification)
 	}
 
-	return latestCursor, notifications, nil
+	err := rows.Err()
 
+	log.Info("[ISSUE]", "loop finished, any error?", err)
+
+	return latestCursor, notifications, err
 }
 
 type activityCenterQueryParamsRead uint
@@ -369,11 +376,17 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 		query += ` LIMIT ?`
 	}
 
+	log.Info("[ISSUE]", "query string", query)
+	log.Info("[ISSUE]", "query args", args)
+
 	rows, err := tx.Query(query, args...)
 	if err != nil {
 		return "", nil, err
 	}
-	return db.unmarshalActivityCenterNotificationRows(rows)
+
+	cursor, marshalledRows, err := db.unmarshalActivityCenterNotificationRows(rows)
+
+	return cursor, marshalledRows, err
 }
 
 func (db sqlitePersistence) runActivityCenterIDQuery(query string) ([][]byte, error) {
@@ -503,6 +516,7 @@ func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit
 }
 
 func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
+	log.Info("[ISSUE]", "activityCenterNotifications -> params", params)
 	var tx *sql.Tx
 	var err error
 	// We fetch limit + 1 to check for pagination
@@ -522,16 +536,20 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	}()
 
 	params.limit = uint64(incrementedLimit)
+	log.Info("[ISSUE]", "buildActivityCenterQuery -> params", params)
 	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, params)
 	if err != nil {
 		return "", nil, err
 	}
 
+	log.Info("[ISSUE]", "buildActivityCenterQuery result -> latestCursor", latestCursor)
+	log.Info("[ISSUE]", "buildActivityCenterQuery result -> len(notifications)", len(notifications))
 	if len(notifications) == incrementedLimit {
 		notifications = notifications[0:nonIncrementedLimit]
 	} else {
 		latestCursor = ""
 	}
+	log.Info("[ISSUE]", "final, modified latestCursor=", latestCursor)
 
 	return latestCursor, notifications, nil
 }
