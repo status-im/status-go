@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/account/generator"
@@ -79,6 +80,8 @@ func (ppm *PairingPayloadManager) Mount() error {
 		return err
 	}
 
+	spew.Dump("PairingPayloadManager.Mount()", ppm.ppm.keys, ppm.ppm.multiaccount, ppm.ppm.password, pb)
+
 	return ppm.Encrypt(pb)
 }
 
@@ -137,6 +140,7 @@ func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
 
 func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
 	pd, err := common.Decrypt(data, pem.aesKey)
+	spew.Dump("common.Decrypt(data, pem.aesKey)", data, pem.aesKey, pd, err)
 	if err != nil {
 		return err
 	}
@@ -198,6 +202,7 @@ func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPa
 func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	pb := new(protobuf.LocalPairingPayload)
 	err := proto.Unmarshal(data, pb)
+	spew.Dump("protobuf.LocalPairingPayload", pb, pb.Multiaccount, pb.Keys)
 	if err != nil {
 		return err
 	}
@@ -216,6 +221,7 @@ func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 	for _, key := range pbKeys {
 		ppm.keys[key.Name] = key.Data
 	}
+	spew.Dump("PairingPayloadMarshaller.accountKeysFromProtobuf", pbKeys, ppm.keys)
 }
 
 func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {

@@ -14,6 +14,7 @@ import (
 	"net/url"
 
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/signal"
@@ -156,6 +157,7 @@ func (c *PairingClient) receiveAccountData() error {
 
 	err = c.PayloadManager.Receive(payload)
 	if err != nil {
+		spew.Dump("c.PayloadManager.Receive(payload)", err.Error())
 		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
 		return err
 	}
