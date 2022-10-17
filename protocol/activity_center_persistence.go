@@ -269,6 +269,9 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	}
 
 	err := rows.Err()
+	if err != nil {
+		defer rows.Close()
+	}
 
 	log.Info("[ISSUE]", "loop finished, any error?", err)
 
