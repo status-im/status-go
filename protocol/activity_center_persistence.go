@@ -122,7 +122,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, reply_message, author) VALUES (?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, encodedReplyMessage, notification.Author)
+	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, reply_message, author) VALUES (?,?,?,?,?,?,?)`, notification.ID.String(), notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, encodedReplyMessage, notification.Author)
 	return err
 }
 
