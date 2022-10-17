@@ -504,6 +504,7 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.ActivityCenterNotifications, 1)
 
 	// Retrieve and accept join request
 	err = tt.RetryWithBackOff(func() error {
@@ -868,6 +869,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
 	requestToJoin1 := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
@@ -945,6 +953,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	s.Require().NotNil(updatedCommunity)
 	s.Require().True(updatedCommunity.HasMember(&s.alice.identity.PublicKey))
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
@@ -1031,6 +1046,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
 	requestToJoin1 := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(requestToJoin1)
 	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
@@ -1108,6 +1130,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
+
 	s.Require().Len(response.Communities(), 1)
 
 	updatedCommunity := response.Communities()[0]
@@ -1167,6 +1196,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	community = response.Communities()[0]
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
 	// Alice should then be removed
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
@@ -1207,6 +1243,13 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin3.Clock)
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Retrieve request to join
 	err = tt.RetryWithBackOff(func() error {
@@ -1295,6 +1338,13 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
 	// Make sure clock is not empty
 	s.Require().NotEmpty(requestToJoin1.Clock)
 
@@ -1354,6 +1404,13 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusDeclined)
+
 	// Check if admin sees requests correctly
 	requestsToJoin, err = s.bob.PendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
@@ -1375,6 +1432,13 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	s.Require().NotNil(updatedCommunity)
 	s.Require().True(updatedCommunity.HasMember(&s.alice.identity.PublicKey))
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
@@ -1933,6 +1997,13 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Len(response.RequestsToJoinCommunity, 1)
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	aRtj := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(aRtj)

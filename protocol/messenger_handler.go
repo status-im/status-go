@@ -1043,11 +1043,11 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	// Activity Center notification
-	requestToJoinId, err := m.communitiesManager.GetRequestToJoinIdByPkAndCommunityID(signer, requestToJoinResponseProto.CommunityId)
+	requestToJoinID, err := m.communitiesManager.GetRequestToJoinIDByPkAndCommunityID(signer, requestToJoinResponseProto.CommunityId)
 	if err != nil {
 		return err
 	}
-	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoinId)
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoinID)
 	if err != nil {
 		return err
 	}
