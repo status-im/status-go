@@ -64,8 +64,8 @@ func (r *Reader) buildReaderAccount(
 	prices map[string]float64,
 	balances map[common.Address]*hexutil.Big,
 ) (ReaderAccount, error) {
-	limit := (*hexutil.Big)(big.NewInt(20))
-	toBlock := (*hexutil.Big)(big.NewInt(0))
+	limit := int64(20)
+	toBlock := big.NewInt(0)
 
 	collections := make(map[uint64][]OpenseaCollection)
 	tokens := make(map[uint64][]ReaderToken)
