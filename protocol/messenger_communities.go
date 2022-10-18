@@ -524,7 +524,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	notification := &ActivityCenterNotification{
 		ID:               types.FromHex(requestToJoin.ID.String()),
 		Type:             ActivityCenterNotificationTypeCommunityRequest,
-		Timestamp:        uint64(time.Now().Unix()),
+		Timestamp:        m.getTimesource().GetCurrentTime(),
 		CommunityID:      community.IDString(),
 		MembershipStatus: ActivityCenterMembershipStatusPending,
 	}

@@ -64,12 +64,8 @@
 // 1664195977_add_deleted_for_mes.up.sql (352B)
 // 1664367420_add_discord_attachments_table.up.sql (350B)
 // 1665079662_add_spectated_column_in_communities.up.sql (86B)
-<<<<<<< HEAD
-// 1665479047_add_community_id_in_notifications.up.sql (74B)
-// 1665484435_add_encrypted_messages.up.sql (402B)
-=======
 // 1665479047_add_community_id_in_notifications.up.sql (169B)
->>>>>>> 08991c6f8 (feat(ActivityCenter): Add membership status for community membership AC notifications)
+// 1665484435_add_encrypted_messages.up.sql (402B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1435,13 +1431,8 @@ func _1665479047_add_community_id_in_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD
-	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1666354658, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa5, 0xa3, 0xfd, 0xf0, 0x62, 0x77, 0x1b, 0x7a, 0xc7, 0xad, 0xb8, 0x44, 0x9c, 0x12, 0xe6, 0xdc, 0x8c, 0x2e, 0xef, 0x3f, 0x4c, 0x4a, 0x86, 0x43, 0xeb, 0xae, 0xed, 0x75, 0x55, 0x9f, 0x7a, 0xa5}}
-=======
-	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1665677520, 0)}
+	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1666611564, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd9, 0x8f, 0x8b, 0x1c, 0xaa, 0x6a, 0x56, 0xd6, 0xa5, 0x88, 0x57, 0x13, 0x8f, 0xea, 0xb9, 0x23, 0x82, 0x50, 0xb7, 0x65, 0x1f, 0xab, 0xfa, 0x23, 0x6f, 0x0, 0x7, 0xb6, 0x6e, 0xb5, 0x85, 0x44}}
->>>>>>> 08991c6f8 (feat(ActivityCenter): Add membership status for community membership AC notifications)
 	return a, nil
 }
 

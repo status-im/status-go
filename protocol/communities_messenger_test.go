@@ -504,7 +504,7 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	s.Require().Len(response.ActivityCenterNotifications, 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
 	// Retrieve and accept join request
 	err = tt.RetryWithBackOff(func() error {
