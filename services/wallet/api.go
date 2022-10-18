@@ -63,10 +63,22 @@ func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []ui
 	return api.s.transferController.CheckRecentHistory(chainIDs, addresses)
 }
 
+func hexBigToBN(hexBig *hexutil.Big) *big.Int {
+	var bN *big.Int
+	if hexBig != nil {
+		bN = hexBig.ToInt()
+	}
+	return bN
+}
+
 // GetTransfersByAddress returns transfers for a single address
 func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address)
-	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, toBlock, limit, fetchMore)
+	var intLimit = int64(1)
+	if limit != nil {
+		intLimit = limit.ToInt().Int64()
+	}
+	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, hexBigToBN(toBlock), intLimit, fetchMore)
 }
 
 // LoadTransferByHash loads transfer to the database
@@ -77,7 +89,7 @@ func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, 
 
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainIDs] get transfers for an address", "address", address)
-	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, toBlock, limit, fetchMore)
+	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, hexBigToBN(toBlock), limit.ToInt().Int64(), fetchMore)
 }
 
 func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
@@ -103,6 +115,11 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 		return nil, err
 	}
 	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
+}
+
+// GetBalanceHistory retrieves native token. Will be extended later to support token balance history
+func (api *API) GetBalanceHistory(ctx context.Context, chainID uint64, address common.Address, timeInterval transfer.BalanceHistoryTimeInterval) ([]transfer.BalanceState, error) {
+	return api.s.transferController.GetBalanceHistory(ctx, chainID, address, timeInterval)
 }
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
@@ -385,7 +402,7 @@ func (api *API) GetDerivedAddressDetails(ctx context.Context, address string) (*
 		return derivedAddress, fmt.Errorf("account already exists")
 	}
 
-	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, commonAddr, nil, (*hexutil.Big)(big.NewInt(1)), false)
+	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, commonAddr, nil, 1, false)
 
 	if err != nil {
 		return derivedAddress, err
@@ -472,7 +489,7 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 	}
 
 	var ctx context.Context
-	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, common.HexToAddress(info[derivedPath].Address), nil, (*hexutil.Big)(big.NewInt(1)), false)
+	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, common.HexToAddress(info[derivedPath].Address), nil, 1, false)
 
 	if err != nil {
 		return nil, err
