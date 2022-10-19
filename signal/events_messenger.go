@@ -7,11 +7,11 @@ const (
 	// EventMesssageDelivered triggered when we got acknowledge from datasync level, that means peer got message
 	EventMesssageDelivered = "message.delivered"
 
-	// EventCommunityFound triggered when user requested info about some community and messenger successfully
+	// EventCommunityInfoFound triggered when user requested info about some community and messenger successfully
 	// retrieved it from mailserver
 	EventCommunityInfoFound = "community.found"
 
-	// Event Automatic Status Updates Timed out
+	// EventStatusUpdatesTimedOut Event Automatic Status Updates Timed out
 	EventStatusUpdatesTimedOut = "status.updates.timedout"
 )
 
