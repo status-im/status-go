@@ -362,6 +362,27 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+
+		if acc.Chat {
+			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
+			account.ColorHash = colorHash
+
+			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
