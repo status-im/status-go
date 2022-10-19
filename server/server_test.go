@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -26,17 +28,18 @@ type ServerURLSuite struct {
 
 func (s *ServerURLSuite) SetupTest() {
 	s.SetupKeyComponents(s.T())
+	logger := logutils.ZapLogger()
 
 	s.server = &MediaServer{Server: Server{
 		hostname:   defaultIP.String(),
-		portManger: newPortManager(nil),
+		portManger: newPortManager(logger, nil),
 	}}
 	err := s.server.SetPort(1337)
 	s.Require().NoError(err)
 
 	s.serverNoPort = &MediaServer{Server: Server{
 		hostname:   defaultIP.String(),
-		portManger: newPortManager(nil),
+		portManger: newPortManager(logger, nil),
 	}}
 	go func() {
 		time.Sleep(waitTime)

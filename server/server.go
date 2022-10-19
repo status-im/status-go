@@ -24,11 +24,12 @@ type Server struct {
 }
 
 func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int)) Server {
+	logger := logutils.ZapLogger()
 	return Server{
-		logger:     logutils.ZapLogger(),
+		logger:     logger,
 		cert:       cert,
 		hostname:   hostname,
-		portManger: newPortManager(afterPortChanged),
+		portManger: newPortManager(logger, afterPortChanged),
 	}
 }
 
