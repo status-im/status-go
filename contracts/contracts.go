@@ -16,21 +16,24 @@ type ContractMaker struct {
 	RPCClient *rpc.Client
 }
 
-func (c *ContractMaker) NewRegistry(chainID uint64) (*resolver.ENSRegistryWithFallback, error) {
-	contractAddr, err := resolver.ContractAddress(chainID)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *ContractMaker) NewRegistryWithAddress(chainID uint64, address common.Address) (*resolver.ENSRegistryWithFallback, error) {
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
 
 	return resolver.NewENSRegistryWithFallback(
-		contractAddr,
+		address,
 		backend,
 	)
+}
+
+func (c *ContractMaker) NewRegistry(chainID uint64) (*resolver.ENSRegistryWithFallback, error) {
+	contractAddr, err := resolver.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return c.NewRegistryWithAddress(chainID, contractAddr)
 }
 
 func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *common.Address) (*resolver.PublicResolver, error) {
