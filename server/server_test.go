@@ -43,7 +43,7 @@ func (s *ServerURLSuite) SetupTest() {
 	}}
 	go func() {
 		time.Sleep(waitTime)
-		s.serverNoPort.mustRead.Unlock()
+		s.serverNoPort.port = 80
 	}()
 
 	s.testStart = time.Now()
@@ -60,12 +60,12 @@ func (s *ServerURLSuite) testNoPort(expected string, actual string) {
 
 func (s *ServerURLSuite) TestServer_MakeBaseURL() {
 	s.Require().Equal("https://127.0.0.1:1337", s.server.MakeBaseURL().String())
-	s.testNoPort("https://127.0.0.1:0", s.serverNoPort.MakeBaseURL().String())
+	s.testNoPort("https://127.0.0.1:80", s.serverNoPort.MakeBaseURL().String())
 }
 
 func (s *ServerURLSuite) TestServer_MakeImageServerURL() {
 	s.Require().Equal("https://127.0.0.1:1337/messages/", s.server.MakeImageServerURL())
-	s.testNoPort("https://127.0.0.1:0/messages/", s.serverNoPort.MakeImageServerURL())
+	s.testNoPort("https://127.0.0.1:80/messages/", s.serverNoPort.MakeImageServerURL())
 }
 
 func (s *ServerURLSuite) TestServer_MakeIdenticonURL() {
@@ -73,7 +73,7 @@ func (s *ServerURLSuite) TestServer_MakeIdenticonURL() {
 		"https://127.0.0.1:1337/messages/identicons?publicKey=0xdaff0d11decade",
 		s.server.MakeIdenticonURL("0xdaff0d11decade"))
 	s.testNoPort(
-		"https://127.0.0.1:0/messages/identicons?publicKey=0xdaff0d11decade",
+		"https://127.0.0.1:80/messages/identicons?publicKey=0xdaff0d11decade",
 		s.serverNoPort.MakeIdenticonURL("0xdaff0d11decade"))
 }
 
@@ -82,7 +82,7 @@ func (s *ServerURLSuite) TestServer_MakeImageURL() {
 		"https://127.0.0.1:1337/messages/images?messageId=0x10aded70ffee",
 		s.server.MakeImageURL("0x10aded70ffee"))
 	s.testNoPort(
-		"https://127.0.0.1:0/messages/images?messageId=0x10aded70ffee",
+		"https://127.0.0.1:80/messages/images?messageId=0x10aded70ffee",
 		s.serverNoPort.MakeImageURL("0x10aded70ffee"))
 }
 
@@ -91,7 +91,7 @@ func (s *ServerURLSuite) TestServer_MakeAudioURL() {
 		"https://127.0.0.1:1337/messages/audio?messageId=0xde1e7ebee71e",
 		s.server.MakeAudioURL("0xde1e7ebee71e"))
 	s.testNoPort(
-		"https://127.0.0.1:0/messages/audio?messageId=0xde1e7ebee71e",
+		"https://127.0.0.1:80/messages/audio?messageId=0xde1e7ebee71e",
 		s.serverNoPort.MakeAudioURL("0xde1e7ebee71e"))
 }
 
@@ -100,6 +100,6 @@ func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 		"https://127.0.0.1:1337/ipfs?hash=0xdeadbeef4ac0",
 		s.server.MakeStickerURL("0xdeadbeef4ac0"))
 	s.testNoPort(
-		"https://127.0.0.1:0/ipfs?hash=0xdeadbeef4ac0",
+		"https://127.0.0.1:80/ipfs?hash=0xdeadbeef4ac0",
 		s.serverNoPort.MakeStickerURL("0xdeadbeef4ac0"))
 }
