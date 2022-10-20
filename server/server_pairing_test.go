@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -19,6 +20,18 @@ type PairingServerSuite struct {
 
 func (s *PairingServerSuite) SetupTest() {
 	s.SetupPairingServerComponents(s.T())
+}
+
+func (s *PairingServerSuite) TestMultiBackgroundForeground() {
+	err := s.PS.Start()
+	s.Require().NoError(err)
+	s.PS.ToBackground()
+	s.PS.ToForeground()
+	s.PS.ToBackground()
+	s.PS.ToBackground()
+	s.PS.ToForeground()
+	s.PS.ToForeground()
+	s.Require().Regexp(regexp.MustCompile("(https://192\\.168\\.0\\.\\d+:\\d+)"), s.PS.MakeBaseURL().String())
 }
 
 func (s *PairingServerSuite) TestPairingServer_StartPairing() {
