@@ -57,6 +57,7 @@ var (
 	nAddedContacts   = flag.Int("added-contacts", 100, "Number of added contacts to create")
 	nContacts        = flag.Int("contacts", 100, "Number of contacts to create")
 	nPublicChats     = flag.Int("public-chats", 5, "Number of public chats")
+	nCommunities     = flag.Int("communities", 5, "Number of communities")
 	nMessages        = flag.Int("number-of-messages", 0, "Number of messages for each chat")
 	nOneToOneChats   = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
 
@@ -215,6 +216,21 @@ func main() {
 			}
 		}
 
+	}
+
+	logger.Info("Creating communities", "num", *nCommunities)
+	for i := 0; i < *nCommunities; i++ {
+		request := requests.CreateCommunity{
+			Name:        randomString(10),
+			Description: randomString(30),
+			Color:       "#ffffff",
+			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		}
+		_, err = wakuext.CreateCommunity(&request)
+		if err != nil {
+			logger.Error("failed to create community", "error", err)
+			return
+		}
 	}
 
 	logger.Info("Creating one to one chats")
