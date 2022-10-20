@@ -47,13 +47,13 @@ func NewTokenManager(
 	networkManager *network.Manager,
 ) *TokenManager {
 	tokenManager := &TokenManager{db, RPCClient, networkManager}
-
 	// Check the networks' custom tokens to see if we must update the tokenStore
 	networks := networkManager.GetConfiguredNetworks()
 	for _, network := range networks {
 		if len(network.TokenOverrides) == 0 {
 			continue
 		}
+
 		for _, overrideToken := range network.TokenOverrides {
 			tokensMap, ok := tokenStore[network.ChainID]
 			if !ok {
