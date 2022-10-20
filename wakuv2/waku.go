@@ -226,6 +226,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		node.WithHostAddress(hostAddr),
 		node.WithConnectionStatusChannel(connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+		node.WithLogger(logger),
 	}
 
 	if cfg.Rendezvous {
