@@ -41,7 +41,7 @@ func TestParseNodesToNodeID(t *testing.T) {
 }
 
 func TestNewGethNodeConfig(t *testing.T) {
-	config, err := params.NewNodeConfig("", params.RopstenNetworkID)
+	config, err := params.NewNodeConfig("", params.GoerliNetworkID)
 	require.NoError(t, err)
 	config.HTTPEnabled = true
 	config.HTTPVirtualHosts = []string{"my.domain.com"}

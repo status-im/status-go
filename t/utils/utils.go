@@ -50,8 +50,6 @@ var (
 	// TestNetworkNames network ID to name mapping
 	TestNetworkNames = map[int]string{
 		params.MainNetworkID:        "Mainnet",
-		params.RopstenNetworkID:     "Ropsten",
-		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
 		params.GoerliNetworkID:      "Goerli",
 	}
@@ -128,10 +126,6 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
 		url = params.MainnetEthereumNetworkURL
-	case params.RinkebyNetworkID:
-		url = params.RinkebyEthereumNetworkURL
-	case params.RopstenNetworkID:
-		url = params.RopstenEthereumNetworkURL
 	case params.GoerliNetworkID:
 		url = params.GoerliEthereumNetworkURL
 	default:
@@ -146,10 +140,6 @@ func GetHeadHashFromNetworkID(id int) string {
 	switch id {
 	case params.MainNetworkID:
 		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
-	case params.RinkebyNetworkID:
-		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
-	case params.RopstenNetworkID:
-		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
 		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
 	case params.GoerliNetworkID:
@@ -175,10 +165,6 @@ func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
 	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
 		return params.MainNetworkID
-	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
-		return params.RinkebyNetworkID
-	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
-		return params.RopstenNetworkID
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
 	case fmt.Sprintf("%d", params.GoerliNetworkID), "goerli":

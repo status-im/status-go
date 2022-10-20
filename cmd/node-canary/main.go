@@ -257,7 +257,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	nodeConfig, err := params.NewNodeConfigWithDefaults(path.Join(workDir, ".ethereum"), uint64(params.RopstenNetworkID))
+	nodeConfig, err := params.NewNodeConfigWithDefaults(path.Join(workDir, ".ethereum"), uint64(params.GoerliNetworkID))
 	if err != nil {
 		return nil, err
 	}

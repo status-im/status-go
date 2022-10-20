@@ -55,10 +55,10 @@ var (
 	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
 	networkID  = flag.Int(
 		"network-id",
-		params.RopstenNetworkID,
+		params.GoerliNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Ropsten), %d (Rinkeby), %d (Goerli)",
-			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID, params.GoerliNetworkID,
+			"A network ID: %d (Mainnet), %d (Goerli)",
+			params.MainNetworkID, params.GoerliNetworkID,
 		),
 	)
 	fleet = flag.String(

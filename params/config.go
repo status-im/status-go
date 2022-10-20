@@ -1106,10 +1106,6 @@ func getUpstreamURL(networkID uint64) string {
 	switch networkID {
 	case MainNetworkID:
 		return MainnetEthereumNetworkURL
-	case RopstenNetworkID:
-		return RopstenEthereumNetworkURL
-	case RinkebyNetworkID:
-		return RinkebyEthereumNetworkURL
 	case GoerliNetworkID:
 		return GoerliEthereumNetworkURL
 	}
@@ -1158,14 +1154,12 @@ func (c *NodeConfig) AddAPIModule(m string) {
 }
 
 // LesTopic returns discovery v5 topic derived from genesis of the provided network.
-// 1 - mainnet, 3 - ropsten, 4 - rinkeby
+// 1 - mainnet, 5 - goerli
 func LesTopic(netid int) string {
 	switch netid {
 	case 1:
 		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
-	case 3:
-		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RopstenGenesisHash.Bytes()[:8])
-	case 4:
+	case 5:
 		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
 	default:
 		return ""

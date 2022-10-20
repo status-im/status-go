@@ -39,26 +39,12 @@ const (
 	// allow us avoid syncing node.
 	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	// RopstenEthereumNetworkURL is URL where the upstream ethereum network is loaded to
-	// allow us avoid syncing node.
-	RopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
-
-	// RinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
-	// allow us avoid syncing node.
-	RinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
-
 	// GoerliEthereumNetworkURL is an open RPC endpoint to Goerli network
 	// Other RPC endpoints are available here: http://goerli.blockscout.com/
 	GoerliEthereumNetworkURL = "http://goerli.blockscout.com/"
 
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
-
-	// RopstenNetworkID is id of a test network (on PoW)
-	RopstenNetworkID = 3
-
-	// RinkebyNetworkID is id of a test network (on PoA)
-	RinkebyNetworkID = 4
 
 	// GoerliNetworkID is id of goerli test network (PoA)
 	GoerliNetworkID = 5
