@@ -1538,7 +1538,7 @@ func (m *Manager) GetHistoryArchivePartitionStartTimestamp(communityID types.Hex
 
 func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	m.UnseedHistoryArchiveTorrent(communityID)
-	_, err := m.CreateHistoryArchiveTorrent(communityID, topics, startDate, endDate, partition, encrypt)
+	_, err := m.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 	if err != nil {
 		return err
 	}
@@ -1626,7 +1626,17 @@ type EncodedArchiveData struct {
 	bytes   []byte
 }
 
-func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *Manager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.CreateHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
+}
+
+func (m *Manager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+
+	return m.CreateHistoryArchiveTorrent(communityID, make([]*types.Message, 0), topics, startDate, endDate, partition, encrypt)
+}
+func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+
+	loadFromDB := len(msgs) == 0
 
 	from := startDate
 	to := from.Add(partition)
@@ -1692,9 +1702,19 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, topics
 			zap.Any("to", to),
 		)
 
-		messages, err := m.persistence.GetWakuMessagesByFilterTopic(topics, uint64(from.Unix()), uint64(to.Unix()))
-		if err != nil {
-			return archiveIDs, err
+		var messages []types.Message
+		if loadFromDB {
+			messages, err = m.persistence.GetWakuMessagesByFilterTopic(topics, uint64(from.Unix()), uint64(to.Unix()))
+			if err != nil {
+				return archiveIDs, err
+			}
+		} else {
+			for _, msg := range msgs {
+				if int64(msg.Timestamp) >= from.Unix() && int64(msg.Timestamp) < to.Unix() {
+					messages = append(messages, *msg)
+				}
+			}
+
 		}
 
 		if len(messages) == 0 {
