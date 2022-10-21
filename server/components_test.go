@@ -13,6 +13,8 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -120,7 +122,7 @@ type MockEncryptOnlyPayloadManager struct {
 }
 
 func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadManager, error) {
-	pem, err := NewPayloadEncryptionManager(aesKey)
+	pem, err := NewPayloadEncryptionManager(aesKey, logutils.ZapLogger())
 	if err != nil {
 		return nil, err
 	}

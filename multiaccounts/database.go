@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
@@ -80,7 +79,6 @@ func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
 	a.KeycardPairing = ma.KeycardPairing
 	a.KeyUID = ma.KeyUid
 	a.Images = identityImages
-	spew.Dump("Account.FromProtobuf end", ma, a)
 }
 
 type MultiAccountMarshaller interface {
