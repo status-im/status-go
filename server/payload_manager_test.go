@@ -39,6 +39,7 @@ func TestPayloadMarshallerSuite(t *testing.T) {
 
 type PayloadMarshallerSuite struct {
 	suite.Suite
+	TestLoggerComponents
 
 	teardown func()
 
@@ -115,6 +116,8 @@ func getFiles(t *testing.T, keyStorePath string) map[string][]byte {
 }
 
 func (pms *PayloadMarshallerSuite) SetupTest() {
+	pms.SetupLoggerComponents()
+
 	db1, db1td := setupTestDB(pms.T())
 	db2, db2td := setupTestDB(pms.T())
 	keystore1, keystore2, kstd := makeKeystores(pms.T())
@@ -194,7 +197,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 	pms.Require().NoError(err)
 
 	// Make and Load PairingPayloadMarshaller 1
-	ppm := NewPairingPayloadMarshaller(pp)
+	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
 	// TEST PairingPayloadMarshaller 1 MarshalToProtobuf()
 	pb, err := ppm.MarshalToProtobuf()
@@ -223,7 +226,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pms.Require().NoError(err)
 
 	// Make and Load PairingPayloadMarshaller 1
-	ppm := NewPairingPayloadMarshaller(pp)
+	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
 	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
@@ -232,7 +235,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pp2 := new(PairingPayload)
 
 	// Make PairingPayloadMarshaller 2
-	ppm2 := NewPairingPayloadMarshaller(pp2)
+	ppm2 := NewPairingPayloadMarshaller(pp2, pms.Logger)
 
 	// TEST PairingPayloadMarshaller 2 is empty
 	pms.Require().Nil(ppm2.keys)
@@ -276,7 +279,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// Make and Load PairingPayloadMarshaller 1
-	ppm := NewPairingPayloadMarshaller(pp)
+	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
 	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
@@ -285,7 +288,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pp2 := new(PairingPayload)
 
 	// Make PairingPayloadMarshaller 2
-	ppm2 := NewPairingPayloadMarshaller(pp2)
+	ppm2 := NewPairingPayloadMarshaller(pp2, pms.Logger)
 
 	err = ppm2.UnmarshalProtobuf(pb)
 	pms.Require().NoError(err)

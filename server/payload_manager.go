@@ -68,7 +68,7 @@ func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig
 		logger:                   l,
 		pp:                       p,
 		PayloadEncryptionManager: pem,
-		ppm:                      NewPairingPayloadMarshaller(p),
+		ppm:                      NewPairingPayloadMarshaller(p, l),
 		ppr:                      NewPairingPayloadRepository(p, config),
 	}, nil
 }
@@ -229,8 +229,8 @@ type PairingPayloadMarshaller struct {
 	*PairingPayload
 }
 
-func NewPairingPayloadMarshaller(p *PairingPayload) *PairingPayloadMarshaller {
-	return &PairingPayloadMarshaller{PairingPayload: p}
+func NewPairingPayloadMarshaller(p *PairingPayload, logger *zap.Logger) *PairingPayloadMarshaller {
+	return &PairingPayloadMarshaller{logger: logger, PairingPayload: p}
 }
 
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
