@@ -27,6 +27,8 @@ LEFT JOIN discord_message_attachments dm_attachment
 ON        dm.id = dm_attachment.discord_message_id
 `
 
+var basicDiscordAttachmentInsertQuery = "INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, content_type) VALUES (?,?,?,?,?,?,?)"
+
 var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
 var cursorField = cursor + " as cursor"
 
@@ -1841,6 +1843,25 @@ func (db sqlitePersistence) HasDiscordMessageAttachmentPayload(id string, messag
 	return hasPayload, err
 }
 
+func (db sqlitePersistence) SaveDiscordMessageAttachment(attachment *protobuf.DiscordMessageAttachment) (err error) {
+	query := basicDiscordAttachmentInsertQuery
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(
+		attachment.GetId(),
+		attachment.GetMessageId(),
+		attachment.GetUrl(),
+		attachment.GetFileName(),
+		attachment.GetFileSizeBytes(),
+		attachment.GetPayload(),
+		attachment.GetContentType(),
+	)
+	return
+}
+
 func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobuf.DiscordMessageAttachment) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -1855,8 +1876,7 @@ func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobu
 		_ = tx.Rollback()
 	}()
 
-	query := "INSERT OR REPLACE INTO discord_message_attachments(id,discord_message_id,url,file_name,file_size_bytes,payload, content_type) VALUES (?,?,?,?,?,?,?)"
-	stmt, err := tx.Prepare(query)
+	stmt, err := tx.Prepare(basicDiscordAttachmentInsertQuery)
 	if err != nil {
 		return
 	}

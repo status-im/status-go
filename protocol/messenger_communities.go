@@ -37,6 +37,8 @@ var messageArchivePartition = 7 * 24 * time.Hour
 var messageArchiveInterval = 2 * time.Minute
 
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
+const maxChunkSizeBytes = 1500000
+const maxChunkSizeMessages = 1000
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
@@ -2095,6 +2097,19 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
+    if createCommunityRequest.Encrypted {
+      // Init hash ratchet for community
+      _, err = m.encryptor.GenerateHashRatchetKey(discordCommunity.ID())
+
+      if err != nil {
+        m.cleanUpImport(discordCommunity.IDString())
+        importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
+        importProgress.StopTask(discord.CommunityCreationTask)
+        progressUpdates <- importProgress
+        return
+      }
+    }
+
 		communityID := discordCommunity.IDString()
 
 		// marking import as not cancelled
@@ -2347,9 +2362,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					messagesToSave[communityID+discordMessage.Id] = messageToSave
 				}
 			}
-			// We're multiplying `progressValue` by `0.9` so we leave 10% actual save
-			// operations
-			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, float32(len(messagesToSave))/float32(totalMessageCount)*0.9)
+			// We're multiplying `progressValue` by `0.5` so we leave 50% for actual save operations
+      // The 0.5 could be calculated but we'd need to know the total message chunks count,
+      // which we don't at this point
+      progressValue = float32(len(messagesToSave))/float32(totalMessageCount) * 0.5
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
 			progressUpdates <- importProgress
 
 			if m.DiscordImportMarkedAsCancelled(communityID) {
@@ -2360,51 +2377,82 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 		}
 
-		var dmsgs []*protobuf.DiscordMessage
+		var discordMessages []*protobuf.DiscordMessage
 		for _, msg := range messagesToSave {
-			dm := msg.GetDiscordMessage()
-			dmsgs = append(dmsgs, dm)
+			discordMessages = append(discordMessages, msg.GetDiscordMessage())
 		}
 
+    // We save these messages in chunks so we don't block the database
+    // for a longer period of time
+		discordMessageChunks := chunkSlice(discordMessages, maxChunkSizeMessages)
+    chunksCount := len(discordMessageChunks)
+
+    // Signal to clients that save operations are starting
 		importProgress.UpdateTaskState(discord.ImportMessagesTask, discord.TaskStateSaving)
 		progressUpdates <- importProgress
 
-		err = m.persistence.SaveDiscordMessages(dmsgs)
-		if err != nil {
-			m.cleanUpImport(communityID)
-			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
-			importProgress.StopTask(discord.ImportMessagesTask)
-			progressUpdates <- importProgress
-			return
-		}
-		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 0.95)
+		for i, msgs := range discordMessageChunks {
+      err = m.persistence.SaveDiscordMessages(msgs)
+      if err != nil {
+        m.cleanUpImport(communityID)
+        importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+        importProgress.StopTask(discord.ImportMessagesTask)
+        progressUpdates <- importProgress
+        return
+      }
 
-		if m.DiscordImportMarkedAsCancelled(communityID) {
-			importProgress.StopTask(discord.ImportMessagesTask)
-			progressUpdates <- importProgress
-			cancel <- communityID
-			return
-		}
+      if m.DiscordImportMarkedAsCancelled(communityID) {
+        importProgress.StopTask(discord.ImportMessagesTask)
+        progressUpdates <- importProgress
+        cancel <- communityID
+        return
+      }
 
-		var msgs []*common.Message
+			// We're multiplying `chunksCount` by `0.25` so we leave 25% for additional save operations
+      // 0.5 are the previous 50% of progress
+			progressValue := 0.5 + (float32(i+1) / float32(chunksCount) * 0.25)
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+
+      // We slow down the saving of message chunks to keep the database responsive
+      time.Sleep(2 * time.Second)
+    }
+
+		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 0.75)
+
+		var messages []*common.Message
 		for _, msg := range messagesToSave {
-			msgs = append(msgs, msg)
+			messages = append(messages, msg)
 		}
 
-		err = m.persistence.SaveMessages(msgs)
-		if err != nil {
-			m.cleanUpImport(communityID)
-			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
-			importProgress.StopTask(discord.ImportMessagesTask)
-			progressUpdates <- importProgress
-			return
-		}
+    // Same as above, we save these messages in chunks so we don't block
+    // the database for a longer period of time
+		messageChunks := chunkSlice(messages, maxChunkSizeMessages)
+    chunksCount = len(messageChunks)
 
-		if m.DiscordImportMarkedAsCancelled(communityID) {
-			importProgress.StopTask(discord.ImportMessagesTask)
-			progressUpdates <- importProgress
-			cancel <- communityID
-			return
+		for i, msgs := range messageChunks {
+			err = m.persistence.SaveMessages(msgs)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				return
+			}
+
+      if m.DiscordImportMarkedAsCancelled(communityID) {
+        importProgress.StopTask(discord.ImportMessagesTask)
+        progressUpdates <- importProgress
+        cancel <- communityID
+        return
+      }
+
+      // 0.75 are the previous 75% of progress, hence we multiply our chunk progress
+      // by 0.25
+			progressValue := 0.75 + ((float32(i+1) / float32(chunksCount)) * 0.25)
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+
+      // We slow down the saving of message chunks to keep the database responsive
+			time.Sleep(2 * time.Second)
 		}
 
 		err = m.persistence.SavePinMessages(pinMessagesToSave)
@@ -2450,8 +2498,8 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				authorProfilesToSave[id] = author
 
 				assetCounter.Increase()
-				progress := float32(assetCounter.Value()) / float32(totalAssetsCount)
-				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progress)
+				progressValue := float32(assetCounter.Value()) / float32(totalAssetsCount)
+				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 				progressUpdates <- importProgress
 
 				if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
@@ -2471,7 +2519,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
-		for idxRange := range gopart.Partition(len(messageAttachmentsToDownload), 20) {
+		for idxRange := range gopart.Partition(len(messageAttachmentsToDownload), 100) {
 			attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
 			wg.Add(1)
 			go func(attachments []*protobuf.DiscordMessageAttachment) {
@@ -2493,9 +2541,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					messageAttachmentsToDownload[i] = attachment
 
 					assetCounter.Increase()
-					// Multiplying progress by `0.8` to leave 20% for saving assets to DB
-					progress := (float32(assetCounter.Value()) / float32(totalAssetsCount)) * 0.8
-					importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progress)
+
+					// Multiplying progress by `0.5` to leave 50% for saving assets to DB
+          // similar to how it's done for messages
+					progressValue := (float32(assetCounter.Value()) / float32(totalAssetsCount)) * 0.5
+					importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 					progressUpdates <- importProgress
 
 					if m.DiscordImportMarkedAsCancelled(communityID) {
@@ -2516,16 +2566,39 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
+    // Signal to the client that save operations are starting
 		importProgress.UpdateTaskState(discord.DownloadAssetsTask, discord.TaskStateSaving)
 		progressUpdates <- importProgress
 
-		err = m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToDownload)
-		if err != nil {
-			m.cleanUpImport(communityID)
-			importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Error(err.Error()))
-			importProgress.Stop()
-			progressUpdates <- importProgress
-			return
+    // We chunk message attachments by `maxChunkSizeBytes` to ensure individual
+    // save operations don't take too long and block the database
+		attachmentChunks := chunkAttachmentsByByteSize(messageAttachmentsToDownload, maxChunkSizeBytes)
+		chunksCount = len(attachmentChunks)
+
+		for i, attachments := range attachmentChunks {
+			err = m.persistence.SaveDiscordMessageAttachments(attachments)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Error(err.Error()))
+				importProgress.Stop()
+				progressUpdates <- importProgress
+				return
+			}
+
+      if m.DiscordImportMarkedAsCancelled(communityID) {
+        importProgress.StopTask(discord.DownloadAssetsTask)
+        progressUpdates <- importProgress
+        cancel <- communityID
+        return
+      }
+
+      // 0.5 are the previous 50% of progress, hence we multiply our chunk progress
+      // by 0.5
+			progressValue := 0.5 + ((float32(i+1) / float32(chunksCount)) * 0.5)
+			importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
+
+      // We slow down the saving of attachment chunks to keep the database responsive
+			time.Sleep(2 * time.Second)
 		}
 
 		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, 1)
@@ -2649,7 +2722,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		m.config.messengerSignalsHandler.DiscordCommunityImportFinished(communityID)
 		close(done)
 
-		wakuChatMessages, err := m.chatMessagesToWakuMessages(msgs, discordCommunity)
+		wakuChatMessages, err := m.chatMessagesToWakuMessages(messages, discordCommunity)
 		if err != nil {
 			m.logger.Error("failed to convert chat messages into waku messages", zap.Error(err))
 			return
@@ -2663,21 +2736,15 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		wakuMessages := append(wakuChatMessages, wakuPinMessages...)
 
-		err = m.communitiesManager.StoreWakuMessages(wakuMessages)
-		if err != nil {
-			m.logger.Error("failed to store waku messages", zap.Error(err))
-			return
-		}
-
-		topics, err := m.communitiesManager.GetCommunityChatsTopics(discordCommunity.ID())
-		if err != nil {
-			m.logger.Error("failed to get community chat topics", zap.Error(err))
-			return
-		}
+    topics, err := m.communitiesManager.GetCommunityChatsTopics(discordCommunity.ID())
+    if err != nil {
+      m.logger.Error("failed to get community chat topics", zap.Error(err))
+      return
+    }
 
 		startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 		endDate := time.Now()
-		_, err = m.communitiesManager.CreateHistoryArchiveTorrent(discordCommunity.ID(), topics, startDate, endDate, messageArchivePartition, discordCommunity.Encrypted())
+		_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(discordCommunity.ID(), wakuMessages, topics, startDate, endDate, messageArchivePartition, discordCommunity.Encrypted())
 		if err != nil {
 			m.logger.Error("failed to create history archive torrent", zap.Error(err))
 			return
@@ -2820,3 +2887,43 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 
 	return wakuMessages, nil
 }
+
+func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxFileSizeBytes uint64) [][]*protobuf.DiscordMessageAttachment {
+	var chunks [][]*protobuf.DiscordMessageAttachment
+
+	currentChunkSize := uint64(0)
+	currentChunk := make([]*protobuf.DiscordMessageAttachment, 0)
+
+	for i, attachment := range slice {
+		payloadBytes := attachment.GetFileSizeBytes()
+		if currentChunkSize+payloadBytes > maxFileSizeBytes && len(currentChunk) > 0 {
+			chunks = append(chunks, currentChunk)
+			currentChunk = make([]*protobuf.DiscordMessageAttachment, 0)
+			currentChunkSize = uint64(0)
+		}
+		currentChunk = append(currentChunk, attachment)
+		currentChunkSize = currentChunkSize + payloadBytes
+    if i == len(slice)-1 {
+			chunks = append(chunks, currentChunk)
+    }
+	}
+	return chunks
+}
+
+func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(slice); i += chunkSize {
+		end := i + chunkSize
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if end > len(slice) {
+			end = len(slice)
+		}
+
+		chunks = append(chunks, slice[i:end])
+	}
+
+	return chunks
+}
+
