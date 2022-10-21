@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
 )
@@ -115,6 +116,14 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 		Cert:     &tpsc.Cert,
 		Hostname: tpsc.OutboundIP.String()})
 	require.NoError(t, err)
+}
+
+type TestLoggerComponents struct {
+	Logger *zap.Logger
+}
+
+func (tlc *TestLoggerComponents) SetupLoggerComponents() {
+	tlc.Logger = logutils.ZapLogger()
 }
 
 type MockEncryptOnlyPayloadManager struct {
