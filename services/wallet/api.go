@@ -363,31 +363,44 @@ func (api *API) GetDerivedAddressForPrivateKey(ctx context.Context, privateKey s
 		return derivedAddresses, err
 	}
 
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(common.HexToAddress(info.Address)))
+	derivedAddress, err := api.GetDerivedAddressDetails(ctx, info.Address)
 	if err != nil {
 		return derivedAddresses, err
+	}
+
+	derivedAddresses = append(derivedAddresses, derivedAddress)
+
+	return derivedAddresses, nil
+}
+
+func (api *API) GetDerivedAddressDetails(ctx context.Context, address string) (*DerivedAddress, error) {
+	var derivedAddress *DerivedAddress
+
+	commonAddr := common.HexToAddress(address)
+	addressExists, err := api.s.accountsDB.AddressExists(types.Address(commonAddr))
+	if err != nil {
+		return derivedAddress, err
 	}
 	if addressExists {
-		return derivedAddresses, fmt.Errorf("account already exists")
+		return derivedAddress, fmt.Errorf("account already exists")
 	}
 
-	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, common.HexToAddress(info.Address), nil, (*hexutil.Big)(big.NewInt(1)), false)
+	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, commonAddr, nil, (*hexutil.Big)(big.NewInt(1)), false)
 
 	if err != nil {
-		return derivedAddresses, err
+		return derivedAddress, err
 	}
 
 	hasActivity := int64(len(transactions)) > 0
 
-	derivedAddress := &DerivedAddress{
-		Address:        common.HexToAddress(info.Address),
+	derivedAddress = &DerivedAddress{
+		Address:        commonAddr,
 		Path:           "",
 		HasActivity:    hasActivity,
 		AlreadyCreated: addressExists,
 	}
-	derivedAddresses = append(derivedAddresses, derivedAddress)
 
-	return derivedAddresses, nil
+	return derivedAddress, nil
 }
 
 func (api *API) getDerivedAddresses(ctx context.Context, id string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
