@@ -14,8 +14,8 @@ import (
 	"net/url"
 
 	"github.com/btcsuite/btcutil/base58"
-	"github.com/davecgh/go-spew/spew"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/signal"
 )
@@ -69,7 +69,7 @@ func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) 
 		return nil, err
 	}
 
-	pm, err := NewPairingPayloadManager(c.aesKey, config)
+	pm, err := NewPairingPayloadManager(c.aesKey, config, logutils.ZapLogger().Named("PairingClient"))
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +109,12 @@ func (c *PairingClient) sendAccountData() error {
 	c.baseAddress.Path = pairingReceive
 	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 		return fmt.Errorf("status not ok, received '%s'", resp.Status)
 	}
 
@@ -140,25 +140,26 @@ func (c *PairingClient) receiveAccountData() error {
 
 	resp, err := c.Do(req)
 	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
-		return fmt.Errorf("status not ok, received '%s'", resp.Status)
+		err = fmt.Errorf("status not ok, received '%s'", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
+		return err
 	}
 
 	payload, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 		return err
 	}
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 
 	err = c.PayloadManager.Receive(payload)
 	if err != nil {
-		spew.Dump("c.PayloadManager.Receive(payload)", err.Error())
-		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
+		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error()})
 		return err
 	}
 	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess})

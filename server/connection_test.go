@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 var (
@@ -29,7 +31,7 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, defaultIP.String())
 	s.Require().NoError(err)
 
-	bs := NewServer(&cert, defaultIP.String(), func(int) {})
+	bs := NewServer(&cert, defaultIP.String(), nil, logutils.ZapLogger())
 	err = bs.SetPort(1337)
 	s.Require().NoError(err)
 

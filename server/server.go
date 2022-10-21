@@ -9,8 +9,6 @@ import (
 	"net/url"
 
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
 )
 
 type Server struct {
@@ -23,13 +21,12 @@ type Server struct {
 	portManger
 }
 
-func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int)) Server {
-	logger := logutils.ZapLogger()
+func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int), logger *zap.Logger) Server {
 	return Server{
 		logger:     logger,
 		cert:       cert,
 		hostname:   hostname,
-		portManger: newPortManager(logger, afterPortChanged),
+		portManger: newPortManager(logger.Named("Server"), afterPortChanged),
 	}
 }
 

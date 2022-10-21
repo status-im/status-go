@@ -405,7 +405,7 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
 			return
 		}
@@ -413,7 +413,7 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 
 		err = ps.PayloadManager.Receive(payload)
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error()})
 			ps.logger.Error("ps.PayloadManager.Receive(payload)", zap.Error(err))
 			return
 		}
@@ -429,7 +429,7 @@ func handlePairingSend(ps *PairingServer) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err := w.Write(ps.PayloadManager.ToSend())
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 			ps.logger.Error("w.Write(ps.PayloadManager.ToSend())", zap.Error(err))
 			return
 		}

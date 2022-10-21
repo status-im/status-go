@@ -20,5 +20,5 @@ const (
 // Event is a type for transfer events.
 type Event struct {
 	Type  EventType `json:"type"`
-	Error error     `json:"error,omitempty"`
+	Error string    `json:"error,omitempty"`
 }
