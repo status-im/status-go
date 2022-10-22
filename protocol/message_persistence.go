@@ -1853,7 +1853,7 @@ func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobu
 }
 
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
-	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
+	query := "INSERT OR REPLACE INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
