@@ -425,8 +425,8 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 
 func (p *Persistence) GetRequestToJoinIDByPkAndCommunityID(pk string, communityID []byte) ([]byte, error) {
 	var id []byte
-	err := p.db.QueryRow(`SELECT id WHERE community_id = ? AND public_key = ?`, communityID, pk).Scan(&id)
-	if err != nil {
+	err := p.db.QueryRow(`SELECT id FROM communities_requests_to_join WHERE community_id = ? AND public_key = ?`, communityID, pk).Scan(&id)
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 

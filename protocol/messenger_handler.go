@@ -1035,17 +1035,19 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			return err
 		}
 
-		if requestToJoin.State == communities.RequestToJoinStateAccepted {
-			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
-		} else {
-			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		if notification != nil {
+			if requestToJoin.State == communities.RequestToJoinStateAccepted {
+				notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			} else {
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+			}
+			saveErr := m.persistence.SaveActivityCenterNotification(notification)
+			if saveErr != nil {
+				m.logger.Warn("failed to update notification", zap.Error(saveErr))
+				return saveErr
+			}
+			state.Response.AddActivityCenterNotification(notification)
 		}
-		saveErr := m.persistence.SaveActivityCenterNotification(notification)
-		if saveErr != nil {
-			m.logger.Warn("failed to update notification", zap.Error(saveErr))
-			return saveErr
-		}
-		state.Response.AddActivityCenterNotification(notification)
 	}
 
 	return nil
@@ -1061,16 +1063,6 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		return err
 	}
 
-	// Activity Center notification
-	requestToJoinID, err := m.communitiesManager.GetRequestToJoinIDByPkAndCommunityID(signer, requestToJoinResponseProto.CommunityId)
-	if err != nil {
-		return err
-	}
-	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoinID)
-	if err != nil {
-		return err
-	}
-
 	if requestToJoinResponseProto.Accepted {
 		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId)
 		if err != nil {
@@ -1080,17 +1072,28 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			state.Response.AddCommunity(response.Communities()[0])
 			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
 		}
+	}
 
-		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
-	} else {
-		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+	// Activity Center notification
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), requestToJoinResponseProto.CommunityId)
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestID)
+	if err != nil {
+		return err
 	}
-	saveErr := m.persistence.SaveActivityCenterNotification(notification)
-	if saveErr != nil {
-		m.logger.Warn("failed to update notification", zap.Error(saveErr))
-		return saveErr
+
+	if notification != nil {
+		if requestToJoinResponseProto.Accepted {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+		} else {
+			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		}
+		saveErr := m.persistence.SaveActivityCenterNotification(notification)
+		if saveErr != nil {
+			m.logger.Warn("failed to update notification", zap.Error(saveErr))
+			return saveErr
+		}
+		state.Response.AddActivityCenterNotification(notification)
 	}
-	state.Response.AddActivityCenterNotification(notification)
 
 	return nil
 }

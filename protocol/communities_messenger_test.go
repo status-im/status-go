@@ -506,6 +506,11 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
 	// Retrieve and accept join request
 	err = tt.RetryWithBackOff(func() error {
 		response, err := s.admin.RetrieveAll()
@@ -513,7 +518,7 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 			return err
 		}
 		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response")
+			return errors.New("no communities in response (accept join request)")
 		}
 		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
 			return errors.New("user not accepted")
@@ -525,11 +530,12 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 	// Retrieve join request response
 	err = tt.RetryWithBackOff(func() error {
 		response, err := user.RetrieveAll()
+
 		if err != nil {
 			return err
 		}
 		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response")
+			return errors.New("no communities in response (join request response)")
 		}
 		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
 			return errors.New("user not a member")
@@ -958,7 +964,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	notification = response.ActivityCenterNotifications()[0]
 	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	// Pull message and make sure org is received
@@ -1134,7 +1140,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	notification = response.ActivityCenterNotifications()[0]
 	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	s.Require().Len(response.Communities(), 1)
@@ -1195,13 +1201,6 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	community = response.Communities()[0]
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
-
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-
-	notification = response.ActivityCenterNotifications()[0]
-	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
-	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Alice should then be removed
 	err = tt.RetryWithBackOff(func() error {
@@ -1408,7 +1407,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	notification = response.ActivityCenterNotifications()[0]
 	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusDeclined)
 
 	// Check if admin sees requests correctly
@@ -1437,7 +1436,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	notification = response.ActivityCenterNotifications()[0]
 	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	// Pull message and make sure org is received
