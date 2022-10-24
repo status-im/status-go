@@ -162,7 +162,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 }
 
-func (s *MessengerVerificationRequests) TestVerificationRequests() {
+func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
@@ -239,6 +239,100 @@ func (s *MessengerVerificationRequests) TestVerificationRequests() {
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusACCEPTED)
 	s.Require().Equal(common.ContactVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+}
+
+func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	s.mutualContact(theirMessenger)
+
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	challenge := "challenge"
+
+	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	verificationRequestID := resp.VerificationRequests[0].ID
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
+
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(challenge, resp.ActivityCenterNotifications()[0].Message.Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
+
+	// Make sure it's stored and retrieved correctly
+	notifications, err := theirMessenger.UnreadActivityCenterNotifications("", 4, ActivityCenterNotificationTypeContactVerification)
+	s.Require().NoError(err)
+	s.Require().Len(notifications.Notifications, 1)
+	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusPENDING)
+	s.Require().Equal(common.ContactVerificationStatePending, notifications.Notifications[0].Message.ContactVerificationState)
+
+	resp, err = theirMessenger.DeclineContactVerificationRequest(context.Background(), verificationRequestID)
+
+	s.Require().NoError(err)
+
+	s.Require().NotNil(resp)
+
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusDECLINED)
+	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
+	s.Require().Equal(common.ContactVerificationStateDeclined, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactVerificationStateDeclined, resp.Messages()[0].ContactVerificationState)
+
+	// Make sure it's stored and retrieved correctly
+	notifications, err = theirMessenger.UnreadActivityCenterNotifications("", 4, ActivityCenterNotificationTypeContactVerification)
+	s.Require().NoError(err)
+	s.Require().Len(notifications.Notifications, 1)
+	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
+	s.Require().Equal(common.ContactVerificationStateDeclined, notifications.Notifications[0].Message.ContactVerificationState)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactVerificationStateDeclined, resp.Messages()[0].ContactVerificationState)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
+	s.Require().Equal(common.ContactVerificationStateDeclined, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
 }
 
 func (s *MessengerVerificationRequests) TearDownTest() {

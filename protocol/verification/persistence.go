@@ -40,7 +40,7 @@ const (
 )
 
 type Request struct {
-        ID            string        `json:"id"`
+	ID            string        `json:"id"`
 	From          string        `json:"from"`
 	To            string        `json:"to"`
 	Challenge     string        `json:"challenge"`
@@ -72,7 +72,7 @@ func (p *Persistence) GetVerificationRequests() ([]Request, error) {
 func (p *Persistence) GetVerificationRequest(id string) (*Request, error) {
 	var vr Request
 	err := p.db.QueryRow(`SELECT id, from_user, to_user, challenge, response, requested_at, verification_status, replied_at FROM verification_requests_individual WHERE id = ?`, id).Scan(
-                &vr.ID,
+		&vr.ID,
 		&vr.From,
 		&vr.To,
 		&vr.Challenge,
@@ -107,7 +107,7 @@ func (p *Persistence) GetReceivedVerificationRequests(myPublicKey string) ([]*Re
 		var vr Request
 
 		err := rows.Scan(
-                        &vr.ID,
+			&vr.ID,
 			&vr.From,
 			&vr.To,
 			&vr.Challenge,
@@ -129,7 +129,7 @@ func (p *Persistence) GetReceivedVerificationRequests(myPublicKey string) ([]*Re
 func (p *Persistence) GetVerificationRequestSentTo(contactID string) (*Request, error) {
 	var vr Request
 	err := p.db.QueryRow(`SELECT id, from_user, to_user, challenge, response, requested_at, verification_status, replied_at FROM verification_requests_individual WHERE to_user = ?`, contactID).Scan(
-                &vr.ID,
+		&vr.ID,
 		&vr.From,
 		&vr.To,
 		&vr.Challenge,
