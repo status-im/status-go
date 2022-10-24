@@ -1,6 +1,9 @@
 package contracts
 
 import (
+	"context"
+	"errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/contracts/directory"
@@ -157,6 +160,15 @@ func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, err
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
+	}
+
+	bytecode, err := backend.CodeAt(context.Background(), contractAddr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(bytecode) == 0 {
+		return nil, errors.New("is not a contract")
 	}
 
 	return ethscan.NewBalanceScanner(
