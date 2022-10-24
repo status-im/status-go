@@ -477,6 +477,11 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
+// MyCanceledRequestsToJoin returns the pending requests for the logged in user
+func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyCanceledRequestsToJoin()
+}
+
 // PendingRequestsToJoinForCommunity returns the pending requests to join for a given community
 func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
@@ -485,6 +490,16 @@ func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*c
 // DeclinedRequestsToJoinForCommunity returns the declined requests to join for a given community
 func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
+}
+
+// CanceledRequestsToJoinForCommunity returns the declined requests to join for a given community
+func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.CanceledRequestsToJoinForCommunity(id)
+}
+
+// CancelRequestToJoinCommunity accepts a pending request to join a community
+func (api *PublicAPI) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelRequestToJoinCommunity(request)
 }
 
 // AcceptRequestToJoinCommunity accepts a pending request to join a community

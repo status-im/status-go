@@ -253,6 +253,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoin))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoinResponse))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN:
+		return m.unmarshalProtobufData(new(protobuf.CommunityCancelRequestToJoin))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToLeave))
 	case protobuf.ApplicationMetadataMessage_EDIT_MESSAGE:

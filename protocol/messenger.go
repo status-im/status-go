@@ -3993,6 +3993,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
 							continue
 						}
+					case protobuf.CommunityCancelRequestToJoin:
+						logger.Debug("Handling CommunityCancelRequestToJoin")
+						request := msg.ParsedMessage.Interface().(protobuf.CommunityCancelRequestToJoin)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
+						err = m.HandleCommunityCancelRequestToJoin(messageState, publicKey, request)
+						if err != nil {
+							logger.Warn("failed to handle CommunityCancelRequestToJoin", zap.Error(err))
+							continue
+						}
 					case protobuf.CommunityRequestToJoinResponse:
 						logger.Debug("Handling CommunityRequestToJoinResponse")
 						requestToJoinResponse := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoinResponse)

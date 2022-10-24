@@ -353,6 +353,25 @@ func (p *Persistence) SaveRequestToLeave(request *RequestToLeave) error {
 	return err
 }
 
+func (p *Persistence) CanceledRequestsToJoinForUser(pk string) ([]*RequestToJoin, error) {
+	var requests []*RequestToJoin
+	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, RequestToJoinStateCanceled, pk)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		request := &RequestToJoin{}
+		err := rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.CommunityID, &request.State)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	return requests, nil
+}
+
 func (p *Persistence) PendingRequestsToJoinForUser(pk string) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
 	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, RequestToJoinStatePending, pk)
@@ -408,6 +427,10 @@ func (p *Persistence) DeclinedRequestsToJoinForCommunity(id []byte) ([]*RequestT
 	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateDeclined)
 }
 
+func (p *Persistence) CanceledRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateCanceled)
+}
+
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
 	return err
@@ -436,6 +459,16 @@ func (p *Persistence) GetRequestToJoinIDByPkAndCommunityID(pk string, communityI
 	}
 
 	return id, nil
+}
+
+func (p *Persistence) GetRequestToJoinByPk(pk string, communityID []byte, state RequestToJoinState) (*RequestToJoin, error) {
+	request := &RequestToJoin{}
+	err := p.db.QueryRow(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE public_key = ? AND community_id = ? AND state = ?`, pk, communityID, state).Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.CommunityID, &request.State)
+	if err != nil {
+		return nil, err
+	}
+
+	return request, nil
 }
 
 func (p *Persistence) SetSyncClock(id []byte, clock uint64) error {
