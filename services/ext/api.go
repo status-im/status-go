@@ -797,7 +797,7 @@ func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, cont
 	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
 }
 
-func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) error {
+func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
 }
 

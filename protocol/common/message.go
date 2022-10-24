@@ -64,7 +64,7 @@ type ContactVerificationState int
 const (
 	ContactVerificationStatePending ContactVerificationState = iota + 1
 	ContactVerificationStateAccepted
-	ContactVerificationStateDismissed
+	ContactVerificationStateDeclined
 )
 
 type CommandParameters struct {
@@ -205,81 +205,81 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		URL  string `json:"url"`
 	}
 	item := struct {
-		ID                        string                           `json:"id"`
-		WhisperTimestamp          uint64                           `json:"whisperTimestamp"`
-		From                      string                           `json:"from"`
-		Alias                     string                           `json:"alias"`
-		Identicon                 string                           `json:"identicon"`
-		Seen                      bool                             `json:"seen"`
-		OutgoingStatus            string                           `json:"outgoingStatus,omitempty"`
-		QuotedMessage             *QuotedMessage                   `json:"quotedMessage"`
-		RTL                       bool                             `json:"rtl"`
-		ParsedText                json.RawMessage                  `json:"parsedText,omitempty"`
-		LineCount                 int                              `json:"lineCount"`
-		Text                      string                           `json:"text"`
-		ChatID                    string                           `json:"chatId"`
-		LocalChatID               string                           `json:"localChatId"`
-		Clock                     uint64                           `json:"clock"`
-		Replace                   string                           `json:"replace"`
-		ResponseTo                string                           `json:"responseTo"`
-		New                       bool                             `json:"new,omitempty"`
-		EnsName                   string                           `json:"ensName"`
-		DisplayName               string                           `json:"displayName"`
-		Image                     string                           `json:"image,omitempty"`
-		Audio                     string                           `json:"audio,omitempty"`
-		AudioDurationMs           uint64                           `json:"audioDurationMs,omitempty"`
-		CommunityID               string                           `json:"communityId,omitempty"`
-		Sticker                   *StickerAlias                    `json:"sticker,omitempty"`
-		CommandParameters         *CommandParameters               `json:"commandParameters,omitempty"`
-		GapParameters             *GapParameters                   `json:"gapParameters,omitempty"`
-		Timestamp                 uint64                           `json:"timestamp"`
-		ContentType               protobuf.ChatMessage_ContentType `json:"contentType"`
-		MessageType               protobuf.MessageType             `json:"messageType"`
-		Mentions                  []string                         `json:"mentions,omitempty"`
-		Mentioned                 bool                             `json:"mentioned,omitempty"`
-		Links                     []string                         `json:"links,omitempty"`
-		EditedAt                  uint64                           `json:"editedAt,omitempty"`
-		Deleted                   bool                             `json:"deleted,omitempty"`
-		DeletedForMe              bool                             `json:"deletedForMe,omitempty"`
-		ContactRequestState       ContactRequestState              `json:"contactRequestState,omitempty"`
-		ContactVerificationState ContactVerificationState        `json:"contactVerificationState,omitempty"`
-		DiscordMessage            *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
+		ID                       string                           `json:"id"`
+		WhisperTimestamp         uint64                           `json:"whisperTimestamp"`
+		From                     string                           `json:"from"`
+		Alias                    string                           `json:"alias"`
+		Identicon                string                           `json:"identicon"`
+		Seen                     bool                             `json:"seen"`
+		OutgoingStatus           string                           `json:"outgoingStatus,omitempty"`
+		QuotedMessage            *QuotedMessage                   `json:"quotedMessage"`
+		RTL                      bool                             `json:"rtl"`
+		ParsedText               json.RawMessage                  `json:"parsedText,omitempty"`
+		LineCount                int                              `json:"lineCount"`
+		Text                     string                           `json:"text"`
+		ChatID                   string                           `json:"chatId"`
+		LocalChatID              string                           `json:"localChatId"`
+		Clock                    uint64                           `json:"clock"`
+		Replace                  string                           `json:"replace"`
+		ResponseTo               string                           `json:"responseTo"`
+		New                      bool                             `json:"new,omitempty"`
+		EnsName                  string                           `json:"ensName"`
+		DisplayName              string                           `json:"displayName"`
+		Image                    string                           `json:"image,omitempty"`
+		Audio                    string                           `json:"audio,omitempty"`
+		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
+		CommunityID              string                           `json:"communityId,omitempty"`
+		Sticker                  *StickerAlias                    `json:"sticker,omitempty"`
+		CommandParameters        *CommandParameters               `json:"commandParameters,omitempty"`
+		GapParameters            *GapParameters                   `json:"gapParameters,omitempty"`
+		Timestamp                uint64                           `json:"timestamp"`
+		ContentType              protobuf.ChatMessage_ContentType `json:"contentType"`
+		MessageType              protobuf.MessageType             `json:"messageType"`
+		Mentions                 []string                         `json:"mentions,omitempty"`
+		Mentioned                bool                             `json:"mentioned,omitempty"`
+		Links                    []string                         `json:"links,omitempty"`
+		EditedAt                 uint64                           `json:"editedAt,omitempty"`
+		Deleted                  bool                             `json:"deleted,omitempty"`
+		DeletedForMe             bool                             `json:"deletedForMe,omitempty"`
+		ContactRequestState      ContactRequestState              `json:"contactRequestState,omitempty"`
+		ContactVerificationState ContactVerificationState         `json:"contactVerificationState,omitempty"`
+		DiscordMessage           *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
 	}{
-		ID:                        m.ID,
-		WhisperTimestamp:          m.WhisperTimestamp,
-		From:                      m.From,
-		Alias:                     m.Alias,
-		Identicon:                 m.Identicon,
-		Seen:                      m.Seen,
-		OutgoingStatus:            m.OutgoingStatus,
-		QuotedMessage:             m.QuotedMessage,
-		RTL:                       m.RTL,
-		ParsedText:                m.ParsedText,
-		LineCount:                 m.LineCount,
-		Text:                      m.Text,
-		Replace:                   m.Replace,
-		ChatID:                    m.ChatId,
-		LocalChatID:               m.LocalChatID,
-		Clock:                     m.Clock,
-		ResponseTo:                m.ResponseTo,
-		New:                       m.New,
-		EnsName:                   m.EnsName,
-		DisplayName:               m.DisplayName,
-		Image:                     m.ImageLocalURL,
-		Audio:                     m.AudioLocalURL,
-		CommunityID:               m.CommunityID,
-		Timestamp:                 m.Timestamp,
-		ContentType:               m.ContentType,
-		Mentions:                  m.Mentions,
-		Mentioned:                 m.Mentioned,
-		Links:                     m.Links,
-		MessageType:               m.MessageType,
-		CommandParameters:         m.CommandParameters,
-		GapParameters:             m.GapParameters,
-		EditedAt:                  m.EditedAt,
-		Deleted:                   m.Deleted,
-		DeletedForMe:              m.DeletedForMe,
-		ContactRequestState:       m.ContactRequestState,
+		ID:                       m.ID,
+		WhisperTimestamp:         m.WhisperTimestamp,
+		From:                     m.From,
+		Alias:                    m.Alias,
+		Identicon:                m.Identicon,
+		Seen:                     m.Seen,
+		OutgoingStatus:           m.OutgoingStatus,
+		QuotedMessage:            m.QuotedMessage,
+		RTL:                      m.RTL,
+		ParsedText:               m.ParsedText,
+		LineCount:                m.LineCount,
+		Text:                     m.Text,
+		Replace:                  m.Replace,
+		ChatID:                   m.ChatId,
+		LocalChatID:              m.LocalChatID,
+		Clock:                    m.Clock,
+		ResponseTo:               m.ResponseTo,
+		New:                      m.New,
+		EnsName:                  m.EnsName,
+		DisplayName:              m.DisplayName,
+		Image:                    m.ImageLocalURL,
+		Audio:                    m.AudioLocalURL,
+		CommunityID:              m.CommunityID,
+		Timestamp:                m.Timestamp,
+		ContentType:              m.ContentType,
+		Mentions:                 m.Mentions,
+		Mentioned:                m.Mentioned,
+		Links:                    m.Links,
+		MessageType:              m.MessageType,
+		CommandParameters:        m.CommandParameters,
+		GapParameters:            m.GapParameters,
+		EditedAt:                 m.EditedAt,
+		Deleted:                  m.Deleted,
+		DeletedForMe:             m.DeletedForMe,
+		ContactRequestState:      m.ContactRequestState,
 		ContactVerificationState: m.ContactVerificationState,
 	}
 	if sticker := m.GetSticker(); sticker != nil {

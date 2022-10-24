@@ -279,13 +279,13 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	resp.AddMessage(chatMessage)
 
 	if notification != nil {
-                // TODO: Should we update only the message or only the notification or both?
-                err := m.persistence.UpdateActivityCenterNotificationContactVerificationStatus(notification.ID, verification.RequestStatusACCEPTED)
-                if err != nil {
-                  return nil, err
-                }
+		// TODO: Should we update only the message or only the notification or both?
+		err := m.persistence.UpdateActivityCenterNotificationContactVerificationStatus(notification.ID, verification.RequestStatusACCEPTED)
+		if err != nil {
+			return nil, err
+		}
 
-                notification.ContactVerificationStatus = verification.RequestStatusACCEPTED
+		notification.ContactVerificationStatus = verification.RequestStatusACCEPTED
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateAccepted
 		err = m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
@@ -416,31 +416,31 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, contactID string)
 	return nil
 }
 
-func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id string) error {
+func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id string) (*MessengerResponse, error) {
 	verifRequest, err := m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if verifRequest == nil {
 		m.logger.Error("could not find verification request with id", zap.String("id", id))
-		return verification.ErrVerificationRequestNotFound
+		return nil, verification.ErrVerificationRequestNotFound
 	}
 
 	contact, ok := m.allContacts.Load(verifRequest.From)
 	if !ok || !contact.Added || !contact.HasAddedUs {
-		return errors.New("must be a mutual contact")
+		return nil, errors.New("must be a mutual contact")
 	}
 
 	if verifRequest == nil {
-		return errors.New("no contact verification found")
+		return nil, errors.New("no contact verification found")
 	}
 
 	chat, ok := m.allChats.Load(verifRequest.From)
 	if !ok {
 		publicKey, err := contact.PublicKey()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
 		// We don't want to show the chat to the user
@@ -454,12 +454,16 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	verifRequest.RepliedAt = clock
 	err = m.verificationDatabase.SaveVerificationRequest(verifRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	response := &MessengerResponse{}
+
+	response.AddVerificationRequest(verifRequest)
 
 	err = m.SyncVerificationRequest(context.Background(), verifRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	request := &protobuf.DeclineContactVerification{
@@ -469,7 +473,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 
 	encodedMessage, err := proto.Marshal(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
@@ -480,10 +484,38 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return m.verificationDatabase.DeclineContactVerificationRequest(verifRequest.From)
+	err = m.verificationDatabase.DeclineContactVerificationRequest(id)
+	if err != nil {
+		return nil, err
+	}
+
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(id))
+	if err != nil {
+		return nil, err
+	}
+
+	if notification != nil {
+		// TODO: Should we update only the message or only the notification or both?
+		err := m.persistence.UpdateActivityCenterNotificationContactVerificationStatus(notification.ID, verification.RequestStatusDECLINED)
+		if err != nil {
+			return nil, err
+		}
+
+		notification.ContactVerificationStatus = verification.RequestStatusDECLINED
+		message := notification.Message
+		message.ContactVerificationState = common.ContactVerificationStateDeclined
+		err = m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
+		if err != nil {
+			return nil, err
+		}
+		response.AddActivityCenterNotification(notification)
+		response.AddMessage(message)
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) MarkAsTrusted(ctx context.Context, contactID string) error {
@@ -728,7 +760,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 		return errors.New("must be a mutual contact")
 	}
 
-	persistedVR, err := m.verificationDatabase.GetVerificationRequestSentTo(contactID)
+	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
 	if err != nil {
 		m.logger.Debug("Error obtaining verification request", zap.Error(err))
 		return err
@@ -765,9 +797,17 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
 
-	// TODO: create or update activity center notification
+	msg, err := m.persistence.MessageByID(request.Id)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	if msg != nil {
+		msg.ContactVerificationState = common.ContactVerificationStateDeclined
+		state.Response.AddMessage(msg)
+	}
+
+	return m.createContactVerificationNotification(contact, state, persistedVR, msg)
 }
 
 func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState, request protobuf.ContactVerificationTrusted) error {

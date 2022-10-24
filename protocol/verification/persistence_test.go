@@ -34,7 +34,7 @@ func (s *PersistenceSuite) SetupTest() {
 
 func (s *PersistenceSuite) TestVerificationRequests() {
 	request := &Request{
-                ID:            "0xabc",
+		ID:            "0xabc",
 		From:          "0x01",
 		To:            "0x02",
 		Challenge:     "ABC",
@@ -46,30 +46,32 @@ func (s *PersistenceSuite) TestVerificationRequests() {
 
 	// Test Insert
 	err := s.db.SaveVerificationRequest(request)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Test Found
 	dbRequest, err := s.db.GetVerificationRequest("0xabc")
-	s.NoError(err)
-	s.Equal(request, dbRequest)
+	s.Require().NoError(err)
+	s.Require().Equal(request, dbRequest)
 
 	// Test Not Found
-	dbRequest2, err := s.db.GetVerificationRequestFrom("0xdef")
-	s.NoError(err)
-	s.Nil(dbRequest2)
+	dbRequest2, err := s.db.GetVerificationRequest("0xdef")
+	s.Require().NoError(err)
+	s.Require().Nil(dbRequest2)
 
 	// Test Accept
-	err = s.db.AcceptContactVerificationRequest("0x01", "XYZ")
-	s.NoError(err)
+	err = s.db.AcceptContactVerificationRequest("0xabc", "XYZ")
+	s.Require().NoError(err)
 
-	dbRequest, err = s.db.GetVerificationRequestFrom("0x01")
-	s.NoError(err)
-	s.Equal(RequestStatusACCEPTED, dbRequest.RequestStatus)
-	s.Equal("XYZ", dbRequest.Response)
-	s.NotEqual(time.Unix(0, 0), dbRequest.RepliedAt)
+	dbRequest, err = s.db.GetVerificationRequest("0xabc")
+	s.Require().NoError(err)
+	s.Require().NotNil(dbRequest)
+	s.Require().Equal(RequestStatusACCEPTED, dbRequest.RequestStatus)
+	s.Require().Equal("XYZ", dbRequest.Response)
+	s.Require().NotEqual(time.Unix(0, 0), dbRequest.RepliedAt)
 
 	// Test Decline
 	request = &Request{
+		ID:            "0x01",
 		From:          "0x03",
 		To:            "0x02",
 		Challenge:     "ABC",
@@ -82,51 +84,14 @@ func (s *PersistenceSuite) TestVerificationRequests() {
 	err = s.db.SaveVerificationRequest(request)
 	s.NoError(err)
 
-	err = s.db.DeclineContactVerificationRequest("0x03")
+	err = s.db.DeclineContactVerificationRequest("0x01")
 	s.NoError(err)
 
-	dbRequest, err = s.db.GetVerificationRequestFrom("0x03")
+	dbRequest, err = s.db.GetVerificationRequest("0x01")
 	s.NoError(err)
 	s.Equal(RequestStatusDECLINED, dbRequest.RequestStatus)
 	s.NotEqual(time.Unix(0, 0), dbRequest.RepliedAt)
 
-	// Test Upsert fails because of older record
-	ogDbRequestStatus := dbRequest.RequestStatus
-	dbRequest.RequestStatus = RequestStatusPENDING
-	shouldSync, err := s.db.UpsertVerificationRequest(dbRequest)
-	s.NoError(err)
-	s.False(shouldSync)
-
-	dbRequest.RequestStatus = ogDbRequestStatus
-	dbRequest2, err = s.db.GetVerificationRequestFrom("0x03")
-	s.NoError(err)
-	s.Equal(dbRequest, dbRequest2)
-
-	// Test upsert success (update)
-	dbRequest2.RequestStatus = RequestStatusPENDING
-	dbRequest2.RepliedAt = dbRequest2.RepliedAt + 100
-	shouldSync, err = s.db.UpsertVerificationRequest(dbRequest2)
-	s.NoError(err)
-	s.True(shouldSync)
-
-	// Test upsert success (insert)
-	verifReq := &Request{
-		From:          "0x0A",
-		To:            "0x0B",
-		Challenge:     "123",
-		Response:      "456",
-		RequestedAt:   uint64(time.Now().Unix()),
-		RepliedAt:     uint64(time.Now().Unix()),
-		RequestStatus: RequestStatusPENDING,
-	}
-
-	shouldSync, err = s.db.UpsertVerificationRequest(verifReq)
-	s.NoError(err)
-	s.True(shouldSync)
-
-	dbRequest, err = s.db.GetVerificationRequestFrom("0x0A")
-	s.NoError(err)
-	s.Equal(verifReq.To, dbRequest.To)
 }
 
 func (s *PersistenceSuite) TestTrustStatus() {

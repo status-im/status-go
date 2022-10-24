@@ -122,7 +122,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author) VALUES (?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status) VALUES (?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus)
 	return err
 }
 
@@ -148,7 +148,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&messageBytes,
 		&lastMessageBytes,
 		&replyMessageBytes,
-                &notification.ContactVerificationStatus,
+		&notification.ContactVerificationStatus,
 		&name,
 		&author)
 
@@ -710,11 +710,10 @@ func (db sqlitePersistence) UpdateActivityCenterNotificationMessage(id types.Hex
 }
 
 func (db sqlitePersistence) UpdateActivityCenterNotificationContactVerificationStatus(id types.HexBytes, status verification.RequestStatus) error {
-  _, err := db.db.Exec(`UPDATE activity_center_notifications SET contact_verification_status = ? WHERE id = ?`, status, id)
-  return err
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET contact_verification_status = ? WHERE id = ?`, status, id)
+	return err
 
 }
-
 
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
