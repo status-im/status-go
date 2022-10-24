@@ -10,6 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
@@ -65,6 +66,15 @@ func TestResolver(t *testing.T) {
 	r, err := api.Resolver(context.Background(), 1, "rramos.eth")
 	require.NoError(t, err)
 	require.Equal(t, "0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41", r.String())
+}
+
+func TestGetName(t *testing.T) {
+	api, cancel := setupTestAPI(t)
+	defer cancel()
+
+	r, err := api.GetName(context.Background(), 1, common.HexToAddress("0x7d28Ab6948F3Db2F95A43742265D382a4888c120"))
+	require.NoError(t, err)
+	require.Equal(t, "rramos.eth", r)
 }
 
 func TestOwnerOf(t *testing.T) {

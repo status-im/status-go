@@ -14,6 +14,7 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
 	"github.com/pkg/errors"
+	"github.com/wealdtech/go-ens/v3"
 	"github.com/wealdtech/go-multicodec"
 
 	"github.com/ethereum/go-ethereum"
@@ -96,6 +97,14 @@ func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (
 	}
 
 	return &resolver, nil
+}
+
+func (api *API) GetName(ctx context.Context, chainID uint64, address common.Address) (string, error) {
+	backend, err := api.contractMaker.RPCClient.EthClient(chainID)
+	if err != nil {
+		return "", err
+	}
+	return ens.ReverseResolve(backend, address)
 }
 
 func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
