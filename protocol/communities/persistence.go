@@ -686,8 +686,8 @@ func (p *Persistence) UpdateCommunitySettings(communitySettings CommunitySetting
     WHERE community_id = ?`,
 		communitySettings.HistoryArchiveSupportEnabled,
 		communitySettings.HistoryArchiveSupportEnabled,
-		communitySettings.CommunityID,
 		communitySettings.Clock,
+		communitySettings.CommunityID,
 	)
 	return err
 }
