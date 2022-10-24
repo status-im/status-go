@@ -11,6 +11,10 @@ import (
 
 const cryptocompareURL = "https://min-api.cryptocompare.com"
 
+var renameMapping = map[string]string{
+	"STT": "SNT",
+}
+
 type Coin struct {
 	ID                   string  `json:"Id"`
 	Name                 string  `json:"Name"`
@@ -60,10 +64,25 @@ type MarketValuesContainer struct {
 	Display map[string]map[string]MarketCoinValues `json:"Display"`
 }
 
+func renameSymbols(symbols []string) (renames []string) {
+	for _, symbol := range symbols {
+		renames = append(renames, getRealSymbol(symbol))
+	}
+	return
+}
+
+func getRealSymbol(symbol string) string {
+	if val, ok := renameMapping[strings.ToUpper(symbol)]; ok {
+		return val
+	}
+	return strings.ToUpper(symbol)
+}
+
 func fetchCryptoComparePrices(symbols []string, currency string) (map[string]float64, error) {
+	realSymbols := renameSymbols(symbols)
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(symbols, ","), currency)
+	url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -83,7 +102,7 @@ func fetchCryptoComparePrices(symbols []string, currency string) (map[string]flo
 
 	result := make(map[string]float64)
 	for _, symbol := range symbols {
-		result[symbol] = prices[strings.ToUpper(symbol)][strings.ToUpper(currency)]
+		result[symbol] = prices[getRealSymbol(symbol)][strings.ToUpper(currency)]
 	}
 	return result, nil
 }
@@ -112,17 +131,18 @@ func fetchCryptoCompareTokenDetails(symbols []string) (map[string]Coin, error) {
 	coins := make(map[string]Coin)
 
 	for _, symbol := range symbols {
-		coins[symbol] = container.Data[symbol]
+		coins[symbol] = container.Data[getRealSymbol(symbol)]
 	}
 
 	return coins, nil
 }
 
 func fetchTokenMarketValues(symbols []string, currency string) (map[string]MarketCoinValues, error) {
+	realSymbols := renameSymbols(symbols)
 	item := map[string]MarketCoinValues{}
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(symbols, ","), currency)
+	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return item, err
@@ -140,19 +160,18 @@ func fetchTokenMarketValues(symbols []string, currency string) (map[string]Marke
 		return item, err
 	}
 
-	for key, element := range container.Display {
-		item[key] = element[strings.ToUpper(currency)]
+	for _, symbol := range symbols {
+		item[symbol] = container.Display[getRealSymbol(symbol)][strings.ToUpper(currency)]
 	}
 
 	return item, nil
-
 }
 
 func fetchHourlyMarketValues(symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
 	item := []TokenHistoricalPairs{}
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("%s/data/v2/histohour?fsym=%s&tsym=%s&aggregate=%d&limit=%d&extraParams=Status.im", cryptocompareURL, symbol, currency, aggregate, limit)
+	url := fmt.Sprintf("%s/data/v2/histohour?fsym=%s&tsym=%s&aggregate=%d&limit=%d&extraParams=Status.im", cryptocompareURL, getRealSymbol(symbol), currency, aggregate, limit)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return item, err
@@ -179,7 +198,7 @@ func fetchDailyMarketValues(symbol string, currency string, limit int, allData b
 	item := []TokenHistoricalPairs{}
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("%s/data/v2/histoday?fsym=%s&tsym=%s&aggregate=%d&limit=%d&allData=%v&extraParams=Status.im", cryptocompareURL, symbol, currency, aggregate, limit, allData)
+	url := fmt.Sprintf("%s/data/v2/histoday?fsym=%s&tsym=%s&aggregate=%d&limit=%d&allData=%v&extraParams=Status.im", cryptocompareURL, getRealSymbol(symbol), currency, aggregate, limit, allData)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return item, err
