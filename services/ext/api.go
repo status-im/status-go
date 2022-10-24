@@ -759,6 +759,9 @@ func (api *PublicAPI) SendOneToOneMessage(request *requests.SendOneToOneMessage)
 	return api.service.messenger.SendOneToOneMessage(request)
 }
 
+func (api *PublicAPI) SendGroupChatMessage(request *requests.SendGroupChatMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendGroupChatMessage(request)
+}
 
 func (api *PublicAPI) EditMessage(ctx context.Context, request *requests.EditMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditMessage(ctx, request)

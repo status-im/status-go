@@ -1918,41 +1918,6 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message
 	return m.sendChatMessage(ctx, message)
 }
 
-func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-        chatID := request.ID.String()
-
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		// Only one to one chan be muted when it's not in the database
-		publicKey, err := common.HexToPubkey(chatID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Create a one to one chat
-		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
-		err = m.initChatSyncFields(chat)
-		if err != nil {
-			return nil, err
-		}
-		err = m.saveChat(chat)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-        message := &common.Message{}
-        message.Text = request.Message
-        message.ChatId = chatID
-        message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-
-        return m.sendChatMessage(context.Background(), message)
-}
-
 // SendChatMessages takes a array of messages and sends it based on the corresponding chats
 func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Message) (*MessengerResponse, error) {
 	var response MessengerResponse
