@@ -143,11 +143,6 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, err
 	}
 
-	err = m.persistence.HideMessage(messageID)
-	if err != nil {
-		return nil, err
-	}
-
 	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
 		if err := m.updateLastMessage(chat); err != nil {
 			return nil, err
@@ -271,7 +266,7 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 		return err
 	}
 
-	return m.persistence.HideMessage(message.ID)
+	return nil
 }
 
 func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {

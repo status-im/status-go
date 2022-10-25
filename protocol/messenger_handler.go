@@ -1270,11 +1270,6 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
-	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
-	if err != nil {
-		return err
-	}
-
 	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
 	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteMessage.MessageId)
 
