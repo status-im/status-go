@@ -202,8 +202,6 @@ github.com/ethereum/go-ethereum/accounts/abi/bind
 github.com/ethereum/go-ethereum/accounts/external
 github.com/ethereum/go-ethereum/accounts/keystore
 github.com/ethereum/go-ethereum/accounts/scwallet
-github.com/ethereum/go-ethereum/accounts/usbwallet
-github.com/ethereum/go-ethereum/accounts/usbwallet/trezor
 github.com/ethereum/go-ethereum/common
 github.com/ethereum/go-ethereum/common/bitutil
 github.com/ethereum/go-ethereum/common/hexutil
@@ -211,10 +209,8 @@ github.com/ethereum/go-ethereum/common/math
 github.com/ethereum/go-ethereum/common/mclock
 github.com/ethereum/go-ethereum/common/prque
 github.com/ethereum/go-ethereum/consensus
-github.com/ethereum/go-ethereum/consensus/clique
 github.com/ethereum/go-ethereum/consensus/ethash
 github.com/ethereum/go-ethereum/consensus/misc
-github.com/ethereum/go-ethereum/console/prompt
 github.com/ethereum/go-ethereum/core
 github.com/ethereum/go-ethereum/core/bloombits
 github.com/ethereum/go-ethereum/core/rawdb
@@ -266,9 +262,7 @@ github.com/ethereum/go-ethereum/params
 github.com/ethereum/go-ethereum/rlp
 github.com/ethereum/go-ethereum/rlp/internal/rlpstruct
 github.com/ethereum/go-ethereum/rpc
-github.com/ethereum/go-ethereum/signer/core
 github.com/ethereum/go-ethereum/signer/core/apitypes
-github.com/ethereum/go-ethereum/signer/storage
 github.com/ethereum/go-ethereum/trie
 # github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
 ## explicit
@@ -346,7 +340,6 @@ github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.5.2
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/protoc-gen-go/descriptor
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
@@ -441,17 +434,6 @@ github.com/jbenet/goprocess
 # github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 ## explicit
 github.com/jinzhu/copier
-# github.com/karalabe/usb v0.0.2
-## explicit; go 1.12
-github.com/karalabe/usb
-github.com/karalabe/usb/hidapi
-github.com/karalabe/usb/hidapi/hidapi
-github.com/karalabe/usb/hidapi/libusb
-github.com/karalabe/usb/hidapi/mac
-github.com/karalabe/usb/hidapi/windows
-github.com/karalabe/usb/libusb
-github.com/karalabe/usb/libusb/libusb
-github.com/karalabe/usb/libusb/libusb/os
 # github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 ## explicit
 github.com/keighl/metabolize
@@ -778,9 +760,6 @@ github.com/pbnjay/memory
 # github.com/pborman/uuid v1.2.0
 ## explicit
 github.com/pborman/uuid
-# github.com/peterh/liner v1.2.1
-## explicit
-github.com/peterh/liner
 # github.com/pion/datachannel v1.5.2
 ## explicit; go 1.13
 github.com/pion/datachannel

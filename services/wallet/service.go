@@ -64,7 +64,7 @@ type Service struct {
 	accountsDB            *accounts.Database
 	rpcClient             *rpc.Client
 	savedAddressesManager *SavedAddressesManager
-	tokenManager          *token.TokenManager
+	tokenManager          *token.Manager
 	transactionManager    *TransactionManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
