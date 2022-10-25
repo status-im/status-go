@@ -28,7 +28,7 @@ func TestCustoms(t *testing.T) {
 	manager, stop := setupTestTokenDB(t)
 	defer stop()
 
-	rst, err := manager.getCustoms()
+	rst, err := manager.GetCustoms()
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
@@ -41,18 +41,18 @@ func TestCustoms(t *testing.T) {
 		ChainID:  777,
 	}
 
-	err = manager.upsertCustom(token)
+	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
 
-	rst, err = manager.getCustoms()
+	rst, err = manager.GetCustoms()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, token, *rst[0])
 
-	err = manager.deleteCustom(777, token.Address)
+	err = manager.DeleteCustom(777, token.Address)
 	require.NoError(t, err)
 
-	rst, err = manager.getCustoms()
+	rst, err = manager.GetCustoms()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 }

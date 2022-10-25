@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"

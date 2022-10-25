@@ -33,6 +33,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/ethereum/go-ethereum/signer/storage"
 )
 
@@ -52,11 +54,11 @@ type ExternalAPI interface {
 	// New request to create a new account
 	New(ctx context.Context) (common.Address, error)
 	// SignTransaction request to sign the specified transaction
-	SignTransaction(ctx context.Context, args SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error)
+	SignTransaction(ctx context.Context, args apitypes.SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error)
 	// SignData - request to sign the given data (plus prefix)
 	SignData(ctx context.Context, contentType string, addr common.MixedcaseAddress, data interface{}) (hexutil.Bytes, error)
 	// SignTypedData - request to sign the given structured data (plus prefix)
-	SignTypedData(ctx context.Context, addr common.MixedcaseAddress, data TypedData) (hexutil.Bytes, error)
+	SignTypedData(ctx context.Context, addr common.MixedcaseAddress, data apitypes.TypedData) (hexutil.Bytes, error)
 	// EcRecover - recover public key from given message and signature
 	EcRecover(ctx context.Context, data hexutil.Bytes, sig hexutil.Bytes) (common.Address, error)
 	// Version info about the APIs
@@ -104,7 +106,7 @@ type Validator interface {
 	// ValidateTransaction does a number of checks on the supplied transaction, and
 	// returns either a list of warnings, or an error (indicating that the transaction
 	// should be immediately rejected).
-	ValidateTransaction(selector *string, tx *SendTxArgs) (*ValidationMessages, error)
+	ValidateTransaction(selector *string, tx *apitypes.SendTxArgs) (*apitypes.ValidationMessages, error)
 }
 
 // SignerAPI defines the actual implementation of ExternalAPI
@@ -187,23 +189,24 @@ func StartClefAccountManager(ksLocation string, nousb, lightKDF bool, scpath str
 
 // MetadataFromContext extracts Metadata from a given context.Context
 func MetadataFromContext(ctx context.Context) Metadata {
+	info := rpc.PeerInfoFromContext(ctx)
+
 	m := Metadata{"NA", "NA", "NA", "", ""} // batman
 
-	if v := ctx.Value("remote"); v != nil {
-		m.Remote = v.(string)
+	if info.Transport != "" {
+		if info.Transport == "http" {
+			m.Scheme = info.HTTP.Version
+		}
+		m.Scheme = info.Transport
 	}
-	if v := ctx.Value("scheme"); v != nil {
-		m.Scheme = v.(string)
+	if info.RemoteAddr != "" {
+		m.Remote = info.RemoteAddr
 	}
-	if v := ctx.Value("local"); v != nil {
-		m.Local = v.(string)
+	if info.HTTP.Host != "" {
+		m.Local = info.HTTP.Host
 	}
-	if v := ctx.Value("Origin"); v != nil {
-		m.Origin = v.(string)
-	}
-	if v := ctx.Value("User-Agent"); v != nil {
-		m.UserAgent = v.(string)
-	}
+	m.Origin = info.HTTP.Origin
+	m.UserAgent = info.HTTP.UserAgent
 	return m
 }
 
@@ -220,24 +223,24 @@ func (m Metadata) String() string {
 type (
 	// SignTxRequest contains info about a Transaction to sign
 	SignTxRequest struct {
-		Transaction SendTxArgs       `json:"transaction"`
-		Callinfo    []ValidationInfo `json:"call_info"`
-		Meta        Metadata         `json:"meta"`
+		Transaction apitypes.SendTxArgs       `json:"transaction"`
+		Callinfo    []apitypes.ValidationInfo `json:"call_info"`
+		Meta        Metadata                  `json:"meta"`
 	}
 	// SignTxResponse result from SignTxRequest
 	SignTxResponse struct {
 		//The UI may make changes to the TX
-		Transaction SendTxArgs `json:"transaction"`
-		Approved    bool       `json:"approved"`
+		Transaction apitypes.SendTxArgs `json:"transaction"`
+		Approved    bool                `json:"approved"`
 	}
 	SignDataRequest struct {
-		ContentType string                  `json:"content_type"`
-		Address     common.MixedcaseAddress `json:"address"`
-		Rawdata     []byte                  `json:"raw_data"`
-		Messages    []*NameValueType        `json:"messages"`
-		Callinfo    []ValidationInfo        `json:"call_info"`
-		Hash        hexutil.Bytes           `json:"hash"`
-		Meta        Metadata                `json:"meta"`
+		ContentType string                    `json:"content_type"`
+		Address     common.MixedcaseAddress   `json:"address"`
+		Rawdata     []byte                    `json:"raw_data"`
+		Messages    []*apitypes.NameValueType `json:"messages"`
+		Callinfo    []apitypes.ValidationInfo `json:"call_info"`
+		Hash        hexutil.Bytes             `json:"hash"`
+		Meta        Metadata                  `json:"meta"`
 	}
 	SignDataResponse struct {
 		Approved bool `json:"approved"`
@@ -316,7 +319,6 @@ func (api *SignerAPI) openTrezor(url accounts.URL) {
 		log.Warn("failed to open wallet", "wallet", url, "err", err)
 		return
 	}
-
 }
 
 // startUSBListener starts a listener for USB events, for hardware wallet interaction
@@ -407,7 +409,7 @@ func (api *SignerAPI) List(ctx context.Context) ([]common.Address, error) {
 
 // New creates a new password protected Account. The private key is protected with
 // the given password. Users are responsible to backup the private key that is stored
-// in the keystore location thas was specified when this API was created.
+// in the keystore location that was specified when this API was created.
 func (api *SignerAPI) New(ctx context.Context) (common.Address, error) {
 	if be := api.am.Backends(keystore.KeyStoreType); len(be) == 0 {
 		return common.Address{}, errors.New("password based accounts not supported")
@@ -537,7 +539,7 @@ func (api *SignerAPI) lookupOrQueryPassword(address common.Address, title, promp
 }
 
 // SignTransaction signs the given Transaction and returns it both as json and rlp-encoded form
-func (api *SignerAPI) SignTransaction(ctx context.Context, args SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error) {
+func (api *SignerAPI) SignTransaction(ctx context.Context, args apitypes.SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error) {
 	var (
 		err    error
 		result SignTxResponse
@@ -548,7 +550,7 @@ func (api *SignerAPI) SignTransaction(ctx context.Context, args SendTxArgs, meth
 	}
 	// If we are in 'rejectMode', then reject rather than show the user warnings
 	if api.rejectMode {
-		if err := msgs.getWarnings(); err != nil {
+		if err := msgs.GetWarnings(); err != nil {
 			return nil, err
 		}
 	}
@@ -585,7 +587,7 @@ func (api *SignerAPI) SignTransaction(ctx context.Context, args SendTxArgs, meth
 		return nil, err
 	}
 	// Convert fields into a real transaction
-	var unsignedTx = result.Transaction.toTransaction()
+	var unsignedTx = result.Transaction.ToTransaction()
 	// Get the password for the transaction
 	pw, err := api.lookupOrQueryPassword(acc.Address, "Account password",
 		fmt.Sprintf("Please enter the password for account %s", acc.Address.String()))
@@ -609,7 +611,6 @@ func (api *SignerAPI) SignTransaction(ctx context.Context, args SendTxArgs, meth
 	api.UI.OnApprovedTx(response)
 	// ...and to the external caller
 	return &response, nil
-
 }
 
 func (api *SignerAPI) SignGnosisSafeTx(ctx context.Context, signerAddress common.MixedcaseAddress, gnosisTx GnosisSafeTx, methodSelector *string) (*GnosisSafeTx, error) {
@@ -621,7 +622,7 @@ func (api *SignerAPI) SignGnosisSafeTx(ctx context.Context, signerAddress common
 	}
 	// If we are in 'rejectMode', then reject rather than show the user warnings
 	if api.rejectMode {
-		if err := msgs.getWarnings(); err != nil {
+		if err := msgs.GetWarnings(); err != nil {
 			return nil, err
 		}
 	}
@@ -634,7 +635,7 @@ func (api *SignerAPI) SignGnosisSafeTx(ctx context.Context, signerAddress common
 
 	gnosisTx.Signature = signature
 	gnosisTx.SafeTxHash = common.BytesToHash(preimage)
-	gnosisTx.Sender = *checkSummedSender // Must be checksumed to be accepted by relay
+	gnosisTx.Sender = *checkSummedSender // Must be checksummed to be accepted by relay
 
 	return &gnosisTx, nil
 }

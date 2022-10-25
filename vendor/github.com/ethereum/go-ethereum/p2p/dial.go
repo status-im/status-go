@@ -77,20 +77,19 @@ var (
 	errAlreadyDialing   = errors.New("already dialing")
 	errAlreadyConnected = errors.New("already connected")
 	errRecentlyDialed   = errors.New("recently dialed")
-	errNotWhitelisted   = errors.New("not contained in netrestrict whitelist")
+	errNetRestrict      = errors.New("not contained in netrestrict list")
 	errNoPort           = errors.New("node does not provide TCP port")
 )
 
 // dialer creates outbound connections and submits them into Server.
 // Two types of peer connections can be created:
 //
-//  - static dials are pre-configured connections. The dialer attempts
-//    keep these nodes connected at all times.
+//   - static dials are pre-configured connections. The dialer attempts
+//     keep these nodes connected at all times.
 //
-//  - dynamic dials are created from node discovery results. The dialer
-//    continuously reads candidate nodes from its input iterator and attempts
-//    to create peer connections to nodes arriving through the iterator.
-//
+//   - dynamic dials are created from node discovery results. The dialer
+//     continuously reads candidate nodes from its input iterator and attempts
+//     to create peer connections to nodes arriving through the iterator.
 type dialScheduler struct {
 	dialConfig
 	setupFunc   dialSetupFunc
@@ -107,7 +106,7 @@ type dialScheduler struct {
 	// Everything below here belongs to loop and
 	// should only be accessed by code on the loop goroutine.
 	dialing   map[enode.ID]*dialTask // active tasks
-	peers     map[enode.ID]connFlag  // all connected peers
+	peers     map[enode.ID]struct{}  // all connected peers
 	dialPeers int                    // current number of dialed peers
 
 	// The static map tracks all static dial tasks. The subset of usable static dial tasks
@@ -133,7 +132,7 @@ type dialConfig struct {
 	self           enode.ID         // our own ID
 	maxDialPeers   int              // maximum number of dialed peers
 	maxActiveDials int              // maximum number of active dials
-	netRestrict    *netutil.Netlist // IP whitelist, disabled if nil
+	netRestrict    *netutil.Netlist // IP netrestrict list, disabled if nil
 	resolver       nodeResolver
 	dialer         NodeDialer
 	log            log.Logger
@@ -166,7 +165,7 @@ func newDialScheduler(config dialConfig, it enode.Iterator, setupFunc dialSetupF
 		setupFunc:   setupFunc,
 		dialing:     make(map[enode.ID]*dialTask),
 		static:      make(map[enode.ID]*dialTask),
-		peers:       make(map[enode.ID]connFlag),
+		peers:       make(map[enode.ID]struct{}),
 		doneCh:      make(chan *dialTask),
 		nodesIn:     make(chan *enode.Node),
 		addStaticCh: make(chan *enode.Node),
@@ -259,7 +258,7 @@ loop:
 				d.dialPeers++
 			}
 			id := c.node.ID()
-			d.peers[id] = c.flags
+			d.peers[id] = struct{}{}
 			// Remove from static pool because the node is now connected.
 			task := d.static[id]
 			if task != nil && task.staticPoolIndex >= 0 {
@@ -403,7 +402,7 @@ func (d *dialScheduler) checkDial(n *enode.Node) error {
 		return errAlreadyConnected
 	}
 	if d.netRestrict != nil && !d.netRestrict.Contains(n.IP()) {
-		return errNotWhitelisted
+		return errNetRestrict
 	}
 	if d.history.contains(string(n.ID().Bytes())) {
 		return errRecentlyDialed

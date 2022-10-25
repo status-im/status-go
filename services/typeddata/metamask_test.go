@@ -10,9 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/types"
-
-	signercore "github.com/ethereum/go-ethereum/signer/core"
 )
 
 func TestTypedDataSuite(t *testing.T) {
@@ -23,8 +22,8 @@ type TypedDataSuite struct {
 	suite.Suite
 
 	privateKey  *ecdsa.PrivateKey
-	typedDataV3 signercore.TypedData
-	typedDataV4 signercore.TypedData
+	typedDataV3 apitypes.TypedData
+	typedDataV4 apitypes.TypedData
 }
 
 func (s *TypedDataSuite) SetupTest() {
@@ -49,7 +48,7 @@ func (s *TypedDataSuite) TestTypedDataV4() {
 	actual := s.typedDataV4.TypeHash("Person")
 	s.Require().Equal(expected, actual.String())
 
-	fromTypedData := signercore.TypedData{}
+	fromTypedData := apitypes.TypedData{}
 	s.Require().NoError(json.Unmarshal([]byte(fromJSON), &fromTypedData))
 
 	actual, err := s.typedDataV4.HashStruct("Person", fromTypedData.Message)
