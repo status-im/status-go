@@ -13,12 +13,12 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-func setupTestTokenDB(t *testing.T) (*TokenManager, func()) {
+func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-token-tests-")
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-token-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
-	return &TokenManager{db, nil, nil}, func() {
+	return &Manager{db, nil, nil}, func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
