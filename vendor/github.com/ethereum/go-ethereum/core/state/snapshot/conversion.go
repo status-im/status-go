@@ -43,7 +43,7 @@ type trieKV struct {
 type (
 	// trieGeneratorFn is the interface of trie generation which can
 	// be implemented by different trie algorithm.
-	trieGeneratorFn func(db ethdb.KeyValueWriter, in chan (trieKV), out chan (common.Hash))
+	trieGeneratorFn func(db ethdb.KeyValueWriter, owner common.Hash, in chan (trieKV), out chan (common.Hash))
 
 	// leafCallbackFn is the callback invoked at the leaves of the trie,
 	// returns the subtrie root with the specified subtrie identifier.
@@ -136,7 +136,7 @@ func (stat *generateStats) progressAccounts(account common.Hash, done uint64) {
 	stat.head = account
 }
 
-// finishAccounts updates the gemerator stats for the finished account range.
+// finishAccounts updates the generator stats for the finished account range.
 func (stat *generateStats) finishAccounts(done uint64) {
 	stat.lock.Lock()
 	defer stat.lock.Unlock()
@@ -253,7 +253,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		generatorFn(db, in, out)
+		generatorFn(db, account, in, out)
 	}()
 	// Spin up a go-routine for progress logging
 	if report && stats != nil {
@@ -360,8 +360,8 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 	return stop(nil)
 }
 
-func stackTrieGenerate(db ethdb.KeyValueWriter, in chan trieKV, out chan common.Hash) {
-	t := trie.NewStackTrie(db)
+func stackTrieGenerate(db ethdb.KeyValueWriter, owner common.Hash, in chan trieKV, out chan common.Hash) {
+	t := trie.NewStackTrieWithOwner(db, owner)
 	for leaf := range in {
 		t.TryUpdate(leaf.key[:], leaf.value)
 	}

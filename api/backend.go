@@ -1,7 +1,7 @@
 package api
 
 import (
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
