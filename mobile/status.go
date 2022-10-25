@@ -11,7 +11,7 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
@@ -452,7 +452,7 @@ func HashTypedData(data string) string {
 // if password matches selected account.
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
-	var typed signercore.TypedData
+	var typed apitypes.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -464,7 +464,7 @@ func SignTypedDataV4(data, address, password string) string {
 // HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
 //export HashTypedDataV4
 func HashTypedDataV4(data string) string {
-	var typed signercore.TypedData
+	var typed apitypes.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)

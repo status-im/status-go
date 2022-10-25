@@ -51,7 +51,7 @@ func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 
 	from := types.Address(common.HexToAddress("0x5ffa75ce51c3a7ebe23bde37b5e3a0143dfbcee0"))
 	tx := transactions.SendTxArgs{
 		From:  from,
-		Value: (*hexutil.Big)(big.NewInt(0)),
+		Value: (*hexutil.Big)(zero),
 	}
 	if s == ENSRegister {
 		estimate, err := service.ens.API().RegisterEstimate(context.Background(), network.ChainID, tx, EstimateUsername, EstimatePubKey)
@@ -78,8 +78,8 @@ func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 
 	}
 
 	if s == StickersBuy {
-		packId := &bigint.BigInt{Int: big.NewInt(2)}
-		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, from, packId)
+		packID := &bigint.BigInt{Int: big.NewInt(2)}
+		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, from, packID)
 		if err != nil {
 			return 400000
 		}
@@ -210,7 +210,7 @@ func newSuggestedRoutes(amountIn *big.Int, candidates []*Path) *SuggestedRoutes 
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.MaxAmountIn.ToInt())
-			if diff.Cmp(big.NewInt(0)) >= 0 {
+			if diff.Cmp(zero) >= 0 {
 				path.AmountIn = path.MaxAmountIn
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
@@ -235,7 +235,7 @@ func NewRouter(s *Service) *Router {
 	return &Router{s, bridges}
 }
 
-func containsNetworkChainId(network *params.Network, chainIDs []uint64) bool {
+func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
 	for _, chainID := range chainIDs {
 		if chainID == network.ChainID {
 			return true
@@ -298,7 +298,7 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 			continue
 		}
 
-		if containsNetworkChainId(network, disabledFromChainIDs) {
+		if containsNetworkChainID(network, disabledFromChainIDs) {
 			continue
 		}
 
@@ -345,11 +345,11 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					if len(preferedChainIDs) > 0 && !containsNetworkChainId(network, preferedChainIDs) {
+					if len(preferedChainIDs) > 0 && !containsNetworkChainID(network, preferedChainIDs) {
 						continue
 					}
 
-					if containsNetworkChainId(dest, disabledToChaindIDs) {
+					if containsNetworkChainID(dest, disabledToChaindIDs) {
 						continue
 					}
 
@@ -378,7 +378,7 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					preferred := containsNetworkChainId(dest, preferedChainIDs)
+					preferred := containsNetworkChainID(dest, preferedChainIDs)
 
 					gasCost := new(big.Float)
 					gasCost.Mul(
@@ -400,8 +400,8 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						From:          network,
 						To:            dest,
 						MaxAmountIn:   (*hexutil.Big)(balance),
-						AmountIn:      (*hexutil.Big)(big.NewInt(0)),
-						AmountOut:     (*hexutil.Big)(big.NewInt(0)),
+						AmountIn:      (*hexutil.Big)(zero),
+						AmountOut:     (*hexutil.Big)(zero),
 						GasAmount:     gasLimit,
 						GasFees:       gasFees,
 						BonderFees:    (*hexutil.Big)(bonderFees),

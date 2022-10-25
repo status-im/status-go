@@ -121,7 +121,7 @@ func (h *HopBridge) Can(from, to *params.Network, token *token.Token, balance *b
 	return true, nil
 }
 
-func (s *HopBridge) EstimateGas(from, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (h *HopBridge) EstimateGas(from, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error) {
 	// TODO: find why this doesn't work
 	// ethClient, err := s.contractMaker.RPCClient.EthClient(from.ChainID)
 	// if err != nil {
@@ -158,8 +158,8 @@ func (s *HopBridge) EstimateGas(from, to *params.Network, token *token.Token, am
 	return 500000 + 1000, nil
 }
 
-func (s *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	networks, err := s.contractMaker.RPCClient.NetworkManager.Get(false)
+func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	networks, err := h.contractMaker.RPCClient.NetworkManager.Get(false)
 	if err != nil {
 		return hash, err
 	}
@@ -172,9 +172,9 @@ func (s *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.S
 	}
 
 	if fromNetwork.Layer == 1 {
-		return s.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
+		return h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
 	}
-	return s.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
+	return h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
 }
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
@@ -184,8 +184,8 @@ func getSigner(chainID uint64, from types.Address, verifiedAccount *account.Sele
 	}
 }
 
-func (s *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	bridge, err := s.contractMaker.NewHopL1Bridge(chainID, sendArgs.Symbol)
+func (h *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	bridge, err := h.contractMaker.NewHopL1Bridge(chainID, sendArgs.Symbol)
 	if err != nil {
 		return hash, err
 	}
@@ -210,8 +210,8 @@ func (s *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccoun
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *HopBridge) swapAndSend(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	ammWrapper, err := s.contractMaker.NewHopL2AmmWrapper(chainID, sendArgs.Symbol)
+func (h *HopBridge) swapAndSend(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	ammWrapper, err := h.contractMaker.NewHopL2AmmWrapper(chainID, sendArgs.Symbol)
 	if err != nil {
 		return hash, err
 	}
