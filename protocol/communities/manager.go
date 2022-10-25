@@ -1063,6 +1063,10 @@ func (m *Manager) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64,
 	return m.persistence.GetMagnetlinkMessageClock(communityID)
 }
 
+func (m *Manager) GetRequestToJoinIDByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) ([]byte, error) {
+	return m.persistence.GetRequestToJoinIDByPkAndCommunityID(common.PubkeyToHex(pk), communityID)
+}
+
 func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
 	community, err := m.GetByIDString(communityID.String())
 	if err != nil {

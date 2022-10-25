@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -226,6 +227,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		Author:      messageState.CurrentMessageState.Contact.ID,
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
+		CommunityID: chat.CommunityID,
 	}
 
 	err := m.addActivityCenterNotification(messageState, notification)
@@ -986,6 +988,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		if err != nil {
 			return err
 		}
+
 	}
 
 	community, err := m.communitiesManager.GetByID(requestToJoinProto.CommunityId)
@@ -1008,6 +1011,43 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
+
+		// Activity Center notification, new for pending state
+		notification := &ActivityCenterNotification{
+			ID:               types.FromHex(requestToJoin.ID.String()),
+			Type:             ActivityCenterNotificationTypeCommunityMembershipRequest,
+			Timestamp:        m.getTimesource().GetCurrentTime(),
+			Author:           contact.ID,
+			CommunityID:      community.IDString(),
+			MembershipStatus: ActivityCenterMembershipStatusPending,
+		}
+
+		saveErr := m.persistence.SaveActivityCenterNotification(notification)
+		if saveErr != nil {
+			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			return saveErr
+		}
+		state.Response.AddActivityCenterNotification(notification)
+	} else {
+		// Activity Center notification, updating existing for accespted/declined
+		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+		if err != nil {
+			return err
+		}
+
+		if notification != nil {
+			if requestToJoin.State == communities.RequestToJoinStateAccepted {
+				notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			} else {
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+			}
+			saveErr := m.persistence.SaveActivityCenterNotification(notification)
+			if saveErr != nil {
+				m.logger.Warn("failed to update notification", zap.Error(saveErr))
+				return saveErr
+			}
+			state.Response.AddActivityCenterNotification(notification)
+		}
 	}
 
 	return nil
@@ -1033,6 +1073,28 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
 		}
 	}
+
+	// Activity Center notification
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), requestToJoinResponseProto.CommunityId)
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestID)
+	if err != nil {
+		return err
+	}
+
+	if notification != nil {
+		if requestToJoinResponseProto.Accepted {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+		} else {
+			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		}
+		saveErr := m.persistence.SaveActivityCenterNotification(notification)
+		if saveErr != nil {
+			m.logger.Warn("failed to update notification", zap.Error(saveErr))
+			return saveErr
+		}
+		state.Response.AddActivityCenterNotification(notification)
+	}
+
 	return nil
 }
 
@@ -1054,6 +1116,21 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 	if len(response.Communities()) > 0 {
 		state.Response.AddCommunity(response.Communities()[0])
 	}
+
+	// Activity Center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.NewRandom().String()),
+		Type:        ActivityCenterNotificationTypeCommunityKicked,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: string(requestToLeaveProto.CommunityId),
+	}
+
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return saveErr
+	}
+	state.Response.AddActivityCenterNotification(notification)
 
 	return nil
 }
