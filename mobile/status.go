@@ -19,6 +19,7 @@ import (
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
@@ -732,6 +734,32 @@ func ValidateMnemonic(mnemonic string) string {
 	m := extkeys.NewMnemonic()
 	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
 	return makeJSONResponse(err)
+}
+
+// DecompressPublicKey decompresses 33-byte compressed format to uncompressed 65-byte format.
+func DecompressPublicKey(key string) string {
+	decoded, err := types.DecodeHex(key)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	const compressionBytesNumber = 33
+	if len(decoded) != compressionBytesNumber {
+		return makeJSONResponse(errors.New("key is not 33 bytes long"))
+	}
+	pubKey, err := crypto.DecompressPubkey(decoded)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return types.EncodeHex(crypto.FromECDSAPub(pubKey))
+}
+
+// CompressPublicKey compresses uncompressed 65-byte format to 33-byte compressed format.
+func CompressPublicKey(key string) string {
+	pubKey, err := common.HexToPubkey(key)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return types.EncodeHex(crypto.CompressPubkey(pubKey))
 }
 
 // SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
