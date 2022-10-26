@@ -31,23 +31,24 @@ type ClearedHistory struct {
 }
 
 type MessengerResponse struct {
-	Contacts                      []*Contact
-	Installations                 []*multidevice.Installation
-	EmojiReactions                []*EmojiReaction
-	Invitations                   []*GroupChatInvitation
-	CommunityChanges              []*communities.CommunityChanges
-	RequestsToJoinCommunity       []*communities.RequestToJoin
-	AnonymousMetrics              []*appmetrics.AppMetric
-	Mailservers                   []mailservers.Mailserver
-	Bookmarks                     []*browsers.Bookmark
-	Settings                      []*settings.SyncSettingField
-	IdentityImages                []images.IdentityImage
-	Accounts                      []*accounts.Account
-	VerificationRequests          []*verification.Request
-	DiscordCategories             []*discord.Category
-	DiscordChannels               []*discord.Channel
-	DiscordOldestMessageTimestamp int
-	SavedAddresses                []*wallet.SavedAddress
+	Contacts                        []*Contact
+	Installations                   []*multidevice.Installation
+	EmojiReactions                  []*EmojiReaction
+	Invitations                     []*GroupChatInvitation
+	CommunityChanges                []*communities.CommunityChanges
+	RequestsToJoinCommunity         []*communities.RequestToJoin
+	DeclinedRequestsToJoinCommunity []*communities.RequestToJoin
+	AnonymousMetrics                []*appmetrics.AppMetric
+	Mailservers                     []mailservers.Mailserver
+	Bookmarks                       []*browsers.Bookmark
+	Settings                        []*settings.SyncSettingField
+	IdentityImages                  []images.IdentityImage
+	Accounts                        []*accounts.Account
+	VerificationRequests            []*verification.Request
+	DiscordCategories               []*discord.Category
+	DiscordChannels                 []*discord.Channel
+	DiscordOldestMessageTimestamp   int
+	SavedAddresses                  []*wallet.SavedAddress
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -71,22 +72,23 @@ type MessengerResponse struct {
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
-		Chats                   []*Chat                             `json:"chats,omitempty"`
-		RemovedChats            []string                            `json:"removedChats,omitempty"`
-		RemovedMessages         []*RemovedMessage                   `json:"removedMessages,omitempty"`
-		Messages                []*common.Message                   `json:"messages,omitempty"`
-		Contacts                []*Contact                          `json:"contacts,omitempty"`
-		Installations           []*multidevice.Installation         `json:"installations,omitempty"`
-		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
-		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
-		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
-		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
-		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
-		Mailservers             []mailservers.Mailserver            `json:"mailservers,omitempty"`
-		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
-		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
-		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
-		TrustStatus             map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
+		Chats                           []*Chat                             `json:"chats,omitempty"`
+		RemovedChats                    []string                            `json:"removedChats,omitempty"`
+		RemovedMessages                 []*RemovedMessage                   `json:"removedMessages,omitempty"`
+		Messages                        []*common.Message                   `json:"messages,omitempty"`
+		Contacts                        []*Contact                          `json:"contacts,omitempty"`
+		Installations                   []*multidevice.Installation         `json:"installations,omitempty"`
+		PinMessages                     []*common.PinMessage                `json:"pinMessages,omitempty"`
+		EmojiReactions                  []*EmojiReaction                    `json:"emojiReactions,omitempty"`
+		Invitations                     []*GroupChatInvitation              `json:"invitations,omitempty"`
+		CommunityChanges                []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
+		RequestsToJoinCommunity         []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
+		DeclinedRequestsToJoinCommunity []*communities.RequestToJoin        `json:"declinedRequestsToJoinCommunity,omitempty"`
+		Mailservers                     []mailservers.Mailserver            `json:"mailservers,omitempty"`
+		Bookmarks                       []*browsers.Bookmark                `json:"bookmarks,omitempty"`
+		ClearedHistories                []*ClearedHistory                   `json:"clearedHistories,omitempty"`
+		VerificationRequests            []*verification.Request             `json:"verificationRequests,omitempty"`
+		TrustStatus                     map[string]verification.TrustStatus `json:"trustStatus,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
 		Notifications                 []*localnotifications.Notification   `json:"notifications"`
@@ -105,20 +107,21 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
 	}{
-		Contacts:                r.Contacts,
-		Installations:           r.Installations,
-		EmojiReactions:          r.EmojiReactions,
-		Invitations:             r.Invitations,
-		CommunityChanges:        r.CommunityChanges,
-		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
-		Mailservers:             r.Mailservers,
-		Bookmarks:               r.Bookmarks,
-		CurrentStatus:           r.currentStatus,
-		Settings:                r.Settings,
-		IdentityImages:          r.IdentityImages,
-		Accounts:                r.Accounts,
-		VerificationRequests:    r.VerificationRequests,
-		SavedAddresses:          r.SavedAddresses,
+		Contacts:                        r.Contacts,
+		Installations:                   r.Installations,
+		EmojiReactions:                  r.EmojiReactions,
+		Invitations:                     r.Invitations,
+		CommunityChanges:                r.CommunityChanges,
+		RequestsToJoinCommunity:         r.RequestsToJoinCommunity,
+		DeclinedRequestsToJoinCommunity: r.DeclinedRequestsToJoinCommunity,
+		Mailservers:                     r.Mailservers,
+		Bookmarks:                       r.Bookmarks,
+		CurrentStatus:                   r.currentStatus,
+		Settings:                        r.Settings,
+		IdentityImages:                  r.IdentityImages,
+		Accounts:                        r.Accounts,
+		VerificationRequests:            r.VerificationRequests,
+		SavedAddresses:                  r.SavedAddresses,
 
 		Messages:                      r.Messages(),
 		Notifications:                 r.Notifications(),
@@ -250,6 +253,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.VerificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
 		len(r.SavedAddresses) == 0 &&
+		len(r.DeclinedRequestsToJoinCommunity) == 0 &&
 		r.currentStatus == nil
 }
 
@@ -261,6 +265,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.EmojiReactions)+
 		len(response.Invitations)+
 		len(response.RequestsToJoinCommunity)+
+		len(response.DeclinedRequestsToJoinCommunity)+
 		len(response.Mailservers)+
 		len(response.EmojiReactions)+
 		len(response.Bookmarks)+

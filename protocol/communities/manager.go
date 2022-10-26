@@ -929,13 +929,23 @@ func (m *Manager) GetRequestToJoin(ID types.HexBytes) (*RequestToJoin, error) {
 	return m.persistence.GetRequestToJoin(ID)
 }
 
-func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCommunity) error {
+func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCommunity) (*Community, error) {
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(dbRequest.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
@@ -1362,6 +1372,9 @@ func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*Request
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.PendingRequestsToJoinForUser(common.PubkeyToHex(pk))
+}
+func (m *Manager) DeclinedRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+	return m.persistence.DeclinedRequestsToJoinForUser(common.PubkeyToHex(pk))
 }
 
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {

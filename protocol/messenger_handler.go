@@ -1096,7 +1096,6 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	if err != nil {
 		return err
 	}
-
 	if requestToJoinResponseProto.Accepted {
 		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId)
 		if err != nil {
@@ -1106,6 +1105,13 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			state.Response.AddCommunity(response.Communities()[0])
 			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
 		}
+	} else {
+		declinedRequestsToJoin, err := m.communitiesManager.DeclinedRequestsToJoinForCommunity(requestToJoinResponseProto.CommunityId)
+		if err != nil {
+			return err
+		}
+
+		state.Response.DeclinedRequestsToJoinCommunity = declinedRequestsToJoin
 	}
 
 	// Activity Center notification

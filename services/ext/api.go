@@ -477,9 +477,14 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
-// MyCanceledRequestsToJoin returns the pending requests for the logged in user
+// MyCanceledRequestsToJoin returns the canceled requests for the logged in user
 func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyCanceledRequestsToJoin()
+}
+
+// MyDeclinedRequestsToJoin returns the declined requests for the logged in user
+func (api *PublicAPI) MyDeclinedRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyDeclinedRequestsToJoin()
 }
 
 // PendingRequestsToJoinForCommunity returns the pending requests to join for a given community

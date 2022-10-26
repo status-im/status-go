@@ -758,7 +758,41 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 		return nil, err
 	}
 
-	err := m.communitiesManager.DeclineRequestToJoin(request)
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.DeclineRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
+		Clock:       community.Clock(),
+		Accepted:    false,
+		CommunityId: community.ID(),
+		Community:   community.Description(),
+	}
+
+	payload, err := proto.Marshal(requestToJoinResponseProto)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:        payload,
+		Sender:         community.PrivateKey(),
+		SkipEncryption: true,
+		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+	}
+
+	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -1245,6 +1279,10 @@ func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, er
 
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
+}
+
+func (m *Messenger) MyDeclinedRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.DeclinedRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
