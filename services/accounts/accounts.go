@@ -110,6 +110,17 @@ func (api *API) AddAccountWithMnemonic(
 	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, pathWalletRoot)
 }
 
+func (api *API) AddAccountWithMnemonicPasswordVerified(
+	ctx context.Context,
+	mnemonic string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+) error {
+	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, pathWalletRoot)
+}
+
 func (api *API) AddAccountWithMnemonicAndPath(
 	ctx context.Context,
 	mnemonic string,
@@ -122,7 +133,21 @@ func (api *API) AddAccountWithMnemonicAndPath(
 	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, path)
 }
 
-func (api *API) AddAccountWithPrivateKey(
+func (api *API) AddAccountWithMnemonicAndPathPasswordVerified(
+	ctx context.Context,
+	mnemonic string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+) error {
+	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, path)
+}
+
+// AddAccountWithPrivateKeyPasswordVerified adds an accounts.Account created from the given private key
+// assuming that client has already authenticated logged in use, this function doesn't verify a password.
+func (api *API) AddAccountWithPrivateKeyPasswordVerified(
 	ctx context.Context,
 	privateKey string,
 	password string,
@@ -130,10 +155,6 @@ func (api *API) AddAccountWithPrivateKey(
 	color string,
 	emoji string,
 ) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
 
 	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
 	if err != nil {
@@ -165,6 +186,22 @@ func (api *API) AddAccountWithPrivateKey(
 	}
 
 	return api.SaveAccounts(ctx, []*accounts.Account{account})
+}
+
+func (api *API) AddAccountWithPrivateKey(
+	ctx context.Context,
+	privateKey string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+) error {
+	err := api.verifyPassword(password)
+	if err != nil {
+		return err
+	}
+
+	return api.AddAccountWithPrivateKeyPasswordVerified(ctx, privateKey, password, name, color, emoji)
 }
 
 func (api *API) GenerateAccount(
@@ -200,6 +237,39 @@ func (api *API) GenerateAccount(
 	return err
 }
 
+func (api *API) GenerateAccountPasswordVerified(
+	ctx context.Context,
+	password string,
+	name string,
+	color string,
+	emoji string,
+) error {
+	address, err := api.db.GetWalletRootAddress()
+	if err != nil {
+		return err
+	}
+
+	latestDerivedPath, err := api.db.GetLatestDerivedPath()
+	if err != nil {
+		return err
+	}
+
+	newDerivedPath := latestDerivedPath + 1
+	path := fmt.Sprint(pathWalletRoot, "/", newDerivedPath)
+
+	err = api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, address.Hex())
+	if err != nil {
+		return err
+	}
+
+	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (api *API) GenerateAccountWithDerivedPath(
 	ctx context.Context,
 	password string,
@@ -212,6 +282,18 @@ func (api *API) GenerateAccountWithDerivedPath(
 	return api.generateAccount(ctx, password, name, color, emoji, path, derivedFrom)
 }
 
+func (api *API) GenerateAccountWithDerivedPathPasswordVerified(
+	ctx context.Context,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+	derivedFrom string,
+) error {
+	return api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, derivedFrom)
+}
+
 func (api *API) verifyPassword(password string) error {
 	address, err := api.db.GetChatAddress()
 	if err != nil {
@@ -221,7 +303,9 @@ func (api *API) verifyPassword(password string) error {
 	return err
 }
 
-func (api *API) addAccountWithMnemonic(
+// addAccountWithMnemonicPasswordVerified adds an accounts.Account derived from the given Mnemonic
+// assuming that client has already authenticated logged in use, this function doesn't verify a password.
+func (api *API) addAccountWithMnemonicPasswordVerified(
 	ctx context.Context,
 	mnemonic string,
 	password string,
@@ -231,11 +315,6 @@ func (api *API) addAccountWithMnemonic(
 	path string,
 ) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
-
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
 
 	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
@@ -266,7 +345,26 @@ func (api *API) addAccountWithMnemonic(
 	return api.SaveAccounts(ctx, []*accounts.Account{account})
 }
 
-func (api *API) generateAccount(
+func (api *API) addAccountWithMnemonic(
+	ctx context.Context,
+	mnemonic string,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+) error {
+	err := api.verifyPassword(password)
+	if err != nil {
+		return err
+	}
+
+	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, path)
+}
+
+// generateAccountPasswordVerified adds an accounts.Account generated from the given path
+// assuming that client has already authenticated logged in use, this function doesn't verify a password.
+func (api *API) generateAccountPasswordVerified(
 	ctx context.Context,
 	password string,
 	name string,
@@ -275,11 +373,6 @@ func (api *API) generateAccount(
 	path string,
 	address string,
 ) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
-
 	info, err := api.manager.AccountsGenerator().LoadAccount(address, password)
 	if err != nil {
 		return err
@@ -308,6 +401,23 @@ func (api *API) generateAccount(
 	}
 
 	return api.SaveAccounts(ctx, []*accounts.Account{acc})
+}
+
+func (api *API) generateAccount(
+	ctx context.Context,
+	password string,
+	name string,
+	color string,
+	emoji string,
+	path string,
+	address string,
+) error {
+	err := api.verifyPassword(password)
+	if err != nil {
+		return err
+	}
+
+	return api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, address)
 }
 
 func (api *API) VerifyPassword(password string) bool {
