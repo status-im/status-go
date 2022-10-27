@@ -604,11 +604,6 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 		contact.Block()
 	}
 
-	err := m.sendRetractContactRequest(contact)
-	if err != nil {
-		return nil, err
-	}
-
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
