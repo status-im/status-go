@@ -78,31 +78,49 @@ func getRealSymbol(symbol string) string {
 	return strings.ToUpper(symbol)
 }
 
+func chunkSymbols(symbols []string) [][]string {
+	var chunks [][]string
+	chunkSize := 20
+	for i := 0; i < len(symbols); i += chunkSize {
+		end := i + chunkSize
+
+		if end > len(symbols) {
+			end = len(symbols)
+		}
+
+		chunks = append(chunks, symbols[i:end])
+	}
+
+	return chunks
+}
+
 func fetchCryptoComparePrices(symbols []string, currency string) (map[string]float64, error) {
-	realSymbols := renameSymbols(symbols)
-	httpClient := http.Client{Timeout: time.Minute}
-
-	url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
-	resp, err := httpClient.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	prices := make(map[string]map[string]float64)
-	err = json.Unmarshal(body, &prices)
-	if err != nil {
-		return nil, err
-	}
-
+	chunks := chunkSymbols(symbols)
 	result := make(map[string]float64)
-	for _, symbol := range symbols {
-		result[symbol] = prices[getRealSymbol(symbol)][strings.ToUpper(currency)]
+	for _, smbls := range chunks {
+		realSymbols := renameSymbols(smbls)
+		httpClient := http.Client{Timeout: time.Minute}
+		url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
+		resp, err := httpClient.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		prices := make(map[string]map[string]float64)
+		err = json.Unmarshal(body, &prices)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, symbol := range smbls {
+			result[symbol] = prices[getRealSymbol(symbol)][strings.ToUpper(currency)]
+		}
 	}
 	return result, nil
 }
