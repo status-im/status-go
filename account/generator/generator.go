@@ -100,11 +100,11 @@ func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccou
 	return acc.ToIdentifiedAccountInfo(id), nil
 }
 
-func (g *Generator) CreateAccountFromMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
+func (g *Generator) CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicPhrase string, bip39Passphrase string, paths []string) (GeneratedAndDerivedAccountInfo, error) {
 	mnemonic := extkeys.NewMnemonic()
 	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
 	if err != nil {
-		return GeneratedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
+		return GeneratedAndDerivedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
 
 	acc := &Account{
@@ -112,9 +112,22 @@ func (g *Generator) CreateAccountFromMnemonic(mnemonicPhrase string, bip39Passph
 		extendedKey: masterExtendedKey,
 	}
 
-	id := uuid.NewRandom().String()
+	derivedAccountsInfo := make(map[string]AccountInfo)
+	if len(paths) > 0 {
+		derivedAccounts, err := g.deriveChildAccounts(acc, paths)
+		if err != nil {
+			return GeneratedAndDerivedAccountInfo{}, err
+		}
 
-	return acc.ToGeneratedAccountInfo(id, mnemonicPhrase), nil
+		for pathString, childAccount := range derivedAccounts {
+			derivedAccountsInfo[pathString] = childAccount.ToAccountInfo()
+		}
+	}
+
+	id := uuid.NewRandom().String()
+	accInfo := acc.ToGeneratedAccountInfo(id, mnemonicPhrase)
+
+	return accInfo.toGeneratedAndDerived(derivedAccountsInfo), nil
 }
 
 func (g *Generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
