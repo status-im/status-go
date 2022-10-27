@@ -49,8 +49,9 @@ type MultiAccountLoadAccountParams struct {
 
 // MultiAccountImportMnemonicParams are the params sent to MultiAccountImportMnemonic.
 type MultiAccountImportMnemonicParams struct {
-	MnemonicPhrase  string `json:"mnemonicPhrase"`
-	Bip39Passphrase string `json:"Bip39Passphrase"`
+	MnemonicPhrase  string   `json:"mnemonicPhrase"`
+	Bip39Passphrase string   `json:"Bip39Passphrase"`
+	Paths           []string `json:"paths"`
 }
 
 // MultiAccountGenerate generates account in memory without storing them.
@@ -158,8 +159,9 @@ func MultiAccountImportPrivateKey(paramsJSON string) string {
 	return string(out)
 }
 
-// CreateAccountFromMnemonic returns an account derived from the mnemonic phrase and the Bip39Passphrase without storing it.
-func CreateAccountFromMnemonic(paramsJSON string) string {
+// CreateAccountFromMnemonicAndDeriveAccountsForPaths returns an account derived from the mnemonic phrase and the Bip39Passphrase
+// and generate derived accounts for the list of paths without storing it
+func CreateAccountFromMnemonicAndDeriveAccountsForPaths(paramsJSON string) string {
 	var p MultiAccountImportMnemonicParams
 
 	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
@@ -169,7 +171,7 @@ func CreateAccountFromMnemonic(paramsJSON string) string {
 	// remove any duplicate whitespaces
 	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
 
-	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
+	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase, p.Paths)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
