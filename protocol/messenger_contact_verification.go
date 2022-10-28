@@ -266,32 +266,31 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		VerificationRequests: []*verification.Request{verifRequest},
 	}
 
-	chatMessage, err := m.createLocalContactVerificationMessage(response, chat, rawMessage.ID, common.ContactVerificationStateAccepted)
+	replyMessage, err := m.createLocalContactVerificationMessage(response, chat, rawMessage.ID, common.ContactVerificationStateAccepted)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*common.Message{chatMessage})
+	err = m.persistence.SaveMessages([]*common.Message{replyMessage})
 	if err != nil {
 		return nil, err
 	}
 
-	resp.AddMessage(chatMessage)
+	resp.AddMessage(replyMessage)
 
 	if notification != nil {
 		// TODO: Should we update only the message or only the notification or both?
-		err := m.persistence.UpdateActivityCenterNotificationContactVerificationStatus(notification.ID, verification.RequestStatusACCEPTED)
-		if err != nil {
-			return nil, err
-		}
 
 		notification.ContactVerificationStatus = verification.RequestStatusACCEPTED
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateAccepted
-		err = m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
+                notification.ReplyMessage = replyMessage
+
+		err := m.persistence.UpdateActivityCenterNotificationFields(notification.ID, message, replyMessage, verification.RequestStatusACCEPTED)
 		if err != nil {
 			return nil, err
 		}
+
 		resp.AddActivityCenterNotification(notification)
 
 	}
@@ -639,8 +638,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
 
-	// TODO: update activity center notification, this only creates a new one
-	return m.createContactVerificationNotification(contact, state, persistedVR, chatMessage)
+	return m.createContactVerificationNotification(contact, state, persistedVR, chatMessage, nil)
 }
 
 func ValidateAcceptContactVerification(request protobuf.AcceptContactVerification) error {
@@ -676,7 +674,6 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		m.logger.Debug("Error obtaining verification request", zap.Error(err))
 		return err
 	}
-	m.logger.Info("PAST 1")
 
 	if persistedVR != nil && persistedVR.RepliedAt > request.Clock {
 		return nil // older message, ignore it
@@ -685,10 +682,8 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	if persistedVR.RequestStatus == verification.RequestStatusCANCELED {
 		return nil // Do nothing, We have already cancelled the verification request
 	}
-	m.logger.Info("PAST 2")
 
 	if persistedVR == nil {
-		m.logger.Info("PAST 3")
 		// This is a response for which we have not received its request before
 		persistedVR = &verification.Request{}
 		persistedVR.ID = request.Id
@@ -705,14 +700,11 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		m.logger.Debug("Error storing verification request", zap.Error(err))
 		return err
 	}
-	m.logger.Info("PAST 4")
 
 	err = m.SyncVerificationRequest(context.Background(), persistedVR)
 	if err != nil {
 		return err
 	}
-
-	m.logger.Info("PAST 5")
 
 	chat, ok := m.allChats.Load(contactID)
 	if !ok {
@@ -734,14 +726,20 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 
 	state.Response.AddMessage(chatMessage)
 
-	err = m.createContactVerificationNotification(contact, state, persistedVR, chatMessage)
+	msg, err := m.persistence.MessageByID(request.Id)
+	if err != nil {
+		return err
+	}
+        msg.ContactVerificationState = common.ContactVerificationStateAccepted
+
+	state.Response.AddMessage(msg)
+
+	err = m.createContactVerificationNotification(contact, state, persistedVR, msg, chatMessage)
 	if err != nil {
 		return err
 	}
 
 	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
-
-	// TODO: create or update activity center notification
 
 	return nil
 }
@@ -807,7 +805,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 		state.Response.AddMessage(msg)
 	}
 
-	return m.createContactVerificationNotification(contact, state, persistedVR, msg)
+	return m.createContactVerificationNotification(contact, state, persistedVR, msg, nil)
 }
 
 func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState, request protobuf.ContactVerificationTrusted) error {
@@ -898,13 +896,14 @@ func (m *Messenger) GetLatestVerificationRequestFrom(contactID string) (*verific
 	return m.verificationDatabase.GetLatestVerificationRequestFrom(contactID)
 }
 
-func (m *Messenger) createContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message) error {
+func (m *Messenger) createContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
 		Name:                      contact.CanonicalName(),
 		Type:                      ActivityCenterNotificationTypeContactVerification,
 		Author:                    messageState.CurrentMessageState.Contact.ID,
 		Message:                   chatMessage,
+                ReplyMessage:              replyMessage,
 		Timestamp:                 messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
