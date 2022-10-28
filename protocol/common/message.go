@@ -483,7 +483,14 @@ func runMentionsAndLinksVisitor(parsedText ast.Node, identity string) *MentionsA
 // PrepareContent return the parsed content of the message, the line-count and whether
 // is a right-to-left message
 func (m *Message) PrepareContent(identity string) error {
-	parsedText := markdown.Parse([]byte(m.Text), nil)
+	var parsedText ast.Node
+	switch m.ContentType {
+	case protobuf.ChatMessage_DISCORD_MESSAGE:
+		parsedText = markdown.Parse([]byte(m.GetDiscordMessage().Content), nil)
+	default:
+		parsedText = markdown.Parse([]byte(m.Text), nil)
+	}
+
 	visitor := runMentionsAndLinksVisitor(parsedText, identity)
 	m.Mentions = visitor.mentions
 	m.Links = visitor.links
