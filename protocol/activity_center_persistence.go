@@ -727,6 +727,23 @@ func (db sqlitePersistence) UpdateActivityCenterNotificationContactVerificationS
 
 }
 
+func (db sqlitePersistence) UpdateActivityCenterNotificationFields(id types.HexBytes, message *common.Message, replyMessage *common.Message, status verification.RequestStatus) error {
+	encodedMessage, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	encodedReplyMessage, err := json.Marshal(replyMessage)
+	if err != nil {
+		return err
+	}
+
+
+	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ?, reply_message = ?, contact_verification_status = ? WHERE id = ?`, encodedMessage, encodedReplyMessage, status, id)
+	return err
+
+}
+
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
