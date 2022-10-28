@@ -149,6 +149,29 @@ func (p *Persistence) GetVerificationRequestSentTo(contactID string) (*Request, 
 	}
 }
 
+func (p *Persistence) GetLatestVerificationRequestFrom(contactID string) (*Request, error) {
+	var vr Request
+	err := p.db.QueryRow(`SELECT id, from_user, to_user, challenge, response, requested_at, verification_status, replied_at FROM verification_requests_individual WHERE from_user = ? ORDER BY requested_at DESC`, contactID).Scan(
+		&vr.ID,
+		&vr.From,
+		&vr.To,
+		&vr.Challenge,
+		&vr.Response,
+		&vr.RequestedAt,
+		&vr.RequestStatus,
+		&vr.RepliedAt,
+	)
+
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		return &vr, nil
+	default:
+		return nil, err
+	}
+}
+
 func (p *Persistence) SaveVerificationRequest(vr *Request) error {
 	if vr == nil {
 		return errors.New("invalid verification request provided")
