@@ -8,6 +8,8 @@ import (
 	"math"
 
 	"github.com/fogleman/gg"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type Theme int
@@ -23,11 +25,11 @@ var (
 )
 
 type DrawRingParam struct {
-	Theme      Theme   `json:"theme"`
-	ColorHash  [][]int `json:"colorHash"`
-	ImageBytes []byte  `json:"imageBytes"`
-	Height     int     `json:"height"`
-	Width      int     `json:"width"`
+	Theme      Theme                    `json:"theme"`
+	ColorHash  multiaccounts.ColourHash `json:"colorHash"`
+	ImageBytes []byte                   `json:"imageBytes"`
+	Height     int                      `json:"height"`
+	Width      int                      `json:"width"`
 }
 
 func DrawRing(param *DrawRingParam) ([]byte, error) {

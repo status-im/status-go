@@ -25,7 +25,7 @@ var (
 	expected = multiaccounts.Account{
 		Name:          "cool account",
 		KeyUID:        keyUID,
-		ColorHash:     [][]int{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
+		ColorHash:     multiaccounts.ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
 		ColorID:       10,
 		Images:        images.SampleIdentityImages(),
 		KDFIterations: sqlite.ReducedKDFIterationsNumber,
