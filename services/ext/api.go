@@ -820,12 +820,12 @@ func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, con
 	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
 }
 
-func (api *PublicAPI) VerifiedTrusted(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedTrusted(ctx, contactID)
+func (api *PublicAPI) VerifiedTrusted(ctx context.Context, request *requests.VerifiedTrusted) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedTrusted(ctx, request)
 }
 
-func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedUntrustworthy(ctx, contactID)
+func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *requests.VerifiedUntrustworthy) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedUntrustworthy(ctx, request)
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
