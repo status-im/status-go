@@ -28,12 +28,14 @@ func NewAccount(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey) Accou
 }
 
 func (a *Account) ToAccountInfo() AccountInfo {
+	privateKeyHex := types.EncodeHex(crypto.FromECDSA(a.privateKey))
 	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
-		PublicKey: publicKeyHex,
-		Address:   addressHex,
+		PrivateKey: privateKeyHex,
+		PublicKey:  publicKeyHex,
+		Address:    addressHex,
 	}
 }
 
@@ -58,8 +60,9 @@ func (a *Account) ToGeneratedAccountInfo(id string, mnemonic string) GeneratedAc
 
 // AccountInfo contains a PublicKey and an Address of an account.
 type AccountInfo struct {
-	PublicKey string `json:"publicKey"`
-	Address   string `json:"address"`
+	PrivateKey string `json:"privateKey"`
+	PublicKey  string `json:"publicKey"`
+	Address    string `json:"address"`
 }
 
 // IdentifiedAccountInfo contains AccountInfo and the ID of an account.
