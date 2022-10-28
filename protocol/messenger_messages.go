@@ -184,6 +184,12 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return nil, err
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddMessage(message)
 	response.AddChat(chat)

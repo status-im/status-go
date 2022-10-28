@@ -1338,6 +1338,12 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return err
+		}
+	}
+
 	state.Response.AddMessage(originalMessage)
 	state.Response.AddChat(chat)
 
@@ -1495,7 +1501,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
 		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
 		if err != nil {
