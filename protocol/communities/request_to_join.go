@@ -11,6 +11,7 @@ const (
 	RequestToJoinStatePending RequestToJoinState = iota + 1
 	RequestToJoinStateDeclined
 	RequestToJoinStateAccepted
+	RequestToJoinStateCanceled
 )
 
 type RequestToJoin struct {

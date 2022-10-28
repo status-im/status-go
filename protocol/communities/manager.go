@@ -854,8 +854,40 @@ func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) e
 	return nil
 }
 
+func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
+	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
+}
+
 func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
 	return m.persistence.SetMuted(id, muted)
+}
+
+func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommunity) (*RequestToJoin, *Community, error) {
+	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	community, err := m.GetByID(dbRequest.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pk, err := common.HexToPubkey(dbRequest.PublicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := m.markRequestToJoinAsCanceled(pk, community); err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dbRequest, community, nil
 }
 
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
@@ -904,6 +936,28 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	}
 
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+}
+
+func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	err = m.markRequestToJoinAsCanceled(signer, community)
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoin, err := m.persistence.GetRequestToJoinByPk(common.PubkeyToHex(signer), community.ID(), RequestToJoinStateCanceled)
+	if err != nil {
+		return nil, err
+	}
+
+	return requestToJoin, nil
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
@@ -1302,6 +1356,10 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 	return m.persistence.SaveRequestToJoin(request)
 }
 
+func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
+}
+
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.PendingRequestsToJoinForUser(common.PubkeyToHex(pk))
 }
@@ -1314,6 +1372,11 @@ func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*Reque
 func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
 	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	return m.persistence.CanceledRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {

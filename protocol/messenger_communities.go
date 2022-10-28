@@ -632,6 +632,50 @@ func (m *Messenger) DeleteCommunityCategory(request *requests.DeleteCommunityCat
 	return &response, nil
 }
 
+func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	requestToJoin, community, err := m.communitiesManager.CancelRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
+
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	cancelRequestToJoinProto := &protobuf.CommunityCancelRequestToJoin{
+		Clock:       community.Clock(),
+		EnsName:     requestToJoin.ENSName,
+		DisplayName: displayName,
+		CommunityId: community.ID(),
+	}
+
+	payload, err := proto.Marshal(cancelRequestToJoinProto)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:        payload,
+		CommunityID:    community.ID(),
+		SkipEncryption: true,
+		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
+	}
+	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -1195,6 +1239,10 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	return response, nil
 }
 
+func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.CanceledRequestsToJoinForUser(&m.identity.PublicKey)
+}
+
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
@@ -1205,6 +1253,10 @@ func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*com
 
 func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.CanceledRequestsToJoinForCommunity(id)
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {

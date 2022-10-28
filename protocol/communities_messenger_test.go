@@ -1003,6 +1003,167 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 }
 
+func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
+	ctx := context.Background()
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+
+	s.Require().NoError(s.bob.SaveChat(chat))
+
+	message := buildTestMessage(*chat)
+	message.CommunityID = community.IDString()
+
+	// We send a community link to alice
+	response, err = s.bob.SendChatMessage(ctx, message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Retrieve community link & community
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("message not received")
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	// We try to join the org
+	response, err = s.alice.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin1)
+	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
+	s.Require().True(requestToJoin1.Our)
+	s.Require().NotEmpty(requestToJoin1.ID)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+
+	// Make sure clock is not empty
+	s.Require().NotEmpty(requestToJoin1.Clock)
+
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin1.Clock)
+
+	// pull all communities to make sure we set RequestedToJoinAt
+
+	allCommunities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
+	} else {
+		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
+	}
+
+	// pull to make sure it has been saved
+	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Make sure the requests are fetched also by community
+	requestsToJoin, err = s.alice.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Retrieve request to join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.RequestsToJoinCommunity) == 0 {
+			return errors.New("request to join community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin2 := response.RequestsToJoinCommunity[0]
+
+	s.Require().NotNil(requestToJoin2)
+	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
+	s.Require().False(requestToJoin2.Our)
+	s.Require().NotEmpty(requestToJoin2.ID)
+	s.Require().NotEmpty(requestToJoin2.Clock)
+	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
+
+	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
+
+	// Cancel request to join community
+	requestsToJoin, err = s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	requestToJoin := requestsToJoin[0]
+
+	requestToCancel := &requests.CancelRequestToJoinCommunity{ID: requestToJoin.ID}
+	response, err = s.alice.CancelRequestToJoinCommunity(requestToCancel)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// pull to make sure it has been saved
+	cancelRequestsToJoin, err := s.alice.MyCanceledRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(cancelRequestsToJoin, 1)
+	s.Require().Equal(cancelRequestsToJoin[0].State, communities.RequestToJoinStateCanceled)
+
+	// Retrieve cancel request to join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.RequestsToJoinCommunity) == 0 {
+			return errors.New("request to join community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	cancelRequestToJoin2 := response.RequestsToJoinCommunity[0]
+
+	s.Require().NotNil(cancelRequestToJoin2)
+	s.Require().Equal(community.ID(), cancelRequestToJoin2.CommunityID)
+	s.Require().False(cancelRequestToJoin2.Our)
+	s.Require().NotEmpty(cancelRequestToJoin2.ID)
+	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
+	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
+
+}
+
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
