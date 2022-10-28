@@ -792,6 +792,10 @@ func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (ver
 	return api.service.messenger.GetTrustStatus(contactID)
 }
 
+func (api *PublicAPI) GetLatestVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
+	return api.service.messenger.GetLatestVerificationRequestFrom(contactID)
+}
+
 func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
 }

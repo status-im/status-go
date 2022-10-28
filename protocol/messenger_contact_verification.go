@@ -894,6 +894,10 @@ func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState
 	return nil
 }
 
+func (m *Messenger) GetLatestVerificationRequestFrom(contactID string) (*verification.Request, error) {
+	return m.verificationDatabase.GetLatestVerificationRequestFrom(contactID)
+}
+
 func (m *Messenger) createContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
