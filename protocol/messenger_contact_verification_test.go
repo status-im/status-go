@@ -178,7 +178,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	verificationRequestID := resp.VerificationRequests[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
-        s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
+	s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
 	s.Require().Equal(challenge, resp.Messages()[0].Text)
 	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
 
@@ -200,7 +200,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().Equal(challenge, resp.ActivityCenterNotifications()[0].Message.Text)
 	s.Require().Equal(common.ContactVerificationStatePending, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
 	s.Require().Len(resp.Messages(), 1)
-        s.Require().Empty(resp.Messages()[0].OutgoingStatus)
+	s.Require().Empty(resp.Messages()[0].OutgoingStatus)
 	s.Require().Equal(challenge, resp.Messages()[0].Text)
 	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
 
@@ -238,21 +238,21 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().Len(resp.VerificationRequests, 1)
 	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
 
-        messages := resp.Messages()
+	messages := resp.Messages()
 	s.Require().Len(messages, 2)
-        var originalMessage *common.Message
-        var replyMessage *common.Message
+	var originalMessage *common.Message
+	var replyMessage *common.Message
 
-        if messages[0].ID == resp.VerificationRequests[0].ID {
-          originalMessage = messages[0]
-          replyMessage = messages[1]
-        } else {
-          originalMessage = messages[1]
-          replyMessage = messages[0]
-        }
+	if messages[0].ID == resp.VerificationRequests[0].ID {
+		originalMessage = messages[0]
+		replyMessage = messages[1]
+	} else {
+		originalMessage = messages[1]
+		replyMessage = messages[0]
+	}
 
 	s.Require().Equal(common.ContactVerificationStateAccepted, originalMessage.ContactVerificationState)
-        // Not sure this is the right state for this, it should probably be pendingtrustedverification or something
+	// Not sure this is the right state for this, it should probably be pendingtrustedverification or something
 	s.Require().Equal(common.ContactVerificationStateAccepted, replyMessage.ContactVerificationState)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -263,6 +263,134 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].ReplyMessage)
 	s.Require().Empty(resp.ActivityCenterNotifications()[0].ReplyMessage.OutgoingStatus)
 	s.Require().Equal("hello back", resp.ActivityCenterNotifications()[0].ReplyMessage.Text)
+
+	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusTRUSTED)
+	s.Require().Equal(common.ContactVerificationStateTrusted, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
+
+}
+
+func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests() {
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	s.mutualContact(theirMessenger)
+
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	challenge := "challenge"
+
+	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	verificationRequestID := resp.VerificationRequests[0].ID
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
+
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(challenge, resp.ActivityCenterNotifications()[0].Message.Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Empty(resp.Messages()[0].OutgoingStatus)
+	s.Require().Equal(challenge, resp.Messages()[0].Text)
+	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
+
+	resp, err = theirMessenger.AcceptContactVerificationRequest(context.Background(), verificationRequestID, "hello back")
+
+	s.Require().NoError(err)
+
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
+	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusACCEPTED)
+	s.Require().Equal(common.ContactVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactVerificationStateAccepted, resp.Messages()[0].ContactVerificationState)
+
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].ReplyMessage)
+	s.Require().NotEmpty(resp.ActivityCenterNotifications()[0].ReplyMessage.OutgoingStatus)
+	s.Require().Equal("hello back", resp.ActivityCenterNotifications()[0].ReplyMessage.Text)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.VerificationRequests) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(resp.VerificationRequests, 1)
+	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+
+	messages := resp.Messages()
+	s.Require().Len(messages, 2)
+	var originalMessage *common.Message
+	var replyMessage *common.Message
+
+	if messages[0].ID == resp.VerificationRequests[0].ID {
+		originalMessage = messages[0]
+		replyMessage = messages[1]
+	} else {
+		originalMessage = messages[1]
+		replyMessage = messages[0]
+	}
+
+	s.Require().Equal(common.ContactVerificationStateAccepted, originalMessage.ContactVerificationState)
+	// Not sure this is the right state for this, it should probably be pendingtrustedverification or something
+	s.Require().Equal(common.ContactVerificationStateAccepted, replyMessage.ContactVerificationState)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusACCEPTED)
+	s.Require().Equal(common.ContactVerificationStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].ReplyMessage)
+	s.Require().Empty(resp.ActivityCenterNotifications()[0].ReplyMessage.OutgoingStatus)
+	s.Require().Equal("hello back", resp.ActivityCenterNotifications()[0].ReplyMessage.Text)
+
+	resp, err = s.m.VerifiedUntrustworthy(context.Background(), &requests.VerifiedUntrustworthy{ID: types.FromHex(verificationRequestID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusUNTRUSTWORTHY)
+	s.Require().Equal(common.ContactVerificationStateUntrustworthy, resp.ActivityCenterNotifications()[0].Message.ContactVerificationState)
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactVerificationStateUntrustworthy, resp.Messages()[0].ContactVerificationState)
 }
 
 func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {

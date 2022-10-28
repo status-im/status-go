@@ -738,7 +738,6 @@ func (db sqlitePersistence) UpdateActivityCenterNotificationFields(id types.HexB
 		return err
 	}
 
-
 	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ?, reply_message = ?, contact_verification_status = ? WHERE id = ?`, encodedMessage, encodedReplyMessage, status, id)
 	return err
 

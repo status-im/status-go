@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 )
 
@@ -284,7 +285,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		notification.ContactVerificationStatus = verification.RequestStatusACCEPTED
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateAccepted
-                notification.ReplyMessage = replyMessage
+		notification.ReplyMessage = replyMessage
 
 		err := m.persistence.UpdateActivityCenterNotificationFields(notification.ID, message, replyMessage, verification.RequestStatusACCEPTED)
 		if err != nil {
@@ -298,27 +299,43 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	return resp, nil
 }
 
-func (m *Messenger) VerifiedTrusted(ctx context.Context, contactID string) error {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
-		return errors.New("must be a mutual contact")
+func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.VerifiedTrusted) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+	// Pull one from the db if there
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusTRUSTED, m.getTimesource().GetCurrentTime())
+	if notification == nil || notification.ReplyMessage == nil {
+		return nil, errors.New("could not find notification")
+	}
+
+	contactID := notification.ReplyMessage.From
+
+	contact, ok := m.allContacts.Load(contactID)
+	if !ok || !contact.Added || !contact.HasAddedUs {
+		return nil, errors.New("must be a mutual contact")
+	}
+
+	err = m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusTRUSTED, m.getTimesource().GetCurrentTime())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusTRUSTED)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	contact.VerificationStatus = VerificationStatusVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	chat, ok := m.allChats.Load(contactID)
@@ -326,20 +343,20 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, contactID string) error
 	if !ok {
 		publicKey, err := contact.PublicKey()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	request := &protobuf.ContactVerificationTrusted{
+	r := &protobuf.ContactVerificationTrusted{
 		Clock: clock,
 	}
 
-	encodedMessage, err := proto.Marshal(request)
+	encodedMessage, err := proto.Marshal(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
@@ -350,69 +367,133 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, contactID string) error
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	verifRequest, err := m.verificationDatabase.GetVerificationRequestSentTo(contactID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if verifRequest == nil {
-		return errors.New("no contact verification found")
+		return nil, errors.New("no contact verification found")
 	}
 
 	verifRequest.RequestStatus = verification.RequestStatusTRUSTED
 	verifRequest.RepliedAt = clock
 	err = m.verificationDatabase.SaveVerificationRequest(verifRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.SyncVerificationRequest(context.Background(), verifRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	response := &MessengerResponse{}
+
+	notification.ContactVerificationStatus = verification.RequestStatusTRUSTED
+	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
+
+	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := m.persistence.MessageByID(notification.ReplyMessage.ID)
+	if err != nil {
+		return nil, err
+	}
+	msg.ContactVerificationState = common.ContactVerificationStateTrusted
+
+	err = m.persistence.SaveMessages([]*common.Message{msg})
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddMessage(msg)
+	response.AddActivityCenterNotification(notification)
+
+	return response, nil
 }
 
-func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, contactID string) error {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
-		return errors.New("must be a mutual contact")
+func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests.VerifiedUntrustworthy) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
 	}
 
-	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusUNTRUSTWORTHY, m.getTimesource().GetCurrentTime())
+	// Pull one from the db if there
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	if notification == nil || notification.ReplyMessage == nil {
+		return nil, errors.New("could not find notification")
+	}
+
+	contactID := notification.ReplyMessage.From
+
+	contact, ok := m.allContacts.Load(contactID)
+	if !ok || !contact.Added || !contact.HasAddedUs {
+		return nil, errors.New("must be a mutual contact")
+	}
+
+	err = m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusUNTRUSTWORTHY, m.getTimesource().GetCurrentTime())
+	if err != nil {
+		return nil, err
 	}
 
 	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusUNTRUSTWORTHY)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	contact.VerificationStatus = VerificationStatusVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	response := &MessengerResponse{}
+
+	notification.ContactVerificationStatus = verification.RequestStatusUNTRUSTWORTHY
+	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
+
+	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := m.persistence.MessageByID(notification.ReplyMessage.ID)
+	if err != nil {
+		return nil, err
+	}
+	msg.ContactVerificationState = common.ContactVerificationStateUntrustworthy
+
+	err = m.persistence.SaveMessages([]*common.Message{msg})
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddMessage(msg)
+	response.AddActivityCenterNotification(notification)
+
+	return response, nil
 }
 
 func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id string) (*MessengerResponse, error) {
@@ -730,7 +811,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	if err != nil {
 		return err
 	}
-        msg.ContactVerificationState = common.ContactVerificationStateAccepted
+	msg.ContactVerificationState = common.ContactVerificationStateAccepted
 
 	state.Response.AddMessage(msg)
 
@@ -903,7 +984,7 @@ func (m *Messenger) createContactVerificationNotification(contact *Contact, mess
 		Type:                      ActivityCenterNotificationTypeContactVerification,
 		Author:                    messageState.CurrentMessageState.Contact.ID,
 		Message:                   chatMessage,
-                ReplyMessage:              replyMessage,
+		ReplyMessage:              replyMessage,
 		Timestamp:                 messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
