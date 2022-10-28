@@ -20,12 +20,26 @@ import (
 
 // PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
 type PayloadManager interface {
+	// Mount Loads the payload into the PayloadManager's state
 	Mount() error
+
+	// Receive stores data from an inbound source into the PayloadManager's state
 	Receive(data []byte) error
+
+	// ToSend returns an outbound safe (encrypted) payload
 	ToSend() []byte
+
+	// Received returns a decrypted and parsed payload from an inbound source
 	Received() []byte
+
+	// ResetPayload resets all payloads the PayloadManager has in its state
 	ResetPayload()
+
+	// EncryptPlain encrypts the given plaintext using internal key(s)
 	EncryptPlain(plaintext []byte) ([]byte, error)
+
+	// LockPayload prevents future excess to outbound safe and received data
+	LockPayload()
 }
 
 // PairingPayloadSourceConfig represents location and access data of the pairing payload
@@ -135,6 +149,11 @@ func (ppm *PairingPayloadManager) ResetPayload() {
 type EncryptionPayload struct {
 	plain     []byte
 	encrypted []byte
+	locked    bool
+}
+
+func (ep *EncryptionPayload) lock() {
+	ep.locked = true
 }
 
 // PayloadEncryptionManager is responsible for encrypting and decrypting payload data
@@ -149,6 +168,8 @@ func NewPayloadEncryptionManager(aesKey []byte, logger *zap.Logger) (*PayloadEnc
 	return &PayloadEncryptionManager{logger.Named("PayloadEncryptionManager"), aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
 }
 
+// EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
+// This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
 func (pem *PayloadEncryptionManager) EncryptPlain(plaintext []byte) ([]byte, error) {
 	l := pem.logger.Named("EncryptPlain()")
 	l.Debug("fired")
@@ -200,16 +221,30 @@ func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
 }
 
 func (pem *PayloadEncryptionManager) ToSend() []byte {
+	if pem.toSend.locked {
+		return nil
+	}
 	return pem.toSend.encrypted
 }
 
 func (pem *PayloadEncryptionManager) Received() []byte {
+	if pem.toSend.locked {
+		return nil
+	}
 	return pem.received.plain
 }
 
 func (pem *PayloadEncryptionManager) ResetPayload() {
 	pem.toSend = new(EncryptionPayload)
 	pem.received = new(EncryptionPayload)
+}
+
+func (pem *PayloadEncryptionManager) LockPayload() {
+	l := pem.logger.Named("LockPayload")
+	l.Debug("fired")
+
+	pem.toSend.lock()
+	pem.received.lock()
 }
 
 // PairingPayload represents the payload structure a PairingServer handles

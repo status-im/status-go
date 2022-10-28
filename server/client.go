@@ -119,6 +119,8 @@ func (c *PairingClient) sendAccountData() error {
 	}
 
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
+
+	c.PayloadManager.LockPayload()
 	return nil
 }
 

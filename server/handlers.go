@@ -424,7 +424,6 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 func handlePairingSend(ps *PairingServer) http.HandlerFunc {
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
 
-	// TODO lock sending after one successful transfer, perhaps perform the lock on the PayloadManager level
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err := w.Write(ps.PayloadManager.ToSend())
@@ -434,6 +433,8 @@ func handlePairingSend(ps *PairingServer) http.HandlerFunc {
 			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
+
+		ps.PayloadManager.LockPayload()
 	}
 }
 
