@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
@@ -325,4 +326,27 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().Exactly(expected.Name, acc.Name)
 	pms.Require().Exactly(expected.Timestamp, acc.Timestamp)
 	pms.Require().Len(acc.Images, 2)
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {
+	AESKey := make([]byte, 32)
+	_, err := rand.Read(AESKey)
+	pms.Require().NoError(err)
+
+	pm, err := NewMockEncryptOnlyPayloadManager(AESKey)
+	pms.Require().NoError(err)
+
+	err = pm.Mount()
+	pms.Require().NoError(err)
+
+	toSend := pm.ToSend()
+	pms.Len(toSend, 60)
+
+	toSend2 := pm.ToSend()
+	pms.Len(toSend2, 60)
+
+	pm.LockPayload()
+
+	toSend3 := pm.ToSend()
+	pms.Nil(toSend3)
 }
