@@ -1352,7 +1352,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
-	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
+	messages, err := m.persistence.LatestMessageByChatID(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -1503,7 +1503,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
+		messages, err := m.persistence.LatestMessageByChatID(receivedMessage.LocalChatID)
 		if err != nil {
 			return err
 		}

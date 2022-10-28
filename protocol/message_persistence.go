@@ -620,6 +620,36 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+// Get last chat message that is not hide or deleted or deleted_for_me
+func (db sqlitePersistence) LatestMessageByChatID(chatID string) ([]*common.Message, error) {
+	args := []interface{}{chatID}
+	where := `WHERE
+                NOT(m1.hide) AND NOT(m1.deleted) AND NOT(m1.deleted_for_me) AND m1.local_chat_id = ?
+            ORDER BY cursor DESC
+            LIMIT ?`
+
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
+
+	rows, err := db.db.Query(
+		query,
+		append(args, 2)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result, _, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 1 {
+		result = result[:1]
+	}
+	return result, nil
+}
+
 func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, error) {
 	var clock uint64
 	err := db.db.QueryRow(
