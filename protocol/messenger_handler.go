@@ -923,6 +923,11 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// part of and doesn't own the private key at the same time
 		if !signedByOwnedCommunity && joinedCommunity && clock >= lastClock {
 
+      err := m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
+      if err != nil {
+        return err
+      }
+
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
 			m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 			go func() {
@@ -943,37 +948,74 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					}
 				}
 
-				messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, downloadedArchiveIDs)
-				if err != nil {
-					log.Println("failed to extract history archive messages", err)
-					m.logger.Debug("failed to extract history archive messages", zap.Error(err))
-					return
-				}
 
-				importedMessages := make(map[transport.Filter][]*types.Message, 0)
-				otherMessages := make(map[transport.Filter][]*types.Message, 0)
+        var response *MessengerResponse
+        for _, archiveID := range downloadedArchiveIDs {
+          messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, []string{archiveID})
+          if err != nil {
+            log.Println("failed to extract history archive messages", err)
+            m.logger.Debug("failed to extract history archive messages", zap.Error(err))
+            return
+          }
 
-				for filter, messages := range messagesToHandle {
-					for _, message := range messages {
-						if message.ThirdPartyID != "" {
-							importedMessages[filter] = append(importedMessages[filter], message)
-						} else {
-							otherMessages[filter] = append(otherMessages[filter], message)
-						}
-					}
-				}
+          importedMessages := make(map[transport.Filter][]*types.Message, 0)
+          otherMessages := make(map[transport.Filter][]*types.Message, 0)
 
-				err = m.handleImportedMessages(importedMessages)
-				if err != nil {
-					log.Println("failed to handle imported messages", err)
-					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
-				}
+          for filter, messages := range messagesToHandle {
+            for _, message := range messages {
+              if message.ThirdPartyID != "" {
+                importedMessages[filter] = append(importedMessages[filter], message)
+              } else {
+                otherMessages[filter] = append(otherMessages[filter], message)
+              }
+            }
+          }
 
-				response, err := m.handleRetrievedMessages(otherMessages, false)
-				if err != nil {
-					log.Println("failed to write history archive messages to database", err)
-					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
-				}
+          err = m.handleImportedMessages(importedMessages)
+          if err != nil {
+            log.Println("failed to handle imported messages", err)
+            m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+          }
+
+          r, err := m.handleRetrievedMessages(otherMessages, false)
+          if err != nil {
+            log.Println("failed to write history archive messages to database", err)
+            m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+          }
+          response.Merge(r)
+        }
+
+				// messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, downloadedArchiveIDs)
+				// if err != nil {
+				// 	log.Println("failed to extract history archive messages", err)
+				// 	m.logger.Debug("failed to extract history archive messages", zap.Error(err))
+				// 	return
+				// }
+
+				// importedMessages := make(map[transport.Filter][]*types.Message, 0)
+				// otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+				// for filter, messages := range messagesToHandle {
+				// 	for _, message := range messages {
+				// 		if message.ThirdPartyID != "" {
+				// 			importedMessages[filter] = append(importedMessages[filter], message)
+				// 		} else {
+				// 			otherMessages[filter] = append(otherMessages[filter], message)
+				// 		}
+				// 	}
+				// }
+
+				// err = m.handleImportedMessages(importedMessages)
+				// if err != nil {
+				// 	log.Println("failed to handle imported messages", err)
+				// 	m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+				// }
+
+				// response, err := m.handleRetrievedMessages(otherMessages, false)
+				// if err != nil {
+				// 	log.Println("failed to write history archive messages to database", err)
+				// 	m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
+				// }
 				if !response.IsEmpty() {
 					notifications := response.Notifications()
 					response.ClearNotifications()
@@ -982,8 +1024,6 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				}
 				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 			}()
-
-			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
 		}
 	}
 	return nil
