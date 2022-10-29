@@ -51,6 +51,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				SyncedTo:              chat.SyncedTo,
 				SyncedFrom:            chat.SyncedFrom,
 				Highlight:             chat.Highlight,
+				Members:               chat.Members, 
 			}
 			if chat.LastMessage != nil {
 				chatPreview.ContentType = chat.LastMessage.ContentType
