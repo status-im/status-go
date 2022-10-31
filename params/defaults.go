@@ -9,6 +9,8 @@ const (
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
 
+	BalanceMethodName = "eth_getBalance"
+
 	// AccountsMethodName defines the name for listing the currently signed accounts.
 	AccountsMethodName = "eth_accounts"
 

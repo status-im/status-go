@@ -1,3 +1,7 @@
+# github.com/BurntSushi/toml v1.2.1
+## explicit; go 1.16
+github.com/BurntSushi/toml
+github.com/BurntSushi/toml/internal
 # github.com/PuerkitoBio/goquery v1.6.1
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
@@ -876,6 +880,9 @@ github.com/shirou/gopsutil/internal/common
 # github.com/shopspring/decimal v1.2.0
 ## explicit; go 1.13
 github.com/shopspring/decimal
+# github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
+## explicit; go 1.18
+github.com/siphiuel/lc-proxy-wrapper
 # github.com/spaolacci/murmur3 v1.1.0
 ## explicit
 github.com/spaolacci/murmur3
