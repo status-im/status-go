@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/status-im/status-go/appdatabase"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -83,7 +85,7 @@ func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig
 		pp:                       p,
 		PayloadEncryptionManager: pem,
 		ppm:                      NewPairingPayloadMarshaller(p, l),
-		ppr:                      NewPairingPayloadRepository(p, config),
+		ppr:                      NewPairingPayloadRepository(p, config, l),
 	}, nil
 }
 
@@ -329,6 +331,8 @@ func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
 
+const keystoreDir = "keystore"
+
 type PayloadRepository interface {
 	LoadFromSource() error
 	StoreToSource() error
@@ -341,11 +345,14 @@ type PairingPayloadRepository struct {
 	multiaccountsDB *multiaccounts.Database
 
 	keystorePath, keyUID string
+
+	logger *zap.Logger
 }
 
-func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManagerConfig) *PairingPayloadRepository {
+func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManagerConfig, logger *zap.Logger) *PairingPayloadRepository {
 	ppr := &PairingPayloadRepository{
 		PairingPayload: p,
+		logger:         logger,
 	}
 
 	if config == nil {
@@ -433,6 +440,11 @@ func (ppr *PairingPayloadRepository) StoreToSource() error {
 		return err
 	}
 
+	err = ppr.initialiseEncryptedDB()
+	if err != nil {
+		return err
+	}
+
 	// TODO install PublicKey into settings, probably do this outside of StoreToSource
 	return nil
 }
@@ -460,9 +472,9 @@ func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
 
 	_, lastDir := filepath.Split(keyStorePath)
 
-	// If lastDir == "keystore" we presume we need to create the rest of the keystore path
+	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == "keystore" {
+	if lastDir == keystoreDir {
 		if ppr.multiaccount == nil || ppr.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
@@ -494,4 +506,59 @@ func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
 
 func (ppr *PairingPayloadRepository) storeMultiAccount() error {
 	return ppr.multiaccountsDB.SaveAccount(*ppr.multiaccount)
+}
+
+func (ppr *PairingPayloadRepository) initialiseEncryptedDB() error {
+	l := ppr.logger.Named("initialiseEncryptedDB")
+	l.Debug("fired")
+
+	var path string
+	var err error
+
+	// get root path
+	pos := getKeystorePosition(ppr.keystorePath)
+	// If the keystore position is negative or zero, just use the whole path
+	if pos > 0 {
+		// otherwise truncate the path
+		path, err = truncatePath(ppr.keystorePath, uint(pos-1))
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO resolve what to do with returned DB, could do nothing
+	// TODO resolve what to do with KDFIterations. Currently KDFIs are set by the client, and stored in the
+	//  multi-account DB. However this is an issue when we sync between desktop and mobile
+	//  desktop use significantly higher KDFIs and would cause a problem on mobile.
+	//  Potential solution would be to know the OS type and manually set the KDFIs instead of syncing them
+	_, err = appdatabase.InitializeDB(path, ppr.password, ppr.multiaccount.KDFIterations)
+	if err != nil {
+		l.Error("failed to initialize db", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+// getKeystorePosition splits a path into a list of dirs, ranges through the list and returns the index
+// of the first dir that matches the keystoreDir const
+func getKeystorePosition(keyStorePath string) int {
+	paths := strings.Split(keyStorePath, string(os.PathSeparator))
+	for i, path := range paths {
+		if path == keystoreDir {
+			return i
+		}
+	}
+	return -1
+}
+
+// truncatePath takes a path splits the path into a list of dirs, then joins the path list up to the given
+// pos index
+func truncatePath(path string, pos uint) (string, error) {
+	paths := strings.Split(path, string(os.PathSeparator))
+
+	if pos > uint(len(paths)) {
+		return "", fmt.Errorf("pos can not be greater than the number of dirs in path")
+	}
+	return filepath.Join(paths[:pos+1]...), nil
 }
