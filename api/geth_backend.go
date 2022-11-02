@@ -244,6 +244,7 @@ func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir str
 	return err
 }
 
+//
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

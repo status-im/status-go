@@ -160,7 +160,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr := NewPairingPayloadRepository(pp, pms.config1)
+	ppr := NewPairingPayloadRepository(pp, pms.config1, pms.Logger)
 	err := ppr.LoadFromSource()
 	pms.Require().NoError(err)
 
@@ -193,7 +193,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr := NewPairingPayloadRepository(pp, pms.config1)
+	ppr := NewPairingPayloadRepository(pp, pms.config1, pms.Logger)
 	err := ppr.LoadFromSource()
 	pms.Require().NoError(err)
 
@@ -222,7 +222,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr := NewPairingPayloadRepository(pp, pms.config1)
+	ppr := NewPairingPayloadRepository(pp, pms.config1, pms.Logger)
 	err := ppr.LoadFromSource()
 	pms.Require().NoError(err)
 
@@ -275,7 +275,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr := NewPairingPayloadRepository(pp, pms.config1)
+	ppr := NewPairingPayloadRepository(pp, pms.config1, pms.Logger)
 	err := ppr.LoadFromSource()
 	pms.Require().NoError(err)
 
@@ -295,7 +295,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// Make and Load PairingPayloadRepository 2
-	ppr2 := NewPairingPayloadRepository(pp2, pms.config2)
+	ppr2 := NewPairingPayloadRepository(pp2, pms.config2, pms.Logger)
 
 	err = ppr2.StoreToSource()
 	pms.Require().NoError(err)
@@ -349,4 +349,43 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {
 
 	toSend3 := pm.ToSend()
 	pms.Nil(toSend3)
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_getKeystorePosition() {
+	ts := []struct {
+		Path     []string
+		Position int
+	}{
+		{[]string{"no", "key", "store", "path"}, -1},
+		{[]string{"keystore"}, 0},
+		{[]string{"some", "keystore"}, 1},
+		{[]string{"some", "other", "keystore"}, 2},
+		{[]string{"some", "other", "keystore", "with", "trailing", "path"}, 2},
+	}
+
+	for _, tc := range ts {
+		pms.Require().Equal(tc.Position, getKeystorePosition(filepath.Join(tc.Path...)))
+	}
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_truncatePath() {
+	ts := []struct {
+		Path     []string
+		Position uint
+		Result   []string
+	}{
+		{[]string{"some", "random", "path"}, 2, []string{"some", "random", "path"}},
+		{[]string{"some", "random", "path"}, 1, []string{"some", "random"}},
+		{[]string{"some", "random", "path"}, 0, []string{"some"}},
+	}
+
+	for _, tc := range ts {
+		tp, err := truncatePath(filepath.Join(tc.Path...), tc.Position)
+		pms.Require().NoError(err)
+
+		pms.Require().Equal(
+			filepath.Join(tc.Result...),
+			tp,
+		)
+	}
 }
