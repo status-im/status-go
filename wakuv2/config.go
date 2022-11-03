@@ -54,7 +54,7 @@ var DefaultConfig = Config{
 	Port:              60000,
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
-	MinPeersForRelay:  2, // TODO: determine correct value with Vac team
+	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
 	UDPPort:           9000,
 	AutoUpdate:        false,
 }
