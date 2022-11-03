@@ -183,6 +183,7 @@ func (m *Messenger) allMailservers() ([]mailservers.Mailserver, error) {
 
 	for _, c := range customMailservers {
 		if c.Fleet == fleet {
+			c.Version = m.transport.WakuVersion()
 			allMailservers = append(allMailservers, c)
 		}
 	}
@@ -669,6 +670,7 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 
 	for _, c := range customMailservers {
 		if c.Fleet == fleet && c.ID == pinnedMailserver {
+			c.Version = m.transport.WakuVersion()
 			return &c, nil
 		}
 	}

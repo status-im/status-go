@@ -868,15 +868,15 @@ func (w *Waku) broadcast() {
 			}
 
 			if w.settings.LightClient {
-				log.Debug("publishing message via lightpush", zap.Any("hash", hexutil.Encode(hash)))
+				log.Debug("publishing message via lightpush", "hash", hexutil.Encode(hash))
 				_, err = w.node.Lightpush().Publish(context.Background(), msg)
 			} else {
-				log.Debug("publishing message via relay", zap.Any("hash", hexutil.Encode(hash)))
+				log.Debug("publishing message via relay", "hash", hexutil.Encode(hash))
 				_, err = w.node.Relay().Publish(context.Background(), msg)
 			}
 
 			if err != nil {
-				log.Error("could not send message", zap.Any("hash", hexutil.Encode(hash)), zap.Error(err))
+				log.Error("could not send message", "hash", hexutil.Encode(hash), "err", zap.Error(err))
 				w.envelopeFeed.Send(common.EnvelopeEvent{
 					Hash:  gethcommon.BytesToHash(hash),
 					Event: common.EventEnvelopeExpired,
