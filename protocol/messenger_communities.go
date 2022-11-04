@@ -23,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -2221,6 +2222,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		// marking import as not cancelled
 		m.importingCommunities[communityID] = false
 		importProgress.CommunityID = communityID
+		importProgress.CommunityImages = make(map[string]images.IdentityImage)
+
+		imgs := discordCommunity.Images()
+		for t, i := range imgs {
+			importProgress.CommunityImages[t] = images.IdentityImage{Name: t, Payload: i.Payload}
+		}
+
 		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.75)
 		progressUpdates <- importProgress
 

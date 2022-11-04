@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -149,14 +150,15 @@ type ImportTaskProgress struct {
 type ImportTasks map[ImportTask]*ImportTaskProgress
 
 type ImportProgress struct {
-	CommunityID   string                `json:"communityId,omitempty"`
-	CommunityName string                `json:"communityName"`
-	Tasks         []*ImportTaskProgress `json:"tasks"`
-	Progress      float32               `json:"progress"`
-	ErrorsCount   uint                  `json:"errorsCount"`
-	WarningsCount uint                  `json:"warningsCount"`
-	Stopped       bool                  `json:"stopped"`
-	m             sync.Mutex
+	CommunityID     string                          `json:"communityId,omitempty"`
+	CommunityName   string                          `json:"communityName"`
+	CommunityImages map[string]images.IdentityImage `json:"communityImages"`
+	Tasks           []*ImportTaskProgress           `json:"tasks"`
+	Progress        float32                         `json:"progress"`
+	ErrorsCount     uint                            `json:"errorsCount"`
+	WarningsCount   uint                            `json:"warningsCount"`
+	Stopped         bool                            `json:"stopped"`
+	m               sync.Mutex
 }
 
 func (progress *ImportProgress) Init(tasks []ImportTask) {
