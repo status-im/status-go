@@ -3,10 +3,10 @@ package node
 import (
 	"context"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/status-im/go-waku/logging"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
@@ -49,11 +49,11 @@ func NewConnectionNotifier(ctx context.Context, h host.Host, log *zap.Logger) Co
 }
 
 // Listen is called when network starts listening on an addr
-func (c ConnectionNotifier) Listen(n network.Network, m ma.Multiaddr) {
+func (c ConnectionNotifier) Listen(n network.Network, m multiaddr.Multiaddr) {
 }
 
 // ListenClose is called when network stops listening on an address
-func (c ConnectionNotifier) ListenClose(n network.Network, m ma.Multiaddr) {
+func (c ConnectionNotifier) ListenClose(n network.Network, m multiaddr.Multiaddr) {
 }
 
 // Connected is called when a connection is opened

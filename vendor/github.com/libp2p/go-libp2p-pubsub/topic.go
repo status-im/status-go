@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/crypto"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // ErrTopicClosed is returned if a Topic is utilized after it has been closed
@@ -215,7 +215,7 @@ type ProvideKey func() (crypto.PrivKey, peer.ID)
 type PublishOptions struct {
 	ready     RouterReady
 	customKey ProvideKey
-	local bool
+	local     bool
 }
 
 type PubOpt func(pub *PublishOptions) error

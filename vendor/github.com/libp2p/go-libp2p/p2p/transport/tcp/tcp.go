@@ -9,11 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/net/reuseport"
-
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
 
 	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
@@ -107,14 +106,21 @@ func WithConnectionTimeout(d time.Duration) Option {
 	}
 }
 
+func WithMetrics() Option {
+	return func(tr *TcpTransport) error {
+		tr.enableMetrics = true
+		return nil
+	}
+}
+
 // TcpTransport is the TCP transport.
 type TcpTransport struct {
 	// Connection upgrader for upgrading insecure stream connections to
 	// secure multiplex connections.
 	upgrader transport.Upgrader
 
-	// Explicitly disable reuseport.
-	disableReuseport bool
+	disableReuseport bool // Explicitly disable reuseport.
+	enableMetrics    bool
 
 	// TCP connect timeout
 	connectTimeout time.Duration
@@ -190,10 +196,14 @@ func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) 
 	// This means we can immediately reuse the 5-tuple and reconnect.
 	tryLinger(conn, 0)
 	tryKeepAlive(conn, true)
-	c, err := newTracingConn(conn, true)
-	if err != nil {
-		connScope.Done()
-		return nil, err
+	c := conn
+	if t.enableMetrics {
+		var err error
+		c, err = newTracingConn(conn, true)
+		if err != nil {
+			connScope.Done()
+			return nil, err
+		}
 	}
 	direction := network.DirOutbound
 	if ok, isClient, _ := network.GetSimultaneousConnect(ctx); ok && !isClient {
@@ -220,7 +230,9 @@ func (t *TcpTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	list = newTracingListener(&tcpListener{list, 0})
+	if t.enableMetrics {
+		list = newTracingListener(&tcpListener{list, 0})
+	}
 	return t.upgrader.UpgradeListener(t, list), nil
 }
 

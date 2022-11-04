@@ -1,56 +1,54 @@
 package utils
 
 import (
-	"fmt"
+	"strings"
+
+	logging "github.com/ipfs/go-log/v2"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var log *zap.Logger = nil
-var atom = zap.NewAtomicLevel()
-
-// SetLogLevel sets a custom log level
-func SetLogLevel(level string) error {
-	lvl := zapcore.InfoLevel // zero value
-	err := lvl.Set(level)
-	if err != nil {
-		return err
-	}
-	atom.SetLevel(lvl)
-	return nil
-}
 
 // Logger creates a zap.Logger with some reasonable defaults
 func Logger() *zap.Logger {
 	if log == nil {
-		InitLogger("console")
+		InitLogger("console", "stdout")
 	}
 	return log
 }
 
 // InitLogger initializes a global logger using an specific encoding
-func InitLogger(encoding string) {
-	cfg := zap.Config{
-		Encoding:         encoding,
-		Level:            atom,
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:   "message",
-			LevelKey:     "level",
-			EncodeLevel:  zapcore.CapitalLevelEncoder,
-			TimeKey:      "time",
-			EncodeTime:   zapcore.ISO8601TimeEncoder,
-			NameKey:      "caller",
-			EncodeCaller: zapcore.ShortCallerEncoder,
-		},
+func InitLogger(encoding string, output string) {
+	cfg := logging.GetConfig()
+
+	if encoding == "json" {
+		cfg.Format = logging.JSONOutput
+	} else if encoding == "nocolor" {
+		cfg.Format = logging.PlaintextOutput
+	} else {
+		cfg.Format = logging.ColorizedOutput
 	}
 
-	logger, err := cfg.Build()
-	if err != nil {
-		panic(fmt.Errorf("could not create logger: %s", err.Error()))
+	if output == "stdout" || output == "" {
+		cfg.Stdout = true
+		cfg.Stderr = false
+	} else {
+		if encoding == "console" {
+			cfg.Format = logging.PlaintextOutput
+		}
+		cfg.Stdout = false
+		cfg.Stderr = false
+
+		outputParts := strings.Split(output, ":")
+		if len(outputParts) == 2 {
+			cfg.File = outputParts[1]
+		} else {
+			cfg.File = "./waku.log"
+		}
 	}
 
-	log = logger.Named("gowaku")
+	logging.SetupLogging(cfg)
+
+	log = logging.Logger("gowaku").Desugar()
 }

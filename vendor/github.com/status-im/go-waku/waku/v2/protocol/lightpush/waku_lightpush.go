@@ -6,9 +6,9 @@ import (
 	"errors"
 	"math"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
 	"github.com/status-im/go-waku/logging"
 	"github.com/status-im/go-waku/waku/v2/metrics"
@@ -49,7 +49,7 @@ func NewWakuLightPush(ctx context.Context, h host.Host, relay *relay.WakuRelay, 
 
 // Start inits the lighpush protocol
 func (wakuLP *WakuLightPush) Start() error {
-	if wakuLP.IsClientOnly() {
+	if wakuLP.relayIsNotAvailable() {
 		return errors.New("relay is required, without it, it is only a client and cannot be started")
 	}
 
@@ -60,8 +60,8 @@ func (wakuLP *WakuLightPush) Start() error {
 	return nil
 }
 
-// IsClientOnly determines if this node supports relaying messages for other lightpush clients
-func (wakuLp *WakuLightPush) IsClientOnly() bool {
+// relayIsNotAvailable determines if this node supports relaying messages for other lightpush clients
+func (wakuLp *WakuLightPush) relayIsNotAvailable() bool {
 	return wakuLp.relay == nil
 }
 
@@ -85,7 +85,7 @@ func (wakuLP *WakuLightPush) onRequest(s network.Stream) {
 	if requestPushRPC.Query != nil {
 		logger.Info("push request")
 		response := new(pb.PushResponse)
-		if !wakuLP.IsClientOnly() {
+		if !wakuLP.relayIsNotAvailable() {
 			pubSubTopic := requestPushRPC.Query.PubsubTopic
 			message := requestPushRPC.Query.Message
 
@@ -203,8 +203,10 @@ func (wakuLP *WakuLightPush) IsStarted() bool {
 
 // Stop unmounts the lightpush protocol
 func (wakuLP *WakuLightPush) Stop() {
-	wakuLP.h.RemoveStreamHandler(LightPushID_v20beta1)
-	wakuLP.started = false
+	if wakuLP.started {
+		wakuLP.h.RemoveStreamHandler(LightPushID_v20beta1)
+		wakuLP.started = false
+	}
 }
 
 // PublishToTopic is used to broadcast a WakuMessage to a pubsub topic via lightpush protocol
@@ -223,7 +225,8 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *pb.Wak
 	}
 
 	if response.IsSuccess {
-		hash, _ := message.Hash()
+		hash, _, _ := message.Hash()
+		wakuLP.log.Info("received", logging.HexString("messageID", hash))
 		return hash, nil
 	} else {
 		return nil, errors.New(response.Info)

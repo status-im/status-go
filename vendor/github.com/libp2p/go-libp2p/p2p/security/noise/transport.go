@@ -4,10 +4,11 @@ import (
 	"context"
 	"net"
 
-	"github.com/libp2p/go-libp2p-core/canonicallog"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/sec"
+	"github.com/libp2p/go-libp2p/core/canonicallog"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/sec"
+
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -17,7 +18,7 @@ const ID = "/noise"
 var _ sec.SecureTransport = &Transport{}
 
 // Transport implements the interface sec.SecureTransport
-// https://godoc.org/github.com/libp2p/go-libp2p-core/sec#SecureConn
+// https://godoc.org/github.com/libp2p/go-libp2p/core/sec#SecureConn
 type Transport struct {
 	localID    peer.ID
 	privateKey crypto.PrivKey
@@ -40,7 +41,7 @@ func New(privkey crypto.PrivKey) (*Transport, error) {
 // SecureInbound runs the Noise handshake as the responder.
 // If p is empty, connections from any peer are accepted.
 func (t *Transport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	c, err := newSecureSession(t, ctx, insecure, p, false)
+	c, err := newSecureSession(t, ctx, insecure, p, nil, nil, nil, false)
 	if err != nil {
 		addr, maErr := manet.FromNetAddr(insecure.RemoteAddr())
 		if maErr == nil {
@@ -52,5 +53,15 @@ func (t *Transport) SecureInbound(ctx context.Context, insecure net.Conn, p peer
 
 // SecureOutbound runs the Noise handshake as the initiator.
 func (t *Transport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	return newSecureSession(t, ctx, insecure, p, true)
+	return newSecureSession(t, ctx, insecure, p, nil, nil, nil, true)
+}
+
+func (t *Transport) WithSessionOptions(opts ...SessionOption) (sec.SecureTransport, error) {
+	st := &SessionTransport{t: t}
+	for _, opt := range opts {
+		if err := opt(st); err != nil {
+			return nil, err
+		}
+	}
+	return st, nil
 }

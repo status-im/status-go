@@ -7,25 +7,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/record"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/record"
 
-	"github.com/libp2p/go-eventbus"
-	"github.com/libp2p/go-msgio/protoio"
-
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	pb "github.com/libp2p/go-libp2p/p2p/protocol/identify/pb"
 
-	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr/net"
-	msmux "github.com/multiformats/go-multistream"
+	"github.com/libp2p/go-msgio/protoio"
 
 	"github.com/gogo/protobuf/proto"
 	logging "github.com/ipfs/go-log/v2"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
+	msmux "github.com/multiformats/go-multistream"
 )
 
 var log = logging.Logger("net/identify")
@@ -34,11 +33,7 @@ var log = logging.Logger("net/identify")
 // service.
 const ID = "/ipfs/id/1.0.0"
 
-// LibP2PVersion holds the current protocol version for a client running this code
-// TODO(jbenet): fix the versioning mess.
-// XXX: Don't change this till 2020. You'll break all go-ipfs versions prior to
-// 0.4.17 which asserted an exact version match.
-const LibP2PVersion = "ipfs/0.1.0"
+const DefaultProtocolVersion = "ipfs/0.1.0"
 
 const ServiceName = "libp2p.identify"
 
@@ -86,12 +81,13 @@ type IDService interface {
 // useful information about the local peer. A sort of hello.
 //
 // The idService sends:
-//  * Our IPFS Protocol Version
-//  * Our IPFS Agent Version
-//  * Our public Listen Addresses
+//   - Our IPFS Protocol Version
+//   - Our IPFS Agent Version
+//   - Our public Listen Addresses
 type idService struct {
-	Host      host.Host
-	UserAgent string
+	Host            host.Host
+	UserAgent       string
+	ProtocolVersion string
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -136,9 +132,15 @@ func NewIDService(h host.Host, opts ...Option) (*idService, error) {
 		userAgent = cfg.userAgent
 	}
 
+	protocolVersion := DefaultProtocolVersion
+	if cfg.protocolVersion != "" {
+		protocolVersion = cfg.protocolVersion
+	}
+
 	s := &idService{
-		Host:      h,
-		UserAgent: userAgent,
+		Host:            h,
+		UserAgent:       userAgent,
+		ProtocolVersion: protocolVersion,
 
 		conns: make(map[network.Conn]chan struct{}),
 
@@ -189,8 +191,10 @@ func (ids *idService) loop() {
 	defer ids.refCount.Done()
 
 	phs := make(map[peer.ID]*peerHandler)
-	sub, err := ids.Host.EventBus().Subscribe([]interface{}{&event.EvtLocalProtocolsUpdated{},
-		&event.EvtLocalAddressesUpdated{}}, eventbus.BufSize(256))
+	sub, err := ids.Host.EventBus().Subscribe([]interface{}{
+		&event.EvtLocalProtocolsUpdated{},
+		&event.EvtLocalAddressesUpdated{},
+	}, eventbus.BufSize(256))
 	if err != nil {
 		log.Errorf("failed to subscribe to events on the bus, err=%s", err)
 		return
@@ -490,7 +494,6 @@ func (ids *idService) writeChunkedIdentifyMsg(c network.Conn, snapshot *identify
 	m := &pb.Identify{SignedPeerRecord: sr}
 	err := writer.WriteMsg(m)
 	return err
-
 }
 
 func (ids *idService) createBaseIdentifyResponse(
@@ -542,10 +545,8 @@ func (ids *idService) createBaseIdentifyResponse(
 	}
 
 	// set protocol versions
-	pv := LibP2PVersion
-	av := ids.UserAgent
-	mes.ProtocolVersion = &pv
-	mes.AgentVersion = &av
+	mes.ProtocolVersion = &ids.ProtocolVersion
+	mes.AgentVersion = &ids.UserAgent
 
 	return mes
 }

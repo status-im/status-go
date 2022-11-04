@@ -9,8 +9,8 @@ import (
 
 	"github.com/flynn/noise"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type secureSession struct {
@@ -34,18 +34,26 @@ type secureSession struct {
 
 	enc *noise.CipherState
 	dec *noise.CipherState
+
+	// noise prologue
+	prologue []byte
+
+	initiatorEarlyDataHandler, responderEarlyDataHandler EarlyDataHandler
 }
 
 // newSecureSession creates a Noise session over the given insecureConn Conn, using
 // the libp2p identity keypair from the given Transport.
-func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, remote peer.ID, initiator bool) (*secureSession, error) {
+func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, remote peer.ID, prologue []byte, initiatorEDH, responderEDH EarlyDataHandler, initiator bool) (*secureSession, error) {
 	s := &secureSession{
-		insecureConn:   insecure,
-		insecureReader: bufio.NewReader(insecure),
-		initiator:      initiator,
-		localID:        tpt.localID,
-		localKey:       tpt.privateKey,
-		remoteID:       remote,
+		insecureConn:              insecure,
+		insecureReader:            bufio.NewReader(insecure),
+		initiator:                 initiator,
+		localID:                   tpt.localID,
+		localKey:                  tpt.privateKey,
+		remoteID:                  remote,
+		prologue:                  prologue,
+		initiatorEarlyDataHandler: initiatorEDH,
+		responderEarlyDataHandler: responderEDH,
 	}
 
 	// the go-routine we create to run the handshake will

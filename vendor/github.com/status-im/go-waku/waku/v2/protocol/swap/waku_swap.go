@@ -3,7 +3,7 @@ package swap
 import (
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.uber.org/zap"
 )
 

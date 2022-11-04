@@ -1,17 +1,18 @@
 package noise
 
 import (
-	n "github.com/flynn/noise"
+	n "github.com/waku-org/noise"
 )
 
 /*
- K1K1:
-    ->  s
-    <-  s
-       ...
-    ->  e
-    <-  e, ee, es
-    ->  se
+K1K1:
+
+	->  s
+	<-  s
+	   ...
+	->  e
+	<-  e, ee, es
+	->  se
 */
 var HandshakeK1K1 = n.HandshakePattern{
 	Name:                 "K1K1",
@@ -25,12 +26,13 @@ var HandshakeK1K1 = n.HandshakePattern{
 }
 
 /*
- XK1:
-    <-  s
-       ...
-    ->  e
-    <-  e, ee, es
-    ->  s, se
+XK1:
+
+	<-  s
+	   ...
+	->  e
+	<-  e, ee, es
+	->  s, se
 */
 var HandshakeXK1 = n.HandshakePattern{
 	Name:                 "XK1",
@@ -44,9 +46,10 @@ var HandshakeXK1 = n.HandshakePattern{
 
 /*
 XX:
-    ->  e
-    <-  e, ee, s, es
-    ->  s, se
+
+	->  e
+	<-  e, ee, s, es
+	->  s, se
 */
 var HandshakeXX = n.HandshakePattern{
 	Name: "XX",
@@ -58,10 +61,11 @@ var HandshakeXX = n.HandshakePattern{
 }
 
 /*
- XXpsk0:
-    ->  psk, e
-    <-  e, ee, s, es
-    ->  s, se
+XXpsk0:
+
+	->  psk, e
+	<-  e, ee, s, es
+	->  s, se
 */
 var HandshakeXXpsk0 = n.HandshakePattern{
 	Name: "XXpsk0",

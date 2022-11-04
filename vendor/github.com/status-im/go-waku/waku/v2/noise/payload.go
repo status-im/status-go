@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	n "github.com/flynn/noise"
+	n "github.com/waku-org/noise"
 )
 
 const MaxUint8 = 1<<8 - 1

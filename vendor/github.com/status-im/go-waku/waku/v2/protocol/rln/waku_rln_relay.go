@@ -6,18 +6,19 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	proto "github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/relay"
 	"github.com/status-im/go-waku/waku/v2/utils"
-	r "github.com/status-im/go-zerokit-rln/rln"
+	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 
@@ -29,10 +30,12 @@ const MAX_EPOCH_GAP = int64(MAX_CLOCK_GAP_SECONDS / r.EPOCH_UNIT_SECONDS)
 
 type RegistrationHandler = func(tx *types.Transaction)
 
+const AcceptableRootWindowSize = 5
+
 type WakuRLNRelay struct {
 	ctx context.Context
 
-	membershipKeyPair r.MembershipKeyPair
+	membershipKeyPair *r.MembershipKeyPair
 
 	// membershipIndex denotes the index of a leaf in the Merkle tree
 	// that contains the pk of the current peer
@@ -48,10 +51,15 @@ type WakuRLNRelay struct {
 
 	RLN *r.RLN
 	// pubsubTopic is the topic for which rln relay is mounted
-	pubsubTopic  string
-	contentTopic string
+	pubsubTopic     string
+	contentTopic    string
+	lastIndexLoaded r.MembershipIndex
+
+	validMerkleRoots []r.MerkleNode
+
 	// the log of nullifiers and Shamir shares of the past messages grouped per epoch
-	nullifierLog map[r.Epoch][]r.ProofMetadata
+	nullifierLogLock sync.RWMutex
+	nullifierLog     map[r.Epoch][]r.ProofMetadata
 
 	registrationHandler RegistrationHandler
 	log                 *zap.Logger
@@ -112,7 +120,9 @@ func (rln *WakuRLNRelay) HasDuplicate(msg *pb.WakuMessage) (bool, error) {
 		ShareY:    msgProof.ShareY,
 	}
 
+	rln.nullifierLogLock.RLock()
 	proofs, ok := rln.nullifierLog[msgProof.Epoch]
+	rln.nullifierLogLock.RUnlock()
 
 	// check if the epoch exists
 	if !ok {
@@ -154,6 +164,8 @@ func (rln *WakuRLNRelay) updateLog(msg *pb.WakuMessage) (bool, error) {
 		ShareY:    msgProof.ShareY,
 	}
 
+	rln.nullifierLogLock.Lock()
+	defer rln.nullifierLogLock.Unlock()
 	proofs, ok := rln.nullifierLog[msgProof.Epoch]
 
 	// check if the epoch exists
@@ -183,7 +195,6 @@ func (rln *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime *time
 	// the `msg` does not violate the rate limit
 	// `timeOption` indicates Unix epoch time (fractional part holds sub-seconds)
 	// if `timeOption` is supplied, then the current epoch is calculated based on that
-
 	if msg == nil {
 		return MessageValidationResult_Unknown, errors.New("nil message")
 	}
@@ -207,7 +218,7 @@ func (rln *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime *time
 
 	// calculate the gaps and validate the epoch
 	gap := r.Diff(epoch, msgProof.Epoch)
-	if int64(math.Abs(float64(gap))) >= MAX_EPOCH_GAP {
+	if int64(math.Abs(float64(gap))) > MAX_EPOCH_GAP {
 		// message's epoch is too old or too ahead
 		// accept messages whose epoch is within +-MAX_EPOCH_GAP from the current epoch
 		rln.log.Debug("invalid message: epoch gap exceeds a threshold", zap.Int64("gap", gap))
@@ -217,9 +228,18 @@ func (rln *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime *time
 	// verify the proof
 	contentTopicBytes := []byte(msg.ContentTopic)
 	input := append(msg.Payload, contentTopicBytes...)
-	if !rln.RLN.Verify(input, *msgProof) {
+
+	// TODO: set window of roots
+	roots := [][32]byte{}
+	valid, err := rln.RLN.VerifyWithRoots(input, *msgProof, roots)
+	if err != nil {
+		rln.log.Debug("could not verify proof", zap.Error(err))
+		return MessageValidationResult_Invalid, nil
+	}
+
+	if !valid {
 		// invalid proof
-		rln.log.Debug("invalid message: invalid proof")
+		rln.log.Debug("Invalid proof")
 		return MessageValidationResult_Invalid, nil
 	}
 
@@ -256,9 +276,13 @@ func (rln *WakuRLNRelay) AppendRLNProof(msg *pb.WakuMessage, senderEpochTime tim
 		return errors.New("nil message")
 	}
 
+	if rln.membershipKeyPair == nil {
+		return errors.New("No keypair setup")
+	}
+
 	input := toRLNSignal(msg)
 
-	proof, err := rln.RLN.GenerateProof(input, rln.membershipKeyPair, rln.membershipIndex, r.CalcEpoch(senderEpochTime))
+	proof, err := rln.RLN.GenerateProof(input, *rln.membershipKeyPair, rln.membershipIndex, r.CalcEpoch(senderEpochTime))
 	if err != nil {
 		return err
 	}
@@ -276,12 +300,35 @@ func (rln *WakuRLNRelay) AppendRLNProof(msg *pb.WakuMessage, senderEpochTime tim
 	return nil
 }
 
-func (r *WakuRLNRelay) MembershipKeyPair() r.MembershipKeyPair {
+func (r *WakuRLNRelay) MembershipKeyPair() *r.MembershipKeyPair {
 	return r.membershipKeyPair
 }
 
 func (r *WakuRLNRelay) MembershipIndex() r.MembershipIndex {
 	return r.membershipIndex
+}
+
+func (r *WakuRLNRelay) MembershipContractAddress() common.Address {
+	return r.membershipContractAddress
+}
+
+func (r *WakuRLNRelay) insertMember(pubkey [32]byte) error {
+	r.log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]))
+	// assuming all the members arrive in order
+	err := r.RLN.InsertMember(pubkey)
+	if err == nil {
+		newRoot, err := r.RLN.GetMerkleRoot()
+		if err != nil {
+			r.log.Error("inserting member into merkletree", zap.Error(err))
+			return err
+		}
+		r.validMerkleRoots = append(r.validMerkleRoots, newRoot)
+		if len(r.validMerkleRoots) > AcceptableRootWindowSize {
+			r.validMerkleRoots = r.validMerkleRoots[1:]
+		}
+	}
+
+	return err
 }
 
 type SpamHandler = func(message *pb.WakuMessage) error

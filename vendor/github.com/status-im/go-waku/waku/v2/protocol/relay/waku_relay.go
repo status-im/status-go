@@ -3,19 +3,21 @@ package relay
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 
 	proto "github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/status-im/go-waku/logging"
 	v2 "github.com/status-im/go-waku/waku/v2"
 	"github.com/status-im/go-waku/waku/v2/metrics"
 	waku_proto "github.com/status-im/go-waku/waku/v2/protocol"
@@ -184,6 +186,8 @@ func (w *WakuRelay) PublishToTopic(ctx context.Context, message *pb.WakuMessage,
 
 	hash := pb.Hash(out)
 
+	w.log.Info("published", zap.String("messageID", hex.EncodeToString(hash)))
+
 	return hash, nil
 }
 
@@ -340,6 +344,8 @@ func (w *WakuRelay) subscribeToTopic(t string, subscription *Subscription, sub *
 			}
 
 			envelope := waku_proto.NewEnvelope(wakuMessage, utils.GetUnixEpoch(), string(t))
+
+			w.log.Info("received", logging.HexString("messageID", envelope.Hash()))
 
 			if w.bcaster != nil {
 				w.bcaster.Submit(envelope)

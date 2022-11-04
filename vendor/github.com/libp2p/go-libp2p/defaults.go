@@ -5,6 +5,9 @@ package libp2p
 import (
 	"crypto/rand"
 
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -13,11 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 // DefaultSecurity is the default security option.
@@ -56,7 +56,7 @@ var DefaultPeerstore Option = func(cfg *Config) error {
 
 // RandomIdentity generates a random identity. (default behaviour)
 var RandomIdentity = func(cfg *Config) error {
-	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
+	priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return err
 	}
@@ -65,18 +65,28 @@ var RandomIdentity = func(cfg *Config) error {
 
 // DefaultListenAddrs configures libp2p to use default listen address.
 var DefaultListenAddrs = func(cfg *Config) error {
-	defaultIP4ListenAddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
+	defaultIP4TCPListenAddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
+	if err != nil {
+		return err
+	}
+	defaultIP4QUICListenAddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/udp/0/quic")
 	if err != nil {
 		return err
 	}
 
-	defaultIP6ListenAddr, err := multiaddr.NewMultiaddr("/ip6/::/tcp/0")
+	defaultIP6TCPListenAddr, err := multiaddr.NewMultiaddr("/ip6/::/tcp/0")
+	if err != nil {
+		return err
+	}
+	defaultIP6QUICListenAddr, err := multiaddr.NewMultiaddr("/ip6/::/udp/0/quic")
 	if err != nil {
 		return err
 	}
 	return cfg.Apply(ListenAddrs(
-		defaultIP4ListenAddr,
-		defaultIP6ListenAddr,
+		defaultIP4TCPListenAddr,
+		defaultIP4QUICListenAddr,
+		defaultIP6TCPListenAddr,
+		defaultIP6QUICListenAddr,
 	))
 }
 
@@ -105,6 +115,11 @@ var DefaultConnectionManager = func(cfg *Config) error {
 	}
 
 	return cfg.Apply(ConnectionManager(mgr))
+}
+
+// DefaultMultiaddrResolver creates a default connection manager
+var DefaultMultiaddrResolver = func(cfg *Config) error {
+	return cfg.Apply(MultiaddrResolver(madns.DefaultResolver))
 }
 
 // Complete list of default options and when to fallback on them.
@@ -150,6 +165,10 @@ var defaults = []struct {
 	{
 		fallback: func(cfg *Config) bool { return cfg.ConnManager == nil },
 		opt:      DefaultConnectionManager,
+	},
+	{
+		fallback: func(cfg *Config) bool { return cfg.MultiaddrResolver == nil },
+		opt:      DefaultMultiaddrResolver,
 	},
 }
 

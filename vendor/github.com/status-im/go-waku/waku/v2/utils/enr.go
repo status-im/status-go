@@ -11,8 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 )
 
@@ -50,12 +50,12 @@ func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 }
 
 // GetENRandIP returns a enr Node and TCP address obtained from a multiaddress. priv key and protocols supported
-func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, *net.TCPAddr, error) {
+func GetENRandIP(addr multiaddr.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, *net.TCPAddr, error) {
 	var ip string
 
-	dns4, err := addr.ValueForProtocol(ma.P_DNS4)
+	dns4, err := addr.ValueForProtocol(multiaddr.P_DNS4)
 	if err != nil {
-		ip, err = addr.ValueForProtocol(ma.P_IP4)
+		ip, err = addr.ValueForProtocol(multiaddr.P_IP4)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -67,7 +67,7 @@ func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.Priv
 		ip = netIP.String()
 	}
 
-	portStr, err := addr.ValueForProtocol(ma.P_TCP)
+	portStr, err := addr.ValueForProtocol(multiaddr.P_TCP)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,26 +90,26 @@ func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.Priv
 		return nil, nil, fmt.Errorf("could not set port %d", port)
 	}
 
-	var multiaddrItems []ma.Multiaddr
+	var multiaddrItems []multiaddr.Multiaddr
 
 	// 31/WAKU2-ENR
 
-	_, err = addr.ValueForProtocol(ma.P_WS)
+	_, err = addr.ValueForProtocol(multiaddr.P_WS)
 	if err == nil {
 		multiaddrItems = append(multiaddrItems, addr)
 	}
 
-	_, err = addr.ValueForProtocol(ma.P_WSS)
+	_, err = addr.ValueForProtocol(multiaddr.P_WSS)
 	if err == nil {
 		multiaddrItems = append(multiaddrItems, addr)
 	}
 
-	p2p, err := addr.ValueForProtocol(ma.P_P2P)
+	p2p, err := addr.ValueForProtocol(multiaddr.P_P2P)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	p2pAddr, err := ma.NewMultiaddr("/p2p/" + p2p)
+	p2pAddr, err := multiaddr.NewMultiaddr("/p2p/" + p2p)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create p2p addr: %w", err)
 	}
@@ -142,18 +142,18 @@ func GetENRandIP(addr ma.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.Priv
 }
 
 // EnodeToMultiaddress converts an enode into a multiaddress
-func enodeToMultiAddr(node *enode.Node) (ma.Multiaddr, error) {
+func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
 	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
+	return multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
 }
 
 // Multiaddress is used to extract all the multiaddresses that are part of a ENR record
-func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
+func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
@@ -168,7 +168,7 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 			if err != nil {
 				return nil, err
 			}
-			return []ma.Multiaddr{addr}, nil
+			return []multiaddr.Multiaddr{addr}, nil
 		}
 		return nil, err
 	}
@@ -177,12 +177,12 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 		return nil, errors.New("invalid multiaddress field length")
 	}
 
-	hostInfo, err := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
+	hostInfo, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
 	if err != nil {
 		return nil, err
 	}
 
-	var result []ma.Multiaddr
+	var result []multiaddr.Multiaddr
 	offset := 0
 	for {
 		maSize := binary.BigEndian.Uint16(multiaddrRaw[offset : offset+2])
@@ -190,7 +190,7 @@ func Multiaddress(node *enode.Node) ([]ma.Multiaddr, error) {
 			return nil, errors.New("invalid multiaddress field length")
 		}
 		maRaw := multiaddrRaw[offset+2 : offset+2+int(maSize)]
-		addr, err := ma.NewMultiaddrBytes(maRaw)
+		addr, err := multiaddr.NewMultiaddrBytes(maRaw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid multiaddress field length")
 		}

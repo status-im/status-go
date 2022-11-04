@@ -5,23 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/pnet"
-	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/libp2p/go-libp2p-core/sec"
-	"github.com/libp2p/go-libp2p-core/transport"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
-
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/pnet"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/core/sec"
+	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	blankhost "github.com/libp2p/go-libp2p/p2p/host/blank"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	tptu "github.com/libp2p/go-libp2p/p2p/net/upgrader"
@@ -64,6 +63,11 @@ type Config struct {
 	//
 	// Set it via the UserAgent option function.
 	UserAgent string
+
+	// ProtocolVersion is the protocol version that identifies the family
+	// of protocols used by the peer in the Identify protocol. It is set
+	// using the [ProtocolVersion] option.
+	ProtocolVersion string
 
 	PeerKey crypto.PrivKey
 
@@ -151,6 +155,9 @@ func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
 	if cfg.ResourceManager != nil {
 		opts = append(opts, swarm.WithResourceManager(cfg.ResourceManager))
 	}
+	if cfg.MultiaddrResolver != nil {
+		opts = append(opts, swarm.WithMultiaddrResolver(cfg.MultiaddrResolver))
+	}
 	// TODO: Make the swarm implementation configurable.
 	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
 }
@@ -189,7 +196,7 @@ func (cfg *Config) addTransports(h host.Host) error {
 	if err != nil {
 		return err
 	}
-	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.Transports)
+	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.MultiaddrResolver, cfg.Transports)
 	if err != nil {
 		return err
 	}
@@ -224,7 +231,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		NATManager:          cfg.NATManager,
 		EnablePing:          !cfg.DisablePing,
 		UserAgent:           cfg.UserAgent,
-		MultiaddrResolver:   cfg.MultiaddrResolver,
+		ProtocolVersion:     cfg.ProtocolVersion,
 		EnableHolePunching:  cfg.EnableHolePunching,
 		HolePunchingOptions: cfg.HolePunchingOptions,
 		EnableRelayService:  cfg.EnableRelayService,

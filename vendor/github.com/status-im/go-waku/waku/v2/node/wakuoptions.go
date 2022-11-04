@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
@@ -23,7 +23,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	rendezvous "github.com/status-im/go-waku-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/protocol/filter"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
@@ -31,8 +30,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Default clientId
-const clientId string = "Go Waku v2 node"
+// Default userAgent
+const userAgent string = "go-waku"
 
 // Default minRelayPeersToPublish
 const defaultMinRelayPeersToPublish = 0
@@ -71,11 +70,6 @@ type WakuNodeParameters struct {
 	swapMode                int
 	swapDisconnectThreshold int
 	swapPaymentThreshold    int
-
-	enableRendezvous       bool
-	enableRendezvousServer bool
-	rendevousStorage       rendezvous.Storage
-	rendezvousOpts         []pubsub.DiscoverOpt
 
 	enableDiscV5     bool
 	udpPort          int
@@ -283,26 +277,6 @@ func WithDiscoveryV5(udpPort int, bootnodes []*enode.Node, autoUpdate bool, disc
 	}
 }
 
-// WithRendezvous is a WakuOption used to enable go-waku-rendezvous discovery.
-// It accepts an optional list of DiscoveryOpt options
-func WithRendezvous(discoverOpts ...pubsub.DiscoverOpt) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.enableRendezvous = true
-		params.rendezvousOpts = discoverOpts
-		return nil
-	}
-}
-
-// WithRendezvousServer is a WakuOption used to set the node as a rendezvous
-// point, using an specific storage for the peer information
-func WithRendezvousServer(storage rendezvous.Storage) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.enableRendezvousServer = true
-		params.rendevousStorage = storage
-		return nil
-	}
-}
-
 // WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
 // accepts a list of WakuFilter gossipsub options to setup the protocol
 func WithWakuFilter(fullNode bool, filterOpts ...filter.Option) WakuNodeOption {
@@ -431,7 +405,8 @@ var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.ChainOptions(
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
-	), libp2p.UserAgent(clientId),
+	),
+	libp2p.UserAgent(userAgent),
 	libp2p.ChainOptions(
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
