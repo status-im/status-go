@@ -189,7 +189,7 @@ func (progress *ImportProgress) AddTaskError(task ImportTask, err *ImportError) 
 	for i, t := range progress.Tasks {
 		if t.Type == task.String() {
 			errorsAndWarningsCount := progress.Tasks[i].ErrorsCount + progress.Tasks[i].WarningsCount
-			if errorsAndWarningsCount < MaxTaskErrorItemsCount {
+			if (errorsAndWarningsCount < MaxTaskErrorItemsCount) || err.Code > WarningType {
 				errors := progress.Tasks[i].Errors
 				progress.Tasks[i].Errors = append(errors, err)
 			}
