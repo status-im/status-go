@@ -27,7 +27,6 @@ type Config struct {
 	MaxMessageSize       uint32   `toml:",omitempty"`
 	Host                 string   `toml:",omitempty"`
 	Port                 int      `toml:",omitempty"`
-	PersistPeers         bool     `toml:",omitempty"`
 	PeerExchange         bool     `toml:",omitempty"`
 	KeepAliveInterval    int      `toml:",omitempty"`
 	MinPeersForRelay     int      `toml:",omitempty"`
@@ -36,8 +35,6 @@ type Config struct {
 	StoreNodes           []string `toml:",omitempty"`
 	FilterNodes          []string `toml:",omitempty"`
 	LightpushNodes       []string `toml:",omitempty"`
-	Rendezvous           bool     `toml:",omitempty"`
-	WakuRendezvousNodes  []string `toml:",omitempty"`
 	DiscV5BootstrapNodes []string `toml:",omitempty"`
 	EnableDiscV5         bool     `toml:",omitempty"`
 	DiscoveryLimit       int      `toml:",omitempty"`

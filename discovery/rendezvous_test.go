@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/server"
 	"github.com/stretchr/testify/assert"

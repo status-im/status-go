@@ -40,11 +40,13 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
+BUILD_TAGS ?= gowaku_skip_migrations
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
+
 BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
@@ -91,7 +93,7 @@ statusgo: ##@build Build status-go as statusd server
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
 statusd-prune: ##@statusd-prune Build statusd-prune
-	go build -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
+	go build -tags '$(BUILD_TAGS)' -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
 
@@ -125,6 +127,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	gomobile init; \
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
@@ -136,6 +139,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
+		-tags 'nowatchdog $(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/Statusgo.framework \
 		github.com/status-im/status-go/mobile
@@ -147,6 +151,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building static library..."
 	go build \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
 		-o $(GOBIN)/libstatus.a \
@@ -160,6 +165,7 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building shared library..."
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
 		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
@@ -302,8 +308,8 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -timeout 20m -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
-	cd ./waku && go test -timeout 20m -v -failfast ./... $(gotest_extraflags)
+	go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	cd ./waku && go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast ./... $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

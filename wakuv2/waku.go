@@ -31,8 +31,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
 	"go.uber.org/zap"
@@ -40,24 +39,20 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
 
-	dssql "github.com/ipfs/go-ds-sql"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/metrics"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/metrics"
 
-	libp2pproto "github.com/libp2p/go-libp2p-core/protocol"
+	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
 
-	rendezvous "github.com/status-im/go-waku-rendezvous"
 	"github.com/status-im/go-waku/waku/v2/dnsdisc"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
@@ -70,23 +65,20 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
 
-	"github.com/libp2p/go-libp2p-core/discovery"
+	"github.com/libp2p/go-libp2p/core/discovery"
 	node "github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
 )
 
 const messageQueueLimit = 1024
-const requestTimeout = 10 * time.Second
-
-const PeerStoreTable = "peerstore"
+const requestTimeout = 30 * time.Second
 
 type settings struct {
 	LightClient         bool   // Indicates if the node is a light client
 	MinPeersForRelay    int    // Indicates the minimum number of peers required for using Relay Protocol instead of Lightpush
 	MaxMsgSize          uint32 // Maximal message length allowed by the waku node
 	EnableConfirmations bool   // Enable sending message confirmations
-	PersistPeers        bool   // Indicates if the node will persist peers
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -163,7 +155,6 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		MaxMsgSize:       cfg.MaxMessageSize,
 		LightClient:      cfg.LightClient,
 		MinPeersForRelay: cfg.MinPeersForRelay,
-		PersistPeers:     cfg.PersistPeers,
 	}
 
 	waku.filters = common.NewFilters()
@@ -200,26 +191,6 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
 	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
 
-	if cfg.PersistPeers {
-		if appDB == nil {
-			return nil, fmt.Errorf("a db connection must be provided in order to persist the peers")
-		}
-
-		// Create persistent peerstore
-		queries, err := persistence.NewQueries(PeerStoreTable, appDB)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup peerstore table: %v", err)
-		}
-
-		datastore := dssql.NewDatastore(appDB, queries)
-		opts := pstoreds.DefaultOpts()
-		peerStore, err := pstoreds.NewPeerstore(ctx, datastore, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup peerstore: %v", err)
-		}
-		libp2pOpts = append(libp2pOpts, libp2p.Peerstore(peerStore))
-	}
-
 	opts := []node.WakuNodeOption{
 		node.WithLibP2POptions(libp2pOpts...),
 		node.WithPrivateKey(privateKey),
@@ -227,10 +198,6 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		node.WithConnectionStatusChannel(connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
 		node.WithLogger(logger),
-	}
-
-	if cfg.Rendezvous {
-		opts = append(opts, node.WithRendezvous(pubsub.WithDiscoveryOpts(discovery.Limit(cfg.DiscoveryLimit))))
 	}
 
 	if cfg.EnableDiscV5 {
@@ -306,7 +273,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 	go waku.runFilterMsgLoop()
 	go waku.runRelayMsgLoop()
 
-	log.Info("setup the go-waku node successfully")
+	waku.logger.Info("setup the go-waku node successfully")
 
 	return waku, nil
 }
@@ -386,7 +353,7 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 	if !ok {
 		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress)
 		if err != nil {
-			log.Warn("dns discovery error ", err)
+			w.logger.Warn("dns discovery error ", zap.Error(err))
 			return
 		}
 
@@ -402,7 +369,7 @@ func (w *Waku) dnsDiscover(enrtreeAddress string, protocol libp2pproto.ID, apply
 func (w *Waku) addPeerFromString(addrString string, protocol libp2pproto.ID, apply fnApplyToEachPeer) {
 	addr, err := multiaddr.NewMultiaddr(addrString)
 	if err != nil {
-		log.Warn("invalid peer multiaddress", addrString, err)
+		w.logger.Warn("invalid peer multiaddress", zap.String("addr", addrString), zap.Error(err))
 		return
 	}
 
@@ -421,9 +388,9 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 					defer cancel()
 					err := w.node.DialPeerWithMultiAddress(ctx, node)
 					if err != nil {
-						log.Warn("could not dial peer", err)
+						w.logger.Warn("could not dial peer", zap.Error(err))
 					} else {
-						log.Info("relay peer dialed successfully", "multiaddr", node)
+						w.logger.Info("relay peer dialed successfully", zap.String("multiaddr", node.String()))
 					}
 				}(m)
 			}
@@ -435,17 +402,16 @@ func (w *Waku) addWakuV2Peers(cfg *Config) {
 		for _, m := range d.Addresses {
 			peerID, err := w.node.AddPeer(m, string(protocol))
 			if err != nil {
-				log.Warn("could not add peer", "multiaddr", m, "err", err)
+				w.logger.Warn("could not add peer", zap.String("multiaddr", m.String()), zap.Error(err))
 				return
 			}
-			log.Info("peer added successfully", "peerId", peerID)
+			w.logger.Info("peer added successfully", zap.String("peerId", peerID.String()))
 		}
 	}
 
 	w.addPeers(cfg.StoreNodes, store.StoreID_v20beta4, addToPeerStore)
 	w.addPeers(cfg.FilterNodes, filter.FilterID_v20beta1, addToPeerStore)
 	w.addPeers(cfg.LightpushNodes, lightpush.LightPushID_v20beta1, addToPeerStore)
-	w.addPeers(cfg.WakuRendezvousNodes, rendezvous.RendezvousID_v001, addToPeerStore)
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -469,6 +435,9 @@ func (w *Waku) runRelayMsgLoop() {
 
 	for env := range sub.C {
 		envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+		if err != nil {
+			w.logger.Error("onNewEnvelope error", zap.Error(err))
+		}
 		// TODO: should these be handled?
 		_ = envelopeErrors
 		_ = err
@@ -862,22 +831,22 @@ func (w *Waku) broadcast() {
 		select {
 		case msg := <-w.sendQueue:
 
-			hash, err := msg.Hash()
+			hash, _, err := msg.Hash()
 			if err != nil {
-				log.Error("invalid message")
+				w.logger.Error("invalid message", zap.Error(err))
 				continue
 			}
 
 			if w.settings.LightClient {
-				log.Debug("publishing message via lightpush", "hash", hexutil.Encode(hash))
+				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(hash)))
 				_, err = w.node.Lightpush().Publish(context.Background(), msg)
 			} else {
-				log.Debug("publishing message via relay", "hash", hexutil.Encode(hash))
+				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(hash)))
 				_, err = w.node.Relay().Publish(context.Background(), msg)
 			}
 
 			if err != nil {
-				log.Error("could not send message", "hash", hexutil.Encode(hash), "err", zap.Error(err))
+				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(hash)), zap.Error(err))
 				w.envelopeFeed.Send(common.EnvelopeEvent{
 					Hash:  gethcommon.BytesToHash(hash),
 					Event: common.EventEnvelopeExpired,
@@ -902,7 +871,7 @@ func (w *Waku) broadcast() {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
-	hash, err := msg.Hash()
+	hash, _, err := msg.Hash()
 	if err != nil {
 		return nil, err
 	}
@@ -945,7 +914,7 @@ func (w *Waku) Query(topics []common.TopicType, from uint64, to uint64, opts []s
 
 	for _, msg := range result.Messages {
 		envelope := wakuprotocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
-		w.logger.Debug("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
+		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
 		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
 			return nil, err
@@ -992,6 +961,7 @@ func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope, msgType common.Me
 	_, err := w.add(recvMessage)
 	if err != nil {
 		w.logger.Info("invalid envelope received", zap.Error(err))
+		trouble = true
 	}
 
 	common.EnvelopesValidatedCounter.Inc()
@@ -1025,10 +995,10 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	}
 
 	if alreadyCached {
-		log.Trace("w envelope already cached", "hash", recvMessage.Hash().Hex())
+		w.logger.Debug("w envelope already cached", zap.String("envelopeHash", recvMessage.Hash().Hex()))
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
-		log.Trace("cached w envelope", "hash", recvMessage.Hash().Hex())
+		w.logger.Debug("cached w envelope", zap.String("envelopeHash", recvMessage.Hash().Hex()))
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(recvMessage.Envelope.Size()))
 		w.postEvent(recvMessage) // notify the local node about the new message
@@ -1072,14 +1042,6 @@ func (w *Waku) processQueue() {
 			})
 		}
 	}
-}
-
-func (w *Waku) ClearPeerCache() error {
-	if !w.settings.PersistPeers {
-		return nil
-	}
-
-	return persistence.Clean(w.appDB, PeerStoreTable)
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.
