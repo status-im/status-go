@@ -2,19 +2,28 @@ package libp2pquic
 
 import (
 	"context"
+	"net"
 
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	tpt "github.com/libp2p/go-libp2p-core/transport"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	tpt "github.com/libp2p/go-libp2p/core/transport"
 
 	"github.com/lucas-clemente/quic-go"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
+type pConn interface {
+	net.PacketConn
+
+	// count conn reference
+	DecreaseCount()
+	IncreaseCount()
+}
+
 type conn struct {
 	quicConn  quic.Connection
-	pconn     *reuseConn
+	pconn     pConn
 	transport *transport
 	scope     network.ConnManagementScope
 

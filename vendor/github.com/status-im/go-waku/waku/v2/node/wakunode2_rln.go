@@ -9,7 +9,7 @@ import (
 	"errors"
 
 	"github.com/status-im/go-waku/waku/v2/protocol/rln"
-	r "github.com/status-im/go-zerokit-rln/rln"
+	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 

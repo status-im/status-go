@@ -11,12 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/status-im/go-discover/discover"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/status-im/go-waku/logging"
 	"github.com/status-im/go-waku/waku/v2/utils"
+	"github.com/waku-org/go-discover/discover"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +60,8 @@ type discV5Parameters struct {
 }
 
 type DiscoveryV5Option func(*discV5Parameters)
+
+var protocolID = [6]byte{'d', '5', 'w', 'a', 'k', 'u'}
 
 func WithAutoUpdate(autoUpdate bool) DiscoveryV5Option {
 	return func(params *discV5Parameters) {
@@ -124,7 +126,7 @@ func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.Loc
 				return evaluateNode(&n)
 			},
 			V5Config: discover.V5Config{
-				ProtocolID: [6]byte{'d', '5', 'w', 'a', 'k', 'u'},
+				ProtocolID: &protocolID,
 			},
 		},
 		udpAddr: &net.UDPAddr{

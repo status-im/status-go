@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	libp2pProtocol "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
 	"go.uber.org/zap"
 
@@ -473,6 +473,13 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	if response.Error == pb.HistoryResponse_INVALID_CURSOR {
 		return nil, errors.New("invalid cursor")
 	}
+
+	var messageIDs [][]byte
+	for _, m := range response.Messages {
+		messageID, _, _ := m.Hash()
+		messageIDs = append(messageIDs, messageID)
+	}
+	store.log.Info("retrieved", logging.HexArray("messageIDs", messageIDs...))
 
 	result := &Result{
 		Messages: response.Messages,

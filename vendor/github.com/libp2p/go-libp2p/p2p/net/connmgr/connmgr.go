@@ -7,9 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/benbjohnson/clock"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
@@ -26,6 +27,8 @@ var log = logging.Logger("connmgr")
 // See configuration parameters in NewConnManager.
 type BasicConnMgr struct {
 	*decayer
+
+	clock clock.Clock
 
 	cfg      *config
 	segments segments
@@ -74,7 +77,7 @@ func (ss *segments) countPeers() (count int) {
 	return count
 }
 
-func (s *segment) tagInfoFor(p peer.ID) *peerInfo {
+func (s *segment) tagInfoFor(p peer.ID, now time.Time) *peerInfo {
 	pi, ok := s.peers[p]
 	if ok {
 		return pi
@@ -82,7 +85,7 @@ func (s *segment) tagInfoFor(p peer.ID) *peerInfo {
 	// create a temporary peer to buffer early tags before the Connected notification arrives.
 	pi = &peerInfo{
 		id:        p,
-		firstSeen: time.Now(), // this timestamp will be updated when the first Connected notification arrives.
+		firstSeen: now, // this timestamp will be updated when the first Connected notification arrives.
 		temp:      true,
 		tags:      make(map[string]int),
 		decaying:  make(map[*decayingTag]*connmgr.DecayingValue),
@@ -102,6 +105,7 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 		lowWater:      low,
 		gracePeriod:   time.Minute,
 		silencePeriod: 10 * time.Second,
+		clock:         clock.New(),
 	}
 	for _, o := range opts {
 		if err := o(cfg); err != nil {
@@ -116,6 +120,7 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 
 	cm := &BasicConnMgr{
 		cfg:       cfg,
+		clock:     cfg.clock,
 		protected: make(map[peer.ID]map[string]struct{}, 16),
 		segments: func() (ret segments) {
 			for i := range ret {
@@ -167,7 +172,7 @@ func (cm *BasicConnMgr) memoryEmergency() {
 
 	// finally, update the last trim time.
 	cm.lastTrimMu.Lock()
-	cm.lastTrim = time.Now()
+	cm.lastTrim = cm.clock.Now()
 	cm.lastTrimMu.Unlock()
 }
 
@@ -243,19 +248,11 @@ type peerInfo struct {
 
 type peerInfos []peerInfo
 
-func (p peerInfos) SortByValue() {
-	sort.Slice(p, func(i, j int) bool {
-		left, right := p[i], p[j]
-		// temporary peers are preferred for pruning.
-		if left.temp != right.temp {
-			return left.temp
-		}
-		// otherwise, compare by value.
-		return left.value < right.value
-	})
-}
-
-func (p peerInfos) SortByValueAndStreams() {
+// SortByValueAndStreams sorts peerInfos by their value and stream count. It
+// will sort peers with no streams before those with streams (all else being
+// equal). If `sortByMoreStreams` is true it will sort peers with more streams
+// before those with fewer streams. This is useful to prioritize freeing memory.
+func (p peerInfos) SortByValueAndStreams(sortByMoreStreams bool) {
 	sort.Slice(p, func(i, j int) bool {
 		left, right := p[i], p[j]
 		// temporary peers are preferred for pruning.
@@ -278,12 +275,21 @@ func (p peerInfos) SortByValueAndStreams() {
 		}
 		leftIncoming, leftStreams := incomingAndStreams(left.conns)
 		rightIncoming, rightStreams := incomingAndStreams(right.conns)
+		// prefer closing inactive connections (no streams open)
+		if rightStreams != leftStreams && (leftStreams == 0 || rightStreams == 0) {
+			return leftStreams < rightStreams
+		}
 		// incoming connections are preferred for pruning
 		if leftIncoming != rightIncoming {
 			return leftIncoming
 		}
-		// prune connections with a higher number of streams first
-		return rightStreams < leftStreams
+
+		if sortByMoreStreams {
+			// prune connections with a higher number of streams first
+			return rightStreams < leftStreams
+		} else {
+			return leftStreams < rightStreams
+		}
 	})
 }
 
@@ -310,7 +316,7 @@ func (cm *BasicConnMgr) background() {
 		interval = cm.cfg.silencePeriod
 	}
 
-	ticker := time.NewTicker(interval)
+	ticker := cm.clock.Ticker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -335,7 +341,7 @@ func (cm *BasicConnMgr) doTrim() {
 	if count == atomic.LoadUint64(&cm.trimCount) {
 		cm.trim()
 		cm.lastTrimMu.Lock()
-		cm.lastTrim = time.Now()
+		cm.lastTrim = cm.clock.Now()
 		cm.lastTrimMu.Unlock()
 		atomic.AddUint64(&cm.trimCount, 1)
 	}
@@ -368,7 +374,7 @@ func (cm *BasicConnMgr) getConnsToCloseEmergency(target int) []network.Conn {
 	cm.plk.RUnlock()
 
 	// Sort peers according to their value.
-	candidates.SortByValueAndStreams()
+	candidates.SortByValueAndStreams(true)
 
 	selected := make([]network.Conn, 0, target+10)
 	for _, inf := range candidates {
@@ -398,7 +404,7 @@ func (cm *BasicConnMgr) getConnsToCloseEmergency(target int) []network.Conn {
 	}
 	cm.plk.RUnlock()
 
-	candidates.SortByValueAndStreams()
+	candidates.SortByValueAndStreams(true)
 	for _, inf := range candidates {
 		if target <= 0 {
 			break
@@ -426,7 +432,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 
 	candidates := make(peerInfos, 0, cm.segments.countPeers())
 	var ncandidates int
-	gracePeriodStart := time.Now().Add(-cm.cfg.gracePeriod)
+	gracePeriodStart := cm.clock.Now().Add(-cm.cfg.gracePeriod)
 
 	cm.plk.RLock()
 	for _, s := range cm.segments {
@@ -459,7 +465,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 	}
 
 	// Sort peers according to their value.
-	candidates.SortByValue()
+	candidates.SortByValueAndStreams(false)
 
 	target := ncandidates - cm.cfg.lowWater
 
@@ -528,7 +534,7 @@ func (cm *BasicConnMgr) TagPeer(p peer.ID, tag string, val int) {
 	s.Lock()
 	defer s.Unlock()
 
-	pi := s.tagInfoFor(p)
+	pi := s.tagInfoFor(p, cm.clock.Now())
 
 	// Update the total value of the peer.
 	pi.value += val - pi.tags[tag]
@@ -558,7 +564,7 @@ func (cm *BasicConnMgr) UpsertTag(p peer.ID, tag string, upsert func(int) int) {
 	s.Lock()
 	defer s.Unlock()
 
-	pi := s.tagInfoFor(p)
+	pi := s.tagInfoFor(p, cm.clock.Now())
 
 	oldval := pi.tags[tag]
 	newval := upsert(oldval)
@@ -628,7 +634,7 @@ func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
 	if !ok {
 		pinfo = &peerInfo{
 			id:        id,
-			firstSeen: time.Now(),
+			firstSeen: cm.clock.Now(),
 			tags:      make(map[string]int),
 			decaying:  make(map[*decayingTag]*connmgr.DecayingValue),
 			conns:     make(map[network.Conn]time.Time),
@@ -639,7 +645,7 @@ func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
 		// Connected notification arrived: flip the temporary flag, and update the firstSeen
 		// timestamp to the real one.
 		pinfo.temp = false
-		pinfo.firstSeen = time.Now()
+		pinfo.firstSeen = cm.clock.Now()
 	}
 
 	_, ok = pinfo.conns[c]
@@ -648,7 +654,7 @@ func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
 		return
 	}
 
-	pinfo.conns[c] = time.Now()
+	pinfo.conns[c] = cm.clock.Now()
 	atomic.AddInt32(&cm.connCount, 1)
 }
 

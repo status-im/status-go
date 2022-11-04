@@ -167,7 +167,9 @@ func init() {
 	prometheus.MustRegister(collector)
 }
 
-type metricsTracer struct{}
+type metricsTracer struct {
+	logging.NullTracer
+}
 
 var _ logging.Tracer = &metricsTracer{}
 
@@ -179,10 +181,9 @@ func (m *metricsTracer) SentPacket(_ net.Addr, _ *logging.Header, size logging.B
 	bytesTransferred.WithLabelValues("sent").Add(float64(size))
 }
 
-func (m *metricsTracer) DroppedPacket(addr net.Addr, packetType logging.PacketType, count logging.ByteCount, reason logging.PacketDropReason) {
-}
-
 type metricsConnTracer struct {
+	logging.NullConnectionTracer
+
 	perspective       logging.Perspective
 	startTime         time.Time
 	connID            logging.ConnectionID
@@ -224,9 +225,6 @@ func (m *metricsConnTracer) StartedConnection(net.Addr, net.Addr, logging.Connec
 	collector.AddConn(m.connID.String(), m)
 }
 
-func (m *metricsConnTracer) NegotiatedVersion(chosen quic.VersionNumber, clientVersions []quic.VersionNumber, serverVersions []quic.VersionNumber) {
-}
-
 func (m *metricsConnTracer) ClosedConnection(e error) {
 	var (
 		applicationErr      *quic.ApplicationError
@@ -264,9 +262,6 @@ func (m *metricsConnTracer) ClosedConnection(e error) {
 	}
 	connErrors.WithLabelValues(side, desc).Inc()
 }
-func (m *metricsConnTracer) SentTransportParameters(parameters *logging.TransportParameters)     {}
-func (m *metricsConnTracer) ReceivedTransportParameters(parameters *logging.TransportParameters) {}
-func (m *metricsConnTracer) RestoredTransportParameters(parameters *logging.TransportParameters) {}
 func (m *metricsConnTracer) SentPacket(hdr *logging.ExtendedHeader, size logging.ByteCount, _ *logging.AckFrame, _ []logging.Frame) {
 	bytesTransferred.WithLabelValues("sent").Add(float64(size))
 	sentPackets.WithLabelValues(m.getEncLevel(logging.PacketTypeFromHeader(&hdr.Header))).Inc()
@@ -329,8 +324,6 @@ func (m *metricsConnTracer) UpdatedMetrics(rttStats *logging.RTTStats, cwnd, byt
 	m.mutex.Unlock()
 }
 
-func (m *metricsConnTracer) AcknowledgedPacket(logging.EncryptionLevel, logging.PacketNumber) {}
-
 func (m *metricsConnTracer) LostPacket(level logging.EncryptionLevel, _ logging.PacketNumber, r logging.PacketLossReason) {
 	var reason string
 	switch r {
@@ -344,23 +337,11 @@ func (m *metricsConnTracer) LostPacket(level logging.EncryptionLevel, _ logging.
 	lostPackets.WithLabelValues(level.String(), reason).Inc()
 }
 
-func (m *metricsConnTracer) UpdatedCongestionState(state logging.CongestionState) {}
-func (m *metricsConnTracer) UpdatedPTOCount(value uint32)                         {}
-func (m *metricsConnTracer) UpdatedKeyFromTLS(level logging.EncryptionLevel, perspective logging.Perspective) {
-}
-func (m *metricsConnTracer) UpdatedKey(generation logging.KeyPhase, remote bool) {}
 func (m *metricsConnTracer) DroppedEncryptionLevel(level logging.EncryptionLevel) {
 	if level == logging.EncryptionHandshake {
 		m.handleHandshakeComplete()
 	}
 }
-func (m *metricsConnTracer) DroppedKey(generation logging.KeyPhase) {}
-func (m *metricsConnTracer) SetLossTimer(timerType logging.TimerType, level logging.EncryptionLevel, time time.Time) {
-}
-
-func (m *metricsConnTracer) LossTimerExpired(timerType logging.TimerType, level logging.EncryptionLevel) {
-}
-func (m *metricsConnTracer) LossTimerCanceled() {}
 
 func (m *metricsConnTracer) Close() {
 	if m.handshakeComplete {
@@ -370,8 +351,6 @@ func (m *metricsConnTracer) Close() {
 	}
 	collector.RemoveConn(m.connID.String())
 }
-
-func (m *metricsConnTracer) Debug(name, msg string) {}
 
 func (m *metricsConnTracer) handleHandshakeComplete() {
 	m.handshakeComplete = true

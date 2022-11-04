@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	inat "github.com/libp2p/go-libp2p/p2p/net/nat"
-
-	"github.com/libp2p/go-libp2p-core/network"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -34,9 +33,9 @@ func NewNATManager(net network.Network) NATManager {
 // natManager takes care of adding + removing port mappings to the nat.
 // Initialized with the host if it has a NATPortMap option enabled.
 // natManager receives signals from the network, and check on nat mappings:
-//  * natManager listens to the network and adds or closes port mappings
-//    as the network signals Listen() or ListenClose().
-//  * closing the natManager closes the nat and its mappings.
+//   - natManager listens to the network and adds or closes port mappings
+//     as the network signals Listen() or ListenClose().
+//   - closing the natManager closes the nat and its mappings.
 type natManager struct {
 	net   network.Network
 	natMx sync.RWMutex

@@ -7,13 +7,13 @@ import (
 )
 
 // Hash calculates the hash of a waku message
-func (msg *WakuMessage) Hash() ([]byte, error) {
+func (msg *WakuMessage) Hash() ([]byte, int, error) {
 	out, err := proto.Marshal(msg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return Hash(out), nil
+	return Hash(out), len(out), nil
 }
 
 // Hash calculates a hash from a byte slice using sha2-256 for the hashing algorithm

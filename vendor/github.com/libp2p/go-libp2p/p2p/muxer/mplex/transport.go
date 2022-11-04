@@ -3,7 +3,7 @@ package mplex
 import (
 	"net"
 
-	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p/core/network"
 
 	mp "github.com/libp2p/go-mplex"
 )

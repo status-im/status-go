@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	logging "github.com/ipfs/go-log/v2"
 	tec "github.com/jbenet/go-temp-err-catcher"
@@ -51,11 +51,11 @@ func (l *listener) Close() error {
 //
 // This function does a few interesting things that should be noted:
 //
-// 1. It logs and discards temporary/transient errors (errors with a Temporary()
-//    function that returns true).
-// 2. It stops accepting new connections once AcceptQueueLength connections have
-//    been fully negotiated but not accepted. This gives us a basic backpressure
-//    mechanism while still allowing us to negotiate connections in parallel.
+//  1. It logs and discards temporary/transient errors (errors with a Temporary()
+//     function that returns true).
+//  2. It stops accepting new connections once AcceptQueueLength connections have
+//     been fully negotiated but not accepted. This gives us a basic backpressure
+//     mechanism while still allowing us to negotiate connections in parallel.
 func (l *listener) handleIncoming() {
 	var wg sync.WaitGroup
 	defer func() {

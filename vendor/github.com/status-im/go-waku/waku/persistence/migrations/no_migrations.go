@@ -1,5 +1,5 @@
-//go:build !gowaku_run_migrations
-// +build !gowaku_run_migrations
+//go:build gowaku_skip_migrations
+// +build gowaku_skip_migrations
 
 package migrations
 

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	n "github.com/flynn/noise"
+	n "github.com/waku-org/noise"
 )
 
 // WakuNoiseProtocolID indicates the protocol ID defined according to https://rfc.vac.dev/spec/35/#specification
@@ -116,6 +116,7 @@ func (hs *Handshake) Step(readPayloadV2 *PayloadV2, transportMessage []byte) (*H
 	var cs2 *n.CipherState
 	var err error
 	var msg []byte
+	var noisePubKeys [][]byte
 
 	result := HandshakeStepResult{}
 
@@ -128,8 +129,7 @@ func (hs *Handshake) Step(readPayloadV2 *PayloadV2, transportMessage []byte) (*H
 			return nil, err
 		}
 
-		var noisePubKeys [][]byte
-		msg, cs1, cs2, err = hs.state.WriteMessageAndGetPK(hs.hsBuff, &noisePubKeys, payload)
+		msg, noisePubKeys, cs1, cs2, err = hs.state.WriteMessageAndGetPK(hs.hsBuff, [][]byte{}, payload)
 		if err != nil {
 			return nil, err
 		}

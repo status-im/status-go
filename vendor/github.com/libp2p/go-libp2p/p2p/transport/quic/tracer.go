@@ -13,16 +13,12 @@ import (
 	"github.com/lucas-clemente/quic-go/qlog"
 )
 
-var tracer logging.Tracer
+var qlogTracer logging.Tracer
 
 func init() {
-	tracers := []logging.Tracer{&metricsTracer{}}
 	if qlogDir := os.Getenv("QLOGDIR"); len(qlogDir) > 0 {
-		if qlogger := initQlogger(qlogDir); qlogger != nil {
-			tracers = append(tracers, qlogger)
-		}
+		qlogTracer = initQlogger(qlogDir)
 	}
-	tracer = logging.NewMultiplexedTracer(tracers...)
 }
 
 func initQlogger(qlogDir string) logging.Tracer {
@@ -62,7 +58,9 @@ func newQlogger(qlogDir string, role logging.Perspective, connID []byte) io.Writ
 	return &qlogger{
 		f:        f,
 		filename: finalFilename,
-		Writer:   bufio.NewWriter(f),
+		// The size of a qlog file for a raw file download is ~2/3 of the amount of data transferred.
+		// bufio.NewWriter creates a buffer with a buffer of only 4 kB, leading to a large number of syscalls.
+		Writer: bufio.NewWriterSize(f, 128<<10),
 	}
 }
 
@@ -80,7 +78,7 @@ func (l *qlogger) Close() error {
 		return err
 	}
 	defer f.Close()
-	buf := bufio.NewWriter(f)
+	buf := bufio.NewWriterSize(f, 128<<10)
 	c, err := zstd.NewWriter(buf, zstd.WithEncoderLevel(zstd.SpeedFastest), zstd.WithWindowSize(32*1024))
 	if err != nil {
 		return err

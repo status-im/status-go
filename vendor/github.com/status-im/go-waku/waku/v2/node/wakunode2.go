@@ -8,22 +8,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p"
 	"go.uber.org/zap"
 
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
 
-	rendezvous "github.com/status-im/go-waku-rendezvous"
 	"github.com/status-im/go-waku/logging"
 	"github.com/status-im/go-waku/waku/try"
 	v2 "github.com/status-im/go-waku/waku/v2"
@@ -49,13 +49,14 @@ type Peer struct {
 type storeFactory func(w *WakuNode) store.Store
 
 type MembershipKeyPair = struct {
-	IDKey        [32]byte
-	IDCommitment [32]byte
+	IDKey        [32]byte `json:"idKey"`
+	IDCommitment [32]byte `json:"idCommitment"`
 }
 
 type RLNRelay interface {
-	MembershipKeyPair() MembershipKeyPair
+	MembershipKeyPair() *MembershipKeyPair
 	MembershipIndex() uint
+	MembershipContractAddress() common.Address
 	AppendRLNProof(msg *pb.WakuMessage, senderEpochTime time.Time) error
 	Stop()
 }
@@ -65,14 +66,13 @@ type WakuNode struct {
 	opts *WakuNodeParameters
 	log  *zap.Logger
 
-	relay      *relay.WakuRelay
-	filter     *filter.WakuFilter
-	lightPush  *lightpush.WakuLightPush
-	rendezvous *rendezvous.RendezvousService
-	store      store.Store
-	swap       *swap.WakuSwap
-	rlnRelay   RLNRelay
-	wakuFlag   utils.WakuEnrBitfield
+	relay     *relay.WakuRelay
+	filter    *filter.WakuFilter
+	lightPush *lightpush.WakuLightPush
+	store     store.Store
+	swap      *swap.WakuSwap
+	rlnRelay  RLNRelay
+	wakuFlag  utils.WakuEnrBitfield
 
 	localNode *enode.LocalNode
 
@@ -279,11 +279,6 @@ func (w *WakuNode) Start() error {
 		w.filter = filter
 	}
 
-	if w.opts.enableRendezvous {
-		rendezvous := rendezvous.NewRendezvousDiscovery(w.host)
-		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(rendezvous, w.opts.rendezvousOpts...))
-	}
-
 	err := w.setupENR(w.ListenAddresses())
 	if err != nil {
 		return err
@@ -319,13 +314,6 @@ func (w *WakuNode) Start() error {
 		}
 	}
 
-	if w.opts.enableRendezvousServer {
-		err := w.mountRendezvous()
-		if err != nil {
-			return err
-		}
-	}
-
 	// Subscribe store to topic
 	if w.opts.storeMsgs {
 		w.log.Info("Subscribing store to broadcaster")
@@ -352,10 +340,6 @@ func (w *WakuNode) Stop() {
 	defer w.protocolEventSub.Close()
 	defer w.identificationEventSub.Close()
 	defer w.addressChangesSub.Close()
-
-	if w.rendezvous != nil {
-		w.rendezvous.Stop()
-	}
 
 	if w.filter != nil {
 		w.filter.Stop()
@@ -434,7 +418,7 @@ func (w *WakuNode) Publish(ctx context.Context, msg *pb.WakuMessage) error {
 		return errors.New("cannot publish message, relay and lightpush are disabled")
 	}
 
-	hash, _ := msg.Hash()
+	hash, _, _ := msg.Hash()
 	err := try.Do(func(attempt int) (bool, error) {
 		var err error
 		if !w.relay.EnoughPeersToPublish() {
@@ -488,17 +472,6 @@ func (w *WakuNode) mountDiscV5() error {
 	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
 
 	return err
-}
-
-func (w *WakuNode) mountRendezvous() error {
-	w.rendezvous = rendezvous.NewRendezvousService(w.host, w.opts.rendevousStorage)
-
-	if err := w.rendezvous.Start(); err != nil {
-		return err
-	}
-
-	w.log.Info("Rendezvous service started")
-	return nil
 }
 
 func (w *WakuNode) startStore() {

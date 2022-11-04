@@ -20,13 +20,12 @@ type Envelope struct {
 // It's used as a way to know to which Pubsub topic belongs a WakuMessage
 // as well as generating a hash based on the bytes that compose the message
 func NewEnvelope(msg *pb.WakuMessage, receiverTime int64, pubSubTopic string) *Envelope {
-	data, _ := msg.Marshal()
+	messageHash, dataLen, _ := msg.Hash()
 	hash := sha256.Sum256(append([]byte(msg.ContentTopic), msg.Payload...))
-
 	return &Envelope{
 		msg:  msg,
-		size: len(data),
-		hash: pb.Hash(data),
+		size: dataLen,
+		hash: messageHash,
 		index: &pb.Index{
 			Digest:       hash[:],
 			ReceiverTime: receiverTime,

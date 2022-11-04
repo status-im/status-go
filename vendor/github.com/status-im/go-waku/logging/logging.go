@@ -4,21 +4,46 @@
 // implementation purposely does as little as possible at field creation time,
 // and postpones any transformation to output time by relying on the generic
 // zap types like zap.Stringer, zap.Array, zap.Object
-//
 package logging
 
 import (
+	"encoding/hex"
 	"net"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+// List of []byte
+type byteArr [][]byte
+
+// HexArray creates a field with an array of bytes that will be shown as a hexadecimal string in logs
+func HexArray(key string, byteVal ...[]byte) zapcore.Field {
+	return zap.Array(key, byteArr(byteVal))
+}
+
+func (bArr byteArr) MarshalLogArray(encoder zapcore.ArrayEncoder) error {
+	for _, b := range bArr {
+		encoder.AppendString(hex.EncodeToString(b))
+	}
+	return nil
+}
+
+type hexByte []byte
+
+func HexString(key string, byteVal []byte) zapcore.Field {
+	return zap.Stringer(key, hexByte(byteVal))
+}
+
+func (h hexByte) String() string {
+	return hex.EncodeToString(h)
+}
 
 // List of multiaddrs
 type multiaddrs []multiaddr.Multiaddr

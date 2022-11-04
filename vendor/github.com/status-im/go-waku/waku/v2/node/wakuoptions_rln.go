@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/go-waku/waku/v2/protocol/rln"
-	r "github.com/status-im/go-zerokit-rln/rln"
+	r "github.com/waku-org/go-zerokit-rln/rln"
 )
 
 // WithStaticRLNRelay enables the Waku V2 RLN protocol in offchain mode
@@ -25,21 +25,29 @@ func WithStaticRLNRelay(pubsubTopic string, contentTopic string, memberIndex r.M
 	}
 }
 
+type MembershipCredentials struct {
+	Contract common.Address       `json:"contract"`
+	Keypair  *r.MembershipKeyPair `json:"membershipKeyPair"`
+	Index    r.MembershipIndex    `json:"rlnIndex"`
+}
+
 // WithStaticRLNRelay enables the Waku V2 RLN protocol in onchain mode.
 // Requires the `gowaku_rln` build constrain (or the env variable RLN=true if building go-waku)
-func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, memberIndex r.MembershipIndex, idKey *r.IDKey, idCommitment *r.IDCommitment, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, membershipContractAddress common.Address, registrationHandler rln.RegistrationHandler) WakuNodeOption {
+func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, membershipCredentials MembershipCredentials, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, registrationHandler rln.RegistrationHandler) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRLN = true
 		params.rlnRelayDynamic = true
-		params.rlnRelayMemIndex = memberIndex
-		params.rlnRelayIDKey = idKey
-		params.rlnRelayIDCommitment = idCommitment
+		params.rlnRelayMemIndex = membershipCredentials.Index
+		if membershipCredentials.Keypair != nil {
+			params.rlnRelayIDKey = &membershipCredentials.Keypair.IDKey
+			params.rlnRelayIDCommitment = &membershipCredentials.Keypair.IDCommitment
+		}
 		params.rlnRelayPubsubTopic = pubsubTopic
 		params.rlnRelayContentTopic = contentTopic
 		params.rlnSpamHandler = spamHandler
 		params.rlnETHClientAddress = ethClientAddress
 		params.rlnETHPrivateKey = ethPrivateKey
-		params.rlnMembershipContractAddress = membershipContractAddress
+		params.rlnMembershipContractAddress = membershipCredentials.Contract
 		params.rlnRegistrationHandler = registrationHandler
 		return nil
 	}
