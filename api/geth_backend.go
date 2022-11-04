@@ -1362,10 +1362,5 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 		return err
 	}
 
-	waku2 := b.statusNode.WakuV2Service()
-	if waku2 != nil {
-		return waku2.ClearPeerCache()
-	}
-
 	return nil
 }

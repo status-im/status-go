@@ -175,10 +175,6 @@ type WakuV2Config struct {
 	// DiscoveryLimit indicates the maximum number of peers to discover
 	DiscoveryLimit int
 
-	// PersistPeers indicates if peer records are going to be stored in the DB so next time the node starts,
-	//it attempts to reconnect to these peers
-	PersistPeers bool
-
 	// DataDir is the file system folder Waku should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
 	DataDir string
@@ -950,14 +946,13 @@ func loadConfigFromAsset(name string, config *NodeConfig) error {
 //
 // A single error for a struct:
 //
-//   type TestStruct struct {
-//       TestField string `validate:"required"`
-//   }
+//	type TestStruct struct {
+//	    TestField string `validate:"required"`
+//	}
 //
 // has the following format:
 //
-//   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
-//
+//	Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 
