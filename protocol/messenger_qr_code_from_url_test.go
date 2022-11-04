@@ -61,10 +61,24 @@ func (s *MakeQRCodeFromURLSuite) newMessenger(shh types.Waku) *Messenger {
 }
 
 func (s *MakeQRCodeFromURLSuite) TestMotherOfAllTests() {
-	var URLToTest string = "2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3"
-	var PublicKey string = "0x10aded70ffee"
+	URLToTest := "2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3"
+	PublicKey := "0x10aded70ffee"
 
 	err := s.m.MakeQRCodeFromURL(URLToTest, PublicKey)
+	s.Require().NoError(err)
+
+	var optionsThatAllowProfileImage = QROptions{
+		AllowProfileImage: true,
+		URL:               "cs2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3",
+	}
+
+	var optionsThatDontAllowProfileImage = QROptions{
+		AllowProfileImage: false,
+		URL:               "cs2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3",
+	}
+
+	err = s.m.MakeQRWithOptions(optionsThatAllowProfileImage)
+	err = s.m.MakeQRWithOptions(optionsThatDontAllowProfileImage)
 	s.Require().NoError(err)
 
 }

@@ -102,3 +102,12 @@ func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 		"https://127.0.0.1:80/ipfs?hash=0xdeadbeef4ac0",
 		s.serverNoPort.MakeStickerURL("0xdeadbeef4ac0"))
 }
+
+func (s *ServerURLSuite) TestServer_MakeQRURL() {
+	s.Require().Equal(
+		"https://127.0.0.1:1337/QRImages?hash=0xdeadbeef4ac0",
+		s.server.MakeQRURL("0xdeadbeef4ac0"))
+	s.Require().Equal(
+		"https://127.0.0.1:0/QRImages?hash=0xdeadbeef4ac0",
+		s.serverNoPort.MakeQRURL("0xdeadbeef4ac0"))
+}

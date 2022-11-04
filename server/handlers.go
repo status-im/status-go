@@ -31,6 +31,8 @@ const (
 	// Handler routes for pairing
 	accountImagesPath = "/accountImages"
 	contactImagesPath = "/contactImages"
+
+	QRImagePath = "/QRImages"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -94,6 +96,36 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-store")
 
+		_, err = w.Write(payload)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleQRImage(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		//params := r.URL.Query()
+		//
+		//keyUids, ok := params["keyUid"]
+		//if !ok || len(keyUids) == 0 {
+		//	logger.Error("no keyUid")
+		//	return
+		//}
+		//
+		//identityImage, err := multiaccountsDB.GetIdentityImage(keyUids[0], "thumbnail")
+		//
+		//var payload = identityImage.Payload
+
+		payload, err := ioutil.ReadFile("../protocol/LogoWithQR.png")
+		mime, err := images.ImageMime(payload)
+
+		// figure out the mime variable
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		//figure out the payload variable
 		_, err = w.Write(payload)
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
