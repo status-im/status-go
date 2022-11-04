@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	_errors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -2300,7 +2301,11 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			communityWithChats, changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false)
 			if err != nil {
 				m.cleanUpImport(communityID)
-				importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(err.Error()))
+				errmsg := err.Error()
+				if _errors.Is(err, communities.ErrInvalidCommunityDescriptionDuplicatedName) {
+					errmsg = fmt.Sprintf("Couldn't create channel '%s': %s", communityChat.Identity.DisplayName, err.Error())
+				}
+				importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(errmsg))
 				importProgress.StopTask(discord.ChannelsCreationTask)
 				progressUpdates <- importProgress
 				return
