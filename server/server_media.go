@@ -45,6 +45,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		contactImagesPath:      handleContactImages(s.db, s.logger),
 		discordAuthorsPath:     handleDiscordAuthorAvatar(s.db, s.logger),
 		discordAttachmentsPath: handleDiscordAttachment(s.db, s.logger),
+		QRImagePath:            handleQRImage(s.multiaccountsDB, s.logger),
 	})
 
 	return s, nil
@@ -101,5 +102,12 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	u.Path = ipfsPath
 	u.RawQuery = url.Values{"hash": {stickerHash}}.Encode()
 
+	return u.String()
+}
+
+func (s *MediaServer) MakeQRURL(QRURL string) string {
+	u := s.MakeBaseURL()
+	u.Path = QRImagePath
+	//u.RawQuery = url.Values{"hash": {QRURL}}.Encode()
 	return u.String()
 }

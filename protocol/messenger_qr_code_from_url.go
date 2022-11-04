@@ -5,10 +5,41 @@ import (
 	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
-type GenerateBasicURLCode struct {
+type QROptions struct {
 	URL                  string `json:"url"`
 	ErrorCorrectionLevel string `json:"errorCorrectionLevel"`
 	Capacity             string `json:"capacity"`
+	AllowProfileImage    bool   `json:"withLogo"`
+}
+
+func (m *Messenger) MakeQRWithOptions(options QROptions) error {
+	var logoFileStaticPath = "./logo.png"
+	var writerObject qrcode.Writer
+
+	qrc, err := qrcode.NewWith(options.URL,
+		qrcode.WithEncodingMode(qrcode.EncModeAuto),
+		qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionMedium),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if options.AllowProfileImage {
+		writerObject, err = standard.New(
+			"./LogoWithQR.png",
+			standard.WithLogoImageFilePNG(logoFileStaticPath),
+		)
+	} else {
+		writerObject, err = standard.New(
+			"./LogoWithoutQR.png",
+		)
+	}
+
+	if err = qrc.Save(writerObject); err != nil {
+		panic(err)
+	}
+
+	return err
 }
 
 // known issue : if the url of the qr is too small,
@@ -68,7 +99,7 @@ func (m *Messenger) MakeQRCodeFromURL(URL string, PublicKey string) error {
 	//2. once the url is ready have to return the url for the front end to consume
 
 	w, err := standard.New(
-		"./simple.png",
+		"./alisherOnLogo.png",
 		standard.WithLogoImageFilePNG(fileNameStaticPath),
 	)
 	if err != nil {
