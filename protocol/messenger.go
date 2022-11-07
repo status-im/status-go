@@ -3251,7 +3251,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.ID.String()))
-				logger.Debug("processing message")
+				logger.Info("processing message")
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.Installations)
