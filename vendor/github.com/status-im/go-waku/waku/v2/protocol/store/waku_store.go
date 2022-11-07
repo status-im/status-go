@@ -479,7 +479,7 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 		messageID, _, _ := m.Hash()
 		messageIDs = append(messageIDs, messageID)
 	}
-	store.log.Info("retrieved", logging.HexArray("messageIDs", messageIDs...))
+	store.log.Info("waku.store retrieved", logging.HexArray("hashes", messageIDs...))
 
 	result := &Result{
 		Messages: response.Messages,
