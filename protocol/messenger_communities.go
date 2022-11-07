@@ -1656,6 +1656,14 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return nil
 	}
 
+	// Handle community keys
+	if len(syncCommunity.EncryptionKeys) != 0 {
+		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Handle any community requests to join.
 	// MUST BE HANDLED BEFORE DESCRIPTION!
 	pending := false
