@@ -143,6 +143,12 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 				return 0, err
 			}
 
+			encodedKeys, err := m.encryptor.GetAllHREncodedKeys(c.ID())
+			if err != nil {
+				return 0, err
+			}
+			syncMessage.EncryptionKeys = encodedKeys
+
 			backupMessage := &protobuf.Backup{
 				Communities: []*protobuf.SyncCommunity{syncMessage},
 			}

@@ -2730,6 +2730,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
+	encodedKeys, err := m.encryptor.GetAllHREncodedKeys(community.ID())
+	if err != nil {
+		return err
+	}
+	syncMessage.EncryptionKeys = encodedKeys
+
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
