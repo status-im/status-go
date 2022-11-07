@@ -68,6 +68,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
 		ResendAutomatically: true,
+		Ephemeral:           statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 	}
 
 	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
@@ -168,6 +169,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
 		ResendAutomatically: true,
+		Ephemeral:           statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 	}
 
 	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
