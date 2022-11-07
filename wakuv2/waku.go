@@ -954,13 +954,15 @@ func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope, msgType common.Me
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	envelopeErrors := make([]common.EnvelopeError, 0)
 
-	w.logger.Debug("received new envelope")
+	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
+
+	logger.Debug("received new envelope")
 
 	trouble := false
 
 	_, err := w.add(recvMessage)
 	if err != nil {
-		w.logger.Info("invalid envelope received", zap.Error(err))
+		logger.Info("invalid envelope received", zap.Error(err))
 		trouble = true
 	}
 

@@ -30,7 +30,7 @@ func HexArray(key string, byteVal ...[]byte) zapcore.Field {
 
 func (bArr byteArr) MarshalLogArray(encoder zapcore.ArrayEncoder) error {
 	for _, b := range bArr {
-		encoder.AppendString(hex.EncodeToString(b))
+		encoder.AppendString("0x" + hex.EncodeToString(b))
 	}
 	return nil
 }
@@ -42,7 +42,7 @@ func HexString(key string, byteVal []byte) zapcore.Field {
 }
 
 func (h hexByte) String() string {
-	return hex.EncodeToString(h)
+	return "0x" + hex.EncodeToString(h)
 }
 
 // List of multiaddrs

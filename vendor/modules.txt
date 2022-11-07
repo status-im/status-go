@@ -900,7 +900,7 @@ github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.4
 ## explicit; go 1.18
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.2.3-0.20221103135445-98745d9e9292
+# github.com/status-im/go-waku v0.2.3-0.20221107152343-98c3ca8dc60f
 ## explicit; go 1.18
 github.com/status-im/go-waku/logging
 github.com/status-im/go-waku/waku/persistence

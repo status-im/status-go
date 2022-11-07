@@ -51,7 +51,7 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.2.3-0.20221103135445-98745d9e9292
+	github.com/status-im/go-waku v0.2.3-0.20221107152343-98c3ca8dc60f
 	github.com/status-im/markdown v0.0.0-20220622180305-7ee4aa8bbc3f
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.6
