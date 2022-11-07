@@ -551,6 +551,8 @@ func (s *MessageSender) SendPublic(
 		}
 	}
 
+	newMessage.Ephemeral = rawMessage.Ephemeral
+
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
 

@@ -179,6 +179,7 @@ type NewMessage struct {
 	Payload    []byte           `json:"payload"`
 	Padding    []byte           `json:"padding"`
 	TargetPeer string           `json:"targetPeer"`
+	Ephemeral  bool             `json:"ephemeral"`
 }
 
 // Post posts a message on the Waku network.
@@ -253,6 +254,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Version:      version,
 		ContentTopic: req.Topic.ContentTopic(),
 		Timestamp:    utils.GetUnixEpoch(),
+		Ephemeral:    req.Ephemeral,
 	}
 
 	hash, err := api.w.Send(wakuMsg)

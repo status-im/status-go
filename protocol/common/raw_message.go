@@ -33,4 +33,5 @@ type RawMessage struct {
 	SendOnPersonalTopic   bool
 	CommunityID           []byte
 	CommunityKeyExMsgType CommKeyExMsgType
+	Ephemeral             bool
 }
