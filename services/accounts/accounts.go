@@ -425,13 +425,24 @@ func (api *API) VerifyPassword(password string) bool {
 	return err == nil
 }
 
-func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {
+func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, keyStoreDir string) error {
 	var addresses []types.Address
 	for _, addr := range accountAddresses {
 		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	return api.db.AddMigratedKeyPair(kcUID, kpName, keyUID, addresses)
+	err := api.db.AddMigratedKeyPair(kcUID, kpName, keyUID, addresses)
+	if err != nil {
+		return err
+	}
+
+	// Once we migrate a keypair, corresponding keystore files need to be deleted.
+	for _, addr := range addresses {
+		// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
+		// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
+		_ = api.manager.DeleteAccount(keyStoreDir, addr)
+	}
+	return nil
 }
 
 func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {
