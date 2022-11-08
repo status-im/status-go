@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -626,10 +627,11 @@ func TestConvertAccount(t *testing.T) {
 	err = backend.AccountManager().InitKeystore(keyStoreDir)
 	require.NoError(t, err)
 
+	const path = "m/44'/60'/0'/0"
 	backend.AccountManager()
 	accs, err := backend.AccountManager().
 		AccountsGenerator().
-		GenerateAndDeriveAddresses(12, 1, "", []string{"m/44'/60'/0'/0"})
+		GenerateAndDeriveAddresses(12, 1, "", []string{path})
 	require.NoError(t, err)
 
 	generateAccount := accs[0]
@@ -663,10 +665,22 @@ func TestConvertAccount(t *testing.T) {
 		SigningPhrase:     "yurt joey vibe",
 		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
 
+	acc := accounts.Account{
+		Address:   types.HexToAddress(generateAccount.Address),
+		KeyUID:    generateAccount.KeyUID,
+		Type:      accounts.AccountTypeGenerated,
+		PublicKey: types.Hex2Bytes(generateAccount.PublicKey),
+		Path:      path,
+		Wallet:    false,
+		Chat:      false,
+		Name:      "GeneratedAccount",
+	}
+
+	accounts := []*accounts.Account{&acc}
 	err = backend.saveAccountsAndSettings(
 		s,
 		&params.NodeConfig{},
-		nil)
+		accounts)
 	require.NoError(t, err)
 
 	err = backend.OpenAccounts()
@@ -690,13 +704,36 @@ func TestConvertAccount(t *testing.T) {
 		KeycardPairing:     "pairing",
 	}
 
-	_, keyStoreErrBefore := os.Stat(keyStoreDir)
+	addrWithoutPrefix := strings.ToLower(generateAccount.Address[2:len(generateAccount.Address)])
+	found := false
+	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !fileInfo.IsDir() && strings.Contains(path, addrWithoutPrefix) {
+			found = true
+		}
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.True(t, found)
 
 	err = backend.ConvertToKeycardAccount(keyStoreDir, keycardAccount, keycardSettings, password, keycardPassword)
 	require.NoError(t, err)
 
-	_, keyStoreErrAfter := os.Stat(keyStoreDir)
-	require.True(t, keyStoreErrBefore == keyStoreErrAfter)
+	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !fileInfo.IsDir() && strings.Contains(path, addrWithoutPrefix) {
+			found = false
+		}
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.True(t, found)
 
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
