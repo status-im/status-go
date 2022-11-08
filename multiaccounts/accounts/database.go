@@ -251,11 +251,6 @@ func (db *Database) DeleteAccount(address types.Address) error {
 	return err
 }
 
-func (db *Database) DeleteSeedAndKeyAccounts() error {
-	_, err := db.db.Exec("DELETE FROM accounts WHERE type = ? OR type = ?", AccountTypeSeed, AccountTypeKey)
-	return err
-}
-
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = 1").Scan(&rst)
 	return
