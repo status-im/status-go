@@ -14,6 +14,7 @@ import (
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")
 var ErrInvalidDeleteTypeAuthor = errors.New("message type cannot be deleted")
 var ErrInvalidEditContentType = errors.New("only text or emoji messages can be replaced")
+var ErrInvalidEditRequestContentType = errors.New("message type can't be changed")
 
 func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessage) (*MessengerResponse, error) {
 	err := request.Validate()
@@ -27,6 +28,10 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
 		return nil, ErrInvalidEditOrDeleteAuthor
+	}
+
+	if message.ContentType != request.ContentType {
+		return nil, ErrInvalidEditRequestContentType
 	}
 
 	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI {

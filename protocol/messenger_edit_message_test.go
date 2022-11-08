@@ -94,8 +94,9 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 	editedText := "edited text"
 	editedMessage := &requests.EditMessage{
-		ID:   messageID,
-		Text: editedText,
+		ID:          messageID,
+		Text:        editedText,
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}
 
 	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
@@ -122,8 +123,9 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 	// Main instance user attempts to edit the message it received from theirMessenger
 	editedMessage = &requests.EditMessage{
-		ID:   messageID,
-		Text: "edited-again text",
+		ID:          messageID,
+		Text:        "edited-again text",
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}
 	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
@@ -166,8 +168,9 @@ func (s *MessengerEditMessageSuite) TestEditMessageActivityCenter() {
 
 	editedText := "edited text"
 	editedMessage := &requests.EditMessage{
-		ID:   messageID,
-		Text: editedText,
+		ID:          messageID,
+		Text:        editedText,
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}
 
 	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
@@ -199,8 +202,9 @@ func (s *MessengerEditMessageSuite) TestEditMessageActivityCenter() {
 
 	// Main instance user attempts to edit the message it received from theirMessenger
 	editedMessage = &requests.EditMessage{
-		ID:   messageID,
-		Text: "edited-again text",
+		ID:          messageID,
+		Text:        "edited-again text",
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}
 	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
@@ -244,10 +248,11 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	editMessage := EditMessage{
 		EditMessage: protobuf.EditMessage{
-			Clock:     editedMessage.Clock + 1,
-			Text:      "some text",
-			MessageId: editedMessage.ID,
-			ChatId:    chat.ID,
+			Clock:       editedMessage.Clock + 1,
+			Text:        "some text",
+			MessageId:   editedMessage.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			ChatId:      chat.ID,
 		},
 		From: wrongContact.ID,
 	}
@@ -293,6 +298,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 			Text:        "some other text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   editedMessage.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 			ChatId:      chat.ID,
 		},
 		From: contact.ID,
@@ -332,6 +338,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 			Text:        "some text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 			ChatId:      theirChat.ID,
 		},
 		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
@@ -429,8 +436,9 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 
 	editedText := "edited text"
 	editedMessage := &requests.EditMessage{
-		ID:   messageID,
-		Text: editedText,
+		ID:          messageID,
+		Text:        editedText,
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}
 
 	_, err = theirMessenger.EditMessage(context.Background(), editedMessage)
