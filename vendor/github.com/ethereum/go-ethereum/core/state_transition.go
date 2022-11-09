@@ -25,26 +25,34 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
 
-/*
-The State Transitioning Model
+var emptyCodeHash = crypto.Keccak256Hash(nil)
 
-A state transition is a change made when a transaction is applied to the current world state
-The state transitioning model does all the necessary work to work out a valid new state root.
-
-1) Nonce handling
-2) Pre pay gas
-3) Create a new state object if the recipient is \0*32
-4) Value transfer
-== If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
-== end ==
-5) Run Script section
-6) Derive new state root
-*/
+// StateTransition represents a state transition.
+//
+// == The State Transitioning Model
+//
+// A state transition is a change made when a transaction is applied to the current world
+// state. The state transitioning model does all the necessary work to work out a valid new
+// state root.
+//
+//  1. Nonce handling
+//  2. Pre pay gas
+//  3. Create a new state object if the recipient is \0*32
+//  4. Value transfer
+//
+// == If contract creation ==
+//
+//	4a. Attempt to run transaction data
+//	4b. If valid, use result as code for the new state object
+//
+// == end ==
+//
+//  5. Run Script section
+//  6. Derive new state root
 type StateTransition struct {
 	gp         *GasPool
 	msg        Message
@@ -71,7 +79,7 @@ type Message interface {
 	Value() *big.Int
 
 	Nonce() uint64
-	CheckNonce() bool
+	IsFake() bool
 	Data() []byte
 	AccessList() types.AccessList
 }
@@ -193,6 +201,7 @@ func (st *StateTransition) buyGas() error {
 	if st.gasFeeCap != nil {
 		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
 		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
+		balanceCheck.Add(balanceCheck, st.value)
 	}
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
@@ -208,8 +217,9 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() {
+	// Only check transactions that are not fake
+	if !st.msg.IsFake() {
+		// Make sure this transaction's nonce is correct.
 		stNonce := st.state.GetNonce(st.msg.From())
 		if msgNonce := st.msg.Nonce(); stNonce < msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooHigh,
@@ -217,6 +227,14 @@ func (st *StateTransition) preCheck() error {
 		} else if stNonce > msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooLow,
 				st.msg.From().Hex(), msgNonce, stNonce)
+		} else if stNonce+1 < stNonce {
+			return fmt.Errorf("%w: address %v, nonce: %d", ErrNonceMax,
+				st.msg.From().Hex(), stNonce)
+		}
+		// Make sure the sender is an EOA
+		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != emptyCodeHash && codeHash != (common.Hash{}) {
+			return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
+				st.msg.From().Hex(), codeHash)
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
@@ -249,13 +267,10 @@ func (st *StateTransition) preCheck() error {
 // TransitionDb will transition the state by applying the current message and
 // returning the evm execution result with following fields.
 //
-// - used gas:
-//      total gas used (including gas being refunded)
-// - returndata:
-//      the returned data from evm
-// - concrete execution error:
-//      various **EVM** error which aborts the execution,
-//      e.g. ErrOutOfGas, ErrExecutionReverted
+//   - used gas: total gas used (including gas being refunded)
+//   - returndata: the returned data from evm
+//   - concrete execution error: various EVM errors which abort the execution, e.g.
+//     ErrOutOfGas, ErrExecutionReverted
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
@@ -274,14 +289,23 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if err := st.preCheck(); err != nil {
 		return nil, err
 	}
-	msg := st.msg
-	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsHomestead(st.evm.Context.BlockNumber)
-	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.BlockNumber)
-	contractCreation := msg.To() == nil
+
+	if st.evm.Config.Debug {
+		st.evm.Config.Tracer.CaptureTxStart(st.initialGas)
+		defer func() {
+			st.evm.Config.Tracer.CaptureTxEnd(st.gas)
+		}()
+	}
+
+	var (
+		msg              = st.msg
+		sender           = vm.AccountRef(msg.From())
+		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil)
+		contractCreation = msg.To() == nil
+	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
+	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +320,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	// Set up the initial access list.
-	if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsBerlin {
+	if rules.IsBerlin {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 	var (
@@ -310,7 +334,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
-	if !st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
+
+	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
 		st.refundGas(params.RefundQuotient)
 	} else {
@@ -318,10 +343,19 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := st.gasPrice
-	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
+	if rules.IsLondon {
 		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
-	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+
+	if st.evm.Config.NoBaseFee && st.gasFeeCap.Sign() == 0 && st.gasTipCap.Sign() == 0 {
+		// Skip fee payment when NoBaseFee is set and the fee fields
+		// are 0. This avoids a negative effectiveTip being applied to
+		// the coinbase when simulating calls.
+	} else {
+		fee := new(big.Int).SetUint64(st.gasUsed())
+		fee.Mul(fee, effectiveTip)
+		st.state.AddBalance(st.evm.Context.Coinbase, fee)
+	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

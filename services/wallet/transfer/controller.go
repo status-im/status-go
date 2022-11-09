@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -25,6 +26,7 @@ type Controller struct {
 	accountFeed  *event.Feed
 	TransferFeed *event.Feed
 	group        *async.Group
+	balanceCache *balanceCache
 }
 
 func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Controller {
@@ -199,26 +201,22 @@ func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Clie
 	return nil
 }
 
-func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]View, error) {
+func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int, limit int64, fetchMore bool) ([]View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address)
-	var toBlockBN *big.Int
-	if toBlock != nil {
-		toBlockBN = toBlock.ToInt()
-	}
 
-	rst, err := c.db.GetTransfersByAddress(chainID, address, toBlockBN, limit.ToInt().Int64())
+	rst, err := c.db.GetTransfersByAddress(chainID, address, toBlock, limit)
 	if err != nil {
 		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
 		return nil, err
 	}
 
-	transfersCount := big.NewInt(int64(len(rst)))
+	transfersCount := int64(len(rst))
 	chainClient, err := chain.NewClient(c.rpcClient, chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	if fetchMore && limit.ToInt().Cmp(transfersCount) == 1 {
+	if fetchMore && limit > transfersCount {
 		block, err := c.block.GetFirstKnownBlock(chainID, address)
 		if err != nil {
 			return nil, err
@@ -246,12 +244,14 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 		}}
 		toByAddress := map[common.Address]*big.Int{address: block}
 
-		balanceCache := newBalanceCache()
+		if c.balanceCache == nil {
+			c.balanceCache = newBalanceCache()
+		}
 		blocksCommand := &findAndCheckBlockRangeCommand{
 			accounts:      []common.Address{address},
 			db:            c.db,
 			chainClient:   chainClient,
-			balanceCache:  balanceCache,
+			balanceCache:  c.balanceCache,
 			feed:          c.TransferFeed,
 			fromByAddress: fromByAddress,
 			toByAddress:   toByAddress,
@@ -280,7 +280,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 				return nil, err
 			}
 
-			rst, err = c.db.GetTransfersByAddress(chainID, address, toBlockBN, limit.ToInt().Int64())
+			rst, err = c.db.GetTransfersByAddress(chainID, address, toBlock, limit)
 			if err != nil {
 				return nil, err
 			}
@@ -297,4 +297,126 @@ func (c *Controller) GetCachedBalances(ctx context.Context, chainID uint64, addr
 	}
 
 	return blocksToViews(result), nil
+}
+
+type BalanceState struct {
+	Value     *hexutil.Big `json:"value"`
+	Timestamp uint64       `json:"time"`
+}
+
+type BalanceHistoryTimeInterval int
+
+const (
+	BalanceHistory7Hours BalanceHistoryTimeInterval = iota + 1
+	BalanceHistory1Month
+	BalanceHistory6Months
+	BalanceHistory1Year
+	BalanceHistoryAllTime
+)
+
+var balanceHistoryTimeIntervalToHoursPerStep = map[BalanceHistoryTimeInterval]int64{
+	BalanceHistory7Hours:  2,
+	BalanceHistory1Month:  12,
+	BalanceHistory6Months: (24 * 7) / 2,
+	BalanceHistory1Year:   24 * 7,
+}
+
+var balanceHistoryTimeIntervalToSampleNo = map[BalanceHistoryTimeInterval]int64{
+	BalanceHistory7Hours:  84,
+	BalanceHistory1Month:  60,
+	BalanceHistory6Months: 52,
+	BalanceHistory1Year:   52,
+	BalanceHistoryAllTime: 50,
+}
+
+// GetBalanceHistory expect a time precision of +/- average block time (~12s)
+// implementation relies that a block has constant time length to save block header requests
+func (c *Controller) GetBalanceHistory(ctx context.Context, chainID uint64, address common.Address, timeInterval BalanceHistoryTimeInterval) ([]BalanceState, error) {
+	chainClient, err := chain.NewClient(c.rpcClient, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.balanceCache == nil {
+		c.balanceCache = newBalanceCache()
+	}
+
+	if c.balanceCache.history == nil {
+		c.balanceCache.history = new(balanceHistoryCache)
+	}
+
+	currentTimestamp := time.Now().Unix()
+	lastBlockNo := big.NewInt(0)
+	var lastBlockTimestamp int64
+	if (currentTimestamp - c.balanceCache.history.lastBlockTimestamp) >= (12 * 60 * 60) {
+		lastBlock, err := chainClient.BlockByNumber(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		lastBlockNo.Set(lastBlock.Number())
+		lastBlockTimestamp = int64(lastBlock.Time())
+		c.balanceCache.history.lastBlockNo = big.NewInt(0).Set(lastBlockNo)
+		c.balanceCache.history.lastBlockTimestamp = lastBlockTimestamp
+	} else {
+		lastBlockNo.Set(c.balanceCache.history.lastBlockNo)
+		lastBlockTimestamp = c.balanceCache.history.lastBlockTimestamp
+	}
+
+	initialBlock, err := chainClient.BlockByNumber(ctx, big.NewInt(1))
+	if err != nil {
+		return nil, err
+	}
+	initialBlockNo := big.NewInt(0).Set(initialBlock.Number())
+	initialBlockTimestamp := int64(initialBlock.Time())
+
+	allTimeBlockCount := big.NewInt(0).Sub(lastBlockNo, initialBlockNo)
+	allTimeInterval := lastBlockTimestamp - initialBlockTimestamp
+
+	// Expected to be around 12
+	blockDuration := float64(allTimeInterval) / float64(allTimeBlockCount.Int64())
+
+	lastBlockTime := time.Unix(lastBlockTimestamp, 0)
+	// Snap to the beginning of the day or half day which is the closest to the last block
+	hour := 0
+	if lastBlockTime.Hour() >= 12 {
+		hour = 12
+	}
+	lastTime := time.Date(lastBlockTime.Year(), lastBlockTime.Month(), lastBlockTime.Day(), hour, 0, 0, 0, lastBlockTime.Location())
+	endBlockTimestamp := lastTime.Unix()
+	blockGaps := big.NewInt(int64(float64(lastBlockTimestamp-endBlockTimestamp) / blockDuration))
+	endBlockNo := big.NewInt(0).Sub(lastBlockNo, blockGaps)
+
+	totalBlockCount, startTimestamp := int64(0), int64(0)
+	if timeInterval == BalanceHistoryAllTime {
+		startTimestamp = initialBlockTimestamp
+		totalBlockCount = endBlockNo.Int64()
+	} else {
+		secondsToNow := balanceHistoryTimeIntervalToHoursPerStep[timeInterval] * 3600 * (balanceHistoryTimeIntervalToSampleNo[timeInterval])
+		startTimestamp = endBlockTimestamp - secondsToNow
+		totalBlockCount = int64(float64(secondsToNow) / blockDuration)
+	}
+	blocksInStep := totalBlockCount / (balanceHistoryTimeIntervalToSampleNo[timeInterval])
+	stepDuration := int64(float64(blocksInStep) * blockDuration)
+
+	points := make([]BalanceState, 0)
+
+	nextBlockNumber := big.NewInt(0).Set(endBlockNo)
+	nextTimestamp := endBlockTimestamp
+	for nextTimestamp >= startTimestamp && nextBlockNumber.Cmp(initialBlockNo) >= 0 && nextBlockNumber.Cmp(big.NewInt(0)) > 0 {
+		newBlockNo := big.NewInt(0).Set(nextBlockNumber)
+		currentBalance, err := c.balanceCache.BalanceAt(ctx, chainClient, address, newBlockNo)
+		if err != nil {
+			return nil, err
+		}
+
+		var currentBalanceState BalanceState
+		currentBalanceState.Value = (*hexutil.Big)(currentBalance)
+		currentBalanceState.Timestamp = uint64(nextTimestamp)
+		points = append([]BalanceState{currentBalanceState}, points...)
+
+		// decrease block number and timestamp
+		nextTimestamp -= stepDuration
+		nextBlockNumber.Sub(nextBlockNumber, big.NewInt(blocksInStep))
+	}
+	return points, nil
 }

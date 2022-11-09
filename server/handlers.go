@@ -405,15 +405,17 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 			ps.logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
 
 		err = ps.PayloadManager.Receive(payload)
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error()})
 			ps.logger.Error("ps.PayloadManager.Receive(payload)", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess})
 	}
@@ -422,15 +424,17 @@ func handlePairingReceive(ps *PairingServer) http.HandlerFunc {
 func handlePairingSend(ps *PairingServer) http.HandlerFunc {
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess})
 
-	// TODO lock sending after one successful transfer, perhaps perform the lock on the PayloadManager level
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err := w.Write(ps.PayloadManager.ToSend())
 		if err != nil {
-			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err})
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error()})
 			ps.logger.Error("w.Write(ps.PayloadManager.ToSend())", zap.Error(err))
+			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess})
+
+		ps.PayloadManager.LockPayload()
 	}
 }
 
@@ -440,6 +444,7 @@ func challengeMiddleware(ps *PairingServer, next http.Handler) http.HandlerFunc 
 		if err != nil {
 			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
+			return
 		}
 
 		blocked, ok := s.Values[sessionBlocked].(bool)
@@ -491,6 +496,7 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 		s, err := ps.cookieStore.Get(r, sessionChallenge)
 		if err != nil {
 			ps.logger.Error("ps.cookieStore.Get(r, pairingStoreChallenge)", zap.Error(err))
+			return
 		}
 
 		var challenge []byte
@@ -500,12 +506,14 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 			_, err = rand.Read(challenge)
 			if err != nil {
 				ps.logger.Error("_, err = rand.Read(auth)", zap.Error(err))
+				return
 			}
 
 			s.Values[sessionChallenge] = challenge
 			err = s.Save(r, w)
 			if err != nil {
 				ps.logger.Error("err = s.Save(r, w)", zap.Error(err))
+				return
 			}
 		}
 
@@ -513,6 +521,7 @@ func handlePairingChallenge(ps *PairingServer) http.HandlerFunc {
 		_, err = w.Write(challenge)
 		if err != nil {
 			ps.logger.Error("_, err = w.Write(challenge)", zap.Error(err))
+			return
 		}
 	}
 }

@@ -191,6 +191,9 @@ type ChatPreview struct {
 
 	// Used for display invited community's name in the last message
 	ContentCommunityID string `json:"contentCommunityId,omitempty"`
+
+	// Members array to represent how many there are for chats preview of group chats
+	Members []ChatMember `json:"members"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {

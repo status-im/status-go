@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	_errors "errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,8 +19,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
+	"github.com/meirf/gopart"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -26,10 +31,13 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 // 7 days interval
 var messageArchiveInterval = 7 * 24 * time.Hour
+
+const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
@@ -130,6 +138,10 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						sub.HistoryArchiveDownloadedSignal.To,
 					)
 				}
+
+				if sub.DownloadingHistoryArchivesFinishedSignal != nil {
+					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.HistoryArchiveDownloadedSignal.CommunityID)
+				}
 			case <-m.quit:
 				return
 			}
@@ -184,9 +196,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 				for idx := range orgs {
 					org := orgs[idx]
-					err := m.publishOrg(org)
-					if err != nil {
-						m.logger.Warn("failed to publish org", zap.Error(err))
+					_, beingImported := m.importingCommunities[org.IDString()]
+					if !beingImported {
+						err := m.publishOrg(org)
+						if err != nil {
+							m.logger.Warn("failed to publish org", zap.Error(err))
+						}
 					}
 				}
 
@@ -520,6 +535,22 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		}
 	}()
 
+	// Activity center notification
+	notification := &ActivityCenterNotification{
+		ID:               types.FromHex(requestToJoin.ID.String()),
+		Type:             ActivityCenterNotificationTypeCommunityRequest,
+		Timestamp:        m.getTimesource().GetCurrentTime(),
+		CommunityID:      community.IDString(),
+		MembershipStatus: ActivityCenterMembershipStatusPending,
+	}
+
+	saveErr := m.persistence.SaveActivityCenterNotification(notification)
+	if saveErr != nil {
+		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		return nil, saveErr
+	}
+	response.AddActivityCenterNotification(notification)
+
 	return response, nil
 }
 
@@ -603,6 +634,50 @@ func (m *Messenger) DeleteCommunityCategory(request *requests.DeleteCommunityCat
 	return &response, nil
 }
 
+func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	requestToJoin, community, err := m.communitiesManager.CancelRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
+
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	cancelRequestToJoinProto := &protobuf.CommunityCancelRequestToJoin{
+		Clock:       community.Clock(),
+		EnsName:     requestToJoin.ENSName,
+		DisplayName: displayName,
+		CommunityId: community.ID(),
+	}
+
+	payload, err := proto.Marshal(cancelRequestToJoinProto)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:        payload,
+		CommunityID:    community.ID(),
+		SkipEncryption: true,
+		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
+	}
+	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -660,15 +735,55 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+
+	// Activity Center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if notification != nil {
+		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+		saveErr := m.persistence.SaveActivityCenterNotification(notification)
+		if saveErr != nil {
+			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			return nil, saveErr
+		}
+		response.AddActivityCenterNotification(notification)
+	}
+
 	return response, nil
 }
 
-func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) error {
+func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return m.communitiesManager.DeclineRequestToJoin(request)
+	err := m.communitiesManager.DeclineRequestToJoin(request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Activity Center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+
+	if notification != nil {
+		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		saveErr := m.persistence.SaveActivityCenterNotification(notification)
+		if saveErr != nil {
+			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			return nil, saveErr
+		}
+		response.AddActivityCenterNotification(notification)
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
@@ -1126,6 +1241,10 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	return response, nil
 }
 
+func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.CanceledRequestsToJoinForUser(&m.identity.PublicKey)
+}
+
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
@@ -1136,6 +1255,10 @@ func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*com
 
 func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.CanceledRequestsToJoinForCommunity(id)
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
@@ -1918,6 +2041,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 		Categories:             map[string]*discord.Category{},
 		ExportedData:           make([]*discord.ExportedData, 0),
 		OldestMessageTimestamp: 0,
+		MessageCount:           0,
 	}
 
 	errors := map[string]*discord.ImportError{}
@@ -1926,10 +2050,7 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 		filePath := strings.Replace(fileToImport, "file://", "", -1)
 		bytes, err := os.ReadFile(filePath)
 		if err != nil {
-			errors[fileToImport] = &discord.ImportError{
-				Code:    2,
-				Message: err.Error(),
-			}
+			errors[fileToImport] = discord.Error(err.Error())
 			continue
 		}
 
@@ -1937,18 +2058,12 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 
 		err = json.Unmarshal(bytes, &discordExportedData)
 		if err != nil {
-			errors[fileToImport] = &discord.ImportError{
-				Code:    2,
-				Message: err.Error(),
-			}
+			errors[fileToImport] = discord.Error(err.Error())
 			continue
 		}
 
 		if len(discordExportedData.Messages) == 0 {
-			errors[fileToImport] = &discord.ImportError{
-				Code:    2,
-				Message: "No messages to import",
-			}
+			errors[fileToImport] = discord.Error(discord.ErrNoMessageData.Error())
 			continue
 		}
 
@@ -1965,11 +2080,11 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 			extractedData.Categories[categoryID] = &discordCategory
 		}
 
+		extractedData.MessageCount = extractedData.MessageCount + discordExportedData.MessageCount
 		extractedData.ExportedData = append(extractedData.ExportedData, &discordExportedData)
 
 		if len(discordExportedData.Messages) > 0 {
-			layout := "2006-01-02T15:04:05+00:00"
-			msgTime, err := time.Parse(layout, discordExportedData.Messages[0].Timestamp)
+			msgTime, err := time.Parse(discordTimestampLayout, discordExportedData.Messages[0].Timestamp)
 			if err != nil {
 				m.logger.Error("failed to parse discord message timestamp", zap.Error(err))
 				continue
@@ -2014,4 +2129,971 @@ func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []s
 			int64(response.DiscordOldestMessageTimestamp),
 			errors)
 	}()
+}
+
+func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
+	go func() {
+
+		progressUpdates := make(chan *discord.ImportProgress)
+		done := make(chan struct{})
+		cancel := make(chan string)
+		m.startPublishImportProgressInterval(progressUpdates, cancel, done)
+
+		importProgress := &discord.ImportProgress{}
+		importProgress.Init([]discord.ImportTask{
+			discord.CommunityCreationTask,
+			discord.ChannelsCreationTask,
+			discord.ImportMessagesTask,
+			discord.DownloadAssetsTask,
+			discord.InitCommunityTask,
+		})
+		importProgress.CommunityName = request.Name
+
+		// initial progress immediately
+		m.publishImportProgress(importProgress)
+
+		exportData, errs := m.ExtractDiscordDataFromImportFiles(request.FilesToImport)
+		if len(errs) > 0 {
+			for _, err := range errs {
+				importProgress.AddTaskError(discord.CommunityCreationTask, err)
+			}
+			progressUpdates <- importProgress
+			return
+		}
+		totalChannelsCount := len(exportData.ExportedData)
+		totalMessageCount := exportData.MessageCount
+
+		if totalChannelsCount == 0 || totalMessageCount == 0 {
+			importError := discord.Error(discord.ErrNoChannelData.Error())
+			if totalMessageCount == 0 {
+				importError.Message = discord.ErrNoMessageData.Error()
+			}
+			importProgress.AddTaskError(discord.CommunityCreationTask, importError)
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			return
+		}
+
+		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.5)
+		progressUpdates <- importProgress
+
+		createCommunityRequest := request.ToCreateCommunityRequest()
+
+		// We're calling `CreateCommunity` on `communitiesManager` directly, instead of
+		// using the `Messenger` API, so we get more control over when we set up filters,
+		// the community is published and data is being synced (we don't want the community
+		// to show up in clients while the import is in progress)
+		discordCommunity, err := m.communitiesManager.CreateCommunity(createCommunityRequest, false)
+		if err != nil {
+			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			return
+		}
+
+		communitySettings := communities.CommunitySettings{
+			CommunityID:                  discordCommunity.IDString(),
+			HistoryArchiveSupportEnabled: true,
+		}
+		err = m.communitiesManager.SaveCommunitySettings(communitySettings)
+		if err != nil {
+			m.cleanUpImport(discordCommunity.IDString())
+			importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			return
+		}
+
+		if createCommunityRequest.Encrypted {
+			// Init hash ratchet for community
+			_, err = m.encryptor.GenerateHashRatchetKey(discordCommunity.ID())
+
+			if err != nil {
+				m.cleanUpImport(discordCommunity.IDString())
+				importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.CommunityCreationTask)
+				progressUpdates <- importProgress
+				return
+			}
+		}
+
+		communityID := discordCommunity.IDString()
+
+		// marking import as not cancelled
+		m.importingCommunities[communityID] = false
+		importProgress.CommunityID = communityID
+		importProgress.CommunityImages = make(map[string]images.IdentityImage)
+
+		imgs := discordCommunity.Images()
+		for t, i := range imgs {
+			importProgress.CommunityImages[t] = images.IdentityImage{Name: t, Payload: i.Payload}
+		}
+
+		importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.75)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		//This is a map of discord category IDs <-> Status category IDs
+		processedCategoriesIds := make(map[string]string, 0)
+		totalCategoriesCount := len(exportData.Categories)
+
+		for _, category := range exportData.Categories {
+
+			createCommunityCategoryRequest := &requests.CreateCommunityCategory{
+				CommunityID:  discordCommunity.ID(),
+				CategoryName: category.Name,
+				ChatIDs:      make([]string, 0),
+			}
+			// We call `CreateCategory` on `communitiesManager` directly so we can control
+			// whether or not the community update should be published (it should not until the
+			// import has finished)
+			communityWithCategories, changes, err := m.communitiesManager.CreateCategory(createCommunityCategoryRequest, false)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.CommunityCreationTask)
+				progressUpdates <- importProgress
+				return
+			}
+			discordCommunity = communityWithCategories
+			// This looks like we keep overriding the same field but there's
+			// only one `CategoriesAdded` change at this point.
+			for _, addedCategory := range changes.CategoriesAdded {
+				processedCategoriesIds[category.ID] = addedCategory.CategoryId
+			}
+
+			// We're multiplying `progressValue` by 0.25 as it's added to the previous 0.75 progress
+			progressValue := (float32(len(processedCategoriesIds)) / float32(totalCategoriesCount)) * 0.25
+			importProgress.UpdateTaskProgress(discord.CommunityCreationTask, 0.75+progressValue)
+
+			progressUpdates <- importProgress
+		}
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.CommunityCreationTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		var chatsToSave []*Chat
+		processedChannelIds := make(map[string]string, 0)
+		messagesToSave := make(map[string]*common.Message, 0)
+		pinMessagesToSave := make([]*common.PinMessage, 0)
+		authorProfilesToSave := make(map[string]*protobuf.DiscordMessageAuthor, 0)
+		messageAttachmentsToDownload := make([]*protobuf.DiscordMessageAttachment, 0)
+
+		for _, channel := range exportData.ExportedData {
+
+			communityChat := &protobuf.CommunityChat{
+				Permissions: &protobuf.CommunityPermissions{
+					Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+				},
+				Identity: &protobuf.ChatIdentity{
+					DisplayName: channel.Channel.Name,
+					Emoji:       "",
+					Description: channel.Channel.Description,
+					Color:       discordCommunity.Color(),
+				},
+				CategoryId: processedCategoriesIds[channel.Channel.CategoryID],
+			}
+
+			// We call `CreateChat` on `communitiesManager` directly to get more control
+			// over whether we want to publish the updated community description.
+			communityWithChats, changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				errmsg := err.Error()
+				if _errors.Is(err, communities.ErrInvalidCommunityDescriptionDuplicatedName) {
+					errmsg = fmt.Sprintf("Couldn't create channel '%s': %s", communityChat.Identity.DisplayName, err.Error())
+				}
+				importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(errmsg))
+				importProgress.StopTask(discord.ChannelsCreationTask)
+				progressUpdates <- importProgress
+				return
+			}
+			discordCommunity = communityWithChats
+
+			// This looks like we keep overriding the chat id value
+			// as we iterate over `ChatsAdded`, however at this point we
+			// know there was only a single such change (and it's a map)
+			for chatID, chat := range changes.ChatsAdded {
+				c := CreateCommunityChat(communityID, chatID, chat, m.getTimesource())
+				chatsToSave = append(chatsToSave, c)
+				processedChannelIds[channel.Channel.ID] = c.ID
+			}
+
+			progressValue := float32(len(processedChannelIds)) / float32(totalChannelsCount)
+			importProgress.UpdateTaskProgress(discord.ChannelsCreationTask, progressValue)
+			progressUpdates <- importProgress
+
+			for _, discordMessage := range channel.Messages {
+
+				progressValue := float32(len(messagesToSave)) / float32(totalMessageCount)
+
+				timestamp, err := time.Parse(discordTimestampLayout, discordMessage.Timestamp)
+				if err != nil {
+					m.logger.Error("failed to parse discord message timestamp", zap.Error(err))
+					importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+					importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+					continue
+				}
+
+				if timestamp.Unix() < request.From {
+					continue
+				}
+
+				exists, err := m.persistence.HasDiscordMessageAuthor(discordMessage.Author.GetId())
+				if err != nil {
+					m.logger.Error("failed to check if message author exists in database", zap.Error(err))
+					importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+					importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+					continue
+				}
+
+				if !exists {
+					err := m.persistence.SaveDiscordMessageAuthor(discordMessage.Author)
+					if err != nil {
+						importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+						importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+						continue
+					}
+				}
+
+				hasPayload, err := m.persistence.HasDiscordMessageAuthorImagePayload(discordMessage.Author.GetId())
+				if err != nil {
+					m.logger.Error("failed to check if message avatar payload exists in database", zap.Error(err))
+					importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+					importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+					continue
+				}
+
+				if !hasPayload {
+					authorProfilesToSave[discordMessage.Author.Id] = discordMessage.Author
+				}
+
+				// Convert timestamp to unix timestamp
+				discordMessage.Timestamp = fmt.Sprintf("%d", timestamp.Unix())
+
+				if discordMessage.TimestampEdited != "" {
+					timestampEdited, err := time.Parse(discordTimestampLayout, discordMessage.TimestampEdited)
+					if err != nil {
+						m.logger.Error("failed to parse discord message timestamp", zap.Error(err))
+						importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+						importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+						progressUpdates <- importProgress
+						continue
+					}
+					// Convert timestamp to unix timestamp
+					discordMessage.TimestampEdited = fmt.Sprintf("%d", timestampEdited.Unix())
+				}
+
+				for i := range discordMessage.Attachments {
+					discordMessage.Attachments[i].MessageId = discordMessage.Id
+				}
+				messageAttachmentsToDownload = append(messageAttachmentsToDownload, discordMessage.Attachments...)
+
+				clockAndTimestamp := uint64(timestamp.Unix()) * 1000
+				communityPubKey := discordCommunity.PrivateKey().PublicKey
+
+				chatMessage := protobuf.ChatMessage{
+					Timestamp:   clockAndTimestamp,
+					MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+					ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+					Clock:       clockAndTimestamp,
+					ChatId:      processedChannelIds[channel.Channel.ID],
+					Payload: &protobuf.ChatMessage_DiscordMessage{
+						DiscordMessage: discordMessage,
+					},
+				}
+
+				// Handle message replies
+				if discordMessage.Type == string(discord.MessageTypeReply) && discordMessage.Reference != nil {
+					_, exists := messagesToSave[communityID+discordMessage.Reference.MessageId]
+					if exists {
+						chatMessage.ResponseTo = communityID + discordMessage.Reference.MessageId
+					}
+				}
+
+				messageToSave := &common.Message{
+					ID:               communityID + discordMessage.Id,
+					WhisperTimestamp: clockAndTimestamp,
+					From:             types.EncodeHex(crypto.FromECDSAPub(&communityPubKey)),
+					Seen:             true,
+					LocalChatID:      processedChannelIds[channel.Channel.ID],
+					SigPubKey:        &communityPubKey,
+					CommunityID:      communityID,
+					ChatMessage:      chatMessage,
+				}
+
+				err = messageToSave.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+				if err != nil {
+					m.logger.Error("failed to prepare message content", zap.Error(err))
+					importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+					importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+					continue
+				}
+
+				// Handle pin messages
+				if discordMessage.Type == string(discord.MessageTypeChannelPinned) && discordMessage.Reference != nil {
+
+					_, exists := messagesToSave[communityID+discordMessage.Reference.MessageId]
+					if exists {
+						pinMessage := protobuf.PinMessage{
+							Clock:       messageToSave.WhisperTimestamp,
+							MessageId:   communityID + discordMessage.Reference.MessageId,
+							ChatId:      messageToSave.LocalChatID,
+							MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+							Pinned:      true,
+						}
+
+						encodedPayload, err := proto.Marshal(&pinMessage)
+						if err != nil {
+							m.logger.Error("failed to parse marshal pin message", zap.Error(err))
+							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+							importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+							progressUpdates <- importProgress
+							continue
+						}
+
+						wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, discordCommunity.PrivateKey())
+						if err != nil {
+							m.logger.Error("failed to wrap pin message", zap.Error(err))
+							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+							importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+							progressUpdates <- importProgress
+							continue
+						}
+
+						messageID := v1protocol.MessageID(&communityPubKey, wrappedPayload)
+
+						pinMessageToSave := common.PinMessage{
+							ID:               types.EncodeHex(messageID),
+							PinMessage:       pinMessage,
+							LocalChatID:      processedChannelIds[channel.Channel.ID],
+							From:             messageToSave.From,
+							SigPubKey:        messageToSave.SigPubKey,
+							WhisperTimestamp: messageToSave.WhisperTimestamp,
+						}
+
+						pinMessagesToSave = append(pinMessagesToSave, &pinMessageToSave)
+					}
+				} else {
+					messagesToSave[communityID+discordMessage.Id] = messageToSave
+				}
+			}
+			// We're multiplying `progressValue` by `0.5` so we leave 50% for actual save operations
+			// The 0.5 could be calculated but we'd need to know the total message chunks count,
+			// which we don't at this point
+			progressValue = float32(len(messagesToSave)) / float32(totalMessageCount) * 0.5
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+			progressUpdates <- importProgress
+
+			if m.DiscordImportMarkedAsCancelled(communityID) {
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				cancel <- communityID
+				return
+			}
+		}
+
+		var discordMessages []*protobuf.DiscordMessage
+		for _, msg := range messagesToSave {
+			discordMessages = append(discordMessages, msg.GetDiscordMessage())
+		}
+
+		// We save these messages in chunks so we don't block the database
+		// for a longer period of time
+		discordMessageChunks := chunkSlice(discordMessages, maxChunkSizeMessages)
+		chunksCount := len(discordMessageChunks)
+
+		// Signal to clients that save operations are starting
+		importProgress.UpdateTaskState(discord.ImportMessagesTask, discord.TaskStateSaving)
+		progressUpdates <- importProgress
+
+		for i, msgs := range discordMessageChunks {
+			err = m.persistence.SaveDiscordMessages(msgs)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				return
+			}
+
+			if m.DiscordImportMarkedAsCancelled(communityID) {
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				cancel <- communityID
+				return
+			}
+
+			// We're multiplying `chunksCount` by `0.25` so we leave 25% for additional save operations
+			// 0.5 are the previous 50% of progress
+			currentCount := i + 1
+			progressValue := 0.5 + (float32(currentCount) / float32(chunksCount) * 0.25)
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+
+			// We slow down the saving of message chunks to keep the database responsive
+			if currentCount < chunksCount {
+				time.Sleep(2 * time.Second)
+			}
+		}
+
+		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 0.75)
+
+		var messages []*common.Message
+		for _, msg := range messagesToSave {
+			messages = append(messages, msg)
+		}
+
+		// Same as above, we save these messages in chunks so we don't block
+		// the database for a longer period of time
+		messageChunks := chunkSlice(messages, maxChunkSizeMessages)
+		chunksCount = len(messageChunks)
+
+		for i, msgs := range messageChunks {
+			err = m.persistence.SaveMessages(msgs)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				return
+			}
+
+			if m.DiscordImportMarkedAsCancelled(communityID) {
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				cancel <- communityID
+				return
+			}
+
+			// 0.75 are the previous 75% of progress, hence we multiply our chunk progress
+			// by 0.25
+			currentCount := i + 1
+			progressValue := 0.75 + ((float32(currentCount) / float32(chunksCount)) * 0.25)
+			importProgress.UpdateTaskProgress(discord.ImportMessagesTask, progressValue)
+
+			// We slow down the saving of message chunks to keep the database responsive
+			if currentCount < chunksCount {
+				time.Sleep(2 * time.Second)
+			}
+		}
+
+		pinMessageChunks := chunkSlice(pinMessagesToSave, maxChunkSizeMessages)
+		for _, pinMsgs := range pinMessageChunks {
+			err = m.persistence.SavePinMessages(pinMsgs)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				return
+			}
+
+			if m.DiscordImportMarkedAsCancelled(communityID) {
+				importProgress.StopTask(discord.ImportMessagesTask)
+				progressUpdates <- importProgress
+				cancel <- communityID
+				return
+			}
+		}
+
+		importProgress.UpdateTaskProgress(discord.ImportMessagesTask, 1)
+		progressUpdates <- importProgress
+
+		totalAssetsCount := len(messageAttachmentsToDownload) + len(authorProfilesToSave)
+		var assetCounter discord.AssetCounter
+
+		var wg sync.WaitGroup
+
+		for id, author := range authorProfilesToSave {
+			wg.Add(1)
+			go func(id string, author *protobuf.DiscordMessageAuthor) {
+				defer wg.Done()
+				imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
+				if err != nil {
+					errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
+					importProgress.AddTaskError(
+						discord.DownloadAssetsTask,
+						discord.Warning(errmsg),
+					)
+					progressUpdates <- importProgress
+					return
+				}
+
+				err = m.persistence.UpdateDiscordMessageAuthorImage(author.Id, imagePayload)
+				if err != nil {
+					importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Warning(err.Error()))
+					progressUpdates <- importProgress
+					return
+				}
+
+				author.AvatarImagePayload = imagePayload
+				authorProfilesToSave[id] = author
+
+				assetCounter.Increase()
+				progressValue := float32(assetCounter.Value()) / float32(totalAssetsCount)
+				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
+				progressUpdates <- importProgress
+
+				if m.DiscordImportMarkedAsCancelled(discordCommunity.IDString()) {
+					importProgress.StopTask(discord.DownloadAssetsTask)
+					progressUpdates <- importProgress
+					cancel <- discordCommunity.IDString()
+					return
+				}
+			}(id, author)
+		}
+		wg.Wait()
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.DownloadAssetsTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		for idxRange := range gopart.Partition(len(messageAttachmentsToDownload), 100) {
+			attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
+			wg.Add(1)
+			go func(attachments []*protobuf.DiscordMessageAttachment) {
+				defer wg.Done()
+				for i, attachment := range attachments {
+					assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
+					if err != nil {
+						errmsg := fmt.Sprintf("Couldn't download message attachment '%s': %s", attachment.Url, err.Error())
+						importProgress.AddTaskError(
+							discord.DownloadAssetsTask,
+							discord.Warning(errmsg),
+						)
+						progressUpdates <- importProgress
+						continue
+					}
+
+					attachment.Payload = assetPayload
+					attachment.ContentType = contentType
+					messageAttachmentsToDownload[i] = attachment
+
+					assetCounter.Increase()
+
+					// Multiplying progress by `0.5` to leave 50% for saving assets to DB
+					// similar to how it's done for messages
+					progressValue := (float32(assetCounter.Value()) / float32(totalAssetsCount)) * 0.5
+					importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
+					progressUpdates <- importProgress
+
+					if m.DiscordImportMarkedAsCancelled(communityID) {
+						importProgress.StopTask(discord.DownloadAssetsTask)
+						progressUpdates <- importProgress
+						cancel <- communityID
+						return
+					}
+				}
+			}(attachments)
+		}
+		wg.Wait()
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.DownloadAssetsTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		// Signal to the client that save operations are starting
+		importProgress.UpdateTaskState(discord.DownloadAssetsTask, discord.TaskStateSaving)
+		progressUpdates <- importProgress
+
+		// We chunk message attachments by `maxChunkSizeBytes` to ensure individual
+		// save operations don't take too long and block the database
+		attachmentChunks := chunkAttachmentsByByteSize(messageAttachmentsToDownload, maxChunkSizeBytes)
+		chunksCount = len(attachmentChunks)
+
+		for i, attachments := range attachmentChunks {
+			err = m.persistence.SaveDiscordMessageAttachments(attachments)
+			if err != nil {
+				m.cleanUpImport(communityID)
+				importProgress.AddTaskError(discord.DownloadAssetsTask, discord.Error(err.Error()))
+				importProgress.Stop()
+				progressUpdates <- importProgress
+				return
+			}
+
+			if m.DiscordImportMarkedAsCancelled(communityID) {
+				importProgress.StopTask(discord.DownloadAssetsTask)
+				progressUpdates <- importProgress
+				cancel <- communityID
+				return
+			}
+
+			// 0.5 are the previous 50% of progress, hence we multiply our chunk progress
+			// by 0.5
+			currentCount := i + 1
+			progressValue := 0.5 + ((float32(currentCount) / float32(chunksCount)) * 0.5)
+			importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
+
+			// We slow down the saving of attachment chunks to keep the database responsive
+			if currentCount < chunksCount {
+				time.Sleep(2 * time.Second)
+			}
+		}
+
+		importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, 1)
+		progressUpdates <- importProgress
+
+		err = m.publishOrg(discordCommunity)
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.Stop()
+			progressUpdates <- importProgress
+			return
+		}
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		// Chats need to be saved after the community has been published,
+		// hence we make this part of the `InitCommunityTask`
+		err = m.saveChats(chatsToSave)
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.Stop()
+			progressUpdates <- importProgress
+			return
+		}
+		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.15)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		// Init the community filter so we can receive messages on the community
+		_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{discordCommunity.PrivateKey()})
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			return
+		}
+		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.25)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		filterChatIds := discordCommunity.DefaultFilters()
+		for _, chatID := range processedChannelIds {
+			filterChatIds = append(filterChatIds, chatID)
+		}
+
+		filters, err := m.transport.InitPublicFilters(filterChatIds)
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			return
+		}
+
+		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.5)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		_, err = m.scheduleSyncFilters(filters)
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			return
+		}
+		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 0.75)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		err = m.reregisterForPushNotifications()
+		if err != nil {
+			m.cleanUpImport(communityID)
+			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			return
+		}
+		importProgress.UpdateTaskProgress(discord.InitCommunityTask, 1)
+		progressUpdates <- importProgress
+
+		if m.DiscordImportMarkedAsCancelled(communityID) {
+			importProgress.StopTask(discord.InitCommunityTask)
+			progressUpdates <- importProgress
+			cancel <- communityID
+			return
+		}
+
+		m.config.messengerSignalsHandler.DiscordCommunityImportFinished(communityID)
+		close(done)
+
+		wakuChatMessages, err := m.chatMessagesToWakuMessages(messages, discordCommunity)
+		if err != nil {
+			m.logger.Error("failed to convert chat messages into waku messages", zap.Error(err))
+			return
+		}
+
+		wakuPinMessages, err := m.pinMessagesToWakuMessages(pinMessagesToSave, discordCommunity)
+		if err != nil {
+			m.logger.Error("failed to convert pin messages into waku messages", zap.Error(err))
+			return
+		}
+
+		wakuMessages := append(wakuChatMessages, wakuPinMessages...)
+
+		topics, err := m.communitiesManager.GetCommunityChatsTopics(discordCommunity.ID())
+		if err != nil {
+			m.logger.Error("failed to get community chat topics", zap.Error(err))
+			return
+		}
+
+		startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
+		endDate := time.Now()
+
+		partitions := partitionWakuMessages(wakuMessages, startDate, endDate, messageArchiveInterval)
+
+		for _, partition := range partitions {
+			_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(
+				discordCommunity.ID(),
+				partition.Messages,
+				topics,
+				partition.StartDate,
+				partition.EndDate,
+				messageArchiveInterval,
+				discordCommunity.Encrypted(),
+			)
+			if err != nil {
+				m.logger.Error("failed to create history archive torrent", zap.Error(err))
+				return
+			}
+		}
+
+		if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && communitySettings.HistoryArchiveSupportEnabled {
+
+			err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
+			if err != nil {
+				m.logger.Error("failed to seed history archive", zap.Error(err))
+			}
+			go m.communitiesManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
+		}
+	}()
+}
+
+func (m *Messenger) MarkDiscordCommunityImportAsCancelled(communityID string) {
+	m.importingCommunities[communityID] = true
+}
+
+func (m *Messenger) DiscordImportMarkedAsCancelled(communityID string) bool {
+	cancelled, exists := m.importingCommunities[communityID]
+	return exists && cancelled
+}
+
+func (m *Messenger) cleanUpImports() {
+	for id := range m.importingCommunities {
+		m.cleanUpImport(id)
+	}
+}
+
+func (m *Messenger) cleanUpImport(communityID string) {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		m.logger.Error("clean up failed, couldn't delete community", zap.Error(err))
+		return
+	}
+	deleteErr := m.communitiesManager.DeleteCommunity(community.ID())
+	if deleteErr != nil {
+		m.logger.Error("clean up failed, couldn't delete community", zap.Error(deleteErr))
+	}
+	deleteErr = m.persistence.DeleteMessagesByCommunityID(community.IDString())
+	if deleteErr != nil {
+		m.logger.Error("clean up failed, couldn't delete community messages", zap.Error(deleteErr))
+	}
+}
+
+func (m *Messenger) publishImportProgress(progress *discord.ImportProgress) {
+	m.config.messengerSignalsHandler.DiscordCommunityImportProgress(progress)
+}
+
+func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportProgress, cancel chan string, done chan struct{}) {
+
+	var currentProgress *discord.ImportProgress
+
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+					if currentProgress.Stopped {
+						return
+					}
+				}
+			case progressUpdate := <-c:
+				currentProgress = progressUpdate
+			case <-done:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+				return
+			case communityID := <-cancel:
+				if currentProgress != nil {
+					m.publishImportProgress(currentProgress)
+				}
+				m.cleanUpImport(communityID)
+				m.config.messengerSignalsHandler.DiscordCommunityImportCancelled(communityID)
+				return
+			case <-m.quit:
+				m.cleanUpImports()
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*types.Message, error) {
+	wakuMessages := make([]*types.Message, 0)
+	for _, msg := range pinMessages {
+
+		filter := m.transport.FilterByChatID(msg.LocalChatID)
+		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
+		if err != nil {
+			return nil, err
+		}
+		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, c.PrivateKey())
+		if err != nil {
+			return nil, err
+		}
+
+		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
+		wakuMessage := &types.Message{
+			Sig:       crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
+			Timestamp: uint32(msg.WhisperTimestamp / 1000),
+			Topic:     filter.Topic,
+			Payload:   wrappedPayload,
+			Padding:   []byte{1},
+			Hash:      hash[:],
+		}
+		wakuMessages = append(wakuMessages, wakuMessage)
+	}
+
+	return wakuMessages, nil
+}
+
+func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*types.Message, error) {
+	wakuMessages := make([]*types.Message, 0)
+	for _, msg := range chatMessages {
+
+		filter := m.transport.FilterByChatID(msg.LocalChatID)
+		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
+		if err != nil {
+			return nil, err
+		}
+
+		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, c.PrivateKey())
+		if err != nil {
+			return nil, err
+		}
+
+		hash := crypto.Keccak256Hash([]byte(c.IDString() + msg.GetDiscordMessage().Id))
+		wakuMessage := &types.Message{
+			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
+			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
+			Topic:        filter.Topic,
+			Payload:      wrappedPayload,
+			Padding:      []byte{1},
+			Hash:         hash[:],
+			ThirdPartyID: c.IDString() + msg.GetDiscordMessage().Id,
+		}
+		wakuMessages = append(wakuMessages, wakuMessage)
+	}
+
+	return wakuMessages, nil
+}
+
+type wakuMessageChunk struct {
+	StartDate time.Time
+	EndDate   time.Time
+	Messages  []*types.Message
+}
+
+func partitionWakuMessages(messages []*types.Message, startDate time.Time, endDate time.Time, partition time.Duration) []*wakuMessageChunk {
+	var chunks []*wakuMessageChunk
+
+	from := startDate
+	to := from.Add(partition)
+	if to.After(endDate) {
+		to = endDate
+	}
+
+	for {
+		if from.Equal(endDate) || from.After(endDate) {
+			break
+		}
+
+		var msgs []*types.Message
+		for _, msg := range messages {
+			if int64(msg.Timestamp) >= from.Unix() && int64(msg.Timestamp) < to.Unix() {
+				msgs = append(msgs, msg)
+			}
+		}
+
+		if len(msgs) > 0 {
+			chunk := &wakuMessageChunk{
+				StartDate: from,
+				EndDate:   to,
+				Messages:  msgs,
+			}
+			chunks = append(chunks, chunk)
+		}
+
+		from = to
+		to = to.Add(partition)
+		if to.After(endDate) {
+			to = endDate
+		}
+	}
+	return chunks
 }

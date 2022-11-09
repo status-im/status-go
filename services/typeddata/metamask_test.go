@@ -10,9 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/types"
-
-	signercore "github.com/ethereum/go-ethereum/signer/core"
 )
 
 func TestTypedDataSuite(t *testing.T) {
@@ -23,8 +22,8 @@ type TypedDataSuite struct {
 	suite.Suite
 
 	privateKey  *ecdsa.PrivateKey
-	typedDataV3 signercore.TypedData
-	typedDataV4 signercore.TypedData
+	typedDataV3 apitypes.TypedData
+	typedDataV4 apitypes.TypedData
 }
 
 func (s *TypedDataSuite) SetupTest() {
@@ -49,7 +48,7 @@ func (s *TypedDataSuite) TestTypedDataV4() {
 	actual := s.typedDataV4.TypeHash("Person")
 	s.Require().Equal(expected, actual.String())
 
-	fromTypedData := signercore.TypedData{}
+	fromTypedData := apitypes.TypedData{}
 	s.Require().NoError(json.Unmarshal([]byte(fromJSON), &fromTypedData))
 
 	actual, err := s.typedDataV4.HashStruct("Person", fromTypedData.Message)
@@ -60,18 +59,18 @@ func (s *TypedDataSuite) TestTypedDataV4() {
 	encodedData, err := s.typedDataV4.EncodeData(s.typedDataV4.PrimaryType, s.typedDataV4.Message, 1)
 	s.Require().NoError(err)
 
-	expected = "0x4bd8a9a2b93427bb184aca81e24beb30ffa3c747e2a33d4225ec08bf12e2e7539b4846dd48b866f0ac54d61b9b21a9e746f921cefa4ee94c4c0a1c49c774f67fefa62530c7ae3a290f8a13a5fc20450bdb3a6af19d9d9d2542b5a94e631a9168b5aadf3154a261abdd9086fc627b61efca26ae5702701d05cd2305f7c52a2fc8"
+	expected = "0x4bd8a9a2b93427bb184aca81e24beb30ffa3c747e2a33d4225ec08bf12e2e7539b4846dd48b866f0ac54d61b9b21a9e746f921cefa4ee94c4c0a1c49c774f67fca322beec85be24e374d18d582a6f2997f75c54e7993ab5bc07404ce176ca7cdb5aadf3154a261abdd9086fc627b61efca26ae5702701d05cd2305f7c52a2fc8"
 	s.Require().Equal(expected, encodedData.String())
 
 	actual, err = s.typedDataV4.HashStruct(s.typedDataV4.PrimaryType, s.typedDataV4.Message)
 	s.Require().NoError(err)
 
-	expected = "0x99b97a26b830a26d5ca27ced87ba4d73c6276a2b8315656882a771d6f98b01f3"
+	expected = "0xeb4221181ff3f1a83ea7313993ca9218496e424604ba9492bb4052c03d5c3df8"
 	s.Require().Equal(expected, actual.String())
 
 	signature, err := SignTypedDataV4(s.typedDataV4, s.privateKey, big.NewInt(1))
 	s.Require().NoError(err)
-	s.Require().Equal("0xf632e305033e23de75545fcdd0a481d83d9d41954e12c07004327cddf4e3c762757652b04d11dd022e0018e6160723f322d0b4bd9b41c87db93755405f5548391b", types.EncodeHex(signature))
+	s.Require().Equal("0x65cbd956f2fae28a601bebc9b906cea0191744bd4c4247bcd27cd08f8eb6b71c78efdf7a31dc9abee78f492292721f362d296cf86b4538e07b51303b67f749061b", types.EncodeHex(signature))
 }
 
 const typedDataV3 = `

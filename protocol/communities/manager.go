@@ -55,6 +55,7 @@ type Manager struct {
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          map[string]chan struct{}
 	torrentTasks                 map[string]metainfo.Hash
+	historyArchiveDownloadTasks  map[string]chan struct{}
 }
 
 func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {
@@ -75,15 +76,16 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 	}
 
 	manager := &Manager{
-		logger:              logger,
-		stdoutLogger:        stdoutLogger,
-		encryptor:           encryptor,
-		identity:            identity,
-		quit:                make(chan struct{}),
-		transport:           transport,
-		torrentConfig:       torrentConfig,
-		historyArchiveTasks: make(map[string]chan struct{}),
-		torrentTasks:        make(map[string]metainfo.Hash),
+		logger:                      logger,
+		stdoutLogger:                stdoutLogger,
+		encryptor:                   encryptor,
+		identity:                    identity,
+		quit:                        make(chan struct{}),
+		transport:                   transport,
+		torrentConfig:               torrentConfig,
+		historyArchiveTasks:         make(map[string]chan struct{}),
+		torrentTasks:                make(map[string]metainfo.Hash),
+		historyArchiveDownloadTasks: make(map[string]chan struct{}),
 		persistence: &Persistence{
 			logger: logger,
 			db:     db,
@@ -356,6 +358,14 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	}
 
 	return community, nil
+}
+
+func (m *Manager) DeleteCommunity(id types.HexBytes) error {
+	err := m.persistence.DeleteCommunity(id)
+	if err != nil {
+		return err
+	}
+	return m.persistence.DeleteCommunitySettings(id)
 }
 
 // EditCommunity takes a description, updates the community with the description,
@@ -844,8 +854,40 @@ func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) e
 	return nil
 }
 
+func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
+	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
+}
+
 func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
 	return m.persistence.SetMuted(id, muted)
+}
+
+func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommunity) (*RequestToJoin, *Community, error) {
+	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	community, err := m.GetByID(dbRequest.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pk, err := common.HexToPubkey(dbRequest.PublicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := m.markRequestToJoinAsCanceled(pk, community); err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dbRequest, community, nil
 }
 
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
@@ -894,6 +936,28 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	}
 
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+}
+
+func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	err = m.markRequestToJoinAsCanceled(signer, community)
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoin, err := m.persistence.GetRequestToJoinByPk(common.PubkeyToHex(signer), community.ID(), RequestToJoinStateCanceled)
+	if err != nil {
+		return nil, err
+	}
+
+	return requestToJoin, nil
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
@@ -1061,6 +1125,10 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 
 func (m *Manager) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
 	return m.persistence.GetMagnetlinkMessageClock(communityID)
+}
+
+func (m *Manager) GetRequestToJoinIDByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) ([]byte, error) {
+	return m.persistence.GetRequestToJoinIDByPkAndCommunityID(common.PubkeyToHex(pk), communityID)
 }
 
 func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
@@ -1288,6 +1356,10 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 	return m.persistence.SaveRequestToJoin(request)
 }
 
+func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
+}
+
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.PendingRequestsToJoinForUser(common.PubkeyToHex(pk))
 }
@@ -1300,6 +1372,11 @@ func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*Reque
 func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
 	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	return m.persistence.CanceledRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
@@ -1475,6 +1552,10 @@ func (m *Manager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.T
 
 func (m *Manager) StoreWakuMessage(message *types.Message) error {
 	return m.persistence.SaveWakuMessage(message)
+}
+
+func (m *Manager) StoreWakuMessages(messages []*types.Message) error {
+	return m.persistence.SaveWakuMessages(messages)
 }
 
 func (m *Manager) GetLatestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
@@ -1785,12 +1866,6 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 	if len(encodedArchives) > 0 {
 
 		dataBytes := make([]byte, 0)
-		if _, err := os.Stat(dataPath); err == nil {
-			dataBytes, err = os.ReadFile(dataPath)
-			if err != nil {
-				return archiveIDs, err
-			}
-		}
 
 		for _, encodedArchiveData := range encodedArchives {
 			dataBytes = append(dataBytes, encodedArchiveData.bytes...)
@@ -1819,7 +1894,13 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 			return archiveIDs, err
 		}
 
-		err = os.WriteFile(dataPath, dataBytes, 0644) // nolint: gosec
+		file, err := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			return archiveIDs, err
+		}
+		defer file.Close()
+
+		_, err = file.Write(dataBytes)
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -1933,6 +2014,7 @@ func (m *Manager) SeedHistoryArchiveTorrent(communityID types.HexBytes) error {
 
 func (m *Manager) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {
 	id := communityID.String()
+
 	hash, exists := m.torrentTasks[id]
 
 	if exists {
@@ -1966,6 +2048,16 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		return nil, err
 	}
 
+	// If we're in the middle of downloading archives from the current
+	// torrent, we want to cancel that first.
+	stop, exists := m.historyArchiveDownloadTasks[id]
+	if exists {
+		close(stop)
+	}
+
+	cancel := make(chan struct{})
+	m.historyArchiveDownloadTasks[id] = cancel
+
 	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
 	torrent, err := m.torrentClient.AddMagnet(magnetlink)
 	if err != nil {
@@ -1995,83 +2087,95 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		defer ticker.Stop()
 
 		for {
-			<-ticker.C
-			if indexFile.BytesCompleted() == indexFile.Length() {
-				index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
-				if err != nil {
-					return nil, err
-				}
-
-				var archiveIDs []string
-
-				archiveHashes := make(archiveMDSlice, 0, len(index.Archives))
-
-				for hash, metadata := range index.Archives {
-					archiveHashes = append(archiveHashes, &archiveMetadata{hash: hash, from: metadata.Metadata.From})
-				}
-
-				sort.Sort(sort.Reverse(archiveHashes))
-
-				for _, hd := range archiveHashes {
-					hash := hd.hash
-					metadata := index.Archives[hash]
-					hasArchive, err := m.persistence.HasMessageArchiveID(communityID, hash)
+			select {
+			case <-cancel:
+				return []string{}, nil
+			case <-ticker.C:
+				if indexFile.BytesCompleted() == indexFile.Length() {
+					index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {
-						m.logger.Debug("Failed to check if has message archive id", zap.Error(err))
-						continue
-					}
-					if hasArchive {
-						m.LogStdout("has archive", zap.String("hash", hash))
-						continue
+						return nil, err
 					}
 
-					startIndex := int(metadata.Offset) / pieceLength
-					endIndex := startIndex + int(metadata.Size)/pieceLength
+					var archiveIDs []string
 
-					m.LogStdout("downloading data for message archive", zap.String("hash", hash))
-					m.logger.Debug("pieces (start, end)", zap.Any("startIndex", startIndex), zap.Any("endIndex", endIndex-1))
-					torrent.DownloadPieces(startIndex, endIndex)
+					archiveHashes := make(archiveMDSlice, 0, len(index.Archives))
 
-					psc := torrent.SubscribePieceStateChanges()
-					for {
-						i := startIndex
-						done := false
+					for hash, metadata := range index.Archives {
+						archiveHashes = append(archiveHashes, &archiveMetadata{hash: hash, from: metadata.Metadata.From})
+					}
+
+					sort.Sort(sort.Reverse(archiveHashes))
+
+					for _, hd := range archiveHashes {
+						hash := hd.hash
+						metadata := index.Archives[hash]
+						hasArchive, err := m.persistence.HasMessageArchiveID(communityID, hash)
+						if err != nil {
+							m.logger.Debug("Failed to check if has message archive id", zap.Error(err))
+							continue
+						}
+						if hasArchive {
+							continue
+						}
+
+						startIndex := int(metadata.Offset) / pieceLength
+						endIndex := startIndex + int(metadata.Size)/pieceLength
+
+						m.LogStdout("downloading data for message archive", zap.String("hash", hash))
+						m.LogStdout("pieces (start, end)", zap.Any("startIndex", startIndex), zap.Any("endIndex", endIndex-1))
+						torrent.DownloadPieces(startIndex, endIndex)
+
+						piecesCompleted := make(map[int]bool)
+						for i = startIndex; i < endIndex; i++ {
+							piecesCompleted[i] = false
+						}
+
+						psc := torrent.SubscribePieceStateChanges()
+						downloadTicker := time.NewTicker(1 * time.Second)
+						defer downloadTicker.Stop()
+
+					downloadLoop:
 						for {
-							if i > endIndex-1 {
-								break
-							}
-							done = torrent.PieceState(i).Complete
-							if done {
-								i++
+							select {
+							case <-downloadTicker.C:
+								done := true
+								for i = startIndex; i < endIndex; i++ {
+									piecesCompleted[i] = torrent.PieceState(i).Complete
+									if !piecesCompleted[i] {
+										done = false
+									}
+								}
+								if done {
+									psc.Close()
+									break downloadLoop
+								}
+							case <-cancel:
+								return archiveIDs, nil
 							}
 						}
-						if done {
-							psc.Close()
-							break
+						archiveIDs = append(archiveIDs, hash)
+						err = m.persistence.SaveMessageArchiveID(communityID, hash)
+						if err != nil {
+							m.logger.Debug("couldn't save message archive ID", zap.Error(err))
+							continue
 						}
-						<-psc.Values
-					}
-					archiveIDs = append(archiveIDs, hash)
-					err = m.persistence.SaveMessageArchiveID(communityID, hash)
-					if err != nil {
-						m.logger.Debug("couldn't save message archive ID", zap.Error(err))
-						continue
+						m.publish(&Subscription{
+							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
+								CommunityID: communityID.String(),
+								From:        int(metadata.Metadata.From),
+								To:          int(metadata.Metadata.To),
+							},
+						})
 					}
 					m.publish(&Subscription{
-						HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
+						HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 							CommunityID: communityID.String(),
-							From:        int(metadata.Metadata.From),
-							To:          int(metadata.Metadata.To),
 						},
 					})
+					m.LogStdout("finished download archives")
+					return archiveIDs, nil
 				}
-				m.publish(&Subscription{
-					HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
-						CommunityID: communityID.String(),
-					},
-				})
-				m.LogStdout("finished download archives")
-				return archiveIDs, nil
 			}
 		}
 	}

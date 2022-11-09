@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/typeddata"

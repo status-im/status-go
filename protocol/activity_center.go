@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/verification"
 )
 
 // The activity center is a place where we store incoming notifications before
@@ -21,23 +22,40 @@ const (
 	ActivityCenterNotificationTypeMention
 	ActivityCenterNotificationTypeReply
 	ActivityCenterNotificationTypeContactRequest
+	ActivityCenterNotificationTypeCommunityInvitation
+	ActivityCenterNotificationTypeCommunityRequest
+	ActivityCenterNotificationTypeCommunityMembershipRequest
+	ActivityCenterNotificationTypeCommunityKicked
+	ActivityCenterNotificationTypeContactVerification
+)
+
+type ActivityCenterMembershipStatus int
+
+const (
+	ActivityCenterMembershipStatusIdle ActivityCenterMembershipStatus = iota
+	ActivityCenterMembershipStatusPending
+	ActivityCenterMembershipStatusAccepted
+	ActivityCenterMembershipStatusDeclined
 )
 
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
 
 type ActivityCenterNotification struct {
-	ID           types.HexBytes     `json:"id"`
-	ChatID       string             `json:"chatId"`
-	Name         string             `json:"name"`
-	Author       string             `json:"author"`
-	Type         ActivityCenterType `json:"type"`
-	LastMessage  *common.Message    `json:"lastMessage"`
-	Message      *common.Message    `json:"message"`
-	ReplyMessage *common.Message    `json:"replyMessage"`
-	Timestamp    uint64             `json:"timestamp"`
-	Read         bool               `json:"read"`
-	Dismissed    bool               `json:"dismissed"`
-	Accepted     bool               `json:"accepted"`
+	ID                        types.HexBytes                 `json:"id"`
+	ChatID                    string                         `json:"chatId"`
+	CommunityID               string                         `json:"communityId"`
+	MembershipStatus          ActivityCenterMembershipStatus `json:"membershipStatus"`
+	Name                      string                         `json:"name"`
+	Author                    string                         `json:"author"`
+	Type                      ActivityCenterType             `json:"type"`
+	LastMessage               *common.Message                `json:"lastMessage"`
+	Message                   *common.Message                `json:"message"`
+	ReplyMessage              *common.Message                `json:"replyMessage"`
+	Timestamp                 uint64                         `json:"timestamp"`
+	Read                      bool                           `json:"read"`
+	Dismissed                 bool                           `json:"dismissed"`
+	Accepted                  bool                           `json:"accepted"`
+	ContactVerificationStatus verification.RequestStatus     `json:"contactVerificationStatus"`
 }
 
 type ActivityCenterPaginationResponse struct {

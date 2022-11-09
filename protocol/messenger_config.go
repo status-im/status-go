@@ -48,6 +48,9 @@ type MessengerSignalsHandler interface {
 	DownloadingHistoryArchivesFinished(communityID string)
 	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
 	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError)
+	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
+	DiscordCommunityImportFinished(communityID string)
+	DiscordCommunityImportCancelled(communityID string)
 }
 
 type config struct {

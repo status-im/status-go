@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 var (

@@ -4,11 +4,10 @@ import (
 	"database/sql"
 	"net/url"
 
-	"github.com/status-im/status-go/signal"
-
-	"github.com/status-im/status-go/multiaccounts"
-
 	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/signal"
 )
 
 type MediaServer struct {
@@ -27,7 +26,12 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	}
 
 	s := &MediaServer{
-		Server:          NewServer(globalCertificate, localhost, signal.SendMediaServerStarted),
+		Server: NewServer(
+			globalCertificate,
+			localhost,
+			signal.SendMediaServerStarted,
+			logutils.ZapLogger().Named("MediaServer"),
+		),
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,

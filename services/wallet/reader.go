@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
@@ -20,7 +21,7 @@ type Reader struct {
 }
 
 type ReaderToken struct {
-	Token         *Token       `json:"token"`
+	Token         *token.Token `json:"token"`
 	OraclePrice   float64      `json:"oraclePrice"`
 	CryptoBalance *hexutil.Big `json:"cryptoBalance"`
 	FiatBalance   *big.Float   `json:"fiatBalance"`
@@ -39,8 +40,8 @@ type Wallet struct {
 	Accounts            []ReaderAccount                  `json:"accounts"`
 	OnRamp              []CryptoOnRamp                   `json:"onRamp"`
 	SavedAddresses      map[uint64][]SavedAddress        `json:"savedAddresses"`
-	Tokens              map[uint64][]*Token              `json:"tokens"`
-	CustomTokens        []*Token                         `json:"customTokens"`
+	Tokens              map[uint64][]*token.Token        `json:"tokens"`
+	CustomTokens        []*token.Token                   `json:"customTokens"`
 	PendingTransactions map[uint64][]*PendingTransaction `json:"pendingTransactions"`
 
 	FiatBalance *big.Float `json:"fiatBalance"`
@@ -59,12 +60,12 @@ func (r *Reader) buildReaderAccount(
 	ctx context.Context,
 	chainIDs []uint64,
 	account *accounts.Account,
-	visibleTokens map[uint64][]*Token,
+	visibleTokens map[uint64][]*token.Token,
 	prices map[string]float64,
 	balances map[common.Address]*hexutil.Big,
 ) (ReaderAccount, error) {
-	limit := (*hexutil.Big)(big.NewInt(20))
-	toBlock := (*hexutil.Big)(big.NewInt(0))
+	limit := int64(20)
+	toBlock := big.NewInt(0)
 
 	collections := make(map[uint64][]OpenseaCollection)
 	tokens := make(map[uint64][]ReaderToken)
@@ -118,21 +119,21 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 		return nil, err
 	}
 
-	tokensMap := make(map[uint64][]*Token)
+	tokensMap := make(map[uint64][]*token.Token)
 	for _, chainID := range chainIDs {
-		tokens, err := r.s.tokenManager.getTokens(chainID)
+		tokens, err := r.s.tokenManager.GetTokens(chainID)
 		if err != nil {
 			return nil, err
 		}
 		tokensMap[chainID] = tokens
 	}
 
-	customTokens, err := r.s.tokenManager.getCustoms()
+	customTokens, err := r.s.tokenManager.GetCustoms()
 	if err != nil {
 		return nil, err
 	}
 
-	visibleTokens, err := r.s.tokenManager.getVisible(chainIDs)
+	visibleTokens, err := r.s.tokenManager.GetVisible(chainIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +162,7 @@ func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, err
 		return nil, err
 	}
 
-	balances, err := r.s.tokenManager.getBalances(ctx, clients, getAddresses(accounts), tokenAddresses)
+	balances, err := r.s.tokenManager.GetBalances(ctx, clients, getAddresses(accounts), tokenAddresses)
 	if err != nil {
 		return nil, err
 	}

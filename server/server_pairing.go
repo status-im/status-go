@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/sessions"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
@@ -56,7 +57,8 @@ func makeCookieStore() (*sessions.CookieStore, error) {
 
 // NewPairingServer returns a *PairingServer init from the given *Config
 func NewPairingServer(config *Config) (*PairingServer, error) {
-	pm, err := NewPairingPayloadManager(config.EK, config.PairingPayloadManagerConfig)
+	logger := logutils.ZapLogger().Named("PairingServer")
+	pm, err := NewPairingPayloadManager(config.EK, config.PairingPayloadManagerConfig, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +72,7 @@ func NewPairingServer(config *Config) (*PairingServer, error) {
 		config.Cert,
 		config.Hostname,
 		nil,
+		logger,
 	),
 		pk:             config.PK,
 		ek:             config.EK,
@@ -91,11 +94,7 @@ func (s *PairingServer) MakeConnectionParams() (*ConnectionParams, error) {
 		netIP = netIP4
 	}
 
-	if s.port == 0 {
-		return nil, fmt.Errorf("port is 0, listener is not yet set")
-	}
-
-	return NewConnectionParams(netIP, s.port, s.pk, s.ek, s.mode), nil
+	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek, s.mode), nil
 }
 
 func (s *PairingServer) StartPairing() error {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/verification"
 )
 
 func (db sqlitePersistence) DeleteActivityCenterNotification(id []byte) error {
@@ -34,7 +35,12 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, chatID, "", ActivityCenterNotificationNoType)
+	params := activityCenterQueryParams{
+		chatID:             chatID,
+		activityCenterType: ActivityCenterNotificationNoType,
+	}
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, params)
 
 	if err != nil {
 		return err
@@ -116,12 +122,13 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT INTO activity_center_notifications (id, timestamp, notification_type, chat_id, message, reply_message, author) VALUES (?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, encodedMessage, encodedReplyMessage, notification.Author)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status) VALUES (?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus)
 	return err
 }
 
 func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row) (*ActivityCenterNotification, error) {
 	var chatID sql.NullString
+	var communityID sql.NullString
 	var lastMessageBytes []byte
 	var messageBytes []byte
 	var replyMessageBytes []byte
@@ -133,21 +140,28 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&notification.Timestamp,
 		&notification.Type,
 		&chatID,
+		&communityID,
+		&notification.MembershipStatus,
 		&notification.Read,
 		&notification.Accepted,
 		&notification.Dismissed,
 		&messageBytes,
 		&lastMessageBytes,
 		&replyMessageBytes,
+		&notification.ContactVerificationStatus,
 		&name,
 		&author)
 
 	if err != nil {
 		return nil, err
 	}
+
 	if chatID.Valid {
 		notification.ChatID = chatID.String
+	}
 
+	if communityID.Valid {
+		notification.CommunityID = communityID.String
 	}
 
 	if name.Valid {
@@ -186,7 +200,6 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 	}
 
 	return notification, nil
-
 }
 
 func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Rows) (string, []*ActivityCenterNotification, error) {
@@ -194,6 +207,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	latestCursor := ""
 	for rows.Next() {
 		var chatID sql.NullString
+		var communityID sql.NullString
 		var lastMessageBytes []byte
 		var messageBytes []byte
 		var replyMessageBytes []byte
@@ -205,21 +219,28 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.Timestamp,
 			&notification.Type,
 			&chatID,
+			&communityID,
+			&notification.MembershipStatus,
 			&notification.Read,
 			&notification.Accepted,
 			&notification.Dismissed,
 			&messageBytes,
 			&lastMessageBytes,
 			&replyMessageBytes,
+			&notification.ContactVerificationStatus,
 			&name,
 			&author,
 			&latestCursor)
 		if err != nil {
 			return "", nil, err
 		}
+
 		if chatID.Valid {
 			notification.ChatID = chatID.String
+		}
 
+		if communityID.Valid {
+			notification.CommunityID = communityID.String
 		}
 
 		if name.Valid {
@@ -263,14 +284,36 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	return latestCursor, notifications, nil
 
 }
-func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, limit int, ids []types.HexBytes, chatID string, author string, activityCenterType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
+
+type activityCenterQueryParamsRead uint
+
+const (
+	activityCenterQueryParamsReadRead = iota + 1
+	activityCenterQueryParamsReadUnread
+)
+
+type activityCenterQueryParams struct {
+	cursor             string
+	limit              uint64
+	ids                []types.HexBytes
+	chatID             string
+	author             string
+	read               activityCenterQueryParamsRead
+	activityCenterType ActivityCenterType
+}
+
+func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
 
-	cursorWhere := ""
-	inQueryWhere := ""
-	inChatWhere := ""
-	fromAuthorWhere := ""
-	ofTypeWhere := ""
+	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere, readWhere string
+
+	cursor := params.cursor
+	ids := params.ids
+	author := params.author
+	activityCenterType := params.activityCenterType
+	limit := params.limit
+	chatID := params.chatID
+	read := params.read
 
 	if cursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
@@ -285,6 +328,13 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
 			args = append(args, id)
 		}
 
+	}
+
+	switch read {
+	case activityCenterQueryParamsReadRead:
+		readWhere = "AND a.read = 1"
+	case activityCenterQueryParamsReadUnread:
+		readWhere = "AND NOT(a.read)"
 	}
 
 	if chatID != "" {
@@ -309,12 +359,15 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.timestamp,
   a.notification_type,
   a.chat_id,
+  a.community_id,
+  a.membership_status,
   a.read,
   a.accepted,
   a.dismissed,
   a.message,
   c.last_message,
   a.reply_message,
+  a.contact_verification_status,
   c.name,
   a.author,
   substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
@@ -328,7 +381,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   %s
   %s
   %s
-  ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere)
+  %s
+  ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere, readWhere)
 
 	if limit != 0 {
 		args = append(args, limit)
@@ -425,12 +479,15 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
     a.timestamp,
     a.notification_type,
     a.chat_id,
+    a.community_id,
+    a.membership_status,
     a.read,
     a.accepted,
     a.dismissed,
     a.message,
     c.last_message,
     a.reply_message,
+    a.contact_verification_status,
     c.name,
     a.author
     FROM activity_center_notifications a
@@ -446,11 +503,34 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 	return notification, err
 }
 
-func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
+	params := activityCenterQueryParams{
+		activityCenterType: activityType,
+		cursor:             cursor,
+		limit:              limit,
+		read:               activityCenterQueryParamsReadUnread,
+	}
+
+	return db.activityCenterNotifications(params)
+}
+
+func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
+	params := activityCenterQueryParams{
+		activityCenterType: activityType,
+		cursor:             cursor,
+		limit:              limit,
+		read:               activityCenterQueryParamsReadRead,
+	}
+
+	return db.activityCenterNotifications(params)
+}
+
+func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
 	// We fetch limit + 1 to check for pagination
-	incrementedLimit := int(limit) + 1
+	nonIncrementedLimit := params.limit
+	incrementedLimit := int(params.limit) + 1
 	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return "", nil, err
@@ -464,18 +544,27 @@ func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit
 		_ = tx.Rollback()
 	}()
 
-	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, currCursor, incrementedLimit, nil, "", "", ActivityCenterNotificationNoType)
+	params.limit = uint64(incrementedLimit)
+	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, params)
 	if err != nil {
 		return "", nil, err
 	}
 
 	if len(notifications) == incrementedLimit {
-		notifications = notifications[0:limit]
+		notifications = notifications[0:nonIncrementedLimit]
 	} else {
 		latestCursor = ""
 	}
 
 	return latestCursor, notifications, nil
+}
+
+func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
+	params := activityCenterQueryParams{
+		cursor: currCursor,
+		limit:  limit,
+	}
+	return db.activityCenterNotifications(params)
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotifications() error {
@@ -556,7 +645,11 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityC
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "", "", ActivityCenterNotificationNoType)
+	params := activityCenterQueryParams{
+		activityCenterType: ActivityCenterNotificationNoType,
+	}
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, params)
 
 	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE NOT accepted AND NOT dismissed`)
 	if err != nil {
@@ -583,7 +676,12 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, ids, "", "", ActivityCenterNotificationNoType)
+	params := activityCenterQueryParams{
+		ids:                ids,
+		activityCenterType: ActivityCenterNotificationNoType,
+	}
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, params)
 
 	if err != nil {
 		return nil, err
@@ -611,6 +709,12 @@ func (db sqlitePersistence) UpdateActivityCenterNotificationMessage(id types.Hex
 
 }
 
+func (db sqlitePersistence) UpdateActivityCenterNotificationContactVerificationStatus(id types.HexBytes, status verification.RequestStatus) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET contact_verification_status = ? WHERE id = ?`, status, id)
+	return err
+
+}
+
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
@@ -628,7 +732,12 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil, "", userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
+	params := activityCenterQueryParams{
+		author:             userPublicKey,
+		activityCenterType: ActivityCenterNotificationTypeNewPrivateGroupChat,
+	}
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, params)
 
 	if err != nil {
 		return nil, err
@@ -689,12 +798,15 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
     a.timestamp,
     a.notification_type,
     a.chat_id,
+    a.community_id,
+    a.membership_status,
     a.read,
     a.accepted,
     a.dismissed,
     a.message,
     c.last_message,
     a.reply_message,
+    a.contact_verification_status,
     c.name,
     a.author
     FROM activity_center_notifications a
@@ -711,7 +823,7 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 
 func (db sqlitePersistence) RemoveAllContactRequestActivityCenterNotifications(chatID string) error {
 	_, err := db.db.Exec(`
-        DELETE FROM activity_center_notifications
+				DELETE FROM activity_center_notifications
 	WHERE
 	chat_id = ?
 	AND notification_type = ?

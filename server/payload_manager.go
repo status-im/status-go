@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/keystore"
@@ -19,12 +20,26 @@ import (
 
 // PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
 type PayloadManager interface {
+	// Mount Loads the payload into the PayloadManager's state
 	Mount() error
+
+	// Receive stores data from an inbound source into the PayloadManager's state
 	Receive(data []byte) error
+
+	// ToSend returns an outbound safe (encrypted) payload
 	ToSend() []byte
+
+	// Received returns a decrypted and parsed payload from an inbound source
 	Received() []byte
+
+	// ResetPayload resets all payloads the PayloadManager has in its state
 	ResetPayload()
+
+	// EncryptPlain encrypts the given plaintext using internal key(s)
 	EncryptPlain(plaintext []byte) ([]byte, error)
+
+	// LockPayload prevents future excess to outbound safe and received data
+	LockPayload()
 }
 
 // PairingPayloadSourceConfig represents location and access data of the pairing payload
@@ -43,15 +58,19 @@ type PairingPayloadManagerConfig struct {
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
 type PairingPayloadManager struct {
-	pp *PairingPayload
+	logger *zap.Logger
+	pp     *PairingPayload
 	*PayloadEncryptionManager
 	ppm *PairingPayloadMarshaller
 	ppr PayloadRepository
 }
 
 // NewPairingPayloadManager generates a new and initialised PairingPayloadManager
-func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig) (*PairingPayloadManager, error) {
-	pem, err := NewPayloadEncryptionManager(aesKey)
+func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig, logger *zap.Logger) (*PairingPayloadManager, error) {
+	l := logger.Named("PairingPayloadManager")
+	l.Debug("fired", zap.Binary("aesKey", aesKey), zap.Any("config", config))
+
+	pem, err := NewPayloadEncryptionManager(aesKey, l)
 	if err != nil {
 		return nil, err
 	}
@@ -60,39 +79,62 @@ func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig
 	p := new(PairingPayload)
 
 	return &PairingPayloadManager{
+		logger:                   l,
 		pp:                       p,
 		PayloadEncryptionManager: pem,
-		ppm:                      NewPairingPayloadMarshaller(p),
+		ppm:                      NewPairingPayloadMarshaller(p, l),
 		ppr:                      NewPairingPayloadRepository(p, config),
 	}, nil
 }
 
 // Mount loads and prepares the payload to be stored in the PairingPayloadManager's state ready for later access
 func (ppm *PairingPayloadManager) Mount() error {
+	l := ppm.logger.Named("Mount()")
+	l.Debug("fired")
+
 	err := ppm.ppr.LoadFromSource()
 	if err != nil {
 		return err
 	}
+	l.Debug("after LoadFromSource")
 
 	pb, err := ppm.ppm.MarshalToProtobuf()
 	if err != nil {
 		return err
 	}
+	l.Debug(
+		"after MarshalToProtobuf",
+		zap.Any("ppm.ppm.keys", ppm.ppm.keys),
+		zap.Any("ppm.ppm.multiaccount", ppm.ppm.multiaccount),
+		zap.String("ppm.ppm.password", ppm.ppm.password),
+		zap.Binary("pb", pb),
+	)
 
 	return ppm.Encrypt(pb)
 }
 
 // Receive takes a []byte representing raw data, parses and stores the data
 func (ppm *PairingPayloadManager) Receive(data []byte) error {
+	l := ppm.logger.Named("Receive()")
+	l.Debug("fired")
+
 	err := ppm.Decrypt(data)
 	if err != nil {
 		return err
 	}
+	l.Debug("after Decrypt")
 
 	err = ppm.ppm.UnmarshalProtobuf(ppm.Received())
 	if err != nil {
 		return err
 	}
+	l.Debug(
+		"after UnmarshalProtobuf",
+		zap.Any("ppm.ppm.keys", ppm.ppm.keys),
+		zap.Any("ppm.ppm.multiaccount", ppm.ppm.multiaccount),
+		zap.String("ppm.ppm.password", ppm.ppm.password),
+		zap.Binary("ppm.Received()", ppm.Received()),
+	)
 
 	return ppm.ppr.StoreToSource()
 }
@@ -107,24 +149,38 @@ func (ppm *PairingPayloadManager) ResetPayload() {
 type EncryptionPayload struct {
 	plain     []byte
 	encrypted []byte
+	locked    bool
+}
+
+func (ep *EncryptionPayload) lock() {
+	ep.locked = true
 }
 
 // PayloadEncryptionManager is responsible for encrypting and decrypting payload data
 type PayloadEncryptionManager struct {
+	logger   *zap.Logger
 	aesKey   []byte
 	toSend   *EncryptionPayload
 	received *EncryptionPayload
 }
 
-func NewPayloadEncryptionManager(aesKey []byte) (*PayloadEncryptionManager, error) {
-	return &PayloadEncryptionManager{aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
+func NewPayloadEncryptionManager(aesKey []byte, logger *zap.Logger) (*PayloadEncryptionManager, error) {
+	return &PayloadEncryptionManager{logger.Named("PayloadEncryptionManager"), aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
 }
 
+// EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
+// This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
 func (pem *PayloadEncryptionManager) EncryptPlain(plaintext []byte) ([]byte, error) {
+	l := pem.logger.Named("EncryptPlain()")
+	l.Debug("fired")
+
 	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
 }
 
 func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
+	l := pem.logger.Named("Encrypt()")
+	l.Debug("fired")
+
 	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
 	if err != nil {
 		return err
@@ -132,11 +188,29 @@ func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
 
 	pem.toSend.plain = data
 	pem.toSend.encrypted = ep
+
+	l.Debug(
+		"after common.Encrypt",
+		zap.Binary("data", data),
+		zap.Binary("pem.aesKey", pem.aesKey),
+		zap.Binary("ep", ep),
+	)
+
 	return nil
 }
 
 func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
+	l := pem.logger.Named("Decrypt()")
+	l.Debug("fired")
+
 	pd, err := common.Decrypt(data, pem.aesKey)
+	l.Debug(
+		"after common.Decrypt(data, pem.aesKey)",
+		zap.Binary("data", data),
+		zap.Binary("pem.aesKey", pem.aesKey),
+		zap.Binary("pd", pd),
+		zap.Error(err),
+	)
 	if err != nil {
 		return err
 	}
@@ -147,16 +221,30 @@ func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
 }
 
 func (pem *PayloadEncryptionManager) ToSend() []byte {
+	if pem.toSend.locked {
+		return nil
+	}
 	return pem.toSend.encrypted
 }
 
 func (pem *PayloadEncryptionManager) Received() []byte {
+	if pem.toSend.locked {
+		return nil
+	}
 	return pem.received.plain
 }
 
 func (pem *PayloadEncryptionManager) ResetPayload() {
 	pem.toSend = new(EncryptionPayload)
 	pem.received = new(EncryptionPayload)
+}
+
+func (pem *PayloadEncryptionManager) LockPayload() {
+	l := pem.logger.Named("LockPayload")
+	l.Debug("fired")
+
+	pem.toSend.lock()
+	pem.received.lock()
 }
 
 // PairingPayload represents the payload structure a PairingServer handles
@@ -172,11 +260,12 @@ func (pp *PairingPayload) ResetPayload() {
 
 // PairingPayloadMarshaller is responsible for marshalling and unmarshalling PairingServer payload data
 type PairingPayloadMarshaller struct {
+	logger *zap.Logger
 	*PairingPayload
 }
 
-func NewPairingPayloadMarshaller(p *PairingPayload) *PairingPayloadMarshaller {
-	return &PairingPayloadMarshaller{PairingPayload: p}
+func NewPairingPayloadMarshaller(p *PairingPayload, logger *zap.Logger) *PairingPayloadMarshaller {
+	return &PairingPayloadMarshaller{logger: logger, PairingPayload: p}
 }
 
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
@@ -196,8 +285,17 @@ func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPa
 }
 
 func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
+	l := ppm.logger.Named("UnmarshalProtobuf()")
+	l.Debug("fired")
+
 	pb := new(protobuf.LocalPairingPayload)
 	err := proto.Unmarshal(data, pb)
+	l.Debug(
+		"after protobuf.LocalPairingPayload",
+		zap.Any("pb", pb),
+		zap.Any("pb.Multiaccount", pb.Multiaccount),
+		zap.Any("pb.Keys", pb.Keys),
+	)
 	if err != nil {
 		return err
 	}
@@ -209,6 +307,9 @@ func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 }
 
 func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
+	l := ppm.logger.Named("accountKeysFromProtobuf()")
+	l.Debug("fired")
+
 	if ppm.keys == nil {
 		ppm.keys = make(map[string][]byte)
 	}
@@ -216,6 +317,11 @@ func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 	for _, key := range pbKeys {
 		ppm.keys[key.Name] = key.Data
 	}
+	l.Debug(
+		"after for _, key := range pbKeys",
+		zap.Any("pbKeys", pbKeys),
+		zap.Any("ppm.keys", ppm.keys),
+	)
 }
 
 func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {

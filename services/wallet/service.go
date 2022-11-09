@@ -12,6 +12,9 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/transactions"
 )
@@ -26,11 +29,13 @@ func NewService(
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
+	ens *ens.Service,
+	stickers *stickers.Service,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
-	tokenManager := NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
+	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
@@ -47,6 +52,9 @@ func NewService(
 		openseaAPIKey:         openseaAPIKey,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
+		transactor:            transactor,
+		ens:                   ens,
+		stickers:              stickers,
 	}
 }
 
@@ -56,7 +64,7 @@ type Service struct {
 	accountsDB            *accounts.Database
 	rpcClient             *rpc.Client
 	savedAddressesManager *SavedAddressesManager
-	tokenManager          *TokenManager
+	tokenManager          *token.Manager
 	transactionManager    *TransactionManager
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
@@ -64,6 +72,9 @@ type Service struct {
 	started               bool
 	openseaAPIKey         string
 	gethManager           *account.GethManager
+	transactor            *transactions.Transactor
+	ens                   *ens.Service
+	stickers              *stickers.Service
 }
 
 // Start signals transmitter.

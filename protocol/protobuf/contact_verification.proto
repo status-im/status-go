@@ -10,13 +10,16 @@ message RequestContactVerification {
 
 message AcceptContactVerification {
   uint64 clock = 1;
+  string id = 2;
   string response = 3;
 }
 
 message ContactVerificationTrusted {
   uint64 clock = 1;
+  string id = 2;
 }
 
 message DeclineContactVerification {
   uint64 clock = 1;
+  string id = 2;
 }

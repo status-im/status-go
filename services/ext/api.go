@@ -477,6 +477,11 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
+// MyCanceledRequestsToJoin returns the pending requests for the logged in user
+func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyCanceledRequestsToJoin()
+}
+
 // PendingRequestsToJoinForCommunity returns the pending requests to join for a given community
 func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
@@ -487,13 +492,23 @@ func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*
 	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
 }
 
+// CanceledRequestsToJoinForCommunity returns the declined requests to join for a given community
+func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.CanceledRequestsToJoinForCommunity(id)
+}
+
+// CancelRequestToJoinCommunity accepts a pending request to join a community
+func (api *PublicAPI) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelRequestToJoinCommunity(request)
+}
+
 // AcceptRequestToJoinCommunity accepts a pending request to join a community
 func (api *PublicAPI) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptRequestToJoinCommunity(request)
 }
 
 // DeclineRequestToJoinCommunity accepts a pending request to join a community
-func (api *PublicAPI) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) error {
+func (api *PublicAPI) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeclineRequestToJoinCommunity(request)
 }
 
@@ -777,12 +792,12 @@ func (api *PublicAPI) GetTrustStatus(ctx context.Context, contactID string) (ver
 	return api.service.messenger.GetTrustStatus(contactID)
 }
 
-func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) error {
-	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
+func (api *PublicAPI) GetLatestVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
+	return api.service.messenger.GetLatestVerificationRequestFrom(contactID)
 }
 
-func (api *PublicAPI) GetVerificationRequestFrom(ctx context.Context, contactID string) (*verification.Request, error) {
-	return api.service.messenger.GetVerificationRequestFrom(ctx, contactID)
+func (api *PublicAPI) SendContactVerificationRequest(ctx context.Context, contactID string, challenge string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendContactVerificationRequest(ctx, contactID, challenge)
 }
 
 func (api *PublicAPI) GetReceivedVerificationRequests(ctx context.Context) ([]*verification.Request, error) {
@@ -797,11 +812,11 @@ func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID s
 	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
 }
 
-func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) error {
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
 }
 
-func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) error {
+func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
 }
 
@@ -1062,6 +1077,14 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
 }
 
+func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
+}
+
+func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
+}
+
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages()
 }
@@ -1167,6 +1190,14 @@ func (api *PublicAPI) RequestExtractDiscordChannelsAndCategories(filesToImport [
 
 func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string) (*protocol.MessengerResponse, map[string]*discord.ImportError) {
 	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
+}
+
+func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
+	api.service.messenger.RequestImportDiscordCommunity(request)
+}
+
+func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
+	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
 }
 
 // -----

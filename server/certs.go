@@ -214,7 +214,7 @@ func getServerCert(URL *url.URL) (*x509.Certificate, error) {
 
 	conn, err := tls.Dial("tcp", URL.Host, conf)
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err})
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err.Error()})
 		return nil, err
 	}
 	defer conn.Close()

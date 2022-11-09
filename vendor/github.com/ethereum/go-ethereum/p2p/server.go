@@ -127,7 +127,7 @@ type Config struct {
 	// Protocols should contain the protocols supported
 	// by the server. Matching protocols are launched for
 	// each peer.
-	Protocols []Protocol `toml:"-"`
+	Protocols []Protocol `toml:"-" json:"-"`
 
 	// If ListenAddr is set to a non-nil address, the server
 	// will listen for incoming connections.
@@ -136,6 +136,10 @@ type Config struct {
 	// ListenAddr field will be updated with the actual address when
 	// the server is started.
 	ListenAddr string
+
+	// If DiscAddr is set to a non-nil value, the server will use ListenAddr
+	// for TCP and DiscAddr for the UDP discovery protocol.
+	DiscAddr string
 
 	// If set to a non-nil value, the given NAT port mapper
 	// is used to make the listening port available to the
@@ -580,7 +584,15 @@ func (srv *Server) setupDiscovery() error {
 		return nil
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
+	listenAddr := srv.ListenAddr
+
+	// Use an alternate listening address for UDP if
+	// a custom discovery address is configured.
+	if srv.DiscAddr != "" {
+		listenAddr = srv.DiscAddr
+	}
+
+	addr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return err
 	}
@@ -933,7 +945,7 @@ func (srv *Server) checkInboundConn(remoteIP net.IP) error {
 	}
 	// Reject connections that do not match NetRestrict.
 	if srv.NetRestrict != nil && !srv.NetRestrict.Contains(remoteIP) {
-		return fmt.Errorf("not whitelisted in NetRestrict")
+		return fmt.Errorf("not in netrestrict list")
 	}
 	return nil
 }
@@ -966,9 +978,8 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	}
 
 	// If dialing, figure out the remote public key.
-	var dialPubkey *ecdsa.PublicKey
 	if dialDest != nil {
-		dialPubkey = new(ecdsa.PublicKey)
+		dialPubkey := new(ecdsa.PublicKey)
 		if err := dialDest.Load((*enode.Secp256k1)(dialPubkey)); err != nil {
 			err = errors.New("dial destination doesn't have a secp256k1 public key")
 			srv.log.Trace("Setting up connection failed", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)

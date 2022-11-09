@@ -18,6 +18,7 @@ type ConnectionParamsSuite struct {
 	suite.Suite
 	TestKeyComponents
 	TestCertComponents
+	TestLoggerComponents
 
 	server *PairingServer
 }
@@ -25,12 +26,14 @@ type ConnectionParamsSuite struct {
 func (s *ConnectionParamsSuite) SetupSuite() {
 	s.SetupKeyComponents(s.T())
 	s.SetupCertComponents(s.T())
+	s.SetupLoggerComponents()
 
 	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, defaultIP.String())
 	s.Require().NoError(err)
 
-	bs := NewServer(&cert, defaultIP.String(), func(int) {})
-	bs.port = 1337
+	bs := NewServer(&cert, defaultIP.String(), nil, s.Logger)
+	err = bs.SetPort(1337)
+	s.Require().NoError(err)
 
 	s.server = &PairingServer{
 		Server: bs,

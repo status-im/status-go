@@ -12,6 +12,14 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
+type GasFeeMode int
+
+const (
+	GasFeeLow GasFeeMode = iota
+	GasFeeMedium
+	GasFeeHigh
+)
+
 type SuggestedFees struct {
 	GasPrice             *big.Float `json:"gasPrice"`
 	BaseFee              *big.Float `json:"baseFee"`
@@ -20,6 +28,22 @@ type SuggestedFees struct {
 	MaxFeePerGasMedium   *big.Float `json:"maxFeePerGasMedium"`
 	MaxFeePerGasHigh     *big.Float `json:"maxFeePerGasHigh"`
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
+}
+
+func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Float {
+	if s.EIP1559Enabled {
+		return s.GasPrice
+	}
+
+	if mode == GasFeeLow {
+		return s.MaxFeePerGasLow
+	}
+
+	if mode == GasFeeHigh {
+		return s.MaxFeePerGasHigh
+	}
+
+	return s.MaxFeePerGasMedium
 }
 
 const inclusionThreshold = 0.95
@@ -52,9 +76,12 @@ func weiToGwei(val *big.Int) *big.Float {
 	return result.Quo(result, new(big.Float).SetInt(unit))
 }
 
-func gweiToWei(val float64) *big.Int {
-	res := new(big.Int)
-	res.SetUint64(uint64(val * 1000000000))
+func gweiToEth(val *big.Float) *big.Float {
+	return new(big.Float).Quo(val, big.NewFloat(1000000000))
+}
+
+func gweiToWei(val *big.Float) *big.Int {
+	res, _ := new(big.Float).Mul(val, big.NewFloat(1000000000)).Int(nil)
 	return res
 }
 
@@ -67,12 +94,6 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	if err != nil {
 		return nil, err
 	}
-
-	block, err := backend.BlockByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	maxPriorityFeePerGas, err := backend.SuggestGasTipCap(ctx)
 	if err != nil {
 		return &SuggestedFees{
@@ -86,12 +107,25 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		}, nil
 	}
 
+	block, err := backend.BlockByNumber(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	config := params.MainnetChainConfig
 	baseFee := misc.CalcBaseFee(config, block.Header())
 
 	fees, err := f.getFeeHistorySorted(chainID)
 	if err != nil {
-		return nil, err
+		return &SuggestedFees{
+			GasPrice:             weiToGwei(gasPrice),
+			BaseFee:              weiToGwei(baseFee),
+			MaxPriorityFeePerGas: weiToGwei(maxPriorityFeePerGas),
+			MaxFeePerGasLow:      weiToGwei(maxPriorityFeePerGas),
+			MaxFeePerGasMedium:   weiToGwei(maxPriorityFeePerGas),
+			MaxFeePerGasHigh:     weiToGwei(maxPriorityFeePerGas),
+			EIP1559Enabled:       false,
+		}, nil
 	}
 
 	perc10 := fees[int64(0.1*float64(len(fees)))-1]
@@ -125,7 +159,7 @@ func (f *FeeManager) suggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	}, nil
 }
 
-func (f *FeeManager) transactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas float64) TransactionEstimation {
+func (f *FeeManager) transactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) TransactionEstimation {
 	fees, err := f.getFeeHistorySorted(chainID)
 	if err != nil {
 		return Unknown

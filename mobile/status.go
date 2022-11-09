@@ -11,7 +11,7 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
-	signercore "github.com/ethereum/go-ethereum/signer/core"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
@@ -19,6 +19,7 @@ import (
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	protocol "github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
@@ -362,6 +364,27 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+
+		if acc.Chat {
+			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
+			account.ColorHash = colorHash
+
+			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return makeJSONResponse(err)
+			}
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
@@ -452,7 +475,7 @@ func HashTypedData(data string) string {
 // if password matches selected account.
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
-	var typed signercore.TypedData
+	var typed apitypes.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -464,7 +487,7 @@ func SignTypedDataV4(data, address, password string) string {
 // HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
 //export HashTypedDataV4
 func HashTypedDataV4(data string) string {
-	var typed signercore.TypedData
+	var typed apitypes.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -711,6 +734,32 @@ func ValidateMnemonic(mnemonic string) string {
 	m := extkeys.NewMnemonic()
 	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
 	return makeJSONResponse(err)
+}
+
+// DecompressPublicKey decompresses 33-byte compressed format to uncompressed 65-byte format.
+func DecompressPublicKey(key string) string {
+	decoded, err := types.DecodeHex(key)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	const compressionBytesNumber = 33
+	if len(decoded) != compressionBytesNumber {
+		return makeJSONResponse(errors.New("key is not 33 bytes long"))
+	}
+	pubKey, err := crypto.DecompressPubkey(decoded)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return types.EncodeHex(crypto.FromECDSAPub(pubKey))
+}
+
+// CompressPublicKey compresses uncompressed 65-byte format to 33-byte compressed format.
+func CompressPublicKey(key string) string {
+	pubKey, err := common.HexToPubkey(key)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return types.EncodeHex(crypto.CompressPubkey(pubKey))
 }
 
 // SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
