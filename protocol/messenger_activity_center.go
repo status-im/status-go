@@ -267,6 +267,18 @@ func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint6
 	}, nil
 }
 
+func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType ActivityCenterType, readType ActivityCenterQueryParamsRead) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.ActivityCenterNotificationsBy(cursor, limit, activityType, readType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ActivityCenterPaginationResponse{
+		Cursor:        cursor,
+		Notifications: notifications,
+	}, nil
+}
+
 func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
 

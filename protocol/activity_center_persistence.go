@@ -285,11 +285,12 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 }
 
-type activityCenterQueryParamsRead uint
+type ActivityCenterQueryParamsRead uint
 
 const (
-	activityCenterQueryParamsReadRead = iota + 1
-	activityCenterQueryParamsReadUnread
+	ActivityCenterQueryParamsReadRead = iota + 1
+	ActivityCenterQueryParamsReadUnread
+	ActivityCenterQueryParamsReadAll
 )
 
 type activityCenterQueryParams struct {
@@ -298,7 +299,7 @@ type activityCenterQueryParams struct {
 	ids                []types.HexBytes
 	chatID             string
 	author             string
-	read               activityCenterQueryParamsRead
+	read               ActivityCenterQueryParamsRead
 	activityCenterType ActivityCenterType
 }
 
@@ -331,9 +332,9 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	}
 
 	switch read {
-	case activityCenterQueryParamsReadRead:
+	case ActivityCenterQueryParamsReadRead:
 		readWhere = "AND a.read = 1"
-	case activityCenterQueryParamsReadUnread:
+	case ActivityCenterQueryParamsReadUnread:
 		readWhere = "AND NOT(a.read)"
 	}
 
@@ -508,7 +509,7 @@ func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, lim
 		activityCenterType: activityType,
 		cursor:             cursor,
 		limit:              limit,
-		read:               activityCenterQueryParamsReadUnread,
+		read:               ActivityCenterQueryParamsReadUnread,
 	}
 
 	return db.activityCenterNotifications(params)
@@ -519,7 +520,18 @@ func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit
 		activityCenterType: activityType,
 		cursor:             cursor,
 		limit:              limit,
-		read:               activityCenterQueryParamsReadRead,
+		read:               ActivityCenterQueryParamsReadRead,
+	}
+
+	return db.activityCenterNotifications(params)
+}
+
+func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType ActivityCenterType, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
+	params := activityCenterQueryParams{
+		activityCenterType: activityType,
+		cursor:             cursor,
+		limit:              limit,
+		read:               readType,
 	}
 
 	return db.activityCenterNotifications(params)
