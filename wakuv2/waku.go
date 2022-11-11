@@ -469,14 +469,20 @@ func (w *Waku) runRelayMsgLoop() {
 		return
 	}
 
-	for env := range sub.C {
-		envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
-		if err != nil {
-			w.logger.Error("onNewEnvelope error", zap.Error(err))
+	for {
+		select {
+		case <-w.quit:
+			sub.Unsubscribe()
+			return
+		case env := <-sub.C:
+			envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+			if err != nil {
+				w.logger.Error("onNewEnvelope error", zap.Error(err))
+			}
+			// TODO: should these be handled?
+			_ = envelopeErrors
+			_ = err
 		}
-		// TODO: should these be handled?
-		_ = envelopeErrors
-		_ = err
 	}
 }
 
