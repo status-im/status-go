@@ -592,7 +592,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	// This new column values can also be returned as a cursor for subsequent requests.
 	where := fmt.Sprintf(`
             WHERE
-                NOT(m1.hide) AND m1.local_chat_id = ? %s
+                NOT(m1.hide) AND m1.local_chat_id = ? %s AND NOT(m1.deleted)
             ORDER BY cursor DESC
             LIMIT ?`, cursorWhere)
 

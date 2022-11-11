@@ -1278,6 +1278,74 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 	return community, nil
 }
 
+func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community, error) {
+	id := request.CommunityID
+	publicKey, err := common.HexToPubkey(request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	if !community.hasMember(publicKey) {
+		return nil, ErrMemberNotFound
+	}
+
+	_, err = community.AddRoleToMember(publicKey, request.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
+func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*Community, error) {
+	id := request.CommunityID
+	publicKey, err := common.HexToPubkey(request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	if !community.hasMember(publicKey) {
+		return nil, ErrMemberNotFound
+	}
+
+	_, err = community.RemoveRoleFromMember(publicKey, request.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
 func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*Community, error) {
 	id := request.CommunityID
 

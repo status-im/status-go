@@ -472,6 +472,14 @@ func (api *PublicAPI) UnbanUserFromCommunity(request *requests.UnbanUserFromComm
 	return api.service.messenger.UnbanUserFromCommunity(request)
 }
 
+func (api *PublicAPI) AddRoleToMember(request *requests.AddRoleToMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddRoleToMember(request)
+}
+
+func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveRoleFromMember(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()

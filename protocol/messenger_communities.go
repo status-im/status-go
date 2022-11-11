@@ -1331,6 +1331,34 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	return response, nil
 }
 
+func (m *Messenger) AddRoleToMember(request *requests.AddRoleToMember) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.AddRoleToMember(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
+func (m *Messenger) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.RemoveRoleFromMember(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Community, error) {
 	id, err := hexutil.Decode(communityID)
 	if err != nil {
