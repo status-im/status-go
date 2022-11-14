@@ -931,6 +931,7 @@ func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, chainID uint64, ad
 	}
 
 	return api.service.messenger.DeleteSavedAddress(ctx, chainID, address)
+}
 
 // QR generation APIs
 func (api *PublicAPI) GenerateBasicQRCodeFromURL(ctx context.Context, URL string, PublicKey string) error {
