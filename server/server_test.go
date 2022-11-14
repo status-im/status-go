@@ -105,9 +105,9 @@ func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 
 func (s *ServerURLSuite) TestServer_MakeQRURL() {
 	s.Require().Equal(
-		"https://127.0.0.1:1337/QRImages?hash=0xdeadbeef4ac0",
-		s.server.MakeQRURL("0xdeadbeef4ac0"))
+		"https://127.0.0.1:1337/QRImages",
+		s.server.MakeQRURL())
 	s.Require().Equal(
-		"https://127.0.0.1:0/QRImages?hash=0xdeadbeef4ac0",
-		s.serverNoPort.MakeQRURL("0xdeadbeef4ac0"))
+		"https://127.0.0.1:0/QRImages",
+		s.serverNoPort.MakeQRURL())
 }
