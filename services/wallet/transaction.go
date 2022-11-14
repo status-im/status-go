@@ -68,7 +68,7 @@ const (
 type PendingTransaction struct {
 	Hash               common.Hash    `json:"hash"`
 	Timestamp          uint64         `json:"timestamp"`
-	Value              bigint.BigInt  `json:"value"`
+        Value              *hexutil.Big   `json:"value"`
 	From               common.Address `json:"from"`
 	To                 common.Address `json:"to"`
 	Data               string         `json:"data"`
@@ -106,13 +106,13 @@ func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTrans
 	var transactions []*PendingTransaction
 	for rows.Next() {
 		transaction := &PendingTransaction{
-			Value:    bigint.BigInt{Int: new(big.Int)},
+                        Value:    new(hexutil.Big),
 			GasPrice: bigint.BigInt{Int: new(big.Int)},
 			GasLimit: bigint.BigInt{Int: new(big.Int)},
 		}
 		err := rows.Scan(&transaction.Hash,
 			&transaction.Timestamp,
-			(*bigint.SQLBigIntBytes)(transaction.Value.Int),
+                        &transaction.Value,
 			&transaction.From,
 			&transaction.To,
 			&transaction.Data,
@@ -159,13 +159,13 @@ func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address com
 	var transactions []*PendingTransaction
 	for rows.Next() {
 		transaction := &PendingTransaction{
-			Value:    bigint.BigInt{Int: new(big.Int)},
-			GasPrice: bigint.BigInt{Int: new(big.Int)},
+                        Value:    new(hexutil.Big),
+                        GasPrice: bigint.BigInt{Int: new(big.Int)},
 			GasLimit: bigint.BigInt{Int: new(big.Int)},
 		}
 		err := rows.Scan(&transaction.Hash,
 			&transaction.Timestamp,
-			(*bigint.SQLBigIntBytes)(transaction.Value.Int),
+                        &transaction.Value,
 			&transaction.From,
 			&transaction.To,
 			&transaction.Data,
@@ -187,6 +187,7 @@ func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address com
 }
 
 func (tm *TransactionManager) addPending(transaction PendingTransaction) error {
+fmt.Println("addPending  >>>>>>>>>>>>>>>")
 	insert, err := tm.db.Prepare(`INSERT OR REPLACE INTO pending_transactions
                                       (network_id, hash, timestamp, value, from_address, to_address,
                                        data, symbol, gas_price, gas_limit, type, additional_data)
@@ -199,7 +200,7 @@ func (tm *TransactionManager) addPending(transaction PendingTransaction) error {
 		transaction.ChainID,
 		transaction.Hash,
 		transaction.Timestamp,
-		(*bigint.SQLBigIntBytes)(transaction.Value.Int),
+                transaction.Value,
 		transaction.From,
 		transaction.To,
 		transaction.Data,
@@ -242,7 +243,8 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 	if err != nil {
 		return nil, err
 	}
-	result, err := insert.Exec(
+        fmt.Println("multiTransaction.FromAmount.String() = ", multiTransaction.FromAmount.String())
+        result, err := insert.Exec(
 		multiTransaction.FromAddress,
 		multiTransaction.FromAsset,
 		multiTransaction.FromAmount.String(),
@@ -262,6 +264,7 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 
 	hashes := make(map[uint64][]types.Hash)
 	for _, tx := range data {
+                fmt.Println("tx.Value() = ", tx.Value(), " >>> ", tx)
 		hash, err := bridges[tx.BridgeName].Send(tx, selectedAccount)
 		if err != nil {
 			return nil, err
@@ -269,13 +272,14 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 		err = tm.addPending(PendingTransaction{
 			Hash:               common.Hash(hash),
 			Timestamp:          uint64(time.Now().Unix()),
-			Value:              bigint.BigInt{tx.Value()},
+                        Value:              multiTransaction.FromAmount,
 			From:               common.Address(tx.From()),
 			To:                 common.Address(tx.To()),
 			Data:               tx.Data().String(),
 			Type:               WalletTransfer,
 			ChainID:            tx.ChainID,
 			MultiTransactionID: multiTransactionID,
+                        Symbol: multiTransaction.FromAsset,
 		})
 		if err != nil {
 			return nil, err

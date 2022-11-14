@@ -19,7 +19,7 @@ const (
 	// EventFetchingHistoryError emitted when fetching of tx history failed
 	EventFetchingHistoryError EventType = "fetching-history-error"
 	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
-	EventNonArchivalNodeDetected EventType = "non-archival-node-detected"
+        EventNonArchivalNodeDetected EventType = "non-archival-node-detected"
 )
 
 // Event is a type for transfer events.

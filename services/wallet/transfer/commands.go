@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strings"
 	"time"
+        "fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 )
@@ -67,14 +67,14 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	c.foundHeaders = headers
 	c.resultingFrom = from
 
-	log.Info("eth historical downloader finished successfully", "address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
+        fmt.Println("eth historical downloader finished successfully", "address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
 
 	//err = c.db.ProcessBlocks(c.address, from, c.to, headers, ethTransfer)
 	if err != nil {
-		log.Error("failed to save found blocks with transfers", "error", err)
+                fmt.Println("failed to save found blocks with transfers", "error", err)
 		return err
 	}
-	log.Debug("eth transfers were persisted. command is closed")
+        fmt.Println("eth transfers were persisted. command is closed")
 	return nil
 }
 
@@ -117,14 +117,14 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			c.db, c.chainClient, c.address,
 			c.erc20, getErc20BatchSize(c.chainClient.ChainID), c.to, c.from)
 		if err != nil {
-			log.Error("failed to setup historical downloader for erc20")
+                        fmt.Println("failed to setup historical downloader for erc20")
 			return err
 		}
 	}
 	for !c.iterator.Finished() {
 		headers, _, _, err := c.iterator.Next(ctx)
 		if err != nil {
-			log.Error("failed to get next batch", "error", err)
+                        fmt.Println("failed to get next batch", "error", err)
 			return err
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
@@ -132,11 +132,11 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		/*err = c.db.ProcessBlocks(c.address, from, to, headers, erc20Transfer)
 		if err != nil {
 			c.iterator.Revert()
-			log.Error("failed to save downloaded erc20 blocks with transfers", "error", err)
+                        fmt.Println("failed to save downloaded erc20 blocks with transfers", "error", err)
 			return err
 		}*/
 	}
-	log.Info("wallet historical downloader for erc20 transfers finished", "in", time.Since(start))
+        fmt.Println("wallet historical downloader for erc20 transfers finished", "in", time.Since(start))
 	return nil
 }
 
@@ -161,7 +161,7 @@ func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHDownl
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
-	log.Info("start control command")
+        fmt.Println("start control command")
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 	head, err := c.chainClient.HeaderByNumber(ctx, nil)
 	cancel()
@@ -177,10 +177,10 @@ func (c *controlCommand) Run(parent context.Context) error {
 		Accounts: c.accounts,
 	})
 
-	log.Info("current head is", "block number", head.Number)
+        fmt.Println("current head is", "block number", head.Number)
 	lastKnownEthBlocks, accountsWithoutHistory, err := c.block.GetLastKnownBlockByAddresses(c.chainClient.ChainID, c.accounts)
 	if err != nil {
-		log.Error("failed to load last head from database", "error", err)
+                fmt.Println("failed to load last head from database", "error", err)
 		if c.NewError(err) {
 			return nil
 		}
@@ -282,7 +282,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		BlockNumber: target,
 	})
 
-	log.Info("end control command")
+        fmt.Println("end control command")
 	return err
 }
 
@@ -293,9 +293,9 @@ func nonArchivalNodeError(err error) bool {
 
 func (c *controlCommand) NewError(err error) bool {
 	c.errorsCount++
-	log.Error("controlCommand error", "error", err, "counter", c.errorsCount)
+        fmt.Println("controlCommand error", "error", err, "counter", c.errorsCount)
 	if nonArchivalNodeError(err) {
-		log.Info("Non archival node detected")
+                fmt.Println("Non archival node detected")
 		c.nonArchivalRPCNode = true
 		c.feed.Send(Event{
 			Type: EventNonArchivalNodeDetected,
@@ -337,18 +337,18 @@ func (c *transfersCommand) Command() async.Command {
 func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	allTransfers, err := getTransfersByBlocks(ctx, c.db, c.eth, c.address, []*big.Int{c.block})
 	if err != nil {
-		log.Info("getTransfersByBlocks error", "error", err)
+                fmt.Println("getTransfersByBlocks error", "error", err)
 		return err
 	}
 
 	err = c.db.SaveTranfers(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.block})
 	if err != nil {
-		log.Error("SaveTranfers error", "error", err)
+                fmt.Println("SaveTranfers error", "error", err)
 		return err
 	}
 
 	c.fetchedTransfers = allTransfers
-	log.Debug("transfers loaded", "address", c.address, "len", len(allTransfers))
+        fmt.Println("transfers loaded", "address", c.address, "len", len(allTransfers))
 	return nil
 }
 
@@ -409,7 +409,7 @@ func (c *findAndCheckBlockRangeCommand) Command() async.Command {
 }
 
 func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) {
-	log.Debug("start findAndCHeckBlockRangeCommand")
+        fmt.Println("start findAndCHeckBlockRangeCommand")
 	newFromByAddress, ethHeadersByAddress, err := c.fastIndex(parent, c.balanceCache, c.fromByAddress, c.toByAddress)
 	if err != nil {
 		c.error = err
@@ -460,7 +460,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		}
 
 		lastBlockNumber := c.toByAddress[address]
-		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber, "balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
+                fmt.Println("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber, "balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
 		to := &LastKnownBlock{
 			Number:  lastBlockNumber,
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
@@ -517,7 +517,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 			resultingFromByAddress[command.address] = command.resultingFrom
 			headers[command.address] = command.foundHeaders
 		}
-		log.Info("fast indexer finished", "in", time.Since(start))
+                fmt.Println("fast indexer finished", "in", time.Since(start))
 		return resultingFromByAddress, headers, nil
 	}
 }
@@ -551,7 +551,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 		for _, command := range commands {
 			headres[command.address] = command.foundHeaders
 		}
-		log.Info("fast indexer Erc20 finished", "in", time.Since(start))
+                fmt.Println("fast indexer Erc20 finished", "in", time.Since(start))
 		return headres, nil
 	}
 }
@@ -603,7 +603,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, block *Block,
 				transfersByAddress[command.address] = append(transfers, transfer)
 			}
 		}
-		log.Info("loadTransfers finished", "in", time.Since(start))
+                fmt.Println("loadTransfers finished", "in", time.Since(start))
 		return transfersByAddress, nil
 	}
 }
@@ -631,7 +631,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	}
 
 	firstNonce, err := client.NonceAt(c, account, to)
-	log.Info("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
+        fmt.Println("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
 
 	if err != nil {
 		return nil, err
@@ -664,15 +664,15 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 		}
 		nonceDiff = firstNonce - fromNonce
 
-		log.Info("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
+                fmt.Println("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
 
 		if goal <= nonceDiff && nonceDiff <= (goal+5) {
-			log.Info("range found", "account", account, "from", from, "to", to)
+                        fmt.Println("range found", "account", account, "from", from, "to", to)
 			return from, nil
 		}
 	}
 
-	log.Info("range found", "account", account, "from", from, "to", to)
+        fmt.Println("range found", "account", account, "from", from, "to", to)
 
 	return from, nil
 }
@@ -700,7 +700,7 @@ func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHDown
 		if err != nil {
 			return nil, err
 		}
-		log.Debug("loadTransfers", "block", block, "new transfers", len(transfers))
+                fmt.Println("loadTransfers", "block", block, "new transfers", len(transfers))
 		if len(transfers) > 0 {
 			allTransfers = append(allTransfers, transfers...)
 		}
