@@ -26,12 +26,21 @@ type MakeQRCodeFromURLSuite struct {
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
 	shh types.Waku
-
+	//server       *MediaServer
+	//serverNoPort *MediaServer
 	logger *zap.Logger
 }
 
 func (s *MakeQRCodeFromURLSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
+
+	//s.server = &MediaServer{Server: Server{
+	//	hostname: defaultIP.String(),
+	//	port:     1337,
+	//}}
+	//s.serverNoPort = &MediaServer{Server: Server{
+	//	hostname: defaultIP.String(),
+	//}}
 
 	config := waku.DefaultConfig
 	config.MinimumAcceptedPoW = 0
@@ -79,6 +88,7 @@ func (s *MakeQRCodeFromURLSuite) TestMotherOfAllTests() {
 
 	err = s.m.MakeQRWithOptions(optionsThatAllowProfileImage)
 	err = s.m.MakeQRWithOptions(optionsThatDontAllowProfileImage)
+
 	s.Require().NoError(err)
 
 }

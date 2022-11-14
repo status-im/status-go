@@ -118,7 +118,7 @@ func handleQRImage(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) 
 		//
 		//var payload = identityImage.Payload
 
-		payload, err := ioutil.ReadFile("../protocol/LogoWithQR.png")
+		payload, err := ioutil.ReadFile("../_assets/tests/LogoWithQR.png")
 		mime, err := images.ImageMime(payload)
 
 		// figure out the mime variable

@@ -14,6 +14,9 @@ type QROptions struct {
 
 func (m *Messenger) MakeQRWithOptions(options QROptions) error {
 	var logoFileStaticPath = "./logo.png"
+	var imageFolderBasePath = "../_assets/tests/"
+	var QRFileNameWithLogo = imageFolderBasePath + "LogoWithQR.png"
+	var QRFileNameWithOutLogo = imageFolderBasePath + "LogoWithoutQR.png"
 	var writerObject qrcode.Writer
 
 	qrc, err := qrcode.NewWith(options.URL,
@@ -26,12 +29,12 @@ func (m *Messenger) MakeQRWithOptions(options QROptions) error {
 
 	if options.AllowProfileImage {
 		writerObject, err = standard.New(
-			"./LogoWithQR.png",
+			QRFileNameWithLogo,
 			standard.WithLogoImageFilePNG(logoFileStaticPath),
 		)
 	} else {
 		writerObject, err = standard.New(
-			"./LogoWithoutQR.png",
+			QRFileNameWithOutLogo,
 		)
 	}
 
@@ -39,6 +42,7 @@ func (m *Messenger) MakeQRWithOptions(options QROptions) error {
 		panic(err)
 	}
 
+	// we need to take the file path and make a media url over here and share that url over to status-mobile
 	return err
 }
 

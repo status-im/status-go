@@ -105,9 +105,8 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeQRURL(QRURL string) string {
+func (s *MediaServer) MakeQRURL() string {
 	u := s.MakeBaseURL()
 	u.Path = QRImagePath
-	//u.RawQuery = url.Values{"hash": {QRURL}}.Encode()
 	return u.String()
 }
