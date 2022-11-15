@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -85,7 +84,6 @@ type Service struct {
 	ens                   *ens.Service
 	stickers              *stickers.Service
 	feed                  *event.Feed
-	group                 *async.Group
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
 }
