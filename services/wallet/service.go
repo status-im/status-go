@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -55,6 +56,7 @@ func NewService(
 	cryptoCompare := NewCryptoCompare()
 	priceManager := NewPriceManager(db, cryptoCompare)
 	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
+	history := history.NewService(db, walletFeed, rpcClient, tokenManager)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -75,6 +77,7 @@ func NewService(
 		signals:               signals,
 		reader:                reader,
 		cryptoCompare:         cryptoCompare,
+		history:               history,
 	}
 }
 
@@ -100,6 +103,7 @@ type Service struct {
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
 	cryptoCompare         *CryptoCompare
+	history               *history.Service
 }
 
 // Start signals transmitter.
@@ -121,6 +125,7 @@ func (s *Service) Stop() error {
 	s.signals.Stop()
 	s.transferController.Stop()
 	s.reader.Stop()
+	s.history.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil

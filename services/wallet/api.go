@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/rmg/iso4217"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -39,6 +41,10 @@ func (api *API) StartWallet(ctx context.Context) error {
 
 func (api *API) CheckConnected(ctx context.Context) *ConnectedResult {
 	return api.s.CheckConnected(ctx)
+}
+
+func (api *API) StopWallet(ctx context.Context) error {
+	return api.s.Stop()
 }
 
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
@@ -123,9 +129,27 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
 }
 
-// GetBalanceHistory retrieves native token. Will be extended later to support token balance history
-func (api *API) GetBalanceHistory(ctx context.Context, chainID uint64, address common.Address, timeInterval transfer.BalanceHistoryTimeInterval) ([]transfer.BalanceState, error) {
-	return api.s.transferController.GetBalanceHistory(ctx, chainID, address, timeInterval)
+func (api *API) StartBalanceHistory(ctx context.Context) error {
+	api.s.history.StartBalanceHistory()
+	return nil
+}
+
+func (api *API) StopBalanceHistory(ctx context.Context) error {
+	api.s.history.Stop()
+	return nil
+}
+
+func (api *API) UpdateVisibleTokens(ctx context.Context, symbols []string) error {
+	api.s.history.UpdateVisibleTokens(symbols)
+	return nil
+}
+
+// GetBalanceHistory retrieves token balance history for token identity on multiple chains
+// TODO: pass parameters by GetBalanceHistoryParameters struct
+// TODO: expose endTimestamp parameter
+func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, currency string, timeInterval history.TimeInterval) ([]*history.DataPoint, error) {
+	endTimestamp := time.Now().UTC().Unix()
+	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, currency, endTimestamp, timeInterval)
 }
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
