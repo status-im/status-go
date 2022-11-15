@@ -37,6 +37,11 @@ func (api *API) StartWallet(ctx context.Context) error {
 	return api.reader.Start()
 }
 
+func (api *API) StartBalanceHistory(ctx context.Context) error {
+	api.s.transferController.StartBalanceHistory(api.s.rpcClient.NetworkManager, api.s.tokenManager)
+	return nil
+}
+
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	return api.reader.GetWalletToken(ctx, addresses)
 }
@@ -119,9 +124,10 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
 }
 
-// GetBalanceHistory retrieves native token. Will be extended later to support token balance history
-func (api *API) GetBalanceHistory(ctx context.Context, chainID uint64, address common.Address, timeInterval transfer.BalanceHistoryTimeInterval) ([]transfer.BalanceState, error) {
-	return api.s.transferController.GetBalanceHistory(ctx, chainID, address, timeInterval)
+// GetBalanceHistory retrieves native tokens only
+// TODO: extended to support token balance history
+func (api *API) GetBalanceHistory(ctx context.Context, chainID uint64, address common.Address, currency string, timeInterval transfer.BalanceHistoryTimeInterval) ([]*transfer.BalanceState, error) {
+	return api.s.transferController.GetBalanceHistoryAndInterruptUpdate(ctx, chainID, address, currency, timeInterval)
 }
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
