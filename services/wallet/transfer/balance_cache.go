@@ -15,12 +15,6 @@ type nonceRange struct {
 	min   *big.Int
 }
 
-// balanceHistoryCache is used temporary until we cache balance history in DB
-type balanceHistoryCache struct {
-	lastBlockNo        *big.Int
-	lastBlockTimestamp int64
-}
-
 type balanceCache struct {
 	// balances maps an address to a map of a block number and the balance of this particular address
 	balances     map[common.Address]map[*big.Int]*big.Int
@@ -28,7 +22,6 @@ type balanceCache struct {
 	nonceRanges  map[common.Address]map[int64]nonceRange
 	sortedRanges map[common.Address][]nonceRange
 	rw           sync.RWMutex
-	history      *balanceHistoryCache
 }
 
 type BalanceCache interface {
