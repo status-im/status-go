@@ -229,7 +229,9 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	}
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
-	message.ContentType = editMessage.ContentType
+	if editMessage.ContentType != protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE {
+		message.ContentType = editMessage.ContentType
+	}
 
 	// Save original message as edit so we can retrieve history
 	if message.EditedAt == 0 {
