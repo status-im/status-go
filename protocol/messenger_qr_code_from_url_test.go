@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"github.com/status-im/status-go/protocol/requests"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -76,12 +77,12 @@ func (s *MakeQRCodeFromURLSuite) TestMotherOfAllTests() {
 	err := s.m.MakeQRCodeFromURL(URLToTest, PublicKey)
 	s.Require().NoError(err)
 
-	var optionsThatAllowProfileImage = QROptions{
+	var optionsThatAllowProfileImage = &requests.QROptions{
 		AllowProfileImage: true,
 		URL:               "cs2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3",
 	}
 
-	var optionsThatDontAllowProfileImage = QROptions{
+	var optionsThatDontAllowProfileImage = &requests.QROptions{
 		AllowProfileImage: false,
 		URL:               "cs2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3",
 	}

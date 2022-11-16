@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
 )
@@ -12,7 +13,7 @@ type QROptions struct {
 	AllowProfileImage    bool   `json:"withLogo"`
 }
 
-func (m *Messenger) MakeQRWithOptions(options QROptions) error {
+func (m *Messenger) MakeQRWithOptions(options *requests.QROptions) error {
 	var logoFileStaticPath = "./logo.png"
 	var imageFolderBasePath = "../_assets/tests/"
 	var QRFileNameWithLogo = imageFolderBasePath + "LogoWithQR.png"
