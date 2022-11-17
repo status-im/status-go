@@ -330,6 +330,20 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	s.Require().Equal("test_member_group", response.Chats()[0].Name)
 	s.Require().Equal("#F0F0F0", response.Chats()[0].Color)
 
+	inputMessage := buildTestMessage(*groupChat)
+
+	_, err = admin.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	response, err = WaitOnMessengerResponse(
+		member,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(member.Shutdown())
 }
