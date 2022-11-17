@@ -733,6 +733,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	err = m.setInstallationHostname()
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 
