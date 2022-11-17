@@ -269,13 +269,14 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 		err = tm.addPending(PendingTransaction{
 			Hash:               common.Hash(hash),
 			Timestamp:          uint64(time.Now().Unix()),
-			Value:              bigint.BigInt{tx.Value()},
+			Value:              bigint.BigInt{Int: multiTransaction.FromAmount.ToInt()},
 			From:               common.Address(tx.From()),
 			To:                 common.Address(tx.To()),
 			Data:               tx.Data().String(),
 			Type:               WalletTransfer,
 			ChainID:            tx.ChainID,
 			MultiTransactionID: multiTransactionID,
+			Symbol:             multiTransaction.FromAsset,
 		})
 		if err != nil {
 			return nil, err
