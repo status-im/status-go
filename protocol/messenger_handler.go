@@ -1270,11 +1270,6 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
-	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
-	if err != nil {
-		return err
-	}
-
 	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
 	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteMessage.MessageId)
 
@@ -1343,6 +1338,12 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return err
+		}
+	}
+
 	state.Response.AddMessage(originalMessage)
 	state.Response.AddChat(chat)
 
@@ -1351,7 +1352,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
-	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
+	messages, err := m.persistence.LatestMessageByChatID(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -1500,9 +1501,9 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
+		messages, err := m.persistence.LatestMessageByChatID(receivedMessage.LocalChatID)
 		if err != nil {
 			return err
 		}

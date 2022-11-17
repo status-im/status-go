@@ -162,6 +162,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	response, err = s.alice1.DeleteMessageForMeAndSync(context.Background(), chatID, messageID)
 	s.Require().NoError(err)
 	s.Require().True(response.Messages()[0].DeletedForMe)
+	s.Require().Nil(response.Chats()[0].LastMessage)
 
 	err = tt.RetryWithBackOff(func() error {
 		var err error
