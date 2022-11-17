@@ -2,13 +2,16 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet"
 )
 
@@ -30,6 +33,45 @@ func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, addr
 
 func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
 	return m.savedAddressesManager.DeleteSoftRemovedSavedAddresses(uint64(time.Now().AddDate(0, 0, -30).Unix()))
+}
+
+func (m *Messenger) setInstallationHostname() error {
+	randomDeviceIDLen := 5
+
+	ourInstallation, ok := m.allInstallations.Load(m.installationID)
+	if !ok {
+		m.logger.Error("Messenger's installationID is not set or not loadable")
+		return nil
+	}
+
+	var imd *multidevice.InstallationMetadata
+	if ourInstallation.InstallationMetadata == nil {
+		imd = new(multidevice.InstallationMetadata)
+	} else {
+		imd = ourInstallation.InstallationMetadata
+	}
+
+	// If the name is already set, don't do anything
+	// TODO check the full working mechanics of this
+	if len(imd.Name) > randomDeviceIDLen {
+		return nil
+	}
+
+	if len(imd.Name) == 0 {
+		n, err := common.RandomAlphabeticalString(randomDeviceIDLen)
+		if err != nil {
+			return err
+		}
+
+		imd.Name = n
+	}
+
+	hn, err := server.GetDeviceName()
+	if err != nil {
+		return err
+	}
+	imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+	return m.setInstallationMetadata(m.installationID, imd)
 }
 
 func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage protobuf.SyncSavedAddress) error {
