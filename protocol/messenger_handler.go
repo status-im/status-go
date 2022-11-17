@@ -425,9 +425,9 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 }
 
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
-	removedOrBlcoked := message.Removed || message.Blocked
+	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
-	if !ok && (message.Added || message.Muted) && !removedOrBlcoked {
+	if !ok && (message.Added || message.Muted) && !removedOrBlocked {
 		pubKey, err := common.HexToPubkey(message.Id)
 		if err != nil {
 			return err
