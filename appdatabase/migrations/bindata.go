@@ -37,7 +37,7 @@
 // 1662972194_add_keypairs_table.up.sql (345B)
 // 1664392661_add_third_party_id_to_waku_messages.up.sql (70B)
 // 1664783660_add_sync_info_to_saved_addresses.up.sql (388B)
-// 1668109917_wakunodes.up.sql (97B)
+// 1668109917_wakunodes.up.sql (99B)
 // doc.go (74B)
 
 package migrations
@@ -847,7 +847,7 @@ func _1664783660_add_sync_info_to_saved_addressesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1668109917_wakunodesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xf2\xf4\x0b\x76\x0d\x0a\x51\xf0\xf4\x0b\xf1\x57\x48\xce\x29\x2d\x2e\x49\x2d\x8a\xcf\xcb\x4f\x49\x2d\xd6\x00\x91\x3a\x0a\x25\x95\x05\xa9\x9a\x5c\xc1\xae\x3e\xae\xce\x21\x0a\x08\x21\x05\x2e\xb7\x20\x7f\x5f\x54\x1d\x5c\xe1\x1e\xae\x41\xae\x10\x69\x5b\x05\xa5\xa2\xd4\x9c\xc4\x4a\x25\x2e\x40\x00\x00\x00\xff\xff\x0b\xf6\xc7\x59\x61\x00\x00\x00")
+var __1668109917_wakunodesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xf2\xf4\x0b\x76\x0d\x0a\x51\xf0\xf4\x0b\xf1\x57\x48\xce\x29\x2d\x2e\x49\x2d\x8a\xcf\xcb\x4f\x49\x2d\xd6\x00\x91\x3a\x0a\x25\x95\x05\xa9\x9a\x5c\xc1\xae\x3e\xae\xce\x21\x0a\x10\x21\xf5\xf2\xc4\xec\x52\x75\x05\x2e\xb7\x20\x7f\x5f\x54\x3d\x5c\xe1\x1e\xae\x41\xae\x60\x3d\x0a\xb6\x0a\x4a\x45\xa9\x39\x89\x95\x4a\x5c\x80\x00\x00\x00\xff\xff\x19\x97\xc3\x57\x63\x00\x00\x00")
 
 func _1668109917_wakunodesUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -862,8 +862,8 @@ func _1668109917_wakunodesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1668109917_wakunodes.up.sql", size: 97, mode: os.FileMode(0664), modTime: time.Unix(1668521192, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0x62, 0xdb, 0x4e, 0xa2, 0x41, 0xe6, 0x97, 0x58, 0x5a, 0x90, 0xd9, 0x63, 0x1f, 0x9e, 0x18, 0x92, 0x2f, 0xb, 0x70, 0x7e, 0x6d, 0x73, 0x5b, 0x2b, 0xab, 0x4f, 0x64, 0x15, 0x60, 0x76, 0x74}}
+	info := bindataFileInfo{name: "1668109917_wakunodes.up.sql", size: 99, mode: os.FileMode(0664), modTime: time.Unix(1668785390, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x29, 0xaa, 0x9e, 0x2, 0x66, 0x85, 0x69, 0xa8, 0xd9, 0xe2, 0x4b, 0x8d, 0x2a, 0x9c, 0xdf, 0xd2, 0xef, 0x64, 0x58, 0xe3, 0xa6, 0xe7, 0xc1, 0xd1, 0xc8, 0x9c, 0xc0, 0x2c, 0x1, 0xa8, 0x7b, 0x81}}
 	return a, nil
 }
 
