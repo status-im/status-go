@@ -5799,7 +5799,10 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 				return nil, err
 			}
 
-			encodedMessage, err = m.sender.EncodeAbridgedMembershipUpdate(group, message)
+			// NOTE(cammellos): Disabling for now since the optimiziation is not
+			// applicable anymore after we changed group rules to allow
+			// anyone to change group details
+			encodedMessage, err = m.sender.EncodeMembershipUpdate(group, message)
 			if err != nil {
 				return nil, err
 			}
