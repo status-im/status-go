@@ -345,16 +345,6 @@ func (g Group) Events() []MembershipUpdateEvent {
 	return g.events
 }
 
-func isInSlice(m string, set []string) bool {
-	for _, k := range set {
-		if k == m {
-			return true
-		}
-
-	}
-	return false
-}
-
 // AbridgedEvents returns the minimum set of events for a user to publish a post
 // The events we want to keep:
 // 1) Chat created

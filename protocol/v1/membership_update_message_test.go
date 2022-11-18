@@ -400,7 +400,6 @@ func TestAbridgedEventsNameChanged(t *testing.T) {
 	nameChangedEvent2.ChatID = g.chatID
 	err = g.ProcessEvent(nameChangedEvent2)
 	require.NoError(t, err)
-	clock++
 
 	// Full events is 3 events
 	require.Len(t, g.Events(), 3)
@@ -482,7 +481,6 @@ func TestAbridgedEventsMembers(t *testing.T) {
 	event.ChatID = g.chatID
 	err = g.ProcessEvent(event)
 	require.NoError(t, err)
-	clock++
 
 	require.Len(t, g.Events(), 5)
 	// The previous two events, should be removed, because they have no impact
@@ -540,7 +538,6 @@ func TestAbridgedEventsAdmins(t *testing.T) {
 	event.ChatID = g.chatID
 	err = g.ProcessEvent(event)
 	require.NoError(t, err)
-	clock++
 
 	require.Len(t, g.Events(), 3)
 	// All the events are relevant here, so it should be the same
