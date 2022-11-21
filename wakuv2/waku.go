@@ -216,10 +216,6 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 			pubsub.WithPeerExchange(cfg.PeerExchange),
 		}
 
-		if cfg.PeerExchange {
-			relayOpts = append(relayOpts, pubsub.WithPeerExchange(true))
-		}
-
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.settings.MinPeersForRelay, relayOpts...))
 	}
 
