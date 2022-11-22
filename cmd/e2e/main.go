@@ -303,6 +303,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.EnableNTPSync = true
         nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
 	nodeConfig.ClusterConfig.WakuNodes = nodes
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
 
         nodeConfig.WakuV2Config = params.WakuV2Config{
           Enabled: true,

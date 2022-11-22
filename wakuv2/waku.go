@@ -324,6 +324,16 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 					}
 				}
 				waku.connStatusMu.Unlock()
+                                waku.logger.Info("PEERS", zap.Any("PEERS", latestConnStatus))
+                                for id := range latestConnStatus.Peers {
+                                  peerID, err := peer.Decode(id)
+                                  if err != nil {
+                                    waku.logger.Error("failed to parse PEERID")
+                                    return
+                                  }
+                                  waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
+                                }
+
 				signal.SendPeerStats(latestConnStatus)
 			}
 		}
