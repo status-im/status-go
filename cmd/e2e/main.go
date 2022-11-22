@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
-	wakuextn "github.com/status-im/status-go/services/wakuext"
+	waku2extn "github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -132,13 +132,13 @@ func StartClient(seedPhrase string, path string) (*api.GethStatusBackend, error)
 		return nil, err
 	}
 
-	wakuextservice := backend.StatusNode().WakuExtService()
+	wakuextservice := backend.StatusNode().WakuV2ExtService()
 	if wakuextservice == nil {
 		logger.Error("wakuext not available")
 		return nil, err
 	}
 
-	wakuext := wakuextn.NewPublicAPI(wakuextservice)
+	wakuext := waku2extn.NewPublicAPI(wakuextservice)
 
 	// This will start the push notification server as well as
 	// the config is set to Enabled
@@ -271,16 +271,13 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	return settings, nil
 }
 
+var port = 9001
 func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
-        nodeConfig.HTTPEnabled = true
-        nodeConfig.HTTPPort = 8545
-        nodeConfig.HTTPHost = "localhost"
-        nodeConfig.HTTPVirtualHosts = []string{"localhost"}
         nodeConfig.APIModules = "wakuext,ext,waku"
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
@@ -290,23 +287,30 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 
 	nodeConfig.Name = "StatusIM"
 	nodeConfig.Rendezvous = false
-	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
+	clusterConfig, err := params.LoadClusterConfigFromFleet("status.prod")
 	if err != nil {
 		return nil, err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
+        nodeConfig.NoDiscovery = true
 
+        fmt.Println("SETTING PORT", port)
 	nodeConfig.WalletConfig = params.WalletConfig{Enabled: true}
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
 	nodeConfig.EnableNTPSync = true
-	nodeConfig.WakuConfig = params.WakuConfig{
-		Enabled:     true,
-		LightClient: true,
-		MinimumPoW:  0.000001,
-	}
+        nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
+	nodeConfig.ClusterConfig.WakuNodes = nodes
+
+        nodeConfig.WakuV2Config = params.WakuV2Config{
+          Enabled: true,
+          EnableDiscV5: true,
+          DiscoveryLimit: 20,
+          UDPPort: port,
+        }
+        port = port + 1
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      "",
