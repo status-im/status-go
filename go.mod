@@ -51,7 +51,6 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.2.3-0.20221107152343-98c3ca8dc60f
 	github.com/status-im/markdown v0.0.0-20220622180305-7ee4aa8bbc3f
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.6
@@ -81,6 +80,7 @@ require github.com/fogleman/gg v1.3.0
 require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
+	github.com/waku-org/go-waku v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -273,3 +273,5 @@ require (
 	modernc.org/sqlite v1.14.2-0.20211125151325-d4ed92c0a70f // indirect
 	zombiezen.com/go/sqlite v0.8.0 // indirect
 )
+
+replace github.com/waku-org/go-waku => github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6
