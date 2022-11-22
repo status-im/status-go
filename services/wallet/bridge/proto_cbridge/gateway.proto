@@ -1,0 +1,175 @@
+syntax = "proto3";
+package cbridge;
+
+import "query.proto";
+import "cbridge.proto";
+
+option go_package = "../cbridge";
+
+
+message Chain {
+  uint32 id = 1;
+  string name = 2;
+  string icon = 3;
+  uint32 block_delay = 4;
+  string gas_token_symbol = 5;
+  string explore_url = 6;
+    reserved 7; // rpc_url removed
+  string contract_addr = 8;  // bridge contract addr
+  string drop_gas_amt = 9; // how much gas will be dropped on dst chain when transfer(dst chain gas token)
+  double suggested_base_fee = 10; // only for backend
+}
+
+message ChainTokenInfo {
+  repeated TokenInfo token = 1;
+}
+
+message TokenInfo {
+  Token token = 1;
+  string name = 2;
+  string icon = 3;
+}
+
+message TransferInfo {
+  Chain chain = 1;
+  Token token = 2;
+  string amount = 3;
+}
+
+message GetTransferStatusRequest {
+  string transfer_id = 1;
+}
+
+message GetTransferStatusResponse {
+  ErrMsg err = 1;
+  TransferHistoryStatus status = 2;
+  bytes wd_onchain = 3;            // for refund only
+  repeated bytes sorted_sigs = 4;  // for refund only
+  repeated bytes signers = 5;      // for refund only
+  repeated bytes powers = 6;       // for refund only
+  XferStatus refund_reason = 7;                   // used only for to_be_refund TransferStatus. BAD_LIQUIDITY, BAD_SLIPPAGE and BAD_TOKEN are used here
+  uint32 block_delay = 8;  // waiting
+  string src_block_tx_link = 9;
+  string dst_block_tx_link = 10;
+}
+
+message GetTransferConfigsRequest {}
+
+message GetTransferConfigsResponse {
+  ErrMsg err = 1;
+  repeated Chain chains = 2;
+  map<uint32, ChainTokenInfo> chain_token = 3;  // map<chain_id, ChainTokenInfo>
+  string farming_reward_contract_addr = 4;
+}
+
+message GetTokenInfoRequest {
+  uint32 chain_id = 1;
+  string token_symbol = 2;
+}
+
+message GetTokenInfoResponse {
+  ErrMsg err = 1;
+  TokenInfo token_info = 2;
+}
+
+message EstimateAmtRequest {
+  uint32 src_chain_id = 1;
+  uint32 dst_chain_id = 2;
+  string token_symbol = 3;
+  string amt = 4;
+  string usr_addr = 5;
+  uint32 slippage_tolerance = 6;  // user setting, for ui only, slippage * 1M, eg. 0.5% is 5000
+}
+
+message EstimateAmtResponse {
+  ErrMsg err = 1;
+  string eq_value_token_amt = 2;  // on_dst_chain, to cal minimum_received_amt = eq_value_token_amt*(1-slippage_tolerance) -  fee
+  float bridge_rate = 3;
+  string perc_fee = 4;            // on_dst_chain, percentage fee based on amount
+  string base_fee = 7;            // on_dest_chain, independent of amount, to cover relay onchain tx gas cost
+  uint32 slippage_tolerance = 5;  // user setting, from request, slippage * 1M, eg. 0.5% is 5000
+  uint32 max_slippage = 6;        // param for requesting on chain, slippage * 1M, eg. 0.5% is 5000
+}
+
+message WithdrawInfo {
+  uint32 chain_id = 1;
+  string amount = 2;
+  uint32 slippage_tolerance = 3;  // user setting, for ui only, slippage * 1M, eg. 0.5% is 5000
+}
+
+message EstimateWithdrawAmtRequest {
+  repeated WithdrawInfo src_withdraws = 1;
+  uint32 dst_chain_id = 2;
+  string token_symbol = 3;
+  string usr_addr = 4;
+}
+
+message EstimateWithdrawAmtResponse {
+  ErrMsg err = 1;
+  map<uint32, EstimateWithdrawAmt> req_amt = 2;  // map<src_chain_id, EstimateWithdrawAmt>
+}
+
+message EstimateWithdrawAmt {
+  string eq_value_token_amt = 1;  // on_dst_chain, to cal minimum_received_amt = eq_value_token_amt*(1-slippage_tolerance) -  fee
+  float bridge_rate = 2;
+  string perc_fee = 3;            // on_dst_chain, percentage fee based on amount
+  string base_fee = 4;            // on_dest_chain, independent of amount, to cover relay onchain tx gas cost
+  uint32 slippage_tolerance = 5;  // user setting, for ui only, slippage * 1M, eg. 0.5% is 5000
+  uint32 max_slippage = 6;        // param for requesting on chain, slippage * 1M, eg. 0.5% is 5000
+}
+
+message WithdrawLiquidityRequest {
+  bytes withdraw_req = 1;  // serialized WithdrawReq in sgn/cbridge/v1/tx.proto
+  bytes sig = 2;
+  string estimated_received_amt = 3;   // on dst chain
+  WithdrawMethodType method_type = 4;  // record which type it is
+}
+
+message WithdrawLiquidityResponse {
+  ErrMsg err = 1;
+  uint64 seq_num = 2;  // same as WithdrawLiquidityRequest.reqid
+}
+
+message TransferHistory {
+  string transfer_id = 1;
+  TransferInfo src_send_info = 2;
+  TransferInfo dst_received_info = 3;
+  uint64 ts = 4;
+  string src_block_tx_link = 5;
+  string dst_block_tx_link = 6;
+  TransferHistoryStatus status = 7;
+  XferStatus refund_reason = 8;  // used only for to_be_refund TransferStatus. BAD_LIQUIDITY, BAD_SLIPPAGE and BAD_TOKEN are used here
+}
+
+message TransferHistoryRequest {
+  string next_page_token = 1;  // for first page, it's ""
+  uint64 page_size = 2;
+  string addr = 3;
+}
+
+message TransferHistoryResponse {
+  ErrMsg err = 1;
+  repeated TransferHistory history = 2;
+  string next_page_token = 3;
+  uint64 current_size = 4;
+}
+
+enum WithdrawMethodType {
+  WD_METHOD_TYPE_UNDEFINED = 0;
+  WD_METHOD_TYPE_ONE_RM = 1;         // for lp one chain liquidity remove
+  WD_METHOD_TYPE_ALL_IN_ONE = 2;     // for lp multi-chain -> one chain liquidity remove
+  WD_METHOD_TYPE_STAKING_CLAIM = 3;  // for staking claim lp reward, these entries will not be shown in lp history
+}
+
+message ErrMsg {
+  ErrCode code = 1;
+  string msg = 2;
+}
+
+enum ErrCode {
+  ERROR_CODE_UNDEFINED = 0;
+  ERROR_CODE_COMMON = 500;
+  ERROR_NO_TOKEN_ON_DST_CHAIN = 1001;
+  ERROR_NO_TOKEN_ON_SRC_CHAIN = 1002;
+  ERROR_INIT_WITHDRAW_FAILED = 1003;
+}

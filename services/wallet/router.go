@@ -335,8 +335,10 @@ func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
 	simple := bridge.NewSimpleBridge(s.transactor)
 	hop := bridge.NewHopBridge(s.rpcClient)
+	cbridge := bridge.NewCbridge(s.rpcClient, s.tokenManager)
 	bridges[simple.Name()] = simple
 	bridges[hop.Name()] = hop
+	bridges[cbridge.Name()] = cbridge
 
 	return &Router{s, bridges}
 }
