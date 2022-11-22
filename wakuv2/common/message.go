@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

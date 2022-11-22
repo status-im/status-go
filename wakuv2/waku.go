@@ -53,12 +53,12 @@ import (
 
 	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
 
-	"github.com/status-im/go-waku/waku/v2/dnsdisc"
-	"github.com/status-im/go-waku/waku/v2/protocol"
-	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
-	"github.com/status-im/go-waku/waku/v2/protocol/filter"
-	"github.com/status-im/go-waku/waku/v2/protocol/lightpush"
-	"github.com/status-im/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	wakuprotocol "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/signal"
@@ -66,9 +66,9 @@ import (
 	"github.com/status-im/status-go/wakuv2/persistence"
 
 	"github.com/libp2p/go-libp2p/core/discovery"
-	node "github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	"github.com/status-im/go-waku/waku/v2/protocol/store"
+	node "github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 )
 
 const messageQueueLimit = 1024

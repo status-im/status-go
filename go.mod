@@ -10,10 +10,6 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 
 replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
 
-replace github.com/raulk/go-watchdog v1.3.0 => github.com/status-im/go-watchdog v1.2.0-ios-nolibproc
-
-replace github.com/flynn/noise v1.0.0 => github.com/status-im/noise v1.0.1-handshakeMessages
-
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.2.0
@@ -51,7 +47,6 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.2.3-0.20221107152343-98c3ca8dc60f
 	github.com/status-im/markdown v0.0.0-20220622180305-7ee4aa8bbc3f
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.6
@@ -81,6 +76,7 @@ require github.com/fogleman/gg v1.3.0
 require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
+	github.com/waku-org/go-waku v0.2.3-0.20221122234656-5d7d05ca16a5
 )
 
 require (
@@ -222,7 +218,6 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/raulk/clock v1.1.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect

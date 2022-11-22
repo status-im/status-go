@@ -262,7 +262,7 @@ github.com/ethereum/go-ethereum/trie
 ## explicit
 github.com/fjl/memsize
 github.com/fjl/memsize/memsizeui
-# github.com/flynn/noise v1.0.0 => github.com/status-im/noise v1.0.1-handshakeMessages
+# github.com/flynn/noise v1.0.0
 ## explicit; go 1.16
 github.com/flynn/noise
 # github.com/fogleman/gg v1.3.0
@@ -850,10 +850,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/prometheus/tsdb v0.10.0
 ## explicit
 github.com/prometheus/tsdb/fileutil
-# github.com/raulk/clock v1.1.0
-## explicit; go 1.14
-github.com/raulk/clock
-# github.com/raulk/go-watchdog v1.3.0 => github.com/status-im/go-watchdog v1.2.0-ios-nolibproc
+# github.com/raulk/go-watchdog v1.3.0
 ## explicit; go 1.15
 github.com/raulk/go-watchdog
 # github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0
@@ -900,28 +897,6 @@ github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.4
 ## explicit; go 1.18
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.2.3-0.20221107152343-98c3ca8dc60f
-## explicit; go 1.18
-github.com/status-im/go-waku/logging
-github.com/status-im/go-waku/waku/persistence
-github.com/status-im/go-waku/waku/persistence/migrations
-github.com/status-im/go-waku/waku/try
-github.com/status-im/go-waku/waku/v2
-github.com/status-im/go-waku/waku/v2/discv5
-github.com/status-im/go-waku/waku/v2/dnsdisc
-github.com/status-im/go-waku/waku/v2/metrics
-github.com/status-im/go-waku/waku/v2/node
-github.com/status-im/go-waku/waku/v2/noise
-github.com/status-im/go-waku/waku/v2/protocol
-github.com/status-im/go-waku/waku/v2/protocol/filter
-github.com/status-im/go-waku/waku/v2/protocol/lightpush
-github.com/status-im/go-waku/waku/v2/protocol/pb
-github.com/status-im/go-waku/waku/v2/protocol/relay
-github.com/status-im/go-waku/waku/v2/protocol/rln
-github.com/status-im/go-waku/waku/v2/protocol/rln/contracts
-github.com/status-im/go-waku/waku/v2/protocol/store
-github.com/status-im/go-waku/waku/v2/protocol/swap
-github.com/status-im/go-waku/waku/v2/utils
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 ## explicit
 github.com/status-im/keycard-go/derivationpath
@@ -1012,6 +987,29 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
+# github.com/waku-org/go-waku v0.2.3-0.20221122234656-5d7d05ca16a5
+## explicit; go 1.18
+github.com/waku-org/go-waku/logging
+github.com/waku-org/go-waku/waku/persistence
+github.com/waku-org/go-waku/waku/persistence/migrations
+github.com/waku-org/go-waku/waku/try
+github.com/waku-org/go-waku/waku/v2
+github.com/waku-org/go-waku/waku/v2/discv5
+github.com/waku-org/go-waku/waku/v2/dnsdisc
+github.com/waku-org/go-waku/waku/v2/metrics
+github.com/waku-org/go-waku/waku/v2/node
+github.com/waku-org/go-waku/waku/v2/noise
+github.com/waku-org/go-waku/waku/v2/protocol
+github.com/waku-org/go-waku/waku/v2/protocol/filter
+github.com/waku-org/go-waku/waku/v2/protocol/lightpush
+github.com/waku-org/go-waku/waku/v2/protocol/pb
+github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange
+github.com/waku-org/go-waku/waku/v2/protocol/relay
+github.com/waku-org/go-waku/waku/v2/protocol/rln
+github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts
+github.com/waku-org/go-waku/waku/v2/protocol/store
+github.com/waku-org/go-waku/waku/v2/protocol/swap
+github.com/waku-org/go-waku/waku/v2/utils
 # github.com/waku-org/go-zerokit-rln v0.1.6
 ## explicit; go 1.17
 github.com/waku-org/go-zerokit-rln/rln
