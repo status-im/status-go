@@ -37,6 +37,10 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+
+        "github.com/status-im/status-go/services/wakuv2ext"
+        "github.com/status-im/status-go/services/wakuext"
+
 )
 
 var (
@@ -1381,4 +1385,15 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	}
 
 	return nil
+}
+
+func (b *GethStatusBackend) ExtPublicAPI() (*ext.PublicAPI, error) {
+	if b.statusNode.WakuV2ExtService() != nil {
+          return wakuv2ext.NewPublicAPI(b.statusNode.WakuV2ExtService()).PublicAPI, nil
+        }
+
+	if b.statusNode.WakuExtService() != nil {
+          return wakuext.NewPublicAPI(b.statusNode.WakuExtService()).PublicAPI, nil
+        }
+  return nil, errors.New("can't find waku ext service")
 }
