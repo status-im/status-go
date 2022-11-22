@@ -23,6 +23,16 @@ func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, i
 		return nil, err
 	}
 	localnode := enode.NewLocalNode(db, priv)
+
+	err = w.updateLocalNode(localnode, priv, wsAddr, ipAddr, udpPort, wakuFlags, advertiseAddr, log)
+	if err != nil {
+		return nil, err
+	}
+
+	return localnode, nil
+}
+
+func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort int, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, log *zap.Logger) error {
 	localnode.SetFallbackUDP(udpPort)
 	localnode.Set(enr.WithEntry(utils.WakuENRField, wakuFlags))
 	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
@@ -48,12 +58,12 @@ func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, i
 	for _, addr := range wsAddr {
 		p2p, err := addr.ValueForProtocol(ma.P_P2P)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		p2pAddr, err := ma.NewMultiaddr("/p2p/" + p2p)
 		if err != nil {
-			return nil, fmt.Errorf("could not create p2p addr: %w", err)
+			return fmt.Errorf("could not create p2p addr: %w", err)
 		}
 
 		maRaw := addr.Decapsulate(p2pAddr).Bytes()
@@ -68,7 +78,7 @@ func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, i
 		localnode.Set(enr.WithEntry(utils.MultiaddrENRField, fieldRaw))
 	}
 
-	return localnode, nil
+	return nil
 }
 
 func isPrivate(addr candidateAddr) bool {
@@ -220,12 +230,30 @@ func (w *WakuNode) setupENR(addrs []ma.Multiaddr) error {
 
 	// TODO: make this optional depending on DNS Disc being enabled
 	if w.opts.privKey != nil {
-		localNode, err := w.newLocalnode(w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
-		if err != nil {
-			w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
-			return err
+		if w.localNode != nil {
+			err := w.updateLocalNode(w.localNode, w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
+			if err != nil {
+				w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
+				return err
+			} else {
+				w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+				// Restarting DiscV5
+				if w.discoveryV5 != nil && w.discoveryV5.IsStarted() {
+					w.log.Info("restarting discv5")
+					w.discoveryV5.Stop()
+					err = w.discoveryV5.Start()
+					if err != nil {
+						w.log.Error("could not restart discv5", zap.Error(err))
+						return err
+					}
+				}
+			}
 		} else {
-			if w.localNode == nil || w.localNode.Node().String() != localNode.Node().String() {
+			localNode, err := w.newLocalnode(w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
+			if err != nil {
+				w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
+				return err
+			} else {
 				w.localNode = localNode
 				w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
 			}

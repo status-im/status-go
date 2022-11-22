@@ -80,7 +80,7 @@ require github.com/fogleman/gg v1.3.0
 require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.0.0-00010101000000-000000000000
+	github.com/waku-org/go-waku v0.2.3-0.20221123102023-fd0c6c9d6788
 )
 
 require (
@@ -273,5 +273,3 @@ require (
 	modernc.org/sqlite v1.14.2-0.20211125151325-d4ed92c0a70f // indirect
 	zombiezen.com/go/sqlite v0.8.0 // indirect
 )
-
-replace github.com/waku-org/go-waku => github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6

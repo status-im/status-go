@@ -424,7 +424,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 	),
 	libp2p.EnableNATService(),
 	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
-	libp2p.EnableHolePunching(),
+        libp2p.EnableHolePunching(),
 }
 
 func newConnManager(lo int, hi int, opts ...connmgr.Option) *connmgr.BasicConnMgr {

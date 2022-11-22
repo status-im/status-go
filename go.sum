@@ -1823,8 +1823,6 @@ github.com/prometheus/procfs v0.8.0/go.mod h1:z7EfXMXOkbkqb9IINtpCn86r/to3BnA0ua
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38ic=
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
-github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6 h1:AgpRW55iPssnlU9mGigX1l4jaAoMc6JUpZDB8VHf4uY=
-github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6/go.mod h1:QqlddKC5Q8ucWSnKQrHClWAkm6HszsQ1bUOXZYvt2UA=
 github.com/raulk/clock v1.1.0 h1:dpb29+UKMbLqiU/jqIJptgLR1nn23HLgMY0sTCDza5Y=
 github.com/raulk/clock v1.1.0/go.mod h1:3MpVxdZ/ODBQDxbN+kzshf5OSZwPjtMDx6BBXBmOeY0=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
@@ -2067,6 +2065,8 @@ github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae/go.mod h1:DD4vA1
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
 github.com/waku-org/go-discover v0.0.0-20221027130446-2f43d5f6c73f h1:YHIrSqs8Aot1exhwx0+uwdshCp3RfZu5OY6Hvt3Hk8g=
 github.com/waku-org/go-discover v0.0.0-20221027130446-2f43d5f6c73f/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
+github.com/waku-org/go-waku v0.2.3-0.20221123102023-fd0c6c9d6788 h1:yZry9x+u4vZrJnJFODgZizLtLK9U2AlWUJt209bxGkA=
+github.com/waku-org/go-waku v0.2.3-0.20221123102023-fd0c6c9d6788/go.mod h1:QqlddKC5Q8ucWSnKQrHClWAkm6HszsQ1bUOXZYvt2UA=
 github.com/waku-org/go-zerokit-rln v0.1.6 h1:r8B6S83WJIioxEj1wSruhx+eg47HpSrIwuhi6yaRvy0=
 github.com/waku-org/go-zerokit-rln v0.1.6/go.mod h1:T1wLR/VuTcxLkDv0O7JvR0N/9y7GHM2IeU7LjnWZxek=
 github.com/waku-org/noise v1.0.2 h1:7WmlhpJ0eliBzwzKz6SoTqQznaEU2IuebHF3oCekqqs=

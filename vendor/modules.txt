@@ -990,7 +990,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.0.0-00010101000000-000000000000 => github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6
+# github.com/waku-org/go-waku v0.2.3-0.20221123102023-fd0c6c9d6788
 ## explicit; go 1.18
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -1305,4 +1305,3 @@ zombiezen.com/go/sqlite/sqlitex
 # github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 # github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 # github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
-# github.com/waku-org/go-waku => github.com/rasom/go-waku v0.0.0-20221122101554-9fc473fe45d6
