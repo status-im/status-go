@@ -1,0 +1,34 @@
+syntax = "proto3";
+package cbridge;
+
+option go_package = "../cbridge";
+
+// ========== x/cbridge kv value types
+// for src transfer id
+// normal status flow: after sgn applied user's Send event, status is OK_TO_RELAY. then after apply Relay event
+// status is SUCCESS
+// can't relay flow: after apply send, status will be BAD_xxx, and there'll be no relay. so user need to InitWithdraw, status becomes
+// refund_requested when sgn apply withdrawDone event, status becomes REFUND_DONE
+enum XferStatus {
+  UNKNOWN = 0;  // use as default for unknown xfer
+  // normal flow only has ok then success
+  OK_TO_RELAY = 1;  // x/cbridge emit relay, waiting for sgn nodes to send sig, then sgn will submit relay tx onchain
+  SUCCESS = 2;      // applied onchain relay event
+
+  // can't relay flow status
+  BAD_LIQUIDITY = 3;  // can't complete xfer due to low dst chain liquidity or equal value dest amount is 0
+  BAD_SLIPPAGE = 4;   // slippage larger than user specified max
+  BAD_TOKEN = 5;      // src or dest token are not supported
+
+  // refund, using withdraw flow
+  REFUND_REQUESTED = 6;   // user/gateway called InitWithdraw, XferRefundKey has withdraw seq num
+  REFUND_DONE = 7;        // applied onchain WithdrawDown event
+  BAD_XFER_DISABLED = 8;  // asset is in config, but it is xfer_disabled, so this asset should not be used for transfer. If any transfer
+                          // come, we should go to refund flow.
+  BAD_DEST_CHAIN = 9;     // dest chain is same to src chain, relayer will ignore it.
+
+  EXCEED_MAX_OUT_AMOUNT = 10;  // amount larger than max out allowance
+  XFER_DELAYED = 11;  // relayer has successfully called onchain relay() but the onchain contract decides that the amt is greater than its
+                      // delayThreshold
+  BAD_ADDRESS = 12;
+}

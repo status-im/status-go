@@ -1496,6 +1496,14 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Decimals: 0,
 			ChainID:  5,
 		},
+		common.HexToAddress("0xf4B2cbc3bA04c478F0dC824f4806aC39982Dce73"): &Token{
+			Address:  common.HexToAddress("0xf4B2cbc3bA04c478F0dC824f4806aC39982Dce73"),
+			Name:     "Tether USD",
+			Symbol:   "USDT",
+			Color:    "#f8f8f8",
+			Decimals: 6,
+			ChainID:  5,
+		},
 	},
 	10: {
 		common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"): &Token{
@@ -1633,6 +1641,14 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Decimals:  6,
 			ChainID:   421613,
 			PegSymbol: "USD",
+		},
+		common.HexToAddress("0x265B25e22bcd7f10a5bD6E6410F10537Cc7567e8"): &Token{
+			Address:  common.HexToAddress("0x265B25e22bcd7f10a5bD6E6410F10537Cc7567e8"),
+			Name:     "Tether USD",
+			Symbol:   "USDT",
+			Color:    "#f8f8f8",
+			Decimals: 6,
+			ChainID:  421613,
 		},
 	},
 }
