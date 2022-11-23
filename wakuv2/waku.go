@@ -331,6 +331,14 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
                                     waku.logger.Error("failed to parse PEERID")
                                     return
                                   }
+                                  addr := "/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi"
+
+
+                                  err = waku.DialPeer(addr)
+                                  if err != nil {
+                                    waku.logger.Error("failed to add PEERID",zap.String("peer",addr), zap.Error(err))
+                                    return
+                                  }
                                   waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
                                 }
 
