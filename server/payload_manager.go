@@ -2,9 +2,9 @@ package server
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/appdatabase"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
@@ -47,15 +48,28 @@ type PayloadManager interface {
 // PairingPayloadSourceConfig represents location and access data of the pairing payload
 // ONLY available from the application client
 type PairingPayloadSourceConfig struct {
-	KeystorePath string `json:"keystorePath"`
-	KeyUID       string `json:"keyUID"`
-	Password     string `json:"password"`
+	KeystorePath  string `json:"keystorePath"`
+	KeyUID        string `json:"keyUID"`
+	Password      string `json:"password"`
+	KDFIterations int    `json:"KDFIterations"`
 }
 
 // PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
 type PairingPayloadManagerConfig struct {
-	DB *multiaccounts.Database
+	MultiAccountDB *multiaccounts.Database
+	AppDB          *sql.DB
 	PairingPayloadSourceConfig
+}
+
+// ParsePairingPayloadSourceConfig takes a serialised JSON string and unmarshalls it into a PairingPayloadSourceConfig
+func ParsePairingPayloadSourceConfig(configJSON string) (PairingPayloadSourceConfig, error) {
+	var conf PairingPayloadSourceConfig
+	if configJSON == "" {
+		return conf, fmt.Errorf("no config given, PairingPayloadSourceConfig is expected")
+	}
+
+	err := json.Unmarshal([]byte(configJSON), &conf)
+	return conf, err
 }
 
 // PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
@@ -254,6 +268,7 @@ type PairingPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
+	settings     *protobuf.PairingSettings
 }
 
 func (pp *PairingPayload) ResetPayload() {
@@ -343,8 +358,10 @@ type PairingPayloadRepository struct {
 	*PairingPayload
 
 	multiaccountsDB *multiaccounts.Database
+	appDB           *sql.DB
 
 	keystorePath, keyUID string
+	kdfIterations        int
 
 	logger *zap.Logger
 }
@@ -359,10 +376,12 @@ func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManage
 		return ppr
 	}
 
-	ppr.multiaccountsDB = config.DB
+	ppr.multiaccountsDB = config.MultiAccountDB
+	ppr.appDB = config.AppDB
 	ppr.keystorePath = config.KeystorePath
 	ppr.keyUID = config.KeyUID
 	ppr.password = config.Password
+	ppr.kdfIterations = config.KDFIterations
 	return ppr
 }
 
@@ -526,16 +545,15 @@ func (ppr *PairingPayloadRepository) initialiseEncryptedDB() error {
 		}
 	}
 
-	// TODO resolve what to do with returned DB, could do nothing
-	// TODO resolve what to do with KDFIterations. Currently KDFIs are set by the client, and stored in the
-	//  multi-account DB. However this is an issue when we sync between desktop and mobile
-	//  desktop use significantly higher KDFIs and would cause a problem on mobile.
-	//  Potential solution would be to know the OS type and manually set the KDFIs instead of syncing them
-	_, err = appdatabase.InitializeDB(path, ppr.password, ppr.multiaccount.KDFIterations)
+	ppr.appDB, err = appdatabase.InitializeDB(path, ppr.password, ppr.kdfIterations)
 	if err != nil {
 		l.Error("failed to initialize db", zap.Error(err))
 		return err
 	}
+
+	// TODO handle first settings init
+	// TODO need to also sync over the settings sync clocks
+	// TODO need to handle config tables (see defaultNodeConfig)
 
 	return nil
 }

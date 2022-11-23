@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
+	"database/sql"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -33,6 +33,10 @@ type PairingClient struct {
 }
 
 func NewPairingClient(c *ConnectionParams, config *PairingPayloadManagerConfig) (*PairingClient, error) {
+	if c.serverMode == Receiving && config.AppDB == nil {
+		return nil, fmt.Errorf("new PairingClient init with server mode set to Receiving, but passed a nil AppDB. Data sending requires access to the encrypted database")
+	}
+
 	u, err := c.URL()
 	if err != nil {
 		return nil, err
@@ -183,20 +187,14 @@ func (c *PairingClient) getChallenge() error {
 	return err
 }
 
-func StartUpPairingClient(db *multiaccounts.Database, cs, configJSON string) error {
-	var conf PairingPayloadSourceConfig
-	err := json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return err
-	}
-
+func StartUpPairingClient(db *multiaccounts.Database, appDB *sql.DB, cs string, conf PairingPayloadSourceConfig) error {
 	ccp := new(ConnectionParams)
-	err = ccp.FromString(cs)
+	err := ccp.FromString(cs)
 	if err != nil {
 		return err
 	}
 
-	c, err := NewPairingClient(ccp, &PairingPayloadManagerConfig{db, conf})
+	c, err := NewPairingClient(ccp, &PairingPayloadManagerConfig{db, appDB, conf})
 	if err != nil {
 		return err
 	}

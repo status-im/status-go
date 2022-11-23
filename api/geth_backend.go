@@ -244,7 +244,8 @@ func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir str
 	return err
 }
 
-//
+// ensureAppDBOpened checks that the application database exists, if the old version of the app db exists
+// migrate the db files to the new
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -278,6 +279,15 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	}
 	b.statusNode.SetAppDB(b.appDB)
 	return nil
+}
+
+func (b *GethStatusBackend) GetAppDB(account multiaccounts.Account, password string) (*sql.DB, error) {
+	err := b.ensureAppDBOpened(account, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.appDB, nil
 }
 
 func (b *GethStatusBackend) setupLogSettings() error {
