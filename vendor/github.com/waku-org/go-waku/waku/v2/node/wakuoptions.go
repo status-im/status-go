@@ -424,6 +424,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 	),
 	libp2p.EnableNATService(),
 	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
+        libp2p.EnableRelayService(),
         libp2p.EnableHolePunching(),
 }
 
