@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+        "io/ioutil"
 	stdlog "log"
 	"math/rand"
 	"os"
@@ -116,7 +117,11 @@ func main() {
 		return
 	}
 
-        _, err = StartClient(*seedPhrase, "./tmp")
+        file1, err := ioutil.TempFile("/tmp", "status-go-test")
+        if err != nil {
+          return 
+        }
+        _, err = StartClient("", file1.Name())
         if err != nil {
           return
         }
