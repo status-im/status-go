@@ -5,7 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
-	"encoding/json"
+	"database/sql"
 	"fmt"
 	"net"
 	"time"
@@ -130,7 +130,11 @@ func (s *PairingServer) startSendingAccountData() error {
 }
 
 // MakeFullPairingServer generates a fully configured and randomly seeded PairingServer
-func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig PairingPayloadSourceConfig) (*PairingServer, error) {
+func MakeFullPairingServer(db *multiaccounts.Database, appDB *sql.DB, mode Mode, storeConfig PairingPayloadSourceConfig) (*PairingServer, error) {
+	if mode == Sending && appDB == nil {
+		return nil, fmt.Errorf("new PairingServer init with server mode set to Sending, but passed a nil appDB. Data sending requires access to the encrypted database")
+	}
+
 	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -153,7 +157,7 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig Pa
 	}
 
 	return NewPairingServer(&Config{
-		// Things that can be generated, and CANNOT come from the app client (well they could be this is better)
+		// Things that can be generated, and CANNOT come from the app client (well they could, but this is better)
 		PK:       &tlsKey.PublicKey,
 		EK:       AESKey,
 		Cert:     &tlsCert,
@@ -164,7 +168,8 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig Pa
 
 		PairingPayloadManagerConfig: &PairingPayloadManagerConfig{
 			// Things that can't be generated, but DO NOT come from app client
-			DB: db,
+			MultiAccountDB: db,
+			AppDB:          appDB,
 
 			// Things that can't be generated, but DO come from the app client
 			PairingPayloadSourceConfig: storeConfig,
@@ -174,14 +179,8 @@ func MakeFullPairingServer(db *multiaccounts.Database, mode Mode, storeConfig Pa
 
 // StartUpPairingServer generates a PairingServer, starts the pairing server in the correct mode
 // and returns the ConnectionParams string to allow a PairingClient to make a successful connection.
-func StartUpPairingServer(db *multiaccounts.Database, mode Mode, configJSON string) (string, error) {
-	var conf PairingPayloadSourceConfig
-	err := json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return "", err
-	}
-
-	ps, err := MakeFullPairingServer(db, mode, conf)
+func StartUpPairingServer(db *multiaccounts.Database, appDB *sql.DB, mode Mode, conf PairingPayloadSourceConfig) (string, error) {
+	ps, err := MakeFullPairingServer(db, appDB, mode, conf)
 	if err != nil {
 		return "", err
 	}

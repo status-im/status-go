@@ -35,3 +35,20 @@ message SyncSetting {
 LastBackup uint64
 BackupEnabled bool
  */
+
+message PairingSetting {
+  // Type should be populated with settings.SettingField.dBColumnName
+  string Type = 1;
+  uint64 clock = 2;
+
+  oneof value {
+    string value_string = 3;
+    bytes value_bytes = 4;
+    bool value_bool = 5;
+    int64 value_int64 = 6;
+  }
+}
+
+message PairingSettings {
+  PairingSetting settings = 1;
+}

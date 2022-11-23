@@ -937,11 +937,12 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
-	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	conf, err := server.ParsePairingPayloadSourceConfig(configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
 	}
 
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Receiving, configJSON)
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), nil, server.Receiving, conf)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -955,11 +956,18 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
-	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	conf, err := server.ParsePairingPayloadSourceConfig(configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
 	}
 
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Sending, configJSON)
+	db, err := statusBackend.GetAppDB(multiaccounts.Account{KeyUID: conf.KeyUID, KDFIterations: conf.KDFIterations}, conf.Password)
+	if err != nil {
+		log.Error("failed to get app DB", "configJSON", configJSON, "error", err)
+		return makeJSONResponse(err)
+	}
+
+	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), db, server.Sending, conf)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -969,22 +977,41 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // InputConnectionStringForBootstrapping starts a server.PairingClient
 // The given server.ConnectionParams string will determine the server.Mode
 //
-// server.Mode = server.Sending
-// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
-//
-// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
-//
 // server.Mode = server.Receiving
 // Used when the device is Logged out or has no Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
-	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+	conf, err := server.ParsePairingPayloadSourceConfig(configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
 	}
 
-	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
+	err = server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), nil, cs, conf)
+	return makeJSONResponse(err)
+}
+
+// InputConnectionStringForBootstrappingAnotherDevice starts a server.PairingClient
+// The given server.ConnectionParams string will determine the server.Mode
+//
+// server.Mode = server.Sending
+// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
+//
+// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
+func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
+	conf, err := server.ParsePairingPayloadSourceConfig(configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	db, err := statusBackend.GetAppDB(multiaccounts.Account{KeyUID: conf.KeyUID, KDFIterations: conf.KDFIterations}, conf.Password)
+	if err != nil {
+		log.Error("failed to get app DB", "configJSON", configJSON, "error", err)
+		return makeJSONResponse(err)
+	}
+
+	err = server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), db, cs, conf)
 	return makeJSONResponse(err)
 }
 

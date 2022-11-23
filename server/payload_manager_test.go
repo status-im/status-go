@@ -133,7 +133,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 	pms.Require().NoError(err)
 
 	pms.config1 = &PairingPayloadManagerConfig{
-		DB: db1,
+		MultiAccountDB: db1,
 		PairingPayloadSourceConfig: PairingPayloadSourceConfig{
 			KeystorePath: keystore1,
 			KeyUID:       keyUID,
@@ -142,7 +142,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 	}
 
 	pms.config2 = &PairingPayloadManagerConfig{
-		DB: db2,
+		MultiAccountDB: db2,
 		PairingPayloadSourceConfig: PairingPayloadSourceConfig{
 			KeystorePath: keystore2,
 			KeyUID:       keyUID,
@@ -315,7 +315,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	h2.Write(keys[utils.GetAccount2PKFile()])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
 
-	acc, err := pms.config2.DB.GetAccount(keyUID)
+	acc, err := pms.config2.MultiAccountDB.GetAccount(keyUID)
 	pms.Require().NoError(err)
 
 	pms.Require().Exactly(expected.ColorHash, acc.ColorHash)
