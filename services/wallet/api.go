@@ -347,9 +347,20 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
 }
 
-func (api *API) GetSuggestedRoutes(ctx context.Context, sendType SendType, account common.Address, amountIn *hexutil.Big, tokenSymbol string, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs []uint64, gasFeeMode GasFeeMode) (*SuggestedRoutes, error) {
+func (api *API) GetSuggestedRoutes(
+	ctx context.Context,
+	sendType SendType,
+	account common.Address,
+	amountIn *hexutil.Big,
+	tokenSymbol string,
+	disabledFromChainIDs,
+	disabledToChaindIDs,
+	preferedChainIDs []uint64,
+	gasFeeMode GasFeeMode,
+	fromLockedAmount map[uint64]*hexutil.Big,
+) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode)
+	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
 func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
