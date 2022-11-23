@@ -1600,6 +1600,20 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		return nil
 	}
 
+	removedChatIDs := make([]string, 0)
+	for id := range communityResponse.Changes.ChatsRemoved {
+		chatID := community.IDString() + id
+		_, ok := state.AllChats.Load(chatID)
+		if ok {
+			removedChatIDs = append(removedChatIDs, chatID)
+			state.AllChats.Delete(chatID)
+			err := m.DeleteChat(chatID)
+			if err != nil {
+				m.logger.Error("couldn't delete chat", zap.Error(err))
+			}
+		}
+	}
+
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
@@ -1626,6 +1640,13 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 			// TODO(samyoul) remove storing of an updated reference pointer?
 			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)
+		}
+	}
+
+	for _, chatID := range removedChatIDs {
+		_, err := m.transport.RemoveFilterByChatID(chatID)
+		if err != nil {
+			m.logger.Error("couldn't remove filter", zap.Error(err))
 		}
 	}
 
