@@ -72,20 +72,12 @@ func (m *MessengerSignalsHandler) MessengerResponse(response *protocol.Messenger
 	PublisherSignalHandler{}.NewMessages(response)
 }
 
-func (m *MessengerSignalsHandler) HistoryRequestStarted(requestID string, numBatches int) {
-	signal.SendHistoricMessagesRequestStarted(requestID, numBatches)
+func (m *MessengerSignalsHandler) HistoryRequestStarted(numBatches int) {
+	signal.SendHistoricMessagesRequestStarted(numBatches)
 }
 
-func (m *MessengerSignalsHandler) HistoryRequestBatchProcessed(requestID string, batchIndex int, numBatches int) {
-	signal.SendHistoricMessagesRequestBatchProcessed(requestID, batchIndex, numBatches)
-}
-
-func (m *MessengerSignalsHandler) HistoryRequestFailed(requestID string, err error) {
-	signal.SendHistoricMessagesRequestFailed(requestID, err)
-}
-
-func (m *MessengerSignalsHandler) HistoryRequestCompleted(requestID string) {
-	signal.SendHistoricMessagesRequestCompleted(requestID)
+func (m *MessengerSignalsHandler) HistoryRequestCompleted() {
+	signal.SendHistoricMessagesRequestCompleted()
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesProtocolEnabled() {

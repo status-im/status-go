@@ -32,10 +32,9 @@ type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
 	CommunityInfoFound(community *communities.Community)
 	MessengerResponse(response *MessengerResponse)
-	HistoryRequestStarted(requestID string, numBatches int)
-	HistoryRequestBatchProcessed(requestID string, batchIndex int, batchNum int)
-	HistoryRequestCompleted(requestID string)
-	HistoryRequestFailed(requestID string, err error)
+	HistoryRequestStarted(numBatches int)
+	HistoryRequestCompleted()
+
 	BackupPerformed(uint64)
 	HistoryArchivesProtocolEnabled()
 	HistoryArchivesProtocolDisabled()

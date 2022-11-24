@@ -185,7 +185,6 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		return nil, err
 	}
 	options = []store.HistoryRequestOption{
-		store.WithPeer(peer),
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
@@ -203,7 +202,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		topics = append(topics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(topics, uint64(r.From), uint64(r.To), options)
+	pbCursor, err := w.waku.Query(peer, topics, uint64(r.From), uint64(r.To), options)
 	if err != nil {
 		return nil, err
 	}
