@@ -2,12 +2,15 @@ package protocol
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/server"
 )
 
 const (
@@ -143,4 +146,31 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 	}
 
 	return m.publishContactCode()
+}
+
+func (m *Messenger) setInstallationHostname() error {
+	ourInstallation, ok := m.allInstallations.Load(m.installationID)
+	if !ok {
+		m.logger.Error("Messenger's installationID is not set or not loadable")
+		return nil
+	}
+
+	var imd *multidevice.InstallationMetadata
+	if ourInstallation.InstallationMetadata == nil {
+		imd = new(multidevice.InstallationMetadata)
+	} else {
+		imd = ourInstallation.InstallationMetadata
+	}
+
+	// If the name is already set, don't do anything
+	if len(imd.Name) != 0 {
+		return nil
+	}
+
+	hn, err := server.GetDeviceName()
+	if err != nil {
+		return err
+	}
+	imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+	return m.setInstallationMetadata(m.installationID, imd)
 }
