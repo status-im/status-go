@@ -1163,6 +1163,10 @@ func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
 	return api.service.messenger.Peers()
 }
 
+func (api *PublicAPI) ListenAddresses() ([]string, error) {
+	return api.service.messenger.ListenAddresses()
+}
+
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
 	err := api.service.accountsDB.SaveSettingField(settings.ProfilePicturesShowTo, showTo)
 	if err != nil {

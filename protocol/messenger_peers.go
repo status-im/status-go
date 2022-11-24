@@ -25,3 +25,7 @@ func (m *Messenger) DropPeer(peerID string) error {
 func (m *Messenger) Peers() map[string]types.WakuV2Peer {
 	return m.transport.Peers()
 }
+
+func (m *Messenger) ListenAddresses() ([]string, error) {
+	return m.transport.ListenAddresses()
+}
