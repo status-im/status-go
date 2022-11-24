@@ -18,6 +18,8 @@ import (
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	"github.com/libp2p/go-libp2p/core/peer"
+        "github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -411,6 +413,8 @@ func WithSecureWebsockets(address string, port int, certPath string, keyPath str
 	}
 }
 
+var staticRelay,_ = peer.AddrInfoFromString("/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi")
+
 // Default options used in the libp2p node
 var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.ChainOptions(
@@ -424,8 +428,10 @@ var DefaultLibP2POptions = []libp2p.Option{
 	),
 	libp2p.EnableNATService(),
 	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
-        libp2p.EnableRelayService(),
         libp2p.EnableHolePunching(),
+        libp2p.EnableAutoRelay(
+          autorelay.WithStaticRelays([]peer.AddrInfo{*staticRelay}),
+        ),
 }
 
 func newConnManager(lo int, hi int, opts ...connmgr.Option) *connmgr.BasicConnMgr {
