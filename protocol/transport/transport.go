@@ -435,7 +435,7 @@ func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 
-func (t *Transport) Peers() map[string][]string {
+func (t *Transport) Peers() map[string]types.WakuV2Peer {
 	return t.waku.Peers()
 }
 

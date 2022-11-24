@@ -1,5 +1,7 @@
 package protocol
 
+import "github.com/status-im/status-go/eth-node/types"
+
 func (m *Messenger) AddStorePeer(address string) (string, error) {
 	return m.transport.AddStorePeer(address)
 }
@@ -20,6 +22,6 @@ func (m *Messenger) DropPeer(peerID string) error {
 	return m.transport.DropPeer(peerID)
 }
 
-func (m *Messenger) Peers() map[string][]string {
+func (m *Messenger) Peers() map[string]types.WakuV2Peer {
 	return m.transport.Peers()
 }

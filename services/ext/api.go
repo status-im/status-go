@@ -1159,7 +1159,7 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(peerID)
 }
 
-func (api *PublicAPI) Peers() map[string][]string {
+func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
 	return api.service.messenger.Peers()
 }
 

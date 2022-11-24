@@ -263,7 +263,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 				return
 			case c := <-connStatusChan:
 				waku.connStatusMu.Lock()
-				latestConnStatus := formatConnStatus(c)
+				latestConnStatus := formatConnStatus(waku.node, c)
 				for k, subs := range waku.connStatusSubscriptions {
 					if subs.Active() {
 						subs.C <- latestConnStatus
@@ -1121,8 +1121,8 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
-func (w *Waku) Peers() map[string][]string {
-	return FormatPeerStats(w.node.PeerStats())
+func (w *Waku) Peers() map[string]types.WakuV2Peer {
+	return FormatPeerStats(w.node, w.node.PeerStats())
 }
 
 func (w *Waku) StartDiscV5() error {
@@ -1231,18 +1231,25 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	return id, nil
 }
 
-func FormatPeerStats(peers node.PeerStats) map[string][]string {
-	p := make(map[string][]string)
+func FormatPeerStats(wakuNode *node.WakuNode, peers node.PeerStats) map[string]types.WakuV2Peer {
+	p := make(map[string]types.WakuV2Peer)
 	for k, v := range peers {
-		p[k.Pretty()] = v
+		peerInfo := wakuNode.Host().Peerstore().PeerInfo(k)
+		wakuV2Peer := types.WakuV2Peer{}
+		wakuV2Peer.Protocols = v
+		hostInfo, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", k.Pretty()))
+		for _, addr := range peerInfo.Addrs {
+			wakuV2Peer.Addresses = append(wakuV2Peer.Addresses, addr.Encapsulate(hostInfo).String())
+		}
+		p[k.Pretty()] = wakuV2Peer
 	}
 	return p
 }
 
-func formatConnStatus(c node.ConnStatus) types.ConnStatus {
+func formatConnStatus(wakuNode *node.WakuNode, c node.ConnStatus) types.ConnStatus {
 	return types.ConnStatus{
 		IsOnline:   c.IsOnline,
 		HasHistory: c.HasHistory,
-		Peers:      FormatPeerStats(c.Peers),
+		Peers:      FormatPeerStats(wakuNode, c.Peers),
 	}
 }
