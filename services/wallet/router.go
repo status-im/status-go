@@ -27,12 +27,21 @@ const (
 	ENSRelease
 	ENSSetPubKey
 	StickersBuy
+	Bridge
 )
 const EstimateUsername = "RandomUsername"
 const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
 
 func (s SendType) isTransfer() bool {
 	return s == Transfer
+}
+
+func (s SendType) isAvailableBetween(from, to *params.Network) bool {
+	if s != Bridge {
+		return true
+	}
+
+	return from.ChainID != to.ChainID
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
@@ -342,6 +351,10 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 					}
 
 					if !sendType.isAvailableFor(network) {
+						continue
+					}
+
+					if !sendType.isAvailableBetween(network, dest) {
 						continue
 					}
 
