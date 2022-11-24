@@ -619,6 +619,10 @@ func (t *Transport) StopDiscV5() error {
 	return t.waku.StopDiscV5()
 }
 
+func (t *Transport) ListenAddresses() ([]string, error) {
+	return t.waku.ListenAddresses()
+}
+
 func (t *Transport) AddStorePeer(address string) (string, error) {
 	return t.waku.AddStorePeer(address)
 }

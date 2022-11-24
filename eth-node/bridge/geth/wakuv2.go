@@ -253,6 +253,10 @@ func (w *gethWakuV2Wrapper) DialPeerByID(peerID string) error {
 	return w.waku.DialPeerByID(peerID)
 }
 
+func (w *gethWakuV2Wrapper) ListenAddresses() ([]string, error) {
+	return w.waku.ListenAddresses(), nil
+}
+
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
 	return w.waku.DropPeer(peerID)
 }

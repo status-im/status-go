@@ -76,6 +76,8 @@ type Waku interface {
 	// PeerCount
 	PeerCount() int
 
+	ListenAddresses() ([]string, error)
+
 	Peers() map[string]WakuV2Peer
 
 	StartDiscV5() error

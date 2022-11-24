@@ -1125,6 +1125,15 @@ func (w *Waku) Peers() map[string]types.WakuV2Peer {
 	return FormatPeerStats(w.node, w.node.PeerStats())
 }
 
+func (w *Waku) ListenAddresses() []string {
+	addrs := w.node.ListenAddresses()
+	var result []string
+	for _, addr := range addrs {
+		result = append(result, addr.String())
+	}
+	return result
+}
+
 func (w *Waku) StartDiscV5() error {
 	if w.node.DiscV5() == nil {
 		return errors.New("discv5 is not setup")
