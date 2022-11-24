@@ -11,9 +11,14 @@ import (
 )
 
 type ConnStatus struct {
-	IsOnline   bool                `json:"isOnline"`
-	HasHistory bool                `json:"hasHistory"`
-	Peers      map[string][]string `json:"peers"`
+	IsOnline   bool                  `json:"isOnline"`
+	HasHistory bool                  `json:"hasHistory"`
+	Peers      map[string]WakuV2Peer `json:"peers"`
+}
+
+type WakuV2Peer struct {
+	Protocols []string `json:"protocols"`
+	Addresses []string `json:"addresses"`
 }
 
 type ConnStatusSubscription struct {
@@ -71,7 +76,7 @@ type Waku interface {
 	// PeerCount
 	PeerCount() int
 
-	Peers() map[string][]string
+	Peers() map[string]WakuV2Peer
 
 	StartDiscV5() error
 

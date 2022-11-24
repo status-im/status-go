@@ -241,7 +241,7 @@ func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (string, error) {
 	return w.waku.AddRelayPeer(address)
 }
 
-func (w *gethWakuV2Wrapper) Peers() map[string][]string {
+func (w *gethWakuV2Wrapper) Peers() map[string]types.WakuV2Peer {
 	return w.waku.Peers()
 }
 
