@@ -25,10 +25,12 @@ func WithPeer(p peer.ID) PeerExchangeOption {
 }
 
 // WithAutomaticPeerSelection is an option used to randomly select a peer from the peer store
-// to push a waku message to
-func WithAutomaticPeerSelection() PeerExchangeOption {
+// to obtains peers from. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 	return func(params *PeerExchangeParameters) {
-		p, err := utils.SelectPeer(params.host, string(PeerExchangeID_v20alpha1), params.log)
+		p, err := utils.SelectPeer(params.host, string(PeerExchangeID_v20alpha1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -38,10 +40,12 @@ func WithAutomaticPeerSelection() PeerExchangeOption {
 }
 
 // WithFastestPeerSelection is an option used to select a peer from the peer store
-// with the lowest ping
-func WithFastestPeerSelection(ctx context.Context) PeerExchangeOption {
+// with the lowest ping. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) PeerExchangeOption {
 	return func(params *PeerExchangeParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(PeerExchangeID_v20alpha1), params.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(PeerExchangeID_v20alpha1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {

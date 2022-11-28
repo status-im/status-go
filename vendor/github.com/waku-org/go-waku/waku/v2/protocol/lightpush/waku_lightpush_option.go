@@ -27,10 +27,12 @@ func WithPeer(p peer.ID) LightPushOption {
 }
 
 // WithAutomaticPeerSelection is an option used to randomly select a peer from the peer store
-// to push a waku message to
-func WithAutomaticPeerSelection() LightPushOption {
+// to push a waku message to. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeer(params.host, string(LightPushID_v20beta1), params.log)
+		p, err := utils.SelectPeer(params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -40,10 +42,12 @@ func WithAutomaticPeerSelection() LightPushOption {
 }
 
 // WithFastestPeerSelection is an option used to select a peer from the peer store
-// with the lowest ping
-func WithFastestPeerSelection(ctx context.Context) LightPushOption {
+// with the lowest ping. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1), params.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {

@@ -38,9 +38,12 @@ func WithPeer(p peer.ID) FilterSubscribeOption {
 	}
 }
 
-func WithAutomaticPeerSelection() FilterSubscribeOption {
+// WithAutomaticPeerSelection is an option used to randomly select a peer from the peer store.
+// If a list of specific peers is passed, the peer will be chosen from that list assuming it
+// supports the chosen protocol, otherwise it will chose a peer from the node peerstore
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
-		p, err := utils.SelectPeer(params.host, string(FilterID_v20beta1), params.log)
+		p, err := utils.SelectPeer(params.host, string(FilterID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -49,9 +52,13 @@ func WithAutomaticPeerSelection() FilterSubscribeOption {
 	}
 }
 
-func WithFastestPeerSelection(ctx context.Context) FilterSubscribeOption {
+// WithFastestPeerSelection is an option used to select a peer from the peer store
+// with the lowest ping If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a
+// peer from the node peerstore
+func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(FilterID_v20beta1), params.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(FilterID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {

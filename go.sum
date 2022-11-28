@@ -2065,10 +2065,10 @@ github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae/go.mod h1:DD4vA1
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
 github.com/waku-org/go-discover v0.0.0-20221027130446-2f43d5f6c73f h1:YHIrSqs8Aot1exhwx0+uwdshCp3RfZu5OY6Hvt3Hk8g=
 github.com/waku-org/go-discover v0.0.0-20221027130446-2f43d5f6c73f/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
-github.com/waku-org/go-waku v0.2.3-0.20221122234656-5d7d05ca16a5 h1:fsDf8CcQZOIwgJ9OhEdX7FkYXP+JYlcYcOMWlY/id7w=
-github.com/waku-org/go-waku v0.2.3-0.20221122234656-5d7d05ca16a5/go.mod h1:QqlddKC5Q8ucWSnKQrHClWAkm6HszsQ1bUOXZYvt2UA=
-github.com/waku-org/go-zerokit-rln v0.1.6 h1:r8B6S83WJIioxEj1wSruhx+eg47HpSrIwuhi6yaRvy0=
-github.com/waku-org/go-zerokit-rln v0.1.6/go.mod h1:T1wLR/VuTcxLkDv0O7JvR0N/9y7GHM2IeU7LjnWZxek=
+github.com/waku-org/go-waku v0.2.3-0.20221126210912-041c7be67dfb h1:d/ZP7cofn3xdkGBWCuqtbIC6JlG+ytxscyeau3czQ5Y=
+github.com/waku-org/go-waku v0.2.3-0.20221126210912-041c7be67dfb/go.mod h1:tJGCjHrNc8JjOX0df15Uv4YiLQMNhWrotKHJeeVl3AE=
+github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg h1:2vVIBCtBih2w1K9ll8YnToTDZvbxcgbsClsPlJS/kkg=
+github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg/go.mod h1:GlyaVeEWNEBxVJrWC6jFTvb4LNb9d9qnjdS6EiWVUvk=
 github.com/waku-org/noise v1.0.2 h1:7WmlhpJ0eliBzwzKz6SoTqQznaEU2IuebHF3oCekqqs=
 github.com/waku-org/noise v1.0.2/go.mod h1:emThr8WZLeAtKqFW+/nXfHn9VucuXTh8aHap03UXP84=
 github.com/wealdtech/go-ens/v3 v3.5.0 h1:Huc9GxBgiGweCOGTYomvsg07K2QggAqZpZ5SuiZdC8o=

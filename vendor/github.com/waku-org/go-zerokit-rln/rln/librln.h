@@ -5,13 +5,20 @@
 
 #define TEST_PARAMETERS_INDEX 2
 
+/**
+ * The RLN object.
+ *
+ * It implements the methods required to update the internal Merkle Tree, generate and verify RLN ZK proofs.
+ *
+ * I/O is mostly done using writers and readers implementing `std::io::Write` and `std::io::Read`, respectively.
+ */
 typedef struct RLN RLN;
 
 /**
  * Buffer struct is taken from
- * https://github.com/celo-org/celo-threshold-bls-rs/blob/master/crates/threshold-bls-ffi/src/ffi.rs
+ * <https://github.com/celo-org/celo-threshold-bls-rs/blob/master/crates/threshold-bls-ffi/src/ffi.rs>
  *
- * Also heavily inspired by https://github.com/kilic/rln/blob/master/src/ffi.rs
+ * Also heavily inspired by <https://github.com/kilic/rln/blob/master/src/ffi.rs>
  */
 typedef struct Buffer {
   const uint8_t *ptr;
@@ -34,7 +41,9 @@ bool set_leaf(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffe
 
 bool set_next_leaf(struct RLN *ctx, const struct Buffer *input_buffer);
 
-bool set_leaves(struct RLN *ctx, const struct Buffer *input_buffer);
+bool set_leaves_from(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffer);
+
+bool init_tree_with_leaves(struct RLN *ctx, const struct Buffer *input_buffer);
 
 bool get_root(const struct RLN *ctx, struct Buffer *output_buffer);
 

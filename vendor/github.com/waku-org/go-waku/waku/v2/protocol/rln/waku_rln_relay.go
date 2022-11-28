@@ -229,9 +229,7 @@ func (rln *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime *time
 	contentTopicBytes := []byte(msg.ContentTopic)
 	input := append(msg.Payload, contentTopicBytes...)
 
-	// TODO: set window of roots
-	roots := [][32]byte{}
-	valid, err := rln.RLN.VerifyWithRoots(input, *msgProof, roots)
+	valid, err := rln.RLN.VerifyWithRoots(input, *msgProof, rln.validMerkleRoots)
 	if err != nil {
 		rln.log.Debug("could not verify proof", zap.Error(err))
 		return MessageValidationResult_Invalid, nil
@@ -312,7 +310,7 @@ func (r *WakuRLNRelay) MembershipContractAddress() common.Address {
 	return r.membershipContractAddress
 }
 
-func (r *WakuRLNRelay) insertMember(pubkey [32]byte) error {
+func (r *WakuRLNRelay) insertMember(pubkey r.IDCommitment) error {
 	r.log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]))
 	// assuming all the members arrive in order
 	err := r.RLN.InsertMember(pubkey)

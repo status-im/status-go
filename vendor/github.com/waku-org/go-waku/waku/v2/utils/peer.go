@@ -19,15 +19,23 @@ import (
 var ErrNoPeersAvailable = errors.New("no suitable peers found")
 
 // SelectPeer is used to return a random peer that supports a given protocol.
-func SelectPeer(host host.Host, protocolId string, log *zap.Logger) (*peer.ID, error) {
+// If a list of specific peers is passed, the peer will be chosen from that list assuming
+// it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
+func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (*peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
 	// This will require us to check for various factors such as:
 	//  - which topics they track
 	//  - latency?
 	//  - default store peer?
+
+	peerSet := specificPeers
+	if len(peerSet) == 0 {
+		peerSet = host.Peerstore().Peers()
+	}
+
 	var peers peer.IDSlice
-	for _, peer := range host.Peerstore().Peers() {
+	for _, peer := range peerSet {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
 			log.Error("obtaining protocols supported by peers", zap.Error(err), logging.HostID("peer", peer))
@@ -53,9 +61,17 @@ type pingResult struct {
 }
 
 // SelectPeerWithLowestRTT will select a peer that supports a specific protocol with the lowest reply time
-func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, log *zap.Logger) (*peer.ID, error) {
+// If a list of specific peers is passed, the peer will be chosen from that list assuming
+// it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (*peer.ID, error) {
 	var peers peer.IDSlice
-	for _, peer := range host.Peerstore().Peers() {
+
+	peerSet := specificPeers
+	if len(peerSet) == 0 {
+		peerSet = host.Peerstore().Peers()
+	}
+
+	for _, peer := range peerSet {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
 			log.Error("error obtaining the protocols supported by peers", zap.Error(err))
