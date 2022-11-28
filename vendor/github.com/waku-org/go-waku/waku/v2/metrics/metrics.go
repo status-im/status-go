@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.opencensus.io/stats"
@@ -11,6 +12,7 @@ import (
 )
 
 var (
+	WakuVersion         = stats.Int64("waku_version", "", stats.UnitDimensionless)
 	Messages            = stats.Int64("node_messages", "Number of messages received", stats.UnitDimensionless)
 	Peers               = stats.Int64("peers", "Number of connected peers", stats.UnitDimensionless)
 	Dials               = stats.Int64("dials", "Number of peer dials", stats.UnitDimensionless)
@@ -22,8 +24,9 @@ var (
 )
 
 var (
-	KeyType, _   = tag.NewKey("type")
-	ErrorType, _ = tag.NewKey("error_type")
+	KeyType, _    = tag.NewKey("type")
+	ErrorType, _  = tag.NewKey("error_type")
+	GitVersion, _ = tag.NewKey("git_version")
 )
 
 var (
@@ -72,6 +75,13 @@ var (
 		Aggregation: view.Count(),
 		TagKeys:     []tag.Key{ErrorType},
 	}
+	VersionView = &view.View{
+		Name:        "gowaku_version",
+		Measure:     WakuVersion,
+		Description: "The gowaku version",
+		Aggregation: view.LastValue(),
+		TagKeys:     []tag.Key{GitVersion},
+	}
 )
 
 func RecordLightpushError(ctx context.Context, tagType string) {
@@ -94,6 +104,13 @@ func RecordMessage(ctx context.Context, tagType string, len int) {
 
 func RecordStoreError(ctx context.Context, tagType string) {
 	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, StoreErrors.M(1)); err != nil {
+		utils.Logger().Error("failed to record with tags", zap.Error(err))
+	}
+}
+
+func RecordVersion(ctx context.Context, version string, commit string) {
+	v := fmt.Sprintf("%s-%s", version, commit)
+	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(GitVersion, v)}, WakuVersion.M(1)); err != nil {
 		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
 }

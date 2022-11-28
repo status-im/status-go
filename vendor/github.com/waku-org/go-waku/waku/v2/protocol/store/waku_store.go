@@ -324,10 +324,12 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 }
 
 // WithAutomaticPeerSelection is an option used to randomly select a peer from the peer store
-// to request the message history
-func WithAutomaticPeerSelection() HistoryRequestOption {
+// to request the message history. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeer(params.s.h, string(StoreID_v20beta4), params.s.log)
+		p, err := utils.SelectPeer(params.s.h, string(StoreID_v20beta4), fromThesePeers, params.s.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -336,9 +338,13 @@ func WithAutomaticPeerSelection() HistoryRequestOption {
 	}
 }
 
-func WithFastestPeerSelection(ctx context.Context) HistoryRequestOption {
+// WithFastestPeerSelection is an option used to select a peer from the peer store
+// with the lowest ping. If a list of specific peers is passed, the peer will be chosen
+// from that list assuming it supports the chosen protocol, otherwise it will chose a peer
+// from the node peerstore
+func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.s.h, string(StoreID_v20beta4), params.s.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.s.h, string(StoreID_v20beta4), fromThesePeers, params.s.log)
 		if err == nil {
 			params.selectedPeer = *p
 		} else {
@@ -481,7 +487,11 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 		q.PagingInfo.Direction = pb.PagingInfo_BACKWARD
 	}
 
-	q.PagingInfo.PageSize = params.pageSize
+	pageSize := params.pageSize
+	if pageSize == 0 || pageSize > uint64(MaxPageSize) {
+		pageSize = MaxPageSize
+	}
+	q.PagingInfo.PageSize = pageSize
 
 	response, err := store.queryFrom(ctx, q, params.selectedPeer, params.requestId)
 	if err != nil {
@@ -676,7 +686,7 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 	}
 
 	if len(peerList) == 0 {
-		p, err := utils.SelectPeer(store.h, string(StoreID_v20beta4), store.log)
+		p, err := utils.SelectPeer(store.h, string(StoreID_v20beta4), nil, store.log)
 		if err != nil {
 			store.log.Info("selecting peer", zap.Error(err))
 			return -1, ErrNoPeersAvailable
