@@ -169,7 +169,7 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 
 		for _, asset := range container.Assets {
 			for i := range asset.Traits {
-				asset.Traits[i].TraitType = strings.Replace(strings.ToUpper(asset.Traits[i].TraitType), "_", " ", 1)
+				asset.Traits[i].TraitType = strings.Replace(asset.Traits[i].TraitType, "_", " ", 1)
 				asset.Traits[i].Value = TraitValue(strings.Title(string(asset.Traits[i].Value)))
 			}
 			assets = append(assets, asset)
