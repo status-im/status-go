@@ -990,7 +990,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.2.3-0.20221126210912-041c7be67dfb
+# github.com/waku-org/go-waku v0.2.3-0.20221129201435-94d20ab12276
 ## explicit; go 1.18
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence

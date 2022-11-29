@@ -489,7 +489,7 @@ func (w *WakuNode) mountDiscV5() error {
 	}
 
 	var err error
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.ctx, w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
 
 	return err
 }
