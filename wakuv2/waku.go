@@ -123,7 +123,7 @@ type Waku struct {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku, error) {
+func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -149,6 +149,11 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku,
 		storeMsgIDsMu:           sync.RWMutex{},
 		timeSource:              time.Now,
 		logger:                  logger,
+	}
+
+	// Disabling light client mode if using status.prod or undefined
+	if fleet == "status.prod" || fleet == "" {
+		cfg.LightClient = false
 	}
 
 	waku.settings = settings{
