@@ -189,7 +189,7 @@ type WakuV2Config struct {
 	// A name->libp2p_addr map for Wakuv2 custom nodes
 	CustomNodes map[string]string
 
-	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
+	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
 	PeerExchange bool
 
 	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
