@@ -26,6 +26,7 @@ type DiscoveryV5 struct {
 	discovery.Discovery
 
 	params    *discV5Parameters
+	ctx       context.Context
 	host      host.Host
 	config    discover.Config
 	udpAddr   *net.UDPAddr
@@ -39,7 +40,9 @@ type DiscoveryV5 struct {
 
 	wg *sync.WaitGroup
 
-	peerCache peerCache
+	peerCache          peerCache
+	discoverCtx        context.Context
+	discoverCancelFunc context.CancelFunc
 }
 
 type peerCache struct {
@@ -95,7 +98,9 @@ func DefaultOptions() []DiscoveryV5Option {
 	}
 }
 
-func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+const MaxPeersToDiscover = 600
+
+func NewDiscoveryV5(ctx context.Context, host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -111,6 +116,7 @@ func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.Loc
 	}
 
 	return &DiscoveryV5{
+		ctx:    ctx,
 		host:   host,
 		params: params,
 		NAT:    NAT,
@@ -194,6 +200,10 @@ func (d *DiscoveryV5) Start() error {
 		return err
 	}
 
+	// create cancellable
+	d.discoverCtx, d.discoverCancelFunc = context.WithCancel(d.ctx)
+	go d.runDiscoveryV5Loop()
+
 	return nil
 }
 
@@ -206,6 +216,7 @@ func (d *DiscoveryV5) Stop() {
 	}
 
 	close(d.quit)
+	d.discoverCancelFunc()
 
 	d.listener.Close()
 	d.listener = nil
@@ -279,7 +290,7 @@ func (d *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discover
 	return 20 * time.Minute, nil
 }
 
-func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limit int, doneCh chan struct{}) {
+func (d *DiscoveryV5) iterate(iterator enode.Iterator, limit int, doneCh chan struct{}) {
 	defer d.wg.Done()
 
 	for {
@@ -287,7 +298,7 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 			break
 		}
 
-		if ctx.Err() != nil {
+		if d.discoverCtx.Err() != nil {
 			break
 		}
 
@@ -308,6 +319,7 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 			continue
 		}
 
+		d.peerCache.Lock()
 		for _, p := range peerAddrs {
 			d.peerCache.recs[p.ID] = PeerRecord{
 				expire: time.Now().Unix() + 3600, // Expires in 1hr
@@ -315,7 +327,7 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 				Node:   *iterator.Node(),
 			}
 		}
-
+		d.peerCache.Unlock()
 	}
 
 	close(doneCh)
@@ -337,6 +349,25 @@ func (d *DiscoveryV5) removeExpiredPeers() int {
 	return newCacheSize
 }
 
+func (d *DiscoveryV5) runDiscoveryV5Loop() {
+	iterator := d.listener.RandomNodes()
+	iterator = enode.Filter(iterator, evaluateNode)
+	defer iterator.Close()
+
+	doneCh := make(chan struct{})
+
+	d.wg.Add(1)
+
+	go d.iterate(iterator, MaxPeersToDiscover, doneCh)
+
+	select {
+	case <-d.discoverCtx.Done():
+	case <-doneCh:
+	}
+
+	d.log.Warn("Discv5 loop stopped")
+}
+
 func (d *DiscoveryV5) FindNodes(ctx context.Context, topic string, opts ...discovery.Option) ([]PeerRecord, error) {
 	// Get options
 	var options discovery.Options
@@ -345,10 +376,9 @@ func (d *DiscoveryV5) FindNodes(ctx context.Context, topic string, opts ...disco
 		return nil, err
 	}
 
-	const maxLimit = 600
 	limit := options.Limit
-	if limit == 0 || limit > maxLimit {
-		limit = maxLimit
+	if limit == 0 || limit > MaxPeersToDiscover {
+		limit = MaxPeersToDiscover
 	}
 
 	// We are ignoring the topic. Future versions might use a map[string]*peerCache instead where the string represents the pubsub topic
@@ -356,28 +386,7 @@ func (d *DiscoveryV5) FindNodes(ctx context.Context, topic string, opts ...disco
 	d.peerCache.Lock()
 	defer d.peerCache.Unlock()
 
-	cacheSize := d.removeExpiredPeers()
-
-	// Discover new records if we don't have enough
-	if cacheSize < limit && d.listener != nil {
-		d.Lock()
-
-		iterator := d.listener.RandomNodes()
-		iterator = enode.Filter(iterator, evaluateNode)
-		defer iterator.Close()
-
-		doneCh := make(chan struct{})
-
-		d.wg.Add(1)
-		go d.iterate(ctx, iterator, limit, doneCh)
-
-		select {
-		case <-ctx.Done():
-		case <-doneCh:
-		}
-
-		d.Unlock()
-	}
+	d.removeExpiredPeers()
 
 	// Randomize and fill channel with available records
 	count := len(d.peerCache.recs)
