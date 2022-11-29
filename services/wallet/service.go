@@ -55,6 +55,7 @@ func NewService(
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
+		feed:                  accountFeed,
 	}
 }
 
@@ -75,6 +76,7 @@ type Service struct {
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
 	stickers              *stickers.Service
+	feed                  *event.Feed
 }
 
 // Start signals transmitter.

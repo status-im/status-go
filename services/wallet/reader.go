@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -11,7 +12,11 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
+
+// WalletTickReload emitted every 15mn to reload the wallet balance and history
+const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 
 func NewReader(s *Service) *Reader {
 	return &Reader{s}
@@ -90,12 +95,18 @@ func getTokenAddresses(tokens []*token.Token) []common.Address {
 }
 
 func (r *Reader) Start(ctx context.Context, chainIDs []uint64) error {
-	accounts, err := r.s.accountsDB.GetAccounts()
-	if err != nil {
-		return err
+	run := func(context.Context) error {
+		r.s.feed.Send(walletevent.Event{
+			Type: EventWalletTickReload,
+		})
+		return nil
 	}
-
-	return r.s.transferController.CheckRecentHistory(chainIDs, getAddresses(accounts))
+	command := async.FiniteCommand{
+		Interval: 10 * time.Second,
+		Runable:  run,
+	}
+	go command.Run(ctx)
+	return nil
 }
 
 func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token, error) {

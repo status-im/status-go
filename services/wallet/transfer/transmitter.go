@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -28,7 +29,7 @@ func (tmr *SignalsTransmitter) Start() error {
 		return nil
 	}
 	tmr.quit = make(chan struct{})
-	events := make(chan Event, 10)
+	events := make(chan walletevent.Event, 10)
 	sub := tmr.publisher.Subscribe(events)
 
 	tmr.wg.Add(1)
