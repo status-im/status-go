@@ -12,6 +12,20 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+const (
+	// EventNewTransfers emitted when new block was added to the same canonical chan.
+	EventNewTransfers walletevent.EventType = "new-transfers"
+	// EventFetchingRecentHistory emitted when fetching of lastest tx history is started
+	EventFetchingRecentHistory walletevent.EventType = "recent-history-fetching"
+	// EventRecentHistoryReady emitted when fetching of lastest tx history is started
+	EventRecentHistoryReady walletevent.EventType = "recent-history-ready"
+	// EventFetchingHistoryError emitted when fetching of tx history failed
+	EventFetchingHistoryError walletevent.EventType = "fetching-history-error"
+	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
+	EventNonArchivalNodeDetected walletevent.EventType = "non-archival-node-detected"
 )
 
 var (
@@ -172,7 +186,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return err
 	}
 
-	c.feed.Send(Event{
+	c.feed.Send(walletevent.Event{
 		Type:     EventFetchingRecentHistory,
 		Accounts: c.accounts,
 	})
@@ -256,9 +270,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return err
 	}
 
-	events := map[common.Address]Event{}
+	events := map[common.Address]walletevent.Event{}
 	for _, address := range c.accounts {
-		event := Event{
+		event := walletevent.Event{
 			Type:     EventNewTransfers,
 			Accounts: []common.Address{address},
 		}
@@ -276,7 +290,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		c.feed.Send(event)
 	}
 
-	c.feed.Send(Event{
+	c.feed.Send(walletevent.Event{
 		Type:        EventRecentHistoryReady,
 		Accounts:    c.accounts,
 		BlockNumber: target,
@@ -297,12 +311,12 @@ func (c *controlCommand) NewError(err error) bool {
 	if nonArchivalNodeError(err) {
 		log.Info("Non archival node detected")
 		c.nonArchivalRPCNode = true
-		c.feed.Send(Event{
+		c.feed.Send(walletevent.Event{
 			Type: EventNonArchivalNodeDetected,
 		})
 	}
 	if c.errorsCount >= 3 {
-		c.feed.Send(Event{
+		c.feed.Send(walletevent.Event{
 			Type:    EventFetchingHistoryError,
 			Message: err.Error(),
 		})

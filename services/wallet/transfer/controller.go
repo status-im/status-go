@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 type Controller struct {
@@ -230,7 +231,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 		from, err := findFirstRange(ctx, address, block, chainClient)
 		if err != nil {
 			if nonArchivalNodeError(err) {
-				c.TransferFeed.Send(Event{
+				c.TransferFeed.Send(walletevent.Event{
 					Type: EventNonArchivalNodeDetected,
 				})
 				from = big.NewInt(0).Sub(block, big.NewInt(100))
