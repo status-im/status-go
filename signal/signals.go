@@ -87,16 +87,18 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Trace("Notification received", "event", jsonEvent)
 }
 
+// nolint: golint
+//
 //export NotifyNode
-//nolint: golint
 func NotifyNode(jsonEvent *C.char) {
 	notificationHandlerMutex.RLock()
 	defer notificationHandlerMutex.RUnlock()
 	notificationHandler(C.GoString(jsonEvent))
 }
 
+// nolint: golint
+//
 //export TriggerTestSignal
-//nolint: golint
 func TriggerTestSignal() {
 	str := C.CString(`{"answer": 42}`)
 	C.StatusServiceSignalEvent(str)

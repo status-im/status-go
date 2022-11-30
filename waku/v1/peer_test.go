@@ -44,7 +44,7 @@ func initSingleTest() {
 var sharedTopic = common.TopicType{0xF, 0x1, 0x2, 0}
 var wrongTopic = common.TopicType{0, 0, 0, 0}
 
-//two generic waku node handshake. one don't send light flag
+// two generic waku node handshake. one don't send light flag
 func TestTopicOrBloomMatch(t *testing.T) {
 	p := Peer{}
 	p.setTopicInterest([]common.TopicType{sharedTopic})

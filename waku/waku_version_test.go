@@ -547,7 +547,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	}
 }
 
-//two generic waku node handshake
+// two generic waku node handshake
 func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() { handleError(s.T(), rw1.Close()) }()
@@ -571,7 +571,7 @@ func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 	s.Require().Equal(pow, p2.PoWRequirement())
 }
 
-//two generic waku node handshake. one don't send light flag
+// two generic waku node handshake. one don't send light flag
 func (s *WakuTestSuite) TestHandshakeWithOldVersionWithoutLightModeFlag() {
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() { handleError(s.T(), rw1.Close()) }()
@@ -591,7 +591,7 @@ func (s *WakuTestSuite) TestHandshakeWithOldVersionWithoutLightModeFlag() {
 	s.Require().NoError(err)
 }
 
-//two light nodes handshake. restriction enable
+// two light nodes handshake. restriction enable
 func (s *WakuTestSuite) TestTwoLightPeerHandshakeRestrictionOff() {
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() { handleError(s.T(), rw1.Close()) }()
@@ -613,7 +613,7 @@ func (s *WakuTestSuite) TestTwoLightPeerHandshakeRestrictionOff() {
 	s.Require().NoError(p2.Start())
 }
 
-//two light nodes handshake. restriction enabled
+// two light nodes handshake. restriction enabled
 func (s *WakuTestSuite) TestTwoLightPeerHandshakeError() {
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() { handleError(s.T(), rw1.Close()) }()

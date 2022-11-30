@@ -85,7 +85,9 @@ func checkLogsAreInOrder(records []cacheRecord) error {
 
 // merge merges received records into old slice starting at provided position, example:
 // [1, 2, 3]
-//    [2, 3, 4]
+//
+//	[2, 3, 4]
+//
 // [1, 2, 3, 4]
 // if hash doesn't match previously received hash - such block was removed due to reorg
 // logs that were a part of that block will be returned with Removed set to true
