@@ -151,6 +151,7 @@ type Messenger struct {
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
 	savedAddressesManager                *wallet.SavedAddressesManager
+	backedupMessagesHandler              backupHandler
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -479,6 +480,9 @@ func NewMessenger(
 		},
 		logger:                logger,
 		savedAddressesManager: savedAddressesManager,
+		backedupMessagesHandler: backupHandler{
+			postponeHandling: true,
+		},
 	}
 
 	if c.outputMessagesCSV {
@@ -684,6 +688,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
 	m.startBackupLoop()
+	m.startWaitingForTheLatestBackedupMessageLoop()
 	err = m.startAutoMessageLoop()
 	if err != nil {
 		return nil, err
@@ -3570,9 +3575,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						p := msg.ParsedMessage.Interface().(protobuf.Backup)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling Backup", zap.Any("message", p))
-						err = m.HandleBackup(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle Backup", zap.Error(err))
+						errors := m.HandleBackup(messageState, p)
+						if len(errors) > 0 {
+							for _, err := range errors {
+								logger.Warn("failed to handle Backup", zap.Error(err))
+							}
 							allMessagesProcessed = false
 							continue
 						}
@@ -3706,12 +3713,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, ss)
 						logger.Debug("Handling SyncSetting", zap.Any("message", ss))
 
-						err := m.handleSyncSetting(messageState.Response, &ss)
+						settingField, err := m.extractSyncSetting(&ss)
 						if err != nil {
 							logger.Warn("failed to handle SyncSetting", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
+						messageState.Response.Settings = append(messageState.Response.Settings, settingField)
 
 					case protobuf.RequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)

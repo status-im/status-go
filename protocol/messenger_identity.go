@@ -49,7 +49,7 @@ func ValidateDisplayName(displayName *string) error {
 	return nil
 }
 
-func (m *Messenger) SetDisplayName(displayName string) error {
+func (m *Messenger) SetDisplayName(displayName string, publishChange bool) error {
 	currDisplayName, err := m.settings.DisplayName()
 	if err != nil {
 		return err
@@ -74,12 +74,16 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
-	err = m.resetLastPublishedTimeForChatIdentity()
-	if err != nil {
-		return err
+	if publishChange {
+		err = m.resetLastPublishedTimeForChatIdentity()
+		if err != nil {
+			return err
+		}
+
+		return m.publishContactCode()
 	}
 
-	return m.publishContactCode()
+	return nil
 }
 
 func ValidateBio(bio *string) error {

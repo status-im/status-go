@@ -5,6 +5,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -142,4 +143,16 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
 	signal.SendDiscordCommunityImportCancelled(id)
+}
+
+func (m *MessengerSignalsHandler) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuFetchingBackupProgress(response)
+}
+
+func (m *MessengerSignalsHandler) SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuBackedUpProfile(response)
+}
+
+func (m *MessengerSignalsHandler) SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuBackedUpSettings(response)
 }

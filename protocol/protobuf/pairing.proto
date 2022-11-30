@@ -1,14 +1,30 @@
 syntax = "proto3";
 
+import "sync_settings.proto";
+
 option go_package = "./;protobuf";
 package protobuf;
+
+/* `FetchingBackedUpDataDetails` is used to describe how many messages a single backup data structure consists of */
+message FetchingBackedUpDataDetails {
+  uint32 data_number = 1;
+  uint32 total_number = 2;
+}
 
 message Backup {
   uint64 clock = 1;
   string id = 2;
 
+/* this is what we already had */
   repeated SyncInstallationContactV2 contacts = 3;
   repeated SyncCommunity communities = 4;
+/* newly added details to be backed up to and fetched from waku */
+  FetchingBackedUpDataDetails contactsDetails = 5;
+  FetchingBackedUpDataDetails communitiesDetails = 6;
+  BackedUpProfile profile = 7;
+  FetchingBackedUpDataDetails profileDetails = 8;
+  SyncSetting setting = 9;
+  FetchingBackedUpDataDetails settingsDetails = 10;
 }
 
 message MultiAccount {
@@ -254,4 +270,12 @@ message SyncContactRequestDecision {
     ACCEPTED = 0;
     DECLINED = 1;
   }
+}
+
+/* `BackedUpProfile` is used to describe profile of logged in user */
+message BackedUpProfile {
+  string key_uid = 1;
+  string display_name = 2;
+  uint64 display_name_clock = 3;
+  repeated SyncProfilePicture pictures = 4;
 }

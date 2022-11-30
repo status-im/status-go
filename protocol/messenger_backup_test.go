@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,6 +13,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -106,13 +110,9 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := s.m.RetrieveAll()
+			_, err := bob2.RetrieveAll()
 			if err != nil {
-				s.logger.Info("Failed")
-				return false
-			}
-
-			if len(bob2.Contacts()) < 2 {
+				bob2.logger.Info("Failed")
 				return false
 			}
 
@@ -122,6 +122,9 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
 	s.Require().Len(bob2.AddedContacts(), 2)
 
 	actualContacts = bob2.AddedContacts()
@@ -132,6 +135,193 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 		s.Require().Equal(actualContacts[0].ID, contactID2)
 		s.Require().Equal(actualContacts[1].ID, contactID1)
 	}
+	lastBackup, err := bob1.lastBackup()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(lastBackup)
+	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupProfile() {
+	const bob1DisplayName = "bobby"
+
+	// Create bob1
+	bob1 := s.m
+	err := bob1.SetDisplayName(bob1DisplayName, true)
+	s.Require().NoError(err)
+	bob1KeyUID := bob1.account.KeyUID
+	imagesExpected := fmt.Sprintf(`[{"keyUid":"%s","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"%s","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`,
+		bob1KeyUID, bob1KeyUID)
+
+	iis := images.SampleIdentityImages()
+	s.Require().NoError(bob1.multiAccounts.StoreIdentityImages(bob1KeyUID, iis, false))
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Check bob1
+	storedBob1DisplayName, err := bob1.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1DisplayName, storedBob1DisplayName)
+
+	bob1Images, err := bob1.multiAccounts.GetIdentityImages(bob1KeyUID)
+	s.Require().NoError(err)
+	jBob1Images, err := json.Marshal(bob1Images)
+	s.Require().NoError(err)
+	s.Require().Equal(imagesExpected, string(jBob1Images))
+
+	// Check bob2
+	storedBob2DisplayName, err := bob2.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("", storedBob2DisplayName)
+
+	var expectedEmpty []*images.IdentityImage
+	bob2Images, err := bob2.multiAccounts.GetIdentityImages(bob1KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedEmpty, bob2Images)
+
+	// Backup
+	clock, err := bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			_, err := bob2.RetrieveAll()
+			if err != nil {
+				bob2.logger.Info("Failed")
+				return false
+			}
+
+			return true
+		},
+		"profile data not backed up",
+	)
+	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
+	// Check bob2
+	storedBob2DisplayName, err = bob2.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1DisplayName, storedBob2DisplayName)
+
+	bob2Images, err = bob2.multiAccounts.GetIdentityImages(bob1KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(bob2Images))
+	s.Require().Equal(bob2Images[0].Payload, bob1Images[0].Payload)
+	s.Require().Equal(bob2Images[1].Payload, bob1Images[1].Payload)
+
+	lastBackup, err := bob1.lastBackup()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(lastBackup)
+	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupSettings() {
+	const (
+		bob1DisplayName               = "bobby"
+		bob1Currency                  = "eur"
+		bob1MessagesFromContactsOnly  = true
+		bob1ProfilePicturesShowTo     = settings.ProfilePicturesShowToEveryone
+		bob1ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
+	)
+
+	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
+	bob1 := s.m
+	err := bob1.settings.SaveSettingField(settings.DisplayName, bob1DisplayName)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.Currency, bob1Currency)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.MessagesFromContactsOnly, bob1MessagesFromContactsOnly)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.ProfilePicturesShowTo, bob1ProfilePicturesShowTo)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.ProfilePicturesVisibility, bob1ProfilePicturesVisibility)
+	s.Require().NoError(err)
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Check bob1
+	storedBob1DisplayName, err := bob1.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1DisplayName, storedBob1DisplayName)
+	storedBob1Currency, err := bob1.settings.GetCurrency()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1Currency, storedBob1Currency)
+	storedBob1MessagesFromContactsOnly, err := bob1.settings.GetMessagesFromContactsOnly()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1MessagesFromContactsOnly, storedBob1MessagesFromContactsOnly)
+	storedBob1ProfilePicturesShowTo, err := bob1.settings.GetProfilePicturesShowTo()
+	s.Require().NoError(err)
+	s.Require().Equal(int64(bob1ProfilePicturesShowTo), storedBob1ProfilePicturesShowTo)
+	storedBob1ProfilePicturesVisibility, err := bob1.settings.GetProfilePicturesVisibility()
+	s.Require().NoError(err)
+	s.Require().Equal(int(bob1ProfilePicturesVisibility), storedBob1ProfilePicturesVisibility)
+
+	// Check bob2
+	storedBob2DisplayName, err := bob2.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1DisplayName, storedBob2DisplayName)
+	storedBob2Currency, err := bob2.settings.GetCurrency()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1Currency, storedBob2Currency)
+	storedBob2MessagesFromContactsOnly, err := bob2.settings.GetMessagesFromContactsOnly()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1MessagesFromContactsOnly, storedBob2MessagesFromContactsOnly)
+	storedBob2ProfilePicturesShowTo, err := bob2.settings.GetProfilePicturesShowTo()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1ProfilePicturesShowTo, storedBob2ProfilePicturesShowTo)
+	storedBob2ProfilePicturesVisibility, err := bob2.settings.GetProfilePicturesVisibility()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1ProfilePicturesVisibility, storedBob2ProfilePicturesVisibility)
+
+	// Backup
+	clock, err := bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			_, err := bob2.RetrieveAll()
+			if err != nil {
+				bob2.logger.Info("Failed")
+				return false
+			}
+
+			return true
+		},
+		"profile data not backed up",
+	)
+	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
+	// Check bob2
+	storedBob2DisplayName, err = bob2.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1DisplayName, storedBob2DisplayName)
+	storedBob2Currency, err = bob2.settings.GetCurrency()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1Currency, storedBob2Currency)
+	storedBob2MessagesFromContactsOnly, err = bob2.settings.GetMessagesFromContactsOnly()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1MessagesFromContactsOnly, storedBob2MessagesFromContactsOnly)
+	storedBob2ProfilePicturesShowTo, err = bob2.settings.GetProfilePicturesShowTo()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1ProfilePicturesShowTo, storedBob2ProfilePicturesShowTo)
+	storedBob2ProfilePicturesVisibility, err = bob2.settings.GetProfilePicturesVisibility()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1ProfilePicturesVisibility, storedBob2ProfilePicturesVisibility)
+
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)
@@ -170,22 +360,21 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := s.m.RetrieveAll()
+			_, err := bob2.RetrieveAll()
 			if err != nil {
 				s.logger.Info("Failed")
 				return false
 			}
 
-			if len(bob2.Contacts()) < BackupContactsPerBatch*2 {
-				return false
-			}
-
 			return true
-
 		},
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
+	s.Require().Less(BackupContactsPerBatch*2, len(bob2.Contacts()))
 	s.Require().Len(bob2.AddedContacts(), BackupContactsPerBatch*2)
 }
 
@@ -246,23 +435,21 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := s.m.RetrieveAll()
+			_, err := bob2.RetrieveAll()
 			if err != nil {
-				s.logger.Info("Failed")
-				return false
-			}
-
-			if len(bob2.Contacts()) != 1 && bob2.Contacts()[0].ID != contactID1 {
+				bob2.logger.Info("Failed")
 				return false
 			}
 
 			return true
-
 		},
 		"contacts not backed up",
 	)
 	// Bob 2 should remove the contact
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
 	s.Require().Len(bob2.AddedContacts(), 1)
 	s.Require().Equal(contactID1, bob2.AddedContacts()[0].ID)
 
@@ -303,24 +490,26 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := s.m.RetrieveAll()
+			_, err := bob2.RetrieveAll()
 			if err != nil {
-				s.logger.Info("Failed")
+				bob2.logger.Info("Failed")
 				return false
 			}
 
-			for _, c := range bob2.Contacts() {
-				if c.ID == contactID1 {
-					actualContact = c
-					return true
-				}
-			}
-			return false
-
+			return true
 		},
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
+	for _, c := range bob2.Contacts() {
+		if c.ID == contactID1 {
+			actualContact = c
+			break
+		}
+	}
 
 	s.Require().Equal(actualContact.LocalNickname, nickname)
 	lastBackup, err := bob1.lastBackup()
@@ -356,11 +545,20 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			return len(bob2.AddedContacts()) >= 1
+			_, err := bob2.RetrieveAll()
+			if err != nil {
+				bob2.logger.Info("Failed")
+				return false
+			}
+
+			return true
 		},
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
 	s.Require().Len(bob2.AddedContacts(), 1)
 
 	actualContacts := bob2.AddedContacts()
@@ -422,19 +620,21 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := s.m.RetrieveAll()
+			_, err := bob2.RetrieveAll()
 			if err != nil {
-				s.logger.Info("Failed")
+				bob2.logger.Info("Failed")
 				return false
 			}
 
-			communities, err := bob2.Communities()
-			s.Require().NoError(err)
-			return len(communities) >= 2
+			return true
 		},
 		"communities not backed up",
 	)
+
 	s.Require().NoError(err)
+
+	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
+
 	communities, err = bob2.JoinedCommunities()
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)

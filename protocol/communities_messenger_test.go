@@ -556,7 +556,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.joinCommunity(community, s.alice)
 
 	// Trigger ContactCodeAdvertisement
-	err := s.bob.SetDisplayName("bobby")
+	err := s.bob.SetDisplayName("bobby", true)
 	s.Require().NoError(err)
 	err = s.bob.SetBio("I like P2P chats")
 	s.Require().NoError(err)

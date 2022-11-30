@@ -407,24 +407,6 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) error {
-	for _, contact := range message.Contacts {
-		err := m.HandleSyncInstallationContact(state, *contact)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, community := range message.Communities {
-		err := m.handleSyncCommunity(state, *community)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
 	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)

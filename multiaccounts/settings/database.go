@@ -426,6 +426,14 @@ func (db *Database) GetMessagesFromContactsOnly() (result bool, err error) {
 	return result, err
 }
 
+func (db *Database) GetProfilePicturesShowTo() (result int64, err error) {
+	err = db.makeSelectRow(ProfilePicturesShowTo).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
 func (db *Database) GetLatestDerivedPath() (result uint, err error) {
 	err = db.makeSelectRow(LatestDerivedPath).Scan(&result)
 	return
