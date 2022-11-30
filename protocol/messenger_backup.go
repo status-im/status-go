@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -78,6 +79,124 @@ func (m *Messenger) startBackupLoop() {
 }
 
 func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
+	clock, chat := m.getLastClockWithRelatedChat()
+	contactsToBackup := m.backupContacts(ctx)
+	communitiesToBackup, err := m.backupCommunities(ctx, clock)
+	if err != nil {
+		return 0, err
+	}
+	profileToBackup, err := m.backupProfile(ctx, clock)
+	if err != nil {
+		return 0, err
+	}
+	_, settings, errors := m.prepareSyncSettingsMessages(clock)
+	if len(errors) != 0 {
+		// return just the first error, the others have been logged
+		return 0, errors[0]
+	}
+
+	backupDetailsOnly := func() *protobuf.Backup {
+		return &protobuf.Backup{
+			Clock: clock,
+			ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(contactsToBackup)),
+			},
+			CommunitiesDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(communitiesToBackup)),
+			},
+			ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(profileToBackup)),
+			},
+			SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(settings)),
+			},
+		}
+	}
+
+	// Update contacts messages encode and dispatch
+	for i, d := range contactsToBackup {
+		pb := backupDetailsOnly()
+		pb.ContactsDetails.DataNumber = uint32(i + 1)
+		pb.Contacts = d.Contacts
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Update communities messages encode and dispatch
+	for i, d := range communitiesToBackup {
+		pb := backupDetailsOnly()
+		pb.CommunitiesDetails.DataNumber = uint32(i + 1)
+		pb.Communities = d.Communities
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Update profile messages encode and dispatch
+	for i, d := range profileToBackup {
+		pb := backupDetailsOnly()
+		pb.ProfileDetails.DataNumber = uint32(i + 1)
+		pb.Profile = d.Profile
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Update settings messages encode and dispatch
+	for i, d := range settings {
+		pb := backupDetailsOnly()
+		pb.SettingsDetails.DataNumber = uint32(i + 1)
+		pb.Setting = d
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	chat.LastClockValue = clock
+	err = m.saveChat(chat)
+	if err != nil {
+		return 0, err
+	}
+
+	clockInSeconds := clock / 1000
+	err = m.settings.SetLastBackup(clockInSeconds)
+	if err != nil {
+		return 0, err
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.BackupPerformed(clockInSeconds)
+	}
+
+	return clockInSeconds, nil
+}
+
+func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message *protobuf.Backup, chatID string) error {
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chatID,
+		Payload:             encodedMessage,
+		SkipEncryption:      true,
+		SendOnPersonalTopic: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
+	})
+
+	return err
+}
+
+func (m *Messenger) backupContacts(ctx context.Context) []*protobuf.Backup {
 	var contacts []*protobuf.SyncInstallationContactV2
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		syncContact := m.syncBackupContact(ctx, contact)
@@ -87,8 +206,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return true
 	})
 
-	clock, chat := m.getLastClockWithRelatedChat()
-
+	var backupMessages []*protobuf.Backup
 	for i := 0; i < len(contacts); i += BackupContactsPerBatch {
 		j := i + BackupContactsPerBatch
 		if j > len(contacts) {
@@ -100,52 +218,41 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		backupMessage := &protobuf.Backup{
 			Contacts: contactsToAdd,
 		}
-
-		encodedMessage, err := proto.Marshal(backupMessage)
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = m.dispatchMessage(ctx, common.RawMessage{
-			LocalChatID:         chat.ID,
-			Payload:             encodedMessage,
-			SkipEncryption:      true,
-			SendOnPersonalTopic: true,
-			MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
-		})
-		if err != nil {
-			return 0, err
-		}
-
+		backupMessages = append(backupMessages, backupMessage)
 	}
 
+	return backupMessages
+}
+
+func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
 	joinedCs, err := m.communitiesManager.JoinedAndPendingCommunitiesWithRequests()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	deletedCs, err := m.communitiesManager.DeletedCommunities()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
+	var backupMessages []*protobuf.Backup
 	cs := append(joinedCs, deletedCs...)
 	for _, c := range cs {
 		_, beingImported := m.importingCommunities[c.IDString()]
 		if !beingImported {
 			settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 
 			syncMessage, err := c.ToSyncCommunityProtobuf(clock, settings)
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 
 			encodedKeys, err := m.encryptor.GetAllHREncodedKeys(c.ID())
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 			syncMessage.EncryptionKeys = encodedKeys
 
@@ -153,39 +260,11 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 				Communities: []*protobuf.SyncCommunity{syncMessage},
 			}
 
-			encodedMessage, err := proto.Marshal(backupMessage)
-			if err != nil {
-				return 0, err
-			}
-
-			_, err = m.dispatchMessage(ctx, common.RawMessage{
-				LocalChatID:         chat.ID,
-				Payload:             encodedMessage,
-				SkipEncryption:      true,
-				SendOnPersonalTopic: true,
-				MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
-			})
-			if err != nil {
-				return 0, err
-			}
+			backupMessages = append(backupMessages, backupMessage)
 		}
 	}
 
-	chat.LastClockValue = clock
-	err = m.saveChat(chat)
-	if err != nil {
-		return 0, err
-	}
-	clockInSeconds := clock / 1000
-	err = m.settings.SetLastBackup(clockInSeconds)
-	if err != nil {
-		return 0, err
-	}
-	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.BackupPerformed(clockInSeconds)
-	}
-
-	return clockInSeconds, nil
+	return backupMessages, nil
 }
 
 // syncContact sync as contact with paired devices
@@ -219,4 +298,55 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 		VerificationStatus: int64(contact.VerificationStatus),
 		TrustStatus:        int64(contact.TrustStatus),
 	}
+}
+
+func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
+	displayName, err := m.settings.DisplayName()
+	if err != nil {
+		return nil, err
+	}
+
+	displayNameClock, err := m.settings.GetSettingLastSynced(settings.DisplayName)
+	if err != nil {
+		return nil, err
+	}
+	if displayNameClock == 0 {
+		displayNameClock = clock
+	}
+
+	keyUID := m.account.KeyUID
+	images, err := m.multiAccounts.GetIdentityImages(keyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	pictures := make([]*protobuf.SyncProfilePicture, len(images))
+	for i, image := range images {
+		p := &protobuf.SyncProfilePicture{}
+		p.Name = image.Name
+		p.Payload = image.Payload
+		p.Width = uint32(image.Width)
+		p.Height = uint32(image.Height)
+		p.FileSize = uint32(image.FileSize)
+		p.ResizeTarget = uint32(image.ResizeTarget)
+		if image.Clock == 0 {
+			p.Clock = clock
+		} else {
+			p.Clock = image.Clock
+		}
+		pictures[i] = p
+	}
+
+	backupMessage := &protobuf.Backup{
+		Profile: &protobuf.BackedUpProfile{
+			KeyUid:           keyUID,
+			DisplayName:      displayName,
+			Pictures:         pictures,
+			DisplayNameClock: displayNameClock,
+		},
+	}
+
+	backupMessages := []*protobuf.Backup{backupMessage}
+
+	return backupMessages, nil
 }

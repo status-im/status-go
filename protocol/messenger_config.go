@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 )
 
@@ -52,6 +53,9 @@ type MessengerSignalsHandler interface {
 	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
 	DiscordCommunityImportFinished(communityID string)
 	DiscordCommunityImportCancelled(communityID string)
+	SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse)
+	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
+	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
 }
 
 type config struct {

@@ -72,6 +72,12 @@ var (
 	DisplayName = SettingField{
 		reactFieldName: "display-name",
 		dBColumnName:   "display_name",
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     displayNameProtobufFactory,
+			fromStruct:        displayNameProtobufFactoryStruct,
+			valueFromProtobuf: StringFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_DISPLAY_NAME,
+		},
 	}
 	Bio = SettingField{
 		reactFieldName: "bio",
