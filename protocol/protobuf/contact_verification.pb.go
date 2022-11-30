@@ -216,11 +216,59 @@ func (m *DeclineContactVerification) GetId() string {
 	return ""
 }
 
+type CancelContactVerification struct {
+	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
+	Id                   string   `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *CancelContactVerification) Reset()         { *m = CancelContactVerification{} }
+func (m *CancelContactVerification) String() string { return proto.CompactTextString(m) }
+func (*CancelContactVerification) ProtoMessage()    {}
+func (*CancelContactVerification) Descriptor() ([]byte, []int) {
+	return fileDescriptor_d6997df64de39454, []int{4}
+}
+
+func (m *CancelContactVerification) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CancelContactVerification.Unmarshal(m, b)
+}
+func (m *CancelContactVerification) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CancelContactVerification.Marshal(b, m, deterministic)
+}
+func (m *CancelContactVerification) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CancelContactVerification.Merge(m, src)
+}
+func (m *CancelContactVerification) XXX_Size() int {
+	return xxx_messageInfo_CancelContactVerification.Size(m)
+}
+func (m *CancelContactVerification) XXX_DiscardUnknown() {
+	xxx_messageInfo_CancelContactVerification.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CancelContactVerification proto.InternalMessageInfo
+
+func (m *CancelContactVerification) GetClock() uint64 {
+	if m != nil {
+		return m.Clock
+	}
+	return 0
+}
+
+func (m *CancelContactVerification) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
 func init() {
 	proto.RegisterType((*RequestContactVerification)(nil), "protobuf.RequestContactVerification")
 	proto.RegisterType((*AcceptContactVerification)(nil), "protobuf.AcceptContactVerification")
 	proto.RegisterType((*ContactVerificationTrusted)(nil), "protobuf.ContactVerificationTrusted")
 	proto.RegisterType((*DeclineContactVerification)(nil), "protobuf.DeclineContactVerification")
+	proto.RegisterType((*CancelContactVerification)(nil), "protobuf.CancelContactVerification")
 }
 
 func init() {
@@ -228,7 +276,7 @@ func init() {
 }
 
 var fileDescriptor_d6997df64de39454 = []byte{
-	// 196 bytes of a gzipped FileDescriptorProto
+	// 208 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0x4a, 0xce, 0xcf, 0x2b,
 	0x49, 0x4c, 0x2e, 0x89, 0x2f, 0x4b, 0x2d, 0xca, 0x4c, 0xcb, 0x4c, 0x4e, 0x2c, 0xc9, 0xcc, 0xcf,
 	0xd3, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x00, 0x53, 0x49, 0xa5, 0x69, 0x4a, 0x01, 0x5c,
@@ -239,7 +287,7 @@ var fileDescriptor_d6997df64de39454 = []byte{
 	0x06, 0xf2, 0x71, 0x31, 0x65, 0xa6, 0x48, 0x30, 0x81, 0x4d, 0x62, 0xca, 0x4c, 0x11, 0x92, 0xe2,
 	0xe2, 0x28, 0x4a, 0x2d, 0x2e, 0xc8, 0xcf, 0x2b, 0x86, 0x99, 0x0f, 0xe7, 0x2b, 0x39, 0x71, 0x49,
 	0x61, 0x31, 0x38, 0xa4, 0xa8, 0xb4, 0xb8, 0x24, 0x35, 0x85, 0x38, 0xf3, 0x41, 0x66, 0xb8, 0xa4,
-	0x26, 0xe7, 0x64, 0xe6, 0xa5, 0x92, 0xed, 0x46, 0x27, 0xde, 0x28, 0x6e, 0x3d, 0x7d, 0x6b, 0x58,
-	0x38, 0x26, 0xb1, 0x81, 0x59, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0x70, 0x15, 0x72, 0xc2,
-	0x76, 0x01, 0x00, 0x00,
+	0x26, 0xe7, 0x64, 0xe6, 0xa5, 0x92, 0xed, 0x46, 0x25, 0x47, 0x2e, 0x49, 0xe7, 0xc4, 0xbc, 0xe4,
+	0xd4, 0x1c, 0xb2, 0x8d, 0x70, 0xe2, 0x8d, 0xe2, 0xd6, 0xd3, 0xb7, 0x86, 0x45, 0x45, 0x12, 0x1b,
+	0x98, 0x65, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0x9c, 0x91, 0x98, 0xa6, 0xb9, 0x01, 0x00, 0x00,
 }

@@ -140,56 +140,101 @@ func (m *Messenger) GetReceivedVerificationRequests(ctx context.Context) ([]*ver
 	return m.verificationDatabase.GetReceivedVerificationRequests(myPubKey)
 }
 
-func (m *Messenger) CancelVerificationRequest(ctx context.Context, contactID string) error {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
-		return errors.New("must be a mutual contact")
-	}
-
-	verifRequest, err := m.verificationDatabase.GetVerificationRequestSentTo(contactID)
+func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*MessengerResponse, error) {
+	verifRequest, err := m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if verifRequest == nil {
-		return errors.New("no contact verification found")
+		m.logger.Error("could not find verification request with id", zap.String("id", id))
+		return nil, verification.ErrVerificationRequestNotFound
+	}
+
+	if verifRequest.From != common.PubkeyToHex(&m.identity.PublicKey) {
+		return nil, errors.New("Can cancel only outgoing contact request")
+	}
+
+	contactID := verifRequest.To
+	contact, ok := m.allContacts.Load(contactID)
+	if !ok || !contact.Added || !contact.HasAddedUs {
+		return nil, errors.New("Can't find contact for camnceling verification request")
 	}
 
 	if verifRequest.RequestStatus != verification.RequestStatusPENDING {
-		return errors.New("can't cancel a request already verified")
+		return nil, errors.New("can cancel only pending verification request")
 	}
 
 	verifRequest.RequestStatus = verification.RequestStatusCANCELED
 	err = m.verificationDatabase.SaveVerificationRequest(verifRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	contact.VerificationStatus = VerificationStatusUNVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact)
 	if err != nil {
-		return err
-	}
-
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.allContacts.Store(contact.ID, contact)
 
-	return nil
+	// NOTE: does we need it?
+	chat, ok := m.allChats.Load(verifRequest.To)
+	if !ok {
+		publicKey, err := contact.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	m.allChats.Store(chat.ID, chat)
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	response := &MessengerResponse{}
+
+	response.AddVerificationRequest(verifRequest)
+
+	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &protobuf.CancelContactVerification{
+		Id:    id,
+		Clock: clock,
+	}
+
+	encodedMessage, err := proto.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_CANCEL_CONTACT_VERIFICATION,
+		ResendAutomatically: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id string, response string) (*MessengerResponse, error) {
-
 	verifRequest, err := m.verificationDatabase.GetVerificationRequest(id)
 	if err != nil {
 		return nil, err
@@ -293,7 +338,6 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		}
 
 		resp.AddActivityCenterNotification(notification)
-
 	}
 
 	return resp, nil
@@ -883,6 +927,59 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 
 	if msg != nil {
 		msg.ContactVerificationState = common.ContactVerificationStateDeclined
+		state.Response.AddMessage(msg)
+	}
+
+	return m.createContactVerificationNotification(contact, state, persistedVR, msg, nil)
+}
+
+func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request protobuf.CancelContactVerification) error {
+	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
+	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
+
+	contact := state.CurrentMessageState.Contact
+
+	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
+	if err != nil {
+		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		return err
+	}
+
+	if persistedVR != nil && persistedVR.RequestStatus != verification.RequestStatusPENDING {
+		m.logger.Debug("Only pending verification request can be canceled", zap.String("contactID", contactID))
+		return errors.New("must be a pending verification request")
+	}
+
+	if persistedVR == nil {
+		// This is a response for which we have not received its request before
+		persistedVR = &verification.Request{}
+		persistedVR.From = contactID
+		persistedVR.To = myPubKey
+	}
+
+	persistedVR.RequestStatus = verification.RequestStatusCANCELED
+	persistedVR.RepliedAt = request.Clock
+
+	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
+	if err != nil {
+		m.logger.Debug("Error storing verification request", zap.Error(err))
+		return err
+	}
+
+	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	if err != nil {
+		return err
+	}
+
+	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
+
+	msg, err := m.persistence.MessageByID(request.Id)
+	if err != nil {
+		return err
+	}
+
+	if msg != nil {
+		msg.ContactVerificationState = common.ContactVerificationStateCanceled
 		state.Response.AddMessage(msg)
 	}
 

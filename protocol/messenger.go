@@ -3976,6 +3976,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.CancelContactVerification:
+						logger.Debug("Handling CancelContactVerification")
+						err = m.HandleCancelContactVerification(messageState, msg.ParsedMessage.Interface().(protobuf.CancelContactVerification))
+						if err != nil {
+							logger.Warn("failed to handle CancelContactVerification", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.ContactVerificationTrusted:
 						logger.Debug("Handling ContactVerificationTrusted")
 						err = m.HandleContactVerificationTrusted(messageState, msg.ParsedMessage.Interface().(protobuf.ContactVerificationTrusted))

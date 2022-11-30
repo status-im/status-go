@@ -820,16 +820,16 @@ func (api *PublicAPI) GetVerificationRequestSentTo(ctx context.Context, contactI
 	return api.service.messenger.GetVerificationRequestSentTo(ctx, contactID)
 }
 
-func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID string) error {
-	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
+func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, id string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelVerificationRequest(ctx, id)
 }
 
-func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, id string, response string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptContactVerificationRequest(ctx, id, response)
 }
 
-func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
+func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, id string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeclineContactVerificationRequest(ctx, id)
 }
 
 func (api *PublicAPI) VerifiedTrusted(ctx context.Context, request *requests.VerifiedTrusted) (*protocol.MessengerResponse, error) {
