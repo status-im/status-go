@@ -1,4 +1,4 @@
-package transfer
+package walletevent
 
 import (
 	"sync"
@@ -6,17 +6,16 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
-type publisher interface {
+type Publisher interface {
 	Subscribe(interface{}) event.Subscription
 }
 
 // SignalsTransmitter transmits received events as wallet signals.
 type SignalsTransmitter struct {
-	publisher
+	Publisher
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -29,8 +28,8 @@ func (tmr *SignalsTransmitter) Start() error {
 		return nil
 	}
 	tmr.quit = make(chan struct{})
-	events := make(chan walletevent.Event, 10)
-	sub := tmr.publisher.Subscribe(events)
+	events := make(chan Event, 10)
+	sub := tmr.Publisher.Subscribe(events)
 
 	tmr.wg.Add(1)
 	go func() {
