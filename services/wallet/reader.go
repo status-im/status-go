@@ -8,7 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -18,12 +20,16 @@ import (
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 
-func NewReader(s *Service) *Reader {
-	return &Reader{s}
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+	return &Reader{rpcClient, tokenManager, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
-	s *Service
+	rpcClient    *rpc.Client
+	tokenManager *token.Manager
+	accountsDB   *accounts.Database
+	walletFeed   *event.Feed
+	cancel       context.CancelFunc
 }
 
 type ChainBalance struct {
@@ -94,23 +100,35 @@ func getTokenAddresses(tokens []*token.Token) []common.Address {
 	return res
 }
 
-func (r *Reader) Start(ctx context.Context, chainIDs []uint64) error {
-	run := func(context.Context) error {
-		r.s.feed.Send(walletevent.Event{
-			Type: EventWalletTickReload,
-		})
-		return nil
-	}
-	command := async.FiniteCommand{
-		Interval: 10 * time.Second,
-		Runable:  run,
-	}
-	go command.Run(ctx)
+func (r *Reader) Start() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.walletFeed.Send(walletevent.Event{
+					Type: EventWalletTickReload,
+				})
+			}
+		}
+	}()
 	return nil
 }
 
+func (r *Reader) Stop() {
+	if r.cancel != nil {
+		r.cancel()
+	}
+}
+
 func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token, error) {
-	networks, err := r.s.rpcClient.NetworkManager.Get(false)
+	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
@@ -120,23 +138,23 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 		chainIDs = append(chainIDs, network.ChainID)
 	}
 
-	currency, err := r.s.accountsDB.GetCurrency()
+	currency, err := r.accountsDB.GetCurrency()
 	if err != nil {
 		return nil, err
 	}
 
-	allTokens, err := r.s.tokenManager.GetAllTokens()
+	allTokens, err := r.tokenManager.GetAllTokens()
 	if err != nil {
 		return nil, err
 	}
 	for _, network := range networks {
-		allTokens = append(allTokens, r.s.tokenManager.ToToken(network))
+		allTokens = append(allTokens, r.tokenManager.ToToken(network))
 	}
 
 	tokenSymbols := getTokenSymbols(allTokens)
 	tokenAddresses := getTokenAddresses(allTokens)
 
-	accounts, err := r.s.accountsDB.GetAccounts()
+	accounts, err := r.accountsDB.GetAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -174,12 +192,12 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 	})
 
 	group.Add(func(parent context.Context) error {
-		clients, err := chain.NewClients(r.s.rpcClient, chainIDs)
+		clients, err := chain.NewClients(r.rpcClient, chainIDs)
 		if err != nil {
 			return err
 		}
 
-		balances, err = r.s.tokenManager.GetBalancesByChain(ctx, clients, getAddresses(accounts), tokenAddresses)
+		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, getAddresses(accounts), tokenAddresses)
 		if err != nil {
 			return err
 		}

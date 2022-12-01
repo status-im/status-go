@@ -21,7 +21,6 @@ import (
 type Controller struct {
 	db           *Database
 	rpcClient    *rpc.Client
-	signals      *SignalsTransmitter
 	block        *Block
 	reactor      *Reactor
 	accountFeed  *event.Feed
@@ -30,29 +29,22 @@ type Controller struct {
 	balanceCache *balanceCache
 }
 
-func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed) *Controller {
-	transferFeed := &event.Feed{}
-	signals := &SignalsTransmitter{
-		publisher: transferFeed,
-	}
+func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed) *Controller {
 	block := &Block{db}
 	return &Controller{
 		db:           NewDB(db),
 		block:        block,
 		rpcClient:    rpcClient,
-		signals:      signals,
 		accountFeed:  accountFeed,
 		TransferFeed: transferFeed,
 	}
 }
 
-func (c *Controller) Start() error {
+func (c *Controller) Start() {
 	c.group = async.NewGroup(context.Background())
-	return c.signals.Start()
 }
 
 func (c *Controller) Stop() {
-	c.signals.Stop()
 	if c.reactor != nil {
 		c.reactor.stop()
 	}
