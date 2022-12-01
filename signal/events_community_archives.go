@@ -24,6 +24,9 @@ const (
 	// EventHistoryArchivesUnseeded is triggered when the community owner node
 	// drops a torrent for a particular community
 	EventHistoryArchivesUnseeded = "community.historyArchivesUnseeded"
+	// EventDownloadingHistoryArchivesFinished is triggered when the community member node
+	// has downloaded all archives
+	EventDownloadingHistoryArchivesStarted = "community.downloadingHistoryArchivesStarted"
 	// EventHistoryArchiveDownloaded is triggered when the community member node
 	// has downloaded an individual community archive
 	EventHistoryArchiveDownloaded = "community.historyArchiveDownloaded"
@@ -60,6 +63,10 @@ type HistoryArchiveDownloadedSignal struct {
 	CommunityID string `json:"communityId"`
 	From        int    `json:"from"`
 	To          int    `json:"to"`
+}
+
+type DownloadingHistoryArchivesStartedSignal struct {
+	CommunityID string `json:"communityId"`
 }
 
 type DownloadingHistoryArchivesFinishedSignal struct {
@@ -107,6 +114,12 @@ func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
 		CommunityID: communityID,
 		From:        from,
 		To:          to,
+	})
+}
+
+func SendDownloadingHistoryArchivesStarted(communityID string) {
+	send(EventDownloadingHistoryArchivesStarted, DownloadingHistoryArchivesStartedSignal{
+		CommunityID: communityID,
 	})
 }
 
