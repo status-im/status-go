@@ -112,7 +112,6 @@ type Path struct {
 	BonderFees    *hexutil.Big
 	TokenFees     *big.Float
 	Cost          *big.Float
-	Preferred     bool
 	EstimatedTime TransactionEstimation
 }
 
@@ -358,7 +357,7 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					if len(preferedChainIDs) > 0 && !containsNetworkChainID(network, preferedChainIDs) {
+					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}
 
@@ -391,8 +390,6 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					preferred := containsNetworkChainID(dest, preferedChainIDs)
-
 					gasCost := new(big.Float)
 					gasCost.Mul(
 						new(big.Float).Mul(gweiToEth(maxFees), big.NewFloat((float64(gasLimit)))),
@@ -419,7 +416,6 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						GasFees:       gasFees,
 						BonderFees:    (*hexutil.Big)(bonderFees),
 						TokenFees:     tokenFeesAsFloat,
-						Preferred:     preferred,
 						Cost:          cost,
 						EstimatedTime: estimatedTime,
 					})
