@@ -135,6 +135,7 @@ type Subscription struct {
 	HistoryArchivesSeedingSignal             *signal.HistoryArchivesSeedingSignal
 	HistoryArchivesUnseededSignal            *signal.HistoryArchivesUnseededSignal
 	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
+	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 }
 
@@ -2106,6 +2107,12 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 					}
 
 					sort.Sort(sort.Reverse(archiveHashes))
+
+					m.publish(&Subscription{
+						DownloadingHistoryArchivesStartedSignal: &signal.DownloadingHistoryArchivesStartedSignal{
+							CommunityID: communityID.String(),
+						},
+					})
 
 					for _, hd := range archiveHashes {
 						hash := hd.hash
