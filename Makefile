@@ -141,9 +141,9 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		-target=ios -ldflags="-s -w" \
 		-tags 'nowatchdog $(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
-		-o build/bin/Statusgo.framework \
+		-o build/bin/Statusgo.xcframework \
 		github.com/status-im/status-go/mobile
-	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
+	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
@@ -272,8 +272,8 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
 	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
-	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
-	mv build/bin/Statusgo.framework.zip $(RELEASE_DIR)/status-go-ios.zip
+	zip -r build/bin/Statusgo.xcframework.zip build/bin/Statusgo.xcframework
+	mv build/bin/Statusgo.xcframework.zip $(RELEASE_DIR)/status-go-ios.zip
 	zip -r $(RELEASE_DIR)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 
