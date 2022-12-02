@@ -963,6 +963,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					}
 				}
 
+				m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
+
 				err = m.handleImportedMessages(importedMessages)
 				if err != nil {
 					log.Println("failed to handle imported messages", err)
