@@ -116,6 +116,10 @@ func (m *MessengerSignalsHandler) DownloadingHistoryArchivesStarted(communityID 
 	signal.SendDownloadingHistoryArchivesStarted(communityID)
 }
 
+func (m *MessengerSignalsHandler) ImportingHistoryArchiveMessages(communityID string) {
+	signal.SendImportingHistoryArchiveMessages(communityID)
+}
+
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesFinished(communityID string) {
 	signal.SendDownloadingHistoryArchivesFinished(communityID)
 }

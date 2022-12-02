@@ -146,6 +146,10 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 				if sub.DownloadingHistoryArchivesStartedSignal != nil {
 					m.config.messengerSignalsHandler.DownloadingHistoryArchivesStarted(sub.DownloadingHistoryArchivesStartedSignal.CommunityID)
 				}
+
+				if sub.ImportingHistoryArchiveMessagesSignal != nil {
+					m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(sub.ImportingHistoryArchiveMessagesSignal.CommunityID)
+				}
 			case <-m.quit:
 				return
 			}

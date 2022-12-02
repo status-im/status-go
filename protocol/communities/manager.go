@@ -137,6 +137,7 @@ type Subscription struct {
 	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
+	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 }
 
 type CommunityResponse struct {

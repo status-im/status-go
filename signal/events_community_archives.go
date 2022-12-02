@@ -30,6 +30,9 @@ const (
 	// EventHistoryArchiveDownloaded is triggered when the community member node
 	// has downloaded an individual community archive
 	EventHistoryArchiveDownloaded = "community.historyArchiveDownloaded"
+	// EventImportingHistoryArchiveMessages is triggered when the community member node
+	// has starts importing downloaded archive messages into the database
+	EventImportingHistoryArchiveMessages = "community.importingHistoryArchiveMessages"
 	// EventDownloadingHistoryArchivesFinished is triggered when the community member node
 	// has downloaded all archives
 	EventDownloadingHistoryArchivesFinished = "community.downloadingHistoryArchivesFinished"
@@ -66,6 +69,10 @@ type HistoryArchiveDownloadedSignal struct {
 }
 
 type DownloadingHistoryArchivesStartedSignal struct {
+	CommunityID string `json:"communityId"`
+}
+
+type ImportingHistoryArchiveMessagesSignal struct {
 	CommunityID string `json:"communityId"`
 }
 
@@ -119,6 +126,12 @@ func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
 
 func SendDownloadingHistoryArchivesStarted(communityID string) {
 	send(EventDownloadingHistoryArchivesStarted, DownloadingHistoryArchivesStartedSignal{
+		CommunityID: communityID,
+	})
+}
+
+func SendImportingHistoryArchiveMessages(communityID string) {
+	send(EventImportingHistoryArchiveMessages, ImportingHistoryArchiveMessagesSignal{
 		CommunityID: communityID,
 	})
 }

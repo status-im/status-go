@@ -46,6 +46,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchiveDownloaded(communityID string, from int, to int)
 	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
+	ImportingHistoryArchiveMessages(communityID string)
 	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
 	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError)
 	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
