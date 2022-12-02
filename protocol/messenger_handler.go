@@ -1257,9 +1257,22 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return errors.New("chat not found")
 	}
 
-	// Check edit is valid
+	var canDeleteMessageForEveryone = false
 	if originalMessage.From != deleteMessage.From {
-		return errors.New("invalid delete, not the right author")
+		if chat.ChatType == ChatTypeCommunityChat {
+			fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
+			if err != nil {
+				return err
+			}
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(chat.CommunityID, fromPublicKey)
+			if !canDeleteMessageForEveryone {
+				return ErrInvalidDeletePermission
+			}
+		}
+		// Check edit is valid
+		if !canDeleteMessageForEveryone {
+			return errors.New("invalid delete, not the right author")
+		}
 	}
 
 	// Update message and return it

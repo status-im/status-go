@@ -103,7 +103,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = s.m.DeleteMessageAndSend(context.Background(), ogMessage.ID)
 
-	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
+	s.Require().ErrorContains(err, "Chat not found")
 }
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
