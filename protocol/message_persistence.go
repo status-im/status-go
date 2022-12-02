@@ -2360,6 +2360,7 @@ func SortByClock(msgs HasClocks) {
 
 func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bool) ([]*common.Message, error) {
 	messageIdx := make(map[string]*common.Message, 0)
+	var messages common.Messages
 	for rows.Next() {
 		// There's a possibility of multiple rows per message if the
 		// message has a discordMessage and the discordMessage has multiple
@@ -2382,16 +2383,12 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bo
 
 		if msg, ok := messageIdx[message.ID]; !ok {
 			messageIdx[message.ID] = &message
+			messages = append(messages, &message)
 		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
 			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.Messages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, nil
@@ -2400,8 +2397,8 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bo
 func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Message, []string, error) {
 
 	var cursors []string
+	var messages common.Messages
 	messageIdx := make(map[string]*common.Message, 0)
-
 	for rows.Next() {
 		// There's a possibility of multiple rows per message if the
 		// message has a discordMessage and the discordMessage has multiple
@@ -2420,16 +2417,12 @@ func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]
 		if msg, ok := messageIdx[message.ID]; !ok {
 			messageIdx[message.ID] = &message
 			cursors = append(cursors, cursor)
+			messages = append(messages, &message)
 		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
 			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.Messages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, cursors, nil
@@ -2438,6 +2431,7 @@ func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]
 func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.PinnedMessage, []string, error) {
 
 	var cursors []string
+	var messages common.PinnedMessages
 	messageIdx := make(map[string]*common.PinnedMessage, 0)
 
 	for rows.Next() {
@@ -2457,17 +2451,13 @@ func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Row
 				PinnedBy: pinnedBy,
 			}
 			messageIdx[message.ID] = pinnedMessage
+			messages = append(messages, pinnedMessage)
 			cursors = append(cursors, cursor)
 		} else if discordMessage := msg.Message.GetDiscordMessage(); discordMessage != nil {
 			msg.Message.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.PinnedMessages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, cursors, nil
