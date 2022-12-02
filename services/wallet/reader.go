@@ -57,14 +57,6 @@ type Token struct {
 	CurrencyPrice    float64                 `json:"currencyPrice"`
 }
 
-func getAddresses(accounts []*accounts.Account) []common.Address {
-	addresses := make([]common.Address, len(accounts))
-	for _, account := range accounts {
-		addresses = append(addresses, common.Address(account.Address))
-	}
-	return addresses
-}
-
 func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
 	res := make(map[string][]*token.Token)
 
@@ -127,7 +119,7 @@ func (r *Reader) Stop() {
 	}
 }
 
-func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token, error) {
+func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
@@ -153,11 +145,6 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 
 	tokenSymbols := getTokenSymbols(allTokens)
 	tokenAddresses := getTokenAddresses(allTokens)
-
-	accounts, err := r.accountsDB.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
 
 	var (
 		group             = async.NewAtomicGroup(ctx)
@@ -197,7 +184,7 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 			return err
 		}
 
-		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, getAddresses(accounts), tokenAddresses)
+		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
 			return err
 		}
@@ -214,13 +201,12 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 		return nil, err
 	}
 	result := make(map[common.Address][]Token)
-	for _, account := range accounts {
-		commonAddress := common.Address(account.Address)
+	for _, address := range addresses {
 		for symbol, tokens := range getTokenBySymbols(allTokens) {
 			balancesPerChain := make(map[uint64]ChainBalance)
 			decimals := tokens[0].Decimals
 			for _, token := range tokens {
-				hexBalance := balances[token.ChainID][commonAddress][token.Address]
+				hexBalance := balances[token.ChainID][address][token.Address]
 				balance := big.NewFloat(0.0)
 				if hexBalance != nil {
 					balance = new(big.Float).Quo(
@@ -254,7 +240,7 @@ func (r *Reader) GetWalletToken(ctx context.Context) (map[common.Address][]Token
 				CurrencyPrice:    prices[symbol],
 			}
 
-			result[commonAddress] = append(result[commonAddress], walletToken)
+			result[address] = append(result[address], walletToken)
 		}
 	}
 	return result, nil

@@ -34,8 +34,8 @@ func (api *API) StartWallet(ctx context.Context) error {
 	return api.reader.Start()
 }
 
-func (api *API) GetWalletToken(ctx context.Context) (map[common.Address][]Token, error) {
-	return api.reader.GetWalletToken(ctx)
+func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.GetWalletToken(ctx, addresses)
 }
 
 type DerivedAddress struct {
