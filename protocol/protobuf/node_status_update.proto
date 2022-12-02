@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message NodeStatusUpdate {
+  
+  uint64 clock = 1;
+  
+  string community_id = 2;
+
+}

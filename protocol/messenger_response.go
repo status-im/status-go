@@ -67,6 +67,7 @@ type MessengerResponse struct {
 	statusUpdates               map[string]UserStatus
 	clearedHistories            map[string]*ClearedHistory
 	trustStatus                 map[string]verification.TrustStatus
+	nodeStatusUpdates           []string
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -481,6 +482,10 @@ func (r *MessengerResponse) AddStatusUpdate(upd UserStatus) {
 	}
 
 	r.statusUpdates[upd.PublicKey] = upd
+}
+
+func (r *MessengerResponse) AddNodeStatusUpdate(communityId string) {
+	r.nodeStatusUpdates = append(r.nodeStatusUpdates, communityId)
 }
 
 func (r *MessengerResponse) DiscordMessages() []*protobuf.DiscordMessage {

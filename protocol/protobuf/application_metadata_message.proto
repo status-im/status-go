@@ -74,5 +74,6 @@ message ApplicationMetadataMessage {
     SYNC_DELETE_FOR_ME_MESSAGE = 58;
     SYNC_SAVED_ADDRESS = 59;
     COMMUNITY_CANCEL_REQUEST_TO_JOIN = 60;
+    NODE_STATUS_UPDATE = 61;
   }
 }

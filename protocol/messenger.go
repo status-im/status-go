@@ -681,6 +681,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
+	m.broadcastNodeStatus()
 	m.timeoutAutomaticStatusUpdates()
 	m.startBackupLoop()
 	err = m.startAutoMessageLoop()
@@ -3427,6 +3428,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling StatusUpdate", zap.Any("message", p))
 						err = m.HandleStatusUpdate(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle StatusMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.NodeStatusUpdate:
+						p := msg.ParsedMessage.Interface().(protobuf.NodeStatusUpdate)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling NodeStatusUpdate", zap.Any("message", p))
+						err = m.HandleNodeStatusUpdate(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle StatusMessage", zap.Error(err))
 							allMessagesProcessed = false

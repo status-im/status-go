@@ -91,6 +91,41 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	return nil
 }
 
+func (m *Messenger) sendNodeStatus(ctx context.Context) {
+	communities, err := m.Communities()
+	if err != nil {
+		m.logger.Debug("Error while getting all communities", zap.Error(err))
+		return
+	}
+
+	for _, community := range communities {
+		if community.IsAdmin() && community.AcceptRequestToJoinAutomatically() {
+			nodeStatusUpdate := &protobuf.NodeStatusUpdate{
+				Clock:       uint64(time.Now().Unix()),
+				CommunityId: community.IDString(),
+			}
+
+			encodedMessage, err := proto.Marshal(nodeStatusUpdate)
+			if err != nil {
+				m.logger.Debug("Error while sending node status", zap.Error(err))
+				return
+			}
+
+			rawMessage := common.RawMessage{
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_NODE_STATUS_UPDATE,
+				ResendAutomatically: true,
+			}
+
+			_, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+			if err != nil {
+				m.logger.Debug("Error while sending node status", zap.Error(err))
+				return
+			}
+		}
+	}
+}
+
 func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 	err := m.persistence.CleanOlderStatusUpdates()
 	if err != nil {
@@ -181,6 +216,22 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 	return nil
 }
 
+func (m *Messenger) broadcastNodeStatus() {
+	m.logger.Debug("broadcasting node status")
+	ctx := context.Background()
+
+	go func() {
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				m.sendNodeStatus(ctx)
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
 func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
@@ -229,6 +280,25 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	currStatus.CustomText = newCustomText
 
 	return m.sendUserStatus(ctx, *currStatus)
+}
+
+func (m *Messenger) HandleNodeStatusUpdate(state *ReceivedMessageState, statusMessage protobuf.NodeStatusUpdate) error {
+	if err := ValidateNodeStatusUpdate(statusMessage); err != nil {
+		return err
+	}
+
+	communities, err := m.SpectatedCommunities()
+	if err != nil {
+		return err
+	}
+	// Send status just for spectated communities
+	for _, community := range communities {
+		if community.IDString() == statusMessage.CommunityId {
+			state.Response.AddNodeStatusUpdate(statusMessage.CommunityId)
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessage protobuf.StatusUpdate) error {

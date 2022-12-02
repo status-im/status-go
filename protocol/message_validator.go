@@ -57,6 +57,19 @@ func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
 
 }
 
+func ValidateNodeStatusUpdate(message protobuf.NodeStatusUpdate) error {
+	if message.Clock == 0 {
+		return errors.New("clock can't be 0")
+	}
+
+	if len(message.CommunityId) == 0 {
+		return errors.New("community-id can't be empty")
+	}
+
+	return nil
+
+}
+
 func ValidateEditMessage(message protobuf.EditMessage) error {
 	if message.Clock == 0 {
 		return errors.New("clock can't be 0")
