@@ -158,7 +158,7 @@ func (m *Manager) Start() error {
 
 	if m.torrentConfig != nil && m.torrentConfig.Enabled {
 		err := m.StartTorrentClient()
-		return err
+		m.logger.Warn("couldn't start torrent client", zap.Error(err))
 	}
 
 	return nil

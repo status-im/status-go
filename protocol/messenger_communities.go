@@ -1076,7 +1076,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.communitiesManager.StopHistoryArchiveTasksInterval(id)
 		} else if !m.communitiesManager.IsSeedingHistoryArchiveTorrent(id) {
@@ -1135,7 +1135,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
 		var communities []*communities.Community
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
@@ -2976,7 +2976,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 		}
 
-		if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && communitySettings.HistoryArchiveSupportEnabled {
+		if m.config.torrentConfig != nil &&
+			m.config.torrentConfig.Enabled &&
+			communitySettings.HistoryArchiveSupportEnabled &&
+			m.communitiesManager.TorrentClientStarted() {
 
 			err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 			if err != nil {
