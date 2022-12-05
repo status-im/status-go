@@ -45,9 +45,6 @@ const (
 	// EventHistoryRequestFailed is triggered when requesting history messages fails
 	EventHistoryRequestFailed = "history.request.failed"
 
-	// EventHistoryRequestFailed is triggered when requesting history messages succeeds
-	EventHistoryRequestSuccess = "history.request.success"
-
 	// EventBackupPerformed is triggered when a backup has been performed
 	EventBackupPerformed = "backup.performed"
 
@@ -156,10 +153,6 @@ func SendHistoricMessagesRequestStarted(numBatches int) {
 
 func SendHistoricMessagesRequestFailed(requestID []byte, peerID peer.ID, err error) {
 	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerID.String(), ErrorMsg: err.Error()})
-}
-
-func SendHistoricMessagesRequestSuccess(requestID []byte, peerID peer.ID) {
-	send(EventHistoryRequestSuccess, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerID.String()})
 }
 
 func SendHistoricMessagesRequestCompleted() {

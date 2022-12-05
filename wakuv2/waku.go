@@ -972,8 +972,6 @@ func (w *Waku) Query(peerID peer.ID, topics []common.TopicType, from uint64, to 
 		return nil, err
 	}
 
-	signal.SendHistoricMessagesRequestSuccess(requestID, peerID)
-
 	for _, msg := range result.Messages {
 		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
