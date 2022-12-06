@@ -60,9 +60,11 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
 
@@ -127,10 +129,13 @@ type Waku struct {
 	timeSource func() time.Time // source of time for waku
 
 	logger *zap.Logger
+
+	// NTP Synced timesource
+	timesource *timesource.NTPTimeSource
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB) (*Waku, error) {
+func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, timesource *timesource.NTPTimeSource) (*Waku, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -1274,6 +1279,13 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 		return "", err
 	}
 	return string(*peerID), nil
+}
+
+func (w *Waku) timestamp() int64 {
+	if w.timesource != nil {
+		return w.timesource.Now().UnixNano()
+	}
+	return utils.GetUnixEpoch()
 }
 
 func (w *Waku) autoRelayPeerSource(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
