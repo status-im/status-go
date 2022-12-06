@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 	"os"
 	"testing"
 
@@ -21,6 +22,7 @@ var (
 	}
 
 	networks = json.RawMessage("{}")
+	fleet    = "prod.eth"
 	settings = Settings{
 		Address:                   types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
 		AnonMetricsShouldSend:     false,
@@ -43,7 +45,9 @@ var (
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6"),
+		Fleet:                     &fleet,
+	}
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -185,4 +189,43 @@ func TestSyncColumnsSet(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func Test(t *testing.T) {
+	fields := []string{"Address", "BackupEnabled", "Fleet", "Networks", "ProfilePicturesShowTo"}
+
+	for _, f := range fields {
+		fg, err := settings.getFieldByName(f)
+		if err != nil {
+			spew.Dump(err)
+		}
+		spew.Dump(fg)
+
+		pb, err := settings.fieldToPairingBootstrapSetting(fg)
+		if err != nil {
+			spew.Dump(err)
+		}
+		spew.Dump(pb)
+
+		ns := Settings{}
+
+		fg, err = ns.pairingBootstrapSettingToField(pb)
+		if err != nil {
+			spew.Dump(err)
+		}
+		spew.Dump(fg.v.Interface())
+	}
+
+	pbs, err := settings.ToPairingBootstrapSettings()
+	if err != nil {
+		spew.Dump(err)
+	}
+	spew.Dump(pbs)
+
+	ns := Settings{}
+	ssf, err := ns.FromPairingBootstrapSettings(pbs)
+	if err != nil {
+		spew.Dump(err)
+	}
+	spew.Dump(ssf)
 }

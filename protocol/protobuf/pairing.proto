@@ -37,10 +37,28 @@ message MultiAccount {
   }
 }
 
+message PairingBootstrapSetting {
+  // Type should be populated with settings.SettingField.FieldName
+  string Type = 1;
+
+  oneof value {
+    bool bool = 2;
+    bytes bytes = 3;
+    int64 int64 = 4;
+    string string = 5;
+    uint64 uint64= 6;
+  }
+}
+
+message PairingBootstrapSettings {
+  repeated PairingBootstrapSetting settings = 1;
+}
+
 message LocalPairingPayload {
   repeated Key keys = 1;
   MultiAccount multiaccount = 2;
   string password = 3;
+  PairingBootstrapSettings settings = 4;
 
   message Key {
     string name = 1;

@@ -328,12 +328,9 @@ const pathDefaultWallet = pathWalletRoot + "/0"
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
-	// TODO write wrapping functionality for local pairing bootstrapping
-
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	settings := &settings.Settings{}
-	// From key data ... Probably just use the original device settings
 	settings.KeyUID = generatedAccountInfo.KeyUID
 	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
 	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
@@ -344,17 +341,12 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	settings.Name = name
-	// From DB
 	settings.PublicKey = chatKeyString
 
-	// from DB
 	settings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	// From DB
 	settings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	// From DB
 	settings.Mnemonic = mnemonic
 
-	// From DB
 	signingPhrase, err := buildSigningPhrase()
 	if err != nil {
 		return nil, err
@@ -362,19 +354,13 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	settings.SigningPhrase = signingPhrase
 
 	settings.SendPushNotifications = true
-	// Random
 	// TODO trace other uses, check that the application doesn't use this outside of the setting table
 	settings.InstallationID = uuid.New().String()
-	// From DB
 	settings.UseMailservers = true
 
-	// Use default
 	settings.PreviewPrivacy = true
-	// From DB
 	settings.Currency = "usd"
-	// From DB
 	settings.ProfilePicturesVisibility = 1
-	// From DB
 	settings.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
@@ -384,7 +370,6 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	// From DB
 	settings.WalletVisibleTokens = &visibleTokenJSONRaw
 
 	// TODO: fix this
