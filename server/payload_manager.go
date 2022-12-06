@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -149,6 +151,7 @@ func (ppm *PairingPayloadManager) Receive(data []byte) error {
 		zap.Any("ppm.ppm.keys", ppm.ppm.keys),
 		zap.Any("ppm.ppm.multiaccount", ppm.ppm.multiaccount),
 		zap.String("ppm.ppm.password", ppm.ppm.password),
+		zap.Any("ppm.ppm.syncSettingFields", ppm.ppm.syncSettingFields),
 		zap.Binary("ppm.Received()", ppm.Received()),
 	)
 
@@ -265,10 +268,11 @@ func (pem *PayloadEncryptionManager) LockPayload() {
 
 // PairingPayload represents the payload structure a PairingServer handles
 type PairingPayload struct {
-	keys         map[string][]byte
-	multiaccount *multiaccounts.Account
-	password     string
-	settings     *protobuf.PairingSettings
+	keys              map[string][]byte
+	multiaccount      *multiaccounts.Account
+	password          string
+	settings          *settings.Settings
+	syncSettingFields []settings.SyncSettingField
 }
 
 func (pp *PairingPayload) ResetPayload() {
@@ -286,10 +290,16 @@ func NewPairingPayloadMarshaller(p *PairingPayload, logger *zap.Logger) *Pairing
 }
 
 func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
+	pbs, err := ppm.settings.ToPairingBootstrapSettings()
+	if err != nil {
+		return nil, err
+	}
+
 	return proto.Marshal(&protobuf.LocalPairingPayload{
 		Keys:         ppm.accountKeysToProtobuf(),
 		Multiaccount: ppm.multiaccount.ToProtobuf(),
 		Password:     ppm.password,
+		Settings:     pbs,
 	})
 }
 
@@ -312,6 +322,7 @@ func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 		zap.Any("pb", pb),
 		zap.Any("pb.Multiaccount", pb.Multiaccount),
 		zap.Any("pb.Keys", pb.Keys),
+		zap.Any("pb.Settings", pb.Settings),
 	)
 	if err != nil {
 		return err
@@ -320,7 +331,7 @@ func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	ppm.accountKeysFromProtobuf(pb.Keys)
 	ppm.multiaccountFromProtobuf(pb.Multiaccount)
 	ppm.password = pb.Password
-	return nil
+	return ppm.settingsFromProtobuf(pb.Settings)
 }
 
 func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
@@ -344,6 +355,16 @@ func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
 	ppm.multiaccount = new(multiaccounts.Account)
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
+}
+
+func (ppm *PairingPayloadMarshaller) settingsFromProtobuf(pbSettings *protobuf.PairingBootstrapSettings) error {
+	s := new(settings.Settings)
+	ssf, err := s.FromPairingBootstrapSettings(pbSettings)
+	if err != nil {
+		return err
+	}
+	ppm.syncSettingFields = ssf
+	return nil
 }
 
 const keystoreDir = "keystore"
@@ -401,6 +422,11 @@ func (ppr *PairingPayloadRepository) LoadFromSource() error {
 		return err
 	}
 
+	err = ppr.loadBootstrapData()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -443,6 +469,21 @@ func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
 	return nil
 }
 
+func (ppr *PairingPayloadRepository) loadBootstrapData() error {
+	sdb, err := settings.MakeNewDB(ppr.appDB)
+	if err != nil {
+		return err
+	}
+
+	s, err := sdb.GetSettings()
+	if err != nil {
+		return err
+	}
+
+	ppr.settings = &s
+	return nil
+}
+
 func (ppr *PairingPayloadRepository) StoreToSource() error {
 	err := ppr.validateKeys(ppr.password)
 	if err != nil {
@@ -464,8 +505,9 @@ func (ppr *PairingPayloadRepository) StoreToSource() error {
 		return err
 	}
 
-	// TODO install PublicKey into settings, probably do this outside of StoreToSource
-	return nil
+	return ppr.storeSettings()
+
+	// TODO need to handle config tables (see defaultNodeConfig)? Or do we init from client?
 }
 
 func (ppr *PairingPayloadRepository) validateKeys(password string) error {
@@ -551,10 +593,26 @@ func (ppr *PairingPayloadRepository) initialiseEncryptedDB() error {
 		return err
 	}
 
-	// TODO handle first settings init
-	// TODO need to also sync over the settings sync clocks
-	// TODO need to handle config tables (see defaultNodeConfig)
+	return nil
+}
 
+func (ppr *PairingPayloadRepository) storeSettings() error {
+	sdb, err := settings.MakeNewDB(ppr.appDB)
+	if err != nil {
+		return err
+	}
+
+	err = sdb.SaveSettingField(settings.InstallationID, uuid.New().String())
+	if err != nil {
+		return err
+	}
+
+	for _, ssf := range ppr.syncSettingFields {
+		err = sdb.SaveSettingField(ssf.SettingField, ssf.Value)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

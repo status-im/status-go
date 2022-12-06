@@ -36,19 +36,39 @@ LastBackup uint64
 BackupEnabled bool
  */
 
-message PairingSetting {
-  // Type should be populated with settings.SettingField.dBColumnName
-  string Type = 1;
-  uint64 clock = 2;
-
-  oneof value {
-    string value_string = 3;
-    bytes value_bytes = 4;
-    bool value_bool = 5;
-    int64 value_int64 = 6;
-  }
+// TODO reconcile these columns against the sync register, there is some mismatch
+/*
+message PairingBootstrapSetting {
+  bytes address = 1;
+  bool auto_message_enabled = 2;
+  bool backup_enabled = 3;
+  bool backup_fetched = 4;
+  string currency = 2;
+  string current_network = 3;
+  bytes custom_bootnodes = 4;
+  bytes custom_bootnodes_enabled = 5;
+  bytes dapps_address = 4;
+  string display_name = 5;
+  bytes eip1581_address = 5;
+  bytes gif_favorites = 6;
+  bytes gif_recents = 7;
+  string key_uid = 6;
+  string latest_derived_path = 7;
+  bool link_preview_request_enabled = 7;
+  bytes link_previews_enabled_sites = 8;
+  bool messages_from_contacts_only = 9;
+  string mnemonic = 8;
+  bool mutual_contact_enabled = 9;
+  string name = 9;
+  bytes networks = 10;
+  bool opensea_enabled = 11;
+  bytes pinned_mailservers = 12;
+  int64 profile_pictures_show_to = 13;
+  int64 profile_pictures_visibility = 11;
+  string public_key = 12;
+  string signing_phrase = 13;
+  bool use_mailservers = 14;
+  bytes wallet_root_address = 15;
+  bytes wallet_visible_tokens = 16;
 }
-
-message PairingSettings {
-  PairingSetting settings = 1;
-}
+ */
