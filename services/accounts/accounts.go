@@ -445,6 +445,10 @@ func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName str
 	return nil
 }
 
+func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
+	return api.db.GetAllKnownKeycards()
+}
+
 func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {
 	return api.db.GetAllMigratedKeyPairs()
 }

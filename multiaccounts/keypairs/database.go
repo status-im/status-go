@@ -25,7 +25,16 @@ func NewKeyPairs(db *sql.DB) *KeyPairs {
 	}
 }
 
-func (kp *KeyPairs) processResult(rows *sql.Rows) ([]*KeyPair, error) {
+func containsAddress(addresses []types.Address, address types.Address) bool {
+	for _, addr := range addresses {
+		if addr == address {
+			return true
+		}
+	}
+	return false
+}
+
+func (kp *KeyPairs) processResult(rows *sql.Rows, groupByKeycard bool) ([]*KeyPair, error) {
 	keyPairs := []*KeyPair{}
 	for rows.Next() {
 		keyPair := &KeyPair{}
@@ -37,15 +46,25 @@ func (kp *KeyPairs) processResult(rows *sql.Rows) ([]*KeyPair, error) {
 
 		foundAtIndex := -1
 		for i := range keyPairs {
-			if keyPairs[i].KeyUID == keyPair.KeyUID {
-				foundAtIndex = i
-				break
+			if groupByKeycard {
+				if keyPairs[i].KeycardUID == keyPair.KeycardUID {
+					foundAtIndex = i
+					break
+				}
+			} else {
+				if keyPairs[i].KeyUID == keyPair.KeyUID {
+					foundAtIndex = i
+					break
+				}
 			}
 		}
 		if foundAtIndex == -1 {
 			keyPair.AccountsAddresses = append(keyPair.AccountsAddresses, addr)
 			keyPairs = append(keyPairs, keyPair)
 		} else {
+			if containsAddress(keyPairs[foundAtIndex].AccountsAddresses, addr) {
+				continue
+			}
 			keyPairs[foundAtIndex].AccountsAddresses = append(keyPairs[foundAtIndex].AccountsAddresses, addr)
 		}
 	}
@@ -53,7 +72,7 @@ func (kp *KeyPairs) processResult(rows *sql.Rows) ([]*KeyPair, error) {
 	return keyPairs, nil
 }
 
-func (kp *KeyPairs) GetAllMigratedKeyPairs() ([]*KeyPair, error) {
+func (kp *KeyPairs) getAllRows(groupByKeycard bool) ([]*KeyPair, error) {
 	rows, err := kp.db.Query(`
 		SELECT 
 			keycard_uid, 
@@ -71,7 +90,15 @@ func (kp *KeyPairs) GetAllMigratedKeyPairs() ([]*KeyPair, error) {
 	}
 
 	defer rows.Close()
-	return kp.processResult(rows)
+	return kp.processResult(rows, groupByKeycard)
+}
+
+func (kp *KeyPairs) GetAllKnownKeycards() ([]*KeyPair, error) {
+	return kp.getAllRows(true)
+}
+
+func (kp *KeyPairs) GetAllMigratedKeyPairs() ([]*KeyPair, error) {
+	return kp.getAllRows(false)
 }
 
 func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error) {
@@ -94,7 +121,7 @@ func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error
 	}
 
 	defer rows.Close()
-	return kp.processResult(rows)
+	return kp.processResult(rows, false)
 }
 
 func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID string, accountAddresses []types.Address) (err error) {
