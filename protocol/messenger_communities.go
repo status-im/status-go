@@ -861,12 +861,12 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	// Make chat inactive
 	for chatID := range community.Chats() {
 		communityChatID := communityID.String() + chatID
-		err := m.deleteChat(communityChatID)
+		response.AddRemovedChat(communityChatID)
+
+		_, err = m.deactivateChat(communityChatID, 0, false, false)
 		if err != nil {
 			return nil, err
 		}
-		response.AddRemovedChat(communityChatID)
-
 		_, err = m.transport.RemoveFilterByChatID(communityChatID)
 		if err != nil {
 			return nil, err

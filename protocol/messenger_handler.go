@@ -619,7 +619,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 		}
 	}
 
-	response, err := m.deactivateChat(message.Id, message.Clock, false)
+	response, err := m.deactivateChat(message.Id, message.Clock, false, true)
 	if err != nil {
 		return err
 	}

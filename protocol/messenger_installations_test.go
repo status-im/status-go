@@ -172,7 +172,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	chat2.DeletedAtClockValue = 1
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
-	_, err = s.m.deactivateChat(removedChatID, 0, true)
+	_, err = s.m.deactivateChat(removedChatID, 0, true, true)
 	s.Require().NoError(err)
 
 	// pair
