@@ -372,7 +372,8 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
 	if !ok {
-		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress)
+                // NOTE: Temporary fix for DNS resolution on android/ios, as gomobile does not support it
+		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, dnsdisc.WithNameserver("1.1.1.1"))
 		if err != nil {
 			w.logger.Warn("dns discovery error ", zap.Error(err))
 			return
