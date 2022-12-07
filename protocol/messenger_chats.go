@@ -347,10 +347,10 @@ func (m *Messenger) DeactivateChat(request *requests.DeactivateChat) (*Messenger
 		return nil, err
 	}
 
-	return m.deactivateChat(request.ID, 0, true)
+	return m.deactivateChat(request.ID, 0, true, true)
 }
 
-func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shouldBeSynced bool) (*MessengerResponse, error) {
+func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shouldBeSynced bool, doClearHistory bool) (*MessengerResponse, error) {
 	var response MessengerResponse
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -380,7 +380,7 @@ func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shou
 		deactivationClock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	}
 
-	err = m.persistence.DeactivateChat(chat, deactivationClock)
+	err = m.persistence.DeactivateChat(chat, deactivationClock, doClearHistory)
 
 	if err != nil {
 		return nil, err

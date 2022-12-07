@@ -1150,7 +1150,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	publicChat.LastMessage = &lastMessage
 	publicChat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(publicChat, currentClockValue)
+	err = p.DeactivateChat(publicChat, currentClockValue, true)
 
 	// It does not set deleted at for a public chat
 	require.NoError(t, err)
@@ -1219,7 +1219,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	chat.LastMessage = &lastMessage
 	chat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(chat, currentClockValue)
+	err = p.DeactivateChat(chat, currentClockValue, true)
 
 	// It does set deleted at for a public chat
 	require.NoError(t, err)

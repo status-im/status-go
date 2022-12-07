@@ -2149,7 +2149,7 @@ func (db sqlitePersistence) ClearHistoryFromSyncMessage(chat *Chat, currentClock
 }
 
 // Deactivate chat sets a chat as inactive and clear its history
-func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64) (err error) {
+func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64, doClearHistory bool) (err error) {
 	var tx *sql.Tx
 
 	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
@@ -2165,18 +2165,21 @@ func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64)
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
-	err = db.deactivateChat(chat, currentClockValue, tx)
+	err = db.deactivateChat(chat, currentClockValue, tx, doClearHistory)
 
 	return
 }
 
-func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx, doClearHistory bool) error {
 	chat.Active = false
 	err := db.saveChat(tx, *chat)
 	if err != nil {
 		return err
 	}
 
+	if !doClearHistory {
+		return nil
+	}
 	return db.clearHistory(chat, currentClockValue, tx, true)
 }
 

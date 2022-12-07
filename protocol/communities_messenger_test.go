@@ -1746,12 +1746,32 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.Require().NoError(err)
 	s.Require().Equal(2, joinedCommunities[0].MembersCount())
 
+	chats, err := s.alice.persistence.Chats()
+	s.Require().NoError(err)
+	var numberInactiveChats = 0
+	for i := 0; i < len(chats); i++ {
+		if !chats[i].Active {
+			numberInactiveChats++
+		}
+	}
+	s.Require().Equal(3, numberInactiveChats)
+
 	// alice can rejoin
 	s.joinCommunity(community, s.alice)
 
 	joinedCommunities, err = s.admin.communitiesManager.Joined()
 	s.Require().NoError(err)
 	s.Require().Equal(3, joinedCommunities[0].MembersCount())
+
+	chats, err = s.alice.persistence.Chats()
+	s.Require().NoError(err)
+	numberInactiveChats = 0
+	for i := 0; i < len(chats); i++ {
+		if !chats[i].Active {
+			numberInactiveChats++
+		}
+	}
+	s.Require().Equal(1, numberInactiveChats)
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
