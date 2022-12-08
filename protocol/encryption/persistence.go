@@ -871,7 +871,40 @@ func (s *sqlitePersistence) SaveHashRatchetKey(
 	keyID uint32,
 	key []byte,
 ) error {
-	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption(group_id, key_id, key)
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	var result uint64
+	stmt, err := tx.Prepare(`SELECT 1
+        FROM hash_ratchet_encryption
+        WHERE group_id = ? AND key_id = ?
+        LIMIT 1`)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	err = stmt.QueryRow(groupID, keyID).Scan(&result)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	} else if err == nil {
+		// already in the database, nothing to do
+		return nil
+	}
+
+	stmt, err = tx.Prepare(`INSERT INTO hash_ratchet_encryption(group_id, key_id, key)
            VALUES(?,?,?)`)
 	if err != nil {
 		return err

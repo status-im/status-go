@@ -282,18 +282,13 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Port:                 nodeConfig.WakuV2Config.Port,
 			LightClient:          nodeConfig.WakuV2Config.LightClient,
 			KeepAliveInterval:    nodeConfig.WakuV2Config.KeepAliveInterval,
-			RelayNodes:           nodeConfig.ClusterConfig.RelayNodes,
-			StoreNodes:           nodeConfig.ClusterConfig.StoreNodes,
-			FilterNodes:          nodeConfig.ClusterConfig.FilterNodes,
-			LightpushNodes:       nodeConfig.ClusterConfig.LightpushNodes,
 			Rendezvous:           nodeConfig.Rendezvous,
-			WakuRendezvousNodes:  nodeConfig.ClusterConfig.WakuRendezvousNodes,
+			WakuNodes:            nodeConfig.ClusterConfig.WakuNodes,
 			PeerExchange:         nodeConfig.WakuV2Config.PeerExchange,
 			EnableStore:          nodeConfig.WakuV2Config.EnableStore,
 			StoreCapacity:        nodeConfig.WakuV2Config.StoreCapacity,
 			StoreSeconds:         nodeConfig.WakuV2Config.StoreSeconds,
 			DiscoveryLimit:       nodeConfig.WakuV2Config.DiscoveryLimit,
-			PersistPeers:         nodeConfig.WakuV2Config.PersistPeers,
 			DiscV5BootstrapNodes: nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
 			EnableDiscV5:         nodeConfig.WakuV2Config.EnableDiscV5,
 			UDPPort:              nodeConfig.WakuV2Config.UDPPort,
@@ -310,7 +305,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 		}
 		logging.SetAllLoggers(lvl)
 
-		w, err := wakuv2.New(nodeConfig.NodeKey, cfg, logutils.ZapLogger(), b.appDB)
+		w, err := wakuv2.New(nodeConfig.NodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource())
 
 		if err != nil {
 			return nil, err

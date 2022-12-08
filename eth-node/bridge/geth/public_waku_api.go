@@ -103,6 +103,7 @@ func (w *gethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessag
 		PowTime:    req.PowTime,
 		PowTarget:  req.PowTarget,
 		TargetPeer: req.TargetPeer,
+		Ephemeral:  req.Ephemeral,
 	}
 	return w.api.Post(ctx, msg)
 }

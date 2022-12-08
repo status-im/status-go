@@ -425,9 +425,9 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 }
 
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
-	removedOrBlcoked := message.Removed || message.Blocked
+	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
-	if !ok && (message.Added || message.Muted) && !removedOrBlcoked {
+	if !ok && (message.Added || message.Muted) && !removedOrBlocked {
 		pubKey, err := common.HexToPubkey(message.Id)
 		if err != nil {
 			return err
@@ -963,6 +963,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					}
 				}
 
+				m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
+
 				err = m.handleImportedMessages(importedMessages)
 				if err != nil {
 					log.Println("failed to handle imported messages", err)
@@ -1257,20 +1259,28 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return errors.New("chat not found")
 	}
 
-	// Check edit is valid
+	var canDeleteMessageForEveryone = false
 	if originalMessage.From != deleteMessage.From {
-		return errors.New("invalid delete, not the right author")
+		if chat.ChatType == ChatTypeCommunityChat {
+			fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
+			if err != nil {
+				return err
+			}
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(chat.CommunityID, fromPublicKey)
+			if !canDeleteMessageForEveryone {
+				return ErrInvalidDeletePermission
+			}
+		}
+		// Check edit is valid
+		if !canDeleteMessageForEveryone {
+			return errors.New("invalid delete, not the right author")
+		}
 	}
 
 	// Update message and return it
 	originalMessage.Deleted = true
 
 	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
-	if err != nil {
-		return err
-	}
-
-	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
 	if err != nil {
 		return err
 	}
@@ -1343,6 +1353,12 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return err
+		}
+	}
+
 	state.Response.AddMessage(originalMessage)
 	state.Response.AddChat(chat)
 
@@ -1351,7 +1367,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
-	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
+	messages, err := m.persistence.LatestMessageByChatID(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -1500,9 +1516,9 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
+		messages, err := m.persistence.LatestMessageByChatID(receivedMessage.LocalChatID)
 		if err != nil {
 			return err
 		}

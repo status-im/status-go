@@ -65,6 +65,8 @@ const (
 	ContactVerificationStatePending ContactVerificationState = iota + 1
 	ContactVerificationStateAccepted
 	ContactVerificationStateDeclined
+	ContactVerificationStateTrusted
+	ContactVerificationStateUntrustworthy
 )
 
 type CommandParameters struct {

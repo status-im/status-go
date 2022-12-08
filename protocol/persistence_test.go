@@ -247,6 +247,34 @@ func TestMessageByChatID(t *testing.T) {
 	)
 }
 
+func TestLatestMessageByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+
+	id := strconv.Itoa(10)
+	err = insertMinimalDeletedMessage(p, id)
+	require.NoError(t, err)
+	ids = append(ids, id)
+
+	id = strconv.Itoa(11)
+	err = insertMinimalDeletedForMeMessage(p, id)
+	require.NoError(t, err)
+	ids = append(ids, id)
+
+	m, err := p.LatestMessageByChatID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, m[0].ID, ids[9])
+}
+
 func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -778,6 +806,26 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
+	}})
+}
+
+func insertMinimalDeletedMessage(p *sqlitePersistence, id string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		Deleted:     true,
+		LocalChatID: testPublicChatID,
+		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		From:        "me",
+	}})
+}
+
+func insertMinimalDeletedForMeMessage(p *sqlitePersistence, id string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:           id,
+		DeletedForMe: true,
+		LocalChatID:  testPublicChatID,
+		ChatMessage:  protobuf.ChatMessage{Text: "some-text"},
+		From:         "me",
 	}})
 }
 

@@ -1,3 +1,8 @@
 {
-  "go.formatFlags": [ "-local", "github.com/ethereum/go-ethereum,github.com/status-im/status-go", "-w"],
+  "go.formatFlags": [
+    "-local",
+    "github.com/ethereum/go-ethereum,github.com/status-im/status-go",
+    "-w"
+  ],
+  "go.testTags": "gowaku_skip_migrations",
 }

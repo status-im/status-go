@@ -701,14 +701,16 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+	_, err = theirMessenger.Join(theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
-
 	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
@@ -717,22 +719,50 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 		ID:          publicKeyHex,
 		EnsName:     "contact-name",
 		LastUpdated: 20,
-		Blocked:     true,
+		Blocked:     false,
 	}
 
+	requireMessageArrival := func(receiver *Messenger, require bool) {
+		// Wait for the message to reach its destination
+		time.Sleep(100 * time.Millisecond)
+		response, err := receiver.RetrieveAll()
+		s.Require().NoError(err)
+		if require {
+			s.Require().Len(response.Messages(), 1)
+		} else {
+			s.Require().Len(response.Messages(), 0)
+		}
+	}
+
+	// Block contact
 	_, err = s.m.BlockContact(blockedContact.ID)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(*chat)
-
-	_, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	// Blocked contact sends message, we should not receive it
+	theirMessage := buildTestMessage(*theirChat)
+	_, err = theirMessenger.SendChatMessage(context.Background(), theirMessage)
 	s.NoError(err)
+	requireMessageArrival(s.m, false)
 
-	// Wait for the message to reach its destination
-	time.Sleep(100 * time.Millisecond)
-	response, err := s.m.RetrieveAll()
+	// We send a message, blocked contact should still receive it
+	ourMessage := buildTestMessage(*chat)
+	_, err = s.m.SendChatMessage(context.Background(), ourMessage)
+	s.NoError(err)
+	requireMessageArrival(theirMessenger, true)
+
+	// Unblock contact
+	err = s.m.UnblockContact(blockedContact.ID)
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 0)
+
+	// Unblocked contact sends message, we should receive it
+	_, err = theirMessenger.SendChatMessage(context.Background(), theirMessage)
+	s.Require().NoError(err)
+	requireMessageArrival(s.m, true)
+
+	// We send a message, unblocked contact should receive it
+	_, err = s.m.SendChatMessage(context.Background(), ourMessage)
+	s.NoError(err)
+	requireMessageArrival(theirMessenger, true)
 }
 
 // Resend their public message, receive only once

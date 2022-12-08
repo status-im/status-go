@@ -250,7 +250,6 @@ func randomNodeConfig() *params.NodeConfig {
 			LightClient:         randomBool(),
 			FullNode:            randomBool(),
 			DiscoveryLimit:      randomInt(math.MaxInt64),
-			PersistPeers:        randomBool(),
 			DataDir:             randomString(),
 			MaxMessageSize:      uint32(randomInt(math.MaxInt64)),
 			EnableConfirmations: randomBool(),

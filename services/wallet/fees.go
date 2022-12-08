@@ -31,7 +31,7 @@ type SuggestedFees struct {
 }
 
 func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Float {
-	if s.EIP1559Enabled {
+	if !s.EIP1559Enabled {
 		return s.GasPrice
 	}
 

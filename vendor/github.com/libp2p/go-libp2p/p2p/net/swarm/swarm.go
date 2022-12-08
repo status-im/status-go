@@ -10,15 +10,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 const (
@@ -50,6 +51,14 @@ type Option func(*Swarm) error
 func WithConnectionGater(gater connmgr.ConnectionGater) Option {
 	return func(s *Swarm) error {
 		s.gater = gater
+		return nil
+	}
+}
+
+// WithMultiaddrResolver sets a custom multiaddress resolver
+func WithMultiaddrResolver(maResolver *madns.Resolver) Option {
+	return func(s *Swarm) error {
+		s.maResolver = maResolver
 		return nil
 	}
 }
@@ -127,6 +136,8 @@ type Swarm struct {
 		m map[int]transport.Transport
 	}
 
+	maResolver *madns.Resolver
+
 	// stream handlers
 	streamh atomic.Value
 
@@ -153,6 +164,7 @@ func NewSwarm(local peer.ID, peers peerstore.Peerstore, opts ...Option) (*Swarm,
 		ctxCancel:        cancel,
 		dialTimeout:      defaultDialTimeout,
 		dialTimeoutLocal: defaultDialTimeoutLocal,
+		maResolver:       madns.DefaultResolver,
 	}
 
 	s.conns.m = make(map[peer.ID][]*Conn)

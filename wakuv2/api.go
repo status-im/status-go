@@ -26,9 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	"github.com/status-im/go-waku/waku/v2/utils"
+	"github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -179,6 +178,7 @@ type NewMessage struct {
 	Payload    []byte           `json:"payload"`
 	Padding    []byte           `json:"padding"`
 	TargetPeer string           `json:"targetPeer"`
+	Ephemeral  bool             `json:"ephemeral"`
 }
 
 // Post posts a message on the Waku network.
@@ -252,7 +252,8 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Payload:      payload,
 		Version:      version,
 		ContentTopic: req.Topic.ContentTopic(),
-		Timestamp:    utils.GetUnixEpoch(),
+		Timestamp:    api.w.timestamp(),
+		Ephemeral:    req.Ephemeral,
 	}
 
 	hash, err := api.w.Send(wakuMsg)

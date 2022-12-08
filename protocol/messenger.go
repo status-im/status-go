@@ -705,7 +705,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
 		adminCommunities, err := m.communitiesManager.Created()
 		if err == nil && len(adminCommunities) > 0 {
 			available := m.SubscribeMailserverAvailable()
@@ -729,6 +729,11 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	err = m.garbageCollectRemovedSavedAddresses()
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.setInstallationHostname()
 	if err != nil {
 		return nil, err
 	}
@@ -2730,6 +2735,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
+	encodedKeys, err := m.encryptor.GetAllHREncodedKeys(community.ID())
+	if err != nil {
+		return err
+	}
+	syncMessage.EncryptionKeys = encodedKeys
+
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
@@ -3251,7 +3262,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			for _, msg := range statusMessages {
 				logger := logger.With(zap.String("message-id", msg.ID.String()))
-				logger.Debug("processing message")
+				logger.Info("processing message")
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.Installations)
@@ -5793,7 +5804,10 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 				return nil, err
 			}
 
-			encodedMessage, err = m.sender.EncodeAbridgedMembershipUpdate(group, message)
+			// NOTE(cammellos): Disabling for now since the optimiziation is not
+			// applicable anymore after we changed group rules to allow
+			// anyone to change group details
+			encodedMessage, err = m.sender.EncodeMembershipUpdate(group, message)
 			if err != nil {
 				return nil, err
 			}

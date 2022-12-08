@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -34,13 +36,10 @@ const (
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
 
-	// EventHistoryRequestStarted is triggered before processing a mailserver batch
+	// EventHistoryRequestStarted is triggered before processing a store request
 	EventHistoryRequestStarted = "history.request.started"
 
-	// EventHistoryBatchProcessed is triggered after processing a mailserver batch
-	EventHistoryBatchProcessed = "history.request.batch.processed"
-
-	// EventHistoryRequestCompleted is triggered after processing all mailserver batches
+	// EventHistoryRequestCompleted is triggered after processing all storenode requests
 	EventHistoryRequestCompleted = "history.request.completed"
 
 	// EventHistoryRequestFailed is triggered when requesting history messages fails
@@ -79,6 +78,7 @@ type MailServerResponseSignal struct {
 
 type HistoryMessagesSignal struct {
 	RequestID  string `json:"requestId"`
+	PeerID     string `json:"peerId"`
 	BatchIndex int    `json:"batchIndex"`
 	NumBatches int    `json:"numBatches,omitempty"`
 	ErrorMsg   string `json:"errorMessage,omitempty"`
@@ -147,20 +147,16 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 	send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
 }
 
-func SendHistoricMessagesRequestStarted(requestID string, numBatches int) {
-	send(EventHistoryRequestStarted, HistoryMessagesSignal{RequestID: requestID, NumBatches: numBatches})
+func SendHistoricMessagesRequestStarted(numBatches int) {
+	send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
 }
 
-func SendHistoricMessagesRequestBatchProcessed(requestID string, batchIndex int, numBatches int) {
-	send(EventHistoryBatchProcessed, HistoryMessagesSignal{RequestID: requestID, BatchIndex: batchIndex, NumBatches: numBatches})
+func SendHistoricMessagesRequestFailed(requestID []byte, peerID peer.ID, err error) {
+	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerID.String(), ErrorMsg: err.Error()})
 }
 
-func SendHistoricMessagesRequestFailed(requestID string, err error) {
-	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: requestID, ErrorMsg: err.Error()})
-}
-
-func SendHistoricMessagesRequestCompleted(requestID string) {
-	send(EventHistoryRequestCompleted, HistoryMessagesSignal{RequestID: requestID})
+func SendHistoricMessagesRequestCompleted() {
+	send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
 }
 
 func SendUpdateAvailable(available bool, latestVersion string, url string) {

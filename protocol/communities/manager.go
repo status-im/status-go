@@ -135,7 +135,9 @@ type Subscription struct {
 	HistoryArchivesSeedingSignal             *signal.HistoryArchivesSeedingSignal
 	HistoryArchivesUnseededSignal            *signal.HistoryArchivesUnseededSignal
 	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
+	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
+	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 }
 
 type CommunityResponse struct {
@@ -156,7 +158,7 @@ func (m *Manager) Start() error {
 
 	if m.torrentConfig != nil && m.torrentConfig.Enabled {
 		err := m.StartTorrentClient()
-		return err
+		m.logger.Warn("couldn't start torrent client", zap.Error(err))
 	}
 
 	return nil
@@ -906,7 +908,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = community.AddMember(pk)
+	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{})
 	if err != nil {
 		return nil, err
 	}
@@ -1200,7 +1202,7 @@ func (m *Manager) InviteUsersToCommunity(communityID types.HexBytes, pks []*ecds
 	return m.inviteUsersToCommunity(community, pks)
 }
 
-func (m *Manager) AddMemberToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1209,7 +1211,7 @@ func (m *Manager) AddMemberToCommunity(communityID types.HexBytes, pk *ecdsa.Pub
 		return nil, ErrOrgNotFound
 	}
 
-	err = community.AddMember(pk)
+	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL})
 	if err != nil {
 		return nil, err
 	}
@@ -1263,6 +1265,74 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 	}
 
 	_, err = community.UnbanUserFromCommunity(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
+func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community, error) {
+	id := request.CommunityID
+	publicKey, err := common.HexToPubkey(request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	if !community.hasMember(publicKey) {
+		return nil, ErrMemberNotFound
+	}
+
+	_, err = community.AddRoleToMember(publicKey, request.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
+func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*Community, error) {
+	id := request.CommunityID
+	publicKey, err := common.HexToPubkey(request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	if !community.hasMember(publicKey) {
+		return nil, ErrMemberNotFound
+	}
+
+	_, err = community.RemoveRoleFromMember(publicKey, request.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -2106,6 +2176,12 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 					}
 
 					sort.Sort(sort.Reverse(archiveHashes))
+
+					m.publish(&Subscription{
+						DownloadingHistoryArchivesStartedSignal: &signal.DownloadingHistoryArchivesStartedSignal{
+							CommunityID: communityID.String(),
+						},
+					})
 
 					for _, hd := range archiveHashes {
 						hash := hd.hash

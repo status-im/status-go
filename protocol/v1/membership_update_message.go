@@ -345,26 +345,24 @@ func (g Group) Events() []MembershipUpdateEvent {
 	return g.events
 }
 
-func isInSlice(m string, set []string) bool {
-	for _, k := range set {
-		if k == m {
-			return true
-		}
-
-	}
-	return false
-}
-
 // AbridgedEvents returns the minimum set of events for a user to publish a post
-func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEvent {
+// The events we want to keep:
+// 1) Chat created
+// 2) Latest color changed
+// 3) Latest image changed
+// 4) For each admin, the latest admins added event that contains them
+// 5) For each member, the latest members added event that contains them
+// 4 & 5, might bring removed admins or removed members, for those, we also need to
+// keep the event that removes them
+func (g Group) AbridgedEvents() []MembershipUpdateEvent {
 	var events []MembershipUpdateEvent
 	var nameChangedEventFound bool
 	var colorChangedEventFound bool
 	var imageChangedEventFound bool
-	var joinedEventFound bool
-	memberID := publicKeyToString(publicKey)
-	var addedEventFound bool
-	nextInChain := memberID
+	removedMembers := make(map[string]*MembershipUpdateEvent)
+	addedMembers := make(map[string]bool)
+	extraMembers := make(map[string]bool)
+	admins := make(map[string]bool)
 	// Iterate in reverse
 	for i := len(g.events) - 1; i >= 0; i-- {
 		event := g.events[i]
@@ -389,44 +387,59 @@ func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEven
 			}
 			events = append(events, event)
 			imageChangedEventFound = true
+
 		case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
-			// If we already have an added event
-			// or the user is not in slice, ignore
-			if addedEventFound {
-				continue
+			var shouldAddEvent bool
+			for _, m := range event.Members {
+				// If it's adding a current user, and we don't have a more
+				// recent event
+				// if it's an admin, we track it
+				if admins[m] || (g.members.Has(m) && !addedMembers[m]) {
+					addedMembers[m] = true
+					shouldAddEvent = true
+				}
 			}
-
-			areWeTheTarget := isInSlice(nextInChain, event.Members)
-
-			// If it's us, and we have been added by the creator, no more work to do, this is authoritative
-			if areWeTheTarget && g.events[0].From == event.From {
-				addedEventFound = true
+			if shouldAddEvent {
+				// Append the event and check the not current members that are also
+				// added
+				for _, m := range event.Members {
+					if !g.members.Has(m) && !admins[m] {
+						extraMembers[m] = true
+					}
+				}
 				events = append(events, event)
-
-			} else if areWeTheTarget {
-				// if it's us and we haven't been added by the creator, we follow the history of whoever invited us
-				nextInChain = event.From
-				events = append(events, event)
 			}
-		case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
-			if joinedEventFound || event.From != memberID {
-				continue
-			}
-			joinedEventFound = true
+		case protobuf.MembershipUpdateEvent_ADMIN_REMOVED:
+			// We add it always for now
 			events = append(events, event)
-
 		case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
-			if isInSlice(nextInChain, event.Members) {
+			// We track admins in full
+			admins[event.Members[0]] = true
+			events = append(events, event)
+		case protobuf.MembershipUpdateEvent_MEMBER_REMOVED:
+			// Save member removed events, as we might need it
+			// to remove members who have been added but subsequently left
+			if removedMembers[event.Members[0]] == nil || removedMembers[event.Members[0]].ClockValue < event.ClockValue {
+				removedMembers[event.Members[0]] = &event
+			}
+
+		case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
+			if g.members.Has(event.From) {
 				events = append(events, event)
 			}
+
 		}
-
 	}
 
-	// Reverse events
-	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
-		events[i], events[j] = events[j], events[i]
+	for m := range extraMembers {
+		if removedMembers[m] != nil {
+			events = append(events, *removedMembers[m])
+		}
 	}
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ClockValue < events[j].ClockValue
+	})
 
 	return events
 }

@@ -16,12 +16,8 @@ const BootNodes = "boot"
 const TrustedMailServers = "trusted_mailserver"
 const PushNotificationsServers = "pushnotification"
 const RendezvousNodes = "rendezvous"
-const RelayNodes = "relay"
-const StoreNodes = "store"
-const FilterNodes = "filter"
-const LightpushNodes = "lightpush"
-const WakuRendezvousNodes = "waku_rendezvous"
 const DiscV5BootstrapNodes = "discV5boot"
+const WakuNodes = "waku"
 
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
@@ -282,10 +278,10 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertWakuV2Config(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
-		enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, persist_peers, data_dir,
+		enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
 		max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port,  auto_update, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.WakuV2Config.Enabled, c.WakuV2Config.Host, c.WakuV2Config.Port, c.WakuV2Config.KeepAliveInterval, c.WakuV2Config.LightClient, c.WakuV2Config.FullNode, c.WakuV2Config.DiscoveryLimit, c.WakuV2Config.PersistPeers, c.WakuV2Config.DataDir,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.WakuV2Config.Enabled, c.WakuV2Config.Host, c.WakuV2Config.Port, c.WakuV2Config.KeepAliveInterval, c.WakuV2Config.LightClient, c.WakuV2Config.FullNode, c.WakuV2Config.DiscoveryLimit, c.WakuV2Config.DataDir,
 		c.WakuV2Config.MaxMessageSize, c.WakuV2Config.EnableConfirmations, c.WakuV2Config.PeerExchange, c.WakuV2Config.EnableDiscV5, c.WakuV2Config.UDPPort, c.WakuV2Config.AutoUpdate,
 	)
 	if err != nil {
@@ -369,12 +365,8 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
 	nodeMap[RendezvousNodes] = c.ClusterConfig.RendezvousNodes
-	nodeMap[RelayNodes] = c.ClusterConfig.RelayNodes
-	nodeMap[StoreNodes] = c.ClusterConfig.StoreNodes
-	nodeMap[FilterNodes] = c.ClusterConfig.FilterNodes
-	nodeMap[LightpushNodes] = c.ClusterConfig.LightpushNodes
-	nodeMap[WakuRendezvousNodes] = c.ClusterConfig.WakuRendezvousNodes
 	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
+	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
 
 	for nodeType, nodes := range nodeMap {
 		for _, node := range nodes {
@@ -599,11 +591,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
 	nodeMap[RendezvousNodes] = &nodecfg.ClusterConfig.RendezvousNodes
-	nodeMap[RelayNodes] = &nodecfg.ClusterConfig.RelayNodes
-	nodeMap[StoreNodes] = &nodecfg.ClusterConfig.StoreNodes
-	nodeMap[FilterNodes] = &nodecfg.ClusterConfig.FilterNodes
-	nodeMap[LightpushNodes] = &nodecfg.ClusterConfig.LightpushNodes
-	nodeMap[WakuRendezvousNodes] = &nodecfg.ClusterConfig.WakuRendezvousNodes
+	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
 	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
 	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
 	if err != nil && err != sql.ErrNoRows {
@@ -741,12 +729,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, persist_peers, data_dir,
+	SELECT enabled, host, port, keep_alive_interval, light_client, full_node, discovery_limit, data_dir,
 	max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port, auto_update
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.KeepAliveInterval, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
-		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.PersistPeers, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
+		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
 		&nodecfg.WakuV2Config.PeerExchange, &nodecfg.WakuV2Config.EnableDiscV5, &nodecfg.WakuV2Config.UDPPort, &nodecfg.WakuV2Config.AutoUpdate,
 	)
 	if err != nil && err != sql.ErrNoRows {

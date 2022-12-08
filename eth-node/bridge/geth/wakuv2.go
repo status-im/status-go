@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	"github.com/status-im/go-waku/waku/v2/protocol/store"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
@@ -185,7 +185,6 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		return nil, err
 	}
 	options = []store.HistoryRequestOption{
-		store.WithPeer(peer),
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
@@ -203,7 +202,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		topics = append(topics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(topics, uint64(r.From), uint64(r.To), options)
+	pbCursor, err := w.waku.Query(peer, topics, uint64(r.From), uint64(r.To), options)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +240,7 @@ func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (string, error) {
 	return w.waku.AddRelayPeer(address)
 }
 
-func (w *gethWakuV2Wrapper) Peers() map[string][]string {
+func (w *gethWakuV2Wrapper) Peers() map[string]types.WakuV2Peer {
 	return w.waku.Peers()
 }
 
@@ -251,6 +250,10 @@ func (w *gethWakuV2Wrapper) DialPeer(address string) error {
 
 func (w *gethWakuV2Wrapper) DialPeerByID(peerID string) error {
 	return w.waku.DialPeerByID(peerID)
+}
+
+func (w *gethWakuV2Wrapper) ListenAddresses() ([]string, error) {
+	return w.waku.ListenAddresses(), nil
 }
 
 func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {

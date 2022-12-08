@@ -105,6 +105,7 @@ message SyncCommunity {
   SyncCommunitySettings settings = 9;
   bool encrypted = 10;
   bool spectated = 11;
+  bytes encryption_keys = 12;
 }
 
 message SyncCommunityRequestsToJoin {

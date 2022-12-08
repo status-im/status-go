@@ -19,9 +19,8 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	reader := NewReader(s)
 	router := NewRouter(s)
-	return &API{s, reader, router}
+	return &API{s, s.reader, router}
 }
 
 // API is class with methods available over RPC.
@@ -31,12 +30,12 @@ type API struct {
 	router *Router
 }
 
-func (api *API) StartWallet(ctx context.Context, chainIDs []uint64) error {
-	return api.reader.Start(ctx, chainIDs)
+func (api *API) StartWallet(ctx context.Context) error {
+	return api.reader.Start()
 }
 
-func (api *API) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
-	return api.reader.GetWallet(ctx, chainIDs)
+func (api *API) GetWalletToken(ctx context.Context) (map[common.Address][]Token, error) {
+	return api.reader.GetWalletToken(ctx)
 }
 
 type DerivedAddress struct {

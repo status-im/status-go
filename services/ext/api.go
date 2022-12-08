@@ -472,6 +472,14 @@ func (api *PublicAPI) UnbanUserFromCommunity(request *requests.UnbanUserFromComm
 	return api.service.messenger.UnbanUserFromCommunity(request)
 }
 
+func (api *PublicAPI) AddRoleToMember(request *requests.AddRoleToMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddRoleToMember(request)
+}
+
+func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveRoleFromMember(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()
@@ -820,12 +828,12 @@ func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, con
 	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
 }
 
-func (api *PublicAPI) VerifiedTrusted(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedTrusted(ctx, contactID)
+func (api *PublicAPI) VerifiedTrusted(ctx context.Context, request *requests.VerifiedTrusted) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedTrusted(ctx, request)
 }
 
-func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedUntrustworthy(ctx, contactID)
+func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *requests.VerifiedUntrustworthy) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedUntrustworthy(ctx, request)
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
@@ -1032,7 +1040,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, true)
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
@@ -1083,6 +1091,10 @@ func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint6
 
 func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
 	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
+}
+
+func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityType, readType)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
@@ -1155,8 +1167,12 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(peerID)
 }
 
-func (api *PublicAPI) Peers() map[string][]string {
+func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
 	return api.service.messenger.Peers()
+}
+
+func (api *PublicAPI) ListenAddresses() ([]string, error) {
+	return api.service.messenger.ListenAddresses()
 }
 
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {

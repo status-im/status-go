@@ -140,7 +140,15 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 				}
 
 				if sub.DownloadingHistoryArchivesFinishedSignal != nil {
-					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.HistoryArchiveDownloadedSignal.CommunityID)
+					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.DownloadingHistoryArchivesFinishedSignal.CommunityID)
+				}
+
+				if sub.DownloadingHistoryArchivesStartedSignal != nil {
+					m.config.messengerSignalsHandler.DownloadingHistoryArchivesStarted(sub.DownloadingHistoryArchivesStartedSignal.CommunityID)
+				}
+
+				if sub.ImportingHistoryArchiveMessagesSignal != nil {
+					m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(sub.ImportingHistoryArchiveMessagesSignal.CommunityID)
 				}
 			case <-m.quit:
 				return
@@ -1068,7 +1076,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.communitiesManager.StopHistoryArchiveTasksInterval(id)
 		} else if !m.communitiesManager.IsSeedingHistoryArchiveTorrent(id) {
@@ -1112,12 +1120,16 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	//request info already stored on mailserver, but its success is not crucial
-	// for import
-	_, _ = m.RequestCommunityInfoFromMailserver(community.IDString())
+	_, err = m.RequestCommunityInfoFromMailserver(community.IDString(), false)
+	if err != nil {
+		// TODO In the future we should add a mechanism to re-apply next steps (adding owner, joining)
+		// if there is no connection with mailserver. Otherwise changes will be overwritten.
+		// Do not return error to make tests pass.
+		m.logger.Error("Can't request community info from mailserver")
+	}
 
 	// We add ourselves
-	community, err = m.communitiesManager.AddMemberToCommunity(community.ID(), &m.identity.PublicKey)
+	community, err = m.communitiesManager.AddMemberOwnerToCommunity(community.ID(), &m.identity.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1127,7 +1139,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled {
+	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
 		var communities []*communities.Community
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
@@ -1327,6 +1339,34 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	return response, nil
 }
 
+func (m *Messenger) AddRoleToMember(request *requests.AddRoleToMember) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.AddRoleToMember(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
+func (m *Messenger) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	community, err := m.communitiesManager.RemoveRoleFromMember(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
 func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Community, error) {
 	id, err := hexutil.Decode(communityID)
 	if err != nil {
@@ -1342,15 +1382,19 @@ func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Co
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
-// from mailserver. It waits until it  has the community before returning it
-func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	community, err := m.findCommunityInfoFromDB(communityID)
-	if err != nil {
-		return nil, err
+// from mailserver. It waits until it has the community before returning it.
+// If useDatabase is true, it searches for community in database and does not request mailserver.
+func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string, useDatabase bool) (*communities.Community, error) {
+	if useDatabase {
+		community, err := m.findCommunityInfoFromDB(communityID)
+		if err != nil {
+			return nil, err
+		}
+		if community != nil {
+			return community, nil
+		}
 	}
-	if community != nil {
-		return community, nil
-	}
+
 	return m.requestCommunityInfoFromMailserver(communityID, true)
 }
 
@@ -1600,6 +1644,20 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		return nil
 	}
 
+	removedChatIDs := make([]string, 0)
+	for id := range communityResponse.Changes.ChatsRemoved {
+		chatID := community.IDString() + id
+		_, ok := state.AllChats.Load(chatID)
+		if ok {
+			removedChatIDs = append(removedChatIDs, chatID)
+			state.AllChats.Delete(chatID)
+			err := m.DeleteChat(chatID)
+			if err != nil {
+				m.logger.Error("couldn't delete chat", zap.Error(err))
+			}
+		}
+	}
+
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
@@ -1629,6 +1687,13 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		}
 	}
 
+	for _, chatID := range removedChatIDs {
+		_, err := m.transport.RemoveFilterByChatID(chatID)
+		if err != nil {
+			m.logger.Error("couldn't remove filter", zap.Error(err))
+		}
+	}
+
 	// Load transport filters
 	filters, err := m.transport.InitPublicFilters(chatIDs)
 	if err != nil {
@@ -1654,6 +1719,14 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	logger.Debug("ShouldHandleSyncCommunity result", zap.Bool("shouldHandle", shouldHandle))
 	if !shouldHandle {
 		return nil
+	}
+
+	// Handle community keys
+	if len(syncCommunity.EncryptionKeys) != 0 {
+		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Handle any community requests to join.
@@ -2908,7 +2981,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 		}
 
-		if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && communitySettings.HistoryArchiveSupportEnabled {
+		if m.config.torrentConfig != nil &&
+			m.config.torrentConfig.Enabled &&
+			communitySettings.HistoryArchiveSupportEnabled &&
+			m.communitiesManager.TorrentClientStarted() {
 
 			err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 			if err != nil {

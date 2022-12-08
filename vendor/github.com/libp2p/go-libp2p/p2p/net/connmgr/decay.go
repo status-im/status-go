@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/benbjohnson/clock"
 )
@@ -62,9 +62,9 @@ type DecayerCfg struct {
 // WithDefaults writes the default values on this DecayerConfig instance,
 // and returns itself for chainability.
 //
-//  cfg := (&DecayerCfg{}).WithDefaults()
-//  cfg.Resolution = 30 * time.Second
-//  t := NewDecayer(cfg, cm)
+//	cfg := (&DecayerCfg{}).WithDefaults()
+//	cfg.Resolution = 30 * time.Second
+//	t := NewDecayer(cfg, cm)
 func (cfg *DecayerCfg) WithDefaults() *DecayerCfg {
 	cfg.Resolution = DefaultResolution
 	return cfg
@@ -221,7 +221,7 @@ func (d *decayer) process() {
 			s := d.mgr.segments.get(peer)
 			s.Lock()
 
-			p := s.tagInfoFor(peer)
+			p := s.tagInfoFor(peer, d.clock.Now())
 			v, ok := p.decaying[tag]
 			if !ok {
 				v = &connmgr.DecayingValue{
@@ -244,7 +244,7 @@ func (d *decayer) process() {
 			s := d.mgr.segments.get(rm.peer)
 			s.Lock()
 
-			p := s.tagInfoFor(rm.peer)
+			p := s.tagInfoFor(rm.peer, d.clock.Now())
 			v, ok := p.decaying[rm.tag]
 			if !ok {
 				s.Unlock()

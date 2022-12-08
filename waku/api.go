@@ -222,6 +222,7 @@ type NewMessage struct {
 	PowTime    uint32           `json:"powTime"`
 	PowTarget  float64          `json:"powTarget"`
 	TargetPeer string           `json:"targetPeer"`
+	Ephemeral  bool             `json:"ephemeral"`
 }
 
 // Post posts a message on the Waku network.

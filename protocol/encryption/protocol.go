@@ -233,10 +233,19 @@ func (p *Protocol) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
 	return p.encryptor.GenerateHashRatchetKey(groupID)
 }
 
-// BuildHashRatchetKeyExchangeMessage builds a 1:1 message
-// containing newly generated hash ratchet key
-func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, keyIDs []uint32) (*ProtocolMessageSpec, error) {
+func (p *Protocol) GetAllHREncodedKeys(groupID []byte) ([]byte, error) {
+	keyIDs, err := p.encryptor.persistence.GetKeyIDsForGroup(groupID)
+	if err != nil {
+		return nil, err
+	}
+	if len(keyIDs) == 0 {
+		return nil, nil
+	}
 
+	return p.GetHREncodedKeys(groupID, keyIDs)
+}
+
+func (p *Protocol) GetHREncodedKeys(groupID []byte, keyIDs []uint32) ([]byte, error) {
 	keys := &HRKeys{}
 	for _, keyID := range keyIDs {
 		keyData, err := p.encryptor.persistence.GetHashRatchetKeyByID(groupID, keyID, 0)
@@ -250,7 +259,14 @@ func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.Priva
 		keys.Keys = append(keys.Keys, key)
 	}
 
-	encodedKeys, err := proto.Marshal(keys)
+	return proto.Marshal(keys)
+}
+
+// BuildHashRatchetKeyExchangeMessage builds a 1:1 message
+// containing newly generated hash ratchet key
+func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, keyIDs []uint32) (*ProtocolMessageSpec, error) {
+
+	encodedKeys, err := p.GetHREncodedKeys(groupID, keyIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +494,26 @@ type DecryptMessageResponse struct {
 	HashRatchetInfo  []*HashRatchetInfo
 }
 
+func (p *Protocol) HandleHashRatchetKeys(groupID, encodedKeys []byte) ([]*HashRatchetInfo, error) {
+
+	var info []*HashRatchetInfo
+	keys := &HRKeys{}
+	err := proto.Unmarshal(encodedKeys, keys)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys.Keys {
+		// Payload contains hash ratchet key
+		err = p.encryptor.persistence.SaveHashRatchetKey(groupID, key.KeyId, key.Key)
+		if err != nil {
+			return nil, err
+		}
+		info = append(info, &HashRatchetInfo{GroupID: groupID, KeyID: key.KeyId})
+	}
+
+	return info, nil
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *Protocol) HandleMessage(
 	myIdentityKey *ecdsa.PrivateKey,
@@ -547,19 +583,11 @@ func (p *Protocol) HandleMessage(
 		if dmProtocol != nil {
 			hrHeader := dmProtocol.HRHeader
 			if hrHeader != nil && hrHeader.SeqNo == 0 {
-				keys := &HRKeys{}
-				err := proto.Unmarshal(message, keys)
+				hashRatchetKeys, err := p.HandleHashRatchetKeys(hrHeader.GroupId, message)
 				if err != nil {
 					return nil, err
 				}
-				for _, key := range keys.Keys {
-					// Payload contains hash ratchet key
-					err = p.encryptor.persistence.SaveHashRatchetKey(hrHeader.GroupId, key.KeyId, key.Key)
-					if err != nil {
-						return nil, err
-					}
-					response.HashRatchetInfo = append(response.HashRatchetInfo, &HashRatchetInfo{GroupID: hrHeader.GroupId, KeyID: key.KeyId})
-				}
+				response.HashRatchetInfo = hashRatchetKeys
 			}
 		}
 

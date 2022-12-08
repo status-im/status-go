@@ -2,7 +2,10 @@ package protocol
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
+
+	"go.uber.org/zap"
 
 	"github.com/golang/protobuf/proto"
 
@@ -14,6 +17,7 @@ import (
 var ErrInvalidEditOrDeleteAuthor = errors.New("sender is not the author of the message")
 var ErrInvalidDeleteTypeAuthor = errors.New("message type cannot be deleted")
 var ErrInvalidEditContentType = errors.New("only text or emoji messages can be replaced")
+var ErrInvalidDeletePermission = errors.New("don't have enough permission to delete")
 
 func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessage) (*MessengerResponse, error) {
 	err := request.Validate()
@@ -86,20 +90,42 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	return response, nil
 }
 
+func (m *Messenger) CanDeleteMessageForEveryone(communityID string, publicKey *ecdsa.PublicKey) bool {
+	if communityID != "" {
+		community, err := m.communitiesManager.GetByIDString(communityID)
+		if err != nil {
+			m.logger.Error("failed to find community", zap.String("communityID", communityID), zap.Error(err))
+			return false
+		}
+		return community.CanDeleteMessageForEveryone(publicKey)
+	}
+	return false
+}
+
 func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) (*MessengerResponse, error) {
 	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err
 	}
 
-	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
-		return nil, ErrInvalidEditOrDeleteAuthor
-	}
-
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("Chat not found")
+	}
+
+	var canDeleteMessageForEveryone = false
+	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
+		if message.MessageType == protobuf.MessageType_COMMUNITY_CHAT {
+			communityID := chat.CommunityID
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(communityID, &m.identity.PublicKey)
+			if !canDeleteMessageForEveryone {
+				return nil, ErrInvalidDeletePermission
+			}
+		}
+		if !canDeleteMessageForEveryone {
+			return nil, ErrInvalidEditOrDeleteAuthor
+		}
 	}
 
 	// Only certain types of messages can be deleted
@@ -139,11 +165,6 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	message.Deleted = true
 	err = m.persistence.SaveMessages([]*common.Message{message})
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.persistence.HideMessage(messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +210,12 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return nil, err
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddMessage(message)
 	response.AddChat(chat)
@@ -229,7 +256,9 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	}
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
-	message.ContentType = editMessage.ContentType
+	if editMessage.ContentType != protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE {
+		message.ContentType = editMessage.ContentType
+	}
 
 	// Save original message as edit so we can retrieve history
 	if message.EditedAt == 0 {
@@ -271,7 +300,7 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 		return err
 	}
 
-	return m.persistence.HideMessage(message.ID)
+	return nil
 }
 
 func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {

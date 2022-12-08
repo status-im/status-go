@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -21,10 +20,14 @@ import (
 
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
+
 var mailserverRequestTimeout = 10 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 var mailserverMaxTries uint = 2
 var mailserverMaxFailedRequests uint = 2
+
+// maxTopicsPerRequest sets the batch size to limit the number of topics per store query
+var maxTopicsPerRequest int = 10
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
@@ -436,12 +439,9 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		syncedTopics = append(syncedTopics, topicData)
 	}
 
-	requestID := uuid.NewRandom().String()
-
-	m.logger.Debug("syncing topics", zap.Any("batches", batches), zap.Any("requestId", requestID))
-
+	m.logger.Debug("syncing topics", zap.Any("batches", batches))
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, len(batches))
+		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
 
 	batchKeys := make([]int, 0, len(batches))
@@ -456,21 +456,14 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		i++
 		err := m.processMailserverBatch(batch)
 		if err != nil {
-			m.logger.Error("error syncing topics", zap.Any("requestId", requestID), zap.Error(err))
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-			}
+			m.logger.Error("error syncing topics", zap.Error(err))
 			return nil, err
-		}
-
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, i, len(batches))
 		}
 	}
 
 	m.logger.Debug("topics synced")
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
 	err = m.mailserversDatabase.AddTopics(syncedTopics)
@@ -571,28 +564,39 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 	if err != nil {
 		return err
 	}
-	cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, nil, nil, batch.Topics, true)
-	if err != nil {
-		logger.Error("failed to send request", zap.Error(err))
-		return err
-	}
 
-	for len(cursor) != 0 || storeCursor != nil {
-		logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
-		err = func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
-			defer cancel()
+	for i := 0; i < len(batch.Topics); i += maxTopicsPerRequest {
+		j := i + maxTopicsPerRequest
+		if j > len(batch.Topics) {
+			j = len(batch.Topics)
+		}
 
-			cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, cursor, storeCursor, batch.Topics, true)
+		topicsForIteration := batch.Topics[i:j]
+
+		cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, nil, nil, topicsForIteration, true)
+		if err != nil {
+			logger.Error("failed to send request", zap.Error(err))
+			return err
+		}
+
+		for len(cursor) != 0 || storeCursor != nil {
+			logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
+			err = func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+				defer cancel()
+
+				cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, cursor, storeCursor, topicsForIteration, true)
+				if err != nil {
+					return err
+				}
+				return nil
+			}()
 			if err != nil {
 				return err
 			}
-			return nil
-		}()
-		if err != nil {
-			return err
 		}
 	}
+
 	// NOTE(camellos): Disabling for now, not critical and I'd rather take a bit more time
 	// to test it
 	//logger.Info("waiting until message processed")
@@ -660,27 +664,18 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			From:    chat.SyncedFrom - defaultSyncPeriod,
 			Topics:  topics,
 		}
-
-		requestID := uuid.NewRandom().String()
-
 		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
 		err = m.processMailserverBatch(batch)
 		if err != nil {
-
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-			}
 			return nil, err
 		}
 
 		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
-			m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+			m.config.messengerSignalsHandler.HistoryRequestCompleted()
 		}
-
 		if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
 			chat.SyncedFrom = batch.From
 		}
@@ -737,23 +732,17 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		Topics:  topics,
 	}
 
-	requestID := uuid.NewRandom().String()
-
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
 	err = m.processMailserverBatch(batch)
 	if err != nil {
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-		}
 		return err
 	}
 
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
-		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
 	return m.persistence.DeleteMessages(messageIDs)

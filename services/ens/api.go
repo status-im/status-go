@@ -121,7 +121,7 @@ func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	owner, err := registry.Owner(callOpts, nameHash(username))
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return &owner, nil
@@ -205,7 +205,6 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 	log.Info("obtaining username registrar address")
 	api.addrPerChainMutex.Lock()
 	defer api.addrPerChainMutex.Unlock()
-
 	addr, ok := api.addrPerChain[chainID]
 	if ok {
 		return addr, nil

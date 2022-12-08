@@ -10,11 +10,6 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-var (
-	wsma  = ma.StringCast("/ws")
-	wssma = ma.StringCast("/wss")
-)
-
 type listener struct {
 	nl     net.Listener
 	server http.Server
@@ -25,16 +20,31 @@ type listener struct {
 	incoming chan *Conn
 }
 
+func (pwma *parsedWebsocketMultiaddr) toMultiaddr() ma.Multiaddr {
+	if !pwma.isWSS {
+		return pwma.restMultiaddr.Encapsulate(wsComponent)
+	}
+
+	if pwma.sni == nil {
+		return pwma.restMultiaddr.Encapsulate(tlsComponent).Encapsulate(wsComponent)
+	}
+
+	return pwma.restMultiaddr.Encapsulate(tlsComponent).Encapsulate(pwma.sni).Encapsulate(wsComponent)
+}
+
 // newListener creates a new listener from a raw net.Listener.
 // tlsConf may be nil (for unencrypted websockets).
 func newListener(a ma.Multiaddr, tlsConf *tls.Config) (*listener, error) {
-	// Only look at the _last_ component.
-	maddr, wscomponent := ma.SplitLast(a)
-	isWSS := wscomponent.Equal(wssma)
-	if isWSS && tlsConf == nil {
+	parsed, err := parseWebsocketMultiaddr(a)
+	if err != nil {
+		return nil, err
+	}
+
+	if parsed.isWSS && tlsConf == nil {
 		return nil, fmt.Errorf("cannot listen on wss address %s without a tls.Config", a)
 	}
-	lnet, lnaddr, err := manet.DialArgs(maddr)
+
+	lnet, lnaddr, err := manet.DialArgs(parsed.restMultiaddr)
 	if err != nil {
 		return nil, err
 	}
@@ -54,15 +64,16 @@ func newListener(a ma.Multiaddr, tlsConf *tls.Config) (*listener, error) {
 		_, last := ma.SplitFirst(laddr)
 		laddr = first.Encapsulate(last)
 	}
+	parsed.restMultiaddr = laddr
 
 	ln := &listener{
 		nl:       nl,
-		laddr:    laddr.Encapsulate(wscomponent),
+		laddr:    parsed.toMultiaddr(),
 		incoming: make(chan *Conn),
 		closed:   make(chan struct{}),
 	}
 	ln.server = http.Server{Handler: ln}
-	if isWSS {
+	if parsed.isWSS {
 		ln.server.TLSConfig = tlsConf
 	}
 	return ln, nil

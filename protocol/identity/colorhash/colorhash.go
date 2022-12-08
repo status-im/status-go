@@ -3,6 +3,7 @@ package colorhash
 import (
 	"math/big"
 
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity"
 )
 
@@ -13,7 +14,7 @@ const (
 
 var colorHashAlphabet [][]int
 
-func GenerateFor(pubkey string) (hash [][]int, err error) {
+func GenerateFor(pubkey string) (hash multiaccounts.ColourHash, err error) {
 	if len(colorHashAlphabet) == 0 {
 		colorHashAlphabet = makeColorHashAlphabet(colorHashSegmentMaxLen, colorHashColorsCount)
 	}
@@ -47,12 +48,12 @@ func makeColorHashAlphabet(units, colors int) (res [][]int) {
 	return
 }
 
-func toColorHash(value *big.Int, alphabet *[][]int, colorsCount int) (hash [][]int) {
+func toColorHash(value *big.Int, alphabet *[][]int, colorsCount int) (hash multiaccounts.ColourHash) {
 	alphabetLen := len(*alphabet)
 	indexes := identity.ToBigBase(value, uint64(alphabetLen))
-	hash = make([][](int), len(indexes))
+	hash = make(multiaccounts.ColourHash, len(indexes))
 	for i, v := range indexes {
-		hash[i] = make([](int), 2)
+		hash[i] = [2]int{}
 		hash[i][0] = (*alphabet)[v][0]
 		hash[i][1] = (*alphabet)[v][1]
 	}

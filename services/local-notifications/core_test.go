@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 
@@ -115,13 +116,13 @@ func TestTransactionNotification(t *testing.T) {
 	require.NoError(t, walletDb.ProcessBlocks(1777, header.Address, big.NewInt(1), lastBlock, []*transfer.DBHeader{header}))
 	require.NoError(t, walletDb.ProcessTranfers(1777, transfers, []*transfer.DBHeader{}))
 
-	feed.Send(transfer.Event{
+	feed.Send(walletevent.Event{
 		Type:        transfer.EventRecentHistoryReady,
 		BlockNumber: big.NewInt(0),
 		Accounts:    []common.Address{header.Address},
 	})
 
-	feed.Send(transfer.Event{
+	feed.Send(walletevent.Event{
 		Type:        transfer.EventNewTransfers,
 		BlockNumber: header.Number,
 		Accounts:    []common.Address{header.Address},

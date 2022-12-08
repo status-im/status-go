@@ -74,6 +74,11 @@ func (w *gethWakuWrapper) DialPeerByID(peerID string) error {
 	return errors.New("not available in WakuV1")
 }
 
+// ListenAddresses function only added for compatibility with waku V2
+func (w *gethWakuWrapper) ListenAddresses() ([]string, error) {
+	return nil, errors.New("not available in WakuV1")
+}
+
 // PeerCount function only added for compatibility with waku V2
 func (w *gethWakuWrapper) DropPeer(peerID string) error {
 	return errors.New("not available in WakuV1")
@@ -84,8 +89,8 @@ func (w *gethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 }
 
 // Peers function only added for compatibility with waku V2
-func (w *gethWakuWrapper) Peers() map[string][]string {
-	p := make(map[string][]string)
+func (w *gethWakuWrapper) Peers() map[string]types.WakuV2Peer {
+	p := make(map[string]types.WakuV2Peer)
 	return p
 }
 

@@ -598,12 +598,30 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
+	knownAccounts, err := accountDB.GetAccounts()
+	if err != nil {
+		return err
+	}
+
 	err = b.closeAppDB()
 	if err != nil {
 		return err
 	}
 
-	return b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
+	err = b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	for _, acc := range knownAccounts {
+		if account.KeyUID == acc.KeyUID {
+			// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
+			// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
+			_ = b.accountManager.DeleteAccount(keyStoreDir, acc.Address)
+		}
+	}
+
+	return nil
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
@@ -1360,11 +1378,6 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	err = nodecfg.SaveNodeConfig(b.appDB, conf)
 	if err != nil {
 		return err
-	}
-
-	waku2 := b.statusNode.WakuV2Service()
-	if waku2 != nil {
-		return waku2.ClearPeerCache()
 	}
 
 	return nil
