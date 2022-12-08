@@ -614,6 +614,7 @@ func (m *Messenger) updateWakuV2PeerStatus() {
 		select {
 		case status := <-connSubscription.C:
 			var connectedPeers []ConnectedPeer
+                        m.logger.Info("CONNECTED PEERS",zap.Any("peers", status.Peers)) 
 			for id := range status.Peers {
 				connectedPeers = append(connectedPeers, ConnectedPeer{UniqueID: id})
 			}
@@ -624,6 +625,7 @@ func (m *Messenger) updateWakuV2PeerStatus() {
 			}
 
 		case <-ticker.C:
+                        m.logger.Info("CONNECTED PEERS",zap.Any("peers", m.storenodesPeersInfo()))
 			err := m.handleMailserverCycleEvent(m.storenodesPeersInfo())
 			if err != nil {
 				m.logger.Error("failed to handle mailserver cycle event", zap.Error(err))

@@ -305,6 +305,7 @@ func (ids *idService) ObservedAddrsFor(local ma.Multiaddr) []ma.Multiaddr {
 }
 
 func (ids *idService) IdentifyConn(c network.Conn) {
+        log.Info("identify-wait: identify-conn", c)
 	<-ids.IdentifyWait(c)
 }
 
@@ -780,6 +781,7 @@ func (nn *netNotifiee) IDService() *idService {
 }
 
 func (nn *netNotifiee) Connected(n network.Network, v network.Conn) {
+        log.Info("identify-wait: connected", v)
 	nn.IDService().IdentifyWait(v)
 }
 
