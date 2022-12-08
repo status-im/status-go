@@ -407,6 +407,8 @@ func (d *DiscoveryV5) FindPeers(ctx context.Context, topic string, opts ...disco
 		chPeer <- r.Peer
 	}
 
+        d.log.Info("discovery-v5: found peers", zap.Any("peers", records))
+
 	close(chPeer)
 
 	return chPeer, err
