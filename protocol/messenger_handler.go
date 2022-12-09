@@ -906,7 +906,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && settings != nil && settings.HistoryArchiveSupportEnabled {
+	if m.torrentClientReady() && settings != nil && settings.HistoryArchiveSupportEnabled {
 		signedByOwnedCommunity, err := m.communitiesManager.IsAdminCommunity(communityPubKey)
 		if err != nil {
 			return err
@@ -950,112 +950,114 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				// this wait groups tracks all ongoing tasks across communities
 				m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
-
-				downloadTaskInfo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, task.Cancel)
-				if err != nil {
-					logMsg := "failed to download history archive data"
-					if err == communities.ErrTorrentTimedout {
-						m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
-						downloadTaskInfo, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, task.Cancel)
-						if err != nil {
-							m.communitiesManager.LogStdout(logMsg, zap.Error(err))
-							return
-						}
-					} else {
-						m.communitiesManager.LogStdout(logMsg, zap.Error(err))
-						return
-					}
-				}
-
-				if downloadTaskInfo.Cancelled {
-					if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
-						m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
-					}
-					return
-				}
-
-				importTicker := time.NewTicker(100 * time.Millisecond)
-				defer importTicker.Stop()
-
-			importMessageArchivesLoop:
-				for {
-					select {
-					case <-task.Cancel:
-						m.communitiesManager.LogStdout("interrupted importing history archive messages")
-						return
-					case <-importTicker.C:
-
-						archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(id)
-						if err != nil {
-							m.communitiesManager.LogStdout("couldn't get message archive IDs to import", zap.Error(err))
-							return
-						}
-
-						if len(archiveIDsToImport) == 0 {
-							m.communitiesManager.LogStdout("no message archives to import")
-							break importMessageArchivesLoop
-						}
-
-						m.communitiesManager.LogStdout(fmt.Sprintf("importing message archive, %d left", len(archiveIDsToImport)))
-
-						// only process one archive at a time, so in case of cancel we don't
-						// wait for all archives to be processed first
-						downloadedArchiveID := archiveIDsToImport[0]
-
-						messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, []string{downloadedArchiveID})
-						if err != nil {
-							m.communitiesManager.LogStdout("failed to extract history archive messages", zap.Error(err))
-							continue
-						}
-
-						importedMessages := make(map[transport.Filter][]*types.Message, 0)
-						otherMessages := make(map[transport.Filter][]*types.Message, 0)
-
-						for filter, messages := range messagesToHandle {
-							for _, message := range messages {
-								if message.ThirdPartyID != "" {
-									importedMessages[filter] = append(importedMessages[filter], message)
-								} else {
-									otherMessages[filter] = append(otherMessages[filter], message)
-								}
-							}
-						}
-
-						m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
-
-						err = m.handleImportedMessages(importedMessages)
-						if err != nil {
-							m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
-							continue
-						}
-
-						response, err := m.handleRetrievedMessages(otherMessages, false)
-						if err != nil {
-							m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
-							continue
-						}
-
-						err = m.communitiesManager.SetMessageArchiveIDImported(id, downloadedArchiveID, true)
-						if err != nil {
-							m.communitiesManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
-							continue
-						}
-
-						if !response.IsEmpty() {
-							notifications := response.Notifications()
-							response.ClearNotifications()
-							signal.SendNewMessages(response)
-							localnotifications.PushMessages(notifications)
-						}
-					}
-				}
-				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+				m.downloadAndImportHistoryArchives(id, magnetlink, task.Cancel)
 			}(currentTask)
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
 		}
 	}
 	return nil
+}
+
+func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
+	downloadTaskInfo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+	if err != nil {
+		logMsg := "failed to download history archive data"
+		if err == communities.ErrTorrentTimedout {
+			m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
+			downloadTaskInfo, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+			if err != nil {
+				m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+				return
+			}
+		} else {
+			m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+			return
+		}
+	}
+
+	if downloadTaskInfo.Cancelled {
+		m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		return
+	}
+
+	importTicker := time.NewTicker(100 * time.Millisecond)
+	defer importTicker.Stop()
+
+importMessageArchivesLoop:
+	for {
+		select {
+		case <-cancel:
+			m.communitiesManager.LogStdout("interrupted importing history archive messages")
+			return
+		case <-importTicker.C:
+
+			archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(id)
+			if err != nil {
+				m.communitiesManager.LogStdout("couldn't get message archive IDs to import", zap.Error(err))
+				return
+			}
+
+			if len(archiveIDsToImport) == 0 {
+				m.communitiesManager.LogStdout("no message archives to import")
+				break importMessageArchivesLoop
+			}
+
+			m.communitiesManager.LogStdout(fmt.Sprintf("importing message archive, %d left", len(archiveIDsToImport)))
+
+			// only process one archive at a time, so in case of cancel we don't
+			// wait for all archives to be processed first
+			downloadedArchiveID := archiveIDsToImport[0]
+
+			messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, []string{downloadedArchiveID})
+			if err != nil {
+				m.communitiesManager.LogStdout("failed to extract history archive messages", zap.Error(err))
+				continue
+			}
+
+			importedMessages := make(map[transport.Filter][]*types.Message, 0)
+			otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+			for filter, messages := range messagesToHandle {
+				for _, message := range messages {
+					if message.ThirdPartyID != "" {
+						importedMessages[filter] = append(importedMessages[filter], message)
+					} else {
+						otherMessages[filter] = append(otherMessages[filter], message)
+					}
+				}
+			}
+
+			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
+
+			err = m.handleImportedMessages(importedMessages)
+			if err != nil {
+				m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
+				continue
+			}
+
+			response, err := m.handleRetrievedMessages(otherMessages, false)
+			if err != nil {
+				m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
+				continue
+			}
+
+			err = m.communitiesManager.SetMessageArchiveIDImported(id, downloadedArchiveID, true)
+			if err != nil {
+				m.communitiesManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
+				continue
+			}
+
+			if !response.IsEmpty() {
+				notifications := response.Notifications()
+				response.ClearNotifications()
+				signal.SendNewMessages(response)
+				localnotifications.PushMessages(notifications)
+			}
+		}
+	}
+
+	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 }
 
 func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto protobuf.CommunityCancelRequestToJoin) error {
@@ -1172,8 +1174,41 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 		if len(response.Communities()) > 0 {
-			state.Response.AddCommunity(response.Communities()[0])
-			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
+			communitySettings := response.CommunitiesSettings()[0]
+			community := response.Communities()[0]
+			state.Response.AddCommunity(community)
+			state.Response.AddCommunitySettings(communitySettings)
+
+			magnetlink := requestToJoinResponseProto.MagnetUri
+			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+
+				currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(community.IDString())
+				go func(currentTask *communities.HistoryArchiveDownloadTask) {
+
+					// Cancel ongoing download/import task
+					if currentTask != nil {
+						close(currentTask.Cancel)
+						currentTask.Waiter.Wait()
+					}
+
+					task := &communities.HistoryArchiveDownloadTask{
+						Cancel: make(chan struct{}),
+						Waiter: *new(sync.WaitGroup),
+					}
+					m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+
+					task.Waiter.Add(1)
+					defer task.Waiter.Done()
+
+					m.downloadHistoryArchiveTasksWaitGroup.Add(1)
+					defer m.downloadHistoryArchiveTasksWaitGroup.Done()
+
+					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.Cancel)
+				}(currentTask)
+
+				clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
+				return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)
+			}
 		}
 	}
 

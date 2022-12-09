@@ -99,6 +99,7 @@ message CommunityRequestToJoinResponse {
   bool accepted = 3;
   bytes grant = 4;
   bytes community_id = 5;
+  string magnet_uri = 6;
 }
 
 message CommunityRequestToLeave {

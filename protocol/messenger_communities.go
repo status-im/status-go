@@ -719,6 +719,15 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		Grant:       grant,
 	}
 
+	if m.torrentClientReady() && m.communitiesManager.TorrentFileExists(community.IDString()) {
+		magnetlink, err := m.communitiesManager.GetHistoryArchiveMagnetlink(community.ID())
+		if err != nil {
+			m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
+			return nil, err
+		}
+		requestToJoinResponseProto.MagnetUri = magnetlink
+	}
+
 	payload, err := proto.Marshal(requestToJoinResponseProto)
 	if err != nil {
 		return nil, err
@@ -1076,7 +1085,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
+	if m.torrentClientReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.communitiesManager.StopHistoryArchiveTasksInterval(id)
 		} else if !m.communitiesManager.IsSeedingHistoryArchiveTorrent(id) {
@@ -1139,7 +1148,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
+	if m.torrentClientReady() {
 		var communities []*communities.Community
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
@@ -2984,10 +2993,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 		}
 
-		if m.config.torrentConfig != nil &&
-			m.config.torrentConfig.Enabled &&
-			communitySettings.HistoryArchiveSupportEnabled &&
-			m.communitiesManager.TorrentClientStarted() {
+		if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
 
 			err = m.communitiesManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 			if err != nil {
@@ -3099,6 +3105,15 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	}
 
 	return wakuMessages, nil
+}
+
+func (m *Messenger) torrentClientReady() bool {
+	// Simply checking for `torrentConfig.Enabled` isn't enough
+	// as there's a possiblity that the torrent client couldn't
+	// be instantiated (for example in case of port conflicts)
+	return m.config.torrentConfig != nil &&
+		m.config.torrentConfig.Enabled &&
+		m.communitiesManager.TorrentClientStarted()
 }
 
 func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*types.Message, error) {
