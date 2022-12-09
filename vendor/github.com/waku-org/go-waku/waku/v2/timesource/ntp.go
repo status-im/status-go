@@ -2,6 +2,7 @@ package timesource
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -133,8 +134,8 @@ type NTPTimeSource struct {
 	timeQuery         ntpQuery // for ease of testing
 	log               *zap.Logger
 
-	quit chan struct{}
-	wg   sync.WaitGroup
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
 	mu           sync.RWMutex
 	latestOffset time.Duration
@@ -162,9 +163,11 @@ func (s *NTPTimeSource) updateOffset() error {
 
 // runPeriodically runs periodically the given function based on NTPTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
-func (s *NTPTimeSource) runPeriodically(fn func() error) error {
+func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error) error {
 	var period time.Duration
-	s.quit = make(chan struct{})
+
+	s.log.Info("starting service")
+
 	// we try to do it synchronously so that user can have reliable messages right away
 	s.wg.Add(1)
 	go func() {
@@ -177,7 +180,8 @@ func (s *NTPTimeSource) runPeriodically(fn func() error) error {
 					period = s.fastNTPSyncPeriod
 				}
 
-			case <-s.quit:
+			case <-ctx.Done():
+				s.log.Info("stopping service")
 				s.wg.Done()
 				return
 			}
@@ -188,16 +192,16 @@ func (s *NTPTimeSource) runPeriodically(fn func() error) error {
 }
 
 // Start runs a goroutine that updates local offset every updatePeriod.
-func (s *NTPTimeSource) Start() error {
-	return s.runPeriodically(s.updateOffset)
+func (s *NTPTimeSource) Start(ctx context.Context) error {
+	s.wg.Wait() // Waiting for other go routines to stop
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	return s.runPeriodically(ctx, s.updateOffset)
 }
 
 // Stop goroutine that updates time source.
 func (s *NTPTimeSource) Stop() error {
-	if s.quit == nil {
-		return nil
-	}
-	close(s.quit)
+	s.cancel()
 	s.wg.Wait()
 	return nil
 }

@@ -64,13 +64,28 @@ func WithDB(db *sql.DB) DBOption {
 	}
 }
 
+type ConnectionPoolOptions struct {
+	MaxOpenConnections    int
+	MaxIdleConnections    int
+	ConnectionMaxLifetime time.Duration
+	ConnectionMaxIdleTime time.Duration
+}
+
 // WithDriver is a DBOption that will open a *sql.DB connection
-func WithDriver(driverName string, datasourceName string) DBOption {
+func WithDriver(driverName string, datasourceName string, connectionPoolOptions ...ConnectionPoolOptions) DBOption {
 	return func(d *DBStore) error {
 		db, err := sql.Open(driverName, datasourceName)
 		if err != nil {
 			return err
 		}
+
+		if len(connectionPoolOptions) != 0 {
+			db.SetConnMaxIdleTime(connectionPoolOptions[0].ConnectionMaxIdleTime)
+			db.SetConnMaxLifetime(connectionPoolOptions[0].ConnectionMaxLifetime)
+			db.SetMaxIdleConns(connectionPoolOptions[0].MaxIdleConnections)
+			db.SetMaxOpenConns(connectionPoolOptions[0].MaxOpenConnections)
+		}
+
 		d.db = db
 		return nil
 	}
@@ -119,31 +134,8 @@ func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 		}
 	}
 
-	// Disable concurrent access as not supported by the driver
-	result.db.SetMaxOpenConns(1)
-
-	var seq string
-	var name string
-	var file string // file will be empty if DB is :memory"
-	err := result.db.QueryRow("PRAGMA database_list").Scan(&seq, &name, &file)
-	if err != nil {
-		return nil, err
-	}
-
-	// readers do not block writers and faster i/o operations
-	// https://www.sqlite.org/draft/wal.html
-	// must be set after db is encrypted
-	var mode string
-	err = result.db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
-	if err != nil {
-		return nil, err
-	}
-	if mode != WALMode && file != "" {
-		return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
-	}
-
 	if result.enableMigrations {
-		err = migrations.Migrate(result.db)
+		err := migrations.Migrate(result.db)
 		if err != nil {
 			return nil, err
 		}

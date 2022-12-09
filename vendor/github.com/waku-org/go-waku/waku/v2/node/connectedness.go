@@ -96,7 +96,7 @@ func (w *WakuNode) connectednessListener() {
 
 	for {
 		select {
-		case <-w.quit:
+		case <-w.ctx.Done():
 			return
 		case <-w.protocolEventSub.Out():
 		case <-w.identificationEventSub.Out():

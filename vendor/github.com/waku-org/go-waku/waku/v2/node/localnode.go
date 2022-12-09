@@ -241,7 +241,7 @@ func (w *WakuNode) setupENR(addrs []ma.Multiaddr) error {
 				if w.discoveryV5 != nil && w.discoveryV5.IsStarted() {
 					w.log.Info("restarting discv5")
 					w.discoveryV5.Stop()
-					err = w.discoveryV5.Start()
+					err = w.discoveryV5.Start(w.ctx)
 					if err != nil {
 						w.log.Error("could not restart discv5", zap.Error(err))
 						return err

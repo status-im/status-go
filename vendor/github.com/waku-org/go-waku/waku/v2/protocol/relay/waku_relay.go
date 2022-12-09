@@ -247,7 +247,7 @@ func (w *WakuRelay) SubscribeToTopic(ctx context.Context, topic string) (*Subscr
 		w.bcaster.Register(&topic, subscription.C)
 	}
 
-	go w.subscribeToTopic(topic, subscription, sub)
+	go w.subscribeToTopic(ctx, topic, subscription, sub)
 
 	return subscription, nil
 }
@@ -307,8 +307,8 @@ func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <
 	return msgChannel
 }
 
-func (w *WakuRelay) subscribeToTopic(t string, subscription *Subscription, sub *pubsub.Subscription) {
-	ctx, err := tag.New(context.Background(), tag.Insert(metrics.KeyType, "relay"))
+func (w *WakuRelay) subscribeToTopic(ctx context.Context, t string, subscription *Subscription, sub *pubsub.Subscription) {
+	ctx, err := tag.New(ctx, tag.Insert(metrics.KeyType, "relay"))
 	if err != nil {
 		w.log.Error("creating tag map", zap.Error(err))
 		return

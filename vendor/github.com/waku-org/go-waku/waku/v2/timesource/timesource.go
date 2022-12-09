@@ -1,9 +1,12 @@
 package timesource
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Timesource interface {
 	Now() time.Time
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 }
