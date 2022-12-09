@@ -360,10 +360,8 @@ func (rf *relayFinder) tryNode(ctx context.Context, pi peer.AddrInfo) (supportsR
 	ready := make(chan struct{}, 1)
 	for _, conn := range conns {
 		go func(conn network.Conn) {
-                        log.Info("identify-wait: try-node", conn)
 			select {
 			case <-rf.host.IDService().IdentifyWait(conn):
-                                log.Info("identify-wait: try-node identified", conn)
 				select {
 				case ready <- struct{}{}:
 				default:

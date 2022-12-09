@@ -630,10 +630,8 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	//
 	// If the other side doesn't support identify, that's fine. This will
 	// just be a no-op.
-        log.Info("identify-wait: new-stream", s.Conn())
 	select {
 	case <-h.ids.IdentifyWait(s.Conn()):
-            log.Info("identify-wait: new-stream identified", s.Conn())
 	case <-ctx.Done():
 		_ = s.Reset()
 		return nil, ctx.Err()

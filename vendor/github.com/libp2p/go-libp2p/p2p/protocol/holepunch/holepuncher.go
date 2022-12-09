@@ -254,12 +254,10 @@ func (nn *netNotifiee) Connected(_ network.Network, conn network.Conn) {
 		go func() {
 			defer hs.refCount.Done()
 
-                        log.Infow("identify-wait: holepuncher", conn)
 			select {
 			// waiting for Identify here will allow us to access the peer's public and observed addresses
 			// that we can dial to for a hole punch.
 			case <-hs.ids.IdentifyWait(conn):
-                            log.Infow("identify-wait: holepuncher identified", conn)
 			case <-hs.ctx.Done():
 				return
 			}

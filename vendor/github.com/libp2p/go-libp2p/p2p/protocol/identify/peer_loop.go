@@ -167,11 +167,8 @@ func (ph *peerHandler) openStream(ctx context.Context, protos []string) (network
 	// if we know for a fact that it dosen't support the protocol.
 	conns := ph.ids.Host.Network().ConnsToPeer(ph.pid)
 	for _, c := range conns {
-
-                log.Info("identify-wait: peer-loop", c)
 		select {
 		case <-ph.ids.IdentifyWait(c):
-                      log.Info("identify-wait: peer-loop identified", c)
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
@@ -205,10 +202,8 @@ func (ph *peerHandler) openStream(ctx context.Context, protos []string) (network
 func (ph *peerHandler) peerSupportsProtos(ctx context.Context, protos []string) bool {
 	conns := ph.ids.Host.Network().ConnsToPeer(ph.pid)
 	for _, c := range conns {
-                log.Info("identify-wait: peer-supports-protos", c)
 		select {
 		case <-ph.ids.IdentifyWait(c):
-                    log.Info("identify-wait: peer-supports-protos identified", c)
 		case <-ctx.Done():
 			return false
 		}

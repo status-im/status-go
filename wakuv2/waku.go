@@ -324,23 +324,22 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 					}
 				}
 				waku.connStatusMu.Unlock()
-                                waku.logger.Info("PEERS", zap.Any("PEERS", latestConnStatus))
-                                for id := range latestConnStatus.Peers {
-                                  peerID, err := peer.Decode(id)
-                                  if err != nil {
-                                    waku.logger.Error("failed to parse PEERID")
-                                    return
-                                  }
-                                  addr := "/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi"
+				waku.logger.Info("PEERS", zap.Any("PEERS", latestConnStatus))
+				for id := range latestConnStatus.Peers {
+					peerID, err := peer.Decode(id)
+					if err != nil {
+						waku.logger.Error("failed to parse PEERID")
+						return
+					}
+					addr := "/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi"
 
-
-                                  err = waku.DialPeer(addr)
-                                  if err != nil {
-                                    waku.logger.Error("failed to add PEERID",zap.String("peer",addr), zap.Error(err))
-                                    return
-                                  }
-                                  waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
-                                }
+					err = waku.DialPeer(addr)
+					if err != nil {
+						waku.logger.Error("failed to add PEERID", zap.String("peer", addr), zap.Error(err))
+						return
+					}
+					waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
+				}
 
 				signal.SendPeerStats(latestConnStatus)
 			}
