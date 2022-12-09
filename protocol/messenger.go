@@ -706,7 +706,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && m.communitiesManager.TorrentClientStarted() {
+	if m.torrentClientReady() {
 		adminCommunities, err := m.communitiesManager.Created()
 		if err == nil && len(adminCommunities) > 0 {
 			available := m.SubscribeMailserverAvailable()
