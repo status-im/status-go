@@ -19,6 +19,7 @@ var (
 	StoreMessages       = stats.Int64("store_messages", "Number of historical messages", stats.UnitDimensionless)
 	FilterSubscriptions = stats.Int64("filter_subscriptions", "Number of filter subscriptions", stats.UnitDimensionless)
 	StoreErrors         = stats.Int64("errors", "Number of errors in store protocol", stats.UnitDimensionless)
+	StoreQueries        = stats.Int64("store_queries", "Number of store queries", stats.UnitDimensionless)
 	LightpushErrors     = stats.Int64("errors", "Number of errors in lightpush protocol", stats.UnitDimensionless)
 	PeerExchangeError   = stats.Int64("errors", "Number of errors in peer exchange protocol", stats.UnitDimensionless)
 )
@@ -46,6 +47,12 @@ var (
 		Name:        "gowaku_node_messages",
 		Measure:     Messages,
 		Description: "The number of the messages received",
+		Aggregation: view.Count(),
+	}
+	StoreQueriesView = &view.View{
+		Name:        "gowaku_store_queries",
+		Measure:     StoreQueries,
+		Description: "The number of the store queries received",
 		Aggregation: view.Count(),
 	}
 	StoreMessagesView = &view.View{
@@ -100,6 +107,10 @@ func RecordMessage(ctx context.Context, tagType string, len int) {
 	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(KeyType, tagType)}, StoreMessages.M(int64(len))); err != nil {
 		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
+}
+
+func RecordStoreQuery(ctx context.Context) {
+	stats.Record(ctx, StoreQueries.M(1))
 }
 
 func RecordStoreError(ctx context.Context, tagType string) {

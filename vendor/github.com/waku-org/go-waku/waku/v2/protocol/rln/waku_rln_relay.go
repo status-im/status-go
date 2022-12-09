@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
@@ -33,7 +34,8 @@ type RegistrationHandler = func(tx *types.Transaction)
 const AcceptableRootWindowSize = 5
 
 type WakuRLNRelay struct {
-	ctx context.Context
+	ctx        context.Context
+	timesource timesource.Timesource
 
 	membershipKeyPair *r.MembershipKeyPair
 
@@ -206,7 +208,7 @@ func (rln *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime *time
 		epoch = r.CalcEpoch(*optionalTime)
 	} else {
 		// get current rln epoch
-		epoch = r.GetCurrentEpoch()
+		epoch = r.CalcEpoch(rln.timesource.Now())
 	}
 
 	msgProof := ToRateLimitProof(msg)
