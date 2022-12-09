@@ -494,6 +494,11 @@ func (w *WakuNode) mountDiscV5() error {
 	return err
 }
 
+func (w *WakuNode) SetDiscV5Bootnodes(nodes []*enode.Node) error {
+  w.opts.discV5bootnodes = nodes
+  return w.discoveryV5.SetBootnodes(nodes)
+}
+
 func (w *WakuNode) mountPeerExchange() error {
 	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.ctx, w.host, w.discoveryV5, w.log)
 	return w.peerExchange.Start()

@@ -194,7 +194,7 @@ func (tab *Table) setFallbackNodes(nodes []*enode.Node) error {
 		}
 	}
 	tab.nursery = wrapNodes(nodes)
-	return nil
+        return nil
 }
 
 // isInitDone returns whether the table's initial seeding procedure has completed.

@@ -846,6 +846,17 @@ func packNodes(reqid []byte, nodes []*enode.Node) []*v5wire.Nodes {
 	return resp
 }
 
+func (t *UDPv5) SetFallbackNodes(nodes []*enode.Node) error {
+  err := t.tab.setFallbackNodes(nodes)
+  if err != nil {
+    return err
+  }
+  refreshDone    := make(chan struct{})           // where doRefresh reports completion
+  t.tab.doRefresh(refreshDone)
+  <-refreshDone
+  return nil
+}
+
 // handleTalkRequest runs the talk request handler of the requested protocol.
 func (t *UDPv5) handleTalkRequest(p *v5wire.TalkRequest, fromID enode.ID, fromAddr *net.UDPAddr) {
 	t.trlock.Lock()

@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -79,8 +80,9 @@ type Transport struct {
 
 // NewTransport returns a new Transport.
 // TODO: leaving a chat should verify that for a given public key
-//       there are no other chats. It may happen that we leave a private chat
-//       but still have a public chat for a given public key.
+//
+//	there are no other chats. It may happen that we leave a private chat
+//	but still have a public chat for a given public key.
 func NewTransport(
 	waku types.Waku,
 	privateKey *ecdsa.PrivateKey,
@@ -653,4 +655,8 @@ func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
 
 func (t *Transport) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
 	return t.waku.SubscribeToConnStatusChanges()
+}
+
+func (t *Transport) ConnectionChanged(state connection.State) {
+	t.waku.ConnectionChanged(state)
 }

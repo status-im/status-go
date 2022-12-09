@@ -25,6 +25,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"runtime"
@@ -62,6 +63,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/timesource"
@@ -77,6 +79,8 @@ import (
 const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
 const autoRelayMinInterval = 2 * time.Second
+const bootnodesQueryBackoffMs = 200
+const bootnodesMaxRetries = 7
 
 type settings struct {
 	LightClient         bool   // Indicates if the node is a light client
@@ -132,12 +136,31 @@ type Waku struct {
 
 	// NTP Synced timesource
 	timesource *timesource.NTPTimeSource
+
+	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
+	// bootnodes successfully
+	seededBootnodesForDiscV5 bool
+
+	// offline indicates whether we have detected connectivity
+
+	offline bool
+
+	// connectionChanged is channel that notifies when connectivity has changed
+
+	connectionChanged chan struct{}
+
+	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
+	discV5BootstrapNodes []string
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
 func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, timesource *timesource.NTPTimeSource) (*Waku, error) {
+	var err error
 	if logger == nil {
-		logger = zap.NewNop()
+		logger, err = zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfg = setDefaults(cfg)
@@ -154,6 +177,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		sendQueue:               make(chan *pb.WakuMessage, 1000),
 		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
 		quit:                    make(chan struct{}),
+		connectionChanged:       make(chan struct{}),
 		wg:                      sync.WaitGroup{},
 		dnsAddressCache:         make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:     &sync.RWMutex{},
@@ -161,6 +185,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		storeMsgIDsMu:           sync.RWMutex{},
 		timeSource:              time.Now,
 		logger:                  logger,
+		discV5BootstrapNodes:    cfg.DiscV5BootstrapNodes,
 	}
 
 	// Disabling light client mode if using status.prod or undefined
@@ -181,7 +206,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	waku.filterMsgChannel = make(chan *protocol.Envelope, 1024)
 
 	var privateKey *ecdsa.PrivateKey
-	var err error
 	if nodeKey != "" {
 		privateKey, err = crypto.HexToECDSA(nodeKey)
 	} else {
@@ -226,8 +250,10 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	if cfg.EnableDiscV5 {
 		bootnodes, err := waku.getDiscV5BootstrapNodes(ctx, cfg.DiscV5BootstrapNodes)
 		if err != nil {
+			logger.Error("FAILED TO GET BOOTSTRAP", zap.Error(err))
 			return nil, err
 		}
+
 		opts = append(opts, node.WithDiscoveryV5(cfg.UDPPort, bootnodes, cfg.AutoUpdate, pubsub.WithDiscoveryOpts(discovery.Limit(cfg.DiscoveryLimit))))
 
 		// Peer exchange requires DiscV5 to run (might change in future versions of the protocol)
@@ -300,23 +326,22 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 					}
 				}
 				waku.connStatusMu.Unlock()
-                                waku.logger.Info("PEERS", zap.Any("PEERS", latestConnStatus))
-                                for id := range latestConnStatus.Peers {
-                                  peerID, err := peer.Decode(id)
-                                  if err != nil {
-                                    waku.logger.Error("failed to parse PEERID")
-                                    return
-                                  }
-                                  addr := "/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi"
+				waku.logger.Info("PEERS", zap.Any("PEERS", latestConnStatus))
+				for id := range latestConnStatus.Peers {
+					peerID, err := peer.Decode(id)
+					if err != nil {
+						waku.logger.Error("failed to parse PEERID")
+						return
+					}
+					addr := "/ip4/188.166.2.147/tcp/30305/p2p/16Uiu2HAmVkwBTMQhjpE5ZT9wYnNkwHP5mS4FZ8ztUxDHgXoVf1gi"
 
-
-                                  err = waku.DialPeer(addr)
-                                  if err != nil {
-                                    waku.logger.Error("failed to add PEERID",zap.String("peer",addr), zap.Error(err))
-                                    return
-                                  }
-                                  waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
-                                }
+					err = waku.DialPeer(addr)
+					if err != nil {
+						waku.logger.Error("failed to add PEERID", zap.String("peer", addr), zap.Error(err))
+						return
+					}
+					waku.logger.Info("PEER", zap.String("id", id), zap.Any("multiaddr", waku.node.Host().Peerstore().PeerInfo(peerID)))
+				}
 
 				signal.SendPeerStats(latestConnStatus)
 			}
@@ -376,6 +401,9 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 		}
 	}
 	wg.Wait()
+
+	w.seededBootnodesForDiscV5 = len(result) > 0
+
 	return result, nil
 }
 
@@ -1112,6 +1140,7 @@ func (w *Waku) Start() error {
 	}
 
 	go w.broadcast()
+	go w.seedBootnodesForDiscV5()
 
 	return nil
 }
@@ -1123,6 +1152,7 @@ func (w *Waku) Stop() error {
 	w.node.Stop()
 	close(w.quit)
 	close(w.filterMsgChannel)
+	close(w.connectionChanged)
 	w.wg.Wait()
 	return nil
 }
@@ -1284,6 +1314,83 @@ func (w *Waku) StopDiscV5() error {
 
 	w.node.DiscV5().Stop()
 	return nil
+}
+
+func (w *Waku) ConnectionChanged(state connection.State) {
+	if !state.Offline && w.offline {
+		select {
+		case w.connectionChanged <- struct{}{}:
+		}
+	}
+
+	w.offline = !state.Offline
+}
+
+//e.NextRetry = e.VerifiedAt + ENSBackoffTimeSec*uint64(math.Exp2(float64(e.VerificationRetries)))
+
+func (w *Waku) seedBootnodesForDiscV5() {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	var lastTry = time.Now().UnixNano() / int64(time.Millisecond)
+	var retries = 0
+
+	for {
+		select {
+		case <-ticker.C:
+			if w.seededBootnodesForDiscV5 {
+				w.logger.Info("stopped querying bootnodes")
+				return
+			}
+			now := time.Now().UnixNano() / int64(time.Millisecond)
+			backoff := bootnodesQueryBackoffMs * int64(math.Exp2(float64(retries)))
+			w.logger.Info("LOOPING",
+				zap.Int("retries", retries),
+				zap.Int64("last-try", lastTry),
+				zap.Int64("interval", backoff),
+				zap.Int64("time-now", now))
+
+			if lastTry+backoff < now {
+				w.logger.Info("CHECKING backoff")
+				lastTry = now
+				retries++
+				// We reset the retries after a while and restart
+				if retries > bootnodesMaxRetries {
+					retries = 0
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				err := w.restartDiscV5(ctx, w.discV5BootstrapNodes)
+				if err != nil {
+					w.logger.Warn("failed to restart discv5", zap.Error(err))
+				}
+
+			}
+		// If we go online, trigger immediately
+		case <-w.connectionChanged:
+			now := time.Now().UnixNano() / int64(time.Millisecond)
+			retries = 0
+			lastTry = now
+
+		case <-w.quit:
+			return
+		}
+	}
+}
+
+// Restart discv5, re-retrieving bootstrap nodes
+func (w *Waku) restartDiscV5(ctx context.Context, nodes []string) error {
+	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, nodes)
+	if err != nil {
+		return err
+	}
+	if len(bootnodes) == 0 {
+		return errors.New("failed to fetch bootnodes")
+	}
+
+	w.logger.Info("restarting discv5 with nodes", zap.Any("nodes", bootnodes))
+
+	return w.node.SetDiscV5Bootnodes(bootnodes)
+
 }
 
 func (w *Waku) AddStorePeer(address string) (string, error) {
