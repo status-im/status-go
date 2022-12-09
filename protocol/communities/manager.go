@@ -158,7 +158,9 @@ func (m *Manager) Start() error {
 
 	if m.torrentConfig != nil && m.torrentConfig.Enabled {
 		err := m.StartTorrentClient()
-		m.logger.Warn("couldn't start torrent client", zap.Error(err))
+		if err != nil {
+			m.LogStdout("couldn't start torrent client", zap.Error(err))
+		}
 	}
 
 	return nil
@@ -2198,7 +2200,8 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 						startIndex := int(metadata.Offset) / pieceLength
 						endIndex := startIndex + int(metadata.Size)/pieceLength
 
-						m.LogStdout("downloading data for message archive", zap.String("hash", hash))
+						downloadMsg := fmt.Sprintf("downloading data for message archive (%d/%d)", downloadTaskInfo.TotalDownloadedArchivesCount+1, downloadTaskInfo.TotalArchivesCount)
+						m.LogStdout(downloadMsg, zap.String("hash", hash))
 						m.LogStdout("pieces (start, end)", zap.Any("startIndex", startIndex), zap.Any("endIndex", endIndex-1))
 						torrent.DownloadPieces(startIndex, endIndex)
 
@@ -2272,6 +2275,7 @@ func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes,
 	messages := make(map[transport.Filter][]*types.Message)
 
 	for _, hash := range archiveIDs {
+		m.LogStdout("extracting messages from history archive", zap.String("archive id", hash))
 		metadata := index.Archives[hash]
 
 		archive := &protobuf.WakuMessageArchive{}

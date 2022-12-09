@@ -1853,15 +1853,18 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
 
+	m.communitiesManager.LogStdout("initializing history archive tasks")
+
 	for _, c := range communities {
 
 		if c.Joined() {
 			settings, err := m.communitiesManager.GetCommunitySettingsByID(c.ID())
 			if err != nil {
-				m.logger.Debug("failed to get community settings", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to get community settings", zap.Error(err))
 				continue
 			}
 			if !settings.HistoryArchiveSupportEnabled {
+				m.communitiesManager.LogStdout("history archive support disabled for community", zap.String("id", c.IDString()))
 				continue
 			}
 
@@ -1875,7 +1878,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 			filters, err := m.communitiesManager.GetCommunityChatsFilters(c.ID())
 			if err != nil {
-				m.logger.Debug("failed to get community chats filters", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to get community chats filters for community", zap.Error(err))
 				continue
 			}
 
@@ -1944,7 +1947,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				}
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
-				m.communitiesManager.LogStdout("Starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
+				m.communitiesManager.LogStdout("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
 				time.AfterFunc(timeToNextInterval, func() {
 					err := m.communitiesManager.CreateAndSeedHistoryArchive(c.ID(), topics, lastArchiveEndDate, to.Add(timeToNextInterval), messageArchiveInterval, c.Encrypted())
 					if err != nil {
