@@ -8,11 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/libp2p/go-libp2p"
-	"go.uber.org/zap"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/event"
@@ -94,9 +95,8 @@ type WakuNode struct {
 	keepAliveMutex sync.Mutex
 	keepAliveFails map[peer.ID]int
 
-	ctx    context.Context
+	ctx    context.Context // TODO: remove this
 	cancel context.CancelFunc
-	quit   chan struct{}
 	wg     *sync.WaitGroup
 
 	// Channel passed to WakuNode constructor
@@ -170,7 +170,6 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 	w.ctx = ctx
 	w.opts = params
 	w.log = params.logger.Named("node2")
-	w.quit = make(chan struct{})
 	w.wg = &sync.WaitGroup{}
 	w.addrChan = make(chan ma.Multiaddr, 1024)
 	w.keepAliveFails = make(map[peer.ID]int)
@@ -235,7 +234,7 @@ func (w *WakuNode) checkForAddressChanges() {
 	first <- struct{}{}
 	for {
 		select {
-		case <-w.quit:
+		case <-w.ctx.Done():
 			close(w.addrChan)
 			return
 		case <-first:
@@ -268,7 +267,7 @@ func (w *WakuNode) checkForAddressChanges() {
 // Start initializes all the protocols that were setup in the WakuNode
 func (w *WakuNode) Start() error {
 	if w.opts.enableNTP {
-		err := w.timesource.Start()
+		err := w.timesource.Start(w.ctx)
 		if err != nil {
 			return err
 		}
@@ -357,9 +356,7 @@ func (w *WakuNode) Start() error {
 
 // Stop stops the WakuNode and closess all connections to the host
 func (w *WakuNode) Stop() {
-	defer w.cancel()
-
-	close(w.quit)
+	w.cancel()
 
 	w.bcaster.Close()
 
@@ -523,14 +520,14 @@ func (w *WakuNode) mountDiscV5() error {
 	}
 
 	var err error
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.ctx, w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
 
 	return err
 }
 
 func (w *WakuNode) mountPeerExchange() error {
-	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.ctx, w.host, w.discoveryV5, w.log)
-	return w.peerExchange.Start()
+	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.host, w.discoveryV5, w.log)
+	return w.peerExchange.Start(w.ctx)
 }
 
 func (w *WakuNode) startStore() error {
@@ -671,6 +668,12 @@ func (w *WakuNode) PeerStats() PeerStats {
 		p[peerID] = protocols
 	}
 	return p
+}
+
+// Set the bootnodes on discv5
+func (w *WakuNode) SetDiscV5Bootnodes(nodes []*enode.Node) error {
+	w.opts.discV5bootnodes = nodes
+	return w.discoveryV5.SetBootnodes(nodes)
 }
 
 // Peers return the list of peers, addresses, protocols supported and connection status

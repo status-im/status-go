@@ -54,7 +54,8 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 				}
 
 				lastTimeExecuted = w.timesource.Now()
-			case <-w.quit:
+			case <-w.ctx.Done():
+				w.log.Info("stopping ping protocol")
 				return
 			}
 		}

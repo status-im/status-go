@@ -8,9 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
-	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -18,6 +15,10 @@ import (
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
 type DiscoveryV5 struct {
@@ -26,23 +27,20 @@ type DiscoveryV5 struct {
 	discovery.Discovery
 
 	params    *discV5Parameters
-	ctx       context.Context
 	host      host.Host
 	config    discover.Config
 	udpAddr   *net.UDPAddr
 	listener  *discover.UDPv5
 	localnode *enode.LocalNode
 	NAT       nat.Interface
-	quit      chan struct{}
-	started   bool
 
 	log *zap.Logger
 
-	wg *sync.WaitGroup
+	started bool
+	cancel  context.CancelFunc
+	wg      *sync.WaitGroup
 
-	peerCache          peerCache
-	discoverCtx        context.Context
-	discoverCancelFunc context.CancelFunc
+	peerCache peerCache
 }
 
 type peerCache struct {
@@ -100,7 +98,7 @@ func DefaultOptions() []DiscoveryV5Option {
 
 const MaxPeersToDiscover = 600
 
-func NewDiscoveryV5(ctx context.Context, host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -116,7 +114,6 @@ func NewDiscoveryV5(ctx context.Context, host host.Host, priv *ecdsa.PrivateKey,
 	}
 
 	return &DiscoveryV5{
-		ctx:    ctx,
 		host:   host,
 		params: params,
 		NAT:    NAT,
@@ -149,7 +146,7 @@ func (d *DiscoveryV5) Node() *enode.Node {
 	return d.localnode.Node()
 }
 
-func (d *DiscoveryV5) listen() error {
+func (d *DiscoveryV5) listen(ctx context.Context) error {
 	conn, err := net.ListenUDP("udp", d.udpAddr)
 	if err != nil {
 		return err
@@ -160,7 +157,7 @@ func (d *DiscoveryV5) listen() error {
 		d.wg.Add(1)
 		go func() {
 			defer d.wg.Done()
-			nat.Map(d.NAT, d.quit, "udp", d.udpAddr.Port, d.udpAddr.Port, "go-waku discv5 discovery")
+			nat.Map(d.NAT, ctx.Done(), "udp", d.udpAddr.Port, d.udpAddr.Port, "go-waku discv5 discovery")
 		}()
 
 	}
@@ -182,45 +179,35 @@ func (d *DiscoveryV5) listen() error {
 	return nil
 }
 
-func (d *DiscoveryV5) Start() error {
+func (d *DiscoveryV5) Start(ctx context.Context) error {
 	d.Lock()
 	defer d.Unlock()
 
-	if d.started {
-		return nil
-	}
+	d.wg.Wait() // Waiting for any go routines to stop
+	ctx, cancel := context.WithCancel(ctx)
 
-	d.wg.Wait() // Waiting for other go routines to stop
-
-	d.quit = make(chan struct{}, 1)
+	d.cancel = cancel
 	d.started = true
 
-	err := d.listen()
+	err := d.listen(ctx)
 	if err != nil {
 		return err
 	}
 
-	// create cancellable
-	d.discoverCtx, d.discoverCancelFunc = context.WithCancel(d.ctx)
-	go d.runDiscoveryV5Loop()
+	go d.runDiscoveryV5Loop(ctx)
 
 	return nil
 }
 
 func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
-  return d.listener.SetFallbackNodes(nodes)
+	return d.listener.SetFallbackNodes(nodes)
 }
 
 func (d *DiscoveryV5) Stop() {
 	d.Lock()
 	defer d.Unlock()
 
-	if !d.started {
-		return
-	}
-
-	close(d.quit)
-	d.discoverCancelFunc()
+	d.cancel()
 
 	d.listener.Close()
 	d.listener = nil
@@ -294,7 +281,7 @@ func (d *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discover
 	return 20 * time.Minute, nil
 }
 
-func (d *DiscoveryV5) iterate(iterator enode.Iterator, limit int, doneCh chan struct{}) {
+func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limit int) {
 	defer d.wg.Done()
 
 	for {
@@ -302,7 +289,7 @@ func (d *DiscoveryV5) iterate(iterator enode.Iterator, limit int, doneCh chan st
 			break
 		}
 
-		if d.discoverCtx.Err() != nil {
+		if ctx.Err() != nil {
 			break
 		}
 
@@ -333,8 +320,6 @@ func (d *DiscoveryV5) iterate(iterator enode.Iterator, limit int, doneCh chan st
 		}
 		d.peerCache.Unlock()
 	}
-
-	close(doneCh)
 }
 
 func (d *DiscoveryV5) removeExpiredPeers() int {
@@ -353,21 +338,16 @@ func (d *DiscoveryV5) removeExpiredPeers() int {
 	return newCacheSize
 }
 
-func (d *DiscoveryV5) runDiscoveryV5Loop() {
+func (d *DiscoveryV5) runDiscoveryV5Loop(ctx context.Context) {
 	iterator := d.listener.RandomNodes()
 	iterator = enode.Filter(iterator, evaluateNode)
 	defer iterator.Close()
 
-	doneCh := make(chan struct{})
-
 	d.wg.Add(1)
 
-	go d.iterate(iterator, MaxPeersToDiscover, doneCh)
+	go d.iterate(ctx, iterator, MaxPeersToDiscover)
 
-	select {
-	case <-d.discoverCtx.Done():
-	case <-doneCh:
-	}
+	<-ctx.Done()
 
 	d.log.Warn("Discv5 loop stopped")
 }

@@ -33,7 +33,7 @@ func register(ctx context.Context, idComm r.IDCommitment, ethAccountPrivateKey *
 	}
 	defer backend.Close()
 
-	chainID, err := backend.ChainID(context.Background())
+	chainID, err := backend.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}

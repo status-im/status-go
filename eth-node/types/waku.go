@@ -8,6 +8,7 @@ import (
 	"github.com/pborman/uuid"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/connection"
 )
 
 type ConnStatus struct {
@@ -149,4 +150,7 @@ type Waku interface {
 
 	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
 	MarkP2PMessageAsProcessed(common.Hash)
+
+	// ConnectionChanged is called whenever the client knows its connection status has changed
+	ConnectionChanged(connection.State)
 }

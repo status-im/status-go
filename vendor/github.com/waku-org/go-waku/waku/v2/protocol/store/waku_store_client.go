@@ -256,8 +256,11 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	result := &Result{
 		Messages: response.Messages,
 		query:    q,
-		cursor:   response.PagingInfo.Cursor,
 		peerId:   params.selectedPeer,
+	}
+
+	if response.PagingInfo != nil {
+		result.cursor = response.PagingInfo.Cursor
 	}
 
 	return result, nil

@@ -1,6 +1,9 @@
 package timesource
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type WallClockTimeSource struct {
 }
@@ -13,7 +16,7 @@ func (t *WallClockTimeSource) Now() time.Time {
 	return time.Now()
 }
 
-func (t *WallClockTimeSource) Start() error {
+func (t *WallClockTimeSource) Start(ctx context.Context) error {
 	// Do nothing
 	return nil
 }

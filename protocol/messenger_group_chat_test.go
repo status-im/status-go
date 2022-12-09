@@ -82,7 +82,9 @@ func (s *MessengerGroupChatSuite) createEmptyGroupChat(creator *Messenger, name 
 func (s *MessengerGroupChatSuite) verifyGroupChatCreated(member *Messenger, expectedChatActive bool) {
 	response, err := WaitOnMessengerResponse(
 		member,
-		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		func(r *MessengerResponse) bool {
+			return len(r.Chats()) == 1 && r.Chats()[0].Active == expectedChatActive
+		},
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -256,6 +257,7 @@ func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 func (w *gethWakuWrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
 	return nil, errors.New("not implemented")
 }
+func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
 
 type wakuFilterWrapper struct {
 	filter *wakucommon.Filter
