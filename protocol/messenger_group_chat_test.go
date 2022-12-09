@@ -264,11 +264,11 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	s.verifyGroupChatCreated(memberA, true)
 	s.verifyGroupChatCreated(memberB, true)
 
-	_, err := memberA.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err := memberA.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey)})
 	s.Require().Error(err)
 
 	// only admin can remove members from the group
-	_, err = admin.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err = admin.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	// ensure removal is propagated to other members
