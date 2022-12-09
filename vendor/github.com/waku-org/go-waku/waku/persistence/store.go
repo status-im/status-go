@@ -11,6 +11,7 @@ import (
 	"github.com/waku-org/go-waku/waku/persistence/migrations"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
@@ -20,6 +21,7 @@ type MessageProvider interface {
 	Put(env *protocol.Envelope) error
 	Query(query *pb.HistoryQuery) ([]StoredMessage, error)
 	MostRecentTimestamp() (int64, error)
+	Start(timesource timesource.Timesource) error
 	Stop()
 }
 
@@ -31,8 +33,9 @@ const WALMode = "wal"
 // DBStore is a MessageProvider that has a *sql.DB connection
 type DBStore struct {
 	MessageProvider
-	db  *sql.DB
-	log *zap.Logger
+	db         *sql.DB
+	timesource timesource.Timesource
+	log        *zap.Logger
 
 	maxMessages int
 	maxDuration time.Duration
@@ -146,25 +149,31 @@ func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 		}
 	}
 
-	err = result.cleanOlderRecords()
-	if err != nil {
-		return nil, err
-	}
-
-	result.wg.Add(1)
-	go result.checkForOlderRecords(10 * time.Second) // is 10s okay?
-
 	return result, nil
 }
 
+func (d *DBStore) Start(timesource timesource.Timesource) error {
+	d.timesource = timesource
+
+	err := d.cleanOlderRecords()
+	if err != nil {
+		return err
+	}
+
+	d.wg.Add(1)
+	go d.checkForOlderRecords(60 * time.Second)
+
+	return nil
+}
+
 func (d *DBStore) cleanOlderRecords() error {
-	d.log.Debug("Cleaning older records...")
+	d.log.Info("Cleaning older records...")
 
 	// Delete older messages
 	if d.maxDuration > 0 {
 		start := time.Now()
 		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < ?`
-		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(time.Now().Add(-d.maxDuration)))
+		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(d.timesource.Now().Add(-d.maxDuration)))
 		if err != nil {
 			return err
 		}
@@ -183,6 +192,8 @@ func (d *DBStore) cleanOlderRecords() error {
 		elapsed := time.Since(start)
 		d.log.Debug("deleting excess records from the DB", zap.Duration("duration", elapsed))
 	}
+
+	d.log.Info("Older records removed")
 
 	return nil
 }
@@ -257,19 +268,6 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		parameters = append(parameters, query.PubsubTopic)
 	}
 
-	if query.StartTime != 0 {
-		conditions = append(conditions, "id >= ?")
-		startTimeDBKey := NewDBKey(uint64(query.StartTime), "", []byte{})
-		parameters = append(parameters, startTimeDBKey.Bytes())
-
-	}
-
-	if query.EndTime != 0 {
-		conditions = append(conditions, "id <= ?")
-		endTimeDBKey := NewDBKey(uint64(query.EndTime), "", []byte{})
-		parameters = append(parameters, endTimeDBKey.Bytes())
-	}
-
 	if len(query.ContentFilters) != 0 {
 		var ctPlaceHolder []string
 		for _, ct := range query.ContentFilters {
@@ -281,7 +279,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		conditions = append(conditions, "contentTopic IN ("+strings.Join(ctPlaceHolder, ", ")+")")
 	}
 
+	usesCursor := false
 	if query.PagingInfo.Cursor != nil {
+		usesCursor = true
 		var exists bool
 		cursorDBKey := NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
 
@@ -303,6 +303,23 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 			parameters = append(parameters, cursorDBKey.Bytes())
 		} else {
 			return nil, nil, ErrInvalidCursor
+		}
+	}
+
+	if query.StartTime != 0 {
+		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+			conditions = append(conditions, "id >= ?")
+			startTimeDBKey := NewDBKey(uint64(query.StartTime), "", []byte{})
+			parameters = append(parameters, startTimeDBKey.Bytes())
+		}
+
+	}
+
+	if query.EndTime != 0 {
+		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_FORWARD {
+			conditions = append(conditions, "id <= ?")
+			endTimeDBKey := NewDBKey(uint64(query.EndTime), "", []byte{})
+			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
 
@@ -342,7 +359,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	}
 	defer rows.Close()
 
-	cursor := &pb.Index{}
+	var cursor *pb.Index
 	if len(result) != 0 {
 		if len(result) > int(query.PagingInfo.PageSize) {
 			result = result[0:query.PagingInfo.PageSize]

@@ -248,7 +248,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	if cfg.EnableStore {
-		opts = append(opts, node.WithWakuStore(true, true))
+		opts = append(opts, node.WithWakuStore(true, nil))
 		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
 		if err != nil {
 			return nil, err
@@ -1276,7 +1276,7 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(*peerID), nil
+	return string(peerID), nil
 }
 
 func (w *Waku) timestamp() int64 {
@@ -1339,7 +1339,7 @@ func (w *Waku) AddRelayPeer(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(*peerID), nil
+	return string(peerID), nil
 }
 
 func (w *Waku) DialPeer(address string) error {

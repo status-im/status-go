@@ -11,6 +11,7 @@ import (
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"go.uber.org/zap"
@@ -66,15 +67,19 @@ func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 		}
 	}
 
-	err := result.cleanOlderRecords()
+	return result, nil
+}
+
+func (d *DBStore) Start(timesource timesource.Timesource) error {
+	err := d.cleanOlderRecords()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	result.wg.Add(1)
-	go result.checkForOlderRecords(10 * time.Second) // is 10s okay?
+	d.wg.Add(1)
+	go d.checkForOlderRecords(60 * time.Second)
 
-	return result, nil
+	return nil
 }
 
 func (d *DBStore) cleanOlderRecords() error {

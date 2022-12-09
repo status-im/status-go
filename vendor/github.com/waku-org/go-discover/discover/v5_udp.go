@@ -29,12 +29,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/waku-org/go-discover/discover/v5wire"
+
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
-	"github.com/waku-org/go-discover/discover/v5wire"
 )
 
 const (
@@ -844,6 +845,17 @@ func packNodes(reqid []byte, nodes []*enode.Node) []*v5wire.Nodes {
 		resp = append(resp, p)
 	}
 	return resp
+}
+
+func (t *UDPv5) SetFallbackNodes(nodes []*enode.Node) error {
+	err := t.tab.setFallbackNodes(nodes)
+	if err != nil {
+		return err
+	}
+	refreshDone := make(chan struct{})
+	t.tab.doRefresh(refreshDone)
+	<-refreshDone
+	return nil
 }
 
 // handleTalkRequest runs the talk request handler of the requested protocol.

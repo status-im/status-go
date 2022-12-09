@@ -22,7 +22,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/utils"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 )
 
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
@@ -30,8 +30,9 @@ const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
 type WakuRelay struct {
-	host   host.Host
-	pubsub *pubsub.PubSub
+	host       host.Host
+	pubsub     *pubsub.PubSub
+	timesource timesource.Timesource
 
 	log *zap.Logger
 
@@ -55,9 +56,10 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 }
 
 // NewWakuRelay returns a new instance of a WakuRelay struct
-func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, minPeersToPublish int, log *zap.Logger, opts ...pubsub.Option) (*WakuRelay, error) {
+func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, minPeersToPublish int, timesource timesource.Timesource, log *zap.Logger, opts ...pubsub.Option) (*WakuRelay, error) {
 	w := new(WakuRelay)
 	w.host = h
+	w.timesource = timesource
 	w.wakuRelayTopics = make(map[string]*pubsub.Topic)
 	w.relaySubs = make(map[string]*pubsub.Subscription)
 	w.subscriptions = make(map[string][]*Subscription)
@@ -343,7 +345,7 @@ func (w *WakuRelay) subscribeToTopic(t string, subscription *Subscription, sub *
 				return
 			}
 
-			envelope := waku_proto.NewEnvelope(wakuMessage, utils.GetUnixEpoch(), string(t))
+			envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), string(t))
 
 			w.log.Info("waku.relay received", logging.HexString("hash", envelope.Hash()))
 
