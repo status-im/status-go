@@ -24,13 +24,14 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 		ticker := time.NewTicker(t)
 		defer ticker.Stop()
 
-		lastTimeExecuted := <-ticker.C
+		lastTimeExecuted := w.timesource.Now()
+
 		sleepDetectionInterval := int64(t) * 3
 
 		for {
 			select {
 			case <-ticker.C:
-				difference := time.Now().UnixNano() - lastTimeExecuted.UnixNano()
+				difference := w.timesource.Now().UnixNano() - lastTimeExecuted.UnixNano()
 				if difference > sleepDetectionInterval {
 					w.log.Warn("keep alive hasnt been executed recently. Killing all connections to peers")
 					for _, p := range w.host.Network().Peers() {
@@ -39,7 +40,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 							w.log.Warn("while disconnecting peer", zap.Error(err))
 						}
 					}
-					lastTimeExecuted = time.Now()
+					lastTimeExecuted = w.timesource.Now()
 					continue
 				}
 
@@ -52,7 +53,7 @@ func (w *WakuNode) startKeepAlive(t time.Duration) {
 					}
 				}
 
-				lastTimeExecuted = time.Now()
+				lastTimeExecuted = w.timesource.Now()
 			case <-w.quit:
 				return
 			}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
@@ -20,6 +21,7 @@ func RlnRelayStatic(
 	pubsubTopic string,
 	contentTopic string,
 	spamHandler SpamHandler,
+	timesource timesource.Timesource,
 	log *zap.Logger,
 ) (*WakuRLNRelay, error) {
 	log = log.Named("rln-static")
@@ -45,6 +47,7 @@ func RlnRelayStatic(
 		pubsubTopic:       pubsubTopic,
 		contentTopic:      contentTopic,
 		log:               log,
+		timesource:        timesource,
 		nullifierLog:      make(map[r.Epoch][]r.ProofMetadata),
 	}
 
@@ -87,6 +90,7 @@ func RlnRelayDynamic(
 	contentTopic string,
 	spamHandler SpamHandler,
 	registrationHandler RegistrationHandler,
+	timesource timesource.Timesource,
 	log *zap.Logger,
 ) (*WakuRLNRelay, error) {
 	log = log.Named("rln-dynamic")
@@ -109,6 +113,7 @@ func RlnRelayDynamic(
 		pubsubTopic:               pubsubTopic,
 		contentTopic:              contentTopic,
 		log:                       log,
+		timesource:                timesource,
 		nullifierLog:              make(map[r.Epoch][]r.ProofMetadata),
 		registrationHandler:       registrationHandler,
 	}

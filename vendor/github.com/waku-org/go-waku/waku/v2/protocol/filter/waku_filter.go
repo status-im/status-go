@@ -13,9 +13,12 @@ import (
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/protoio"
 	"github.com/waku-org/go-waku/logging"
+	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
@@ -62,7 +65,7 @@ type (
 const FilterID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter/2.0.0-beta1")
 
 // NewWakuRelay returns a new instance of Waku Filter struct setup according to the chosen parameter and options
-func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, log *zap.Logger, opts ...Option) (*WakuFilter, error) {
+func NewWakuFilter(ctx context.Context, host host.Host, broadcaster v2.Broadcaster, isFullNode bool, timesource timesource.Timesource, log *zap.Logger, opts ...Option) (*WakuFilter, error) {
 	wf := new(WakuFilter)
 	wf.log = log.Named("filter").With(zap.Bool("fullNode", isFullNode))
 
@@ -84,7 +87,7 @@ func NewWakuFilter(ctx context.Context, host host.Host, isFullNode bool, log *za
 	wf.MsgC = make(chan *protocol.Envelope, 1024)
 	wf.h = host
 	wf.isFullNode = isFullNode
-	wf.filters = NewFilterMap()
+	wf.filters = NewFilterMap(broadcaster, timesource)
 	wf.subscribers = NewSubscribers(params.timeout)
 
 	wf.h.SetStreamHandlerMatch(FilterID_v20beta1, protocol.PrefixTextMatch(string(FilterID_v20beta1)), wf.onRequest)
@@ -126,6 +129,10 @@ func (wf *WakuFilter) onRequest(s network.Stream) {
 		// This is a filter request coming from a light node.
 		if filterRPCRequest.Request.Subscribe {
 			subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
+			if subscriber.filter.Topic == "" { // @TODO: review if empty topic is possible
+				subscriber.filter.Topic = relay.DefaultWakuTopic
+			}
+
 			len := wf.subscribers.Append(subscriber)
 
 			logger.Info("adding subscriber")
@@ -192,7 +199,7 @@ func (wf *WakuFilter) filterListener() {
 		for subscriber := range wf.subscribers.Items(&(msg.ContentTopic)) {
 			logger := logger.With(logging.HostID("subscriber", subscriber.peer))
 			subscriber := subscriber // https://golang.org/doc/faq#closures_and_goroutines
-			if subscriber.filter.Topic != "" && subscriber.filter.Topic != pubsubTopic {
+			if subscriber.filter.Topic != pubsubTopic {
 				logger.Info("pubsub topic mismatch",
 					zap.String("subscriberTopic", subscriber.filter.Topic),
 					zap.String("messageTopic", pubsubTopic))

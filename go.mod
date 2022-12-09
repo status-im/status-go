@@ -16,7 +16,7 @@ replace github.com/flynn/noise v1.0.0 => github.com/status-im/noise v1.0.1-hands
 
 require (
 	github.com/anacrolix/torrent v1.41.0
-	github.com/beevik/ntp v0.2.0
+	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
@@ -80,7 +80,7 @@ require github.com/fogleman/gg v1.3.0
 require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.2.3-0.20221205192014-05e33105c43f
+	github.com/waku-org/go-waku v0.2.3-test.0.20221209175307-685142e7b743
 )
 
 require (
@@ -242,7 +242,7 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/urfave/cli/v2 v2.20.2 // indirect
-	github.com/waku-org/go-discover v0.0.0-20221027130446-2f43d5f6c73f // indirect
+	github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg // indirect
 	github.com/waku-org/noise v1.0.2 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect

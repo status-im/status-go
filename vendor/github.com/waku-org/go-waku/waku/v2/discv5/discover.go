@@ -207,6 +207,10 @@ func (d *DiscoveryV5) Start() error {
 	return nil
 }
 
+func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
+  return d.listener.SetFallbackNodes(nodes)
+}
+
 func (d *DiscoveryV5) Stop() {
 	d.Lock()
 	defer d.Unlock()
