@@ -105,7 +105,7 @@ func (api *API) RemoveMember(ctx context.Context, communityID types.HexBytes, ch
 	}
 
 	return api.execAndGetGroupChatResponse(func() (*protocol.MessengerResponse, error) {
-		return api.s.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
+		return api.s.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
 	})
 }
 

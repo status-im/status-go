@@ -219,7 +219,11 @@ func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members 
 }
 
 func (api *PublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
+	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
+}
+
+func (api *PublicAPI) RemoveMembersFromGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, members)
 }
 
 func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {

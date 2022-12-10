@@ -289,7 +289,7 @@ func (api *NimbusPublicAPI) AddMembersToGroupChat(ctx Context, chatID string, me
 }
 
 func (api *NimbusPublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
+	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
 }
 
 func (api *NimbusPublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {

@@ -255,20 +255,26 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	admin := s.startNewMessenger()
 	memberA := s.startNewMessenger()
 	memberB := s.startNewMessenger()
-	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
+	memberC := s.startNewMessenger()
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
 	s.makeMutualContacts(admin, memberB)
+	s.makeMutualContacts(admin, memberC)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", members)
 	s.verifyGroupChatCreated(memberA, true)
 	s.verifyGroupChatCreated(memberB, true)
+	s.verifyGroupChatCreated(memberC, true)
 
-	_, err := memberA.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err := memberA.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().Error(err)
 
 	// only admin can remove members from the group
-	_, err = admin.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err = admin.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	// ensure removal is propagated to other members
@@ -285,6 +291,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(memberA.Shutdown())
 	defer s.NoError(memberB.Shutdown())
+	defer s.NoError(memberC.Shutdown())
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
