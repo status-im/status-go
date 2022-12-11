@@ -589,6 +589,10 @@ func (api *PublicAPI) MessageByMessageID(messageID string) (*common.Message, err
 	return api.service.messenger.MessageByID(messageID)
 }
 
+func (api *PublicAPI) FirstUnseenMessageID(chatID string) (string, error) {
+	return api.service.messenger.FirstUnseenMessageID(chatID)
+}
+
 func (api *PublicAPI) AllMessagesFromChatWhichMatchTerm(chatID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
 	messages, err := api.service.messenger.AllMessageByChatIDWhichMatchTerm(chatID, searchTerm, caseSensitive)
 	if err != nil {

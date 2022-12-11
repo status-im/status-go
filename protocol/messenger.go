@@ -4354,6 +4354,10 @@ func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 	return m.persistence.MessagesExist(ids)
 }
 
+func (m *Messenger) FirstUnseenMessageID(chatID string) (string, error) {
+	return m.persistence.FirstUnseenMessageID(chatID)
+}
+
 func (m *Messenger) latestIncomingMessageClock(chatID string) (uint64, error) {
 	return m.persistence.latestIncomingMessageClock(chatID)
 }
