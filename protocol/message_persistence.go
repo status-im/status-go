@@ -620,6 +620,31 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) {
+	var id string
+	err := db.db.QueryRow(
+		fmt.Sprintf(
+			`
+			SELECT
+				id
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ? AND NOT(m1.seen) AND NOT(m1.hide) AND NOT(m1.deleted) AND NOT(m1.deleted_for_me)
+			ORDER BY %s ASC
+			LIMIT 1
+		`, cursor),
+		chatID).Scan(&id)
+
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // Get last chat message that is not hide or deleted or deleted_for_me
 func (db sqlitePersistence) LatestMessageByChatID(chatID string) ([]*common.Message, error) {
 	args := []interface{}{chatID}

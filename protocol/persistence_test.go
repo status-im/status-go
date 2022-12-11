@@ -247,6 +247,51 @@ func TestMessageByChatID(t *testing.T) {
 	)
 }
 
+func TestFirstUnseenMessageIDByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	messageID, err := p.FirstUnseenMessageID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, "", messageID)
+
+	err = p.SaveMessages([]*common.Message{
+		{
+			ID:          "1",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 1,
+				Text:  "some-text"},
+			From: "me",
+			Seen: true,
+		},
+		{
+			ID:          "2",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 2,
+				Text:  "some-text"},
+			From: "me",
+			Seen: false,
+		},
+		{
+			ID:          "3",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 3,
+				Text:  "some-text"},
+			From: "me",
+			Seen: false,
+		},
+	})
+	require.NoError(t, err)
+
+	messageID, err = p.FirstUnseenMessageID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, "2", messageID)
+}
+
 func TestLatestMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
