@@ -158,6 +158,8 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 
 		f.filters[filterID] = filter
 
+		f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+
 		filters = append(filters, filter)
 	}
 	return filters, nil
@@ -368,6 +370,8 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	f.filters[chatID] = chat
 
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", filter.Topic.String()))
+
 	return chat, nil
 
 }
@@ -404,6 +408,8 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	f.filters[chatID] = chat
 
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", filter.Topic.String()))
+
 	return chat, nil
 }
 
@@ -436,6 +442,8 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 	}
 
 	f.filters[chat.ChatID] = chat
+
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", filter.Topic.String()))
 
 	return chat, nil
 }
@@ -482,6 +490,8 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
 
+	f.logger.Debug("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.Topic.String()))
+
 	return []*Filter{personalDiscoveryChat}, nil
 }
 
@@ -516,6 +526,8 @@ func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 
 	f.filters[chatID] = chat
 
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "public"), zap.String("topic", filterAndTopic.Topic.String()))
+
 	return chat, nil
 }
 
@@ -545,6 +557,9 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 	}
 
 	f.filters[chatID] = chat
+
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", contactCodeFilter.Topic.String()))
+
 	return chat, nil
 }
 

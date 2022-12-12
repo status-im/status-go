@@ -1189,6 +1189,7 @@ func (w *Waku) processQueue() {
 
 			// If not matched we remove it
 			if !matched {
+				w.logger.Debug("filters did not match", zap.String("hash", e.Hash().String()))
 				w.storeMsgIDsMu.Lock()
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
