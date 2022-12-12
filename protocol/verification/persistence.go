@@ -127,9 +127,9 @@ func (p *Persistence) GetReceivedVerificationRequests(myPublicKey string) ([]*Re
 	return response, nil
 }
 
-func (p *Persistence) GetVerificationRequestSentTo(contactID string) (*Request, error) {
+func (p *Persistence) GetLatestVerificationRequestSentTo(contactID string) (*Request, error) {
 	var vr Request
-	err := p.db.QueryRow(`SELECT id, from_user, to_user, challenge, response, requested_at, verification_status, replied_at FROM verification_requests_individual WHERE to_user = ?`, contactID).Scan(
+	err := p.db.QueryRow(`SELECT id, from_user, to_user, challenge, response, requested_at, verification_status, replied_at FROM verification_requests_individual WHERE to_user = ? ORDER BY requested_at DESC`, contactID).Scan(
 		&vr.ID,
 		&vr.From,
 		&vr.To,

@@ -132,7 +132,7 @@ func (m *Messenger) GetVerificationRequestSentTo(ctx context.Context, contactID 
 		return nil, errors.New("contact not found")
 	}
 
-	return m.verificationDatabase.GetVerificationRequestSentTo(contactID)
+	return m.verificationDatabase.GetLatestVerificationRequestSentTo(contactID)
 }
 
 func (m *Messenger) GetReceivedVerificationRequests(ctx context.Context) ([]*verification.Request, error) {
@@ -414,7 +414,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 
-	verifRequest, err := m.verificationDatabase.GetVerificationRequestSentTo(contactID)
+	verifRequest, err := m.verificationDatabase.GetLatestVerificationRequestSentTo(contactID)
 	if err != nil {
 		return nil, err
 	}
