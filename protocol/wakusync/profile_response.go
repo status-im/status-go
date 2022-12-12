@@ -5,18 +5,14 @@ import (
 )
 
 type BackedUpProfile struct {
-	DisplayName       string                 `json:"displayName,omitempty"`
-	DisplayNameStored bool                   `json:"displayNameStored,omitempty"`
-	Images            []images.IdentityImage `json:"images,omitempty,omitempty"`
-	ImagesStored      bool                   `json:"imagesStored,omitempty"`
+	DisplayName string                 `json:"displayName,omitempty"`
+	Images      []images.IdentityImage `json:"images,omitempty,omitempty"`
 }
 
-func (sfwr *WakuBackedUpDataResponse) AddDisplayName(displayName string, stored bool) {
+func (sfwr *WakuBackedUpDataResponse) AddDisplayName(displayName string) {
 	sfwr.Profile.DisplayName = displayName
-	sfwr.Profile.DisplayNameStored = stored
 }
 
-func (sfwr *WakuBackedUpDataResponse) AddImages(images []images.IdentityImage, stored bool) {
-	sfwr.Profile.ImagesStored = stored
+func (sfwr *WakuBackedUpDataResponse) AddImages(images []images.IdentityImage) {
 	sfwr.Profile.Images = images
 }

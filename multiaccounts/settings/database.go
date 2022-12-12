@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -142,6 +143,14 @@ INSERT INTO settings (
 	)
 	if err != nil {
 		return err
+	}
+
+	if s.DisplayName != "" {
+		now := time.Now().Unix()
+		err = db.SetSettingLastSynced(DisplayName, uint64(now))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nodecfg.SaveConfigWithTx(tx, &n)
