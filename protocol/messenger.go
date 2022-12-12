@@ -1402,7 +1402,7 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
-		publicChatIDs = append(publicChatIDs, org.IDString(), org.StatusUpdatesChannelID(), org.MagnetlinkMessageChannelID(), org.MemberUpdateChannelID())
+		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
 
 		// This is for status-go versions that didn't have `CommunitySettings`
 		// We need to ensure communities that existed before community settings

@@ -174,19 +174,24 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	var matched bool
 
 	candidates := fs.GetWatchersByTopic(*topic)
+
+	if len(candidates) == 0 {
+		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "topic", (*topic).String())
+	}
+
 	for _, watcher := range candidates {
 		matched = true
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
-				log.Trace("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
+				log.Debug("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
 		} else {
 			matched = watcher.MatchMessage(decodedMsg)
 		}
 
 		if matched && decodedMsg != nil {
-			log.Trace("processing message: decrypted", "hash", recvMessage.Hash().Hex())
+			log.Debug("processing message: decrypted", "hash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}
