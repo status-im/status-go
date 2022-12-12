@@ -310,9 +310,6 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 	if err != nil {
 		return nil, err
 	}
-	if displayNameClock == 0 {
-		displayNameClock = clock
-	}
 
 	keyUID := m.account.KeyUID
 	images, err := m.multiAccounts.GetIdentityImages(keyUID)

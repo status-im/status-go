@@ -122,9 +122,6 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
-
 	s.Require().Len(bob2.AddedContacts(), 2)
 
 	actualContacts = bob2.AddedContacts()
@@ -201,8 +198,6 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 		"profile data not backed up",
 	)
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
 
 	// Check bob2
 	storedBob2DisplayName, err = bob2.settings.DisplayName()
@@ -303,8 +298,6 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	)
 	s.Require().NoError(err)
 
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
-
 	// Check bob2
 	storedBob2DisplayName, err = bob2.settings.DisplayName()
 	s.Require().NoError(err)
@@ -371,8 +364,6 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
 
 	s.Require().Less(BackupContactsPerBatch*2, len(bob2.Contacts()))
 	s.Require().Len(bob2.AddedContacts(), BackupContactsPerBatch*2)
@@ -448,8 +439,6 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	// Bob 2 should remove the contact
 	s.Require().NoError(err)
 
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
-
 	s.Require().Len(bob2.AddedContacts(), 1)
 	s.Require().Equal(contactID1, bob2.AddedContacts()[0].ID)
 
@@ -501,8 +490,6 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
 
 	for _, c := range bob2.Contacts() {
 		if c.ID == contactID1 {
@@ -556,8 +543,6 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 		"contacts not backed up",
 	)
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
 
 	s.Require().Len(bob2.AddedContacts(), 1)
 
@@ -632,8 +617,6 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	)
 
 	s.Require().NoError(err)
-
-	bob2.backedupMessagesHandler.postponeTasksWaitGroup.Wait()
 
 	communities, err = bob2.JoinedCommunities()
 	s.Require().NoError(err)

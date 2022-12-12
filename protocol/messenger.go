@@ -151,7 +151,6 @@ type Messenger struct {
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
 	savedAddressesManager                *wallet.SavedAddressesManager
-	backedupMessagesHandler              backupHandler
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -480,9 +479,6 @@ func NewMessenger(
 		},
 		logger:                logger,
 		savedAddressesManager: savedAddressesManager,
-		backedupMessagesHandler: backupHandler{
-			postponeHandling: true,
-		},
 	}
 
 	if c.outputMessagesCSV {
@@ -688,7 +684,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
 	m.startBackupLoop()
-	m.startWaitingForTheLatestBackedupMessageLoop()
 	err = m.startAutoMessageLoop()
 	if err != nil {
 		return nil, err

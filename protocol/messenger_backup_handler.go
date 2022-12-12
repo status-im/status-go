@@ -1,8 +1,7 @@
 package protocol
 
 import (
-	"sync"
-	"time"
+	"database/sql"
 
 	"go.uber.org/zap"
 
@@ -13,73 +12,14 @@ import (
 )
 
 const (
-	// timeToPostponeBackedUpMessagesHandling - the idea is to wait for 30 secs in loading state with the hope that at least
-	// one message from the set of last backed up messages will arrive, that we can know which set of messages to work with
-	timeToPostponeBackedUpMessagesHandling = 30 * time.Second
-
 	SyncWakuSectionKeyProfile     = "profile"
 	SyncWakuSectionKeyContacts    = "contacts"
 	SyncWakuSectionKeyCommunities = "communities"
 	SyncWakuSectionKeySettings    = "settings"
 )
 
-type backupHandler struct {
-	messagesToProceed      []protobuf.Backup
-	lastKnownTime          uint64
-	postponeHandling       bool
-	postponeTasksWaitGroup sync.WaitGroup
-}
-
-func (bh *backupHandler) addMessage(message protobuf.Backup) {
-	if message.Clock < bh.lastKnownTime {
-		return
-	}
-	if message.Clock > bh.lastKnownTime {
-		bh.messagesToProceed = nil
-		bh.lastKnownTime = message.Clock
-	}
-
-	bh.messagesToProceed = append(bh.messagesToProceed, message)
-}
-
-func (m *Messenger) startWaitingForTheLatestBackedupMessageLoop() {
-	ticker := time.NewTicker(timeToPostponeBackedUpMessagesHandling)
-	m.backedupMessagesHandler.postponeTasksWaitGroup.Add(1)
-	go func() {
-		defer m.backedupMessagesHandler.postponeTasksWaitGroup.Done()
-		for {
-			select {
-			case <-ticker.C:
-				if !m.backedupMessagesHandler.postponeHandling {
-					return
-				}
-				m.backedupMessagesHandler.postponeHandling = false
-
-				for _, msg := range m.backedupMessagesHandler.messagesToProceed {
-					messageState := m.buildMessageState()
-					errors := m.HandleBackup(messageState, msg)
-					if len(errors) > 0 {
-						for _, err := range errors {
-							m.logger.Warn("failed to handle postponed Backup messages", zap.Error(err))
-						}
-					}
-				}
-
-				m.backedupMessagesHandler.messagesToProceed = nil
-			case <-m.quit:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-}
-
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
 	var errors []error
-	if m.backedupMessagesHandler.postponeHandling {
-		m.backedupMessagesHandler.addMessage(message)
-		return errors
-	}
 
 	err := m.handleBackedUpProfile(message.Profile, message.Clock)
 	if err != nil {
@@ -128,18 +68,28 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return err
 	}
 
+	contentSet := false
 	response := wakusync.WakuBackedUpDataResponse{
 		Profile: &wakusync.BackedUpProfile{},
 	}
 
 	if dbDisplayNameClock < message.DisplayNameClock {
-		err := m.SetDisplayName(message.DisplayName, false)
-		response.AddDisplayName(message.DisplayName, err == nil)
+		err = m.SetDisplayName(message.DisplayName, false)
+		if err != nil {
+			return err
+		}
+		contentSet = true
+		response.AddDisplayName(message.DisplayName)
 	}
 
 	syncWithBackedUpImages := false
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
 	if err != nil {
+		if err != sql.ErrNoRows {
+			return err
+		}
+		// if images are deleted and no images were backed up, then we need to delete them on other devices,
+		// that's why we don't return in case of `sql.ErrNoRows`
 		syncWithBackedUpImages = true
 	}
 	if len(dbImages) == 0 {
@@ -155,7 +105,11 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	if syncWithBackedUpImages {
 		if len(message.Pictures) == 0 {
 			err = m.multiAccounts.DeleteIdentityImage(message.KeyUid)
-			response.AddImages(nil, err == nil)
+			if err != nil {
+				return err
+			}
+			contentSet = true
+			response.AddImages(nil)
 		} else {
 			idImages := make([]images.IdentityImage, len(message.Pictures))
 			for i, pic := range message.Pictures {
@@ -171,11 +125,15 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 				idImages[i] = img
 			}
 			err = m.multiAccounts.StoreIdentityImages(message.KeyUid, idImages, false)
-			response.AddImages(idImages, err == nil)
+			if err != nil {
+				return err
+			}
+			contentSet = true
+			response.AddImages(idImages)
 		}
 	}
 
-	if m.config.messengerSignalsHandler != nil {
+	if m.config.messengerSignalsHandler != nil && contentSet {
 		m.config.messengerSignalsHandler.SendWakuBackedUpProfile(&response)
 	}
 
@@ -193,12 +151,14 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 		return nil
 	}
 
-	response := wakusync.WakuBackedUpDataResponse{
-		Setting: settingField,
-	}
+	if settingField != nil {
+		response := wakusync.WakuBackedUpDataResponse{
+			Setting: settingField,
+		}
 
-	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		}
 	}
 
 	return nil
