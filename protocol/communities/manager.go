@@ -55,7 +55,12 @@ type Manager struct {
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          map[string]chan struct{}
 	torrentTasks                 map[string]metainfo.Hash
-	historyArchiveDownloadTasks  map[string]chan struct{}
+	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
+}
+
+type HistoryArchiveDownloadTask struct {
+	Cancel chan struct{}
+	Waiter sync.WaitGroup
 }
 
 func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {
@@ -85,7 +90,7 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		torrentConfig:               torrentConfig,
 		historyArchiveTasks:         make(map[string]chan struct{}),
 		torrentTasks:                make(map[string]metainfo.Hash),
-		historyArchiveDownloadTasks: make(map[string]chan struct{}),
+		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 		persistence: &Persistence{
 			logger: logger,
 			db:     db,
@@ -2112,29 +2117,35 @@ func (m *Manager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) boo
 	return ok && torrent.Seeding()
 }
 
-func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string) ([]string, error) {
+func (m *Manager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
+	return m.historyArchiveDownloadTasks[communityID]
+}
+
+func (m *Manager) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
+	m.historyArchiveDownloadTasks[communityID] = task
+}
+
+type HistoryArchiveDownloadTaskInfo struct {
+	TotalDownloadedArchivesCount int
+	TotalArchivesCount           int
+	Cancelled                    bool
+}
+
+func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
 
 	id := communityID.String()
+
 	ml, err := metainfo.ParseMagnetUri(magnetlink)
 	if err != nil {
 		return nil, err
 	}
-
-	// If we're in the middle of downloading archives from the current
-	// torrent, we want to cancel that first.
-	stop, exists := m.historyArchiveDownloadTasks[id]
-	if exists {
-		close(stop)
-	}
-
-	cancel := make(chan struct{})
-	m.historyArchiveDownloadTasks[id] = cancel
 
 	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", magnetlink))
 	torrent, err := m.torrentClient.AddMagnet(magnetlink)
 	if err != nil {
 		return nil, err
 	}
+
 	m.torrentTasks[id] = ml.InfoHash
 	timeout := time.After(20 * time.Second)
 
@@ -2143,6 +2154,7 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	case <-timeout:
 		return nil, ErrTorrentTimedout
 	case <-torrent.GotInfo():
+
 		files := torrent.Files()
 
 		i, ok := findIndexFile(files)
@@ -2158,20 +2170,40 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 
+		downloadTaskInfo := &HistoryArchiveDownloadTaskInfo{
+			TotalDownloadedArchivesCount: 0,
+			TotalArchivesCount:           0,
+			Cancelled:                    false,
+		}
+
 		for {
 			select {
-			case <-cancel:
-				return []string{}, nil
+			case <-cancelTask:
+				m.LogStdout("cancelled downloading archive index")
+				downloadTaskInfo.Cancelled = true
+				return downloadTaskInfo, nil
 			case <-ticker.C:
 				if indexFile.BytesCompleted() == indexFile.Length() {
+
 					index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {
 						return nil, err
 					}
 
-					var archiveIDs []string
+					existingArchiveIDs, err := m.persistence.GetDownloadedMessageArchiveIDs(communityID)
+					if err != nil {
+						return nil, err
+					}
 
-					archiveHashes := make(archiveMDSlice, 0, len(index.Archives))
+					if len(existingArchiveIDs) == len(index.Archives) {
+						m.LogStdout("download cancelled, no new archives")
+						return downloadTaskInfo, nil
+					}
+
+					downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
+					downloadTaskInfo.TotalArchivesCount = len(index.Archives)
+
+					archiveHashes := make(archiveMDSlice, 0, downloadTaskInfo.TotalArchivesCount)
 
 					for hash, metadata := range index.Archives {
 						archiveHashes = append(archiveHashes, &archiveMetadata{hash: hash, from: metadata.Metadata.From})
@@ -2186,17 +2218,21 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 					})
 
 					for _, hd := range archiveHashes {
+
 						hash := hd.hash
-						metadata := index.Archives[hash]
-						hasArchive, err := m.persistence.HasMessageArchiveID(communityID, hash)
-						if err != nil {
-							m.logger.Debug("Failed to check if has message archive id", zap.Error(err))
-							continue
+						hasArchive := false
+
+						for _, existingHash := range existingArchiveIDs {
+							if existingHash == hash {
+								hasArchive = true
+								break
+							}
 						}
 						if hasArchive {
 							continue
 						}
 
+						metadata := index.Archives[hash]
 						startIndex := int(metadata.Offset) / pieceLength
 						endIndex := startIndex + int(metadata.Size)/pieceLength
 
@@ -2229,14 +2265,16 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 									psc.Close()
 									break downloadLoop
 								}
-							case <-cancel:
-								return archiveIDs, nil
+							case <-cancelTask:
+								m.LogStdout("downloading archive data interrupted")
+								downloadTaskInfo.Cancelled = true
+								return downloadTaskInfo, nil
 							}
 						}
-						archiveIDs = append(archiveIDs, hash)
+						downloadTaskInfo.TotalDownloadedArchivesCount++
 						err = m.persistence.SaveMessageArchiveID(communityID, hash)
 						if err != nil {
-							m.logger.Debug("couldn't save message archive ID", zap.Error(err))
+							m.LogStdout("couldn't save message archive ID", zap.Error(err))
 							continue
 						}
 						m.publish(&Subscription{
@@ -2252,12 +2290,16 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 							CommunityID: communityID.String(),
 						},
 					})
-					m.LogStdout("finished download archives")
-					return archiveIDs, nil
+					m.LogStdout("finished downloading archives")
+					return downloadTaskInfo, nil
 				}
 			}
 		}
 	}
+}
+
+func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
 
 func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes, archiveIDs []string) (map[transport.Filter][]*types.Message, error) {
@@ -2325,6 +2367,10 @@ func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes,
 		}
 	}
 	return messages, nil
+}
+
+func (m *Manager) SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error {
+	return m.persistence.SetMessageArchiveIDImported(communityID, hash, imported)
 }
 
 func (m *Manager) GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error) {
