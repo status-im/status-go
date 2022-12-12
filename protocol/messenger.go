@@ -153,9 +153,10 @@ type Messenger struct {
 	savedAddressesManager                *wallet.SavedAddressesManager
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
-	mutex               sync.Mutex
-	mailPeersMutex      sync.Mutex
-	handleMessagesMutex sync.Mutex
+	mutex                     sync.Mutex
+	mailPeersMutex            sync.Mutex
+	handleMessagesMutex       sync.Mutex
+	handleImportMessagesMutex sync.Mutex
 }
 
 type connStatus int
@@ -3142,11 +3143,14 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	if importMessagesCount > 0 {
 		if importMessagesCount <= maxChunkSizeMessages {
 			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord messages", importMessagesCount))
+			m.handleImportMessagesMutex.Lock()
 			err := m.persistence.SaveDiscordMessages(importMessagesToSave)
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to save discord messages", zap.Error(err))
+				m.handleImportMessagesMutex.Unlock()
 				return err
 			}
+			m.handleImportMessagesMutex.Unlock()
 		} else {
 			// We need to process the messages in chunks otherwise we'll
 			// block the database for too long
@@ -3157,14 +3161,14 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				// We can't defer Unlock here because we want to
 				// unlock after every iteration to leave room for
 				// other processes to access the database
-				m.handleMessagesMutex.Lock()
+				m.handleImportMessagesMutex.Lock()
 				err := m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
 					m.communitiesManager.LogStdout(fmt.Sprintf("failed to save discord message chunk %d of %d", i+1, chunksCount), zap.Error(err))
-					m.handleMessagesMutex.Unlock()
+					m.handleImportMessagesMutex.Unlock()
 					return err
 				}
-				m.handleMessagesMutex.Unlock()
+				m.handleImportMessagesMutex.Unlock()
 				// We slow down the saving of message chunks to keep the database responsive
 				if i < chunksCount-1 {
 					time.Sleep(2 * time.Second)
@@ -3179,15 +3183,15 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 		chunksCount := len(chunks)
 		for i, attachments := range chunks {
 			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", i+1, chunksCount, len(attachments)))
-			m.handleMessagesMutex.Lock()
+			m.handleImportMessagesMutex.Lock()
 			err := m.persistence.SaveDiscordMessageAttachments(attachments)
 			if err != nil {
 				m.communitiesManager.LogStdout(fmt.Sprintf("failed to save discord message attachments chunk %d of %d", i+1, chunksCount), zap.Error(err))
-				m.handleMessagesMutex.Unlock()
+				m.handleImportMessagesMutex.Unlock()
 				return err
 			}
 			// We slow down the saving of message chunks to keep the database responsive
-			m.handleMessagesMutex.Unlock()
+			m.handleImportMessagesMutex.Unlock()
 			if i < chunksCount-1 {
 				time.Sleep(2 * time.Second)
 			}
@@ -3199,10 +3203,13 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	if messagesCount > 0 {
 		if messagesCount <= maxChunkSizeMessages {
 			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d app messages", messagesCount))
+			m.handleMessagesMutex.Lock()
 			err := m.SaveMessages(messagesToSave)
 			if err != nil {
+				m.handleMessagesMutex.Unlock()
 				return err
 			}
+			m.handleMessagesMutex.Unlock()
 		} else {
 			chunks := chunkSlice(messagesToSave, maxChunkSizeMessages)
 			chunksCount := len(chunks)
