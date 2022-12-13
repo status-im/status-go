@@ -65,6 +65,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		image_payload,
 		image_type,
 		image_base64,
+		album_id,
 		audio_payload,
 		audio_type,
 		audio_duration_ms,
