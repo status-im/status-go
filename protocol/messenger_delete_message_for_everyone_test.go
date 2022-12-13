@@ -81,6 +81,15 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	s.Require().Len(response.Communities(), 1)
 	community = response.Communities()[0]
 
+	_, err = WaitOnMessengerResponse(s.moderator, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
+	}, "community description changed message not received")
+	s.Require().NoError(err)
+	_, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
+	}, "community description changed message not received")
+	s.Require().NoError(err)
+
 	ctx := context.Background()
 	inputMessage := &common.Message{}
 	inputMessage.ChatId = communityChat.ID
@@ -95,17 +104,17 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	s.Require().NoError(err)
 	message := response.Messages()[0]
 	s.Require().Equal(inputMessage.Text, message.Text)
+
 	_, err = s.moderator.DeleteMessageAndSend(ctx, message.ID)
 	s.Require().NoError(err)
 
-	// FIXME this test fails
-	// _, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
-	// 	return len(response.RemovedMessages()) > 0
-	// }, "removed messages not received")
-	// s.Require().NoError(err)
-	// message, err = s.bob.MessageByID(message.ID)
-	// s.Require().NoError(err)
-	// s.Require().True(message.Deleted)
+	_, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
+		return len(response.RemovedMessages()) > 0
+	}, "removed messages not received")
+	s.Require().NoError(err)
+	message, err = s.bob.MessageByID(message.ID)
+	s.Require().NoError(err)
+	s.Require().True(message.Deleted)
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) createCommunity() *communities.Community {
