@@ -228,6 +228,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Hash,
 		&image.Payload,
 		&image.Type,
+		&image.AlbumID,
 		&audio.DurationMs,
 		&communityID,
 		&serializedMentions,
@@ -359,6 +360,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		img := protobuf.ImageMessage{
 			Payload: image.Payload,
 			Type:    image.Type,
+			AlbumID: image.AlbumID,
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
 
