@@ -444,6 +444,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		sticker.Hash,
 		image.Payload,
 		image.Type,
+		image.AlbumID,
 		message.Base64Image,
 		audio.Payload,
 		audio.Type,
