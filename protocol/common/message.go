@@ -159,6 +159,8 @@ type Message struct {
 	AudioPath string `json:"audioPath,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
+	// AlbumID for a collage of images
+	AlbumID string `json:"albumId,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
@@ -228,6 +230,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName                  string                           `json:"ensName"`
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
+		AlbumID                  string                           `json:"albumId,omitempty"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
@@ -268,6 +271,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName:                  m.EnsName,
 		DisplayName:              m.DisplayName,
 		Image:                    m.ImageLocalURL,
+		AlbumID:                  m.AlbumID,
 		Audio:                    m.AudioLocalURL,
 		CommunityID:              m.CommunityID,
 		Timestamp:                m.Timestamp,
