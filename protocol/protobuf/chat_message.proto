@@ -13,7 +13,6 @@ message StickerMessage {
 message ImageMessage {
   bytes payload = 1;
   ImageType type = 2;
-  string album_id = 3;
 }
 
 message AudioMessage {
