@@ -178,6 +178,7 @@ type scanner interface {
 
 func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *common.Message, others ...interface{}) error {
 	var quotedID sql.NullString
+	var albumID sql.NullString
 	var ContentType sql.NullInt64
 	var quotedText sql.NullString
 	var quotedParsedText []byte
@@ -287,6 +288,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if editedAt.Valid {
 		message.EditedAt = uint64(editedAt.Int64)
+	}
+
+	if albumID.Valid {
+		message.AlbumID = albumID.String
 	}
 
 	if deleted.Valid {
