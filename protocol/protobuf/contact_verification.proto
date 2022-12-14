@@ -23,3 +23,8 @@ message DeclineContactVerification {
   uint64 clock = 1;
   string id = 2;
 }
+
+message CancelContactVerification {
+  uint64 clock = 1;
+  string id = 2;
+}

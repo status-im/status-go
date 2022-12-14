@@ -67,6 +67,7 @@ const (
 	ContactVerificationStateDeclined
 	ContactVerificationStateTrusted
 	ContactVerificationStateUntrustworthy
+	ContactVerificationStateCanceled
 )
 
 type CommandParameters struct {
