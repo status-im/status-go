@@ -158,7 +158,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 	contactID := verifRequest.To
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok || !contact.Added || !contact.HasAddedUs {
-		return nil, errors.New("Can't find contact for camnceling verification request")
+		return nil, errors.New("Can't find contact for canceling verification request")
 	}
 
 	if verifRequest.RequestStatus != verification.RequestStatusPENDING {
