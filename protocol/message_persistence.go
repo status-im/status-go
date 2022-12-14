@@ -115,7 +115,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.sticker_hash,
 		m1.image_payload,
 		m1.image_type,
-		m1.album_id,
+		COALESCE(m1.album_id, ""),
 		COALESCE(m1.audio_duration_ms,0),
 		m1.community_id,
 		m1.mentions,
