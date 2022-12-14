@@ -189,6 +189,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
+	var albumID sql.NullString
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
@@ -326,6 +327,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 	if communityID.Valid {
 		message.CommunityID = communityID.String
+	}
+
+	if albumID.Valid {
+		message.AlbumID = albumID.String
 	}
 
 	if serializedMentions != nil {
