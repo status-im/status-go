@@ -232,6 +232,14 @@ func (s *MessageSender) getMessageID(rawMessage *RawMessage) (types.HexBytes, er
 	return messageID, nil
 }
 
+func ShouldCommunityMessageBeEncrypted(msgType protobuf.ApplicationMetadataMessage_Type) bool {
+	return msgType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE ||
+		msgType == protobuf.ApplicationMetadataMessage_EDIT_MESSAGE ||
+		msgType == protobuf.ApplicationMetadataMessage_DELETE_MESSAGE ||
+		msgType == protobuf.ApplicationMetadataMessage_PIN_MESSAGE ||
+		msgType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION
+}
+
 // sendCommunity sends a message that's to be sent in a community
 // If it's a chat message, it will go to the respective topic derived by the
 // chat id, if it's not a chat message, it will go to the community topic.
@@ -284,7 +292,7 @@ func (s *MessageSender) sendCommunity(
 	}
 
 	// If it's a chat message, we send it on the community chat topic
-	if rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+	if ShouldCommunityMessageBeEncrypted(rawMessage.MessageType) {
 		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
 		if err != nil {
 			return nil, err
