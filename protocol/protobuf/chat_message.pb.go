@@ -161,6 +161,7 @@ func (m *StickerMessage) GetPack() int32 {
 type ImageMessage struct {
 	Payload              []byte    `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 	Type                 ImageType `protobuf:"varint,2,opt,name=type,proto3,enum=protobuf.ImageType" json:"type,omitempty"`
+	AlbumID   			 string    `protobuf:"bytes,3,opt,name=album_id,json=albumId,proto3" json:"album_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
