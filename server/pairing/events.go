@@ -1,4 +1,4 @@
-package server
+package pairing
 
 // EventType type for event types.
 type EventType string
@@ -19,6 +19,15 @@ const (
 
 // Event is a type for transfer events.
 type Event struct {
-	Type  EventType `json:"type"`
-	Error string    `json:"error,omitempty"`
+	Type   EventType `json:"type"`
+	Error  string    `json:"error,omitempty"`
+	Action Action    `json:"action"`
 }
+
+type Action int
+
+const (
+	ActionPairingAccount = iota + 1
+	ActionSyncDevice
+	ActionConnect
+)

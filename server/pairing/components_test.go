@@ -1,10 +1,14 @@
-package server
+package pairing
 
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
 	"encoding/asn1"
+
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
@@ -13,6 +17,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/server"
 )
 
 const (
@@ -79,10 +85,81 @@ func (tcc *TestCertComponents) SetupCertComponents(t *testing.T) {
 	tcc.NotAfter = tcc.NotBefore.Add(time.Hour)
 }
 
+type TestPairingServerComponents struct {
+	EphemeralPK  *ecdsa.PrivateKey
+	EphemeralAES []byte
+	OutboundIP   net.IP
+	Cert         tls.Certificate
+	PS           *Server
+}
+
+func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing.T) {
+	var err error
+
+	// Get 4 key components for tls.cert generation
+	// 1) Ephemeral private key
+	tpsc.EphemeralPK, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	// 2) AES encryption key
+	tpsc.EphemeralAES, err = common.MakeECDHSharedKey(tpsc.EphemeralPK, &tpsc.EphemeralPK.PublicKey)
+	require.NoError(t, err)
+
+	// 3) Device outbound IP address
+	tpsc.OutboundIP, err = server.GetOutboundIP()
+	require.NoError(t, err)
+
+	// Generate tls.Certificate and Server
+	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, time.Now(), tpsc.OutboundIP.String())
+	require.NoError(t, err)
+
+	tpsc.PS, err = NewPairingServer(nil, &Config{
+		PK:       &tpsc.EphemeralPK.PublicKey,
+		EK:       tpsc.EphemeralAES,
+		Cert:     &tpsc.Cert,
+		Hostname: tpsc.OutboundIP.String(),
+		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{
+			PayloadSourceConfig: &PayloadSourceConfig{
+				KeystorePath: "",
+			},
+		}})
+	require.NoError(t, err)
+}
+
 type TestLoggerComponents struct {
 	Logger *zap.Logger
 }
 
 func (tlc *TestLoggerComponents) SetupLoggerComponents() {
 	tlc.Logger = logutils.ZapLogger()
+}
+
+type MockEncryptOnlyPayloadManager struct {
+	*PayloadEncryptionManager
+}
+
+func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadManager, error) {
+	pem, err := NewPayloadEncryptionManager(aesKey, logutils.ZapLogger())
+	if err != nil {
+		return nil, err
+	}
+
+	return &MockEncryptOnlyPayloadManager{
+		pem,
+	}, nil
+}
+
+func (m *MockEncryptOnlyPayloadManager) Mount() error {
+	// Make a random payload
+	data := make([]byte, 32)
+	_, err := rand.Read(data)
+	if err != nil {
+		return err
+	}
+
+	return m.Encrypt(data)
+}
+
+func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
+	return m.Decrypt(data)
 }

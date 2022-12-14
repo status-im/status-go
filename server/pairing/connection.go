@@ -1,4 +1,4 @@
-package server
+package pairing
 
 import (
 	"crypto/ecdsa"

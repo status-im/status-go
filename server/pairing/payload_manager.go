@@ -1,4 +1,4 @@
-package server
+package pairing
 
 import (
 	"crypto/rand"
@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/status-im/status-go/api"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -42,32 +44,38 @@ type PayloadManager interface {
 	LockPayload()
 }
 
-// PairingPayloadSourceConfig represents location and access data of the pairing payload
+// PayloadSourceConfig represents location and access data of the pairing payload
 // ONLY available from the application client
-type PairingPayloadSourceConfig struct {
+type PayloadSourceConfig struct {
+	// required
 	KeystorePath string `json:"keystorePath"`
-	KeyUID       string `json:"keyUID"`
-	Password     string `json:"password"`
+	// following 2 fields r optional.
+	// optional cases:
+	// 1. server mode is Receiving and server side doesn't contain this info
+	// 2. server mode is Sending and client side doesn't contain this info
+	// they are required in other cases
+	KeyUID   string `json:"keyUID"`
+	Password string `json:"password"`
 }
 
-// PairingPayloadManagerConfig represents the initialisation parameters required for a PairingPayloadManager
-type PairingPayloadManagerConfig struct {
+// AccountPayloadManagerConfig represents the initialisation parameters required for a AccountPayloadManager
+type AccountPayloadManagerConfig struct {
 	DB *multiaccounts.Database
-	PairingPayloadSourceConfig
+	*PayloadSourceConfig
 }
 
-// PairingPayloadManager is responsible for the whole lifecycle of a PairingPayload
-type PairingPayloadManager struct {
-	logger *zap.Logger
-	pp     *PairingPayload
+// AccountPayloadManager is responsible for the whole lifecycle of a AccountPayload
+type AccountPayloadManager struct {
+	logger         *zap.Logger
+	accountPayload *AccountPayload
 	*PayloadEncryptionManager
-	ppm *PairingPayloadMarshaller
-	ppr PayloadRepository
+	accountPayloadMarshaller *AccountPayloadMarshaller
+	payloadRepository        PayloadRepository
 }
 
-// NewPairingPayloadManager generates a new and initialised PairingPayloadManager
-func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig, logger *zap.Logger) (*PairingPayloadManager, error) {
-	l := logger.Named("PairingPayloadManager")
+// NewAccountPayloadManager generates a new and initialised AccountPayloadManager
+func NewAccountPayloadManager(aesKey []byte, config *AccountPayloadManagerConfig, logger *zap.Logger) (*AccountPayloadManager, error) {
+	l := logger.Named("AccountPayloadManager")
 	l.Debug("fired", zap.Binary("aesKey", aesKey), zap.Any("config", config))
 
 	pem, err := NewPayloadEncryptionManager(aesKey, l)
@@ -75,74 +83,74 @@ func NewPairingPayloadManager(aesKey []byte, config *PairingPayloadManagerConfig
 		return nil, err
 	}
 
-	// A new SHARED PairingPayload
-	p := new(PairingPayload)
+	// A new SHARED AccountPayload
+	p := new(AccountPayload)
 
-	return &PairingPayloadManager{
+	return &AccountPayloadManager{
 		logger:                   l,
-		pp:                       p,
+		accountPayload:           p,
 		PayloadEncryptionManager: pem,
-		ppm:                      NewPairingPayloadMarshaller(p, l),
-		ppr:                      NewPairingPayloadRepository(p, config),
+		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
+		payloadRepository:        NewAccountPayloadRepository(p, config),
 	}, nil
 }
 
-// Mount loads and prepares the payload to be stored in the PairingPayloadManager's state ready for later access
-func (ppm *PairingPayloadManager) Mount() error {
-	l := ppm.logger.Named("Mount()")
+// Mount loads and prepares the payload to be stored in the AccountPayloadManager's state ready for later access
+func (apm *AccountPayloadManager) Mount() error {
+	l := apm.logger.Named("Mount()")
 	l.Debug("fired")
 
-	err := ppm.ppr.LoadFromSource()
+	err := apm.payloadRepository.LoadFromSource()
 	if err != nil {
 		return err
 	}
 	l.Debug("after LoadFromSource")
 
-	pb, err := ppm.ppm.MarshalToProtobuf()
+	pb, err := apm.accountPayloadMarshaller.MarshalToProtobuf()
 	if err != nil {
 		return err
 	}
 	l.Debug(
 		"after MarshalToProtobuf",
-		zap.Any("ppm.ppm.keys", ppm.ppm.keys),
-		zap.Any("ppm.ppm.multiaccount", ppm.ppm.multiaccount),
-		zap.String("ppm.ppm.password", ppm.ppm.password),
+		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.keys", apm.accountPayloadMarshaller.keys),
+		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.multiaccount", apm.accountPayloadMarshaller.multiaccount),
+		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apm.accountPayloadMarshaller.password),
 		zap.Binary("pb", pb),
 	)
 
-	return ppm.Encrypt(pb)
+	return apm.Encrypt(pb)
 }
 
 // Receive takes a []byte representing raw data, parses and stores the data
-func (ppm *PairingPayloadManager) Receive(data []byte) error {
-	l := ppm.logger.Named("Receive()")
+func (apm *AccountPayloadManager) Receive(data []byte) error {
+	l := apm.logger.Named("Receive()")
 	l.Debug("fired")
 
-	err := ppm.Decrypt(data)
+	err := apm.Decrypt(data)
 	if err != nil {
 		return err
 	}
 	l.Debug("after Decrypt")
 
-	err = ppm.ppm.UnmarshalProtobuf(ppm.Received())
+	err = apm.accountPayloadMarshaller.UnmarshalProtobuf(apm.Received())
 	if err != nil {
 		return err
 	}
 	l.Debug(
 		"after UnmarshalProtobuf",
-		zap.Any("ppm.ppm.keys", ppm.ppm.keys),
-		zap.Any("ppm.ppm.multiaccount", ppm.ppm.multiaccount),
-		zap.String("ppm.ppm.password", ppm.ppm.password),
-		zap.Binary("ppm.Received()", ppm.Received()),
+		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.keys", apm.accountPayloadMarshaller.keys),
+		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.multiaccount", apm.accountPayloadMarshaller.multiaccount),
+		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apm.accountPayloadMarshaller.password),
+		zap.Binary("accountPayloadMarshaller.Received()", apm.Received()),
 	)
 
-	return ppm.ppr.StoreToSource()
+	return apm.payloadRepository.StoreToSource()
 }
 
-// ResetPayload resets all payload state managed by the PairingPayloadManager
-func (ppm *PairingPayloadManager) ResetPayload() {
-	ppm.pp.ResetPayload()
-	ppm.PayloadEncryptionManager.ResetPayload()
+// ResetPayload resets all payload state managed by the AccountPayloadManager
+func (apm *AccountPayloadManager) ResetPayload() {
+	apm.accountPayload.ResetPayload()
+	apm.PayloadEncryptionManager.ResetPayload()
 }
 
 // EncryptionPayload represents the plain text and encrypted text of payload data
@@ -247,28 +255,28 @@ func (pem *PayloadEncryptionManager) LockPayload() {
 	pem.received.lock()
 }
 
-// PairingPayload represents the payload structure a PairingServer handles
-type PairingPayload struct {
+// AccountPayload represents the payload structure a Server handles
+type AccountPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
 }
 
-func (pp *PairingPayload) ResetPayload() {
-	*pp = PairingPayload{}
+func (ap *AccountPayload) ResetPayload() {
+	*ap = AccountPayload{}
 }
 
-// PairingPayloadMarshaller is responsible for marshalling and unmarshalling PairingServer payload data
-type PairingPayloadMarshaller struct {
+// AccountPayloadMarshaller is responsible for marshalling and unmarshalling Server payload data
+type AccountPayloadMarshaller struct {
 	logger *zap.Logger
-	*PairingPayload
+	*AccountPayload
 }
 
-func NewPairingPayloadMarshaller(p *PairingPayload, logger *zap.Logger) *PairingPayloadMarshaller {
-	return &PairingPayloadMarshaller{logger: logger, PairingPayload: p}
+func NewPairingPayloadMarshaller(ap *AccountPayload, logger *zap.Logger) *AccountPayloadMarshaller {
+	return &AccountPayloadMarshaller{logger: logger, AccountPayload: ap}
 }
 
-func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
+func (ppm *AccountPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
 	return proto.Marshal(&protobuf.LocalPairingPayload{
 		Keys:         ppm.accountKeysToProtobuf(),
 		Multiaccount: ppm.multiaccount.ToProtobuf(),
@@ -276,7 +284,7 @@ func (ppm *PairingPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
 	})
 }
 
-func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
+func (ppm *AccountPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
 	var keys []*protobuf.LocalPairingPayload_Key
 	for name, data := range ppm.keys {
 		keys = append(keys, &protobuf.LocalPairingPayload_Key{Name: name, Data: data})
@@ -284,7 +292,7 @@ func (ppm *PairingPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPa
 	return keys
 }
 
-func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
+func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	l := ppm.logger.Named("UnmarshalProtobuf()")
 	l.Debug("fired")
 
@@ -306,7 +314,7 @@ func (ppm *PairingPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	return nil
 }
 
-func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
+func (ppm *AccountPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.LocalPairingPayload_Key) {
 	l := ppm.logger.Named("accountKeysFromProtobuf()")
 	l.Debug("fired")
 
@@ -320,11 +328,11 @@ func (ppm *PairingPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 	l.Debug(
 		"after for _, key := range pbKeys",
 		zap.Any("pbKeys", pbKeys),
-		zap.Any("ppm.keys", ppm.keys),
+		zap.Any("accountPayloadMarshaller.keys", ppm.keys),
 	)
 }
 
-func (ppm *PairingPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
+func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
 	ppm.multiaccount = new(multiaccounts.Account)
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
@@ -334,18 +342,18 @@ type PayloadRepository interface {
 	StoreToSource() error
 }
 
-// PairingPayloadRepository is responsible for loading, parsing, validating and storing PairingServer payload data
-type PairingPayloadRepository struct {
-	*PairingPayload
+// AccountPayloadRepository is responsible for loading, parsing, validating and storing Server payload data
+type AccountPayloadRepository struct {
+	*AccountPayload
 
 	multiaccountsDB *multiaccounts.Database
 
 	keystorePath, keyUID string
 }
 
-func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManagerConfig) *PairingPayloadRepository {
-	ppr := &PairingPayloadRepository{
-		PairingPayload: p,
+func NewAccountPayloadRepository(p *AccountPayload, config *AccountPayloadManagerConfig) *AccountPayloadRepository {
+	ppr := &AccountPayloadRepository{
+		AccountPayload: p,
 	}
 
 	if config == nil {
@@ -359,18 +367,18 @@ func NewPairingPayloadRepository(p *PairingPayload, config *PairingPayloadManage
 	return ppr
 }
 
-func (ppr *PairingPayloadRepository) LoadFromSource() error {
-	err := ppr.loadKeys(ppr.keystorePath)
+func (apr *AccountPayloadRepository) LoadFromSource() error {
+	err := apr.loadKeys(apr.keystorePath)
 	if err != nil {
 		return err
 	}
 
-	err = ppr.validateKeys(ppr.password)
+	err = apr.validateKeys(apr.password)
 	if err != nil {
 		return err
 	}
 
-	ppr.multiaccount, err = ppr.multiaccountsDB.GetAccount(ppr.keyUID)
+	apr.multiaccount, err = apr.multiaccountsDB.GetAccount(apr.keyUID)
 	if err != nil {
 		return err
 	}
@@ -378,8 +386,8 @@ func (ppr *PairingPayloadRepository) LoadFromSource() error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
-	ppr.keys = make(map[string][]byte)
+func (apr *AccountPayloadRepository) loadKeys(keyStorePath string) error {
+	apr.keys = make(map[string][]byte)
 
 	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
@@ -404,7 +412,7 @@ func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
 			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
 		}
 
-		ppr.keys[fileInfo.Name()] = rawKeyFile
+		apr.keys[fileInfo.Name()] = rawKeyFile
 
 		return nil
 	}
@@ -417,18 +425,18 @@ func (ppr *PairingPayloadRepository) loadKeys(keyStorePath string) error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) StoreToSource() error {
-	err := ppr.validateKeys(ppr.password)
+func (apr *AccountPayloadRepository) StoreToSource() error {
+	err := apr.validateKeys(apr.password)
 	if err != nil {
 		return err
 	}
 
-	err = ppr.storeKeys(ppr.keystorePath)
+	err = apr.storeKeys(apr.keystorePath)
 	if err != nil {
 		return err
 	}
 
-	err = ppr.storeMultiAccount()
+	err = apr.storeMultiAccount()
 	if err != nil {
 		return err
 	}
@@ -437,8 +445,8 @@ func (ppr *PairingPayloadRepository) StoreToSource() error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) validateKeys(password string) error {
-	for _, key := range ppr.keys {
+func (apr *AccountPayloadRepository) validateKeys(password string) error {
+	for _, key := range apr.keys {
 		k, err := keystore.DecryptKey(key, password)
 		if err != nil {
 			return err
@@ -453,7 +461,7 @@ func (ppr *PairingPayloadRepository) validateKeys(password string) error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
+func (apr *AccountPayloadRepository) storeKeys(keyStorePath string) error {
 	if keyStorePath == "" {
 		return fmt.Errorf("keyStorePath can not be empty")
 	}
@@ -463,10 +471,10 @@ func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
 	// If lastDir == "keystore" we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
 	if lastDir == "keystore" {
-		if ppr.multiaccount == nil || ppr.multiaccount.KeyUID == "" {
+		if apr.multiaccount == nil || apr.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
-		keyStorePath = filepath.Join(keyStorePath, ppr.multiaccount.KeyUID)
+		keyStorePath = filepath.Join(keyStorePath, apr.multiaccount.KeyUID)
 
 		err := os.MkdirAll(keyStorePath, 0777)
 		if err != nil {
@@ -474,7 +482,7 @@ func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
 		}
 	}
 
-	for name, data := range ppr.keys {
+	for name, data := range apr.keys {
 		accountKey := new(keystore.EncryptedKeyJSONV3)
 		if err := json.Unmarshal(data, &accountKey); err != nil {
 			return fmt.Errorf("failed to read key file: %s", err)
@@ -492,6 +500,87 @@ func (ppr *PairingPayloadRepository) storeKeys(keyStorePath string) error {
 	return nil
 }
 
-func (ppr *PairingPayloadRepository) storeMultiAccount() error {
-	return ppr.multiaccountsDB.SaveAccount(*ppr.multiaccount)
+func (apr *AccountPayloadRepository) storeMultiAccount() error {
+	return apr.multiaccountsDB.SaveAccount(*apr.multiaccount)
+}
+
+type RawMessagePayloadManager struct {
+	logger *zap.Logger
+	// reference from AccountPayloadManager#accountPayload
+	accountPayload *AccountPayload
+	*PayloadEncryptionManager
+	payloadRepository *RawMessageRepository
+}
+
+func NewRawMessagePayloadManager(logger *zap.Logger, accountPayload *AccountPayload, aesKey []byte, backend *api.GethStatusBackend, keystorePath string) (*RawMessagePayloadManager, error) {
+	l := logger.Named("RawMessagePayloadManager")
+	pem, err := NewPayloadEncryptionManager(aesKey, l)
+	if err != nil {
+		return nil, err
+	}
+	return &RawMessagePayloadManager{
+		logger:                   l,
+		accountPayload:           accountPayload,
+		PayloadEncryptionManager: pem,
+		payloadRepository:        NewRawMessageRepository(backend, keystorePath, accountPayload),
+	}, nil
+}
+
+func (r *RawMessagePayloadManager) Mount() error {
+	err := r.payloadRepository.LoadFromSource()
+	if err != nil {
+		return err
+	}
+	return r.Encrypt(r.payloadRepository.payload)
+}
+
+func (r *RawMessagePayloadManager) Receive(data []byte) error {
+	err := r.Decrypt(data)
+	if err != nil {
+		return err
+	}
+	r.payloadRepository.payload = r.Received()
+	return r.payloadRepository.StoreToSource()
+}
+
+func (r *RawMessagePayloadManager) ResetPayload() {
+	r.payloadRepository.payload = make([]byte, 0)
+	r.PayloadEncryptionManager.ResetPayload()
+}
+
+type RawMessageRepository struct {
+	payload               []byte
+	syncRawMessageHandler *SyncRawMessageHandler
+	keystorePath          string
+	accountPayload        *AccountPayload
+}
+
+func NewRawMessageRepository(backend *api.GethStatusBackend, keystorePath string, accountPayload *AccountPayload) *RawMessageRepository {
+	return &RawMessageRepository{
+		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
+		keystorePath:          keystorePath,
+		payload:               make([]byte, 0),
+		accountPayload:        accountPayload,
+	}
+}
+
+func (r *RawMessageRepository) LoadFromSource() error {
+	account := r.accountPayload.multiaccount
+	if account == nil || account.KeyUID == "" {
+		return fmt.Errorf("no known KeyUID when loading raw messages")
+	}
+	payload, err := r.syncRawMessageHandler.PrepareRawMessage(account.KeyUID)
+	if err != nil {
+		return err
+	}
+	r.payload = payload
+	return nil
+}
+
+func (r *RawMessageRepository) StoreToSource() error {
+	accountPayload := r.accountPayload
+	if accountPayload == nil || accountPayload.multiaccount == nil {
+		return fmt.Errorf("no known multiaccount when storing raw messages")
+	}
+	return r.syncRawMessageHandler.HandleRawMessage(accountPayload.multiaccount, accountPayload.password, r.keystorePath, r.payload)
 }

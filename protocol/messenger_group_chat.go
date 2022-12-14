@@ -725,7 +725,7 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 	}
 
 	if remove && shouldBeSynced {
-		err := m.syncChatRemoving(ctx, chat.ID)
+		err := m.syncChatRemoving(ctx, chat.ID, m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}

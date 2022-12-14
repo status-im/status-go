@@ -146,7 +146,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Len(acc1, 2, "Must have 2 accounts")
 
 	// Trigger's a sync between devices
-	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image")
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {

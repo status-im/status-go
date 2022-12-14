@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
@@ -1347,6 +1348,17 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 	}
 
 	return crypto.SignStringAsHex(content, selectedChatAccount.AccountKey.PrivateKey)
+}
+
+func (b *GethStatusBackend) Messenger() *protocol.Messenger {
+	node := b.StatusNode()
+	if node != nil {
+		wakuExtService := node.WakuExtService()
+		if wakuExtService != nil {
+			return wakuExtService.Messenger()
+		}
+	}
+	return nil
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm

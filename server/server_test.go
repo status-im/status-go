@@ -30,14 +30,14 @@ func (s *ServerURLSuite) SetupTest() {
 	s.SetupLoggerComponents()
 
 	s.server = &MediaServer{Server: Server{
-		hostname:   defaultIP.String(),
+		hostname:   DefaultIP.String(),
 		portManger: newPortManager(s.Logger, nil),
 	}}
 	err := s.server.SetPort(1337)
 	s.Require().NoError(err)
 
 	s.serverNoPort = &MediaServer{Server: Server{
-		hostname:   defaultIP.String(),
+		hostname:   DefaultIP.String(),
 		portManger: newPortManager(s.Logger, nil),
 	}}
 	go func() {

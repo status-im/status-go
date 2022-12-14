@@ -1,9 +1,11 @@
-package server
+package pairing
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	internalServer "github.com/status-im/status-go/server"
 )
 
 var (
@@ -20,7 +22,7 @@ type ConnectionParamsSuite struct {
 	TestCertComponents
 	TestLoggerComponents
 
-	server *PairingServer
+	server *Server
 }
 
 func (s *ConnectionParamsSuite) SetupSuite() {
@@ -28,14 +30,14 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.SetupCertComponents(s.T())
 	s.SetupLoggerComponents()
 
-	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, defaultIP.String())
+	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, internalServer.DefaultIP.String())
 	s.Require().NoError(err)
 
-	bs := NewServer(&cert, defaultIP.String(), nil, s.Logger)
+	bs := internalServer.NewServer(&cert, internalServer.DefaultIP.String(), nil, s.Logger)
 	err = bs.SetPort(1337)
 	s.Require().NoError(err)
 
-	s.server = &PairingServer{
+	s.server = &Server{
 		Server: bs,
 		pk:     &s.PK.PublicKey,
 		ek:     s.AES,
@@ -62,7 +64,7 @@ func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 	s.Require().NoError(err)
 
 	s.Require().Equal("https://127.0.0.1:1337", u.String())
-	s.Require().Equal(defaultIP.String(), u.Hostname())
+	s.Require().Equal(internalServer.DefaultIP.String(), u.Hostname())
 	s.Require().Equal("1337", u.Port())
 
 	s.Require().True(cp.publicKey.Equal(&s.PK.PublicKey))

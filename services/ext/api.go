@@ -872,7 +872,7 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SyncDevices(ctx, name, picture)
+	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
 func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
