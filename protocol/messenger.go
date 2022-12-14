@@ -157,6 +157,9 @@ type Messenger struct {
 	mailPeersMutex            sync.Mutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
+
+	// flag to disable checking #hasPairedDevices
+	localPairing bool
 }
 
 type connStatus int
@@ -1335,7 +1338,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 		for {
 			select {
 			case <-channel:
-				err := m.syncProfilePictures()
+				err := m.syncProfilePictures(m.dispatchMessage)
 				if err != nil {
 					m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
 				}
@@ -1718,8 +1721,15 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 	return m.reSendRawMessage(ctx, messageID)
 }
 
+func (m *Messenger) SetLocalPairing(localPairing bool) {
+	m.localPairing = localPairing
+}
 func (m *Messenger) hasPairedDevices() bool {
 	logger := m.logger.Named("hasPairedDevices")
+
+	if m.localPairing {
+		return true
+	}
 
 	var count int
 	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
@@ -2166,7 +2176,7 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 	return response, nil
 }
 
-func (m *Messenger) syncProfilePictures() error {
+func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -2207,12 +2217,14 @@ func (m *Messenger) syncProfilePictures() error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2223,7 +2235,11 @@ func (m *Messenger) syncProfilePictures() error {
 
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+	if rawMessageHandler == nil {
+		rawMessageHandler = m.dispatchMessage
+	}
+
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	displayName, err := m.settings.DisplayName()
@@ -2231,14 +2247,14 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 
-	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, photoPath, rawMessageHandler); err != nil {
 		return err
 	}
 
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		isPublicChat := !chat.Timeline() && !chat.ProfileUpdates() && chat.Public()
 		if isPublicChat && chat.Active {
-			err = m.syncPublicChat(ctx, chat)
+			err = m.syncPublicChat(ctx, chat, rawMessageHandler)
 			if err != nil {
 				return false
 			}
@@ -2251,7 +2267,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 			}
 
 			if !pending {
-				err = m.syncChatRemoving(ctx, chatID)
+				err = m.syncChatRemoving(ctx, chatID, rawMessageHandler)
 				if err != nil {
 					return false
 				}
@@ -2259,14 +2275,14 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		}
 
 		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat() || chat.CommunityChat()) && chat.Active {
-			err := m.syncChatMessagesRead(ctx, chatID, chat.ReadMessagesAtClockValue)
+			err := m.syncChatMessagesRead(ctx, chatID, chat.ReadMessagesAtClockValue, rawMessageHandler)
 			if err != nil {
 				return false
 			}
 		}
 
 		if isPublicChat && chat.Active && chat.DeletedAtClockValue > 0 {
-			err = m.syncClearHistory(ctx, chat)
+			err = m.syncClearHistory(ctx, chat, rawMessageHandler)
 			if err != nil {
 				return false
 			}
@@ -2281,7 +2297,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.ID != myID &&
 			(contact.LocalNickname != "" || contact.Added || contact.Blocked) {
-			if err = m.syncContact(ctx, contact); err != nil {
+			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
 				return false
 			}
 		}
@@ -2293,7 +2309,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 	for _, c := range cs {
-		if err = m.syncCommunity(ctx, c); err != nil {
+		if err = m.syncCommunity(ctx, c, rawMessageHandler); err != nil {
 			return err
 		}
 	}
@@ -2303,7 +2319,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 	for _, b := range bookmarks {
-		if err = m.SyncBookmark(ctx, b); err != nil {
+		if err = m.SyncBookmark(ctx, b, rawMessageHandler); err != nil {
 			return err
 		}
 	}
@@ -2313,7 +2329,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 	for id, ts := range trustedUsers {
-		if err = m.SyncTrustedUser(ctx, id, ts); err != nil {
+		if err = m.SyncTrustedUser(ctx, id, ts, rawMessageHandler); err != nil {
 			return err
 		}
 	}
@@ -2323,17 +2339,17 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 	for i := range verificationRequests {
-		if err = m.SyncVerificationRequest(ctx, &verificationRequests[i]); err != nil {
+		if err = m.SyncVerificationRequest(ctx, &verificationRequests[i], rawMessageHandler); err != nil {
 			return err
 		}
 	}
 
-	err = m.syncSettings()
+	err = m.syncSettings(rawMessageHandler)
 	if err != nil {
 		return err
 	}
 
-	err = m.syncProfilePictures()
+	err = m.syncProfilePictures(rawMessageHandler)
 	if err != nil {
 		return err
 	}
@@ -2352,14 +2368,14 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	for id, state := range ids {
 		if state == common.ContactRequestStateAccepted || state == common.ContactRequestStateDismissed {
 			accepted := state == common.ContactRequestStateAccepted
-			err := m.syncContactRequestDecision(ctx, id, accepted)
+			err := m.syncContactRequestDecision(ctx, id, accepted, rawMessageHandler)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	err = m.syncWallets(accounts)
+	err = m.syncWallets(accounts, rawMessageHandler)
 	if err != nil {
 		return err
 	}
@@ -2372,7 +2388,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	for i := range savedAddresses {
 		sa := savedAddresses[i]
 
-		err = m.syncSavedAddress(ctx, sa)
+		err = m.syncSavedAddress(ctx, sa, rawMessageHandler)
 		if err != nil {
 			return err
 		}
@@ -2385,7 +2401,7 @@ func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
 	if err != nil {
 		return err
 	}
-	return m.syncWallets(accs)
+	return m.syncWallets(accs, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
@@ -2402,11 +2418,11 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	acc.Removed = true
 
 	accs := []*accounts.Account{acc}
-	return m.syncWallets(accs)
+	return m.syncWallets(accs, m.dispatchMessage)
 }
 
 // syncWallets syncs all wallets with paired devices
-func (m *Messenger) syncWallets(accs []*accounts.Account) error {
+func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -2454,12 +2470,14 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2468,7 +2486,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account) error {
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool) error {
+func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {
 	m.logger.Info("syncContactRequestDecision", zap.Any("from", requestID))
 	if !m.hasPairedDevices() {
 		return nil
@@ -2494,12 +2512,14 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID st
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2570,7 +2590,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 }
 
 // syncPublicChat sync a public chat with paired devices
-func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error {
+func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if !m.hasPairedDevices() {
 		return nil
@@ -2586,12 +2606,14 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2600,7 +2622,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat) error {
+func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if !m.hasPairedDevices() {
 		return nil
@@ -2617,12 +2639,14 @@ func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat) erro
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2631,7 +2655,7 @@ func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat) erro
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncChatRemoving(ctx context.Context, id string) error {
+func (m *Messenger) syncChatRemoving(ctx context.Context, id string, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if !m.hasPairedDevices() {
 		return nil
@@ -2647,12 +2671,14 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string) error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2662,7 +2688,7 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string) error {
 }
 
 // syncContact sync as contact with paired devices
-func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
+func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if contact.IsSyncing {
 		return nil
@@ -2702,12 +2728,14 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2716,7 +2744,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community) error {
+func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Community, rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncCommunity")
 	if !m.hasPairedDevices() {
 		logger.Debug("device has no paired devices")
@@ -2747,12 +2775,14 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -2762,7 +2792,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmark) error {
+func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmark, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -2782,20 +2812,22 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK,
 		ResendAutomatically: true,
-	})
+	}
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
+
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts verification.TrustStatus) error {
+func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts verification.TrustStatus, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -2812,20 +2844,23 @@ func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts ve
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
+
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verification.Request) error {
+func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verification.Request, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -2848,15 +2883,18 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
+
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
 }
@@ -3611,6 +3649,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling SyncChatRemoved", zap.Any("message", p))
 						err := m.HandleSyncChatRemoved(messageState, p)
 						if err != nil {
+							allMessagesProcessed = false
 							logger.Warn("failed to handle sync removing chat", zap.Error(err))
 							continue
 						}
@@ -3626,7 +3665,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling SyncChatMessagesRead", zap.Any("message", p))
 						err := m.HandleSyncChatMessagesRead(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle sync removing chat", zap.Error(err))
+							allMessagesProcessed = false
+							logger.Warn("failed to handle sync chat message read", zap.Error(err))
 							continue
 						}
 
@@ -4094,7 +4134,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						p := msg.ParsedMessage.Interface().(protobuf.SyncContactRequestDecision)
 						err := m.HandleSyncContactRequestDecision(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle SyncContactRequestDecisio", zap.Error(err))
+							logger.Warn("failed to handle SyncContactRequestDecision", zap.Error(err))
 							continue
 						}
 					case protobuf.SyncSavedAddress:
@@ -4186,6 +4226,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
+	return m.saveDataAndPrepareResponse(messageState)
+}
+
+func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageState) (*MessengerResponse, error) {
+	var err error
 	var contactsToSave []*Contact
 	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
 		contact, ok := messageState.AllContacts.Load(id)
@@ -4519,7 +4564,7 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	return count, countWithMentions, nil
 }
 
-func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64) error {
+func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clock uint64, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -4535,12 +4580,14 @@ func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clo
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 
 	return err
 }
@@ -4557,7 +4604,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	}
 
 	if shouldBeSynced {
-		err := m.syncChatMessagesRead(context.Background(), chatID, clock)
+		err := m.syncChatMessagesRead(context.Background(), chatID, clock, m.dispatchMessage)
 		if err != nil {
 			return err
 		}
@@ -4676,7 +4723,7 @@ func (m *Messenger) muteChat(chat *Chat, contact *Contact) error {
 	m.allChats.Store(chat.ID, chat)
 
 	if contact != nil {
-		err := m.syncContact(context.Background(), contact)
+		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
 			return err
 		}
@@ -4712,7 +4759,7 @@ func (m *Messenger) unmuteChat(chat *Chat, contact *Contact) error {
 	m.allChats.Store(chat.ID, chat)
 
 	if contact != nil {
-		err := m.syncContact(context.Background(), contact)
+		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
 			return err
 		}

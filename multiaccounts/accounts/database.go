@@ -120,13 +120,27 @@ func NewDB(db *sql.DB) (*Database, error) {
 }
 
 // DB Gets db sql.DB
-func (db Database) DB() *sql.DB {
+func (db *Database) DB() *sql.DB {
 	return db.db
 }
 
 // Close closes database.
-func (db Database) Close() error {
+func (db *Database) Close() error {
 	return db.db.Close()
+}
+
+func (db *Database) GetAccountsByKeyUID(keyUID string) ([]*Account, error) {
+	accounts, err := db.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+	filteredAccounts := make([]*Account, 0)
+	for _, account := range accounts {
+		if account.KeyUID == keyUID {
+			filteredAccounts = append(filteredAccounts, account)
+		}
+	}
+	return filteredAccounts, nil
 }
 
 func (db *Database) GetAccounts() ([]*Account, error) {

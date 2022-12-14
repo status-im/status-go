@@ -156,7 +156,7 @@ func (pms *PayloadMarshallerSuite) TearDownTest() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
-	// Make a PairingPayload
+	// Make a Payload
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
@@ -189,7 +189,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
-	// Make a PairingPayload
+	// Make a Payload
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
@@ -218,7 +218,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
-	// Make a PairingPayload
+	// Make a Payload
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
@@ -232,7 +232,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
 
-	// Make a PairingPayload
+	// Make a Payload
 	pp2 := new(PairingPayload)
 
 	// Make PairingPayloadMarshaller 2
@@ -271,7 +271,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
-	// Make a PairingPayload
+	// Make a Payload
 	pp := new(PairingPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
@@ -285,7 +285,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pb, err := ppm.MarshalToProtobuf()
 	pms.Require().NoError(err)
 
-	// Make a PairingPayload
+	// Make a Payload
 	pp2 := new(PairingPayload)
 
 	// Make PairingPayloadMarshaller 2

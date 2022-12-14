@@ -52,7 +52,7 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64) (resultRaw 
 	return
 }
 
-func (m *Messenger) syncSettings() error {
+func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncSettings")
 
 	clock, _ := m.getLastClockWithRelatedChat()
@@ -64,7 +64,7 @@ func (m *Messenger) syncSettings() error {
 	}
 
 	for _, rm := range rawMessages {
-		_, err := m.dispatchMessage(context.Background(), *rm)
+		_, err := rawMessageHandler(context.Background(), *rm)
 		if err != nil {
 			logger.Error("dispatchMessage", zap.Error(err))
 			return err

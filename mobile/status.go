@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/server/pairing"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -945,10 +946,9 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Receiving, configJSON)
+	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Receiving, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -963,10 +963,9 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Sending, configJSON)
+	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Sending, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -988,10 +987,10 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
 
-	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
+	err := pairing.StartUpPairingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
 }
 

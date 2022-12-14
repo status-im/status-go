@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/account"
@@ -67,4 +68,13 @@ func (s *Service) APIs() []rpc.API {
 // Protocols returns list of p2p protocols.
 func (s *Service) Protocols() []p2p.Protocol {
 	return nil
+}
+
+func (s *Service) GetAccountsByKeyUID(keyUID string) ([]*accounts.Account, error) {
+
+	return s.db.GetAccountsByKeyUID(keyUID)
+}
+
+func (s *Service) GetSettings() (settings.Settings, error) {
+	return s.db.GetSettings()
 }
