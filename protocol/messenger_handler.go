@@ -69,43 +69,15 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		return ErrMessageNotAllowed
 	}
 
-	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
-	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
-	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
 	ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
-	isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
+	isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey
 	showPushNotification := isActive && messageState.CurrentMessageState.Contact.ID != ourKey
 
 	// wasUserAdded indicates whether the user has been added to the group with this update
 	wasUserAdded := false
-	if chat == nil || waitingForApproval {
+	if chat == nil {
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
-		}
-
-		//approve invitations
-		if waitingForApproval {
-
-			groupChatInvitation := &GroupChatInvitation{
-				GroupChatInvitation: protobuf.GroupChatInvitation{
-					ChatId: message.ChatID,
-				},
-				From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
-			}
-
-			groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
-			if err != nil && err != common.ErrRecordNotFound {
-				return err
-			}
-			if groupChatInvitation != nil {
-				groupChatInvitation.State = protobuf.GroupChatInvitation_APPROVED
-
-				err := m.persistence.SaveInvitation(groupChatInvitation)
-				if err != nil {
-					return err
-				}
-				messageState.GroupChatInvitations[groupChatInvitation.ID()] = groupChatInvitation
-			}
 		}
 
 		group, err = v1protocol.NewGroupWithEvents(message.ChatID, message.Events)
@@ -120,9 +92,8 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		// A new chat always adds us
 		wasUserAdded = true
 		newChat := CreateGroupChat(messageState.Timesource)
-		// We set group chat inactive and create a notification instead
-		// unless is coming from us or a contact or were waiting for approval
-		newChat.Active = isActive
+		// Group chats don't have invitations anymore, you autojoin them
+		newChat.Active = true
 		newChat.ReceivedInvitationAdmin = senderID
 		chat = &newChat
 
@@ -196,7 +167,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	// explicit join has been removed, mimic auto-join for backward compatibility
 	// no all cases are covered, e.g. if added to a group by non-contact
 	autoJoin := chat.Active && wasUserAdded
-	if autoJoin || waitingForApproval {
+	if autoJoin {
 		_, err = m.ConfirmJoiningGroup(context.Background(), chat.ID)
 		if err != nil {
 			return err
