@@ -181,6 +181,8 @@ func (w *WakuRelay) PublishToTopic(ctx context.Context, message *pb.WakuMessage,
 		return nil, err
 	}
 
+        w.log.Info("sending message with byte size", zap.Int("bytes", len(out)))
+
 	err = pubSubTopic.Publish(ctx, out)
 	if err != nil {
 		return nil, err
