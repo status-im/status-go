@@ -712,6 +712,11 @@ func isValidCompressedPublicKeyChar(c byte) bool {
 		c == 'R' || c == 'S' || c == 'T' || c == 'U' || c == 'V' || c == 'W' || c == 'X' || c == 'Y' || c == 'Z'
 }
 
+func isValidSystemTagChar(c byte) bool {
+  return c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' || c == '7' || c == '8' || c == '9'
+}
+
+
 // TODO: this is not used
 // Replace tab characters with spaces, aligning to the next TAB_SIZE column.
 // always ends output with a newline
