@@ -919,15 +919,23 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		if err != nil {
 			return err
 		}
+		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
+		if err != nil {
+			return err
+		}
 		// We are only interested in a community archive magnet link
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
 		if !signedByOwnedCommunity && joinedCommunity && clock >= lastClock {
+			if lastSeenMagnetlink == magnetlink {
+				m.communitiesManager.LogStdout("already processed this magnetlink")
+				return nil
+			}
 
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(id.String())
 
-			go func(currentTask *communities.HistoryArchiveDownloadTask) {
+			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
 
 				// Cancel ongoing download/import task
 				if currentTask != nil {
@@ -941,17 +949,20 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 					Waiter: *new(sync.WaitGroup),
 				}
 
-				m.communitiesManager.AddHistoryArchiveDownloadTask(id.String(), task)
+				m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
 
 				// this wait groups tracks the ongoing task for a particular community
 				task.Waiter.Add(1)
-				defer task.Waiter.Done()
+				defer func() {
+					task.Waiter.Done()
+					m.communitiesManager.DeleteHistoryArchiveDownloadTask(communityID.String())
+				}()
 
 				// this wait groups tracks all ongoing tasks across communities
 				m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
-				m.downloadAndImportHistoryArchives(id, magnetlink, task.Cancel)
-			}(currentTask)
+				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.Cancel)
+			}(currentTask, id)
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
 		}
@@ -977,7 +988,9 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 	}
 
 	if downloadTaskInfo.Cancelled {
-		m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
+			m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		}
 		return
 	}
 
@@ -1055,6 +1068,10 @@ importMessageArchivesLoop:
 				localnotifications.PushMessages(notifications)
 			}
 		}
+	}
+	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
+	if err != nil {
+		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
 	}
 
 	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))

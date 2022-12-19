@@ -597,6 +597,15 @@ func (p *Persistence) HasCommunityArchiveInfo(communityID types.HexBytes) (exist
 	return exists, err
 }
 
+func (p *Persistence) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
+	var magnetlinkURI string
+	err := p.db.QueryRow(`SELECT last_magnetlink_uri FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&magnetlinkURI)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return magnetlinkURI, err
+}
+
 func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
 	var magnetlinkClock uint64
 	err := p.db.QueryRow(`SELECT magnetlink_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&magnetlinkClock)
@@ -619,6 +628,15 @@ func (p *Persistence) UpdateMagnetlinkMessageClock(communityID types.HexBytes, c
     magnetlink_clock = ?
     WHERE community_id = ?`,
 		clock,
+		communityID.String())
+	return err
+}
+
+func (p *Persistence) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
+	_, err := p.db.Exec(`UPDATE communities_archive_info SET
+    last_magnetlink_uri = ?
+    WHERE community_id = ?`,
+		magnetlinkURI,
 		communityID.String())
 	return err
 }
