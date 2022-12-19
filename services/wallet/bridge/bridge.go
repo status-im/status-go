@@ -84,4 +84,5 @@ type Bridge interface {
 	EstimateGas(from *params.Network, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
+	GetContractAddress(network *params.Network, token *token.Token) *common.Address
 }

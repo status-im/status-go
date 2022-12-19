@@ -7,12 +7,19 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strings"
 	"sync"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
@@ -103,19 +110,23 @@ func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 
 var zero = big.NewInt(0)
 
 type Path struct {
-	BridgeName     string
-	From           *params.Network
-	To             *params.Network
-	MaxAmountIn    *hexutil.Big
-	AmountIn       *hexutil.Big
-	AmountInLocked bool
-	AmountOut      *hexutil.Big
-	GasAmount      uint64
-	GasFees        *SuggestedFees
-	BonderFees     *hexutil.Big
-	TokenFees      *big.Float
-	Cost           *big.Float
-	EstimatedTime  TransactionEstimation
+	BridgeName              string
+	From                    *params.Network
+	To                      *params.Network
+	MaxAmountIn             *hexutil.Big
+	AmountIn                *hexutil.Big
+	AmountInLocked          bool
+	AmountOut               *hexutil.Big
+	GasAmount               uint64
+	GasFees                 *SuggestedFees
+	BonderFees              *hexutil.Big
+	TokenFees               *big.Float
+	Cost                    *big.Float
+	EstimatedTime           TransactionEstimation
+	ApprovalRequired        bool
+	ApprovalGasFees         *big.Float
+	ApprovalAmountRequired  *hexutil.Big
+	ApprovalContractAddress *common.Address
 }
 
 func (p *Path) Equal(o *Path) bool {
@@ -334,13 +345,13 @@ func newSuggestedRoutes(
 func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
 	simple := bridge.NewSimpleBridge(s.transactor)
-	hop := bridge.NewHopBridge(s.rpcClient)
-	cbridge := bridge.NewCbridge(s.rpcClient, s.tokenManager)
+	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
+	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
 	bridges[simple.Name()] = simple
 	bridges[hop.Name()] = hop
 	bridges[cbridge.Name()] = cbridge
 
-	return &Router{s, bridges}
+	return &Router{s, bridges, s.rpcClient}
 }
 
 func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
@@ -354,8 +365,66 @@ func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
 }
 
 type Router struct {
-	s       *Service
-	bridges map[string]bridge.Bridge
+	s         *Service
+	bridges   map[string]bridge.Bridge
+	rpcClient *rpc.Client
+}
+
+func (r *Router) requireApproval(ctx context.Context, bridge bridge.Bridge, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (bool, *big.Int, uint64, *common.Address, error) {
+	if token.IsNative() {
+		return false, nil, 0, nil, nil
+	}
+	contractMaker := &contracts.ContractMaker{RPCClient: r.rpcClient}
+
+	bridgeAddress := bridge.GetContractAddress(network, token)
+	if bridgeAddress == nil {
+		return false, nil, 0, nil, nil
+	}
+
+	contract, err := contractMaker.NewERC20(network.ChainID, token.Address)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	allowance, err := contract.Allowance(&bind.CallOpts{
+		Context: ctx,
+	}, account, *bridgeAddress)
+
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	if allowance.Cmp(amountIn) >= 0 {
+		return false, nil, 0, nil, nil
+	}
+
+	ethClient, err := r.rpcClient.EthClient(network.ChainID)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	erc20ABI, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	data, err := erc20ABI.Pack("approve", bridgeAddress, amountIn)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  account,
+		To:    &token.Address,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	return true, amountIn, estimate, bridgeAddress, nil
+
 }
 
 func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -509,34 +578,53 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
+					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, bridge, account, network, token, amountIn)
+					if err != nil {
+						continue
+					}
+					approvalGasFees := new(big.Float).Mul(gweiToEth(maxFees), big.NewFloat((float64(approvalGasLimit))))
+
+					approvalGasCost := new(big.Float)
+					approvalGasCost.Mul(
+						approvalGasFees,
+						big.NewFloat(prices["ETH"]),
+					)
+
 					gasCost := new(big.Float)
 					gasCost.Mul(
 						new(big.Float).Mul(gweiToEth(maxFees), big.NewFloat((float64(gasLimit)))),
 						big.NewFloat(prices["ETH"]),
 					)
+
 					tokenFeesAsFloat := new(big.Float).Quo(
 						new(big.Float).SetInt(tokenFees),
 						big.NewFloat(math.Pow(10, float64(token.Decimals))),
 					)
 					tokenCost := new(big.Float)
 					tokenCost.Mul(tokenFeesAsFloat, big.NewFloat(prices[tokenSymbol]))
+
 					cost := new(big.Float)
 					cost.Add(tokenCost, gasCost)
+					cost.Add(cost, approvalGasCost)
 
 					mu.Lock()
 					candidates = append(candidates, &Path{
-						BridgeName:    bridge.Name(),
-						From:          network,
-						To:            dest,
-						MaxAmountIn:   maxAmountIn,
-						AmountIn:      (*hexutil.Big)(zero),
-						AmountOut:     (*hexutil.Big)(zero),
-						GasAmount:     gasLimit,
-						GasFees:       gasFees,
-						BonderFees:    (*hexutil.Big)(bonderFees),
-						TokenFees:     tokenFeesAsFloat,
-						Cost:          cost,
-						EstimatedTime: estimatedTime,
+						BridgeName:              bridge.Name(),
+						From:                    network,
+						To:                      dest,
+						MaxAmountIn:             maxAmountIn,
+						AmountIn:                (*hexutil.Big)(zero),
+						AmountOut:               (*hexutil.Big)(zero),
+						GasAmount:               gasLimit,
+						GasFees:                 gasFees,
+						BonderFees:              (*hexutil.Big)(bonderFees),
+						TokenFees:               tokenFeesAsFloat,
+						Cost:                    cost,
+						EstimatedTime:           estimatedTime,
+						ApprovalRequired:        approvalRequired,
+						ApprovalGasFees:         approvalGasFees,
+						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
+						ApprovalContractAddress: approvalContractAddress,
 					})
 					mu.Unlock()
 				}
