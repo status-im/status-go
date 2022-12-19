@@ -36,14 +36,16 @@ type CBridgeTxArgs struct {
 
 type CBridge struct {
 	rpcClient          *rpc.Client
+	transactor         *transactions.Transactor
 	tokenManager       *token.Manager
 	prodTransferConfig *cbridge.GetTransferConfigsResponse
 	testTransferConfig *cbridge.GetTransferConfigsResponse
 }
 
-func NewCbridge(rpcClient *rpc.Client, tokenManager *token.Manager) *CBridge {
+func NewCbridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *CBridge {
 	return &CBridge{
 		rpcClient:    rpcClient,
+		transactor:   transactor,
 		tokenManager: tokenManager,
 	}
 }
@@ -219,6 +221,25 @@ func (s *CBridge) EstimateGas(from, to *params.Network, token *token.Token, amou
 	return 200000, nil //default gas limit for erc20 transaction
 }
 
+func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
+	transferConfig, err := s.getTransferConfig(network.IsTest)
+	if err != nil {
+		return nil
+	}
+	if transferConfig.Err != nil {
+		return nil
+	}
+
+	for _, chain := range transferConfig.Chains {
+		if uint64(chain.Id) == network.ChainID {
+			addr := common.HexToAddress(chain.ContractAddr)
+			return &addr
+		}
+	}
+
+	return nil
+}
+
 func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	fromNetwork := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
@@ -228,27 +249,16 @@ func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.Sel
 	if tk == nil {
 		return types.HexToHash(""), errors.New("token not found")
 	}
-	transferConfig, err := s.getTransferConfig(fromNetwork.IsTest)
-	if err != nil {
-		return types.HexToHash(""), err
-	}
-	if transferConfig.Err != nil {
-		return types.HexToHash(""), errors.New(transferConfig.Err.Msg)
-	}
-
-	addrs := ""
-	for _, chain := range transferConfig.Chains {
-		if uint64(chain.Id) == sendArgs.ChainID {
-			addrs = chain.ContractAddr
-			break
-		}
+	addrs := s.GetContractAddress(fromNetwork, nil)
+	if addrs == nil {
+		return types.HexToHash(""), errors.New("contract not found")
 	}
 
 	backend, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
 		return types.HexToHash(""), err
 	}
-	contract, err := celer.NewCeler(common.HexToAddress(addrs), backend)
+	contract, err := celer.NewCeler(*addrs, backend)
 	if err != nil {
 		return types.HexToHash(""), err
 	}
