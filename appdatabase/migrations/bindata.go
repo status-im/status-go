@@ -39,6 +39,7 @@
 // 1664783660_add_sync_info_to_saved_addresses.up.sql (388B)
 // 1668109917_wakunodes.up.sql (99B)
 // 1670836810_add_imported_flag_to_community_archive_hashes.up.sql (144B)
+// 1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql (86B)
 // doc.go (74B)
 
 package migrations
@@ -883,8 +884,28 @@ func _1670836810_add_imported_flag_to_community_archive_hashesUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1670836810_add_imported_flag_to_community_archive_hashes.up.sql", size: 144, mode: os.FileMode(0664), modTime: time.Unix(1670836854, 0)}
+	info := bindataFileInfo{name: "1670836810_add_imported_flag_to_community_archive_hashes.up.sql", size: 144, mode: os.FileMode(0664), modTime: time.Unix(1670944751, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0xf, 0xf0, 0xbd, 0xfe, 0x63, 0x25, 0x8f, 0x5e, 0x46, 0x4b, 0x45, 0x31, 0x8b, 0x3e, 0xd8, 0x6b, 0x5d, 0x9d, 0x6d, 0x10, 0x9a, 0x87, 0x4b, 0x18, 0xc6, 0x39, 0x81, 0x6e, 0xe4, 0x75, 0xfb}}
+	return a, nil
+}
+
+var __1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\xc1\x0a\xc2\x30\x0c\x06\xe0\xfb\x9e\xe2\x67\xaf\xe1\x29\xda\x78\x8a\x0a\x92\x81\xb7\x50\x46\xd5\xe0\x9a\xc1\xd6\xfa\xfc\xfb\x48\x94\x9f\x50\x3a\x0b\x63\x5e\x6b\xed\xe1\xcd\xcb\x6e\x79\x9b\xbf\xfe\x2f\xe6\xf1\x5e\x41\x29\xe1\xf2\x90\xe9\x76\xc7\x92\xf7\x66\x35\x7f\xa2\xb4\xc5\xe3\x67\x7d\x73\x28\xbf\x14\x89\xaf\x34\x89\x62\x1c\x4f\xc3\x70\x04\x00\x00\xff\xff\x53\xcc\x9d\x7d\x56\x00\x00\x00")
+
+func _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql,
+		"1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql",
+	)
+}
+
+func _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql() (*asset, error) {
+	bytes, err := _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql", size: 86, mode: os.FileMode(0664), modTime: time.Unix(1671438768, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xda, 0x8b, 0x4b, 0xd6, 0xd8, 0xe2, 0x3d, 0xf7, 0x6b, 0xcd, 0x1e, 0x70, 0x9, 0x2e, 0x35, 0x4, 0x61, 0xc3, 0xb5, 0x9d, 0xc5, 0x27, 0x21, 0xa, 0x5a, 0xd6, 0x3e, 0xa6, 0x24, 0xa2, 0x12, 0xdf}}
 	return a, nil
 }
 
@@ -1077,6 +1098,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1670836810_add_imported_flag_to_community_archive_hashes.up.sql": _1670836810_add_imported_flag_to_community_archive_hashesUpSql,
 
+	"1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql": _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1121,45 +1144,46 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1640111208_dummy.up.sql":                                         &bintree{_1640111208_dummyUpSql, map[string]*bintree{}},
-	"1642666031_add_removed_clock_to_bookmarks.up.sql":                &bintree{_1642666031_add_removed_clock_to_bookmarksUpSql, map[string]*bintree{}},
-	"1643644541_gif_api_key_setting.up.sql":                           &bintree{_1643644541_gif_api_key_settingUpSql, map[string]*bintree{}},
-	"1644188994_recent_stickers.up.sql":                               &bintree{_1644188994_recent_stickersUpSql, map[string]*bintree{}},
-	"1646659233_add_address_to_dapp_permisssion.up.sql":               &bintree{_1646659233_add_address_to_dapp_permisssionUpSql, map[string]*bintree{}},
-	"1646841105_add_emoji_account.up.sql":                             &bintree{_1646841105_add_emoji_accountUpSql, map[string]*bintree{}},
-	"1647278782_display_name.up.sql":                                  &bintree{_1647278782_display_nameUpSql, map[string]*bintree{}},
-	"1647862838_reset_last_backup.up.sql":                             &bintree{_1647862838_reset_last_backupUpSql, map[string]*bintree{}},
-	"1647871652_add_settings_sync_clock_table.up.sql":                 &bintree{_1647871652_add_settings_sync_clock_tableUpSql, map[string]*bintree{}},
-	"1647880168_add_torrent_config.up.sql":                            &bintree{_1647880168_add_torrent_configUpSql, map[string]*bintree{}},
-	"1647882837_add_communities_settings_table.up.sql":                &bintree{_1647882837_add_communities_settings_tableUpSql, map[string]*bintree{}},
-	"1647956635_add_waku_messages_table.up.sql":                       &bintree{_1647956635_add_waku_messages_tableUpSql, map[string]*bintree{}},
-	"1648554928_network_test.up.sql":                                  &bintree{_1648554928_network_testUpSql, map[string]*bintree{}},
-	"1649174829_add_visitble_token.up.sql":                            &bintree{_1649174829_add_visitble_tokenUpSql, map[string]*bintree{}},
-	"1649882262_add_derived_from_accounts.up.sql":                     &bintree{_1649882262_add_derived_from_accountsUpSql, map[string]*bintree{}},
-	"1650612625_add_community_message_archive_hashes_table.up.sql":    &bintree{_1650612625_add_community_message_archive_hashes_tableUpSql, map[string]*bintree{}},
-	"1650616788_add_communities_archives_info_table.up.sql":           &bintree{_1650616788_add_communities_archives_info_tableUpSql, map[string]*bintree{}},
-	"1652715604_add_clock_accounts.up.sql":                            &bintree{_1652715604_add_clock_accountsUpSql, map[string]*bintree{}},
-	"1653037334_add_notifications_settings_table.up.sql":              &bintree{_1653037334_add_notifications_settings_tableUpSql, map[string]*bintree{}},
-	"1654702119_add_mutual_contact_settings.up.sql":                   &bintree{_1654702119_add_mutual_contact_settingsUpSql, map[string]*bintree{}},
-	"1655375270_add_clock_field_to_communities_settings_table.up.sql": &bintree{_1655375270_add_clock_field_to_communities_settings_tableUpSql, map[string]*bintree{}},
-	"1655385721_drop_networks_config.up.sql":                          &bintree{_1655385721_drop_networks_configUpSql, map[string]*bintree{}},
-	"1655385724_networks_chainColor_shortName.up.sql":                 &bintree{_1655385724_networks_chaincolor_shortnameUpSql, map[string]*bintree{}},
-	"1655456688_add_deleted_at_field_to_bookmarks_table.up.sql":       &bintree{_1655456688_add_deleted_at_field_to_bookmarks_tableUpSql, map[string]*bintree{}},
-	"1655462032_create_bookmarks_deleted_at_index.up.sql":             &bintree{_1655462032_create_bookmarks_deleted_at_indexUpSql, map[string]*bintree{}},
-	"1657617291_add_multi_transactions_table.up.sql":                  &bintree{_1657617291_add_multi_transactions_tableUpSql, map[string]*bintree{}},
-	"1660134042_add_social_links_settings_table.up.sql":               &bintree{_1660134042_add_social_links_settings_tableUpSql, map[string]*bintree{}},
-	"1660134060_settings_bio.up.sql":                                  &bintree{_1660134060_settings_bioUpSql, map[string]*bintree{}},
-	"1660134070_add_wakuv2_store.up.sql":                              &bintree{_1660134070_add_wakuv2_storeUpSql, map[string]*bintree{}},
-	"1660134072_waku2_store_messages.up.sql":                          &bintree{_1660134072_waku2_store_messagesUpSql, map[string]*bintree{}},
-	"1662365868_add_key_uid_accounts.up.sql":                          &bintree{_1662365868_add_key_uid_accountsUpSql, map[string]*bintree{}},
-	"1662447680_add_keypairs_table.up.sql":                            &bintree{_1662447680_add_keypairs_tableUpSql, map[string]*bintree{}},
-	"1662460056_move_favourites_to_saved_addresses.up.sql":            &bintree{_1662460056_move_favourites_to_saved_addressesUpSql, map[string]*bintree{}},
-	"1662738097_add_base_fee_transaction.up.sql":                      &bintree{_1662738097_add_base_fee_transactionUpSql, map[string]*bintree{}},
-	"1662972194_add_keypairs_table.up.sql":                            &bintree{_1662972194_add_keypairs_tableUpSql, map[string]*bintree{}},
-	"1664392661_add_third_party_id_to_waku_messages.up.sql":           &bintree{_1664392661_add_third_party_id_to_waku_messagesUpSql, map[string]*bintree{}},
-	"1664783660_add_sync_info_to_saved_addresses.up.sql":              &bintree{_1664783660_add_sync_info_to_saved_addressesUpSql, map[string]*bintree{}},
-	"1668109917_wakunodes.up.sql":                                     &bintree{_1668109917_wakunodesUpSql, map[string]*bintree{}},
-	"1670836810_add_imported_flag_to_community_archive_hashes.up.sql": &bintree{_1670836810_add_imported_flag_to_community_archive_hashesUpSql, map[string]*bintree{}},
+	"1640111208_dummy.up.sql":                                          &bintree{_1640111208_dummyUpSql, map[string]*bintree{}},
+	"1642666031_add_removed_clock_to_bookmarks.up.sql":                 &bintree{_1642666031_add_removed_clock_to_bookmarksUpSql, map[string]*bintree{}},
+	"1643644541_gif_api_key_setting.up.sql":                            &bintree{_1643644541_gif_api_key_settingUpSql, map[string]*bintree{}},
+	"1644188994_recent_stickers.up.sql":                                &bintree{_1644188994_recent_stickersUpSql, map[string]*bintree{}},
+	"1646659233_add_address_to_dapp_permisssion.up.sql":                &bintree{_1646659233_add_address_to_dapp_permisssionUpSql, map[string]*bintree{}},
+	"1646841105_add_emoji_account.up.sql":                              &bintree{_1646841105_add_emoji_accountUpSql, map[string]*bintree{}},
+	"1647278782_display_name.up.sql":                                   &bintree{_1647278782_display_nameUpSql, map[string]*bintree{}},
+	"1647862838_reset_last_backup.up.sql":                              &bintree{_1647862838_reset_last_backupUpSql, map[string]*bintree{}},
+	"1647871652_add_settings_sync_clock_table.up.sql":                  &bintree{_1647871652_add_settings_sync_clock_tableUpSql, map[string]*bintree{}},
+	"1647880168_add_torrent_config.up.sql":                             &bintree{_1647880168_add_torrent_configUpSql, map[string]*bintree{}},
+	"1647882837_add_communities_settings_table.up.sql":                 &bintree{_1647882837_add_communities_settings_tableUpSql, map[string]*bintree{}},
+	"1647956635_add_waku_messages_table.up.sql":                        &bintree{_1647956635_add_waku_messages_tableUpSql, map[string]*bintree{}},
+	"1648554928_network_test.up.sql":                                   &bintree{_1648554928_network_testUpSql, map[string]*bintree{}},
+	"1649174829_add_visitble_token.up.sql":                             &bintree{_1649174829_add_visitble_tokenUpSql, map[string]*bintree{}},
+	"1649882262_add_derived_from_accounts.up.sql":                      &bintree{_1649882262_add_derived_from_accountsUpSql, map[string]*bintree{}},
+	"1650612625_add_community_message_archive_hashes_table.up.sql":     &bintree{_1650612625_add_community_message_archive_hashes_tableUpSql, map[string]*bintree{}},
+	"1650616788_add_communities_archives_info_table.up.sql":            &bintree{_1650616788_add_communities_archives_info_tableUpSql, map[string]*bintree{}},
+	"1652715604_add_clock_accounts.up.sql":                             &bintree{_1652715604_add_clock_accountsUpSql, map[string]*bintree{}},
+	"1653037334_add_notifications_settings_table.up.sql":               &bintree{_1653037334_add_notifications_settings_tableUpSql, map[string]*bintree{}},
+	"1654702119_add_mutual_contact_settings.up.sql":                    &bintree{_1654702119_add_mutual_contact_settingsUpSql, map[string]*bintree{}},
+	"1655375270_add_clock_field_to_communities_settings_table.up.sql":  &bintree{_1655375270_add_clock_field_to_communities_settings_tableUpSql, map[string]*bintree{}},
+	"1655385721_drop_networks_config.up.sql":                           &bintree{_1655385721_drop_networks_configUpSql, map[string]*bintree{}},
+	"1655385724_networks_chainColor_shortName.up.sql":                  &bintree{_1655385724_networks_chaincolor_shortnameUpSql, map[string]*bintree{}},
+	"1655456688_add_deleted_at_field_to_bookmarks_table.up.sql":        &bintree{_1655456688_add_deleted_at_field_to_bookmarks_tableUpSql, map[string]*bintree{}},
+	"1655462032_create_bookmarks_deleted_at_index.up.sql":              &bintree{_1655462032_create_bookmarks_deleted_at_indexUpSql, map[string]*bintree{}},
+	"1657617291_add_multi_transactions_table.up.sql":                   &bintree{_1657617291_add_multi_transactions_tableUpSql, map[string]*bintree{}},
+	"1660134042_add_social_links_settings_table.up.sql":                &bintree{_1660134042_add_social_links_settings_tableUpSql, map[string]*bintree{}},
+	"1660134060_settings_bio.up.sql":                                   &bintree{_1660134060_settings_bioUpSql, map[string]*bintree{}},
+	"1660134070_add_wakuv2_store.up.sql":                               &bintree{_1660134070_add_wakuv2_storeUpSql, map[string]*bintree{}},
+	"1660134072_waku2_store_messages.up.sql":                           &bintree{_1660134072_waku2_store_messagesUpSql, map[string]*bintree{}},
+	"1662365868_add_key_uid_accounts.up.sql":                           &bintree{_1662365868_add_key_uid_accountsUpSql, map[string]*bintree{}},
+	"1662447680_add_keypairs_table.up.sql":                             &bintree{_1662447680_add_keypairs_tableUpSql, map[string]*bintree{}},
+	"1662460056_move_favourites_to_saved_addresses.up.sql":             &bintree{_1662460056_move_favourites_to_saved_addressesUpSql, map[string]*bintree{}},
+	"1662738097_add_base_fee_transaction.up.sql":                       &bintree{_1662738097_add_base_fee_transactionUpSql, map[string]*bintree{}},
+	"1662972194_add_keypairs_table.up.sql":                             &bintree{_1662972194_add_keypairs_tableUpSql, map[string]*bintree{}},
+	"1664392661_add_third_party_id_to_waku_messages.up.sql":            &bintree{_1664392661_add_third_party_id_to_waku_messagesUpSql, map[string]*bintree{}},
+	"1664783660_add_sync_info_to_saved_addresses.up.sql":               &bintree{_1664783660_add_sync_info_to_saved_addressesUpSql, map[string]*bintree{}},
+	"1668109917_wakunodes.up.sql":                                      &bintree{_1668109917_wakunodesUpSql, map[string]*bintree{}},
+	"1670836810_add_imported_flag_to_community_archive_hashes.up.sql":  &bintree{_1670836810_add_imported_flag_to_community_archive_hashesUpSql, map[string]*bintree{}},
+	"1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql": &bintree{_1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 

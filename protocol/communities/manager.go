@@ -1153,6 +1153,14 @@ func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock
 	return m.persistence.UpdateMagnetlinkMessageClock(communityID, clock)
 }
 
+func (m *Manager) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
+	return m.persistence.UpdateLastSeenMagnetlink(communityID, magnetlinkURI)
+}
+
+func (m *Manager) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
+	return m.persistence.GetLastSeenMagnetlink(communityID)
+}
+
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
@@ -2121,6 +2129,10 @@ func (m *Manager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArch
 	return m.historyArchiveDownloadTasks[communityID]
 }
 
+func (m *Manager) DeleteHistoryArchiveDownloadTask(communityID string) {
+	delete(m.historyArchiveDownloadTasks, communityID)
+}
+
 func (m *Manager) AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask) {
 	m.historyArchiveDownloadTasks[communityID] = task
 }
@@ -2146,6 +2158,12 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		return nil, err
 	}
 
+	downloadTaskInfo := &HistoryArchiveDownloadTaskInfo{
+		TotalDownloadedArchivesCount: 0,
+		TotalArchivesCount:           0,
+		Cancelled:                    false,
+	}
+
 	m.torrentTasks[id] = ml.InfoHash
 	timeout := time.After(20 * time.Second)
 
@@ -2153,6 +2171,10 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	select {
 	case <-timeout:
 		return nil, ErrTorrentTimedout
+	case <-cancelTask:
+		m.LogStdout("cancelled fetching torrent info")
+		downloadTaskInfo.Cancelled = true
+		return downloadTaskInfo, nil
 	case <-torrent.GotInfo():
 
 		files := torrent.Files()
@@ -2169,12 +2191,6 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 		m.LogStdout("downloading history archive index")
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
-
-		downloadTaskInfo := &HistoryArchiveDownloadTaskInfo{
-			TotalDownloadedArchivesCount: 0,
-			TotalArchivesCount:           0,
-			Cancelled:                    false,
-		}
 
 		for {
 			select {
