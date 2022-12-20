@@ -47,7 +47,7 @@ func (c *Controller) Start() {
 }
 
 func (c *Controller) StartBalanceHistory(networkManager *network.Manager, tokenManager *token.Manager) {
-	c.balanceHistory.StartBalanceHistory(c.rpcClient, networkManager, tokenManager)
+	c.balanceHistory.StartBalanceHistory(&BalanceHistoryRequirements{networkManager, tokenManager}, c.rpcClient)
 }
 
 func (c *Controller) Stop() {
