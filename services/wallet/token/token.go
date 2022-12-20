@@ -355,6 +355,18 @@ func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.Client, ac
 	}, account)
 }
 
+func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client *chain.Client, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
+	caller, err := ierc20.NewIERC20Caller(token, client)
+	if err != nil {
+		return nil, err
+	}
+
+	return caller.BalanceOf(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: blockNumber,
+	}, account)
+}
+
 func (tm *Manager) GetChainBalance(ctx context.Context, client *chain.Client, account common.Address) (*big.Int, error) {
 	return client.BalanceAt(ctx, account, nil)
 }

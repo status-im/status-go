@@ -432,7 +432,7 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 	return points, nil
 }
 
-// Concrete implementation of BlockInfoSource interface
+// Native token implementation of BlockInfoSource interface
 type chainClientSource struct {
 	chainClient *chain.Client
 	currency    string
@@ -456,6 +456,15 @@ func (src *chainClientSource) Currency() string {
 
 func (src *chainClientSource) TimeNow() int64 {
 	return time.Now().UTC().Unix()
+}
+
+type tokenChainClientSource struct {
+	chainClientSource
+	tokenManager *token.Manager
+}
+
+func (src *chainClientSource) BalanceAt(ctx context.Context, chainClient *chain.Client, account common.Address, tokenAddress common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return tokenManager.GetTokenBalanceAt(ctx, chainClient, account, tokenAddress, blockNumber)
 }
 
 func (bh *BalanceHistory) StartBalanceHistory(rpcClient *rpc.Client, networkManager *network.Manager, tokenManager *token.Manager) {
@@ -521,28 +530,30 @@ func (bh *BalanceHistory) UpdateBalanceHistoryForAllEnabledNetworks(ctx context.
 	for chainID, tokens := range tokens {
 		for _, token := range tokens {
 			var dataSource BlockInfoSource
+			chainClient, err := chain.NewClient(rpcClient, chainID)
+			if err != nil {
+				return err
+			}
 			if token.IsNative() {
-				chainClient, err := chain.NewClient(rpcClient, chainID)
-				if err != nil {
-					return err
-				}
 				dataSource = &chainClientSource{chainClient, token.Symbol}
+			} else {
+				dataSource = &tokenChainClientSource{tokenManager: tokenManager}
+			}
 
-				for _, address := range addresses {
-					for currentInterval := int(BalanceHistory7Hours); currentInterval <= int(BalanceHistoryAllTime); currentInterval++ {
-						// Check context for cancellation every fetch attempt
-						select {
-						case <-ctx.Done():
-							return errors.New("context cancelled")
-						default:
-						}
-						_, err = bh.getBalanceHistoryFromBlocksSource(ctx, dataSource, common.Address(address), BalanceHistoryTimeInterval(currentInterval))
-						if err != nil {
-							return err
-						}
+			for _, address := range addresses {
+				for currentInterval := int(BalanceHistory7Hours); currentInterval <= int(BalanceHistoryAllTime); currentInterval++ {
+					// Check context for cancellation every fetch attempt
+					select {
+					case <-ctx.Done():
+						return errors.New("context cancelled")
+					default:
+					}
+					_, err = bh.getBalanceHistoryFromBlocksSource(ctx, dataSource, common.Address(address), BalanceHistoryTimeInterval(currentInterval))
+					if err != nil {
+						return err
 					}
 				}
-			} // TODO: implement ERC20 token balance history
+			}
 		}
 	}
 	return nil
