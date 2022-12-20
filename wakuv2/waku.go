@@ -1099,6 +1099,10 @@ func (w *Waku) Query(peerID peer.ID, topics []common.TopicType, from uint64, to 
 	}
 
 	for _, msg := range result.Messages {
+		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
+		// See https://github.com/vacp2p/rfc/issues/563
+		msg.RateLimitProof = nil
+
 		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
 		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
