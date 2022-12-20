@@ -114,6 +114,60 @@ func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, ad
 	return &response, m.saveChat(&chat)
 }
 
+func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*MessengerResponse, error) {
+	var response MessengerResponse
+	logger := m.logger.With(zap.String("site", "RemoveMemberFromGroupChat"))
+	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	// We save the initial recipients as we want to send updates to also
+	// the members kicked out
+	oldRecipients, err := stringSliceToPublicKeys(group.Members())
+	if err != nil {
+		return nil, err
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	// Remove member
+	event := v1protocol.NewMemberRemovedEvent(member, clock)
+	event.ChatID = chat.ID
+	err = event.Sign(m.identity)
+	if err != nil {
+		return nil, err
+	}
+
+	err = group.ProcessEvent(event)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+		Recipients:  oldRecipients,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	chat.updateChatFromGroupMembershipChanges(group)
+
+	return m.addMessagesAndChat(chat, buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations), &response)
+}
+
 func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "RemoveMembersFromGroupChat"))
