@@ -890,7 +890,7 @@ func TestBalanceHistoryGetOldestDataPoint(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	outDataPoints, err := bh.getDBBalanceEntriesTimeSortedAsc(&bhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, 1, 1)
+	outDataPoints, err := bh.getDBBalanceEntriesTimeSortedAsc(&BhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, 1, 1)
 	require.NoError(t, err)
 	require.NotEqual(t, outDataPoints, nil)
 	require.Equal(t, outDataPoints[0], testDataPoints[0])
@@ -906,7 +906,7 @@ func TestBalanceHistoryGetLatestDataPoint(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	outDataPoints, err := bh.getDBBalanceEntriesTimeSortedDesc(&bhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, 1, 1)
+	outDataPoints, err := bh.getDBBalanceEntriesTimeSortedDesc(&BhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, 1, 1)
 	require.NoError(t, err)
 	require.NotEqual(t, outDataPoints, nil)
 	require.Equal(t, outDataPoints[0], testDataPoints[len(testDataPoints)-1])
@@ -923,7 +923,7 @@ func TestBalanceHistoryGetClosestDataPointToTimestamp(t *testing.T) {
 	}
 
 	itemToGetIndex := 2
-	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&bhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, &bhFilter{testDataPoints[itemToGetIndex].timestamp, maxAllRangeTimestamp, 1}, 1)
+	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&BhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, &bhFilter{testDataPoints[itemToGetIndex].timestamp, maxAllRangeTimestamp, 1}, 1)
 	require.NoError(t, err)
 	require.NotEqual(t, outDataPoints, nil)
 	require.Equal(t, len(outDataPoints), 1)
@@ -942,7 +942,7 @@ func TestBalanceHistoryGetDataPointsInTimeRange(t *testing.T) {
 
 	startIndex := 1
 	endIndex := 3
-	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&bhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, &bhFilter{testDataPoints[startIndex].timestamp, testDataPoints[endIndex].timestamp, 1}, 100)
+	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&BhIdentity{testDataPoints[0].chainID, testDataPoints[0].address, testDataPoints[0].currency}, nil, &bhFilter{testDataPoints[startIndex].timestamp, testDataPoints[endIndex].timestamp, 1}, 100)
 	require.NoError(t, err)
 	require.NotEqual(t, outDataPoints, nil)
 	require.Equal(t, len(outDataPoints), endIndex-startIndex+1)
