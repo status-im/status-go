@@ -189,6 +189,7 @@ func (h *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccoun
 	if err != nil {
 		return hash, err
 	}
+
 	txOpts := sendArgs.ToTransactOpts(getSigner(chainID, sendArgs.From, verifiedAccount))
 	txOpts.Value = (*big.Int)(sendArgs.Amount)
 	now := time.Now()
