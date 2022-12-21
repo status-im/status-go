@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -421,26 +420,6 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		chat.Active = false
 	}
 
-	r := &protobuf.ContactVerificationTrusted{
-		Clock: clock,
-	}
-
-	encodedMessage, err := proto.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_VERIFICATION_TRUSTED,
-		ResendAutomatically: true,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
 	verifRequest, err := m.verificationDatabase.GetLatestVerificationRequestSentTo(contactID)
 	if err != nil {
 		return nil, err
@@ -464,6 +443,27 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &protobuf.ContactVerificationTrusted{
+		Clock: clock,
+		Id:    verifRequest.ID,
+	}
+
+	encodedMessage, err := proto.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_VERIFICATION_TRUSTED,
+		ResendAutomatically: true,
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -534,8 +534,62 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 		return nil, err
 	}
 
+	chat, ok := m.allChats.Load(contactID)
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	if !ok {
+		publicKey, err := contact.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	verifRequest, err := m.verificationDatabase.GetLatestVerificationRequestSentTo(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	if verifRequest == nil {
+		return nil, errors.New("no contact verification found")
+	}
+
+	verifRequest.RequestStatus = verification.RequestStatusUNTRUSTWORTHY
+	verifRequest.RepliedAt = clock
+	err = m.verificationDatabase.SaveVerificationRequest(verifRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	if err != nil {
+		return nil, err
+	}
+
 	// We sync the contact with the other devices
 	err = m.syncContact(context.Background(), contact)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &protobuf.ContactVerificationUntrustworthy{
+		Clock: clock,
+		Id:    verifRequest.ID,
+	}
+
+	encodedMessage, err := proto.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_VERIFICATION_UNTRUSTWORTHY,
+		ResendAutomatically: true,
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -670,7 +724,6 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 }
 
 func (m *Messenger) MarkAsTrusted(ctx context.Context, contactID string) error {
-	fmt.Println("->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>MarkAsTrusted")
 	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusTRUSTED, m.getTimesource().GetCurrentTime())
 	if err != nil {
 		return err
@@ -680,7 +733,6 @@ func (m *Messenger) MarkAsTrusted(ctx context.Context, contactID string) error {
 }
 
 func (m *Messenger) MarkAsUntrustworthy(ctx context.Context, contactID string) error {
-	fmt.Println("->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>MarkAsUntrustworthy")
 	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusUNTRUSTWORTHY, m.getTimesource().GetCurrentTime())
 	if err != nil {
 		return err
@@ -1016,7 +1068,6 @@ func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState,
 }
 
 func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState, request protobuf.ContactVerificationTrusted) error {
-	//// ->>>>>>>>>>>>
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
@@ -1103,6 +1154,102 @@ func (m *Messenger) HandleContactVerificationTrusted(state *ReceivedMessageState
 
 	notification.ContactVerificationStatus = verification.RequestStatusTRUSTED
 	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
+
+	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
+	if err != nil {
+		return err
+	}
+
+	return m.addActivityCenterNotification(state.Response, notification)
+}
+
+func (m *Messenger) HandleContactVerificationUntrustworthy(state *ReceivedMessageState, request protobuf.ContactVerificationUntrustworthy) error {
+	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		return nil // Is ours, do nothing
+	}
+
+	if len(request.Id) == 0 {
+		return errors.New("invalid ContactVerificationUntrustworthy")
+	}
+
+	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
+	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
+
+	contact := state.CurrentMessageState.Contact
+	if !contact.Added || !contact.HasAddedUs {
+		m.logger.Debug("Received a verification untrustworthy for a non mutual contact", zap.String("contactID", contactID))
+		return errors.New("must be a mutual contact")
+	}
+
+	err := m.verificationDatabase.SetTrustStatus(contactID, verification.TrustStatusUNTRUSTWORTHY, m.getTimesource().GetCurrentTime())
+	if err != nil {
+		return err
+	}
+
+	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusUNTRUSTWORTHY)
+	if err != nil {
+		return err
+	}
+
+	persistedVR, err := m.verificationDatabase.GetVerificationRequest(request.Id)
+	if err != nil {
+		m.logger.Debug("Error obtaining verification request", zap.Error(err))
+		return err
+	}
+
+	if persistedVR != nil && persistedVR.RepliedAt > request.Clock {
+		return nil // older message, ignore it
+	}
+
+	if persistedVR.RequestStatus == verification.RequestStatusCANCELED {
+		return nil // Do nothing, We have already cancelled the verification request
+	}
+
+	if persistedVR == nil {
+		// This is a response for which we have not received its request before
+		persistedVR = &verification.Request{}
+		persistedVR.From = contactID
+		persistedVR.To = myPubKey
+	}
+
+	persistedVR.RequestStatus = verification.RequestStatusUNTRUSTWORTHY
+
+	err = m.verificationDatabase.SaveVerificationRequest(persistedVR)
+	if err != nil {
+		m.logger.Debug("Error storing verification request", zap.Error(err))
+		return err
+	}
+
+	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	if err != nil {
+		return err
+	}
+
+	state.AllVerificationRequests = append(state.AllVerificationRequests, persistedVR)
+
+	contact.VerificationStatus = VerificationStatusVERIFIED
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+	err = m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return err
+	}
+	state.ModifiedContacts.Store(contact.ID, true)
+	state.AllContacts.Store(contact.ID, contact)
+
+	// We sync the contact with the other devices
+	err = m.syncContact(context.Background(), contact)
+	if err != nil {
+		return err
+	}
+
+	// Pull one from the db if there
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(request.Id))
+	if err != nil {
+		return err
+	}
+
+	notification.ContactVerificationStatus = verification.RequestStatusUNTRUSTWORTHY
+	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
 
 	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
 	if err != nil {
