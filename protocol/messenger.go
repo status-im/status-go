@@ -4003,15 +4003,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-					case protobuf.ContactVerificationTrusted:
-						logger.Debug("Handling ContactVerificationTrusted")
-						err = m.HandleContactVerificationTrusted(messageState, msg.ParsedMessage.Interface().(protobuf.ContactVerificationTrusted))
-						if err != nil {
-							logger.Warn("failed to handle ContactVerificationTrusted", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
 					case protobuf.CommunityInvitation:
 						logger.Debug("Handling CommunityInvitation")
 						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)

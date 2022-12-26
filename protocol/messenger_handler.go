@@ -232,7 +232,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		CommunityID: chat.CommunityID,
 	}
 
-	err := m.addActivityCenterNotification(messageState, notification)
+	err := m.addActivityCenterNotification(messageState.Response, notification)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 	}
@@ -333,7 +333,7 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		ChatID:    contact.ID,
 	}
 
-	return m.addActivityCenterNotification(messageState, notification)
+	return m.addActivityCenterNotification(messageState.Response, notification)
 }
 
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
@@ -1683,13 +1683,13 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	return nil
 }
 
-func (m *Messenger) addActivityCenterNotification(state *ReceivedMessageState, notification *ActivityCenterNotification) error {
+func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
 	err := m.persistence.SaveActivityCenterNotification(notification)
 	if err != nil {
 		m.logger.Warn("failed to save notification", zap.Error(err))
 		return err
 	}
-	state.Response.AddActivityCenterNotification(notification)
+	response.AddActivityCenterNotification(notification)
 	return nil
 }
 

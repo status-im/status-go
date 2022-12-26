@@ -308,8 +308,6 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.AcceptContactVerification))
 	case protobuf.ApplicationMetadataMessage_CANCEL_CONTACT_VERIFICATION:
 		return m.unmarshalProtobufData(new(protobuf.CancelContactVerification))
-	case protobuf.ApplicationMetadataMessage_CONTACT_VERIFICATION_TRUSTED:
-		return m.unmarshalProtobufData(new(protobuf.ContactVerificationTrusted))
 	case protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_VERIFICATION:
 		return m.unmarshalProtobufData(new(protobuf.DeclineContactVerification))
 	case protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER:
