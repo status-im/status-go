@@ -121,8 +121,10 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		wasUserAdded = true
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
-		// unless is coming from us or a contact or were waiting for approval
-		newChat.Active = isActive
+		// unless is coming from us or a contact or were waiting for approval.
+		// Also, as message MEMBER_JOINED may come from member(not creator, not our contact)
+		// reach earlier than CHAT_CREATED from creator, we need check if creator is our contact
+		newChat.Active = isActive || m.checkIfCreatorIsOurContact(group)
 		newChat.ReceivedInvitationAdmin = senderID
 		chat = &newChat
 
@@ -211,6 +213,16 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	}
 
 	return nil
+}
+
+func (m *Messenger) checkIfCreatorIsOurContact(group *v1protocol.Group) bool {
+	creator, err := group.Creator()
+	if err == nil {
+		contact, _ := m.allContacts.Load(creator)
+		return contact != nil && contact.Added && contact.HasAddedUs
+	}
+	m.logger.Warn("failed to get creator from group", zap.String("group name", group.Name()), zap.String("group chat id", group.ChatID()), zap.Error(err))
+	return false
 }
 
 func (m *Messenger) createMessageNotification(chat *Chat, messageState *ReceivedMessageState) {

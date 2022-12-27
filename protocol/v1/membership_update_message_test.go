@@ -67,7 +67,7 @@ func TestGroupCreator(t *testing.T) {
 	require.NoError(t, err)
 	g, err := NewGroupWithCreator("abc", "#fa6565", 20, key)
 	require.NoError(t, err)
-	creator, err := g.creator()
+	creator, err := g.Creator()
 	require.NoError(t, err)
 	require.Equal(t, publicKeyToString(&key.PublicKey), creator)
 }
