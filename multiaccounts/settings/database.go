@@ -147,7 +147,8 @@ INSERT INTO settings (
 
 	if s.DisplayName != "" {
 		now := time.Now().Unix()
-		err = db.SetSettingLastSynced(DisplayName, uint64(now))
+		query := db.buildUpdateSyncClockQueryForField(DisplayName)
+		_, err := tx.Exec(query, uint64(now), uint64(now))
 		if err != nil {
 			return err
 		}
@@ -272,9 +273,13 @@ func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, e
 	return result, nil
 }
 
-func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
+func (db *Database) buildUpdateSyncClockQueryForField(setting SettingField) string {
 	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
-	query = fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
+	return fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
+}
+
+func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
+	query := db.buildUpdateSyncClockQueryForField(setting)
 
 	_, err := db.db.Exec(query, clock, clock)
 	return err
