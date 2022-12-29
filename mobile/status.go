@@ -442,6 +442,7 @@ func SignMessage(rpcParams string) string {
 
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
+//
 //export SignTypedData
 func SignTypedData(data, address, password string) string {
 	var typed typeddata.TypedData
@@ -457,6 +458,7 @@ func SignTypedData(data, address, password string) string {
 }
 
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
+//
 //export HashTypedData
 func HashTypedData(data string) string {
 	var typed typeddata.TypedData
@@ -473,6 +475,7 @@ func HashTypedData(data string) string {
 
 // SignTypedDataV4 unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
+//
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
 	var typed apitypes.TypedData
@@ -485,6 +488,7 @@ func SignTypedDataV4(data, address, password string) string {
 }
 
 // HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
+//
 //export HashTypedDataV4
 func HashTypedDataV4(data string) string {
 	var typed apitypes.TypedData
@@ -586,7 +590,9 @@ func HashTransaction(txArgsJSON string) string {
 
 // HashMessage calculates the hash of a message to be safely signed by the keycard
 // The hash is calulcated as
-//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
+//	keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
 // This gives context to the signed message and prevents signing of transactions.
 func HashMessage(message string) string {
 	hash, err := api.HashMessage(message)
@@ -609,7 +615,7 @@ func StopCPUProfiling() string { //nolint: deadcode
 	return makeJSONResponse(err)
 }
 
-//WriteHeapProfile starts pprof for heap
+// WriteHeapProfile starts pprof for heap
 func WriteHeapProfile(dataDir string) string { //nolint: deadcode
 	err := profiling.WriteHeapFile(dataDir)
 	return makeJSONResponse(err)
@@ -675,6 +681,7 @@ func SetSignalEventCallback(cb unsafe.Pointer) {
 }
 
 // ExportNodeLogs reads current node log and returns content to a caller.
+//
 //export ExportNodeLogs
 func ExportNodeLogs() string {
 	node := statusBackend.StatusNode()

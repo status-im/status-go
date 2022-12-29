@@ -3708,13 +3708,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, ss)
 						logger.Debug("Handling SyncSetting", zap.Any("message", ss))
 
-						settingField, err := m.extractSyncSetting(&ss)
+						err := m.handleSyncSetting(messageState, &ss)
 						if err != nil {
 							logger.Warn("failed to handle SyncSetting", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
-						messageState.Response.Settings = append(messageState.Response.Settings, settingField)
 
 					case protobuf.RequestAddressForTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)

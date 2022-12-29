@@ -1718,6 +1718,22 @@ func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMes
 	return m.handleCommandMessage(messageState, message)
 }
 
+func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting) error {
+	settingField, err := m.extractSyncSetting(message)
+	if err != nil {
+		return err
+	}
+	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME {
+		m.account.Name = message.GetValueString()
+		err = m.multiAccounts.SaveAccount(*m.account)
+		if err != nil {
+			return err
+		}
+	}
+	messageState.Response.AddSetting(settingField)
+	return nil
+}
+
 func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState, command protobuf.RequestTransaction) error {
 	err := ValidateReceivedRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {

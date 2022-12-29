@@ -463,7 +463,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 	return nil
 }
 
-//markBlocksAsLoaded(tx, address, chainID, blocks)
+// markBlocksAsLoaded(tx, address, chainID, blocks)
 func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common.Address, blocks []*big.Int) error {
 	update, err := creator.Prepare("UPDATE blocks SET loaded=? WHERE address=? AND blk_number=? AND network_id=?")
 	if err != nil {
