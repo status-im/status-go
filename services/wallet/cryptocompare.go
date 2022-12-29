@@ -29,13 +29,13 @@ type Coin struct {
 }
 
 type MarketCoinValues struct {
-	MKTCAP          string `json:"MKTCAP"`
-	HIGHDAY         string `json:"HIGHDAY"`
-	LOWDAY          string `json:"LOWDAY"`
-	CHANGEPCTHOUR   string `json:"CHANGEPCTHOUR"`
-	CHANGEPCTDAY    string `json:"CHANGEPCTDAY"`
-	CHANGEPCT24HOUR string `json:"CHANGEPCT24HOUR"`
-	CHANGE24HOUR    string `json:"CHANGE24HOUR"`
+	MKTCAP          float64 `json:"MKTCAP"`
+	HIGHDAY         float64 `json:"HIGHDAY"`
+	LOWDAY          float64 `json:"LOWDAY"`
+	CHANGEPCTHOUR   float64 `json:"CHANGEPCTHOUR"`
+	CHANGEPCTDAY    float64 `json:"CHANGEPCTDAY"`
+	CHANGEPCT24HOUR float64 `json:"CHANGEPCT24HOUR"`
+	CHANGE24HOUR    float64 `json:"CHANGE24HOUR"`
 }
 
 type TokenHistoricalPairs struct {
@@ -61,7 +61,7 @@ type CoinsContainer struct {
 }
 
 type MarketValuesContainer struct {
-	Display map[string]map[string]MarketCoinValues `json:"Display"`
+	Raw map[string]map[string]MarketCoinValues `json:"Raw"`
 }
 
 func renameSymbols(symbols []string) (renames []string) {
@@ -179,7 +179,7 @@ func fetchTokenMarketValues(symbols []string, currency string) (map[string]Marke
 	}
 
 	for _, symbol := range symbols {
-		item[symbol] = container.Display[getRealSymbol(symbol)][strings.ToUpper(currency)]
+		item[symbol] = container.Raw[getRealSymbol(symbol)][strings.ToUpper(currency)]
 	}
 
 	return item, nil
