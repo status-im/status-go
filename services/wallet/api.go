@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/rmg/iso4217"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -520,4 +522,20 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, password string) (*MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
+}
+
+func (api *API) IsCurrencyFiat(name string) bool {
+	code, _ := iso4217.ByName(strings.ToUpper(name))
+
+	return (code != 0)
+}
+
+func (api *API) GetFiatCurrencyMinorUnit(name string) (int, error) {
+	code, minor := iso4217.ByName(strings.ToUpper(name))
+
+	if code == 0 {
+		return code, errors.New("Unknown currency: " + name)
+	}
+
+	return minor, nil
 }

@@ -221,6 +221,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
+	github.com/rmg/iso4217 v1.0.0 // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/dnscache v0.0.0-20210201191234-295bba877686 // indirect
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
