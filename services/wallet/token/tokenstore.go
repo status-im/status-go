@@ -11,6 +11,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359"): &Token{
 			Address:  common.HexToAddress("0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359"),
@@ -19,6 +20,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2"): &Token{
 			Address:  common.HexToAddress("0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2"),
@@ -731,6 +733,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x58b6a8a3302369daec383334672404ee733ab239"): &Token{
 			Address:  common.HexToAddress("0x58b6a8a3302369daec383334672404ee733ab239"),
@@ -867,6 +870,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xEA26c4aC16D4a5A106820BC8AEE85fd0b7b2b664"): &Token{
 			Address:  common.HexToAddress("0xEA26c4aC16D4a5A106820BC8AEE85fd0b7b2b664"),
@@ -883,6 +887,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "XAU",
 		},
 		common.HexToAddress("0x865ec58b06bF6305B886793AA20A2da31D034E68"): &Token{
 			Address:  common.HexToAddress("0x865ec58b06bF6305B886793AA20A2da31D034E68"),
@@ -939,6 +944,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "CAD",
 		},
 		common.HexToAddress("0x6710c63432A2De02954fc0f851db07146a6c0312"): &Token{
 			Address:  common.HexToAddress("0x6710c63432A2De02954fc0f851db07146a6c0312"),
@@ -979,6 +985,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xD0a4b8946Cb52f0661273bfbC6fD0E0C75Fc6433"): &Token{
 			Address:  common.HexToAddress("0xD0a4b8946Cb52f0661273bfbC6fD0E0C75Fc6433"),
@@ -1003,6 +1010,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "GBP",
 		},
 		common.HexToAddress("0xbf2179859fc6D5BEE9Bf9158632Dc51678a4100e"): &Token{
 			Address:  common.HexToAddress("0xbf2179859fc6D5BEE9Bf9158632Dc51678a4100e"),
@@ -1043,6 +1051,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xa3d58c4E56fedCae3a7c43A725aeE9A71F0ece4e"): &Token{
 			Address:  common.HexToAddress("0xa3d58c4E56fedCae3a7c43A725aeE9A71F0ece4e"),
@@ -1083,6 +1092,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "AUD",
 		},
 		common.HexToAddress("0x66497A283E0a007bA3974e837784C6AE323447de"): &Token{
 			Address:  common.HexToAddress("0x66497A283E0a007bA3974e837784C6AE323447de"),
@@ -1171,6 +1181,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xB98d4C97425d9908E66E53A6fDf673ACcA0BE986"): &Token{
 			Address:  common.HexToAddress("0xB98d4C97425d9908E66E53A6fDf673ACcA0BE986"),
@@ -1235,6 +1246,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"): &Token{
 			Address:  common.HexToAddress("0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"),
@@ -1299,6 +1311,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  1,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xc944e90c64b2c07662a292be6244bdf05cda44a7"): &Token{
 			Address:  common.HexToAddress("0xc944e90c64b2c07662a292be6244bdf05cda44a7"),
@@ -1457,6 +1470,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  5,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"): &Token{
 			Address:  common.HexToAddress("0x022e292b44b5a146f2e8ee36ff44d3dd863c915c"),
@@ -1491,6 +1505,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  10,
+			Peg:      "USD",
 		},
 	},
 	100: {
@@ -1511,6 +1526,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  420,
+			Peg:      "USD",
 		},
 	},
 	42161: {
@@ -1521,6 +1537,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  42161,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"): &Token{
 			Address:  common.HexToAddress("0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"),
@@ -1529,6 +1546,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  42161,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0xda10009cbd5d07dd0cecc66161fc93d7c9000da1"): &Token{
 			Address:  common.HexToAddress("0xda10009cbd5d07dd0cecc66161fc93d7c9000da1"),
@@ -1537,6 +1555,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  42161,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"): &Token{
 			Address:  common.HexToAddress("0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"),
@@ -1577,6 +1596,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  42161,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x23a941036ae778ac51ab04cea08ed6e2fe103614"): &Token{
 			Address:  common.HexToAddress("0x23a941036ae778ac51ab04cea08ed6e2fe103614"),
@@ -1593,6 +1613,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 18,
 			ChainID:  42161,
+			Peg:      "USD",
 		},
 		common.HexToAddress("0x11cdb42b0eb46d95f990bedd4695a6e3fa034978"): &Token{
 			Address:  common.HexToAddress("0x11cdb42b0eb46d95f990bedd4695a6e3fa034978"),
@@ -1611,6 +1632,7 @@ var tokenStore = map[uint64]map[common.Address]*Token{
 			Color:    "#f8f8f8",
 			Decimals: 6,
 			ChainID:  421613,
+			Peg:      "USD",
 		},
 	},
 }

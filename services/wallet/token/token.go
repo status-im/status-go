@@ -34,6 +34,10 @@ type Token struct {
 	// to be traded.
 	Decimals uint   `json:"decimals"`
 	ChainID  uint64 `json:"chainId"`
+	// Peg indicates that the token is pegged to some fiat currency, using the
+	// ISO 4217 alphabetic code. For example, an empty string means it is not
+	// pegged, while "USD" means it's pegged to the United States Dollar.
+	Peg string `json:"peg"`
 }
 
 func (t *Token) IsNative() bool {

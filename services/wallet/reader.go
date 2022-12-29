@@ -32,6 +32,17 @@ type Reader struct {
 	cancel       context.CancelFunc
 }
 
+type TokenMarketValues struct {
+	MarketCap       float64 `json:"marketCap"`
+	HighDay         float64 `json:"highDay"`
+	LowDay          float64 `json:"lowDay"`
+	ChangePctHour   float64 `json:"changePctHour"`
+	ChangePctDay    float64 `json:"changePctDay"`
+	ChangePct24hour float64 `json:"changePct24hour"`
+	Change24hour    float64 `json:"change24hour"`
+	Price           float64 `json:"price"`
+}
+
 type ChainBalance struct {
 	Balance *big.Float     `json:"balance"`
 	Address common.Address `json:"address"`
@@ -39,22 +50,16 @@ type ChainBalance struct {
 }
 
 type Token struct {
-	Name             string                  `json:"name"`
-	Symbol           string                  `json:"symbol"`
-	Color            string                  `json:"color"`
-	Decimals         uint                    `json:"decimals"`
-	BalancesPerChain map[uint64]ChainBalance `json:"balancesPerChain"`
-	Description      string                  `json:"description"`
-	AssetWebsiteURL  string                  `json:"assetWebsiteUrl"`
-	BuiltOn          string                  `json:"builtOn"`
-	MarketCap        string                  `json:"marketCap"`
-	HighDay          string                  `json:"highDay"`
-	LowDay           string                  `json:"lowDay"`
-	ChangePctHour    string                  `json:"changePctHour"`
-	ChangePctDay     string                  `json:"changePctDay"`
-	ChangePct24hour  string                  `json:"changePct24hour"`
-	Change24hour     string                  `json:"change24hour"`
-	CurrencyPrice    float64                 `json:"currencyPrice"`
+	Name                    string                       `json:"name"`
+	Symbol                  string                       `json:"symbol"`
+	Color                   string                       `json:"color"`
+	Decimals                uint                         `json:"decimals"`
+	BalancesPerChain        map[uint64]ChainBalance      `json:"balancesPerChain"`
+	Description             string                       `json:"description"`
+	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
+	BuiltOn                 string                       `json:"builtOn"`
+	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
+	Peg                     string                       `json:"peg"`
 }
 
 func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
@@ -221,23 +226,29 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				}
 			}
 
+			marketValuesPerCurrency := make(map[string]TokenMarketValues)
+			marketValuesPerCurrency[currency] = TokenMarketValues{
+				MarketCap:       tokenMarketValues[symbol].MKTCAP,
+				HighDay:         tokenMarketValues[symbol].HIGHDAY,
+				LowDay:          tokenMarketValues[symbol].LOWDAY,
+				ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
+				ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
+				ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
+				Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
+				Price:           prices[symbol],
+			}
+
 			walletToken := Token{
-				Name:             tokens[0].Name,
-				Color:            tokens[0].Color,
-				Symbol:           symbol,
-				BalancesPerChain: balancesPerChain,
-				Decimals:         decimals,
-				Description:      tokenDetails[symbol].Description,
-				AssetWebsiteURL:  tokenDetails[symbol].AssetWebsiteURL,
-				BuiltOn:          tokenDetails[symbol].BuiltOn,
-				MarketCap:        tokenMarketValues[symbol].MKTCAP,
-				HighDay:          tokenMarketValues[symbol].HIGHDAY,
-				LowDay:           tokenMarketValues[symbol].LOWDAY,
-				ChangePctHour:    tokenMarketValues[symbol].CHANGEPCTHOUR,
-				ChangePctDay:     tokenMarketValues[symbol].CHANGEPCTDAY,
-				ChangePct24hour:  tokenMarketValues[symbol].CHANGEPCT24HOUR,
-				Change24hour:     tokenMarketValues[symbol].CHANGE24HOUR,
-				CurrencyPrice:    prices[symbol],
+				Name:                    tokens[0].Name,
+				Color:                   tokens[0].Color,
+				Symbol:                  symbol,
+				BalancesPerChain:        balancesPerChain,
+				Decimals:                decimals,
+				Description:             tokenDetails[symbol].Description,
+				AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
+				BuiltOn:                 tokenDetails[symbol].BuiltOn,
+				MarketValuesPerCurrency: marketValuesPerCurrency,
+				Peg:                     tokens[0].Peg,
 			}
 
 			result[address] = append(result[address], walletToken)
