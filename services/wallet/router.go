@@ -470,9 +470,13 @@ func (r *Router) suggestedRoutes(
 		return nil, err
 	}
 
-	prices, err := fetchCryptoComparePrices([]string{"ETH", tokenSymbol}, "USD")
+	pricesMap, err := fetchCryptoComparePrices([]string{"ETH", tokenSymbol}, []string{"USD"})
 	if err != nil {
 		return nil, err
+	}
+	prices := make(map[string]float64, 0)
+	for symbol, pricePerCurrency := range pricesMap {
+		prices[symbol] = pricePerCurrency["USD"]
 	}
 
 	var (
