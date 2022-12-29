@@ -1088,3 +1088,9 @@ func ToChecksumAddress(address string) string {
 	}
 	return address
 }
+
+func DeserializeAndCompressKey(DesktopKey string) string {
+	deserialisedKey := MultiformatDeserializePublicKey(DesktopKey, "f")
+	sanitisedKey := "0x" + deserialisedKey[5:]
+	return CompressPublicKey(sanitisedKey)
+}
