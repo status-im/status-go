@@ -20,6 +20,10 @@ import (
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 
+func getFixedCurrencies() []string {
+	return []string{"usd"}
+}
+
 func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
 	return &Reader{rpcClient, tokenManager, accountsDB, walletFeed, nil}
 }
@@ -135,10 +139,13 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		chainIDs = append(chainIDs, network.ChainID)
 	}
 
+	currencies := make([]string, 0)
 	currency, err := r.accountsDB.GetCurrency()
 	if err != nil {
 		return nil, err
 	}
+	currencies = append(currencies, currency)
+	currencies = append(currencies, getFixedCurrencies()...)
 
 	allTokens, err := r.tokenManager.GetAllTokens()
 	if err != nil {
@@ -153,14 +160,14 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 
 	var (
 		group             = async.NewAtomicGroup(ctx)
-		prices            = map[string]float64{}
+		prices            = map[string]map[string]float64{}
 		tokenDetails      = map[string]Coin{}
-		tokenMarketValues = map[string]MarketCoinValues{}
+		tokenMarketValues = map[string]map[string]MarketCoinValues{}
 		balances          = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	)
 
 	group.Add(func(parent context.Context) error {
-		prices, err = fetchCryptoComparePrices(tokenSymbols, currency)
+		prices, err = fetchCryptoComparePrices(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}
@@ -176,7 +183,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = fetchTokenMarketValues(tokenSymbols, currency)
+		tokenMarketValues, err = fetchTokenMarketValues(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}
@@ -227,15 +234,17 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			}
 
 			marketValuesPerCurrency := make(map[string]TokenMarketValues)
-			marketValuesPerCurrency[currency] = TokenMarketValues{
-				MarketCap:       tokenMarketValues[symbol].MKTCAP,
-				HighDay:         tokenMarketValues[symbol].HIGHDAY,
-				LowDay:          tokenMarketValues[symbol].LOWDAY,
-				ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
-				ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
-				ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
-				Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
-				Price:           prices[symbol],
+			for _, currency := range currencies {
+				marketValuesPerCurrency[currency] = TokenMarketValues{
+					MarketCap:       tokenMarketValues[symbol][currency].MKTCAP,
+					HighDay:         tokenMarketValues[symbol][currency].HIGHDAY,
+					LowDay:          tokenMarketValues[symbol][currency].LOWDAY,
+					ChangePctHour:   tokenMarketValues[symbol][currency].CHANGEPCTHOUR,
+					ChangePctDay:    tokenMarketValues[symbol][currency].CHANGEPCTDAY,
+					ChangePct24hour: tokenMarketValues[symbol][currency].CHANGEPCT24HOUR,
+					Change24hour:    tokenMarketValues[symbol][currency].CHANGE24HOUR,
+					Price:           prices[symbol][currency],
+				}
 			}
 
 			walletToken := Token{

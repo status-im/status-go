@@ -7,10 +7,11 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/rmg/iso4217"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/rmg/iso4217"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -314,14 +315,14 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }
 
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currency string) (map[string]float64, error) {
+func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	log.Debug("call to FetchPrices")
-	return fetchCryptoComparePrices(symbols, currency)
+	return fetchCryptoComparePrices(symbols, currencies)
 }
 
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]MarketCoinValues, error) {
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return fetchTokenMarketValues(symbols, currency)
+	return fetchTokenMarketValues(symbols, currencies)
 }
 
 func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
