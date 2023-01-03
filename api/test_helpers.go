@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +15,7 @@ import (
 )
 
 func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend, defersFunc func(), err error) {
-	tmpdir, err := ioutil.TempDir("", "verified-account-test-")
+	tmpdir, err := os.MkdirTemp("", "verified-account-test-")
 
 	defers := make([]func(), 0)
 	defersFunc = func() {

@@ -1,7 +1,6 @@
 package account
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -16,7 +15,7 @@ import (
 func makeAccountManager(keydir string) (manager *accounts.Manager, err error) {
 	if keydir == "" {
 		// There is no datadir.
-		keydir, err = ioutil.TempDir("", "go-ethereum-keystore")
+		keydir, err = os.MkdirTemp("", "go-ethereum-keystore")
 	}
 	if err != nil {
 		return nil, err

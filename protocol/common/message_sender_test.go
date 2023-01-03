@@ -1,7 +1,6 @@
 package common
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,7 +53,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
 
-	s.tmpDir, err = ioutil.TempDir("", "")
+	s.tmpDir, err = os.MkdirTemp("", "")
 	s.Require().NoError(err)
 
 	identity, err := crypto.GenerateKey()

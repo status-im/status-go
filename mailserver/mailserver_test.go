@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -70,7 +69,7 @@ func (s *MailserverSuite) SetupTest() {
 	s.shh = waku.New(&waku.DefaultConfig, nil)
 	s.shh.RegisterMailServer(s.server)
 
-	tmpDir, err := ioutil.TempDir("", "mailserver-test")
+	tmpDir, err := os.MkdirTemp("", "mailserver-test")
 	s.Require().NoError(err)
 	s.dataDir = tmpDir
 

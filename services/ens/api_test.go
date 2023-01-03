@@ -34,7 +34,7 @@ func createDB(t *testing.T) (*sql.DB, func()) {
 func setupTestAPI(t *testing.T) (*API, func()) {
 	db, cancel := createDB(t)
 
-	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
 	require.NoError(t, err)
 
 	// Creating a dummy status node to simulate what it's done in get_status_node.go

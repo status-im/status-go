@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +9,7 @@ import (
 )
 
 func TestOpen(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-open")
+	dir, err := os.MkdirTemp("", "test-open")
 	require.NoError(t, err)
 	defer os.Remove(dir)
 
