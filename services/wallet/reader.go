@@ -63,7 +63,7 @@ type Token struct {
 	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
 	BuiltOn                 string                       `json:"builtOn"`
 	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
-	Peg                     string                       `json:"peg"`
+	PegSymbol               string                       `json:"pegSymbol"`
 }
 
 func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
@@ -257,7 +257,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
 				BuiltOn:                 tokenDetails[symbol].BuiltOn,
 				MarketValuesPerCurrency: marketValuesPerCurrency,
-				Peg:                     tokens[0].Peg,
+				PegSymbol:               tokens[0].PegSymbol,
 			}
 
 			result[address] = append(result[address], walletToken)
