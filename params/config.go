@@ -192,6 +192,9 @@ type WakuV2Config struct {
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
 	PeerExchange bool
 
+	// Nameserver determines which nameserver will be used for dns discovery
+	Nameserver string
+
 	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
 	EnableDiscV5 bool
 
