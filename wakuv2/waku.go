@@ -89,6 +89,7 @@ type settings struct {
 	EnableConfirmations bool   // Enable sending message confirmations
 	PeerExchange        bool   // Enable peer exchange
 	DiscoveryLimit      int    // Indicates the number of nodes to discover
+	Nameserver          string // Optional nameserver to use for dns discovery
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -197,6 +198,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		MinPeersForRelay: cfg.MinPeersForRelay,
 		PeerExchange:     cfg.PeerExchange,
 		DiscoveryLimit:   cfg.DiscoveryLimit,
+		Nameserver:       cfg.Nameserver,
 	}
 
 	waku.filters = common.NewFilters()
@@ -400,8 +402,16 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
 	if !ok {
-		// NOTE: Temporary fix for DNS resolution on android/ios, as gomobile does not support it
-		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, dnsdisc.WithNameserver("1.1.1.1"))
+		w.settingsMu.RLock()
+		nameserver := w.settings.Nameserver
+		w.settingsMu.RUnlock()
+
+		var opts []dnsdisc.DnsDiscoveryOption
+		if nameserver != "" {
+			opts = append(opts, dnsdisc.WithNameserver(nameserver))
+		}
+
+		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, opts...)
 		if err != nil {
 			w.logger.Warn("dns discovery error ", zap.Error(err))
 			return
@@ -434,6 +444,7 @@ func (w *Waku) addWakuV2Peers(ctx context.Context, cfg *Config) error {
 	identifyWg := &sync.WaitGroup{}
 	identifyWg.Add(len(cfg.WakuNodes))
 	for _, addrString := range cfg.WakuNodes {
+		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
 			go func() {
