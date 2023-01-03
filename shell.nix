@@ -49,4 +49,8 @@ pkgs.mkShell {
     ANDROID_NDK=${androidSdk}/libexec/android-sdk/ndk-bundle
     ANDROID_NDK_HOME=$ANDROID_NDK
   '';
+
+  # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
+  # https://github.com/status-im/status-mobile/pull/13912
+  __noChroot = pkgs.stdenv.isDarwin;
 }
