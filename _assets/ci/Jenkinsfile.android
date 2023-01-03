@@ -28,6 +28,7 @@ pipeline {
 
   environment {
     TARGET   = 'android'
+    TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     PATH     = "${PATH}:${GOPATH}/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"

@@ -22,7 +22,8 @@ pipeline {
   }
 
   environment {
-    TARGET   = 'linux'
+    TARGET   = 'tests'
+    TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     PATH     = "${PATH}:${GOPATH}/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
@@ -69,4 +70,11 @@ pipeline {
       } }
     }
   } // stages
+
+  post {
+    always  { script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" } }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup { dir(env.TMPDIR) { deleteDir() } }
+  } // post
 } // pipeline
