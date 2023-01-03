@@ -62,21 +62,21 @@ func getTestTime(t *testing.T) time.Time {
 	return testTime.UTC()
 }
 
-func newTestSource(t *testing.T, availableYears int) *chainClientTestSource {
+func newTestSource(t *testing.T, availableYears float64) *chainClientTestSource {
 	return newTestSourceWithCurrentTime(t, availableYears, getTestTime(t).Unix())
 }
 
-func newTestSourceWithCurrentTime(t *testing.T, availableYears int, currentTime int64) *chainClientTestSource {
+func newTestSourceWithCurrentTime(t *testing.T, availableYears float64, currentTime int64) *chainClientTestSource {
 	newInst := &chainClientTestSource{
 		t:                   t,
 		requestedBlocks:     make(map[int64]*requestedBlock),
 		lastBlockTimestamp:  currentTime,
-		firstBlockTimestamp: currentTime - int64(float64(availableYears)*float64(secondsInTimeInterval[BalanceHistory1Year])),
+		firstBlockTimestamp: currentTime - int64(availableYears*float64(secondsInTimeInterval[BalanceHistory1Year])),
 		mockTime:            currentTime,
 		timeAtMock:          time.Now().UTC().Unix(),
 	}
-	newInst.blockByNumberFn = newInst.TestBlockByNumber
-	newInst.balanceAtFn = newInst.TestBalanceAt
+	newInst.blockByNumberFn = newInst.BlockByNumberMock
+	newInst.balanceAtFn = newInst.BalanceAtMock
 	return newInst
 }
 
@@ -116,7 +116,7 @@ func (src *chainClientTestSource) BlockByNumber(ctx context.Context, number *big
 	return src.blockByNumberFn(ctx, number)
 }
 
-func (src *chainClientTestSource) TestBlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+func (src *chainClientTestSource) BlockByNumberMock(ctx context.Context, number *big.Int) (*types.Block, error) {
 	var blockNo int64
 	if number == nil {
 		// Last block was requested
@@ -150,7 +150,7 @@ func weiInEth() *big.Int {
 	return res
 }
 
-func (src *chainClientTestSource) TestBalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+func (src *chainClientTestSource) BalanceAtMock(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
 	var blockNo int64
 	if blockNumber == nil {
 		// Last block was requested
@@ -189,19 +189,26 @@ func (src *chainClientTestSource) TimeNow() int64 {
 	return src.mockTime + (time.Now().UTC().Unix() - src.firstTimeRequest)
 }
 
+const (
+	calibrationEntriesForTheLastYear = 12
+
+	// Account for the calibration interval switch extra block request
+	calibrationRequestsForTheLastYear = calibrationEntriesForTheLastYear + 1
+)
+
 func TestGetOrFetchCalibrationData(t *testing.T) {
 	bh, cleanDB := setupTestBalanceHistoryDB(t)
 	defer cleanDB()
 
 	dataSource := newTestSource(t, 3 /*years*/)
-	balanceData, err := bh.getOrFetchCalibrationData(context.Background(), dataSource)
+	calibrationData, err := bh.getOrFetchCalibrationData(context.Background(), dataSource)
 	require.NoError(t, err)
-	require.Greater(t, len(balanceData), 0)
-	// Account for the last block request
-	require.Equal(t, int(dataSource.availableYears()), len(dataSource.requestedBlocks)-1)
-	require.Equal(t, len(balanceData), len(dataSource.requestedBlocks))
-	for i := 1; i < len(balanceData); i++ {
-		require.Greater(t, balanceData[i].block.Cmp(balanceData[i-1].block), 0)
+	require.Greater(t, len(calibrationData), 0)
+	require.Equal(t, int(dataSource.availableYears())+calibrationRequestsForTheLastYear, len(dataSource.requestedBlocks))
+	// Account for the calibration interval switch extra block request
+	require.Equal(t, len(calibrationData)+1, len(dataSource.requestedBlocks))
+	for i := 1; i < len(calibrationData); i++ {
+		require.Greater(t, calibrationData[i].block.Cmp(calibrationData[i-1].block), 0)
 	}
 }
 
@@ -214,15 +221,13 @@ func TestComputeBlockInfoForTimestamp(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(calibData), 4)
 	for d := 0; d < 6; d++ {
-		for timeInterval := BalanceHistoryAllTime; timeInterval >= BalanceHistory7Hours; timeInterval-- {
+		for timeInterval := BalanceHistoryAllTime; timeInterval >= BalanceHistory7Days; timeInterval-- {
 			calibIndex := len(calibData) - 1 - d
-			testBlockNumber, testBlockTimestamp, resCalibIdx := computeBlockInfoForTimestamp(calibData[calibIndex].timestamp, 0, calibData, timeInterval)
-			if d == 5 {
-				require.Equal(t, 1, resCalibIdx, "resCalibIdx is the second element in calibData for time interval %d and calibration index %d", timeInterval, calibIndex)
-			} else {
-				require.Equal(t, calibIndex, resCalibIdx, "resCalibIdx is the last element in calibData for time interval %d and calibration index %d", timeInterval, calibIndex)
-			}
+			testBlockNumber, testBlockTimestamp, resCalibIdx := computeBlockInfoForTimestamp(calibData[calibIndex].timestamp, 0, calibData, int64((time.Duration(timeIntervalToHoursPerStep[timeInterval]) * time.Hour).Seconds()))
+
+			require.Equal(t, calibIndex, resCalibIdx, "resCalibIdx is the last element in calibData for time interval %d and calibration index %d", timeInterval, calibIndex)
 			require.Equal(t, testBlockNumber.Int64(), calibData[calibIndex].block.Int64(), "testBlockNumber is the last element in calibData for time interval %d and calibration index %d", timeInterval, calibIndex)
+
 			// Expect less than 0.1% error
 			require.Greater(t, float64(timeIntervalToHoursPerStep[timeInterval])*0.001, (time.Duration(calibData[calibIndex].timestamp-testBlockTimestamp) * time.Second).Hours(), "testBlockTimestamp is in acceptable error for time interval %d and calibration index %d", timeInterval, calibIndex)
 		}
@@ -248,7 +253,7 @@ func TestGetOrFetchCalibrationDataErrorFetching(t *testing.T) {
 		if len(dataSource.requestedBlocks) == 1 {
 			return nil, errors.New("test error")
 		}
-		return dataSource.TestBlockByNumber(ctx, number)
+		return dataSource.BlockByNumberMock(ctx, number)
 	}
 	calibrationData, err = bh.getOrFetchCalibrationData(context.Background(), dataSource)
 	require.Error(t, err, "test error")
@@ -260,7 +265,7 @@ func TestGetOrFetchCalibrationDataErrorFetching(t *testing.T) {
 		if number.Cmp(big.NewInt(dataSource.blocksCount()/2)) > 0 {
 			return nil, errors.New("test error")
 		}
-		return dataSource.TestBlockByNumber(ctx, number)
+		return dataSource.BlockByNumberMock(ctx, number)
 	}
 	calibrationData, err = bh.getOrFetchCalibrationData(context.Background(), dataSource)
 	require.Error(t, err, "test error")
@@ -273,8 +278,8 @@ func TestGetOrFetchCalibrationDataErrorFetching(t *testing.T) {
 	calibrationData, err = bh.getOrFetchCalibrationData(context.Background(), dataSource)
 	require.NoError(t, err)
 	require.Greater(t, len(calibrationData), 0)
-	require.Equal(t, 4, len(dataSource.requestedBlocks))
-	require.Equal(t, 7, len(calibrationData))
+	require.Equal(t, 3+calibrationRequestsForTheLastYear, len(dataSource.requestedBlocks))
+	require.Equal(t, 6+calibrationEntriesForTheLastYear, len(calibrationData))
 	require.Equal(t, int64(1), calibrationData[0].block.Int64())
 }
 
@@ -314,11 +319,11 @@ func TestGetBalanceHistoryForBlocksSource(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(balanceData), 0)
 
-	reqBlkNos, calibrations, balances := extractTestData(dataSource)
+	reqBlkNos, blockInfos, balances := extractTestData(dataSource)
 	require.Equal(t, len(balances), len(balanceData))
 
 	// Ensure we don't request the same info twice
-	for block, count := range calibrations {
+	for block, count := range blockInfos {
 		require.Equal(t, 1, count, "block %d has one info request", block)
 		if balanceCount, contains := balances[block]; contains {
 			require.Equal(t, 1, balanceCount, "block %d has one balance request", block)
@@ -344,7 +349,7 @@ func TestGetBalanceHistoryForBlocksSource(t *testing.T) {
 		}
 	}
 	// Account for the last block
-	require.Equal(t, int(dataSource.availableYears()), len(calibrations)-1)
+	require.Equal(t, int(dataSource.availableYears())+calibrationRequestsForTheLastYear, len(blockInfos)-len(balances))
 
 	timeRange := balanceData[len(balanceData)-1].Timestamp - balanceData[0].Timestamp
 	secondsInYear := secondsInTimeInterval[BalanceHistory1Year]
@@ -366,10 +371,10 @@ func TestGetBalanceHistoryForBlocksSourceBlockFetchingFailure(t *testing.T) {
 	}
 	balanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), dataSource, common.Address{7}, BalanceHistory1Year)
 	require.Error(t, err, "test error")
-	require.Equal(t, len(balanceData), 0)
-	_, calibrations, balances := extractTestData(dataSource)
-	require.Equal(t, len(balances), 0)
-	require.Greater(t, len(calibrations), 0)
+	require.Equal(t, 0, len(balanceData))
+	_, blockInfos, balances := extractTestData(dataSource)
+	require.Equal(t, 0, len(balances))
+	require.Greater(t, len(blockInfos), calibrationRequestsForTheLastYear)
 
 	dataSource.resetStats()
 	// Fail in the middle
@@ -377,14 +382,17 @@ func TestGetBalanceHistoryForBlocksSourceBlockFetchingFailure(t *testing.T) {
 		if len(dataSource.requestedBlocks) == 15 {
 			return nil, errors.New("test error")
 		}
-		return dataSource.TestBalanceAt(ctx, account, blockNumber)
+		return dataSource.BalanceAtMock(ctx, account, blockNumber)
 	}
 	balanceData, err = bh.getBalanceHistoryFromBlocksSource(context.Background(), dataSource, common.Address{7}, BalanceHistory1Year)
 	require.Error(t, err, "test error")
 	require.Equal(t, len(balanceData), 0)
-	_, calibrations, balances = extractTestData(dataSource)
-	require.Equal(t, len(balances), 15)
-	require.Equal(t, len(calibrations), 0)
+	reqBlkNos, blockInfos, balances := extractTestData(dataSource)
+	// The request for block info is made before the balance request
+	require.Equal(t, 1, dataSource.requestedBlocks[reqBlkNos[len(reqBlkNos)-1]].blockInfoRequests)
+	require.Equal(t, 0, dataSource.requestedBlocks[reqBlkNos[len(reqBlkNos)-1]].balanceRequests)
+	require.Equal(t, 14, len(balances))
+	require.Equal(t, len(balances), len(blockInfos)-1)
 
 	dataSource.resetStats()
 	dataSource.balanceAtFn = bkFn
@@ -392,8 +400,9 @@ func TestGetBalanceHistoryForBlocksSourceBlockFetchingFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(balanceData), 0)
 
-	_, _, balances = extractTestData(dataSource)
-	require.Equal(t, len(balanceData)-15, len(balances))
+	_, blockInfos, balances = extractTestData(dataSource)
+	require.Equal(t, len(balanceData)-14, len(balances))
+	require.Equal(t, len(blockInfos), len(balances))
 
 	for i := 1; i < len(balanceData); i++ {
 		require.Greater(t, balanceData[i].Timestamp, balanceData[i-1].Timestamp)
@@ -413,12 +422,12 @@ func TestGetBalanceHistoryForBlocksSourceValidateBalanceValues(t *testing.T) {
 
 	dataSource := newTestSource(t, 20 /*years*/)
 
-	for currentInterval := int(BalanceHistory7Hours); currentInterval <= int(BalanceHistoryAllTime); currentInterval++ {
+	for currentInterval := int(BalanceHistory7Days); currentInterval <= int(BalanceHistoryAllTime); currentInterval++ {
 		dataSource.resetStats()
 
 		requestedBalance := make(map[int64]*big.Int)
 		dataSource.balanceAtFn = func(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-			balance, err := dataSource.TestBalanceAt(ctx, account, blockNumber)
+			balance, err := dataSource.BalanceAtMock(ctx, account, blockNumber)
 			requestedBalance[blockNumber.Int64()] = new(big.Int).Set(balance)
 			return balance, err
 		}
@@ -427,7 +436,7 @@ func TestGetBalanceHistoryForBlocksSourceValidateBalanceValues(t *testing.T) {
 		require.Greater(t, len(balanceData), 0)
 
 		// Only first run is not affected by cache
-		if currentInterval == int(BalanceHistory7Hours) {
+		if currentInterval == int(BalanceHistory7Days) {
 			require.Equal(t, len(balanceData), len(requestedBalance))
 
 			reqBlkNos, _, _ := extractTestData(dataSource)
@@ -464,7 +473,7 @@ func TestGetBalanceHistoryForBlocksSourceVerifyCache(t *testing.T) {
 
 	prevBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), dataSource, common.Address{7}, BalanceHistory1Month)
 	require.NoError(t, err)
-	require.Greater(t, len(prevBalanceData), 0)
+	require.Greater(t, len(prevBalanceData), 1)
 
 	timeRange := prevBalanceData[len(prevBalanceData)-1].Timestamp - prevBalanceData[0].Timestamp
 	secondsInMonth := secondsInTimeInterval[BalanceHistory1Month]
@@ -480,9 +489,9 @@ func TestGetBalanceHistoryForBlocksSourceVerifyCache(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(updatedBalanceData), 0)
 
-	reqBlkNos, calibrations, balances := extractTestData(dataSource)
+	reqBlkNos, blockInfos, balances := extractTestData(dataSource)
 	require.Equal(t, 2, len(reqBlkNos))
-	require.Equal(t, 0, len(calibrations))
+	require.Equal(t, len(reqBlkNos), len(blockInfos))
 
 	for block, count := range balances {
 		require.Equal(t, 1, count, "block %d has one request", block)
@@ -515,16 +524,17 @@ func TestGetBalanceHistoryForBlocksSourceFetchMultipleAccounts(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(sevenBalanceData), 0)
 
-	_, sevenCalibrations, _ := extractTestData(sevenDataSource)
-	require.Greater(t, len(sevenCalibrations), 0)
+	_, sevenBlockInfos, _ := extractTestData(sevenDataSource)
+	require.Greater(t, len(sevenBlockInfos), 0)
 
 	nineDataSource := newTestSource(t, 5 /*years*/)
 	nineBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), nineDataSource, common.Address{9}, BalanceHistory1Month)
 	require.NoError(t, err)
 	require.Greater(t, len(nineBalanceData), 0)
 
-	_, nineCalibrations, _ := extractTestData(nineDataSource)
-	require.Equal(t, 0, len(nineCalibrations))
+	_, nineBlockInfos, nineBalances := extractTestData(nineDataSource)
+	require.Equal(t, 0, len(nineBlockInfos))
+	require.Equal(t, len(nineBalanceData), len(nineBalances))
 }
 
 func TestGetBalanceHistoryForBlocksSourceTaskCancellation(t *testing.T) {
@@ -536,17 +546,19 @@ func TestGetBalanceHistoryForBlocksSourceTaskCancellation(t *testing.T) {
 	bkFn := dataSource.blockByNumberFn
 	// Fail after 15 requests
 	dataSource.balanceAtFn = func(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-		if len(dataSource.requestedBlocks) == 15 {
+		if len(dataSource.requestedBlocks) == 15+calibrationRequestsForTheLastYear {
 			cancelFn()
 		}
-		return dataSource.TestBalanceAt(ctx, account, blockNumber)
+		return dataSource.BalanceAtMock(ctx, account, blockNumber)
 	}
 	balanceData, err := bh.getBalanceHistoryFromBlocksSource(ctx, dataSource, common.Address{7}, BalanceHistory1Year)
 	require.Error(t, err, "context cancelled")
-	require.Equal(t, len(balanceData), 0)
+	require.Equal(t, 0, len(balanceData))
 
-	_, calibrations, balances := extractTestData(dataSource)
-	require.Equal(t, 16, len(balances)+len(calibrations))
+	_, blockInfos, balances := extractTestData(dataSource)
+	// The request for block info is made before the balance fails
+	require.Equal(t, 15-int(dataSource.availableYears()), len(balances))
+	require.Equal(t, 15+calibrationRequestsForTheLastYear, len(blockInfos))
 
 	dataSource.blockByNumberFn = bkFn
 	ctx, cancelFn = context.WithCancel(context.Background())
@@ -554,6 +566,16 @@ func TestGetBalanceHistoryForBlocksSourceTaskCancellation(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(balanceData), 0)
 	cancelFn()
+}
+
+func TestGetBalanceHistoryForBlocksSourceFailOnYoungBlockchains(t *testing.T) {
+	bh, cleanDB := setupTestBalanceHistoryDB(t)
+	defer cleanDB()
+
+	dataSource := newTestSource(t, 1.8 /*years*/)
+	balanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), dataSource, common.Address{7}, BalanceHistoryAllTime)
+	require.Error(t, err, "Expect error for younger than 2.1 years blockchains")
+	require.Equal(t, 0, len(balanceData))
 }
 
 func TestHoursPerStepHaveCommonDivisor(t *testing.T) {
@@ -571,7 +593,7 @@ func TestHoursPerStepHaveCommonDivisor(t *testing.T) {
 
 func TestTimeIntervalToBitsetFilterAreConsecutiveFlags(t *testing.T) {
 	values := make([]int, 0, len(timeIntervalToBitsetFilter))
-	for i := BalanceHistoryAllTime; i >= BalanceHistory7Hours; i-- {
+	for i := BalanceHistoryAllTime; i >= BalanceHistory7Days; i-- {
 		values = append(values, int(timeIntervalToBitsetFilter[i]))
 	}
 	values = append(values, int(FilterIncludeAll))
@@ -594,12 +616,12 @@ func TestTimeIntervalToBitsetFilterAreConsecutiveFlags(t *testing.T) {
 
 func TestSnapTimestamp(t *testing.T) {
 	testDate := time.Date(2020, 3 /*M*/, 12 /*d*/, 3 /*H*/, 34 /*m*/, 56 /*s*/, 567 /*ms*/, time.UTC)
-	snappedTimestamp := snapTimestamp(testDate.Unix(), BalanceHistory7Hours)
-	expectedTimestamp := time.Date(2020, 3 /*M*/, 12 /*d*/, 2 /*H*/, 0 /*m*/, 0 /*s*/, 0 /*ms*/, time.UTC).Unix()
+	snappedTimestamp := snapTimestamp(testDate.Unix(), BalanceHistory7Days)
+	expectedTimestamp := time.Date(2020, 3 /*M*/, 12 /*d*/, 0 /*H*/, 0 /*m*/, 0 /*s*/, 0 /*ms*/, time.UTC).Unix()
 	require.Equal(t, expectedTimestamp, snappedTimestamp)
 
 	testDate = testDate.Add(4 * time.Hour)
-	snappedTimestamp = snapTimestamp(testDate.Unix(), BalanceHistory7Hours)
+	snappedTimestamp = snapTimestamp(testDate.Unix(), BalanceHistory7Days)
 	expectedTimestamp = time.Date(2020, 3 /*M*/, 12 /*d*/, 6 /*H*/, 0 /*m*/, 0 /*s*/, 0 /*ms*/, time.UTC).Unix()
 	require.Equal(t, expectedTimestamp, snappedTimestamp)
 
@@ -647,34 +669,44 @@ func TestGetBalanceHistoryForBlocksSourceTestCacheHit(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(monthBalanceData), 0)
 
-	halfYearDataSource := newTestSource(t, 5 /*years*/)
-	halfYearBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), halfYearDataSource, common.Address{7}, BalanceHistory1Year)
-	require.NoError(t, err)
-	require.Greater(t, len(halfYearBalanceData), 0)
-
-	_, _, halfYearBalances := extractTestData(halfYearDataSource)
-	// Minimal cache hit is expected for higher time interval
-	require.Greater(t, len(halfYearBalanceData), len(halfYearBalances))
-
 	yearDataSource := newTestSource(t, 5 /*years*/)
-	yearBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), yearDataSource, common.Address{7}, BalanceHistory6Months)
+	yearBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), yearDataSource, common.Address{7}, BalanceHistory1Year)
 	require.NoError(t, err)
 	require.Greater(t, len(yearBalanceData), 0)
 
-	_, _, yearBalances := extractTestData(yearDataSource)
-	// More than half requests are expected to be cache hit
-	require.Greater(t, int(math.Abs(float64(len(yearBalanceData))/2.0)), len(yearBalances))
+	_, _, halfYearBalances := extractTestData(yearDataSource)
+	// Minimal cache hit is expected for higher time interval
+	require.Greater(t, len(yearBalanceData), len(halfYearBalances)/10)
+
+	halfYearDataSource := newTestSource(t, 5 /*years*/)
+	halfYearBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), halfYearDataSource, common.Address{7}, BalanceHistory6Months)
+	require.NoError(t, err)
+	require.Greater(t, len(halfYearBalanceData), 0)
+
+	_, _, yearBalances := extractTestData(halfYearDataSource)
+	// More than a third requests are expected to be cache hit due to time interval overlap between 1 year and 6 months
+	// However, not all overlapping are cache hit because 1 year fetching has a coarser sampling than 6 months fetching
+	require.Greater(t, len(yearBalances), int(math.Abs(float64(len(halfYearBalanceData))/3.0)))
 
 	// Execute the same fetch again
 	yearDataSource.resetStats()
 	againYearBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), yearDataSource, common.Address{7}, BalanceHistory6Months)
 	require.NoError(t, err)
 	require.Greater(t, len(againYearBalanceData), 0)
-	require.Equal(t, len(yearBalanceData), len(againYearBalanceData))
+	require.Equal(t, halfYearBalanceData, againYearBalanceData)
 
 	_, _, againYearBalances := extractTestData(yearDataSource)
-	// More than half requests are expected to be cache hit
-	require.Equal(t, len(againYearBalances), 0)
+	// We expect no requests to be made the second time
+	require.Equal(t, 0, len(againYearBalances))
+
+	oneWeekDataSource := newTestSource(t, 5 /*years*/)
+	oneWeekBalanceData, err := bh.getBalanceHistoryFromBlocksSource(context.Background(), oneWeekDataSource, common.Address{7}, BalanceHistory7Days)
+	require.NoError(t, err)
+	require.Greater(t, len(oneWeekBalanceData), 0)
+
+	// More than one half of the data should be cached from previous requests
+	_, _, oneWeekBalances := extractTestData(oneWeekDataSource)
+	require.Greater(t, len(oneWeekBalances), len(oneWeekBalanceData)/2)
 }
 
 func TestGetBalanceHistoryForBlocksSourceFetchAllTime(t *testing.T) {
@@ -708,8 +740,7 @@ func TestGetBalanceHistoryForBlocksSourceFetchAllTime(t *testing.T) {
 			blockInfoRequestCount++
 		}
 	}
-	// Account for the last block request
-	require.Equal(t, int64(dataSource.availableYears()), int64(blockInfoRequestCount)-1)
+	require.Equal(t, int(dataSource.availableYears()-1)+len(balanceData)+calibrationRequestsForTheLastYear, int(blockInfoRequestCount))
 }
 
 // generateTestDataForElementCount generates dummy consecutive blocks of data for the same chain_id, address and currency

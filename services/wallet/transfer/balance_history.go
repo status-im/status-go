@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math"
 	"math/big"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/pkg/errors"
 
@@ -70,15 +72,16 @@ const (
 type BalanceHistoryTimeInterval int
 
 const (
-	maxAllRangeTimestamp         = math.MaxInt64
-	minAllRangeTimestamp         = 0
-	balanceHistoryUpdateInterval = 12 * time.Hour
-	calibrationUpdateInterval    = 7 * 24 * time.Hour
+	maxAllRangeTimestamp            = math.MaxInt64
+	minAllRangeTimestamp            = 0
+	balanceHistoryUpdateInterval    = 12 * time.Hour
+	calibrationUpdateInterval       = 30 /*days*/ * 24 * time.Hour
+	coarseCalibrationUpdateInterval = 1 /*year*/ * 365 /*days*/ * 24 * time.Hour
 )
 
 // Specific time intervals for which balance history can be fetched
 const (
-	BalanceHistory7Hours BalanceHistoryTimeInterval = iota + 1
+	BalanceHistory7Days BalanceHistoryTimeInterval = iota + 1
 	BalanceHistory1Month
 	BalanceHistory6Months
 	BalanceHistory1Year
@@ -86,19 +89,17 @@ const (
 )
 
 var secondsInTimeInterval = map[BalanceHistoryTimeInterval]int64{
-	BalanceHistory7Hours:  7 * 24 * 60 * 60,
+	BalanceHistory7Days:   7 * 24 * 60 * 60,
 	BalanceHistory1Month:  30 * 24 * 60 * 60,
 	BalanceHistory6Months: 6 * 30 * 24 * 60 * 60,
 	BalanceHistory1Year:   365 * 24 * 60 * 60,
 	BalanceHistoryAllTime: 50 * 365 * 24 * 60 * 60,
 }
 
-const secondsInHour = 60 * 60
-
 // This defines the granularity of fetched data points for each time interval
 // All must have common divisor of the smallest for the best cache hit
 var timeIntervalToHoursPerStep = map[BalanceHistoryTimeInterval]int64{
-	BalanceHistory7Hours:  2,
+	BalanceHistory7Days:   6,
 	BalanceHistory1Month:  12,
 	BalanceHistory6Months: (24 * 7) / 2,
 	BalanceHistory1Year:   24 * 7,
@@ -114,7 +115,7 @@ const (
 )
 
 var timeIntervalToSnapUnit = map[BalanceHistoryTimeInterval]snapUnit{
-	BalanceHistory7Hours:  snapUnitDay,
+	BalanceHistory7Days:   snapUnitDay,
 	BalanceHistory1Month:  snapUnitDay,
 	BalanceHistory6Months: snapUnitMonth,
 	BalanceHistory1Year:   snapUnitMonth,
@@ -134,7 +135,7 @@ const (
 )
 
 var timeIntervalToBitsetFilter = map[BalanceHistoryTimeInterval]TimeIntervalBitsetFilter{
-	BalanceHistory7Hours:  Filter7Hours,
+	BalanceHistory7Days:   Filter7Hours,
 	BalanceHistory1Month:  Filter1Month,
 	BalanceHistory6Months: Filter6Months,
 	BalanceHistory1Year:   Filter1Year,
@@ -149,7 +150,22 @@ type BlockInfoSource interface {
 	TimeNow() int64
 }
 
-func (bh *BalanceHistory) fetchAndCacheBalanceForBlock(ctx context.Context, chainClient BlockInfoSource, address common.Address, blockNo *big.Int, timestamp int64, bitset TimeIntervalBitsetFilter) (*BalanceState, error) {
+func (bh *BalanceHistory) fetchAndCacheBalanceForBlock(ctx context.Context, chainClient BlockInfoSource, address common.Address, blockNo *big.Int, bitset TimeIntervalBitsetFilter) (*BalanceState, error) {
+	outDataPoint, _, err := bh.getFirstBlockInfoFromDB(chainClient.ChainID(), blockNo)
+	if err != nil {
+		return nil, err
+	}
+	var timestamp int64
+	if outDataPoint == nil {
+		block, err := chainClient.BlockByNumber(ctx, blockNo)
+		if err != nil {
+			return nil, err
+		}
+		timestamp = int64(block.Time())
+	} else {
+		timestamp = outDataPoint.timestamp
+	}
+
 	currentBalance, err := chainClient.BalanceAt(ctx, address, blockNo)
 	if err != nil {
 		return nil, err
@@ -189,15 +205,27 @@ const (
 	calibrationBitset   = 1
 )
 
+// getOrFetchCalibrationData retrieves block timestamps fro a given chain and currency and returns them sorted by block number
+// It will fetch data from the DB and if not enough data is available, it will fetch from the chain
+//
+// We use calibration data instead of previously fetched chain in order to have good cache hit we need all future requests
+// for the same chain and currency to use the same calibration data otherwise we would need to fetch block infos every time
+// due to small differences in block numbers based on different relative time intervals
+//
+// Considerations:
+// - Older than 1 year data is fetched with a longer interval to save on RPC calls, see "calibrationInterval"
+// - The implementation can fail any time so it must be resilient next time and continue from where it left of
+// - Beware - the implementation relies on BlockInfoSource time span being longer than two years
 func (bh *BalanceHistory) getOrFetchCalibrationData(ctx context.Context, chainClient BlockInfoSource) ([]*blockInfo, error) {
-	dbData, err := bh.getDBBalanceEntriesTimeSortedAsc(&BhIdentity{chainClient.ChainID(), calibrationAddress(), calibrationCurrency}, nil, calibrationBitset, 1000)
+	dbData, err := bh.getDBBalanceEntriesTimeSortedAsc(&BhIdentity{chainClient.ChainID(), calibrationAddress(), calibrationCurrency}, nil, calibrationBitset, 2000)
 	if err != nil {
 		return nil, err
 	}
 
+	// We use the second block as start because the initial block doesn't have a timestamp
 	lastBlockInfo := &blockInfo{big.NewInt(1), 0}
 	// It is ok for the initial fetching to use a very long interval, as it isn't as relevant
-	calibrationInterval := 365 * 24 * time.Hour // 1 year
+	calibrationInterval := coarseCalibrationUpdateInterval
 	lastAvgBlockTime := float64(12)
 	nextBlockNo := big.NewInt(1)
 	var prevBlockInfo *blockInfo
@@ -213,9 +241,10 @@ func (bh *BalanceHistory) getOrFetchCalibrationData(ctx context.Context, chainCl
 		}
 
 		// If the last block is newer then a year, use the coarse update interval
-		if currentTime-lastBlockInfo.timestamp < secondsInTimeInterval[BalanceHistory1Year] {
+		if currentTime-lastBlockInfo.timestamp <= secondsInTimeInterval[BalanceHistory1Year] {
 			calibrationInterval = calibrationUpdateInterval
 		}
+
 		nextBlockNo.Add(lastBlockInfo.block, big.NewInt(int64(calibrationInterval.Seconds()/lastAvgBlockTime)))
 
 		for _, dbEntry := range dbData {
@@ -224,7 +253,7 @@ func (bh *BalanceHistory) getOrFetchCalibrationData(ctx context.Context, chainCl
 	}
 
 	reachedPastLastBlock := false
-	for currentTime-lastBlockInfo.timestamp > int64(calibrationUpdateInterval.Seconds()) && !reachedPastLastBlock {
+	for !reachedPastLastBlock && (lastBlockInfo == nil || lastBlockInfo.timestamp < currentTime-int64(calibrationInterval.Seconds())) {
 		// Check context for cancellation every cycle
 		select {
 		case <-ctx.Done():
@@ -245,41 +274,52 @@ func (bh *BalanceHistory) getOrFetchCalibrationData(ctx context.Context, chainCl
 			} else {
 				return nil, err
 			}
+		} else if nextBlockNo.Cmp(big.NewInt(1)) == 0 && int64(block.Time()) > time.Unix(currentTime, 0).Add(time.Duration(-2.1*365*24)*time.Hour).Unix() {
+			return nil, errors.New("Younger than 2.1 years blockchains not supported")
 		}
 
-		dataPoint := balanceHistoryDBEntry{
-			chainID:   chainClient.ChainID(),
-			address:   calibrationAddress(),
-			currency:  calibrationCurrency,
-			block:     new(big.Int).Set(block.Number()),
-			balance:   big.NewInt(0),
-			timestamp: int64(block.Time()),
-		}
-		err = bh.addBalanceEntryToDB(&dataPoint, calibrationBitset)
-		if err != nil {
-			return nil, err
-		}
-		if prevBlockInfo != nil {
-			lastAvgBlockTime = averageBlockDuration(prevBlockInfo.block, block.Number(), prevBlockInfo.timestamp, int64(block.Time()))
+		// Switch update interval from coarse if we got close enough
+		if calibrationInterval != calibrationUpdateInterval && currentTime-int64(block.Time()) < secondsInTimeInterval[BalanceHistory1Year] {
+			calibrationInterval = calibrationUpdateInterval
+			timestampForNextBlock := currentTime - secondsInTimeInterval[BalanceHistory1Year]
+			if timestampForNextBlock <= lastBlockInfo.timestamp {
+				timestampForNextBlock = lastBlockInfo.timestamp + int64(calibrationInterval.Seconds())
+			}
+			nextBlockNo, _, _ = computeBlockInfoForTimestamp(timestampForNextBlock, len(result)-1, result, int64(calibrationInterval.Seconds()))
 		} else {
+			dataPoint := balanceHistoryDBEntry{
+				chainID:   chainClient.ChainID(),
+				address:   calibrationAddress(),
+				currency:  calibrationCurrency,
+				block:     new(big.Int).Set(block.Number()),
+				balance:   big.NewInt(0),
+				timestamp: int64(block.Time()),
+			}
+			err = bh.addBalanceEntryToDB(&dataPoint, calibrationBitset)
+			if err != nil {
+				return nil, err
+			}
+			if prevBlockInfo != nil {
+				lastAvgBlockTime = averageBlockDuration(prevBlockInfo.block, block.Number(), prevBlockInfo.timestamp, int64(block.Time()))
+			} else {
+				prevBlockInfo = &blockInfo{new(big.Int), int64(block.Time())}
+				prevBlockInfo.block.Set(block.Number())
+			}
+
+			lastBlockInfo = &blockInfo{new(big.Int).Set(block.Number()), int64(block.Time())}
+			result = append(result, lastBlockInfo)
+			nextBlockNo.Add(nextBlockNo, big.NewInt(int64(calibrationInterval.Seconds()/lastAvgBlockTime)))
+
 			prevBlockInfo = &blockInfo{new(big.Int), int64(block.Time())}
 			prevBlockInfo.block.Set(block.Number())
 		}
-
-		lastBlockInfo = &blockInfo{new(big.Int).Set(block.Number()), int64(block.Time())}
-		result = append(result, lastBlockInfo)
-		nextBlockNo.Add(nextBlockNo, big.NewInt(int64(calibrationInterval.Seconds()/lastAvgBlockTime)))
-
-		prevBlockInfo = &blockInfo{new(big.Int), int64(block.Time())}
-		prevBlockInfo.block.Set(block.Number())
 	}
 
 	return result, nil
 }
 
-func getStepInfo(prevBlockInfo *blockInfo, blockInfo *blockInfo, timeInterval BalanceHistoryTimeInterval) (blocksInStep int64, stepDuration int64, avgBlockTime float64) {
+func getStepInfo(prevBlockInfo *blockInfo, blockInfo *blockInfo, idealStepDuration int64) (blocksInStep int64, stepDuration int64, avgBlockTime float64) {
 	avgBlockTime = averageBlockDuration(prevBlockInfo.block, blockInfo.block, prevBlockInfo.timestamp, blockInfo.timestamp)
-	idealStepDuration := timeIntervalToHoursPerStep[timeInterval] * secondsInHour
 	blocksInStep = int64(float64(idealStepDuration) / avgBlockTime)
 	stepDuration = int64(float64(blocksInStep) * avgBlockTime)
 	return
@@ -319,15 +359,15 @@ func snapTimestamp(timestamp int64, timeInterval BalanceHistoryTimeInterval) int
 	return rounded.Unix()
 }
 
-func computeBlockInfoForTimestamp(timestamp int64, startCalibIdx int, calib []*blockInfo, timeInterval BalanceHistoryTimeInterval) (block *big.Int, blockTimestamp int64, calibIdx int) {
+func computeBlockInfoForTimestamp(timestamp int64, startCalibIdx int, calib []*blockInfo, idealStepDuration int64) (block *big.Int, blockTimestamp int64, calibIdx int) {
 	if startCalibIdx == 0 {
 		startCalibIdx = 1
 	}
 	calibIdx = startCalibIdx
-	for i := startCalibIdx; i < len(calib) && calib[i-1].timestamp < timestamp; i++ {
+	for i := startCalibIdx + 1; i < len(calib) && calib[i-1].timestamp < timestamp; i++ {
 		calibIdx = i
 	}
-	_, _, currentAvgBlockTime := getStepInfo(calib[calibIdx-1], calib[calibIdx], timeInterval)
+	_, _, currentAvgBlockTime := getStepInfo(calib[calibIdx-1], calib[calibIdx], idealStepDuration)
 	timeToPrevBlock := timestamp - calib[calibIdx-1].timestamp
 	timeToNextBlock := timestamp - calib[calibIdx].timestamp
 	// Compute relative to the closest calibration block to minimize the error
@@ -363,8 +403,8 @@ func expandFlag(flag int) int {
 	return (flag << 1) - 1
 }
 
-// getBalanceHistory expect a time precision of +/- average block time (~12s)
-// implementation relies that a block has relative constant time length to save block header requests
+// getBalanceHistoryFromBlocksSource relies on the expectation of a block length to be ~12s but corrects it based on last two entries blocks
+// it reuses previous fetched blocks timestamp to avoid fetching block headers again
 func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context, chainClient BlockInfoSource, address common.Address, timeInterval BalanceHistoryTimeInterval) ([]*BalanceState, error) {
 	calib, err := bh.getOrFetchCalibrationData(ctx, chainClient)
 	if err != nil {
@@ -386,17 +426,18 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 	}
 
 	var currentBlockNumber *big.Int
-	var currentBlockTimestamp int64
+	var startBlockTimestamp int64
 	nextBlockTimestamp := startTimestamp
 	calibIdx := 1
+	secondsPerStep := int64((time.Duration(timeIntervalToHoursPerStep[timeInterval]) * time.Hour).Seconds())
 	if timeInterval != BalanceHistoryAllTime {
-		currentBlockNumber, currentBlockTimestamp, calibIdx = computeBlockInfoForTimestamp(roundedTimestamp, 1, calib, timeInterval)
+		currentBlockNumber, startBlockTimestamp, calibIdx = computeBlockInfoForTimestamp(roundedTimestamp, 1, calib, secondsPerStep)
 	} else {
 		currentBlockNumber = new(big.Int).Set(calib[0].block)
-		currentBlockTimestamp = calib[0].timestamp
+		startBlockTimestamp = calib[0].timestamp
 	}
 
-	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&BhIdentity{chainClient.ChainID(), address, chainClient.Currency()}, nil, &bhFilter{currentBlockTimestamp, maxAllRangeTimestamp, expandFlag(int(bitsetFilter))}, 1000)
+	outDataPoints, err := bh.getDBBalanceEntriesByTimeIntervalAndSortedAsc(&BhIdentity{chainClient.ChainID(), address, chainClient.Currency()}, nil, &bhFilter{startBlockTimestamp, maxAllRangeTimestamp, expandFlag(int(bitsetFilter))}, 1000)
 	if err != nil {
 		return nil, err
 	}
@@ -412,8 +453,9 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 	prevCalibIdx := 1
 	var stepDuration int64
 	var currentBalanceState *BalanceState
+	var found bool
 	points := make([]*BalanceState, 0)
-	for nextBlockTimestamp < currentTimestamp {
+	for currentBalanceState == nil || int64(currentBalanceState.Timestamp) < currentTimestamp-secondsPerStep {
 		// Check context for cancellation every cycle
 		select {
 		case <-ctx.Done():
@@ -421,10 +463,8 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 		default:
 		}
 
-		cachedDataEntry, found := cachedData[currentBlockNumber.String()]
-		if found {
-			points = append(points, cachedDataEntry)
-		} else {
+		currentBalanceState, found = cachedData[currentBlockNumber.String()]
+		if !found {
 			outDataPoint, bitset, err := bh.getBalanceEntryFromDB(chainClient.ChainID(), address, chainClient.Currency(), currentBlockNumber)
 			if err != nil {
 				return nil, err
@@ -438,17 +478,26 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 					Value:     (*hexutil.Big)(outDataPoint.balance),
 					Timestamp: uint64(outDataPoint.timestamp),
 				}
+				fmt.Println("@dd GOT - DB", currentBlockNumber.String(), time.Unix(int64(currentBalanceState.Timestamp), 0).String())
 			} else {
-				currentBalanceState, err = bh.fetchAndCacheBalanceForBlock(ctx, chainClient, address, currentBlockNumber, currentBlockTimestamp, bitsetFilter)
+				currentBalanceState, err = bh.fetchAndCacheBalanceForBlock(ctx, chainClient, address, currentBlockNumber, bitsetFilter)
 				if err != nil {
-					return nil, err
+					if err == ethereum.NotFound {
+						// We overshoot, stop and return what we have
+						return points, nil
+					} else {
+						return nil, err
+					}
 				}
+				fmt.Println("@dd GOT - FETCH", currentBlockNumber.String(), time.Unix(int64(currentBalanceState.Timestamp), 0).String(), currentBalanceState.Value, "; TErr", (time.Duration(math.Abs(float64(roundedTimestamp-int64(currentBalanceState.Timestamp)))) * time.Second).Hours(), "H")
 			}
-			points = append(points, currentBalanceState)
+		} else {
+			fmt.Println("@dd GOT - MEM", currentBlockNumber.String(), time.Unix(int64(currentBalanceState.Timestamp), 0).String())
 		}
+		points = append(points, currentBalanceState)
 
 		if calibIdx != prevCalibIdx || stepDuration == 0 {
-			_, stepDuration, _ = getStepInfo(calib[calibIdx-1], calib[calibIdx], timeInterval)
+			_, stepDuration, _ = getStepInfo(calib[calibIdx-1], calib[calibIdx], secondsPerStep)
 			prevCalibIdx = calibIdx
 		}
 
@@ -458,7 +507,7 @@ func (bh *BalanceHistory) getBalanceHistoryFromBlocksSource(ctx context.Context,
 			nextBlockTimestamp += stepDuration
 			roundedTimestamp = snapTimestamp(nextBlockTimestamp, timeInterval)
 		}
-		currentBlockNumber, currentBlockTimestamp, calibIdx = computeBlockInfoForTimestamp(roundedTimestamp, calibIdx, calib, timeInterval)
+		currentBlockNumber, _, calibIdx = computeBlockInfoForTimestamp(roundedTimestamp, calibIdx, calib, secondsPerStep)
 	}
 
 	return points, nil
@@ -561,7 +610,7 @@ func (bh *BalanceHistory) updateBalanceHistoryRunTask(rpcClient *rpc.Client, net
 	}, updateBalanceHistoryPriority)
 }
 
-// UpdateBalanceHistoryForAllEnabledNetworks return true if the balance history was updated or false if any step failed due to temporary error (e.g. network error)
+// UpdateBalanceHistoryForAllEnabledNetworks iterates over all enabled and supported networks, tokens
 // Expects ctx to have cancellation support and processing to be cancelled by the caller
 func (bh *BalanceHistory) UpdateBalanceHistoryForAllEnabledNetworks(ctx context.Context, rpcClient *rpc.Client, networkManager *network.Manager, tokenManager *token.Manager) error {
 	accountsDB, err := accounts.NewDB(bh.db)
@@ -610,16 +659,20 @@ func (bh *BalanceHistory) UpdateBalanceHistoryForAllEnabledNetworks(ctx context.
 			}
 
 			for _, address := range addresses {
-				for currentInterval := int(BalanceHistory7Hours); currentInterval <= int(BalanceHistoryAllTime); currentInterval++ {
+				//for currentInterval := int(BalanceHistoryAllTime); currentInterval >= int(BalanceHistory7Days); currentInterval-- {
+				// TODO: DEV remove me
+				for currentInterval := int(BalanceHistory6Months); currentInterval <= int(BalanceHistory1Year); currentInterval++ {
 					// Check context for cancellation every fetch attempt
 					select {
 					case <-ctx.Done():
 						return errors.New("context cancelled")
 					default:
 					}
+					fmt.Println("@dd UPDATE BH - ", dataSource.ChainID(), dataSource.Currency(), address.String(), currentInterval)
 					_, err = bh.getBalanceHistoryFromBlocksSource(ctx, dataSource, common.Address(address), BalanceHistoryTimeInterval(currentInterval))
+					fmt.Println("@dd UPDATE BH DONE - ", dataSource.ChainID(), dataSource.Currency(), address.String(), currentInterval, err)
 					if err != nil {
-						return err
+						log.Warn("Error updating balance history", "chainID", dataSource.ChainID(), "currency", dataSource.Currency(), "address", address.String(), "interval", currentInterval, "err", err)
 					}
 				}
 			}
@@ -677,7 +730,9 @@ func (c *Controller) GetBalanceHistoryAndInterruptUpdate(ctx context.Context, re
 }
 
 func (c *Controller) GetBalanceHistory(ctx context.Context, dataSource BlockInfoSource, address common.Address, timeInterval BalanceHistoryTimeInterval) ([]*BalanceState, error) {
+	fmt.Println("@dd GET BH - ", dataSource.ChainID(), dataSource.Currency(), address.String(), timeInterval)
 	entries, err := c.balanceHistory.getBalanceHistoryFromBlocksSource(ctx, dataSource, address, timeInterval)
+	fmt.Println("@dd GET BH DONE - ", dataSource.ChainID(), dataSource.Currency(), address.String(), timeInterval, err)
 	if err != nil {
 		return nil, err
 	}
@@ -716,6 +771,25 @@ func (bh *BalanceHistory) getBalanceEntryFromDB(chainID uint64, address common.A
 	queryStr := "SELECT timestamp, balance, bitset FROM balance_history WHERE chain_id = ? AND address = ? AND currency = ? AND block = ?"
 	row := bh.db.QueryRow(queryStr, chainID, address, currency, (*bigint.SQLBigInt)(block))
 	err = row.Scan(&res.timestamp, (*bigint.SQLBigIntBytes)(res.balance), &bitset)
+	if err == sql.ErrNoRows {
+		return nil, 0, nil
+	} else if err != nil {
+		return nil, 0, err
+	}
+	res.block.Set(block)
+	return
+}
+
+// getFirstBlockInfoFromDB returns nil if no entry is found
+func (bh *BalanceHistory) getFirstBlockInfoFromDB(chainID uint64, block *big.Int) (res *balanceHistoryDBEntry, bitset int, err error) {
+	res = &balanceHistoryDBEntry{
+		chainID: chainID,
+		block:   new(big.Int),
+		balance: new(big.Int),
+	}
+	queryStr := "SELECT address, currency, timestamp, balance, bitset FROM balance_history WHERE chain_id = ? AND block = ?"
+	row := bh.db.QueryRow(queryStr, chainID, (*bigint.SQLBigInt)(block))
+	err = row.Scan(&res.address, &res.currency, &res.timestamp, (*bigint.SQLBigIntBytes)(res.balance), &bitset)
 	if err == sql.ErrNoRows {
 		return nil, 0, nil
 	} else if err != nil {
