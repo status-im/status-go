@@ -2,12 +2,9 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
-
-	"github.com/rmg/iso4217"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -315,14 +312,14 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }
 
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (api *API) FetchPrices(ctx context.Context, symbols []string, currency string) (map[string]float64, error) {
 	log.Debug("call to FetchPrices")
-	return fetchCryptoComparePrices(symbols, currencies)
+	return fetchCryptoComparePrices(symbols, currency)
 }
 
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return fetchTokenMarketValues(symbols, currencies)
+	return fetchTokenMarketValues(symbols, currency)
 }
 
 func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
@@ -523,20 +520,4 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, password string) (*MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
-}
-
-func (api *API) IsCurrencyFiat(name string) bool {
-	code, _ := iso4217.ByName(strings.ToUpper(name))
-
-	return (code != 0)
-}
-
-func (api *API) GetFiatCurrencyMinorUnit(name string) (int, error) {
-	code, minor := iso4217.ByName(strings.ToUpper(name))
-
-	if code == 0 {
-		return code, errors.New("Unknown currency: " + name)
-	}
-
-	return minor, nil
 }
