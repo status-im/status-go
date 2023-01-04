@@ -29,13 +29,13 @@ type Coin struct {
 }
 
 type MarketCoinValues struct {
-	MKTCAP          float64 `json:"MKTCAP"`
-	HIGHDAY         float64 `json:"HIGHDAY"`
-	LOWDAY          float64 `json:"LOWDAY"`
-	CHANGEPCTHOUR   float64 `json:"CHANGEPCTHOUR"`
-	CHANGEPCTDAY    float64 `json:"CHANGEPCTDAY"`
-	CHANGEPCT24HOUR float64 `json:"CHANGEPCT24HOUR"`
-	CHANGE24HOUR    float64 `json:"CHANGE24HOUR"`
+	MKTCAP          string `json:"MKTCAP"`
+	HIGHDAY         string `json:"HIGHDAY"`
+	LOWDAY          string `json:"LOWDAY"`
+	CHANGEPCTHOUR   string `json:"CHANGEPCTHOUR"`
+	CHANGEPCTDAY    string `json:"CHANGEPCTDAY"`
+	CHANGEPCT24HOUR string `json:"CHANGEPCT24HOUR"`
+	CHANGE24HOUR    string `json:"CHANGE24HOUR"`
 }
 
 type TokenHistoricalPairs struct {
@@ -61,7 +61,7 @@ type CoinsContainer struct {
 }
 
 type MarketValuesContainer struct {
-	Raw map[string]map[string]MarketCoinValues `json:"Raw"`
+	Display map[string]map[string]MarketCoinValues `json:"Display"`
 }
 
 func renameSymbols(symbols []string) (renames []string) {
@@ -94,14 +94,13 @@ func chunkSymbols(symbols []string) [][]string {
 	return chunks
 }
 
-func fetchCryptoComparePrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func fetchCryptoComparePrices(symbols []string, currency string) (map[string]float64, error) {
 	chunks := chunkSymbols(symbols)
-	result := make(map[string]map[string]float64)
-	realCurrencies := renameSymbols(currencies)
+	result := make(map[string]float64)
 	for _, smbls := range chunks {
 		realSymbols := renameSymbols(smbls)
 		httpClient := http.Client{Timeout: time.Minute}
-		url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), strings.Join(realCurrencies, ","))
+		url := fmt.Sprintf("%s/data/pricemulti?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
 		resp, err := httpClient.Get(url)
 		if err != nil {
 			return nil, err
@@ -120,10 +119,7 @@ func fetchCryptoComparePrices(symbols []string, currencies []string) (map[string
 		}
 
 		for _, symbol := range smbls {
-			result[symbol] = map[string]float64{}
-			for _, currency := range currencies {
-				result[symbol][currency] = prices[getRealSymbol(symbol)][getRealSymbol(currency)]
-			}
+			result[symbol] = prices[getRealSymbol(symbol)][strings.ToUpper(currency)]
 		}
 	}
 	return result, nil
@@ -159,13 +155,12 @@ func fetchCryptoCompareTokenDetails(symbols []string) (map[string]Coin, error) {
 	return coins, nil
 }
 
-func fetchTokenMarketValues(symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
-	realCurrencies := renameSymbols(currencies)
+func fetchTokenMarketValues(symbols []string, currency string) (map[string]MarketCoinValues, error) {
 	realSymbols := renameSymbols(symbols)
-	item := map[string]map[string]MarketCoinValues{}
+	item := map[string]MarketCoinValues{}
 	httpClient := http.Client{Timeout: time.Minute}
 
-	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), strings.Join(realCurrencies, ","))
+	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", cryptocompareURL, strings.Join(realSymbols, ","), currency)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return item, err
@@ -184,10 +179,7 @@ func fetchTokenMarketValues(symbols []string, currencies []string) (map[string]m
 	}
 
 	for _, symbol := range symbols {
-		item[symbol] = map[string]MarketCoinValues{}
-		for _, currency := range currencies {
-			item[symbol][currency] = container.Raw[getRealSymbol(symbol)][getRealSymbol(currency)]
-		}
+		item[symbol] = container.Display[getRealSymbol(symbol)][strings.ToUpper(currency)]
 	}
 
 	return item, nil
