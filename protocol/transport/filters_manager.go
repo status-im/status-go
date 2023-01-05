@@ -143,6 +143,7 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 		identityStr := PublicKeyToStr(&pk.PublicKey)
 		rawFilter, err := f.addAsymmetric(identityStr, pk, true)
 		if err != nil {
+			f.logger.Debug("could not register community filter", zap.Error(err))
 			return nil, err
 
 		}
@@ -356,6 +357,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 	// but we discard envelopes if listen is false.
 	filter, err := f.addAsymmetric(chatID, identity, listen)
 	if err != nil {
+		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
 	}
 
@@ -393,6 +395,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	// but we discard envelopes if listen is false.
 	filter, err := f.addAsymmetric(chatID, identity, listen)
 	if err != nil {
+		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -427,6 +430,7 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 	keyString := hex.EncodeToString(secret.Key)
 	filter, err := f.addSymmetric(keyString)
 	if err != nil {
+		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
 	}
 
@@ -482,6 +486,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, f.privateKey, true)
 	if err != nil {
+		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -512,6 +517,7 @@ func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 
 	filterAndTopic, err := f.addSymmetric(chatID)
 	if err != nil {
+		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
@@ -544,6 +550,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 
 	contactCodeFilter, err := f.addSymmetric(chatID)
 	if err != nil {
+		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
