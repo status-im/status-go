@@ -479,7 +479,7 @@ func (g Group) LastClockValue() uint64 {
 	return g.events[len(g.events)-1].ClockValue
 }
 
-func (g Group) creator() (string, error) {
+func (g Group) Creator() (string, error) {
 	if len(g.events) == 0 {
 		return "", errors.New("no events in the group")
 	}
@@ -491,7 +491,7 @@ func (g Group) creator() (string, error) {
 }
 
 func (g Group) validateChatID(chatID string) bool {
-	creator, err := g.creator()
+	creator, err := g.Creator()
 	if err != nil || creator == "" {
 		return false
 	}
