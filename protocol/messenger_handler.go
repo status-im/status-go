@@ -517,6 +517,22 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		state.AllChats.Store(chat.ID, chat)
 	}
 
+	if contact.Added && !contact.HasAddedUs {
+		// This means we have an outgoing contact request that is pending.
+		// There might have been a response to this request already
+		// which wasn't backed up, so we're resending the contact request
+		// and hope for a response.
+
+		request := &requests.SendContactRequest{
+			ID:      types.Hex2Bytes(contact.ID),
+			Message: "Resending pending contact request",
+		}
+		_, err := m.SendContactRequest(context.Background(), request)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -1575,16 +1591,33 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			m.logger.Info("not handling contact message since clock lower")
 			return nil
 		}
-		receivedMessage.ContactRequestState = common.ContactRequestStatePending
-		contact.ContactRequestClock = receivedMessage.Clock
-		contact.ContactRequestReceived()
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-		err = m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
-		if err != nil {
-			return err
-		}
+		currentContact, ok := state.AllContacts.Load(contact.ID)
+		if ok && currentContact.Added {
+			// We've already added this contact, so let's send an ACK
+			ensName, err := m.settings.ENSName()
+			if err != nil {
+				return err
+			}
 
+			displayName, err := m.settings.DisplayName()
+			if err != nil {
+				return err
+			}
+			_, err = m.sendContactUpdate(context.Background(), currentContact.ID, displayName, ensName, "")
+			if err != nil {
+				return err
+			}
+		} else {
+			receivedMessage.ContactRequestState = common.ContactRequestStatePending
+			contact.ContactRequestClock = receivedMessage.Clock
+			contact.ContactRequestReceived()
+			state.ModifiedContacts.Store(contact.ID, true)
+			state.AllContacts.Store(contact.ID, contact)
+			err = m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
+			if err != nil {
+				return err
+			}
+		}
 	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
 	}
