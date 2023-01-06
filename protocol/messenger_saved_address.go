@@ -17,7 +17,7 @@ func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddre
 	if err != nil {
 		return err
 	}
-	return m.syncNewSavedAddress(ctx, &sa, updatedClock, nil)
+	return m.syncNewSavedAddress(ctx, &sa, updatedClock, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address) error {
@@ -25,7 +25,7 @@ func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, addr
 	if err != nil {
 		return err
 	}
-	return m.syncDeletedSavedAddress(ctx, chainID, address, updatedClock, nil)
+	return m.syncDeletedSavedAddress(ctx, chainID, address, updatedClock, m.dispatchMessage)
 }
 
 func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
