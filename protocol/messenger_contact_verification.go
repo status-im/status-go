@@ -85,7 +85,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	}
 
 	// We sync the contact with the other devices
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 	}
 
 	// We sync the contact with the other devices
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 
 	response.AddVerificationRequest(verifRequest)
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		return nil, err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +396,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 
-	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusTRUSTED)
+	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusTRUSTED, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -436,13 +436,13 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
 
 	// We sync the contact with the other devices
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +501,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusUNTRUSTWORTHY)
+	err = m.SyncTrustedUser(context.Background(), contactID, verification.TrustStatusUNTRUSTWORTHY, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -541,13 +541,13 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
 
 	// We sync the contact with the other devices
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +624,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 
 	response.AddVerificationRequest(verifRequest)
 
-	err = m.SyncVerificationRequest(context.Background(), verifRequest)
+	err = m.SyncVerificationRequest(context.Background(), verifRequest, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +687,7 @@ func (m *Messenger) MarkAsTrusted(ctx context.Context, contactID string) error {
 		return err
 	}
 
-	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusTRUSTED)
+	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusTRUSTED, m.dispatchMessage)
 }
 
 func (m *Messenger) MarkAsUntrustworthy(ctx context.Context, contactID string) error {
@@ -696,7 +696,7 @@ func (m *Messenger) MarkAsUntrustworthy(ctx context.Context, contactID string) e
 		return err
 	}
 
-	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusUNTRUSTWORTHY)
+	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusUNTRUSTWORTHY, m.dispatchMessage)
 }
 
 func (m *Messenger) RemoveTrustStatus(ctx context.Context, contactID string) error {
@@ -705,7 +705,7 @@ func (m *Messenger) RemoveTrustStatus(ctx context.Context, contactID string) err
 		return err
 	}
 
-	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusUNKNOWN)
+	return m.SyncTrustedUser(ctx, contactID, verification.TrustStatusUNKNOWN, m.dispatchMessage)
 }
 
 func (m *Messenger) GetTrustStatus(contactID string) (verification.TrustStatus, error) {
@@ -775,7 +775,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 	}
 	m.logger.Info("SAVED", zap.String("id", persistedVR.ID))
 
-	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	err = m.SyncVerificationRequest(context.Background(), persistedVR, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -865,7 +865,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		return err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	err = m.SyncVerificationRequest(context.Background(), persistedVR, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -952,7 +952,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 		return err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	err = m.SyncVerificationRequest(context.Background(), persistedVR, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -1005,7 +1005,7 @@ func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState,
 		return err
 	}
 
-	err = m.SyncVerificationRequest(context.Background(), persistedVR)
+	err = m.SyncVerificationRequest(context.Background(), persistedVR, m.dispatchMessage)
 	if err != nil {
 		return err
 	}

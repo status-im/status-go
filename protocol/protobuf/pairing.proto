@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "sync_settings.proto";
+import 'application_metadata_message.proto';
 
 option go_package = "./;protobuf";
 package protobuf;
@@ -278,4 +279,18 @@ message BackedUpProfile {
   string display_name = 2;
   uint64 display_name_clock = 3;
   repeated SyncProfilePicture pictures = 4;
+}
+
+message RawMessage {
+  bytes payload = 1;
+  ApplicationMetadataMessage.Type messageType = 2;
+}
+
+message SyncRawMessage {
+  repeated RawMessage rawMessages = 1;
+
+  // we need these to be able to login
+  bytes subAccountsJsonBytes = 2;
+  bytes settingsJsonBytes = 3;
+  bytes nodeConfigJsonBytes = 4;
 }

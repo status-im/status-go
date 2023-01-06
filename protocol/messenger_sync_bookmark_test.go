@@ -109,7 +109,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().NoError(err)
 
 	// sync
-	err = s.m.SyncBookmark(context.Background(), &bookmark)
+	err = s.m.SyncBookmark(context.Background(), &bookmark, s.m.dispatchMessage)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -133,7 +133,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 
 	// sync removed state
 	bookmark.Removed = true
-	err = s.m.SyncBookmark(context.Background(), &bookmark)
+	err = s.m.SyncBookmark(context.Background(), &bookmark, s.m.dispatchMessage)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination

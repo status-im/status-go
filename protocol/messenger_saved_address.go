@@ -17,7 +17,7 @@ func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddre
 	if err != nil {
 		return err
 	}
-	return m.syncNewSavedAddress(ctx, &sa, updatedClock)
+	return m.syncNewSavedAddress(ctx, &sa, updatedClock, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address) error {
@@ -25,14 +25,14 @@ func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, addr
 	if err != nil {
 		return err
 	}
-	return m.syncDeletedSavedAddress(ctx, chainID, address, updatedClock)
+	return m.syncDeletedSavedAddress(ctx, chainID, address, updatedClock, m.dispatchMessage)
 }
 
 func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
 	return m.savedAddressesManager.DeleteSoftRemovedSavedAddresses(uint64(time.Now().AddDate(0, 0, -30).Unix()))
 }
 
-func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage protobuf.SyncSavedAddress) error {
+func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage protobuf.SyncSavedAddress, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -44,12 +44,14 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage pr
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -58,32 +60,32 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage pr
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *wallet.SavedAddress, updateClock uint64) error {
+func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *wallet.SavedAddress, updateClock uint64, rawMessageHandler RawMessageHandler) error {
 	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
 		Address:     savedAddress.Address.Bytes(),
 		Name:        savedAddress.Name,
 		Favourite:   savedAddress.Favourite,
 		ChainId:     savedAddress.ChainID,
 		UpdateClock: updateClock,
-	})
+	}, rawMessageHandler)
 }
 
-func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address, updateClock uint64) error {
+func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address, updateClock uint64, rawMessageHandler RawMessageHandler) error {
 	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
 		Address:     address.Bytes(),
 		ChainId:     chainID,
 		UpdateClock: updateClock,
 		Removed:     true,
-	})
+	}, rawMessageHandler)
 }
 
-func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.SavedAddress) (err error) {
+func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.SavedAddress, rawMessageHandler RawMessageHandler) (err error) {
 	if savedAddress.Removed {
-		if err = m.syncDeletedSavedAddress(ctx, savedAddress.ChainID, savedAddress.Address, savedAddress.UpdateClock); err != nil {
+		if err = m.syncDeletedSavedAddress(ctx, savedAddress.ChainID, savedAddress.Address, savedAddress.UpdateClock, rawMessageHandler); err != nil {
 			return err
 		}
 	} else {
-		if err = m.syncNewSavedAddress(ctx, &savedAddress, savedAddress.UpdateClock); err != nil {
+		if err = m.syncNewSavedAddress(ctx, &savedAddress, savedAddress.UpdateClock, rawMessageHandler); err != nil {
 			return err
 		}
 	}

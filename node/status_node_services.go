@@ -211,6 +211,10 @@ func (b *StatusNode) AccountService() *accountssvc.Service {
 	return b.accountsSrvc
 }
 
+func (b *StatusNode) BrowserService() *browsers.Service {
+	return b.browsersSrvc
+}
+
 func (b *StatusNode) WakuService() *waku.Waku {
 	return b.wakuSrvc
 }

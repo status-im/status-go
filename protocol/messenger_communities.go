@@ -368,7 +368,7 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	}
 
 	if com, ok := mr.communities[communityID.String()]; ok {
-		err = m.syncCommunity(context.Background(), com)
+		err = m.syncCommunity(context.Background(), com, m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -493,7 +493,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	if err != nil {
 		return nil, err
 	}
-	err = m.syncCommunity(context.Background(), community)
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -822,7 +822,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	m.communitiesManager.StopHistoryArchiveTasksInterval(communityID)
 
 	if com, ok := mr.communities[communityID.String()]; ok {
-		err = m.syncCommunity(context.Background(), com)
+		err = m.syncCommunity(context.Background(), com, m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -1052,7 +1052,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)
-	err = m.syncCommunity(context.Background(), community)
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}

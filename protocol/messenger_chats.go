@@ -164,7 +164,7 @@ func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse)
 
 	// Sync if it was created
 	if !ok || !wasActive {
-		if err := m.syncPublicChat(context.Background(), chat); err != nil {
+		if err := m.syncPublicChat(context.Background(), chat, m.dispatchMessage); err != nil {
 			return nil, err
 		}
 	}
@@ -407,7 +407,7 @@ func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shou
 	// TODO: Remove filters
 
 	if shouldBeSynced {
-		err := m.syncChatRemoving(context.Background(), chat.ID)
+		err := m.syncChatRemoving(context.Background(), chat.ID, m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -443,7 +443,7 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	// Sync chat if it's a new active public chat, but not a timeline chat
 	if !ok && chat.Active && chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
 
-		if err := m.syncPublicChat(context.Background(), chat); err != nil {
+		if err := m.syncPublicChat(context.Background(), chat, m.dispatchMessage); err != nil {
 			return err
 		}
 	}
@@ -565,7 +565,7 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 		}
 	}
 
-	err = m.syncClearHistory(context.Background(), chat)
+	err = m.syncClearHistory(context.Background(), chat, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
