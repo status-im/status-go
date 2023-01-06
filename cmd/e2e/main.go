@@ -283,6 +283,11 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
+        nodeConfig.HTTPEnabled = true
+        nodeConfig.HTTPPort = 8545
+        nodeConfig.HTTPHost = "localhost"
+        nodeConfig.HTTPVirtualHosts = []string{"localhost"}
+
         nodeConfig.APIModules = "wakuext,ext,waku"
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{

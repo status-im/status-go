@@ -26,17 +26,17 @@ func (m *Messenger) validateAddedGroupMembers(members []string) error {
 		}
 
 		contact, _ := m.allContacts.Load(contactID)
-		if contact == nil || !(contact.Added && contact.HasAddedUs) {
-			return ErrGroupChatAddedContacts
-		}
+                if contact == nil {
+                  contact, err = buildContactFromPkString(contactID)
+                  if err != nil {
+                    return err
+                  }
+                }
 	}
 	return nil
 }
 
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
-	if err := m.validateAddedGroupMembers(members); err != nil {
-		return nil, err
-	}
 
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
