@@ -99,6 +99,7 @@ func makeMutualContact(origin *Messenger, contactPubkey *ecdsa.PublicKey) error 
 	}
 	contact.Added = true
 	contact.HasAddedUs = true
+	contact.ContactRequestState = ContactRequestStateMutual
 	origin.allContacts.Store(contact.ID, contact)
 
 	return nil
