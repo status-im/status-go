@@ -445,6 +445,15 @@ func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName str
 	return nil
 }
 
+func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, accountAddresses []string) error {
+	var addresses []types.Address
+	for _, addr := range accountAddresses {
+		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
+	}
+
+	return api.db.RemoveMigratedAccountsForKeycard(kcUID, addresses)
+}
+
 func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
 	return api.db.GetAllKnownKeycards()
 }

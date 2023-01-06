@@ -3,6 +3,7 @@ package keypairs
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -168,6 +169,35 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 		}
 	}
 	return nil
+}
+
+func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddresses []types.Address) (err error) {
+	inVector := strings.Repeat(",?", len(accountAddresses)-1)
+	query := `
+		DELETE 
+		FROM 
+			keypairs 
+		WHERE 
+			keycard_uid = ?
+		AND
+			account_address	IN (?` + inVector + `)
+	`
+	delete, err := kp.db.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	args := make([]interface{}, len(accountAddresses)+1)
+	args[0] = kcUID
+	for i, addr := range accountAddresses {
+		args[i+1] = addr
+	}
+
+	defer delete.Close()
+
+	_, err = delete.Exec(args...)
+
+	return err
 }
 
 func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string) (err error) {
