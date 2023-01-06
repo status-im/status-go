@@ -36,8 +36,7 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 	}()
 
 	params := activityCenterQueryParams{
-		chatID:             chatID,
-		activityCenterType: ActivityCenterNotificationNoType,
+		chatID: chatID,
 	}
 
 	_, notifications, err := db.buildActivityCenterQuery(tx, params)
@@ -294,24 +293,24 @@ const (
 )
 
 type activityCenterQueryParams struct {
-	cursor             string
-	limit              uint64
-	ids                []types.HexBytes
-	chatID             string
-	author             string
-	read               ActivityCenterQueryParamsRead
-	activityCenterType ActivityCenterType
+	cursor              string
+	limit               uint64
+	ids                 []types.HexBytes
+	chatID              string
+	author              string
+	read                ActivityCenterQueryParamsRead
+	activityCenterTypes []ActivityCenterType
 }
 
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
 
-	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere, readWhere string
+	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere string
 
 	cursor := params.cursor
 	ids := params.ids
 	author := params.author
-	activityCenterType := params.activityCenterType
+	activityCenterTypes := params.activityCenterTypes
 	limit := params.limit
 	chatID := params.chatID
 	read := params.read
@@ -322,13 +321,11 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	}
 
 	if len(ids) != 0 {
-
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 		inQueryWhere = fmt.Sprintf(" AND a.id IN (%s)", inVector)
 		for _, id := range ids {
 			args = append(args, id)
 		}
-
 	}
 
 	switch read {
@@ -348,42 +345,45 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 		args = append(args, author)
 	}
 
-	if activityCenterType != ActivityCenterNotificationNoType {
-		ofTypeWhere = " AND notification_type = ?"
-		args = append(args, activityCenterType)
+	if len(activityCenterTypes) != 0 {
+		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
+		inTypeWhere = fmt.Sprintf(" AND a.notification_type IN (%s)", inVector)
+		for _, activityCenterType := range activityCenterTypes {
+			args = append(args, activityCenterType)
+		}
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
 		`
-  SELECT
-  a.id,
-  a.timestamp,
-  a.notification_type,
-  a.chat_id,
-  a.community_id,
-  a.membership_status,
-  a.read,
-  a.accepted,
-  a.dismissed,
-  a.message,
-  c.last_message,
-  a.reply_message,
-  a.contact_verification_status,
-  c.name,
-  a.author,
-  substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
-  FROM activity_center_notifications a
-  LEFT JOIN chats c
-  ON
-  c.id = a.chat_id
-  WHERE NOT a.dismissed AND NOT a.accepted
-  %s
-  %s
-  %s
-  %s
-  %s
-  %s
-  ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, ofTypeWhere, readWhere)
+	SELECT
+	a.id,
+	a.timestamp,
+	a.notification_type,
+	a.chat_id,
+	a.community_id,
+	a.membership_status,
+	a.read,
+	a.accepted,
+	a.dismissed,
+	a.message,
+	c.last_message,
+	a.reply_message,
+	a.contact_verification_status,
+	c.name,
+	a.author,
+	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
+	FROM activity_center_notifications a
+	LEFT JOIN chats c
+	ON
+	c.id = a.chat_id
+	WHERE NOT a.dismissed AND NOT a.accepted
+	%s
+	%s
+	%s
+	%s
+	%s
+	%s
+	ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere)
 
 	if limit != 0 {
 		args = append(args, limit)
@@ -475,27 +475,27 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 
 func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes) (*ActivityCenterNotification, error) {
 	row := db.db.QueryRow(`
-    SELECT
-    a.id,
-    a.timestamp,
-    a.notification_type,
-    a.chat_id,
-    a.community_id,
-    a.membership_status,
-    a.read,
-    a.accepted,
-    a.dismissed,
-    a.message,
-    c.last_message,
-    a.reply_message,
-    a.contact_verification_status,
-    c.name,
-    a.author
-    FROM activity_center_notifications a
-    LEFT JOIN chats c
-    ON
-    c.id = a.chat_id
-    WHERE a.id = ?`, id)
+		SELECT
+		a.id,
+		a.timestamp,
+		a.notification_type,
+		a.chat_id,
+		a.community_id,
+		a.membership_status,
+		a.read,
+		a.accepted,
+		a.dismissed,
+		a.message,
+		c.last_message,
+		a.reply_message,
+		a.contact_verification_status,
+		c.name,
+		a.author
+		FROM activity_center_notifications a
+		LEFT JOIN chats c
+		ON
+		c.id = a.chat_id
+		WHERE a.id = ?`, id)
 
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
@@ -506,10 +506,10 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 
 func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
-		activityCenterType: activityType,
-		cursor:             cursor,
-		limit:              limit,
-		read:               ActivityCenterQueryParamsReadUnread,
+		activityCenterTypes: []ActivityCenterType{activityType},
+		cursor:              cursor,
+		limit:               limit,
+		read:                ActivityCenterQueryParamsReadUnread,
 	}
 
 	return db.activityCenterNotifications(params)
@@ -517,21 +517,21 @@ func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, lim
 
 func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit uint64, activityType ActivityCenterType) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
-		activityCenterType: activityType,
-		cursor:             cursor,
-		limit:              limit,
-		read:               ActivityCenterQueryParamsReadRead,
+		activityCenterTypes: []ActivityCenterType{activityType},
+		cursor:              cursor,
+		limit:               limit,
+		read:                ActivityCenterQueryParamsReadRead,
 	}
 
 	return db.activityCenterNotifications(params)
 }
 
-func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType ActivityCenterType, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
-		activityCenterType: activityType,
-		cursor:             cursor,
-		limit:              limit,
-		read:               readType,
+		activityCenterTypes: activityTypes,
+		cursor:              cursor,
+		limit:               limit,
+		read:                readType,
 	}
 
 	return db.activityCenterNotifications(params)
@@ -657,11 +657,7 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityC
 		_ = tx.Rollback()
 	}()
 
-	params := activityCenterQueryParams{
-		activityCenterType: ActivityCenterNotificationNoType,
-	}
-
-	_, notifications, err := db.buildActivityCenterQuery(tx, params)
+	_, notifications, err := db.buildActivityCenterQuery(tx, activityCenterQueryParams{})
 
 	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE NOT accepted AND NOT dismissed`)
 	if err != nil {
@@ -689,8 +685,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	}()
 
 	params := activityCenterQueryParams{
-		ids:                ids,
-		activityCenterType: ActivityCenterNotificationNoType,
+		ids: ids,
 	}
 
 	_, notifications, err := db.buildActivityCenterQuery(tx, params)
@@ -761,8 +756,8 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 	}()
 
 	params := activityCenterQueryParams{
-		author:             userPublicKey,
-		activityCenterType: ActivityCenterNotificationTypeNewPrivateGroupChat,
+		author:              userPublicKey,
+		activityCenterTypes: []ActivityCenterType{ActivityCenterNotificationTypeNewPrivateGroupChat},
 	}
 
 	_, notifications, err := db.buildActivityCenterQuery(tx, params)
@@ -821,27 +816,27 @@ func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, er
 
 func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (*ActivityCenterNotification, error) {
 	row := db.db.QueryRow(`
-    SELECT
-    a.id,
-    a.timestamp,
-    a.notification_type,
-    a.chat_id,
-    a.community_id,
-    a.membership_status,
-    a.read,
-    a.accepted,
-    a.dismissed,
-    a.message,
-    c.last_message,
-    a.reply_message,
-    a.contact_verification_status,
-    c.name,
-    a.author
-    FROM activity_center_notifications a
-    LEFT JOIN chats c
-    ON
-    c.id = a.chat_id
-    WHERE NOT dismissed AND NOT a.accepted AND notification_type = ? AND author = ?`, ActivityCenterNotificationTypeContactRequest, contactID)
+		SELECT
+		a.id,
+		a.timestamp,
+		a.notification_type,
+		a.chat_id,
+		a.community_id,
+		a.membership_status,
+		a.read,
+		a.accepted,
+		a.dismissed,
+		a.message,
+		c.last_message,
+		a.reply_message,
+		a.contact_verification_status,
+		c.name,
+		a.author
+		FROM activity_center_notifications a
+		LEFT JOIN chats c
+		ON
+		c.id = a.chat_id
+		WHERE NOT dismissed AND NOT a.accepted AND notification_type = ? AND author = ?`, ActivityCenterNotificationTypeContactRequest, contactID)
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
 		return nil, nil

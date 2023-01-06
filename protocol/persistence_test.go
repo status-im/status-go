@@ -1499,7 +1499,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	require.Equal(t, nID2, notifications[0].ID)
 }
 
-func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
+func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -1554,6 +1554,17 @@ func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.Equal(t, nID1, notifications[1].ID)
+
+	_, notifications, err = p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeNewOneToOne},
+	)
+	require.NoError(t, err)
+	require.Len(t, notifications, 3)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID2, notifications[1].ID)
+	require.Equal(t, nID1, notifications[2].ID)
 
 	// Mark all notifications as read.
 	for _, notification := range allNotifications {
