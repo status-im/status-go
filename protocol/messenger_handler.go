@@ -219,7 +219,7 @@ func (m *Messenger) checkIfCreatorIsOurContact(group *v1protocol.Group) bool {
 	creator, err := group.Creator()
 	if err == nil {
 		contact, _ := m.allContacts.Load(creator)
-		return contact != nil && contact.Added && contact.HasAddedUs
+		return contact != nil && contact.ContactRequestState == ContactRequestStateMutual
 	}
 	m.logger.Warn("failed to get creator from group", zap.String("group name", group.Name()), zap.String("group chat id", group.ChatID()), zap.Error(err))
 	return false
