@@ -1,6 +1,7 @@
 package swap
 
 import (
+	"context"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -72,4 +73,15 @@ func (s *WakuSwap) Debit(peerId string, n int) {
 
 	s.Accounting[peerId] += n
 	s.applyPolicy(peerId)
+}
+
+func (s *WakuSwap) Start(ctx context.Context) error {
+	return nil
+}
+
+func (s *WakuSwap) Stop() {
+}
+
+func (s *WakuSwap) IsStarted() bool {
+	return false
 }

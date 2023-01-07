@@ -4,9 +4,9 @@
 package node
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
-
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
@@ -17,7 +17,7 @@ func (w *WakuNode) RLNRelay() RLNRelay {
 	return w.rlnRelay
 }
 
-func (w *WakuNode) mountRlnRelay() error {
+func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 	// check whether inputs are provided
 	// relay protocol is the prerequisite of rln-relay
 	if w.Relay() == nil {
@@ -46,7 +46,7 @@ func (w *WakuNode) mountRlnRelay() error {
 		}
 
 		// mount rlnrelay in off-chain mode with a static group of users
-		rlnRelay, err := rln.RlnRelayStatic(w.ctx, w.relay, groupKeys, memKeyPair, memIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
+		rlnRelay, err := rln.RlnRelayStatic(ctx, w.Relay(), groupKeys, memKeyPair, memIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (w *WakuNode) mountRlnRelay() error {
 
 		// mount the rln relay protocol in the on-chain/dynamic mode
 		var err error
-		w.rlnRelay, err = rln.RlnRelayDynamic(w.ctx, w.relay, w.opts.rlnETHClientAddress, w.opts.rlnETHPrivateKey, w.opts.rlnMembershipContractAddress, memKeyPair, w.opts.rlnRelayMemIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.opts.rlnRegistrationHandler, w.timesource, w.log)
+		w.rlnRelay, err = rln.RlnRelayDynamic(ctx, w.Relay(), w.opts.rlnETHClientAddress, w.opts.rlnETHPrivateKey, w.opts.rlnMembershipContractAddress, memKeyPair, w.opts.rlnRelayMemIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.opts.rlnRegistrationHandler, w.timesource, w.log)
 		if err != nil {
 			return err
 		}

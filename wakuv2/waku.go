@@ -272,7 +272,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	if cfg.EnableStore {
-		opts = append(opts, node.WithWakuStore(true, nil))
+		opts = append(opts, node.WithWakuStore())
 		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
 		if err != nil {
 			return nil, err
@@ -280,7 +280,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithMessageProvider(dbStore))
 	}
 
-	if waku.node, err = node.New(ctx, opts...); err != nil {
+	if waku.node, err = node.New(opts...); err != nil {
 		return nil, fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 
@@ -291,7 +291,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 
 	waku.identifyService = idService
 
-	if err = waku.node.Start(); err != nil {
+	if err = waku.node.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 

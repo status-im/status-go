@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
@@ -17,19 +18,12 @@ import (
 	"go.uber.org/zap"
 )
 
-func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort int, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, log *zap.Logger) (*enode.LocalNode, error) {
+func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey) (*enode.LocalNode, error) {
 	db, err := enode.OpenDB("")
 	if err != nil {
 		return nil, err
 	}
-	localnode := enode.NewLocalNode(db, priv)
-
-	err = w.updateLocalNode(localnode, priv, wsAddr, ipAddr, udpPort, wakuFlags, advertiseAddr, log)
-	if err != nil {
-		return nil, err
-	}
-
-	return localnode, nil
+	return enode.NewLocalNode(db, priv), nil
 }
 
 func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort int, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, log *zap.Logger) error {
@@ -215,7 +209,7 @@ func selectWSListenAddress(addresses []ma.Multiaddr, extAddr ma.Multiaddr) ([]ma
 	return result, nil
 }
 
-func (w *WakuNode) setupENR(addrs []ma.Multiaddr) error {
+func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 	extAddr, ipAddr, err := selectMostExternalAddress(addrs)
 	if err != nil {
 		w.log.Error("obtaining external address", zap.Error(err))
@@ -229,33 +223,23 @@ func (w *WakuNode) setupENR(addrs []ma.Multiaddr) error {
 	}
 
 	// TODO: make this optional depending on DNS Disc being enabled
-	if w.opts.privKey != nil {
-		if w.localNode != nil {
-			err := w.updateLocalNode(w.localNode, w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
-			if err != nil {
-				w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
-				return err
-			} else {
-				w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
-				// Restarting DiscV5
-				if w.discoveryV5 != nil && w.discoveryV5.IsStarted() {
-					w.log.Info("restarting discv5")
-					w.discoveryV5.Stop()
-					err = w.discoveryV5.Start(w.ctx)
-					if err != nil {
-						w.log.Error("could not restart discv5", zap.Error(err))
-						return err
-					}
-				}
-			}
+	if w.opts.privKey != nil && w.localNode != nil {
+		err := w.updateLocalNode(w.localNode, w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
+		if err != nil {
+			w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
+			return err
 		} else {
-			localNode, err := w.newLocalnode(w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
-			if err != nil {
-				w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
-				return err
-			} else {
-				w.localNode = localNode
-				w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+			w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+			// Restarting DiscV5
+			discV5 := w.DiscV5()
+			if discV5 != nil && discV5.IsStarted() {
+				w.log.Info("restarting discv5")
+				w.discoveryV5.Stop()
+				err = w.discoveryV5.Start(ctx)
+				if err != nil {
+					w.log.Error("could not restart discv5", zap.Error(err))
+					return err
+				}
 			}
 		}
 	}

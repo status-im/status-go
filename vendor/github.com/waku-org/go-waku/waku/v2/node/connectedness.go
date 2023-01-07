@@ -91,12 +91,12 @@ func (w *WakuNode) sendConnStatus() {
 
 }
 
-func (w *WakuNode) connectednessListener() {
+func (w *WakuNode) connectednessListener(ctx context.Context) {
 	defer w.wg.Done()
 
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-w.protocolEventSub.Out():
 		case <-w.identificationEventSub.Out():
