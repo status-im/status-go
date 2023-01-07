@@ -10,10 +10,6 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 
 replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
 
-replace github.com/raulk/go-watchdog v1.3.0 => github.com/status-im/go-watchdog v1.2.0-ios-nolibproc
-
-replace github.com/flynn/noise v1.0.0 => github.com/status-im/noise v1.0.1-handshakeMessages
-
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0
@@ -57,7 +53,7 @@ require (
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
@@ -80,7 +76,7 @@ require github.com/fogleman/gg v1.3.0
 require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.2.3-test.0.20221212154545-7443daea4cd4
+	github.com/waku-org/go-waku v0.3.2-0.20230110124657-7d2a0ac0e25f
 )
 
 require (
@@ -178,7 +174,6 @@ require (
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
-	github.com/mattn/go-sqlite3 v2.0.2+incompatible // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
@@ -222,7 +217,6 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/raulk/clock v1.1.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
@@ -244,7 +238,6 @@ require (
 	github.com/urfave/cli/v2 v2.20.2 // indirect
 	github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg // indirect
-	github.com/waku-org/noise v1.0.2 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect

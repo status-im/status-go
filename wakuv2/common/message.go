@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -209,18 +209,18 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	// TODO: should we update msg instead of creating a new received message?
 	result = new(ReceivedMessage)
 
-	keyInfo := new(node.KeyInfo)
+	keyInfo := new(payload.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
-		keyInfo.Kind = node.Asymmetric
+		keyInfo.Kind = payload.Asymmetric
 		keyInfo.PrivKey = watcher.KeyAsym
 		msg.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
-		keyInfo.Kind = node.Symmetric
+		keyInfo.Kind = payload.Symmetric
 		keyInfo.SymKey = watcher.KeySym
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := node.DecodePayload(msg.Envelope.Message(), keyInfo)
+	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
 
 	if err != nil {
 		log.Error("failed to decode message", "err", err)

@@ -200,8 +200,10 @@ func (s *NTPTimeSource) Start(ctx context.Context) error {
 }
 
 // Stop goroutine that updates time source.
-func (s *NTPTimeSource) Stop() error {
+func (s *NTPTimeSource) Stop() {
+	if s.cancel == nil {
+		return
+	}
 	s.cancel()
 	s.wg.Wait()
-	return nil
 }

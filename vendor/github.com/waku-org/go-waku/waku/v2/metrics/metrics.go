@@ -91,16 +91,18 @@ var (
 	}
 )
 
-func RecordLightpushError(ctx context.Context, tagType string) {
-	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, LightpushErrors.M(1)); err != nil {
+func recordWithTags(ctx context.Context, tagKey tag.Key, tagType string, ms stats.Measurement) {
+	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(tagKey, tagType)}, ms); err != nil {
 		utils.Logger().Error("failed to record with tags", zap.Error(err))
 	}
 }
 
+func RecordLightpushError(ctx context.Context, tagType string) {
+	recordWithTags(ctx, ErrorType, tagType, LightpushErrors.M(1))
+}
+
 func RecordPeerExchangeError(ctx context.Context, tagType string) {
-	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, PeerExchangeError.M(1)); err != nil {
-		utils.Logger().Error("failed to record with tags", zap.Error(err))
-	}
+	recordWithTags(ctx, ErrorType, tagType, PeerExchangeError.M(1))
 }
 
 func RecordMessage(ctx context.Context, tagType string, len int) {
@@ -114,14 +116,10 @@ func RecordStoreQuery(ctx context.Context) {
 }
 
 func RecordStoreError(ctx context.Context, tagType string) {
-	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(ErrorType, tagType)}, StoreErrors.M(1)); err != nil {
-		utils.Logger().Error("failed to record with tags", zap.Error(err))
-	}
+	recordWithTags(ctx, ErrorType, tagType, StoreErrors.M(1))
 }
 
 func RecordVersion(ctx context.Context, version string, commit string) {
 	v := fmt.Sprintf("%s-%s", version, commit)
-	if err := stats.RecordWithTags(ctx, []tag.Mutator{tag.Insert(GitVersion, v)}, WakuVersion.M(1)); err != nil {
-		utils.Logger().Error("failed to record with tags", zap.Error(err))
-	}
+	recordWithTags(ctx, GitVersion, v, WakuVersion.M(1))
 }

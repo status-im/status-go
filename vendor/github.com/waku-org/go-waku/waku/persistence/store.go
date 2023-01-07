@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/waku-org/go-waku/waku/persistence/migrations"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
@@ -33,7 +32,10 @@ const WALMode = "wal"
 // DBStore is a MessageProvider that has a *sql.DB connection
 type DBStore struct {
 	MessageProvider
-	db         *sql.DB
+
+	db          *sql.DB
+	migrationFn func(db *sql.DB) error
+
 	timesource timesource.Timesource
 	log        *zap.Logger
 
@@ -101,19 +103,18 @@ func WithRetentionPolicy(maxMessages int, maxDuration time.Duration) DBOption {
 	}
 }
 
-// WithMigrationsEnabled is a DBOption used to determine whether migrations should
-// be executed or not
-func WithMigrationsEnabled(enabled bool) DBOption {
+// WithMigrations is a DBOption used to determine if migrations should
+// be executed, and what driver to use
+func WithMigrations(migrationFn func(db *sql.DB) error) DBOption {
 	return func(d *DBStore) error {
-		d.enableMigrations = enabled
+		d.enableMigrations = true
+		d.migrationFn = migrationFn
 		return nil
 	}
 }
 
 func DefaultOptions() []DBOption {
-	return []DBOption{
-		WithMigrationsEnabled(true),
-	}
+	return []DBOption{}
 }
 
 // Creates a new DB store using the db specified via options.
@@ -135,7 +136,7 @@ func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 	}
 
 	if result.enableMigrations {
-		err := migrations.Migrate(result.db)
+		err := result.migrationFn(result.db)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +165,7 @@ func (d *DBStore) cleanOlderRecords() error {
 	// Delete older messages
 	if d.maxDuration > 0 {
 		start := time.Now()
-		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < ?`
+		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < $1`
 		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(d.timesource.Now().Add(-d.maxDuration)))
 		if err != nil {
 			return err
@@ -176,7 +177,7 @@ func (d *DBStore) cleanOlderRecords() error {
 	// Limit number of records to a max N
 	if d.maxMessages > 0 {
 		start := time.Now()
-		sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY receiverTimestamp DESC LIMIT -1 OFFSET ?)`
+		sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY receiverTimestamp DESC LIMIT -1 OFFSET $1)`
 		_, err := d.db.Exec(sqlStmt, d.maxMessages)
 		if err != nil {
 			return err
@@ -218,13 +219,13 @@ func (d *DBStore) Stop() {
 
 // Put inserts a WakuMessage into the DB
 func (d *DBStore) Put(env *protocol.Envelope) error {
-	stmt, err := d.db.Prepare("INSERT INTO message (id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version) VALUES (?, ?, ?, ?, ?, ?, ?)")
+	stmt, err := d.db.Prepare("INSERT INTO message (id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version) VALUES ($1, $2, $3, $4, $5, $6, $7)")
 	if err != nil {
 		return err
 	}
 
 	cursor := env.Index()
-	dbKey := NewDBKey(uint64(cursor.SenderTime), env.PubsubTopic(), env.Index().Digest)
+	dbKey := NewDBKey(uint64(cursor.SenderTime), uint64(cursor.ReceiverTime), env.PubsubTopic(), env.Index().Digest)
 	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().Timestamp, env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().Version)
 	if err != nil {
 		return err
@@ -249,14 +250,15 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	sqlQuery := `SELECT id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version 
 					 FROM message 
 					 %s
-					 ORDER BY senderTimestamp %s, id %s, pubsubTopic %s, receiverTimestamp %s
-					 LIMIT ?`
+					 ORDER BY senderTimestamp %s, id %s, pubsubTopic %s, receiverTimestamp %s `
 
 	var conditions []string
 	var parameters []interface{}
+	paramCnt := 0
 
 	if query.PubsubTopic != "" {
-		conditions = append(conditions, "pubsubTopic = ?")
+		paramCnt++
+		conditions = append(conditions, fmt.Sprintf("pubsubTopic = $%d", paramCnt))
 		parameters = append(parameters, query.PubsubTopic)
 	}
 
@@ -264,7 +266,8 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		var ctPlaceHolder []string
 		for _, ct := range query.ContentFilters {
 			if ct.ContentTopic != "" {
-				ctPlaceHolder = append(ctPlaceHolder, "?")
+				paramCnt++
+				ctPlaceHolder = append(ctPlaceHolder, fmt.Sprintf("$%d", paramCnt))
 				parameters = append(parameters, ct.ContentTopic)
 			}
 		}
@@ -275,9 +278,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	if query.PagingInfo.Cursor != nil {
 		usesCursor = true
 		var exists bool
-		cursorDBKey := NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
+		cursorDBKey := NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), uint64(query.PagingInfo.Cursor.ReceiverTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
 
-		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM message WHERE id = ?)",
+		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM message WHERE id = $1)",
 			cursorDBKey.Bytes(),
 		).Scan(&exists)
 
@@ -290,7 +293,8 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 			if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
 				eqOp = "<"
 			}
-			conditions = append(conditions, fmt.Sprintf("id %s ?", eqOp))
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id %s $%d", eqOp, paramCnt))
 
 			parameters = append(parameters, cursorDBKey.Bytes())
 		} else {
@@ -300,8 +304,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 
 	if query.StartTime != 0 {
 		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
-			conditions = append(conditions, "id >= ?")
-			startTimeDBKey := NewDBKey(uint64(query.StartTime), "", []byte{})
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
+			startTimeDBKey := NewDBKey(uint64(query.StartTime), uint64(query.StartTime), "", []byte{})
 			parameters = append(parameters, startTimeDBKey.Bytes())
 		}
 
@@ -309,8 +314,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 
 	if query.EndTime != 0 {
 		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_FORWARD {
-			conditions = append(conditions, "id <= ?")
-			endTimeDBKey := NewDBKey(uint64(query.EndTime), "", []byte{})
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
+			endTimeDBKey := NewDBKey(uint64(query.EndTime), uint64(query.EndTime), "", []byte{})
 			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
@@ -325,6 +331,8 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		orderDirection = "DESC"
 	}
 
+	paramCnt++
+	sqlQuery += fmt.Sprintf("LIMIT $%d", paramCnt)
 	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection, orderDirection, orderDirection)
 
 	stmt, err := d.db.Prepare(sqlQuery)

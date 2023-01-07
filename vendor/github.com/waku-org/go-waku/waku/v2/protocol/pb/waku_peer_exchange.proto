@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package pb;
+
 message PeerInfo {
   bytes ENR = 1;
 }

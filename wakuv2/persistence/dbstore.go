@@ -146,7 +146,7 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 	}
 
 	cursor := env.Index()
-	dbKey := gowakuPersistence.NewDBKey(uint64(cursor.SenderTime), env.PubsubTopic(), env.Index().Digest)
+	dbKey := gowakuPersistence.NewDBKey(uint64(cursor.SenderTime), uint64(env.Index().ReceiverTime), env.PubsubTopic(), env.Index().Digest)
 	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().Timestamp, env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().Version)
 	if err != nil {
 		return err
@@ -171,46 +171,37 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	sqlQuery := `SELECT id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version 
 					 FROM store_messages 
 					 %s
-					 ORDER BY senderTimestamp %s, pubsubTopic, id %s
-					 LIMIT ?`
+					 ORDER BY senderTimestamp %s, id %s, pubsubTopic %s, receiverTimestamp %s `
 
 	var conditions []string
 	var parameters []interface{}
+	paramCnt := 0
 
 	if query.PubsubTopic != "" {
-		conditions = append(conditions, "pubsubTopic = ?")
+		paramCnt++
+		conditions = append(conditions, fmt.Sprintf("pubsubTopic = $%d", paramCnt))
 		parameters = append(parameters, query.PubsubTopic)
-	}
-
-	if query.StartTime != 0 {
-		conditions = append(conditions, "id >= ?")
-		startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.StartTime), "", []byte{})
-		parameters = append(parameters, startTimeDBKey.Bytes())
-
-	}
-
-	if query.EndTime != 0 {
-		conditions = append(conditions, "id <= ?")
-		endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.EndTime), "", []byte{})
-		parameters = append(parameters, endTimeDBKey.Bytes())
 	}
 
 	if len(query.ContentFilters) != 0 {
 		var ctPlaceHolder []string
 		for _, ct := range query.ContentFilters {
 			if ct.ContentTopic != "" {
-				ctPlaceHolder = append(ctPlaceHolder, "?")
+				paramCnt++
+				ctPlaceHolder = append(ctPlaceHolder, fmt.Sprintf("$%d", paramCnt))
 				parameters = append(parameters, ct.ContentTopic)
 			}
 		}
 		conditions = append(conditions, "contentTopic IN ("+strings.Join(ctPlaceHolder, ", ")+")")
 	}
 
+	usesCursor := false
 	if query.PagingInfo.Cursor != nil {
+		usesCursor = true
 		var exists bool
-		cursorDBKey := gowakuPersistence.NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
+		cursorDBKey := gowakuPersistence.NewDBKey(uint64(query.PagingInfo.Cursor.SenderTime), uint64(query.PagingInfo.Cursor.ReceiverTime), query.PagingInfo.Cursor.PubsubTopic, query.PagingInfo.Cursor.Digest)
 
-		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM store_messages WHERE id = ?)",
+		err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM store_messages WHERE id = $1)",
 			cursorDBKey.Bytes(),
 		).Scan(&exists)
 
@@ -223,11 +214,31 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 			if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
 				eqOp = "<"
 			}
-			conditions = append(conditions, fmt.Sprintf("id %s ?", eqOp))
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id %s $%d", eqOp, paramCnt))
 
 			parameters = append(parameters, cursorDBKey.Bytes())
 		} else {
 			return nil, nil, ErrInvalidCursor
+		}
+	}
+
+	if query.StartTime != 0 {
+		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
+			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.StartTime), uint64(query.StartTime), "", []byte{})
+			parameters = append(parameters, startTimeDBKey.Bytes())
+		}
+
+	}
+
+	if query.EndTime != 0 {
+		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_FORWARD {
+			paramCnt++
+			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
+			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.EndTime), uint64(query.EndTime), "", []byte{})
+			parameters = append(parameters, endTimeDBKey.Bytes())
 		}
 	}
 
@@ -241,7 +252,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 		orderDirection = "DESC"
 	}
 
-	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection)
+	paramCnt++
+	sqlQuery += fmt.Sprintf("LIMIT $%d", paramCnt)
+	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection, orderDirection, orderDirection)
 
 	stmt, err := d.db.Prepare(sqlQuery)
 	if err != nil {
@@ -249,7 +262,9 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 	defer stmt.Close()
 
-	parameters = append(parameters, query.PagingInfo.PageSize)
+	pageSize := query.PagingInfo.PageSize + 1
+
+	parameters = append(parameters, pageSize)
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
 		return nil, nil, err
@@ -263,13 +278,15 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 		}
 		result = append(result, record)
 	}
-
 	defer rows.Close()
 
-	cursor := &pb.Index{}
+	var cursor *pb.Index
 	if len(result) != 0 {
-		lastMsgIdx := len(result) - 1
-		cursor = protocol.NewEnvelope(result[lastMsgIdx].Message, result[lastMsgIdx].ReceiverTime, result[lastMsgIdx].PubsubTopic).Index()
+		if len(result) > int(query.PagingInfo.PageSize) {
+			result = result[0:query.PagingInfo.PageSize]
+			lastMsgIdx := len(result) - 1
+			cursor = protocol.NewEnvelope(result[lastMsgIdx].Message, result[lastMsgIdx].ReceiverTime, result[lastMsgIdx].PubsubTopic).Index()
+		}
 	}
 
 	// The retrieved messages list should always be in chronological order

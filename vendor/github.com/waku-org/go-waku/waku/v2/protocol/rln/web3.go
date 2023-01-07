@@ -114,13 +114,13 @@ func (rln *WakuRLNRelay) processLogs(evt *contracts.RLNMemberRegistered, handler
 
 	var pubkey r.IDCommitment = r.Bytes32(evt.Pubkey.Bytes())
 
-	index := r.MembershipIndex(uint(evt.Index.Int64()))
+	index := evt.Index.Int64()
 	if index <= rln.lastIndexLoaded {
 		return nil
 	}
 
 	rln.lastIndexLoaded = index
-	return handler(pubkey, index)
+	return handler(pubkey, r.MembershipIndex(uint(evt.Index.Int64())))
 }
 
 // HandleGroupUpdates mounts the supplied handler for the registration events emitting from the membership contract

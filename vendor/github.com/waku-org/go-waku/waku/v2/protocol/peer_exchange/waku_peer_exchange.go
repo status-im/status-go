@@ -50,8 +50,9 @@ type WakuPeerExchange struct {
 
 	log *zap.Logger
 
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	cancel  context.CancelFunc
+	started bool
+	wg      sync.WaitGroup
 
 	enrCache      map[enode.ID]peerRecord // todo: next step: ring buffer; future: implement cache satisfying https://rfc.vac.dev/spec/34/
 	enrCacheMutex sync.RWMutex
@@ -71,9 +72,15 @@ func NewWakuPeerExchange(h host.Host, disc *discv5.DiscoveryV5, log *zap.Logger)
 
 // Start inits the peer exchange protocol
 func (wakuPX *WakuPeerExchange) Start(ctx context.Context) error {
+	if wakuPX.started {
+		return errors.New("peer exchange already started")
+	}
+
 	wakuPX.wg.Wait() // Waiting for any go routines to stop
+
 	ctx, cancel := context.WithCancel(ctx)
 	wakuPX.cancel = cancel
+	wakuPX.started = true
 
 	wakuPX.h.SetStreamHandlerMatch(PeerExchangeID_v20alpha1, protocol.PrefixTextMatch(string(PeerExchangeID_v20alpha1)), wakuPX.onRequest(ctx))
 	wakuPX.log.Info("Peer exchange protocol started")
@@ -192,6 +199,9 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 
 // Stop unmounts the peer exchange protocol
 func (wakuPX *WakuPeerExchange) Stop() {
+	if wakuPX.cancel == nil {
+		return
+	}
 	wakuPX.cancel()
 	wakuPX.h.RemoveStreamHandler(PeerExchangeID_v20alpha1)
 	wakuPX.wg.Wait()

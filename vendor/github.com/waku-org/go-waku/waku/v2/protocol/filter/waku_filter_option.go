@@ -45,7 +45,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption
 	return func(params *FilterSubscribeParameters) {
 		p, err := utils.SelectPeer(params.host, string(FilterID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}
@@ -60,7 +60,7 @@ func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) Fi
 	return func(params *FilterSubscribeParameters) {
 		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(FilterID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}
