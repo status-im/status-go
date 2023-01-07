@@ -116,6 +116,7 @@ func RlnRelayDynamic(
 		timesource:                timesource,
 		nullifierLog:              make(map[r.Epoch][]r.ProofMetadata),
 		registrationHandler:       registrationHandler,
+		lastIndexLoaded:           -1,
 	}
 
 	root, err := rlnPeer.RLN.GetMerkleRoot()

@@ -67,7 +67,6 @@ type WakuNodeParameters struct {
 
 	enableStore     bool
 	enableSwap      bool
-	storeMsgs       bool
 	resumeNodes     []multiaddr.Multiaddr
 	messageProvider store.MessageProvider
 
@@ -197,25 +196,22 @@ func WithAdvertiseAddress(address *net.TCPAddr) WakuNodeOption {
 			return err
 		}
 
-		params.addressFactory = func([]multiaddr.Multiaddr) []multiaddr.Multiaddr {
-			var result []multiaddr.Multiaddr
-			result = append(result, advertiseAddress)
-			if params.enableWS || params.enableWSS {
-				if params.enableWSS {
-					wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/wss", address.IP, params.wssPort))
-					if err != nil {
-						panic(err)
-					}
-					result = append(result, wsMa)
-				} else {
-					wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address.IP, params.wsPort))
-					if err != nil {
-						panic(err)
-					}
-					result = append(result, wsMa)
+		params.addressFactory = func([]multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
+			addresses = append(addresses, advertiseAddress)
+			if params.enableWSS {
+				wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/wss", address.IP, params.wssPort))
+				if err != nil {
+					panic(err)
 				}
+				addresses = append(addresses, wsMa)
+			} else if params.enableWS {
+				wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address.IP, params.wsPort))
+				if err != nil {
+					panic(err)
+				}
+				addresses = append(addresses, wsMa)
 			}
-			return result
+			return addresses
 		}
 		return nil
 	}
@@ -319,10 +315,9 @@ func WithWakuFilter(fullNode bool, filterOpts ...filter.Option) WakuNodeOption {
 // WithWakuStore enables the Waku V2 Store protocol and if the messages should
 // be stored or not in a message provider. If resumeNodes are specified, the
 // store will attempt to resume message history using those nodes
-func WithWakuStore(shouldStoreMessages bool, resumeNodes ...multiaddr.Multiaddr) WakuNodeOption {
+func WithWakuStore(resumeNodes ...multiaddr.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableStore = true
-		params.storeMsgs = shouldStoreMessages
 		params.resumeNodes = resumeNodes
 		return nil
 	}

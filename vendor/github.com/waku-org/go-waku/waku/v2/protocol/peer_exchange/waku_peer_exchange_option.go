@@ -32,7 +32,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 	return func(params *PeerExchangeParameters) {
 		p, err := utils.SelectPeer(params.host, string(PeerExchangeID_v20alpha1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}
@@ -47,7 +47,7 @@ func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) Pe
 	return func(params *PeerExchangeParameters) {
 		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(PeerExchangeID_v20alpha1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}

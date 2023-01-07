@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -70,20 +70,20 @@ type WakuNode struct {
 	log        *zap.Logger
 	timesource timesource.Timesource
 
-	relay     *relay.WakuRelay
-	filter    *filter.WakuFilter
-	lightPush *lightpush.WakuLightPush
-	store     store.Store
-	swap      *swap.WakuSwap
-	rlnRelay  RLNRelay
-	wakuFlag  utils.WakuEnrBitfield
+	relay        Service
+	lightPush    Service
+	swap         Service
+	discoveryV5  Service
+	peerExchange Service
+	filter       ReceptorService
+	store        ReceptorService
+	rlnRelay     RLNRelay
+
+	wakuFlag utils.WakuEnrBitfield
 
 	localNode *enode.LocalNode
 
 	addrChan chan ma.Multiaddr
-
-	discoveryV5  *discv5.DiscoveryV5
-	peerExchange *peer_exchange.WakuPeerExchange
 
 	bcaster v2.Broadcaster
 
@@ -95,7 +95,6 @@ type WakuNode struct {
 	keepAliveMutex sync.Mutex
 	keepAliveFails map[peer.ID]int
 
-	ctx    context.Context // TODO: remove this
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
 
@@ -111,7 +110,7 @@ func defaultStoreFactory(w *WakuNode) store.Store {
 }
 
 // New is used to instantiate a WakuNode using a set of WakuNodeOptions
-func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
+func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	params := new(WakuNodeParameters)
 
 	params.libP2POpts = DefaultLibP2POptions
@@ -161,13 +160,9 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	w := new(WakuNode)
 	w.bcaster = v2.NewBroadcaster(1024)
 	w.host = host
-	w.cancel = cancel
-	w.ctx = ctx
 	w.opts = params
 	w.log = params.logger.Named("node2")
 	w.wg = &sync.WaitGroup{}
@@ -179,6 +174,33 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		w.timesource = timesource.NewNTPTimesource(w.opts.ntpURLs, w.log)
 	} else {
 		w.timesource = timesource.NewDefaultClock()
+	}
+
+	w.localNode, err = w.newLocalnode(w.opts.privKey)
+	if err != nil {
+		w.log.Error("creating localnode", zap.Error(err))
+	}
+
+	if w.opts.enableDiscV5 {
+		err := w.mountDiscV5()
+		if err != nil {
+			return nil, err
+		}
+
+		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(w.DiscV5(), w.opts.discV5Opts...))
+	}
+
+	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.host, w.DiscV5(), w.log)
+
+	w.relay = relay.NewWakuRelay(w.host, w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
+	w.filter = filter.NewWakuFilter(w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
+	w.lightPush = lightpush.NewWakuLightPush(w.host, w.Relay(), w.log)
+
+	if w.opts.enableSwap {
+		w.swap = swap.NewWakuSwap(w.log, []swap.SwapOption{
+			swap.WithMode(w.opts.swapMode),
+			swap.WithThreshold(w.opts.swapPaymentThreshold, w.opts.swapDisconnectThreshold),
+		}...)
 	}
 
 	if params.storeFactory != nil {
@@ -203,19 +225,6 @@ func New(ctx context.Context, opts ...WakuNodeOption) (*WakuNode, error) {
 		w.connStatusChan = params.connStatusC
 	}
 
-	w.connectionNotif = NewConnectionNotifier(ctx, host, w.log)
-	w.host.Network().Notify(w.connectionNotif)
-
-	w.wg.Add(2)
-	go w.connectednessListener()
-	go w.checkForAddressChanges()
-	go w.onAddrChange()
-
-	if w.opts.keepAliveInterval > time.Duration(0) {
-		w.wg.Add(1)
-		w.startKeepAlive(w.opts.keepAliveInterval)
-	}
-
 	return w, nil
 }
 
@@ -226,7 +235,7 @@ func (w *WakuNode) onAddrChange() {
 	}
 }
 
-func (w *WakuNode) checkForAddressChanges() {
+func (w *WakuNode) checkForAddressChanges(ctx context.Context) {
 	defer w.wg.Done()
 
 	addrs := w.ListenAddresses()
@@ -234,7 +243,7 @@ func (w *WakuNode) checkForAddressChanges() {
 	first <- struct{}{}
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			close(w.addrChan)
 			return
 		case <-first:
@@ -258,97 +267,95 @@ func (w *WakuNode) checkForAddressChanges() {
 				for _, addr := range addrs {
 					w.addrChan <- addr
 				}
-				_ = w.setupENR(addrs)
+				_ = w.setupENR(ctx, addrs)
 			}
 		}
 	}
 }
 
 // Start initializes all the protocols that were setup in the WakuNode
-func (w *WakuNode) Start() error {
+func (w *WakuNode) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	w.cancel = cancel
+
+	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.log)
+	w.host.Network().Notify(w.connectionNotif)
+
+	w.wg.Add(2)
+	go w.connectednessListener(ctx)
+	go w.checkForAddressChanges(ctx)
+	go w.onAddrChange()
+
+	if w.opts.keepAliveInterval > time.Duration(0) {
+		w.wg.Add(1)
+		go w.startKeepAlive(ctx, w.opts.keepAliveInterval)
+	}
+
 	if w.opts.enableNTP {
-		err := w.timesource.Start(w.ctx)
+		err := w.timesource.Start(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	if w.opts.enableSwap {
-		w.swap = swap.NewWakuSwap(w.log, []swap.SwapOption{
-			swap.WithMode(w.opts.swapMode),
-			swap.WithThreshold(w.opts.swapPaymentThreshold, w.opts.swapDisconnectThreshold),
-		}...)
+	if w.opts.enableRelay {
+		err := w.relay.Start(ctx)
+		if err != nil {
+			return err
+		}
+
+		sub, err := w.Relay().Subscribe(ctx)
+		if err != nil {
+			return err
+		}
+
+		w.Broadcaster().Unregister(&relay.DefaultWakuTopic, sub.C)
 	}
 
 	w.store = w.storeFactory(w)
 	if w.opts.enableStore {
-		err := w.startStore()
+		err := w.startStore(ctx)
 		if err != nil {
+			return err
+		}
+
+		w.log.Info("Subscribing store to broadcaster")
+		w.bcaster.Register(nil, w.store.MessageChannel())
+	}
+
+	if w.opts.enableLightPush {
+		if err := w.lightPush.Start(ctx); err != nil {
 			return err
 		}
 	}
 
 	if w.opts.enableFilter {
-		filter, err := filter.NewWakuFilter(w.ctx, w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
+		err := w.filter.Start(ctx)
 		if err != nil {
 			return err
 		}
-		w.filter = filter
+
+		w.log.Info("Subscribing filter to broadcaster")
+		w.bcaster.Register(nil, w.filter.MessageChannel())
 	}
 
-	err := w.setupENR(w.ListenAddresses())
+	err := w.setupENR(ctx, w.ListenAddresses())
 	if err != nil {
 		return err
 	}
 
-	if w.opts.enableDiscV5 {
-		err := w.mountDiscV5()
-		if err != nil {
-			return err
-		}
-	}
-
 	if w.opts.enablePeerExchange {
-		err := w.mountPeerExchange()
-		if err != nil {
-			return err
-		}
-	}
-
-	if w.opts.enableDiscV5 {
-		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(w.discoveryV5, w.opts.discV5Opts...))
-	}
-
-	if w.opts.enableRelay {
-		err = w.mountRelay(w.opts.minRelayPeersToPublish, w.opts.wOpts...)
+		err := w.peerExchange.Start(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	if w.opts.enableRLN {
-		err = w.mountRlnRelay()
+		err = w.mountRlnRelay(ctx)
 		if err != nil {
 			return err
 		}
-	}
-
-	w.lightPush = lightpush.NewWakuLightPush(w.ctx, w.host, w.relay, w.log)
-	if w.opts.enableLightPush {
-		if err := w.lightPush.Start(); err != nil {
-			return err
-		}
-	}
-
-	// Subscribe store to topic
-	if w.opts.storeMsgs {
-		w.log.Info("Subscribing store to broadcaster")
-		w.bcaster.Register(nil, w.store.MessageChannel())
-	}
-
-	if w.filter != nil {
-		w.log.Info("Subscribing filter to broadcaster")
-		w.bcaster.Register(nil, w.filter.MsgC)
 	}
 
 	return nil
@@ -356,6 +363,10 @@ func (w *WakuNode) Start() error {
 
 // Stop stops the WakuNode and closess all connections to the host
 func (w *WakuNode) Stop() {
+	if w.cancel == nil {
+		return
+	}
+
 	w.cancel()
 
 	w.bcaster.Close()
@@ -365,30 +376,19 @@ func (w *WakuNode) Stop() {
 	defer w.identificationEventSub.Close()
 	defer w.addressChangesSub.Close()
 
-	if w.filter != nil {
-		w.filter.Stop()
-	}
+	w.relay.Stop()
+	w.lightPush.Stop()
+	w.store.Stop()
+	w.filter.Stop()
+	w.peerExchange.Stop()
 
-	if w.peerExchange != nil {
-		w.peerExchange.Stop()
-	}
-
-	if w.discoveryV5 != nil {
+	if w.opts.enableDiscV5 {
 		w.discoveryV5.Stop()
 	}
 
-	if w.opts.enableRelay {
-		w.relay.Stop()
-	}
-
-	w.lightPush.Stop()
-	w.store.Stop()
 	_ = w.stopRlnRelay()
 
-	err := w.timesource.Stop()
-	if err != nil {
-		w.log.Error("stopping timesource", zap.Error(err))
-	}
+	w.timesource.Stop()
 
 	w.host.Close()
 
@@ -428,32 +428,47 @@ func (w *WakuNode) Timesource() timesource.Timesource {
 
 // Relay is used to access any operation related to Waku Relay protocol
 func (w *WakuNode) Relay() *relay.WakuRelay {
-	return w.relay
+	if result, ok := w.relay.(*relay.WakuRelay); ok {
+		return result
+	}
+	return nil
 }
 
 // Store is used to access any operation related to Waku Store protocol
 func (w *WakuNode) Store() store.Store {
-	return w.store
+	return w.store.(store.Store)
 }
 
 // Filter is used to access any operation related to Waku Filter protocol
 func (w *WakuNode) Filter() *filter.WakuFilter {
-	return w.filter
+	if result, ok := w.filter.(*filter.WakuFilter); ok {
+		return result
+	}
+	return nil
 }
 
 // Lightpush is used to access any operation related to Waku Lightpush protocol
 func (w *WakuNode) Lightpush() *lightpush.WakuLightPush {
-	return w.lightPush
+	if result, ok := w.lightPush.(*lightpush.WakuLightPush); ok {
+		return result
+	}
+	return nil
 }
 
 // DiscV5 is used to access any operation related to DiscoveryV5
 func (w *WakuNode) DiscV5() *discv5.DiscoveryV5 {
-	return w.discoveryV5
+	if result, ok := w.discoveryV5.(*discv5.DiscoveryV5); ok {
+		return result
+	}
+	return nil
 }
 
 // PeerExchange is used to access any operation related to Peer Exchange
 func (w *WakuNode) PeerExchange() *peer_exchange.WakuPeerExchange {
-	return w.peerExchange
+	if result, ok := w.peerExchange.(*peer_exchange.WakuPeerExchange); ok {
+		return result
+	}
+	return nil
 }
 
 // Broadcaster is used to access the message broadcaster that is used to push
@@ -472,38 +487,20 @@ func (w *WakuNode) Publish(ctx context.Context, msg *pb.WakuMessage) error {
 	hash, _, _ := msg.Hash()
 	err := try.Do(func(attempt int) (bool, error) {
 		var err error
-		if !w.relay.EnoughPeersToPublish() {
-			if !w.lightPush.IsStarted() {
-				err = errors.New("not enought peers for relay and lightpush is not yet started")
-			} else {
-				w.log.Debug("publishing message via lightpush", logging.HexBytes("hash", hash))
-				_, err = w.Lightpush().Publish(ctx, msg)
-			}
+
+		relay := w.Relay()
+		lightpush := w.Lightpush()
+
+		if relay == nil || !relay.EnoughPeersToPublish() {
+			w.log.Debug("publishing message via lightpush", logging.HexBytes("hash", hash))
+			_, err = lightpush.Publish(ctx, msg)
 		} else {
 			w.log.Debug("publishing message via relay", logging.HexBytes("hash", hash))
-			_, err = w.Relay().Publish(ctx, msg)
+			_, err = relay.Publish(ctx, msg)
 		}
 
 		return attempt < maxPublishAttempt, err
 	})
-
-	return err
-}
-
-func (w *WakuNode) mountRelay(minRelayPeersToPublish int, opts ...pubsub.Option) error {
-	var err error
-	w.relay, err = relay.NewWakuRelay(w.ctx, w.host, w.bcaster, minRelayPeersToPublish, w.timesource, w.log, opts...)
-	if err != nil {
-		return err
-	}
-
-	if w.opts.enableRelay {
-		sub, err := w.relay.Subscribe(w.ctx)
-		if err != nil {
-			return err
-		}
-		w.Broadcaster().Unregister(&relay.DefaultWakuTopic, sub.C)
-	}
 
 	return err
 }
@@ -525,13 +522,8 @@ func (w *WakuNode) mountDiscV5() error {
 	return err
 }
 
-func (w *WakuNode) mountPeerExchange() error {
-	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.host, w.discoveryV5, w.log)
-	return w.peerExchange.Start(w.ctx)
-}
-
-func (w *WakuNode) startStore() error {
-	err := w.store.Start(w.ctx)
+func (w *WakuNode) startStore(ctx context.Context) error {
+	err := w.store.Start(ctx)
 	if err != nil {
 		w.log.Error("starting store", zap.Error(err))
 		return err
@@ -554,9 +546,9 @@ func (w *WakuNode) startStore() error {
 		go func() {
 			defer w.wg.Done()
 
-			ctxWithTimeout, ctxCancel := context.WithTimeout(w.ctx, 20*time.Second)
+			ctxWithTimeout, ctxCancel := context.WithTimeout(ctx, 20*time.Second)
 			defer ctxCancel()
-			if _, err := w.store.Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), peerIDs); err != nil {
+			if _, err := w.store.(store.Store).Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), peerIDs); err != nil {
 				w.log.Error("Could not resume history", zap.Error(err))
 				time.Sleep(10 * time.Second)
 			}
@@ -673,7 +665,7 @@ func (w *WakuNode) PeerStats() PeerStats {
 // Set the bootnodes on discv5
 func (w *WakuNode) SetDiscV5Bootnodes(nodes []*enode.Node) error {
 	w.opts.discV5bootnodes = nodes
-	return w.discoveryV5.SetBootnodes(nodes)
+	return w.DiscV5().SetBootnodes(nodes)
 }
 
 // Peers return the list of peers, addresses, protocols supported and connection status

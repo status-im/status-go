@@ -207,13 +207,18 @@ func (d *DiscoveryV5) Stop() {
 	d.Lock()
 	defer d.Unlock()
 
-	d.cancel()
+	if d.cancel == nil {
+		return
+	}
 
-	d.listener.Close()
-	d.listener = nil
+	d.cancel()
 	d.started = false
 
-	d.log.Info("stopped Discovery V5")
+	if d.listener != nil {
+		d.listener.Close()
+		d.listener = nil
+		d.log.Info("stopped Discovery V5")
+	}
 
 	d.wg.Wait()
 }

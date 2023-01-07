@@ -34,7 +34,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) LightPushOption {
 	return func(params *LightPushParameters) {
 		p, err := utils.SelectPeer(params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}
@@ -49,7 +49,7 @@ func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) Li
 	return func(params *LightPushParameters) {
 		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
 		if err == nil {
-			params.selectedPeer = *p
+			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}

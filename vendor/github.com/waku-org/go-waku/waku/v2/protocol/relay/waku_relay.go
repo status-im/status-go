@@ -31,6 +31,7 @@ var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
 type WakuRelay struct {
 	host       host.Host
+	opts       []pubsub.Option
 	pubsub     *pubsub.PubSub
 	timesource timesource.Timesource
 
@@ -56,7 +57,7 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 }
 
 // NewWakuRelay returns a new instance of a WakuRelay struct
-func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, minPeersToPublish int, timesource timesource.Timesource, log *zap.Logger, opts ...pubsub.Option) (*WakuRelay, error) {
+func NewWakuRelay(h host.Host, bcaster v2.Broadcaster, minPeersToPublish int, timesource timesource.Timesource, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
 	w := new(WakuRelay)
 	w.host = h
 	w.timesource = timesource
@@ -71,7 +72,6 @@ func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, minP
 	opts = append(opts, pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign))
 	opts = append(opts, pubsub.WithNoAuthor())
 	opts = append(opts, pubsub.WithMessageIdFn(msgIdFn))
-
 	opts = append(opts, pubsub.WithGossipSubProtocols(
 		[]protocol.ID{pubsub.GossipSubID_v11, pubsub.GossipSubID_v10, pubsub.FloodSubID, WakuRelayID_v200},
 		func(feat pubsub.GossipSubFeature, proto protocol.ID) bool {
@@ -86,15 +86,20 @@ func NewWakuRelay(ctx context.Context, h host.Host, bcaster v2.Broadcaster, minP
 		},
 	))
 
-	ps, err := pubsub.NewGossipSub(ctx, h, opts...)
+	w.opts = opts
+
+	return w
+}
+
+func (w *WakuRelay) Start(ctx context.Context) error {
+	ps, err := pubsub.NewGossipSub(ctx, w.host, w.opts...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	w.pubsub = ps
 
 	w.log.Info("Relay protocol started")
-
-	return w, nil
+	return nil
 }
 
 // PubSub returns the implementation of the pubsub system
@@ -293,7 +298,10 @@ func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <
 		for {
 			msg, err := sub.Next(ctx)
 			if err != nil {
-				w.log.Error("getting message from subscription", zap.Error(err))
+				if !errors.Is(err, context.Canceled) {
+					w.log.Error("getting message from subscription", zap.Error(err))
+				}
+
 				sub.Cancel()
 				close(msgChannel)
 				for _, subscription := range w.subscriptions[sub.Topic()] {

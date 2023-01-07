@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
-	"github.com/waku-org/go-waku/logging"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +20,7 @@ var ErrNoPeersAvailable = errors.New("no suitable peers found")
 // SelectPeer is used to return a random peer that supports a given protocol.
 // If a list of specific peers is passed, the peer will be chosen from that list assuming
 // it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
-func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (*peer.ID, error) {
+func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
 	// This will require us to check for various factors such as:
@@ -38,8 +37,7 @@ func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log 
 	for _, peer := range peerSet {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
-			log.Error("obtaining protocols supported by peers", zap.Error(err), logging.HostID("peer", peer))
-			return nil, err
+			return "", err
 		}
 
 		if len(protocols) > 0 {
@@ -49,10 +47,10 @@ func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log 
 
 	if len(peers) >= 1 {
 		// TODO: proper heuristic here that compares peer scores and selects "best" one. For now a random peer for the given protocol is returned
-		return &peers[rand.Intn(len(peers))], nil // nolint: gosec
+		return peers[rand.Intn(len(peers))], nil // nolint: gosec
 	}
 
-	return nil, ErrNoPeersAvailable
+	return "", ErrNoPeersAvailable
 }
 
 type pingResult struct {
@@ -63,7 +61,7 @@ type pingResult struct {
 // SelectPeerWithLowestRTT will select a peer that supports a specific protocol with the lowest reply time
 // If a list of specific peers is passed, the peer will be chosen from that list assuming
 // it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
-func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (*peer.ID, error) {
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
 	var peers peer.IDSlice
 
 	peerSet := specificPeers
@@ -74,8 +72,7 @@ func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId str
 	for _, peer := range peerSet {
 		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
 		if err != nil {
-			log.Error("error obtaining the protocols supported by peers", zap.Error(err))
-			return nil, err
+			return "", err
 		}
 
 		if len(protocols) > 0 {
@@ -122,11 +119,11 @@ func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId str
 			}
 		}
 		if min == nil {
-			return nil, ErrNoPeersAvailable
+			return "", ErrNoPeersAvailable
 		}
 
-		return &min.p, nil
+		return min.p, nil
 	case <-ctx.Done():
-		return nil, ErrNoPeersAvailable
+		return "", ErrNoPeersAvailable
 	}
 }

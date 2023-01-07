@@ -21,7 +21,6 @@ func (t *WallClockTimeSource) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *WallClockTimeSource) Stop() error {
+func (t *WallClockTimeSource) Stop() {
 	// Do nothing
-	return nil
 }

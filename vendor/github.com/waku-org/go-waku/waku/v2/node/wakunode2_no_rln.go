@@ -3,11 +3,13 @@
 
 package node
 
+import "context"
+
 func (w *WakuNode) RLNRelay() RLNRelay {
 	return nil
 }
 
-func (w *WakuNode) mountRlnRelay() error {
+func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 	return nil
 }
 

@@ -32,17 +32,19 @@ func (k *DBKey) Bytes() []byte {
 	return k.raw
 }
 
-func (k *DBKey) Digest() []byte {
-	return k.raw[TimestampLength+PubsubTopicLength : TimestampLength+PubsubTopicLength+DigestLength]
-}
-
 // NewDBKey creates a new DBKey with the given values.
-func NewDBKey(timestamp uint64, pubsubTopic string, digest []byte) *DBKey {
+func NewDBKey(senderTimestamp uint64, receiverTimestamp uint64, pubsubTopic string, digest []byte) *DBKey {
 	pubSubHash := sha256.Sum256([]byte(pubsubTopic))
 
 	var k DBKey
 	k.raw = make([]byte, DBKeyLength)
-	binary.BigEndian.PutUint64(k.raw, timestamp)
+
+	if senderTimestamp == 0 {
+		binary.BigEndian.PutUint64(k.raw, receiverTimestamp)
+	} else {
+		binary.BigEndian.PutUint64(k.raw, senderTimestamp)
+	}
+
 	copy(k.raw[TimestampLength:], pubSubHash[:])
 	copy(k.raw[TimestampLength+PubsubTopicLength:], digest)
 

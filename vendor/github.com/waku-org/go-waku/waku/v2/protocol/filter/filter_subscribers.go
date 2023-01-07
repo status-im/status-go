@@ -41,6 +41,14 @@ func NewSubscribers(timeout time.Duration) *Subscribers {
 	}
 }
 
+func (sub *Subscribers) Clear() {
+	sub.Lock()
+	defer sub.Unlock()
+
+	sub.subscribers = nil
+	sub.failedPeers = make(map[peer.ID]time.Time)
+}
+
 func (sub *Subscribers) Append(s Subscriber) int {
 	sub.Lock()
 	defer sub.Unlock()

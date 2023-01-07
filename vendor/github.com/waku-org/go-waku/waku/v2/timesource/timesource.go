@@ -8,5 +8,5 @@ import (
 type Timesource interface {
 	Now() time.Time
 	Start(ctx context.Context) error
-	Stop() error
+	Stop()
 }
