@@ -75,6 +75,19 @@ func NewTokenManager(
 	return tokenManager
 }
 
+func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
+	if address == nativeChainAddress {
+		return true
+	}
+	tokensMap, ok := tokenStore[chainID]
+	if !ok {
+		return false
+	}
+	_, ok = tokensMap[address]
+
+	return ok
+}
+
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
 	if tokenSymbol == network.NativeCurrencySymbol {
 		return tm.ToToken(network)
@@ -389,10 +402,10 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 		response[account][token] = &sumHex
 		mu.Unlock()
 	}
-
 	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
+
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
 
 		if err == nil {
@@ -468,6 +481,9 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 					account := accounts[accountIdx]
 					token := tokens[tokenIdx]
 					client := clients[clientIdx]
+					if !tm.inStore(token, client.ChainID) {
+						continue
+					}
 					group.Add(func(parent context.Context) error {
 						ctx, cancel := context.WithTimeout(parent, requestTimeout)
 						defer cancel()
@@ -524,6 +540,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.C
 	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
+
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
 		if err == nil {
 			fetchChainBalance := false
@@ -597,6 +614,9 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.C
 					// Below, we set account, token and client from idx on purpose to avoid override
 					account := accounts[accountIdx]
 					token := tokens[tokenIdx]
+					if !tm.inStore(token, client.ChainID) {
+						continue
+					}
 					client := clients[clientIdx]
 					group.Add(func(parent context.Context) error {
 						ctx, cancel := context.WithTimeout(parent, requestTimeout)
