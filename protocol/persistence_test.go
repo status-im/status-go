@@ -513,7 +513,32 @@ func TestMessageReplies(t *testing.T) {
 		From: "3",
 	}
 
-	messages := []*common.Message{message1, message2, message3}
+	// Message that is deleted
+	message4 := &common.Message{
+		ID:          "id-4",
+		LocalChatID: chatID,
+		Deleted:     true,
+		ChatMessage: protobuf.ChatMessage{
+			Text:  "content-4",
+			Clock: uint64(4),
+		},
+		From: "2",
+	}
+
+	// Message replied to a deleted message. It will not have QuotedMessage info
+	message5 := &common.Message{
+		ID:          "id-5",
+		LocalChatID: chatID,
+		ChatMessage: protobuf.ChatMessage{
+			Text:       "content-4",
+			Clock:      uint64(5),
+			ResponseTo: "id-4",
+		},
+		From: "3",
+	}
+
+	// messages := []*common.Message{message1, message2, message3}
+	messages := []*common.Message{message1, message2, message3, message4, message5}
 
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
@@ -521,14 +546,18 @@ func TestMessageReplies(t *testing.T) {
 	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
 	require.NoError(t, err)
 
-	require.Equal(t, "non-existing", retrievedMessages[0].ResponseTo)
-	require.Nil(t, retrievedMessages[0].QuotedMessage)
-
-	require.Equal(t, "id-1", retrievedMessages[1].ResponseTo)
-	require.Equal(t, &common.QuotedMessage{ID: "id-1", From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
-
-	require.Equal(t, "", retrievedMessages[2].ResponseTo)
+	require.Equal(t, "non-existing", retrievedMessages[2].ResponseTo)
 	require.Nil(t, retrievedMessages[2].QuotedMessage)
+
+	require.Equal(t, "id-1", retrievedMessages[3].ResponseTo)
+	require.Equal(t, &common.QuotedMessage{ID: "id-1", From: "1", Text: "content-1"}, retrievedMessages[3].QuotedMessage)
+
+	require.Equal(t, "", retrievedMessages[4].ResponseTo)
+	require.Nil(t, retrievedMessages[4].QuotedMessage)
+
+	// We have a ResponseTo, but no QuotedMessage, since the message was deleted
+	require.Equal(t, "id-4", retrievedMessages[0].ResponseTo)
+	require.Nil(t, retrievedMessages[0].QuotedMessage)
 }
 
 func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
