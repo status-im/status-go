@@ -165,18 +165,11 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	topic, err := ExtractTopicFromContentTopic(recvMessage.Envelope.Message().ContentTopic)
-	if err != nil {
-		log.Trace(err.Error(), "topic", recvMessage.Envelope.Message().ContentTopic)
-		return false
-	}
-
 	var matched bool
-
-	candidates := fs.GetWatchersByTopic(*topic)
+	candidates := fs.GetWatchersByTopic(recvMessage.Topic)
 
 	if len(candidates) == 0 {
-		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "topic", (*topic).String())
+		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "topic", recvMessage.Topic.String())
 	}
 
 	for _, watcher := range candidates {

@@ -154,14 +154,14 @@ type MemoryMessageStore struct {
 func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
-		ct = new(TopicType)
+		log.Error("failed to extract content topic from message", "topic", env.Message().ContentTopic, "err", err)
 	}
 
 	return &ReceivedMessage{
 		Envelope: env,
 		MsgType:  msgType,
 		Sent:     uint32(env.Message().Timestamp / int64(time.Second)),
-		Topic:    *ct,
+		Topic:    ct,
 	}
 }
 
@@ -241,7 +241,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 		return nil
 	}
 
-	result.Topic = *ct
+	result.Topic = ct
 
 	return result
 }
