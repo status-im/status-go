@@ -344,10 +344,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.AlbumID = albumID.String
 	}
 
-	if imageWidth.Valid {
-		message.ImageWidth = int(imageWidth.Int64)
-		message.ImageHeight = int(imageHeight.Int64)
-	}
+	//if imageWidth.Valid {
+	message.ImageWidth = int(imageWidth.Int64)
+	message.ImageHeight = int(imageHeight.Int64)
+	//}
 
 	if serializedMentions != nil {
 		err := json.Unmarshal(serializedMentions, &message.Mentions)
