@@ -346,6 +346,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if imageWidth.Valid {
 		message.ImageWidth = uint32(imageWidth.Int32)
+	}
+
+	if imageHeight.Valid {
 		message.ImageHeight = uint32(imageHeight.Int32)
 	}
 
