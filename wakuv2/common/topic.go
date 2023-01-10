@@ -69,18 +69,18 @@ func (t TopicType) ContentTopic() string {
 	return "/waku/1/" + enc + "/rfc26"
 }
 
-func ExtractTopicFromContentTopic(s string) (*TopicType, error) {
+func ExtractTopicFromContentTopic(s string) (TopicType, error) {
 	p := strings.Split(s, "/")
 
 	if len(p) != 5 || p[1] != "waku" || p[2] != "1" || p[4] != "rfc26" {
-		return nil, errors.New("invalid content topic format")
+		return TopicType{}, errors.New("invalid content topic format")
 	}
 
 	str, err := hexutil.Decode(p[3])
 	if err != nil {
-		return nil, err
+		return TopicType{}, err
 	}
 
 	result := BytesToTopic(str)
-	return &result, nil
+	return result, nil
 }
