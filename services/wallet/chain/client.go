@@ -109,6 +109,9 @@ func (cc *Client) GetBaseFeeFromBlock(blockNumber *big.Int) (string, error) {
 	var feeHistory FeeHistory
 	err := cc.rpcClient.Call(&feeHistory, cc.ChainID, "eth_feeHistory", "0x1", (*hexutil.Big)(blockNumber), nil)
 	if err != nil {
+		if err.Error() == "the method eth_feeHistory does not exist/is not available" {
+			return "", nil
+		}
 		return "", err
 	}
 
