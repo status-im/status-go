@@ -185,6 +185,9 @@ type Message struct {
 	// Mentioned is whether the user is mentioned in the message
 	Mentioned bool `json:"mentioned"`
 
+	// Replied is whether the user is replied to in the message
+	Replied bool `json:"replied"`
+
 	// Links is an array of links within given message
 	Links []string
 
@@ -245,6 +248,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		MessageType              protobuf.MessageType             `json:"messageType"`
 		Mentions                 []string                         `json:"mentions,omitempty"`
 		Mentioned                bool                             `json:"mentioned,omitempty"`
+		Replied                  bool                             `json:"replied,omitempty"`
 		Links                    []string                         `json:"links,omitempty"`
 		EditedAt                 uint64                           `json:"editedAt,omitempty"`
 		Deleted                  bool                             `json:"deleted,omitempty"`
@@ -281,6 +285,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContentType:              m.ContentType,
 		Mentions:                 m.Mentions,
 		Mentioned:                m.Mentioned,
+		Replied:                  m.Replied,
 		Links:                    m.Links,
 		MessageType:              m.MessageType,
 		CommandParameters:        m.CommandParameters,

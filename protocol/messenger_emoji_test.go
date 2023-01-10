@@ -86,7 +86,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	_, err = bob.Join(chat)
 	s.Require().NoError(err)
 
-	// Send chat message from bob to alice
+	// Send chat message from alice to bob
 
 	message := buildTestMessage(*chat)
 	_, err = alice.SendChatMessage(context.Background(), message)
