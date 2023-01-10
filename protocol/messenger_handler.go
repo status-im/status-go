@@ -160,6 +160,16 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		// Show push notifications when our key is added to members list and chat is Active
 		showPushNotification = showPushNotification && wasUserAdded
 	}
+	maxClockVal := uint64(0)
+	for _, event := range group.Events() {
+		if event.ClockValue > maxClockVal {
+			maxClockVal = event.ClockValue
+		}
+	}
+
+	if chat.LastClockValue < maxClockVal {
+		chat.LastClockValue = maxClockVal
+	}
 
 	// Only create a message notification when the user is added, not when removed
 	if !chat.Active && wasUserAdded {
