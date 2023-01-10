@@ -30,7 +30,7 @@ func NewSyncRawMessageHandler(backend *api.GethStatusBackend) *SyncRawMessageHan
 func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error) {
 	messenger := s.backend.Messenger()
 	if messenger == nil {
-		return nil, fmt.Errorf("messenger is nil when handlePairingSyncDeviceSend")
+		return nil, fmt.Errorf("messenger is nil when PrepareRawMessage")
 	}
 
 	currentAccount, err := s.backend.GetActiveAccount()
@@ -112,6 +112,9 @@ func (s *SyncRawMessageHandler) HandleRawMessage(account *multiaccounts.Account,
 	}
 
 	messenger := s.backend.Messenger()
+	if messenger == nil {
+		return fmt.Errorf("messenger is nil when HandleRawMessage")
+	}
 	return messenger.HandleSyncRawMessages(rawMessages)
 }
 
