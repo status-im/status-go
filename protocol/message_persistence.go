@@ -16,7 +16,7 @@ var basicMessagesSelectQuery = `
 SELECT    %s %s
 FROM      user_messages m1
 LEFT JOIN user_messages m2
-ON        m1.response_to = m2.id
+ON        m1.response_to = m2.id AND m2.deleted = 0
 LEFT JOIN contacts c
 ON        m1.source = c.id
 LEFT JOIN discord_messages dm
