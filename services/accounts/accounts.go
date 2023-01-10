@@ -88,6 +88,10 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	return (*api.messenger).DeleteAccount(address)
 }
 
+func (api *API) DeleteAccountForMigratedKeypair(ctx context.Context, address types.Address) error {
+	return (*api.messenger).DeleteAccount(address)
+}
+
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
 	account := &accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
