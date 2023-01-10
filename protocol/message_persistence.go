@@ -196,8 +196,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var identicon sql.NullString
 	var communityID sql.NullString
 	var albumID sql.NullString
-	var imageWidth sql.NullString
-	var imageHeight sql.NullString
+	var imageWidth sql.NullInt64
+	var imageHeight sql.NullInt64
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
@@ -345,8 +345,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if imageWidth.Valid {
-		message.ImageWidth = imageWidth.String
-		message.ImageHeight = imageHeight.String
+		message.ImageWidth = int(imageWidth.Int64)
+		message.ImageHeight = int(imageHeight.Int64)
 	}
 
 	if serializedMentions != nil {
