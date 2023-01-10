@@ -95,6 +95,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		contact_request_state,
 		contact_verification_status,
 		mentioned,
+		replied,
     discord_message_id`
 }
 
@@ -144,6 +145,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.contact_request_state,
 		m1.contact_verification_status,
 		m1.mentioned,
+		m1.replied,
     COALESCE(m1.discord_message_id, ""),
     COALESCE(dm.author_id, ""),
     COALESCE(dm.type, ""),
@@ -262,6 +264,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&contactRequestState,
 		&contactVerificationState,
 		&message.Mentioned,
+		&message.Replied,
 		&discordMessage.Id,
 		&discordMessage.Author.Id,
 		&discordMessage.Type,
@@ -494,6 +497,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.ContactRequestState,
 		message.ContactVerificationState,
 		message.Mentioned,
+		message.Replied,
 		discordMessage.Id,
 	}, nil
 }
@@ -1537,7 +1541,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
                    highlight = 0
 		WHERE id = ?`, id, id, id)
 
@@ -1565,7 +1569,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		_ = tx.Rollback()
 	}()
 
-	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned)`, chatID, clock)
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied)`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1575,12 +1579,12 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	mentionedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND mentioned`, chatID, clock)
+	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied)`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	mentioned, err := mentionedResult.RowsAffected()
+	mentionedOrReplied, err := mentionedOrRepliedResult.RowsAffected()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1594,7 +1598,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned or replied)),
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 
@@ -1602,7 +1606,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	return (seen + mentioned), mentioned, nil
+	return (seen + mentionedOrReplied), mentionedOrReplied, nil
 }
 
 func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
@@ -1659,7 +1663,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND mentioned AND id IN (" + inVector + ")" // nolint: gosec
+	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND (mentioned OR replied) AND id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -1671,7 +1675,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		return 0, 0, err
 	}
 
-	q = "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND id IN (" + inVector + ")" // nolint: gosec
+	q = "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND NOT(replied) AND id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -1693,7 +1697,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 	return countWithMentions + countNoMentions, countWithMentions, err
@@ -1756,7 +1760,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) (
 		UPDATE chats
 		SET
 			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id),
-			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND mentioned)`)
+			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (mentioned OR replied))`)
 	if err != nil {
 		return nil, err
 	}

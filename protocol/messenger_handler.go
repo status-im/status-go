@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -390,7 +391,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, message.Mentioned)
+		m.updateUnviewedCounts(chat, message.Mentioned || message.Replied)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -1517,6 +1518,20 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
+
+	// If the message is a reply, we check if it's a reply to one of own own messages
+	if receivedMessage.ResponseTo != "" {
+		repliedTo, err := m.persistence.MessageByID(receivedMessage.ResponseTo)
+		if err != nil && err == sql.ErrNoRows {
+			logger.Error("failed to get quoted message", zap.Error(err))
+		} else if err != nil {
+			return err
+		}
+		if repliedTo.From == common.PubkeyToHex(&m.identity.PublicKey) {
+			receivedMessage.Replied = true
+		}
+	}
+
 	chat, err := m.matchChatEntity(receivedMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
@@ -1573,7 +1588,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		if !receivedMessage.Seen {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
+			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
 		}
 	} else {
 		// Our own message, mark as sent
@@ -2384,9 +2399,9 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	return contact.Added, nil
 }
 
-func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {
+func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 	chat.UnviewedMessagesCount++
-	if mentioned {
+	if mentionedOrReplied {
 		chat.UnviewedMentionsCount++
 	}
 }
