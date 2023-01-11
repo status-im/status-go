@@ -1353,9 +1353,9 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 func (b *GethStatusBackend) Messenger() *protocol.Messenger {
 	node := b.StatusNode()
 	if node != nil {
-		wakuExtService := node.WakuExtService()
-		if wakuExtService != nil {
-			return wakuExtService.Messenger()
+		accountService := node.AccountService()
+		if accountService != nil {
+			return accountService.GetMessenger()
 		}
 	}
 	return nil
