@@ -115,6 +115,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	}
 
 	var canDeleteMessageForEveryone = false
+	var deletedBy string
 	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
 		if message.MessageType == protobuf.MessageType_COMMUNITY_CHAT {
 			communityID := chat.CommunityID
@@ -122,6 +123,8 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 			if !canDeleteMessageForEveryone {
 				return nil, ErrInvalidDeletePermission
 			}
+			// only add DeletedBy when not deleted by message.From
+			deletedBy = contactIDFromPublicKey(m.IdentityPublicKey())
 		}
 		if !canDeleteMessageForEveryone {
 			return nil, ErrInvalidEditOrDeleteAuthor
@@ -140,10 +143,10 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	deleteMessage := &DeleteMessage{}
-
 	deleteMessage.ChatId = message.ChatId
 	deleteMessage.MessageId = messageID
 	deleteMessage.Clock = clock
+	deleteMessage.DeletedBy = deletedBy
 
 	encodedMessage, err := m.encodeChatEntity(chat, deleteMessage)
 
@@ -158,12 +161,14 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		SkipGroupMessageWrap: true,
 		ResendAutomatically:  true,
 	}
+
 	_, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
 		return nil, err
 	}
 
 	message.Deleted = true
+	message.DeletedBy = deletedBy
 	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
@@ -177,7 +182,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	response := &MessengerResponse{}
 	response.AddMessage(message)
-	response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
+	response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deletedBy})
 	response.AddChat(chat)
 
 	return response, nil
@@ -289,6 +294,7 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	}
 
 	message.Deleted = true
+	message.DeletedBy = messageDeletes[0].DeletedBy
 
 	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {

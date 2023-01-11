@@ -206,6 +206,8 @@ type Message struct {
 	// Deleted indicates if a message was deleted
 	Deleted bool `json:"deleted"`
 
+	DeletedBy string `json:"deletedBy,omitempty"`
+
 	DeletedForMe bool `json:"deletedForMe"`
 
 	// ContactRequestState is the state of the contact request message
@@ -264,6 +266,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Links                    []string                         `json:"links,omitempty"`
 		EditedAt                 uint64                           `json:"editedAt,omitempty"`
 		Deleted                  bool                             `json:"deleted,omitempty"`
+		DeletedBy                string                           `json:"deletedBy,omitempty"`
 		DeletedForMe             bool                             `json:"deletedForMe,omitempty"`
 		ContactRequestState      ContactRequestState              `json:"contactRequestState,omitempty"`
 		ContactVerificationState ContactVerificationState         `json:"contactVerificationState,omitempty"`
@@ -306,6 +309,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		GapParameters:            m.GapParameters,
 		EditedAt:                 m.EditedAt,
 		Deleted:                  m.Deleted,
+		DeletedBy:                m.DeletedBy,
 		DeletedForMe:             m.DeletedForMe,
 		ContactRequestState:      m.ContactRequestState,
 		ContactVerificationState: m.ContactVerificationState,

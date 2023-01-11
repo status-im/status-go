@@ -104,12 +104,13 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	message := response.Messages()[0]
 	s.Require().Equal(inputMessage.Text, message.Text)
 
-	_, err = s.moderator.DeleteMessageAndSend(ctx, message.ID)
+	deleteMessageResponse, err := s.moderator.DeleteMessageAndSend(ctx, message.ID)
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
 		return len(response.RemovedMessages()) > 0
 	}, "removed messages not received")
+	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(s.moderator.IdentityPublicKey()))
 	s.Require().NoError(err)
 	message, err = s.bob.MessageByID(message.ID)
 	s.Require().NoError(err)
