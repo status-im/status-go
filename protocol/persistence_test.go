@@ -555,9 +555,9 @@ func TestMessageReplies(t *testing.T) {
 	require.Equal(t, "", retrievedMessages[4].ResponseTo)
 	require.Nil(t, retrievedMessages[4].QuotedMessage)
 
-	// We have a ResponseTo, but no QuotedMessage, since the message was deleted
+	// We have a ResponseTo, but no QuotedMessage only gives the ID and Deleted
 	require.Equal(t, "id-4", retrievedMessages[0].ResponseTo)
-	require.Nil(t, retrievedMessages[0].QuotedMessage)
+	require.Equal(t, &common.QuotedMessage{ID: "id-4", Deleted: true}, retrievedMessages[0].QuotedMessage)
 }
 
 func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
