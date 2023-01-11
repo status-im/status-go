@@ -37,6 +37,8 @@ type QuotedMessage struct {
 	HasSticker bool `json:"sticker,omitempty"`
 	// CommunityID is the id of the community advertised
 	CommunityID string `json:"communityId,omitempty"`
+
+	Deleted bool `json:"deleted,omitempty"`
 }
 
 type CommandState int

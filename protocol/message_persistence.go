@@ -16,7 +16,7 @@ var basicMessagesSelectQuery = `
 SELECT    %s %s
 FROM      user_messages m1
 LEFT JOIN user_messages m2
-ON        m1.response_to = m2.id AND m2.deleted = 0
+ON        m1.response_to = m2.id
 LEFT JOIN contacts c
 ON        m1.source = c.id
 LEFT JOIN discord_messages dm
@@ -166,6 +166,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.community_id,
 		m2.id,
         m2.content_type,
+        m2.deleted,
 		c.alias,
 		c.identicon`
 }
@@ -186,6 +187,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedFrom sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
+	var quotedDeleted sql.NullBool
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var alias sql.NullString
@@ -281,6 +283,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedCommunityID,
 		&quotedID,
 		&ContentType,
+		&quotedDeleted,
 		&alias,
 		&identicon,
 	}
@@ -310,13 +313,21 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if quotedText.Valid {
-		message.QuotedMessage = &common.QuotedMessage{
-			ID:          quotedID.String,
-			ContentType: ContentType.Int64,
-			From:        quotedFrom.String,
-			Text:        quotedText.String,
-			ParsedText:  quotedParsedText,
-			CommunityID: quotedCommunityID.String,
+		if quotedDeleted.Bool == true {
+			message.QuotedMessage = &common.QuotedMessage{
+				ID:      quotedID.String,
+				Deleted: quotedDeleted.Bool,
+			}
+		} else {
+			message.QuotedMessage = &common.QuotedMessage{
+				ID:          quotedID.String,
+				ContentType: ContentType.Int64,
+				From:        quotedFrom.String,
+				Text:        quotedText.String,
+				ParsedText:  quotedParsedText,
+				CommunityID: quotedCommunityID.String,
+				Deleted:     quotedDeleted.Bool,
+			}
 		}
 	}
 	message.Alias = alias.String
