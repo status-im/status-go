@@ -1532,12 +1532,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// If the message is a reply, we check if it's a reply to one of own own messages
 	if receivedMessage.ResponseTo != "" {
 		repliedTo, err := m.persistence.MessageByID(receivedMessage.ResponseTo)
-		if err != nil && err == sql.ErrNoRows {
+		if err != nil && (err == sql.ErrNoRows || err == common.ErrRecordNotFound) {
 			logger.Error("failed to get quoted message", zap.Error(err))
 		} else if err != nil {
 			return err
-		}
-		if repliedTo.From == common.PubkeyToHex(&m.identity.PublicKey) {
+		} else if repliedTo.From == common.PubkeyToHex(&m.identity.PublicKey) {
 			receivedMessage.Replied = true
 		}
 	}
