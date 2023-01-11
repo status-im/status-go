@@ -83,6 +83,8 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 	settings, err := defaultSettings(generatedAccountInfo.GeneratedAccountInfo, derivedAddresses, nil)
 	require.NoError(s.T(), err)
 
+	account.Name = settings.Name
+
 	nodeConfig, err := defaultNodeConfig(tmpdir, settings.InstallationID, account.KeyUID)
 	require.NoError(s.T(), err)
 
@@ -146,12 +148,12 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	})
 	require.NoError(s.T(), err)
 
-	activeAccount, err := clientBackend.GetActiveAccount()
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, activeAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
 	var config = PayloadSourceConfig{
 		KeystorePath: clientKeystorePath,
-		KeyUID:       activeAccount.KeyUID,
+		KeyUID:       clientActiveAccount.KeyUID,
 		Password:     s.password,
 	}
 	configBytes, err := json.Marshal(config)
@@ -165,6 +167,10 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
@@ -177,12 +183,12 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 		require.NoError(s.T(), clientBackend.Logout())
 	}()
 
-	activeAccount, err := serverBackend.GetActiveAccount()
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, activeAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
 	var config = PayloadSourceConfig{
 		KeystorePath: serverKeystorePath,
-		KeyUID:       activeAccount.KeyUID,
+		KeyUID:       serverActiveAccount.KeyUID,
 		Password:     s.password,
 	}
 	configBytes, err := json.Marshal(config)
@@ -214,6 +220,10 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
+
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
