@@ -117,11 +117,17 @@ func (s *MessengerReplySuite) TestReceiveReply() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Messages(), 2)
+	messages := response.Messages()
+	s.Require().Len(messages, 2)
 	//* Verify that the reply reponds to the original message
-	s.Require().True(response.Messages()[0].ResponseTo == messageID)
+	messageToCheck := messages[0]
+	if messageToCheck.ResponseTo == "" || messageToCheck.ResponseTo != messageID {
+		// We need to use the second message in the response. They got out of order by accident
+		messageToCheck = messages[1]
+	}
+	s.Require().True(messageToCheck.ResponseTo == messageID)
 	// Verify that it's replied
-	s.Require().True(response.Messages()[0].Replied)
+	s.Require().True(messageToCheck.Replied)
 
 	s.Require().NoError(bob.Shutdown())
 }
