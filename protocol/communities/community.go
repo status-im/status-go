@@ -1242,10 +1242,11 @@ func (o *Community) MemberUpdateChannelID() string {
 
 func (o *Community) DefaultFilters() []string {
 	cID := o.IDString()
+	uncompressedPubKey := common.PubkeyToHex(o.config.ID)[2:]
 	updatesChannelID := o.StatusUpdatesChannelID()
 	mlChannelID := o.MagnetlinkMessageChannelID()
 	memberUpdateChannelID := o.MemberUpdateChannelID()
-	return []string{cID, updatesChannelID, mlChannelID, memberUpdateChannelID}
+	return []string{cID, uncompressedPubKey, updatesChannelID, mlChannelID, memberUpdateChannelID}
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {

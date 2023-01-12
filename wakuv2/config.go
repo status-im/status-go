@@ -34,6 +34,7 @@ type Config struct {
 	WakuNodes            []string `toml:",omitempty"`
 	Rendezvous           bool     `toml:",omitempty"`
 	DiscV5BootstrapNodes []string `toml:",omitempty"`
+	Nameserver           string   `toml:",omitempty"`
 	EnableDiscV5         bool     `toml:",omitempty"`
 	DiscoveryLimit       int      `toml:",omitempty"`
 	AutoUpdate           bool     `toml:",omitempty"`

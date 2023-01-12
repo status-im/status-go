@@ -78,3 +78,7 @@ func (s *Service) GetAccountsByKeyUID(keyUID string) ([]*accounts.Account, error
 func (s *Service) GetSettings() (settings.Settings, error) {
 	return s.db.GetSettings()
 }
+
+func (s *Service) GetMessenger() *protocol.Messenger {
+	return s.messenger
+}
