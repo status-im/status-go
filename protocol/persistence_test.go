@@ -1552,7 +1552,19 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// Don't filter by type if the array of types is empty.
 	_, notifications, err := p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{},
+	)
+	require.NoError(t, err)
+	require.Len(t, notifications, 3)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID2, notifications[1].ID)
+	require.Equal(t, nID1, notifications[2].ID)
+
+	_, notifications, err = p.UnreadActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
