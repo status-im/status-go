@@ -136,7 +136,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
 	var err error
 	var foundKeyFile []byte
-
+	fmt.Println("!!!Pass: ", password)
 	addressObj := types.BytesToAddress(types.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
 		if len(foundKeyFile) > 0 || fileInfo.IsDir() {

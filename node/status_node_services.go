@@ -27,6 +27,7 @@ import (
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
@@ -77,6 +78,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
 	services = append(services, b.ensService())
+	services = append(services, b.collectiblesService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(config.EnableNTPSync, services, b.timeSource())
@@ -395,6 +397,13 @@ func (b *StatusNode) ensService() *ens.Service {
 		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
 	}
 	return b.ensSrvc
+}
+
+func (b *StatusNode) collectiblesService() *collectibles.Service {
+	if b.collectiblesSrvc == nil {
+		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.config)
+	}
+	return b.collectiblesSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
