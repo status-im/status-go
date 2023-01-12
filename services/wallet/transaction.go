@@ -58,11 +58,12 @@ type MultiTransactionResult struct {
 type PendingTrxType string
 
 const (
-	RegisterENS    PendingTrxType = "RegisterENS"
-	ReleaseENS     PendingTrxType = "ReleaseENS"
-	SetPubKey      PendingTrxType = "SetPubKey"
-	BuyStickerPack PendingTrxType = "BuyStickerPack"
-	WalletTransfer PendingTrxType = "WalletTransfer"
+	RegisterENS           PendingTrxType = "RegisterENS"
+	ReleaseENS            PendingTrxType = "ReleaseENS"
+	SetPubKey             PendingTrxType = "SetPubKey"
+	BuyStickerPack        PendingTrxType = "BuyStickerPack"
+	WalletTransfer        PendingTrxType = "WalletTransfer"
+	CollectibleDeployment PendingTrxType = "CollectibleDeployment"
 )
 
 type PendingTransaction struct {
