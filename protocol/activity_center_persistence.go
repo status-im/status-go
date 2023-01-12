@@ -299,13 +299,14 @@ type activityCenterQueryParams struct {
 	chatID              string
 	author              string
 	read                ActivityCenterQueryParamsRead
+	accepted            bool
 	activityCenterTypes []ActivityCenterType
 }
 
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
 
-	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere string
+	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere string
 
 	cursor := params.cursor
 	ids := params.ids
@@ -314,6 +315,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	limit := params.limit
 	chatID := params.chatID
 	read := params.read
+	accepted := params.accepted
 
 	if cursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
@@ -335,13 +337,17 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 		readWhere = "AND NOT(a.read)"
 	}
 
+	if !accepted {
+		acceptedWhere = "AND NOT a.accepted"
+	}
+
 	if chatID != "" {
 		inChatWhere = "AND a.chat_id = ?" //nolint: goconst
 		args = append(args, chatID)
 	}
 
 	if author != "" {
-		fromAuthorWhere = " AND author = ?"
+		fromAuthorWhere = " AND a.author = ?"
 		args = append(args, author)
 	}
 
@@ -376,14 +382,15 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	LEFT JOIN chats c
 	ON
 	c.id = a.chat_id
-	WHERE NOT a.dismissed AND NOT a.accepted
+	WHERE NOT a.dismissed
 	%s
 	%s
 	%s
 	%s
 	%s
 	%s
-	ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere)
+	%s
+	ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere)
 
 	if limit != 0 {
 		args = append(args, limit)
@@ -526,12 +533,13 @@ func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit
 	return db.activityCenterNotifications(params)
 }
 
-func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (string, []*ActivityCenterNotification, error) {
 	params := activityCenterQueryParams{
 		activityCenterTypes: activityTypes,
 		cursor:              cursor,
 		limit:               limit,
 		read:                readType,
+		accepted:            accepted,
 	}
 
 	return db.activityCenterNotifications(params)
@@ -808,9 +816,27 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 
 }
 
+func buildActivityCenterNotificationsCountQuery(isAccepted bool) string {
+	var acceptedWhere string
+
+	if !isAccepted {
+		acceptedWhere = `AND NOT accepted`
+	}
+
+	return fmt.Sprintf(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read AND NOT dismissed %s`, acceptedWhere)
+}
+
 func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	var count uint64
-	err := db.db.QueryRow(`SELECT COUNT(1) FROM activity_center_notifications WHERE NOT read AND NOT dismissed AND NOT accepted`).Scan(&count)
+	query := buildActivityCenterNotificationsCountQuery(false)
+	err := db.db.QueryRow(query).Scan(&count)
+	return count, err
+}
+
+func (db sqlitePersistence) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
+	var count uint64
+	query := buildActivityCenterNotificationsCountQuery(true)
+	err := db.db.QueryRow(query).Scan(&count)
 	return count, err
 }
 

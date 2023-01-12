@@ -1082,6 +1082,10 @@ func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
 
+func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
+	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount()
+}
+
 func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
 	return api.service.messenger.MarkAllActivityCenterNotificationsRead(ctx)
 }
@@ -1124,8 +1128,8 @@ func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uin
 	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
 }
 
-func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType)
+func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

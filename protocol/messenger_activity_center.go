@@ -5,15 +5,18 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"go.uber.org/zap"
 )
 
 func (m *Messenger) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return m.persistence.UnreadActivityCenterNotificationsCount()
+}
+
+func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
+	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount()
 }
 
 func toHexBytes(b [][]byte) []types.HexBytes {
@@ -267,8 +270,8 @@ func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint6
 	}, nil
 }
 
-func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType)
+func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
 	if err != nil {
 		return nil, err
 	}
