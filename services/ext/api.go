@@ -1121,11 +1121,11 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 }
 
 func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
 func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
 func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {

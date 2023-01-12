@@ -1486,13 +1486,21 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
 	require.NoError(t, err)
 
-	cursor, notifications, err := p.UnreadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+		"",
+		2,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 
-	cursor, notifications, err = p.ReadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		"",
+		2,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
@@ -1544,12 +1552,20 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, notifications, err := p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	_, notifications, err := p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	_, notifications, err = p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
@@ -1572,12 +1588,20 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	_, notifications, err = p.ReadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	_, notifications, err = p.ReadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
@@ -1649,34 +1673,54 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch UNREAD notifications, first page.
-	cursor, notifications, err := p.UnreadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+		initialOrFinalCursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID5, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
 	// Fetch next pages.
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 	require.Empty(t, cursor)
 
 	// Fetch READ notifications, first page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		initialOrFinalCursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID4, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
 	// Fetch next page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
