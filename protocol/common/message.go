@@ -169,6 +169,10 @@ type Message struct {
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
+	// Image dimensions
+	ImageWidth  uint32 `json:"imageWidth,omitempty"`
+	ImageHeight uint32 `json:"imageHeight,omitempty"`
+
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
 
@@ -237,6 +241,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
 		AlbumID                  string                           `json:"albumId,omitempty"`
+		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
+		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
@@ -279,6 +285,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		DisplayName:              m.DisplayName,
 		Image:                    m.ImageLocalURL,
 		AlbumID:                  m.AlbumID,
+		ImageWidth:               m.ImageWidth,
+		ImageHeight:              m.ImageHeight,
 		Audio:                    m.AudioLocalURL,
 		CommunityID:              m.CommunityID,
 		Timestamp:                m.Timestamp,
