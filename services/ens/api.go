@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
@@ -34,6 +33,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -310,17 +310,6 @@ func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 	return fmt.Sprintf("%x", price), nil
 }
 
-func (api *API) getSigner(chainID uint64, from types.Address, password string) bind.SignerFn {
-	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
-		selectedAccount, err := api.accountsManager.VerifyAccountPassword(api.config.KeyStoreDir, from.Hex(), password)
-		if err != nil {
-			return nil, err
-		}
-		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
-		return ethTypes.SignTx(tx, s, selectedAccount.PrivateKey)
-	}
-}
-
 func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string) (string, error) {
 	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
 	if err != nil {
@@ -332,7 +321,7 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
 	tx, err := registrar.Release(txOpts, usernameToLabel(username))
 	if err != nil {
 		return "", err
@@ -411,7 +400,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
 	tx, err := snt.ApproveAndCall(
 		txOpts,
 		registryAddr,
@@ -523,7 +512,7 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 	}
 
 	x, y := extractCoordinates(pubkey)
-	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
 	tx, err := resolver.SetPubkey(txOpts, nameHash(username), x, y)
 	if err != nil {
 		return "", err

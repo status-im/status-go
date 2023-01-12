@@ -11,24 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/transactions"
 )
-
-func (api *API) getSigner(chainID uint64, from types.Address, password string) bind.SignerFn {
-	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
-		selectedAccount, err := api.accountsManager.VerifyAccountPassword(api.keyStoreDir, from.Hex(), password)
-		if err != nil {
-			return nil, err
-		}
-		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
-		return ethTypes.SignTx(tx, s, selectedAccount.PrivateKey)
-	}
-}
 
 func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt, password string) (string, error) {
 	snt, err := api.contractMaker.NewSNT(chainID)
@@ -63,7 +52,7 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(api.getSigner(chainID, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.keyStoreDir, txArgs.From, password))
 	tx, err := snt.ApproveAndCall(
 		txOpts,
 		stickerMarketAddress,

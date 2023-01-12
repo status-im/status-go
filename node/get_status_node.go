@@ -35,6 +35,7 @@ import (
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -120,6 +121,7 @@ type StatusNode struct {
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
+	collectiblesSrvc       *collectibles.Service
 	gifSrvc                *gif.Service
 	stickersSrvc           *stickers.Service
 	chatSrvc               *chat.Service
@@ -462,6 +464,7 @@ func (n *StatusNode) stop() error {
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
+	n.collectiblesSrvc = nil
 	n.stickersSrvc = nil
 	n.publicMethods = make(map[string]bool)
 
