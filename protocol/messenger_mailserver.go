@@ -573,26 +573,33 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 
 		topicsForIteration := batch.Topics[i:j]
 
-		cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, nil, nil, topicsForIteration, true)
-		if err != nil {
-			logger.Error("failed to send request", zap.Error(err))
-			return err
-		}
+		for fromSeconds := batch.From; fromSeconds < batch.To; fromSeconds += 86400 { // Limit queries to 1 day (86400s) per batch
+			toSeconds := fromSeconds + 86400
+			if toSeconds > batch.To {
+				toSeconds = batch.To
+			}
 
-		for len(cursor) != 0 || storeCursor != nil {
-			logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
-			err = func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
-				defer cancel()
+			cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, fromSeconds, toSeconds, nil, nil, topicsForIteration, true)
+			if err != nil {
+				logger.Error("failed to send request", zap.Error(err))
+				return err
+			}
 
-				cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, cursor, storeCursor, topicsForIteration, true)
+			for len(cursor) != 0 || storeCursor != nil {
+				logger.Info("retrieved cursor", zap.String("cursor", types.EncodeHex(cursor)))
+				err = func() error {
+					ctx, cancel := context.WithTimeout(context.Background(), mailserverRequestTimeout)
+					defer cancel()
+
+					cursor, storeCursor, err = m.transport.SendMessagesRequestForTopics(ctx, mailserverID, fromSeconds, toSeconds, cursor, storeCursor, topicsForIteration, true)
+					if err != nil {
+						return err
+					}
+					return nil
+				}()
 				if err != nil {
 					return err
 				}
-				return nil
-			}()
-			if err != nil {
-				return err
 			}
 		}
 	}
