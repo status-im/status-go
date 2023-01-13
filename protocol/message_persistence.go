@@ -25,6 +25,10 @@ LEFT JOIN discord_message_authors dm_author
 ON        dm.author_id = dm_author.id
 LEFT JOIN discord_message_attachments dm_attachment
 ON        dm.id = dm_attachment.discord_message_id
+LEFT JOIN discord_messages m2_dm
+ON        m2.discord_message_id = m2_dm.id
+LEFT JOIN discord_message_authors m2_dm_author
+ON        m2_dm.author_id = m2_dm_author.id
 `
 
 var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
@@ -172,7 +176,11 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
         m2.content_type,
         m2.deleted,
 		c.alias,
-		c.identicon`
+		c.identicon,
+    COALESCE(m2.discord_message_id, ""),
+		COALESCE(m2_dm_author.name, ""),
+		COALESCE(m2_dm_author.nickname, ""),
+		COALESCE(m2_dm_author.avatar_url, "")`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsCount() int {
@@ -216,6 +224,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		Author:      &protobuf.DiscordMessageAuthor{},
 		Reference:   &protobuf.DiscordMessageReference{},
 		Attachments: []*protobuf.DiscordMessageAttachment{},
+	}
+
+	quotedDiscordMessage := &protobuf.DiscordMessage{
+		Author: &protobuf.DiscordMessageAuthor{},
 	}
 
 	attachment := &protobuf.DiscordMessageAttachment{}
@@ -294,6 +306,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedDeleted,
 		&alias,
 		&identicon,
+		&quotedDiscordMessage.Id,
+		&quotedDiscordMessage.Author.Name,
+		&quotedDiscordMessage.Author.Nickname,
+		&quotedDiscordMessage.Author.AvatarUrl,
 	}
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
@@ -335,6 +351,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 				ParsedText:  quotedParsedText,
 				CommunityID: quotedCommunityID.String,
 				Deleted:     quotedDeleted.Bool,
+			}
+			if message.QuotedMessage.ContentType == int64(protobuf.ChatMessage_DISCORD_MESSAGE) {
+				message.QuotedMessage.DiscordMessage = quotedDiscordMessage
 			}
 		}
 	}
@@ -1019,10 +1038,20 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
        ON
        dm.author_id = dm_author.id
 
-      LEFT JOIN 
+       LEFT JOIN 
               discord_message_attachments dm_attachment
-      ON        
-      dm.id = dm_attachment.discord_message_id
+			 ON        
+       dm.id = dm_attachment.discord_message_id
+
+			 LEFT JOIN 
+							discord_messages m2_dm
+			 ON        
+			 m2.discord_message_id = m2_dm.id
+
+				LEFT JOIN 
+							discord_message_authors m2_dm_author
+			 ON        
+			 m2_dm.author_id = m2_dm_author.id
 
  			WHERE
  				pm.pinned = 1
