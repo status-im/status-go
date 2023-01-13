@@ -54,7 +54,7 @@ func (s *ServerURLSuite) SetupTest() {
 // This is caused by the ServerURLSuite.SetupTest waiting waitTime before unlocking the portWait sync.Mutex
 func (s *ServerURLSuite) testNoPort(expected string, actual string) {
 	s.Require().Equal(expected, actual)
-	s.Require().Greater(time.Now().Sub(s.testStart), waitTime)
+	s.Require().Greater(time.Since(s.testStart), waitTime)
 }
 
 func (s *ServerURLSuite) TestServer_MakeBaseURL() {

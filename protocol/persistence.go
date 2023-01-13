@@ -1261,7 +1261,7 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 	icons, iconError := finder.FetchIcons(bookmark.URL)
 
 	if iconError == nil && len(icons) > 0 {
-		icon := finder.IconInSizeRange(besticon.SizeRange{48, 48, 100})
+		icon := finder.IconInSizeRange(besticon.SizeRange{Min: 48, Perfect: 48, Max: 100})
 		if icon != nil {
 			bookmark.ImageURL = icon.URL
 		} else {

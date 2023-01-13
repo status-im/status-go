@@ -436,18 +436,6 @@ func (r *Router) getBalance(ctx context.Context, network *params.Network, token 
 	return r.s.tokenManager.GetBalance(ctx, clients[0], account, token.Address)
 }
 
-func (r *Router) estimateTimes(ctx context.Context, network *params.Network, gasFees *SuggestedFees, gasFeeMode GasFeeMode) TransactionEstimation {
-	if gasFeeMode == GasFeeLow {
-		return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasLow)
-	}
-
-	if gasFeeMode == GasFeeMedium {
-		return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasMedium)
-	}
-
-	return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasHigh)
-}
-
 func (r *Router) suggestedRoutes(
 	ctx context.Context,
 	sendType SendType,

@@ -79,7 +79,6 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-	community = response.Communities()[0]
 
 	_, err = WaitOnMessengerResponse(s.moderator, func(response *MessengerResponse) bool {
 		return len(response.Communities()) > 0
@@ -180,7 +179,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) inviteAndJoin(community *commun
 
 	s.Require().NoError(target.SaveChat(response.Chats()[0]))
 
-	response, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
+	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
 		return len(response.Messages()) > 0
 	}, "message 'You have been invited to community' not received")
 	s.Require().NoError(err)

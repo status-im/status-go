@@ -1319,6 +1319,8 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	if !state.Offline && w.offline {
 		select {
 		case w.connectionChanged <- struct{}{}:
+		default:
+			w.logger.Warn("could not write on connection changed channel")
 		}
 	}
 

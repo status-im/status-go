@@ -1422,7 +1422,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			return err
 		}
 
-		if chat.LastMessage != nil && chat.LastMessage.Seen == false && chat.OneToOne() && !chat.Active {
+		if chat.LastMessage != nil && !chat.LastMessage.Seen && chat.OneToOne() && !chat.Active {
 			m.createMessageNotification(chat, state)
 		}
 	}

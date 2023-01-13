@@ -141,9 +141,8 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, token := range tokens {
-		result = append(result, token)
-	}
+
+	result = append(result, tokens...)
 
 	return result, nil
 }

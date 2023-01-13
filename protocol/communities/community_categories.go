@@ -10,7 +10,7 @@ func (o *Community) ChatsByCategoryID(categoryID string) []string {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	var chatIDs []string
-	if o == nil || o.config == nil || o.config.CommunityDescription == nil {
+	if o.config == nil || o.config.CommunityDescription == nil {
 		return chatIDs
 	}
 

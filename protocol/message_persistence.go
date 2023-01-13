@@ -321,7 +321,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if quotedText.Valid {
-		if quotedDeleted.Bool == true {
+		if quotedDeleted.Bool {
 			message.QuotedMessage = &common.QuotedMessage{
 				ID:      quotedID.String,
 				Deleted: quotedDeleted.Bool,
@@ -819,11 +819,11 @@ func (db sqlitePersistence) LatestContactRequestIDs() (map[string]common.Contact
 			LIMIT 20
 		`, cursor), protobuf.ChatMessage_CONTACT_REQUEST)
 
-	defer rows.Close()
-
 	if err != nil {
 		return res, err
 	}
+
+	defer rows.Close()
 
 	for rows.Next() {
 		var id string
