@@ -2318,71 +2318,65 @@ func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]st
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
 
-func (m *Manager) ExtractMessagesFromHistoryArchives(communityID types.HexBytes, archiveIDs []string) (map[transport.Filter][]*types.Message, error) {
+func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
 	id := communityID.String()
 
 	index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
 	if err != nil {
 		return nil, err
 	}
-	totalData, err := os.ReadFile(m.archiveDataFile(id))
+
+	dataFile, err := os.Open(m.archiveDataFile(id))
 	if err != nil {
 		return nil, err
 	}
+	defer dataFile.Close()
 
-	messages := make(map[transport.Filter][]*types.Message)
+	m.LogStdout("extracting messages from history archive", zap.String("archive id", archiveID))
+	metadata := index.Archives[archiveID]
 
-	for _, hash := range archiveIDs {
-		m.LogStdout("extracting messages from history archive", zap.String("archive id", hash))
-		metadata := index.Archives[hash]
+	_, err = dataFile.Seek(int64(metadata.Offset), 0)
+	if err != nil {
+		m.LogStdout("failed to seek archive data file", zap.Error(err))
+		return nil, err
+	}
 
-		archive := &protobuf.WakuMessageArchive{}
-		data := totalData[metadata.Offset : metadata.Offset+metadata.Size-metadata.Padding]
+	data := make([]byte, metadata.Size-metadata.Padding)
+	_, err = dataFile.Read(data)
+	if err != nil {
+		m.LogStdout("failed failed to read archive data", zap.Error(err))
+		return nil, err
+	}
 
-		err := proto.Unmarshal(data, archive)
+	archive := &protobuf.WakuMessageArchive{}
+
+	err = proto.Unmarshal(data, archive)
+	if err != nil {
+		// The archive data might eb encrypted so we try to decrypt instead first
+		var protocolMessage encryption.ProtocolMessage
+		err := proto.Unmarshal(data, &protocolMessage)
 		if err != nil {
-			// The archive data might eb encrypted so we try to decrypt instead first
-			var protocolMessage encryption.ProtocolMessage
-			err := proto.Unmarshal(data, &protocolMessage)
-			if err != nil {
-				m.LogStdout("failed to unmarshal protocol message", zap.Error(err))
-				continue
-			}
-
-			pk, err := crypto.DecompressPubkey(communityID)
-			if err != nil {
-				m.logger.Debug("failed to decompress community pubkey", zap.Error(err))
-				continue
-			}
-			decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
-			if err != nil {
-				m.LogStdout("failed to decrypt message archive", zap.Error(err))
-				continue
-			}
-			err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
-			if err != nil {
-				m.LogStdout("failed to unmarshal message archive data", zap.Error(err))
-				return nil, err
-			}
+			m.LogStdout("failed to unmarshal protocol message", zap.Error(err))
+			return nil, err
 		}
 
-		for _, message := range archive.Messages {
-			filter := m.transport.FilterByTopic(message.Topic)
-			if filter != nil {
-				shhMessage := &types.Message{
-					Sig:          message.Sig,
-					Timestamp:    uint32(message.Timestamp),
-					Topic:        types.BytesToTopic(message.Topic),
-					Payload:      message.Payload,
-					Padding:      message.Padding,
-					Hash:         message.Hash,
-					ThirdPartyID: message.ThirdPartyId,
-				}
-				messages[*filter] = append(messages[*filter], shhMessage)
-			}
+		pk, err := crypto.DecompressPubkey(communityID)
+		if err != nil {
+			m.logger.Debug("failed to decompress community pubkey", zap.Error(err))
+			return nil, err
+		}
+		decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
+		if err != nil {
+			m.LogStdout("failed to decrypt message archive", zap.Error(err))
+			return nil, err
+		}
+		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
+		if err != nil {
+			m.LogStdout("failed to unmarshal message archive data", zap.Error(err))
+			return nil, err
 		}
 	}
-	return messages, nil
+	return archive.Messages, nil
 }
 
 func (m *Manager) SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error {
