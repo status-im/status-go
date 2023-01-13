@@ -4483,6 +4483,18 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_STICKER) {
 		msg.QuotedMessage.HasSticker = true
 	}
+	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_DISCORD_MESSAGE) {
+		dm := msg.QuotedMessage.DiscordMessage
+		exists, err := m.persistence.HasDiscordMessageAuthorImagePayload(dm.Author.Id)
+		if err != nil {
+			return
+		}
+
+		if exists {
+			msg.QuotedMessage.DiscordMessage.Author.LocalUrl = s.MakeDiscordAuthorAvatarURL(dm.Author.Id)
+		}
+	}
+
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
 	}

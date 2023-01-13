@@ -39,6 +39,8 @@ type QuotedMessage struct {
 	CommunityID string `json:"communityId,omitempty"`
 
 	Deleted bool `json:"deleted,omitempty"`
+
+	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 
 type CommandState int
