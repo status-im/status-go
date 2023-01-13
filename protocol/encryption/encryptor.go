@@ -33,7 +33,7 @@ var (
 // If we have no bundles, we use a constant so that the message can reach any device.
 const (
 	noInstallationID         = "none"
-	maxHashRatchetSeqNoDelta = 1000
+	maxHashRatchetSeqNoDelta = 100000
 )
 
 type confirmationData struct {
