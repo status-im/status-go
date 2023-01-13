@@ -1027,36 +1027,15 @@ importMessageArchivesLoop:
 			// wait for all archives to be processed first
 			downloadedArchiveID := archiveIDsToImport[0]
 
-			messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, []string{downloadedArchiveID})
+			archiveMessages, err := m.communitiesManager.ExtractMessagesFromHistoryArchive(id, downloadedArchiveID)
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to extract history archive messages", zap.Error(err))
 				continue
 			}
 
-			importedMessages := make(map[transport.Filter][]*types.Message, 0)
-			otherMessages := make(map[transport.Filter][]*types.Message, 0)
-
-			for filter, messages := range messagesToHandle {
-				for _, message := range messages {
-					if message.ThirdPartyID != "" {
-						importedMessages[filter] = append(importedMessages[filter], message)
-					} else {
-						otherMessages[filter] = append(otherMessages[filter], message)
-					}
-				}
-			}
-
-			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
-
-			err = m.handleImportedMessages(importedMessages)
+			response, err := m.handleArchiveMessages(archiveMessages, id)
 			if err != nil {
-				m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
-				continue
-			}
-
-			response, err := m.handleRetrievedMessages(otherMessages, false)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
+				m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
 				continue
 			}
 
@@ -1078,8 +1057,56 @@ importMessageArchivesLoop:
 	if err != nil {
 		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
 	}
-
 	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+}
+
+func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage, id types.HexBytes) (*MessengerResponse, error) {
+
+	messagesToHandle := make(map[transport.Filter][]*types.Message)
+
+	for _, message := range archiveMessages {
+		filter := m.transport.FilterByTopic(message.Topic)
+		if filter != nil {
+			shhMessage := &types.Message{
+				Sig:          message.Sig,
+				Timestamp:    uint32(message.Timestamp),
+				Topic:        types.BytesToTopic(message.Topic),
+				Payload:      message.Payload,
+				Padding:      message.Padding,
+				Hash:         message.Hash,
+				ThirdPartyID: message.ThirdPartyId,
+			}
+			messagesToHandle[*filter] = append(messagesToHandle[*filter], shhMessage)
+		}
+	}
+
+	importedMessages := make(map[transport.Filter][]*types.Message, 0)
+	otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+	for filter, messages := range messagesToHandle {
+		for _, message := range messages {
+			if message.ThirdPartyID != "" {
+				importedMessages[filter] = append(importedMessages[filter], message)
+			} else {
+				otherMessages[filter] = append(otherMessages[filter], message)
+			}
+		}
+	}
+
+	m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
+	err := m.handleImportedMessages(importedMessages)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
+		return nil, err
+	}
+
+	response, err := m.handleRetrievedMessages(otherMessages, false)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto protobuf.CommunityCancelRequestToJoin) error {
