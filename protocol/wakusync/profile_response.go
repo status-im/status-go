@@ -6,7 +6,7 @@ import (
 
 type BackedUpProfile struct {
 	DisplayName string                 `json:"displayName,omitempty"`
-	Images      []images.IdentityImage `json:"images,omitempty,omitempty"`
+	Images      []images.IdentityImage `json:"images,omitempty"`
 }
 
 func (sfwr *WakuBackedUpDataResponse) AddDisplayName(displayName string) {

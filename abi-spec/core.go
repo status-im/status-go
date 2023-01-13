@@ -145,9 +145,8 @@ func Decode(bytesString string, types []string) ([]interface{}, error) {
 		return nil, fmt.Errorf("invalid ABI definition %s: %v", def, err)
 	}
 
-	if strings.HasPrefix(bytesString, "0x") {
-		bytesString = bytesString[2:]
-	}
+	bytesString = strings.TrimPrefix(bytesString, "0x")
+
 	bytes, err := hex.DecodeString(bytesString)
 	if err != nil {
 		return nil, fmt.Errorf("invalid hex %s: %v", bytesString, err)

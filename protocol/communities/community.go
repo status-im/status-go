@@ -1303,14 +1303,15 @@ func (o *Community) ToBytes() ([]byte, error) {
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
 	response := make(map[string]*protobuf.CommunityChat)
 
-	if o != nil {
-		o.mutex.Lock()
-		defer o.mutex.Unlock()
-	} else {
+	// Why are we checking here for nil, it should be the responsibility of the caller
+	if o == nil {
 		return response
 	}
 
-	if o != nil && o.config != nil && o.config.CommunityDescription != nil {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config != nil && o.config.CommunityDescription != nil {
 		for k, v := range o.config.CommunityDescription.Chats {
 			response[k] = v
 		}
@@ -1322,14 +1323,15 @@ func (o *Community) Chats() map[string]*protobuf.CommunityChat {
 func (o *Community) Images() map[string]*protobuf.IdentityImage {
 	response := make(map[string]*protobuf.IdentityImage)
 
-	if o != nil {
-		o.mutex.Lock()
-		defer o.mutex.Unlock()
-	} else {
+	// Why are we checking here for nil, it should be the responsibility of the caller
+	if o == nil {
 		return response
 	}
 
-	if o != nil && o.config != nil && o.config.CommunityDescription != nil && o.config.CommunityDescription.Identity != nil {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config != nil && o.config.CommunityDescription != nil && o.config.CommunityDescription.Identity != nil {
 		for k, v := range o.config.CommunityDescription.Identity.Images {
 			response[k] = v
 		}
@@ -1341,14 +1343,14 @@ func (o *Community) Images() map[string]*protobuf.IdentityImage {
 func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	response := make(map[string]*protobuf.CommunityCategory)
 
-	if o != nil {
-		o.mutex.Lock()
-		defer o.mutex.Unlock()
-	} else {
+	if o == nil {
 		return response
 	}
 
-	if o != nil && o.config != nil && o.config.CommunityDescription != nil {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config != nil && o.config.CommunityDescription != nil {
 		for k, v := range o.config.CommunityDescription.Categories {
 			response[k] = v
 		}

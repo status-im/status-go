@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	hpprof "net/http/pprof"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -24,8 +25,9 @@ func NewProfiler(port int) *Profiler {
 	mux.HandleFunc("/debug/pprof/trace", hpprof.Trace)
 	p := Profiler{
 		server: &http.Server{
-			Addr:    fmt.Sprintf(":%d", port),
-			Handler: mux,
+			Addr:              fmt.Sprintf(":%d", port),
+			ReadHeaderTimeout: 5 * time.Second,
+			Handler:           mux,
 		},
 	}
 	return &p
