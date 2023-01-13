@@ -5,10 +5,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"go.uber.org/zap"
 )
 
 func (m *Messenger) UnreadActivityCenterNotificationsCount() (uint64, error) {
