@@ -34,7 +34,7 @@ pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go_1_18 gopls go-bindata
+    go_1_18 golangci-lint gopls go-bindata
     mockgen protobuf3_17 protoc-gen-go
     (gomobile.override { xcodeWrapperArgs = { version = "13.4.1"; }; })
   ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
