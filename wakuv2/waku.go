@@ -1484,11 +1484,19 @@ func (w *Waku) DialPeer(address string) error {
 func (w *Waku) DialPeerByID(peerID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
-	return w.node.DialPeerByID(ctx, peer.ID(peerID))
+	pid, err := peer.Decode(peerID)
+	if err != nil {
+		return err
+	}
+	return w.node.DialPeerByID(ctx, pid)
 }
 
 func (w *Waku) DropPeer(peerID string) error {
-	return w.node.ClosePeerById(peer.ID(peerID))
+	pid, err := peer.Decode(peerID)
+	if err != nil {
+		return err
+	}
+	return w.node.ClosePeerById(pid)
 }
 
 func (w *Waku) ProcessingP2PMessages() bool {
