@@ -32,7 +32,6 @@ import (
 const PeerExchangeID_v20alpha1 = libp2pProtocol.ID("/vac/waku/peer-exchange/2.0.0-alpha1")
 const MaxCacheSize = 1000
 const CacheCleanWindow = 200
-const dialTimeout = 7 * time.Second
 
 var (
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
@@ -40,7 +39,7 @@ var (
 )
 
 type peerRecord struct {
-	node enode.Node
+	node *enode.Node
 	idx  int
 }
 
@@ -50,29 +49,35 @@ type WakuPeerExchange struct {
 
 	log *zap.Logger
 
-	cancel  context.CancelFunc
-	started bool
-	wg      sync.WaitGroup
+	cancel context.CancelFunc
 
+	wg            sync.WaitGroup
+	peerConnector PeerConnector
+	peerCh        chan peer.AddrInfo
 	enrCache      map[enode.ID]peerRecord // todo: next step: ring buffer; future: implement cache satisfying https://rfc.vac.dev/spec/34/
 	enrCacheMutex sync.RWMutex
 	rng           *rand.Rand
 }
 
+type PeerConnector interface {
+	PeerChannel() chan<- peer.AddrInfo
+}
+
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct
-func NewWakuPeerExchange(h host.Host, disc *discv5.DiscoveryV5, log *zap.Logger) *WakuPeerExchange {
+func NewWakuPeerExchange(h host.Host, disc *discv5.DiscoveryV5, peerConnector PeerConnector, log *zap.Logger) (*WakuPeerExchange, error) {
 	wakuPX := new(WakuPeerExchange)
 	wakuPX.h = h
 	wakuPX.disc = disc
 	wakuPX.log = log.Named("wakupx")
 	wakuPX.enrCache = make(map[enode.ID]peerRecord)
 	wakuPX.rng = rand.New(rand.NewSource(rand.Int63()))
-	return wakuPX
+	wakuPX.peerConnector = peerConnector
+	return wakuPX, nil
 }
 
 // Start inits the peer exchange protocol
 func (wakuPX *WakuPeerExchange) Start(ctx context.Context) error {
-	if wakuPX.started {
+	if wakuPX.cancel != nil {
 		return errors.New("peer exchange already started")
 	}
 
@@ -80,14 +85,14 @@ func (wakuPX *WakuPeerExchange) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	wakuPX.cancel = cancel
-	wakuPX.started = true
+	wakuPX.peerCh = make(chan peer.AddrInfo)
 
 	wakuPX.h.SetStreamHandlerMatch(PeerExchangeID_v20alpha1, protocol.PrefixTextMatch(string(PeerExchangeID_v20alpha1)), wakuPX.onRequest(ctx))
 	wakuPX.log.Info("Peer exchange protocol started")
 
-	wakuPX.wg.Add(1)
+	wakuPX.wg.Add(2)
 	go wakuPX.runPeerExchangeDiscv5Loop(ctx)
-
+	go wakuPX.handleNewPeers(ctx)
 	return nil
 }
 
@@ -115,26 +120,34 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 			return err
 		}
 
-		if wakuPX.h.Network().Connectedness(peerInfo.ID) != network.Connected {
-			peers = append(peers, *peerInfo)
-		}
+		peers = append(peers, *peerInfo)
 	}
 
 	if len(peers) != 0 {
 		log.Info("connecting to newly discovered peers", zap.Int("count", len(peers)))
-		for _, p := range peers {
-			func(p peer.AddrInfo) {
-				ctx, cancel := context.WithTimeout(ctx, dialTimeout)
-				defer cancel()
-				err := wakuPX.h.Connect(ctx, p)
-				if err != nil {
-					log.Info("connecting to peer", zap.String("peer", p.ID.Pretty()), zap.Error(err))
-				}
-			}(p)
-		}
+		wakuPX.wg.Add(1)
+		go func() {
+			defer wakuPX.wg.Done()
+			for _, p := range peers {
+				wakuPX.peerCh <- p
+			}
+		}()
 	}
 
 	return nil
+}
+
+func (wakuPX *WakuPeerExchange) handleNewPeers(ctx context.Context) {
+	defer wakuPX.wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case p := <-wakuPX.peerCh:
+			wakuPX.peerConnector.PeerChannel() <- p
+		}
+	}
+
 }
 
 func (wakuPX *WakuPeerExchange) onRequest(ctx context.Context) func(s network.Stream) {
@@ -202,8 +215,9 @@ func (wakuPX *WakuPeerExchange) Stop() {
 	if wakuPX.cancel == nil {
 		return
 	}
-	wakuPX.cancel()
 	wakuPX.h.RemoveStreamHandler(PeerExchangeID_v20alpha1)
+	wakuPX.cancel()
+	close(wakuPX.peerCh)
 	wakuPX.wg.Wait()
 }
 
@@ -307,28 +321,41 @@ func (wakuPX *WakuPeerExchange) cleanCache() {
 	wakuPX.enrCache = r
 }
 
-func (wakuPX *WakuPeerExchange) findPeers(ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	peerRecords, err := wakuPX.disc.FindNodes(ctx, "")
+func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) {
+	iterator, err := wakuPX.disc.Iterator()
 	if err != nil {
-		wakuPX.log.Error("finding peers", zap.Error(err))
+		wakuPX.log.Error("obtaining iterator", zap.Error(err))
+		return
 	}
+	defer iterator.Close()
 
-	cnt := 0
-	wakuPX.enrCacheMutex.Lock()
-	for _, p := range peerRecords {
-		cnt++
-		wakuPX.enrCache[p.Node.ID()] = peerRecord{
-			idx:  len(wakuPX.enrCache),
-			node: p.Node,
+	for {
+		if ctx.Err() != nil {
+			break
 		}
+
+		exists := iterator.Next()
+		if !exists {
+			break
+		}
+
+		addresses, err := utils.Multiaddress(iterator.Node())
+		if err != nil {
+			wakuPX.log.Error("extracting multiaddrs from enr", zap.Error(err))
+			continue
+		}
+
+		if len(addresses) == 0 {
+			continue
+		}
+
+		wakuPX.enrCacheMutex.Lock()
+		wakuPX.enrCache[iterator.Node().ID()] = peerRecord{
+			idx:  len(wakuPX.enrCache),
+			node: iterator.Node(),
+		}
+		wakuPX.enrCacheMutex.Unlock()
 	}
-	wakuPX.enrCacheMutex.Unlock()
-
-	wakuPX.log.Info("discovered px peers via discv5", zap.Int("count", cnt))
-
-	wakuPX.cleanCache()
 }
 
 func (wakuPX *WakuPeerExchange) runPeerExchangeDiscv5Loop(ctx context.Context) {
@@ -340,24 +367,23 @@ func (wakuPX *WakuPeerExchange) runPeerExchangeDiscv5Loop(ctx context.Context) {
 		return
 	}
 
-	wakuPX.log.Info("starting peer exchange discovery v5 loop")
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{} // Initial execution
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	// This loop "competes" with the loop in wakunode2
-	// For the purpose of collecting px peers, 30 sec intervals should be enough
-
-	wakuPX.findPeers(ctx)
-
+restartLoop:
 	for {
 		select {
-		case <-ctx.Done():
-			return
-
+		case <-ch:
+			wakuPX.iterate(ctx)
+			ch <- struct{}{}
 		case <-ticker.C:
-			wakuPX.findPeers(ctx)
+			wakuPX.cleanCache()
+		case <-ctx.Done():
+			close(ch)
+			break restartLoop
 		}
-
 	}
 }

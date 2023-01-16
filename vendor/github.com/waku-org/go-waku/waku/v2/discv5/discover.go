@@ -3,12 +3,10 @@ package discv5
 import (
 	"context"
 	"crypto/ecdsa"
-	"math/rand"
+	"errors"
 	"net"
 	"sync"
-	"time"
 
-	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-discover/discover"
@@ -17,48 +15,32 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
 type DiscoveryV5 struct {
 	sync.RWMutex
 
-	discovery.Discovery
-
-	params    *discV5Parameters
-	host      host.Host
-	config    discover.Config
-	udpAddr   *net.UDPAddr
-	listener  *discover.UDPv5
-	localnode *enode.LocalNode
-	NAT       nat.Interface
+	params        *discV5Parameters
+	host          host.Host
+	config        discover.Config
+	udpAddr       *net.UDPAddr
+	listener      *discover.UDPv5
+	localnode     *enode.LocalNode
+	peerConnector PeerConnector
+	NAT           nat.Interface
 
 	log *zap.Logger
 
 	started bool
 	cancel  context.CancelFunc
 	wg      *sync.WaitGroup
-
-	peerCache peerCache
-}
-
-type peerCache struct {
-	sync.RWMutex
-	recs map[peer.ID]PeerRecord
-	rng  *rand.Rand
-}
-
-type PeerRecord struct {
-	expire int64
-	Peer   peer.AddrInfo
-	Node   enode.Node
 }
 
 type discV5Parameters struct {
 	autoUpdate    bool
 	bootnodes     []*enode.Node
-	udpPort       int
+	udpPort       uint
 	advertiseAddr *net.IP
 }
 
@@ -84,7 +66,7 @@ func WithAdvertiseAddr(addr net.IP) DiscoveryV5Option {
 	}
 }
 
-func WithUDPPort(port int) DiscoveryV5Option {
+func WithUDPPort(port uint) DiscoveryV5Option {
 	return func(params *discV5Parameters) {
 		params.udpPort = port
 	}
@@ -96,9 +78,11 @@ func DefaultOptions() []DiscoveryV5Option {
 	}
 }
 
-const MaxPeersToDiscover = 600
+type PeerConnector interface {
+	PeerChannel() chan<- peer.AddrInfo
+}
 
-func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConnector PeerConnector, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -114,29 +98,22 @@ func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.Loc
 	}
 
 	return &DiscoveryV5{
-		host:   host,
-		params: params,
-		NAT:    NAT,
-		wg:     &sync.WaitGroup{},
-		peerCache: peerCache{
-			rng:  rand.New(rand.NewSource(rand.Int63())),
-			recs: make(map[peer.ID]PeerRecord),
-		},
-		localnode: localnode,
+		host:          host,
+		peerConnector: peerConnector,
+		params:        params,
+		NAT:           NAT,
+		wg:            &sync.WaitGroup{},
+		localnode:     localnode,
 		config: discover.Config{
 			PrivateKey: priv,
 			Bootnodes:  params.bootnodes,
-			ValidNodeFn: func(n enode.Node) bool {
-				// TODO: track https://github.com/status-im/nim-waku/issues/770 for improvements over validation func
-				return evaluateNode(&n)
-			},
 			V5Config: discover.V5Config{
 				ProtocolID: &protocolID,
 			},
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,
-			Port: params.udpPort,
+			Port: int(params.udpPort),
 		},
 		log: logger,
 	}, nil
@@ -194,6 +171,7 @@ func (d *DiscoveryV5) Start(ctx context.Context) error {
 		return err
 	}
 
+	d.wg.Add(1)
 	go d.runDiscoveryV5Loop(ctx)
 
 	return nil
@@ -241,27 +219,15 @@ func isWakuNode(node *enode.Node) bool {
 }
 */
 
-func hasTCPPort(node *enode.Node) bool {
-	enrTCP := new(enr.TCP)
-	if err := node.Record().Load(enr.WithEntry(enrTCP.ENRKey(), enrTCP)); err != nil {
-		if !enr.IsNotFound(err) {
-			utils.Logger().Named("discv5").Error("retrieving port for enr", logging.ENode("enr", node))
-		}
-		return false
-	}
-
-	return true
-}
-
 func evaluateNode(node *enode.Node) bool {
-	if node == nil || node.IP() == nil {
+	if node == nil {
 		return false
 	}
 
 	//  TODO: consider node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
-	if /*!isWakuNode(node) ||*/ !hasTCPPort(node) {
+	/*if !isWakuNode(node) {
 		return false
-	}
+	}*/
 
 	_, err := utils.EnodeToPeerInfo(node)
 
@@ -273,27 +239,25 @@ func evaluateNode(node *enode.Node) bool {
 	return true
 }
 
-func (d *DiscoveryV5) Advertise(ctx context.Context, ns string, opts ...discovery.Option) (time.Duration, error) {
-	// Get options
-	var options discovery.Options
-	err := options.Apply(opts...)
-	if err != nil {
-		return 0, err
+func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
+	if d.listener == nil {
+		return nil, errors.New("no discv5 listener")
 	}
 
-	// TODO: once discv5 spec introduces capability and topic discovery, implement this function
-
-	return 20 * time.Minute, nil
+	iterator := d.listener.RandomNodes()
+	return enode.Filter(iterator, evaluateNode), nil
 }
 
-func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limit int) {
-	defer d.wg.Done()
+func (d *DiscoveryV5) iterate(ctx context.Context) {
+	iterator, err := d.Iterator()
+	if err != nil {
+		d.log.Error("obtaining iterator", zap.Error(err))
+		return
+	}
+
+	defer iterator.Close()
 
 	for {
-		if len(d.peerCache.recs) >= limit {
-			break
-		}
-
 		if ctx.Err() != nil {
 			break
 		}
@@ -315,106 +279,33 @@ func (d *DiscoveryV5) iterate(ctx context.Context, iterator enode.Iterator, limi
 			continue
 		}
 
-		d.peerCache.Lock()
-		for _, p := range peerAddrs {
-			d.peerCache.recs[p.ID] = PeerRecord{
-				expire: time.Now().Unix() + 3600, // Expires in 1hr
-				Peer:   p,
-				Node:   *iterator.Node(),
-			}
-		}
-		d.peerCache.Unlock()
-	}
-}
-
-func (d *DiscoveryV5) removeExpiredPeers() int {
-	// Remove all expired entries from cache
-	currentTime := time.Now().Unix()
-	newCacheSize := len(d.peerCache.recs)
-
-	for p := range d.peerCache.recs {
-		rec := d.peerCache.recs[p]
-		if rec.expire < currentTime {
-			newCacheSize--
-			delete(d.peerCache.recs, p)
+		if len(peerAddrs) != 0 {
+			d.peerConnector.PeerChannel() <- peerAddrs[0]
 		}
 	}
-
-	return newCacheSize
 }
 
 func (d *DiscoveryV5) runDiscoveryV5Loop(ctx context.Context) {
-	iterator := d.listener.RandomNodes()
-	iterator = enode.Filter(iterator, evaluateNode)
-	defer iterator.Close()
+	defer d.wg.Done()
 
-	d.wg.Add(1)
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{} // Initial execution
 
-	go d.iterate(ctx, iterator, MaxPeersToDiscover)
-
-	<-ctx.Done()
-
-	d.log.Warn("Discv5 loop stopped")
-}
-
-func (d *DiscoveryV5) FindNodes(ctx context.Context, topic string, opts ...discovery.Option) ([]PeerRecord, error) {
-	// Get options
-	var options discovery.Options
-	err := options.Apply(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	limit := options.Limit
-	if limit == 0 || limit > MaxPeersToDiscover {
-		limit = MaxPeersToDiscover
-	}
-
-	// We are ignoring the topic. Future versions might use a map[string]*peerCache instead where the string represents the pubsub topic
-
-	d.peerCache.Lock()
-	defer d.peerCache.Unlock()
-
-	d.removeExpiredPeers()
-
-	// Randomize and fill channel with available records
-	count := len(d.peerCache.recs)
-	if limit < count {
-		count = limit
-	}
-
-	perm := d.peerCache.rng.Perm(len(d.peerCache.recs))[0:count]
-	permSet := make(map[int]int)
-	for i, v := range perm {
-		permSet[v] = i
-	}
-
-	sendLst := make([]PeerRecord, count)
-	iter := 0
-	for k := range d.peerCache.recs {
-		if sendIndex, ok := permSet[iter]; ok {
-			sendLst[sendIndex] = d.peerCache.recs[k]
+restartLoop:
+	for {
+		select {
+		case <-ch:
+			if d.listener == nil {
+				break
+			}
+			d.iterate(ctx)
+			ch <- struct{}{}
+		case <-ctx.Done():
+			close(ch)
+			break restartLoop
 		}
-		iter++
 	}
-
-	return sendLst, err
-}
-
-func (d *DiscoveryV5) FindPeers(ctx context.Context, topic string, opts ...discovery.Option) (<-chan peer.AddrInfo, error) {
-	records, err := d.FindNodes(ctx, topic, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	chPeer := make(chan peer.AddrInfo, len(records))
-	for _, r := range records {
-		chPeer <- r.Peer
-	}
-
-	close(chPeer)
-
-	return chPeer, err
+	d.log.Warn("Discv5 loop stopped")
 }
 
 func (d *DiscoveryV5) IsStarted() bool {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -13,6 +14,11 @@ import (
 )
 
 const defaultPlaceholder = "value"
+
+var (
+	defaultSliceFlagSeparator = ","
+	disableSliceFlagSeparator = false
+)
 
 var (
 	slPfx = fmt.Sprintf("sl:::%d:::", time.Now().UTC().UnixNano())
@@ -268,19 +274,23 @@ func prefixedNames(names []string, placeholder string) string {
 	return prefixed
 }
 
+func envFormat(envVars []string, prefix, sep, suffix string) string {
+	if len(envVars) > 0 {
+		return fmt.Sprintf(" [%s%s%s]", prefix, strings.Join(envVars, sep), suffix)
+	}
+	return ""
+}
+
+func defaultEnvFormat(envVars []string) string {
+	return envFormat(envVars, "$", ", $", "")
+}
+
 func withEnvHint(envVars []string, str string) string {
 	envText := ""
-	if len(envVars) > 0 {
-		prefix := "$"
-		suffix := ""
-		sep := ", $"
-		if runtime.GOOS == "windows" {
-			prefix = "%"
-			suffix = "%"
-			sep = "%, %"
-		}
-
-		envText = fmt.Sprintf(" [%s%s%s]", prefix, strings.Join(envVars, sep), suffix)
+	if runtime.GOOS != "windows" || os.Getenv("PSHOME") != "" {
+		envText = defaultEnvFormat(envVars)
+	} else {
+		envText = envFormat(envVars, "%", "%, %", "%")
 	}
 	return str + envText
 }
@@ -373,5 +383,9 @@ func flagFromEnvOrFile(envVars []string, filePath string) (value string, fromWhe
 }
 
 func flagSplitMultiValues(val string) []string {
-	return strings.Split(val, ",")
+	if disableSliceFlagSeparator {
+		return []string{val}
+	}
+
+	return strings.Split(val, defaultSliceFlagSeparator)
 }

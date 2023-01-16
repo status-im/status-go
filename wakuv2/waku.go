@@ -70,7 +70,6 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
 
-	"github.com/libp2p/go-libp2p/core/discovery"
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
@@ -263,6 +262,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithHostAddress(hostAddr),
 		node.WithConnectionStatusChannel(connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+		node.WithDiscoverParams(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 	}
 
@@ -273,7 +273,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 			return nil, err
 		}
 
-		opts = append(opts, node.WithDiscoveryV5(cfg.UDPPort, bootnodes, cfg.AutoUpdate, pubsub.WithDiscoveryOpts(discovery.Limit(cfg.DiscoveryLimit))))
+		opts = append(opts, node.WithDiscoveryV5(uint(cfg.UDPPort), bootnodes, cfg.AutoUpdate))
 
 		// Peer exchange requires DiscV5 to run (might change in future versions of the protocol)
 		if cfg.PeerExchange {
@@ -330,6 +330,8 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 
 	go func() {
 		defer waku.wg.Done()
+
+		isConnected := false
 		for {
 			select {
 			case <-waku.quit:
@@ -346,6 +348,20 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 				}
 				waku.connStatusMu.Unlock()
 				signal.SendPeerStats(latestConnStatus)
+
+				// Restarting DiscV5
+				if !latestConnStatus.IsOnline && isConnected {
+					isConnected = false
+					waku.node.DiscV5().Stop()
+				} else if latestConnStatus.IsOnline && !isConnected {
+					isConnected = true
+					if !waku.node.DiscV5().IsStarted() {
+						err := waku.node.DiscV5().Start(ctx)
+						if err != nil {
+							waku.logger.Error("Could not start DiscV5", zap.Error(err))
+						}
+					}
+				}
 			}
 		}
 	}()

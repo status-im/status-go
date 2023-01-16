@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
@@ -70,20 +71,19 @@ type WakuNode struct {
 	log        *zap.Logger
 	timesource timesource.Timesource
 
-	relay        Service
-	lightPush    Service
-	swap         Service
-	discoveryV5  Service
-	peerExchange Service
-	filter       ReceptorService
-	store        ReceptorService
-	rlnRelay     RLNRelay
+	relay         Service
+	lightPush     Service
+	swap          Service
+	peerConnector PeerConnectorService
+	discoveryV5   Service
+	peerExchange  Service
+	filter        ReceptorService
+	store         ReceptorService
+	rlnRelay      RLNRelay
 
 	wakuFlag utils.WakuEnrBitfield
 
 	localNode *enode.LocalNode
-
-	addrChan chan ma.Multiaddr
 
 	bcaster v2.Broadcaster
 
@@ -166,7 +166,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.opts = params
 	w.log = params.logger.Named("node2")
 	w.wg = &sync.WaitGroup{}
-	w.addrChan = make(chan ma.Multiaddr, 1024)
 	w.keepAliveFails = make(map[peer.ID]int)
 	w.wakuFlag = utils.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilter, w.opts.enableStore, w.opts.enableRelay)
 
@@ -181,16 +180,27 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		w.log.Error("creating localnode", zap.Error(err))
 	}
 
+	// Setup peer connection strategy
+	cacheSize := 600
+	rngSrc := rand.NewSource(rand.Int63())
+	minBackoff, maxBackoff := time.Second*30, time.Hour
+	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
+	w.peerConnector, err = v2.NewPeerConnectionStrategy(host, cacheSize, w.opts.discoveryMinPeers, network.DialPeerTimeout, bkf, w.log)
+	if err != nil {
+		w.log.Error("creating peer connection strategy", zap.Error(err))
+	}
+
 	if w.opts.enableDiscV5 {
 		err := w.mountDiscV5()
 		if err != nil {
 			return nil, err
 		}
-
-		w.opts.wOpts = append(w.opts.wOpts, pubsub.WithDiscovery(w.DiscV5(), w.opts.discV5Opts...))
 	}
 
-	w.peerExchange = peer_exchange.NewWakuPeerExchange(w.host, w.DiscV5(), w.log)
+	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.host, w.DiscV5(), w.peerConnector, w.log)
+	if err != nil {
+		return nil, err
+	}
 
 	w.relay = relay.NewWakuRelay(w.host, w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.filter = filter.NewWakuFilter(w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
@@ -228,14 +238,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	return w, nil
 }
 
-func (w *WakuNode) onAddrChange() {
-	for m := range w.addrChan {
-		_ = m
-		// TODO: determine if still needed. Otherwise remove
-	}
-}
-
-func (w *WakuNode) checkForAddressChanges(ctx context.Context) {
+func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 	defer w.wg.Done()
 
 	addrs := w.ListenAddresses()
@@ -244,7 +247,6 @@ func (w *WakuNode) checkForAddressChanges(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			close(w.addrChan)
 			return
 		case <-first:
 			w.log.Info("listening", logging.MultiAddrs("multiaddr", addrs...))
@@ -264,9 +266,6 @@ func (w *WakuNode) checkForAddressChanges(ctx context.Context) {
 			if diff {
 				addrs = newAddrs
 				w.log.Info("listening addresses update received", logging.MultiAddrs("multiaddr", addrs...))
-				for _, addr := range addrs {
-					w.addrChan <- addr
-				}
 				_ = w.setupENR(ctx, addrs)
 			}
 		}
@@ -281,14 +280,19 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.log)
 	w.host.Network().Notify(w.connectionNotif)
 
-	w.wg.Add(2)
+	w.wg.Add(3)
 	go w.connectednessListener(ctx)
-	go w.checkForAddressChanges(ctx)
-	go w.onAddrChange()
+	go w.watchMultiaddressChanges(ctx)
+	go w.watchENRChanges(ctx)
 
 	if w.opts.keepAliveInterval > time.Duration(0) {
 		w.wg.Add(1)
 		go w.startKeepAlive(ctx, w.opts.keepAliveInterval)
+	}
+
+	err := w.peerConnector.Start(ctx)
+	if err != nil {
+		return err
 	}
 
 	if w.opts.enableNTP {
@@ -339,7 +343,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		w.bcaster.Register(nil, w.filter.MessageChannel())
 	}
 
-	err := w.setupENR(ctx, w.ListenAddresses())
+	err = w.setupENR(ctx, w.ListenAddresses())
 	if err != nil {
 		return err
 	}
@@ -386,6 +390,8 @@ func (w *WakuNode) Stop() {
 		w.discoveryV5.Stop()
 	}
 
+	w.peerConnector.Stop()
+
 	_ = w.stopRlnRelay()
 
 	w.timesource.Stop()
@@ -403,6 +409,31 @@ func (w *WakuNode) Host() host.Host {
 // ID returns the base58 encoded ID from the host
 func (w *WakuNode) ID() string {
 	return w.host.ID().Pretty()
+}
+
+func (w *WakuNode) watchENRChanges(ctx context.Context) {
+	defer w.wg.Done()
+
+	timer := time.NewTicker(1 * time.Second)
+	var prevNodeVal string
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			if w.localNode != nil {
+				currNodeVal := w.localNode.Node().String()
+				if prevNodeVal != currNodeVal {
+					if prevNodeVal == "" {
+						w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
+					} else {
+						w.log.Info("new enr record", logging.ENode("enr", w.localNode.Node()))
+					}
+					prevNodeVal = currNodeVal
+				}
+			}
+		}
+	}
 }
 
 // ListenAddresses returns all the multiaddresses used by the host
@@ -517,7 +548,7 @@ func (w *WakuNode) mountDiscV5() error {
 	}
 
 	var err error
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.log, discV5Options...)
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.peerConnector, w.log, discV5Options...)
 
 	return err
 }
