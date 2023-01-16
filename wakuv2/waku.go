@@ -152,6 +152,18 @@ type Waku struct {
 	discV5BootstrapNodes []string
 }
 
+func getUsableUDPPort() (int, error) {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.IPv4zero,
+		Port: 0,
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).Port, nil
+}
+
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
 func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, timesource *timesource.NTPTimeSource) (*Waku, error) {
 	var err error
@@ -163,6 +175,13 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	cfg = setDefaults(cfg)
+
+	if cfg.UDPPort == 0 {
+		cfg.UDPPort, err = getUsableUDPPort()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	logger.Debug("starting wakuv2 with config", zap.Any("config", cfg))
 
