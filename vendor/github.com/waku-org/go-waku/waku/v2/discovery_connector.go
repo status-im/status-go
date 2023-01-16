@@ -20,16 +20,25 @@ import (
 
 // PeerConnectionStrategy is a utility to connect to peers, but only if we have not recently tried connecting to them already
 type PeerConnectionStrategy struct {
-	cache       *lru.TwoQueueCache
-	host        host.Host
-	cancel      context.CancelFunc
+	sync.RWMutex
+
+	cache  *lru.TwoQueueCache
+	host   host.Host
+	cancel context.CancelFunc
+
+	paused       bool
+	workerCtx    context.Context
+	workerCancel context.CancelFunc
+
 	wg          sync.WaitGroup
 	minPeers    int
 	dialTimeout time.Duration
 	peerCh      chan peer.AddrInfo
-	backoff     backoff.BackoffFactory
-	mux         sync.Mutex
-	logger      *zap.Logger
+	dialCh      chan peer.AddrInfo
+
+	backoff backoff.BackoffFactory
+	mux     sync.Mutex
+	logger  *zap.Logger
 }
 
 // NewPeerConnectionStrategy creates a utility to connect to peers, but only if we have not recently tried connecting to them already.
@@ -51,7 +60,6 @@ func NewPeerConnectionStrategy(h host.Host, cacheSize int, minPeers int, dialTim
 		dialTimeout: dialTimeout,
 		backoff:     backoff,
 		logger:      logger.Named("discovery-connector"),
-		peerCh:      make(chan peer.AddrInfo),
 	}, nil
 }
 
@@ -73,8 +81,12 @@ func (c *PeerConnectionStrategy) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
+	c.peerCh = make(chan peer.AddrInfo)
+	c.dialCh = make(chan peer.AddrInfo)
 
-	c.wg.Add(1)
+	c.wg.Add(3)
+	go c.shouldDialPeers(ctx)
+	go c.workPublisher(ctx)
 	go c.dialPeers(ctx)
 
 	return nil
@@ -87,6 +99,85 @@ func (c *PeerConnectionStrategy) Stop() {
 
 	c.cancel()
 	c.wg.Wait()
+
+	close(c.peerCh)
+	close(c.dialCh)
+}
+
+func (c *PeerConnectionStrategy) isPaused() bool {
+	c.RLock()
+	defer c.RUnlock()
+	return c.paused
+}
+
+func (c *PeerConnectionStrategy) shouldDialPeers(ctx context.Context) {
+	defer c.wg.Done()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	c.Lock()
+	c.workerCtx, c.workerCancel = context.WithCancel(ctx)
+	c.Unlock()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			isPaused := c.isPaused()
+			numPeers := len(c.host.Network().Peers())
+			if numPeers >= c.minPeers && !isPaused {
+				c.Lock()
+				c.paused = true
+				c.workerCancel()
+				c.Unlock()
+			} else if numPeers < c.minPeers && isPaused {
+				c.Lock()
+				c.paused = false
+				c.workerCtx, c.workerCancel = context.WithCancel(ctx)
+				c.Unlock()
+			}
+		}
+	}
+}
+
+func (c *PeerConnectionStrategy) publishWork(ctx context.Context, p peer.AddrInfo) {
+	select {
+	case c.dialCh <- p:
+	case <-ctx.Done():
+		return
+	case <-time.After(1 * time.Second):
+		// This timeout is to not lock the goroutine
+		return
+	}
+}
+
+func (c *PeerConnectionStrategy) workPublisher(ctx context.Context) {
+	defer c.wg.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			isPaused := c.isPaused()
+			if !isPaused {
+				select {
+				case <-ctx.Done():
+					return
+				case p := <-c.peerCh:
+					c.publishWork(ctx, p)
+				case <-time.After(1 * time.Second):
+					// This timeout is to not lock the goroutine
+					break
+				}
+			} else {
+				// Check if paused again
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}
 }
 
 func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
@@ -100,7 +191,7 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 	sem := make(chan struct{}, maxGoRoutines)
 	for {
 		select {
-		case pi, ok := <-c.peerCh:
+		case pi, ok := <-c.dialCh:
 			if !ok {
 				return
 			}
@@ -133,34 +224,19 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 			}
 
 			sem <- struct{}{}
+			c.wg.Add(1)
 			go func(pi peer.AddrInfo) {
-				ctx, cancel := context.WithTimeout(ctx, c.dialTimeout)
-				defer cancel()
+				defer c.wg.Done()
 
+				ctx, cancel := context.WithTimeout(c.workerCtx, c.dialTimeout)
+				defer cancel()
 				err := c.host.Connect(ctx, pi)
-				if err != nil {
+				if err != nil && !errors.Is(err, context.Canceled) {
 					c.logger.Info("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
 				}
 				<-sem
 			}(pi)
-
-			ticker := time.NewTicker(1 * time.Second)
-		peerCntLoop:
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if len(c.host.Network().Peers()) < c.minPeers {
-						ticker.Stop()
-						break peerCntLoop
-					}
-				}
-			}
 		case <-ctx.Done():
-			if ctx.Err() != nil {
-				c.logger.Info("discovery: backoff connector context error", zap.Error(ctx.Err()))
-			}
 			return
 		}
 	}

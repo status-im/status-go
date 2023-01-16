@@ -251,7 +251,7 @@ func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
 func (d *DiscoveryV5) iterate(ctx context.Context) {
 	iterator, err := d.Iterator()
 	if err != nil {
-		d.log.Error("obtaining iterator", zap.Error(err))
+		d.log.Debug("obtaining iterator", zap.Error(err))
 		return
 	}
 
@@ -280,7 +280,11 @@ func (d *DiscoveryV5) iterate(ctx context.Context) {
 		}
 
 		if len(peerAddrs) != 0 {
-			d.peerConnector.PeerChannel() <- peerAddrs[0]
+			select {
+			case <-ctx.Done():
+				return
+			case d.peerConnector.PeerChannel() <- peerAddrs[0]:
+			}
 		}
 	}
 }
