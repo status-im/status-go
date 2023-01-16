@@ -90,9 +90,8 @@ func (wakuPX *WakuPeerExchange) Start(ctx context.Context) error {
 	wakuPX.h.SetStreamHandlerMatch(PeerExchangeID_v20alpha1, protocol.PrefixTextMatch(string(PeerExchangeID_v20alpha1)), wakuPX.onRequest(ctx))
 	wakuPX.log.Info("Peer exchange protocol started")
 
-	wakuPX.wg.Add(2)
+	wakuPX.wg.Add(1)
 	go wakuPX.runPeerExchangeDiscv5Loop(ctx)
-	go wakuPX.handleNewPeers(ctx)
 	return nil
 }
 
@@ -129,25 +128,16 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		go func() {
 			defer wakuPX.wg.Done()
 			for _, p := range peers {
-				wakuPX.peerCh <- p
+				select {
+				case <-ctx.Done():
+					return
+				case wakuPX.peerConnector.PeerChannel() <- p:
+				}
 			}
 		}()
 	}
 
 	return nil
-}
-
-func (wakuPX *WakuPeerExchange) handleNewPeers(ctx context.Context) {
-	defer wakuPX.wg.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case p := <-wakuPX.peerCh:
-			wakuPX.peerConnector.PeerChannel() <- p
-		}
-	}
-
 }
 
 func (wakuPX *WakuPeerExchange) onRequest(ctx context.Context) func(s network.Stream) {
@@ -324,7 +314,7 @@ func (wakuPX *WakuPeerExchange) cleanCache() {
 func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) {
 	iterator, err := wakuPX.disc.Iterator()
 	if err != nil {
-		wakuPX.log.Error("obtaining iterator", zap.Error(err))
+		wakuPX.log.Debug("obtaining iterator", zap.Error(err))
 		return
 	}
 	defer iterator.Close()

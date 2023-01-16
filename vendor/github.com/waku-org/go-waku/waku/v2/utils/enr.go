@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"go.uber.org/zap"
 )
 
 // WakuENRField is the name of the ENR field that contains information about which protocols are supported by the node
@@ -50,95 +49,92 @@ func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 }
 
 // GetENRandIP returns a enr Node and TCP address obtained from a multiaddress. priv key and protocols supported
-func GetENRandIP(addr multiaddr.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, *net.TCPAddr, error) {
-	var ip string
-
-	dns4, err := addr.ValueForProtocol(multiaddr.P_DNS4)
-	if err != nil {
-		ip, err = addr.ValueForProtocol(multiaddr.P_IP4)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		netIP, err := net.ResolveIPAddr("ip4", dns4)
-		if err != nil {
-			return nil, nil, err
-		}
-		ip = netIP.String()
-	}
-
-	portStr, err := addr.ValueForProtocol(multiaddr.P_TCP)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return nil, nil, err
-	}
-
+func GetENRandIP(addrs []multiaddr.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, error) {
 	r := &enr.Record{}
+	for _, addr := range addrs {
+		storeInMultiaddrsKey := false
+		var multiaddrItems []multiaddr.Multiaddr
+		_, err := addr.ValueForProtocol(multiaddr.P_WS)
+		if err == nil {
+			storeInMultiaddrsKey = true
+			multiaddrItems = append(multiaddrItems, addr)
+		}
 
-	if port > 0 && port <= math.MaxUint16 {
-		r.Set(enr.TCP(uint16(port))) // lgtm [go/incorrect-integer-conversion]
-	} else {
-		return nil, nil, fmt.Errorf("could not set port %d", port)
+		_, err = addr.ValueForProtocol(multiaddr.P_WSS)
+		if err == nil {
+			storeInMultiaddrsKey = true
+			multiaddrItems = append(multiaddrItems, addr)
+		}
+
+		if !storeInMultiaddrsKey {
+			var ip string
+			dns4, err := addr.ValueForProtocol(multiaddr.P_DNS4)
+			if err != nil {
+				ip, err = addr.ValueForProtocol(multiaddr.P_IP4)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				netIP, err := net.ResolveIPAddr("ip4", dns4)
+				if err != nil {
+					return nil, err
+				}
+				ip = netIP.String()
+			}
+
+			portStr, err := addr.ValueForProtocol(multiaddr.P_TCP)
+			if err != nil {
+				return nil, err
+			}
+
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				return nil, err
+			}
+
+			if port > 0 && port <= math.MaxUint16 {
+				r.Set(enr.TCP(uint16(port))) // lgtm [go/incorrect-integer-conversion]
+			} else {
+				return nil, fmt.Errorf("could not set port %d", port)
+			}
+
+			r.Set(enr.IP(net.ParseIP(ip)))
+		} else {
+			p2p, err := addr.ValueForProtocol(multiaddr.P_P2P)
+			if err != nil {
+				return nil, err
+			}
+
+			p2pAddr, err := multiaddr.NewMultiaddr("/p2p/" + p2p)
+			if err != nil {
+				return nil, fmt.Errorf("could not create p2p addr: %w", err)
+			}
+
+			var fieldRaw []byte
+			for _, ma := range multiaddrItems {
+				maRaw := ma.Decapsulate(p2pAddr).Bytes()
+				maSize := make([]byte, 2)
+				binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
+
+				fieldRaw = append(fieldRaw, maSize...)
+				fieldRaw = append(fieldRaw, maRaw...)
+			}
+
+			if len(fieldRaw) != 0 {
+				r.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
+			}
+		}
 	}
 
-	var multiaddrItems []multiaddr.Multiaddr
-
-	// 31/WAKU2-ENR
-
-	_, err = addr.ValueForProtocol(multiaddr.P_WS)
-	if err == nil {
-		multiaddrItems = append(multiaddrItems, addr)
-	}
-
-	_, err = addr.ValueForProtocol(multiaddr.P_WSS)
-	if err == nil {
-		multiaddrItems = append(multiaddrItems, addr)
-	}
-
-	p2p, err := addr.ValueForProtocol(multiaddr.P_P2P)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	p2pAddr, err := multiaddr.NewMultiaddr("/p2p/" + p2p)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not create p2p addr: %w", err)
-	}
-
-	var fieldRaw []byte
-	for _, ma := range multiaddrItems {
-		maRaw := ma.Decapsulate(p2pAddr).Bytes()
-		maSize := make([]byte, 2)
-		binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
-
-		fieldRaw = append(fieldRaw, maSize...)
-		fieldRaw = append(fieldRaw, maRaw...)
-	}
-
-	if len(fieldRaw) != 0 {
-		r.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
-	}
-
-	r.Set(enr.IP(net.ParseIP(ip)))
 	r.Set(enr.WithEntry(WakuENRField, wakuFlags))
-
-	err = enode.SignV4(r, privK)
+	err := enode.SignV4(r, privK)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	node, err := enode.New(enode.ValidSchemes, r)
 
-	return node, tcpAddr, err
+	return node, err
 }
 
 // EnodeToMultiaddress converts an enode into a multiaddress
@@ -160,21 +156,22 @@ func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 		return nil, err
 	}
 
-	var multiaddrRaw []byte
-	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
-		if enr.IsNotFound(err) {
-			Logger().Debug("trying to convert enode to multiaddress, since I could not retrieve multiaddress field for node ", zap.Any("enode", node))
-			addr, err := enodeToMultiAddr(node)
-			if err != nil {
-				return nil, err
-			}
-			return []multiaddr.Multiaddr{addr}, nil
-		}
+	var result []multiaddr.Multiaddr
+
+	addr, err := enodeToMultiAddr(node)
+	if err != nil {
 		return nil, err
 	}
+	result = append(result, addr)
 
-	if len(multiaddrRaw) < 2 {
-		return nil, errors.New("invalid multiaddress field length")
+	var multiaddrRaw []byte
+	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
+		if !enr.IsNotFound(err) {
+			return nil, err
+		} else {
+			// No multiaddr entry on enr
+			return result, nil
+		}
 	}
 
 	hostInfo, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
@@ -182,7 +179,6 @@ func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 		return nil, err
 	}
 
-	var result []multiaddr.Multiaddr
 	offset := 0
 	for {
 		maSize := binary.BigEndian.Uint16(multiaddrRaw[offset : offset+2])
