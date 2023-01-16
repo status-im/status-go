@@ -964,7 +964,7 @@ github.com/tsenart/tb
 ## explicit; go 1.14
 github.com/tyler-smith/go-bip39
 github.com/tyler-smith/go-bip39/wordlists
-# github.com/urfave/cli/v2 v2.20.2
+# github.com/urfave/cli/v2 v2.23.7
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
@@ -985,7 +985,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.3.2-0.20230110124657-7d2a0ac0e25f
+# github.com/waku-org/go-waku v0.3.2-0.20230116133230-a4230afc62fb
 ## explicit; go 1.18
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence

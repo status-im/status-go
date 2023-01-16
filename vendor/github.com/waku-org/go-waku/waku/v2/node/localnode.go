@@ -26,24 +26,47 @@ func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey) (*enode.LocalNode, error
 	return enode.NewLocalNode(db, priv), nil
 }
 
-func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, priv *ecdsa.PrivateKey, wsAddr []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort int, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, log *zap.Logger) error {
-	localnode.SetFallbackUDP(udpPort)
+func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, wsAddr []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, shouldAutoUpdate bool, log *zap.Logger) error {
+	localnode.SetFallbackUDP(int(udpPort))
 	localnode.Set(enr.WithEntry(utils.WakuENRField, wakuFlags))
 	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
-	localnode.SetStaticIP(ipAddr.IP)
 
-	if udpPort > 0 && udpPort <= math.MaxUint16 {
-		localnode.Set(enr.UDP(uint16(udpPort))) // lgtm [go/incorrect-integer-conversion]
-	}
-
-	if ipAddr.Port > 0 && ipAddr.Port <= math.MaxUint16 {
-		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // lgtm [go/incorrect-integer-conversion]
-	} else {
-		log.Error("setting tcpPort", zap.Int("port", ipAddr.Port))
+	if udpPort > math.MaxUint16 {
+		return errors.New("invalid udp port number")
 	}
 
 	if advertiseAddr != nil {
+		// An advertised address disables libp2p address updates
+		// and discv5 predictions
 		localnode.SetStaticIP(*advertiseAddr)
+		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
+	} else if !shouldAutoUpdate {
+		// We received a libp2p address update. Autoupdate is disabled
+		// Using a static ip will disable endpoint prediction.
+		localnode.SetStaticIP(ipAddr.IP)
+		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
+	} else {
+		// We received a libp2p address update, but we should still
+		// allow discv5 to update the enr record. We set the localnode
+		// keys manually. It's possible that the ENR record might get
+		// updated automatically
+		ip4 := ipAddr.IP.To4()
+		ip6 := ipAddr.IP.To16()
+		if ip4 != nil && !ip4.IsUnspecified() {
+			localnode.Set(enr.IPv4(ip4))
+			localnode.Set(enr.TCP(uint16(ipAddr.Port)))
+		} else {
+			localnode.Delete(enr.IPv4{})
+			localnode.Delete(enr.TCP(0))
+		}
+
+		if ip6 != nil && !ip6.IsUnspecified() {
+			localnode.Set(enr.IPv6(ip6))
+			localnode.Set(enr.TCP6(ipAddr.Port))
+		} else {
+			localnode.Delete(enr.IPv6{})
+			localnode.Delete(enr.TCP6(0))
+		}
 	}
 
 	// Adding websocket multiaddresses
@@ -222,26 +245,10 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 		return err
 	}
 
-	// TODO: make this optional depending on DNS Disc being enabled
-	if w.opts.privKey != nil && w.localNode != nil {
-		err := w.updateLocalNode(w.localNode, w.opts.privKey, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.log)
-		if err != nil {
-			w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
-			return err
-		} else {
-			w.log.Info("enr record", logging.ENode("enr", w.localNode.Node()))
-			// Restarting DiscV5
-			discV5 := w.DiscV5()
-			if discV5 != nil && discV5.IsStarted() {
-				w.log.Info("restarting discv5")
-				w.discoveryV5.Stop()
-				err = w.discoveryV5.Start(ctx)
-				if err != nil {
-					w.log.Error("could not restart discv5", zap.Error(err))
-					return err
-				}
-			}
-		}
+	err = w.updateLocalNode(w.localNode, wsAddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.opts.discV5autoUpdate, w.log)
+	if err != nil {
+		w.log.Error("obtaining ENR record from multiaddress", logging.MultiAddrs("multiaddr", extAddr), zap.Error(err))
+		return err
 	}
 
 	return nil
