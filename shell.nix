@@ -29,28 +29,35 @@
   }
 }:
 
-pkgs.mkShell {
+let
+  inherit (pkgs) lib stdenv;
+
+  /* No Android SDK for Darwin aarch64. */
+  isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
+  /* Lock requires Xcode verison. */
+  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper { version = "14.2"; };
+  /* Gomobile also needs the Xcode wrapper. */
+  gomobileMod = pkgs.gomobile.override {
+    inherit xcodeWrapper;
+    withAndroidPkgs = !isMacM1;
+  };
+in pkgs.mkShell {
   name = "status-go-shell";
 
   buildInputs = with pkgs; [
     git jq which
-    go_1_18 golangci-lint gopls go-bindata
+    go_1_18 golangci-lint gopls go-bindata gomobileMod
     mockgen protobuf3_17 protoc-gen-go
-    (gomobile.override { xcodeWrapperArgs = { version = "13.4.1"; }; })
-  ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-    (xcodeenv.composeXcodeWrapper { version = "13.4.1"; })
-  ];
+  ] ++ lib.optional stdenv.isDarwin xcodeWrapper;
 
-  shellHook = let
-    androidSdk = pkgs.androidPkgs.androidsdk;
-  in ''
-    ANDROID_HOME=${androidSdk}/libexec/android-sdk
+  shellHook = lib.optionalString (!isMacM1) ''
+    ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
+    ANDROID_NDK=$ANDROID_HOME/ndk-bundle
     ANDROID_SDK_ROOT=$ANDROID_HOME
-    ANDROID_NDK=${androidSdk}/libexec/android-sdk/ndk-bundle
     ANDROID_NDK_HOME=$ANDROID_NDK
   '';
 
   # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
   # https://github.com/status-im/status-mobile/pull/13912
-  __noChroot = pkgs.stdenv.isDarwin;
+  __noChroot = stdenv.isDarwin;
 }

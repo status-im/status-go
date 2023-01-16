@@ -1,7 +1,7 @@
 library 'status-jenkins-lib@v1.6.4'
 
 pipeline {
-  agent { label 'macos && x86_64 && go-1.18' }
+  agent { label 'macos && aarch64 && go-1.18 && nix-2.11' }
 
   parameters {
     string(
