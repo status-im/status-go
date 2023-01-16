@@ -37,6 +37,8 @@ var defaultAnnounceList = [][]string{
 }
 var pieceLength = 100 * 1024
 
+const maxArchiveSizeInBytes = 30000000
+
 var ErrTorrentTimedout = errors.New("torrent has timed out")
 
 type Manager struct {
@@ -1894,58 +1896,85 @@ func (m *Manager) CreateHistoryArchiveTorrent(communityID types.HexBytes, msgs [
 			continue
 		}
 
-		wakuMessageArchive := m.createWakuMessageArchive(from, to, messages, topicsAsByteArrays)
-		encodedArchive, err := proto.Marshal(wakuMessageArchive)
-		if err != nil {
-			return archiveIDs, err
-		}
+		// Not only do we partition messages, we also chunk them
+		// roughly by size, such that each chunk will not exceed a given
+		// size and archive data doesn't get too big
+		messageChunks := make([][]types.Message, 0)
+		currentChunkSize := 0
+		currentChunk := make([]types.Message, 0)
 
-		if encrypt {
-			messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, encodedArchive)
+		for _, msg := range messages {
+			msgSize := len(msg.Payload) + len(msg.Sig)
+			if msgSize > maxArchiveSizeInBytes {
+				// we drop messages this big
+				continue
+			}
+
+			if currentChunkSize+msgSize > maxArchiveSizeInBytes {
+				messageChunks = append(messageChunks, currentChunk)
+				currentChunk = make([]types.Message, 0)
+				currentChunkSize = 0
+			}
+			currentChunk = append(currentChunk, msg)
+			currentChunkSize = currentChunkSize + msgSize
+		}
+		messageChunks = append(messageChunks, currentChunk)
+
+		for _, messages := range messageChunks {
+			wakuMessageArchive := m.createWakuMessageArchive(from, to, messages, topicsAsByteArrays)
+			encodedArchive, err := proto.Marshal(wakuMessageArchive)
 			if err != nil {
 				return archiveIDs, err
 			}
 
-			encodedArchive, err = proto.Marshal(messageSpec.Message)
+			if encrypt {
+				messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, encodedArchive)
+				if err != nil {
+					return archiveIDs, err
+				}
+
+				encodedArchive, err = proto.Marshal(messageSpec.Message)
+				if err != nil {
+					return archiveIDs, err
+				}
+			}
+
+			rawSize := len(encodedArchive)
+			padding := 0
+			size := 0
+
+			if rawSize > pieceLength {
+				size = rawSize + pieceLength - (rawSize % pieceLength)
+				padding = size - rawSize
+			} else {
+				padding = pieceLength - rawSize
+				size = rawSize + padding
+			}
+
+			wakuMessageArchiveIndexMetadata := &protobuf.WakuMessageArchiveIndexMetadata{
+				Metadata: wakuMessageArchive.Metadata,
+				Offset:   offset,
+				Size:     uint64(size),
+				Padding:  uint64(padding),
+			}
+
+			wakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(wakuMessageArchiveIndexMetadata)
 			if err != nil {
 				return archiveIDs, err
 			}
+
+			archiveID := crypto.Keccak256Hash(wakuMessageArchiveIndexMetadataBytes).String()
+			archiveIDs = append(archiveIDs, archiveID)
+			wakuMessageArchiveIndex[archiveID] = wakuMessageArchiveIndexMetadata
+			encodedArchives = append(encodedArchives, &EncodedArchiveData{bytes: encodedArchive, padding: padding})
+			offset = offset + uint64(rawSize) + uint64(padding)
 		}
 
-		rawSize := len(encodedArchive)
-		padding := 0
-		size := 0
-
-		if rawSize > pieceLength {
-			size = rawSize + pieceLength - (rawSize % pieceLength)
-			padding = size - rawSize
-		} else {
-			padding = pieceLength - rawSize
-			size = rawSize + padding
-		}
-
-		wakuMessageArchiveIndexMetadata := &protobuf.WakuMessageArchiveIndexMetadata{
-			Metadata: wakuMessageArchive.Metadata,
-			Offset:   offset,
-			Size:     uint64(size),
-			Padding:  uint64(padding),
-		}
-
-		wakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(wakuMessageArchiveIndexMetadata)
-		if err != nil {
-			return archiveIDs, err
-		}
-
-		archiveID := crypto.Keccak256Hash(wakuMessageArchiveIndexMetadataBytes).String()
-		archiveIDs = append(archiveIDs, archiveID)
-		wakuMessageArchiveIndex[archiveID] = wakuMessageArchiveIndexMetadata
-		encodedArchives = append(encodedArchives, &EncodedArchiveData{bytes: encodedArchive, padding: padding})
 		from = to
 		to = to.Add(partition)
 		if to.After(endDate) {
 			to = endDate
 		}
-		offset = offset + uint64(rawSize) + uint64(padding)
 	}
 
 	if len(encodedArchives) > 0 {
