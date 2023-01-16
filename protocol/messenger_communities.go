@@ -3076,22 +3076,18 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 		endDate := time.Now()
 
-		partitions := partitionWakuMessages(wakuMessages, startDate, endDate, messageArchiveInterval)
-
-		for _, partition := range partitions {
-			_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(
-				discordCommunity.ID(),
-				partition.Messages,
-				topics,
-				partition.StartDate,
-				partition.EndDate,
-				messageArchiveInterval,
-				discordCommunity.Encrypted(),
-			)
-			if err != nil {
-				m.logger.Error("failed to create history archive torrent", zap.Error(err))
-				return
-			}
+		_, err = m.communitiesManager.CreateHistoryArchiveTorrentFromMessages(
+			discordCommunity.ID(),
+			wakuMessages,
+			topics,
+			startDate,
+			endDate,
+			messageArchiveInterval,
+			discordCommunity.Encrypted(),
+		)
+		if err != nil {
+			m.logger.Error("failed to create history archive torrent", zap.Error(err))
+			return
 		}
 
 		if m.torrentClientReady() && communitySettings.HistoryArchiveSupportEnabled {
@@ -3246,49 +3242,4 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 	}
 
 	return wakuMessages, nil
-}
-
-type wakuMessageChunk struct {
-	StartDate time.Time
-	EndDate   time.Time
-	Messages  []*types.Message
-}
-
-func partitionWakuMessages(messages []*types.Message, startDate time.Time, endDate time.Time, partition time.Duration) []*wakuMessageChunk {
-	var chunks []*wakuMessageChunk
-
-	from := startDate
-	to := from.Add(partition)
-	if to.After(endDate) {
-		to = endDate
-	}
-
-	for {
-		if from.Equal(endDate) || from.After(endDate) {
-			break
-		}
-
-		var msgs []*types.Message
-		for _, msg := range messages {
-			if int64(msg.Timestamp) >= from.Unix() && int64(msg.Timestamp) < to.Unix() {
-				msgs = append(msgs, msg)
-			}
-		}
-
-		if len(msgs) > 0 {
-			chunk := &wakuMessageChunk{
-				StartDate: from,
-				EndDate:   to,
-				Messages:  msgs,
-			}
-			chunks = append(chunks, chunk)
-		}
-
-		from = to
-		to = to.Add(partition)
-		if to.After(endDate) {
-			to = endDate
-		}
-	}
-	return chunks
 }
