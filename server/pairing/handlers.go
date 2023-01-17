@@ -62,12 +62,14 @@ func handleParingSyncDeviceReceive(ps *Server) http.HandlerFunc {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionSyncDevice})
 
 		err = ps.rawMessagePayloadManager.Receive(payload)
+		logger.Info("ps.rawMessagePayloadManager.Receive", zap.Bool("success", err == nil))
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionSyncDevice})
 			logger.Error("ps.rawMessagePayloadManager.Receive(payload)", zap.Error(err))
 			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionSyncDevice})
+		logger.Info("signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionSyncDevice})")
 	}
 }
 

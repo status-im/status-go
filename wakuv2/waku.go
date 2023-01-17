@@ -25,6 +25,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/logutils"
 	"math"
 	"math/rand"
 	"net"
@@ -946,23 +947,29 @@ func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
 
 // AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
 func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
+	logger := logutils.ZapLogger()
+	logger.Info("AddSymKeyFromPassword!", zap.String("password", password))
 	id, err := common.GenerateRandomID()
+	logger.Info("AddSymKeyFromPassword! GenerateRandomID", zap.String("id", id), zap.Error(err))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 	if w.HasSymKey(id) {
+		logger.Info("AddSymKeyFromPassword! HasSymKey!", zap.String("id", id))
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
 
+	logger.Info("AddSymKeyFromPassword! pbkdf2.Key")
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
 	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
-
+	logger.Info("AddSymKeyFromPassword! done pbkdf2.Key", zap.Any("derived", derived))
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
-
+	logger.Info("AddSymKeyFromPassword! done w.keyMu.Lock")
 	// double check is necessary, because deriveKeyMaterial() is very slow
 	if w.symKeys[id] != nil {
+		logger.Info("AddSymKeyFromPassword! w.symKeys[id] != nil")
 		return "", fmt.Errorf("critical error: failed to generate unique ID")
 	}
 	w.symKeys[id] = derived
@@ -974,6 +981,7 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 func (w *Waku) HasSymKey(id string) bool {
 	w.keyMu.RLock()
 	defer w.keyMu.RUnlock()
+	logutils.ZapLogger().Info("HasSymKey!", zap.String("id", id), zap.Any("w.symKeys", w.symKeys))
 	return w.symKeys[id] != nil
 }
 

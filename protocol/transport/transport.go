@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"github.com/status-im/status-go/logutils"
 	"sync"
 	"time"
 
@@ -188,6 +189,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
+	logutils.ZapLogger().Info("JoinPublic", zap.String("chatID", chatID))
 	return t.filters.LoadPublic(chatID)
 }
 

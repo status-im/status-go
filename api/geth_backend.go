@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -386,35 +387,44 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
+	logger := logutils.ZapLogger()
+	logger.Info("startNodeWithAccount")
 	err := b.ensureAppDBOpened(acc, password)
+	logger.Info("startNodeWithAccount ensureAppDBOpened", zap.Error(err))
 	if err != nil {
 		return err
 	}
 
 	err = b.loadNodeConfig(inputNodeCfg)
+	logger.Info("startNodeWithAccount loadNodeConfig", zap.Error(err))
 	if err != nil {
 		return err
 	}
 
 	err = b.setupLogSettings()
+	logger.Info("startNodeWithAccount setupLogSettings", zap.Error(err))
 	if err != nil {
 		return err
 	}
 
 	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
+	logger.Info("startNodeWithAccount accounts.NewDB", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	chatAddr, err := accountsDB.GetChatAddress()
+	logger.Info("startNodeWithAccount accountsDB.GetChatAddress()", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	walletAddr, err := accountsDB.GetWalletAddress()
+	logger.Info("startNodeWithAccount accountsDB.GetWalletAddress()", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	watchAddrs, err := accountsDB.GetWalletAddresses()
+	logger.Info("startNodeWithAccount accountsDB.GetWalletAddresses()", zap.Error(err))
 	if err != nil {
 		return err
 	}
@@ -426,15 +436,18 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	}
 
 	err = b.StartNode(b.config)
+	logger.Info("startNodeWithAccount b.StartNode(b.config)", zap.Error(err))
 	if err != nil {
 		return err
 	}
 
 	err = b.SelectAccount(login)
+	logger.Info("startNodeWithAccount SelectAccount", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
+	logger.Info("startNodeWithAccount multiaccountsDB.UpdateAccountTimestamp", zap.Error(err))
 	if err != nil {
 		return err
 	}
@@ -473,12 +486,17 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 }
 
 func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
+	logger := logutils.ZapLogger()
+	logger.Info("StartNodeWithAccount")
 	err := b.startNodeWithAccount(acc, password, nodecfg)
+	logger.Info("done StartNodeWithAccount", zap.Error(err))
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
+	logger.Info("SendLoggedIn", zap.Error(err))
 	signal.SendLoggedIn(err)
+	logger.Info("done SendLoggedIn", zap.Error(err))
 	return err
 }
 
@@ -785,15 +803,20 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	nodecfg *params.NodeConfig,
 	subaccs []*accounts.Account,
 ) error {
+	logger := logutils.ZapLogger()
+	logger.Info("StartNodeWithAccountAndInitialConfig")
 	err := b.SaveAccount(account)
+	logger.Info("StartNodeWithAccountAndInitialConfig SaveAccount", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	err = b.ensureAppDBOpened(account, password)
+	logger.Info("StartNodeWithAccountAndInitialConfig ensureAppDBOpened", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	err = b.saveAccountsAndSettings(settings, nodecfg, subaccs)
+	logger.Info("StartNodeWithAccountAndInitialConfig saveAccountsAndSettings", zap.Error(err))
 	if err != nil {
 		return err
 	}

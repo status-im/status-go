@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"errors"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -125,26 +127,32 @@ func (m *Messenger) initChatSyncFields(chat *Chat) error {
 }
 
 func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse) (*MessengerResponse, error) {
+	logger := logutils.ZapLogger()
+	logger.Info("createPublicChat!", zap.String("chatID", chatID))
 	chat, ok := m.allChats.Load(chatID)
+	logger.Info("createPublicChat!allChats.Load", zap.Bool("ok", ok))
 	wasActive := false
 	if !ok {
+		logger.Info("createPublicChat! CreatePublicChat")
 		chat = CreatePublicChat(chatID, m.getTimesource())
-
+		logger.Info("createPublicChat! done CreatePublicChat")
 	} else {
 		wasActive = chat.Active
 	}
 	chat.Active = true
 	chat.DeletedAtClockValue = 0
 
+	logger.Info("createPublicChat! Join chat")
 	// Save topics
 	_, err := m.Join(chat)
+	logger.Info("createPublicChat! done Join chat", zap.Error(err))
 	if err != nil {
 		return nil, err
 	}
 
 	// Store chat
 	m.allChats.Store(chat.ID, chat)
-
+	logger.Info("scheduleSyncChat")
 	willSync, err := m.scheduleSyncChat(chat)
 	if err != nil {
 		return nil, err
@@ -162,14 +170,16 @@ func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse)
 		return nil, err
 	}
 
+	logger.Info("syncPublicChat?", zap.Bool("wasActive", wasActive))
 	// Sync if it was created
 	if !ok || !wasActive {
 		if err := m.syncPublicChat(context.Background(), chat, m.dispatchMessage); err != nil {
 			return nil, err
 		}
 	}
-
+	logger.Info("reregisterForPushNotifications")
 	err = m.reregisterForPushNotifications()
+	logger.Info("done reregisterForPushNotifications", zap.Error(err))
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +489,7 @@ func (m *Messenger) Join(chat *Chat) ([]*transport.Filter, error) {
 		}
 		return m.transport.JoinGroup(members)
 	case ChatTypePublic, ChatTypeProfile, ChatTypeTimeline:
+		logutils.ZapLogger().Info("Joining public chat!!", zap.String("chat", chat.ID))
 		f, err := m.transport.JoinPublic(chat.ID)
 		if err != nil {
 			return nil, err

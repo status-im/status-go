@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	ErrAccountAlreadyExists = errors.New("account already exists")
 	ErrKeyFileAlreadyExists = errors.New("key file already exists")
 )
 

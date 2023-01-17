@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -79,7 +82,17 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
+
 	nodeConfig := s.backend.StatusNode().Config()
+	dataDir := nodeConfig.DataDir
+	disabledDataDir := nodeConfig.ShhextConfig.BackupDisabledDataDir
+	defer func() {
+		// restore data dir
+		nodeConfig.DataDir = dataDir
+		nodeConfig.ShhextConfig.BackupDisabledDataDir = disabledDataDir
+	}()
+	nodeConfig.DataDir = strings.Replace(dataDir, nodeConfig.RootDataDir, "", 1)
+	nodeConfig.ShhextConfig.BackupDisabledDataDir = strings.Replace(disabledDataDir, nodeConfig.RootDataDir, "", 1)
 	if syncRawMessage.NodeConfigJsonBytes, err = json.Marshal(nodeConfig); err != nil {
 		return nil, err
 	}
@@ -100,18 +113,40 @@ func (s *SyncRawMessageHandler) HandleRawMessage(account *multiaccounts.Account,
 	}
 
 	nodeConfig.RootDataDir = filepath.Dir(keystorePath)
-	nodeConfig.DataDir = filepath.Join(nodeConfig.RootDataDir, filepath.Base(nodeConfig.DataDir))
-	nodeConfig.KeyStoreDir = newKeystoreDir
+	nodeConfig.KeyStoreDir = filepath.Join(filepath.Base(keystorePath), account.KeyUID)
 	installationID := uuid.New().String()
 	nodeConfig.ShhextConfig.InstallationID = installationID
 	setting.InstallationID = installationID
 
+	logFile := "local_pair.log"
+	nodeConfig.LogDir = nodeConfig.RootDataDir
+	nodeConfig.LogFile = logFile
+	nodeConfig.LogLevel = "DEBUG"
+	nodeConfig.LogEnabled = true
+	nodeConfig.LogMobileSystem = false
+	nodeConfig.LogToStderr = true
+	logSettings := logutils.LogSettings{
+		Enabled: true,
+		MobileSystem: false,
+		Level:  "DEBUG",
+		File:   filepath.Join(nodeConfig.LogDir, nodeConfig.LogFile),
+		MaxSize: 0,
+		MaxBackups: 0,
+		CompressRotated: false,
+	}
+	if err = logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+		return err
+	}
+	logger := logutils.ZapLogger()
+	logger.Info("HandleRawMessage, done OverrideRootLogWithConfig!")
 	err = s.backend.StartNodeWithAccountAndInitialConfig(*account, password, *setting, nodeConfig, subAccounts)
+	logger.Info("HandleRawMessage, StartNodeWithAccountAndInitialConfig!", zap.Error(err))
 	if err != nil {
 		return err
 	}
-
+	logger.Info("HandleRawMessage, done StartNodeWithAccountAndInitialConfig!")
 	messenger := s.backend.Messenger()
+	logger.Info("HandleRawMessage, backend.Messenger()", zap.Bool("messenger is nil", messenger == nil))
 	if messenger == nil {
 		return fmt.Errorf("messenger is nil when HandleRawMessage")
 	}

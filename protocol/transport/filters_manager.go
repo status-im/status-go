@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"github.com/status-im/status-go/logutils"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -510,12 +511,15 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-
+	logger := logutils.ZapLogger()
+	logger.Info("LoadPublic", zap.String("chatID", chatID))
 	if chat, ok := f.filters[chatID]; ok {
+		logger.Info("LoadPublic f.filters[chatID] ok")
 		return chat, nil
 	}
-
+	logger.Info("LoadPublic f.filters[chatID] not ok, addAsymmetric")
 	filterAndTopic, err := f.addSymmetric(chatID)
+	logger.Info("LoadPublic addAsymmetric", zap.String("chatID", chatID), zap.Error(err))
 	if err != nil {
 		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -574,37 +578,44 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 	var symKeyID string
 	var err error
-
+	logger := logutils.ZapLogger()
+	logger.Info("addSymmetric", zap.String("chatID", chatID))
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	symKey, ok := f.keys[chatID]
+	logger.Info("addSymmetric", zap.String("chatID", chatID), zap.Bool("ok", ok))
 	if ok {
 		symKeyID, err = f.service.AddSymKeyDirect(symKey)
 		if err != nil {
 			return nil, err
 		}
 	} else {
+		logger.Info("addSymmetric f.keys[chatID] not ok", zap.String("chatID", chatID))
 		symKeyID, err = f.service.AddSymKeyFromPassword(chatID)
+		logger.Info("addSymmetric AddSymKeyFromPassword", zap.String("chatID", chatID), zap.String("symKeyID", symKeyID), zap.Error(err))
 		if err != nil {
 			return nil, err
 		}
 		if symKey, err = f.service.GetSymKey(symKeyID); err != nil {
 			return nil, err
 		}
+		logger.Info("addSymmetric done GetSymKey")
 		f.keys[chatID] = symKey
 
 		err = f.persistence.Add(chatID, symKey)
+		logger.Info("addSymmetric done persistence Add", zap.String("chatID", chatID), zap.Error(err))
 		if err != nil {
 			return nil, err
 		}
 	}
-
+	logger.Info("addSymmetric Subscribe", zap.String("chatID", chatID), zap.String("symKeyID", symKeyID))
 	id, err := f.service.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
 		PoW:      minPow,
 		Topics:   topics,
 	})
+	logger.Info("addSymmetric done Subscribe", zap.String("chatID", chatID), zap.String("symKeyID", symKeyID), zap.String("id", id), zap.Error(err))
 	if err != nil {
 		return nil, err
 	}

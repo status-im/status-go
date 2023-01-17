@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -104,6 +106,7 @@ func (w *gethWakuV2Wrapper) AddSymKeyDirect(key []byte) (string, error) {
 }
 
 func (w *gethWakuV2Wrapper) AddSymKeyFromPassword(password string) (string, error) {
+	logutils.ZapLogger().Info("AddSymKeyFromPassword", zap.String("password", password))
 	return w.waku.AddSymKeyFromPassword(password)
 }
 

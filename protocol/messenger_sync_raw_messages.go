@@ -2,8 +2,8 @@ package protocol
 
 import (
 	"context"
-
 	"github.com/golang/protobuf/proto"
+	"github.com/status-im/status-go/logutils"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -18,7 +18,11 @@ type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (
 
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()
+	logger := logutils.ZapLogger()
+	logger.Info("sync messages processing", zap.Int("count", len(rawMessages)))
+
 	for _, rawMessage := range rawMessages {
+		logger.Info("HandleSyncRawMessage")
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 			var message protobuf.ContactUpdate
@@ -33,13 +37,18 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
 			var message protobuf.SyncInstallationPublicChat
+			logger.Info("HandleSyncRawMessage SyncInstallationPublicChat")
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			logger.Info("HandleSyncRawMessage SyncInstallationPublicChat Unmarshal", zap.Error(err))
 			if err != nil {
 				return err
 			}
+			logger.Info("HandleSyncRawMessage SyncInstallationPublicChat HandleSyncInstallationPublicChat")
 			addedChat := m.HandleSyncInstallationPublicChat(state, message)
 			if addedChat != nil {
+				logger.Info("HandleSyncRawMessage SyncInstallationPublicChat createPublicChat addedChat")
 				_, err = m.createPublicChat(addedChat.ID, state.Response)
+				logger.Info("done HandleSyncRawMessage SyncInstallationPublicChat createPublicChat addedChat", zap.Error(err))
 				if err != nil {
 					m.logger.Error("error createPublicChat when HandleSyncRawMessages", zap.Error(err))
 					continue
@@ -190,21 +199,30 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			}
 		}
 	}
+
 	response, err := m.saveDataAndPrepareResponse(state)
+	logger.Info("saveDataAndPrepareResponse", zap.Error(err))
 	if err != nil {
 		return err
 	}
 	publishMessengerResponse(response)
+	logger.Info("done publishMessengerResponse")
 	return nil
 }
 
 // this is a copy implementation of the one in ext/service.go, we should refactor this?
 func publishMessengerResponse(response *MessengerResponse) {
 	if !response.IsEmpty() {
+		logger := logutils.ZapLogger()
+		logger.Info("publishing response")
 		notifications := response.Notifications()
+		logger.Info("publishing response notifications")
 		// Clear notifications as not used for now
 		response.ClearNotifications()
+		logger.Info("publishing response ClearNotifications")
 		signal.SendNewMessages(response)
+		logger.Info("publishing response SendNewMessages")
 		localnotifications.PushMessages(notifications)
+		logger.Info("publishing response PushMessages")
 	}
 }
