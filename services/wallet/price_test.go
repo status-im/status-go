@@ -11,7 +11,7 @@ import (
 func setupTestPriceDB(t *testing.T) (*PriceManager, func()) {
 	db, err := appdatabase.InitializeDB(":memory:", "wallet-price-tests-", 1)
 	require.NoError(t, err)
-	return NewPriceManager(db), func() {
+	return NewPriceManager(db, NewCryptoCompare()), func() {
 		require.NoError(t, db.Close())
 	}
 }

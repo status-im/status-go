@@ -19,22 +19,24 @@ import (
 
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
+const EventWalletTickCheckConnected walletevent.EventType = "wallet-tick-check-connected"
 
 func getFixedCurrencies() []string {
 	return []string{"USD"}
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
-	return &Reader{rpcClient, tokenManager, priceManager, accountsDB, walletFeed, nil}
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, cryptoCompare *CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+	return &Reader{rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
-	rpcClient    *rpc.Client
-	tokenManager *token.Manager
-	priceManager *PriceManager
-	accountsDB   *accounts.Database
-	walletFeed   *event.Feed
-	cancel       context.CancelFunc
+	rpcClient     *rpc.Client
+	tokenManager  *token.Manager
+	priceManager  *PriceManager
+	cryptoCompare *CryptoCompare
+	accountsDB    *accounts.Database
+	walletFeed    *event.Feed
+	cancel        context.CancelFunc
 }
 
 type TokenMarketValues struct {
@@ -107,6 +109,21 @@ func (r *Reader) Start() error {
 	r.cancel = cancel
 
 	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.walletFeed.Send(walletevent.Event{
+					Type: EventWalletTickCheckConnected,
+				})
+			}
+		}
+	}()
+
+	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
 		for {
@@ -176,7 +193,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenDetails, err = fetchCryptoCompareTokenDetails(tokenSymbols)
+		tokenDetails, err = r.cryptoCompare.fetchTokenDetails(tokenSymbols)
 		if err != nil {
 			return err
 		}
@@ -184,7 +201,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = fetchTokenMarketValues(tokenSymbols, currencies)
+		tokenMarketValues, err = r.cryptoCompare.fetchTokenMarketValues(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}
