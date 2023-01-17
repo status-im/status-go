@@ -147,6 +147,13 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
+
+	// mock added as mutual contact
+	contact.LastUpdated = 1
+	contact.HasAddedUs = true
+	contact.ContactRequestState = ContactRequestStateMutual
+	s.m.allContacts.Store(contact.ID, contact)
+
 	contact.LocalNickname = "Test Nickname"
 	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
@@ -253,6 +260,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().True(actualContact.Added)
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
+	s.Require().True(actualContact.HasAddedUs)
+	s.Require().Equal(ContactRequestStateMutual, actualContact.ContactRequestState)
 
 	bookmarks, err := theirMessenger.browserDatabase.GetBookmarks()
 	s.Require().NoError(err)

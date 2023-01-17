@@ -2710,17 +2710,19 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	}
 
 	syncMessage := &protobuf.SyncInstallationContactV2{
-		LastUpdatedLocally: contact.LastUpdatedLocally,
-		LastUpdated:        contact.LastUpdated,
-		Id:                 contact.ID,
-		EnsName:            ensName,
-		LocalNickname:      contact.LocalNickname,
-		Added:              contact.Added,
-		Blocked:            contact.Blocked,
-		Muted:              muted,
-		Removed:            contact.Removed,
-		VerificationStatus: int64(contact.VerificationStatus),
-		TrustStatus:        int64(contact.TrustStatus),
+		LastUpdatedLocally:  contact.LastUpdatedLocally,
+		LastUpdated:         contact.LastUpdated,
+		Id:                  contact.ID,
+		EnsName:             ensName,
+		LocalNickname:       contact.LocalNickname,
+		Added:               contact.Added,
+		Blocked:             contact.Blocked,
+		Muted:               muted,
+		Removed:             contact.Removed,
+		VerificationStatus:  int64(contact.VerificationStatus),
+		TrustStatus:         int64(contact.TrustStatus),
+		HasAddedUs:          contact.HasAddedUs,
+		ContactRequestState: int64(contact.ContactRequestState),
 	}
 
 	encodedMessage, err := proto.Marshal(syncMessage)

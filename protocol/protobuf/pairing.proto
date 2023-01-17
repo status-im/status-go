@@ -97,6 +97,7 @@ message SyncInstallationContactV2 {
   bool has_added_us = 13;
   int64 verification_status = 14;
   int64 trust_status = 15;
+  int64 contact_request_state = 16;
 }
 
 message SyncInstallationAccount {
