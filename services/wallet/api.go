@@ -37,6 +37,10 @@ func (api *API) StartWallet(ctx context.Context) error {
 	return api.reader.Start()
 }
 
+func (api *API) CheckConnected(ctx context.Context) *ConnectedResult {
+	return api.s.CheckConnected(ctx)
+}
+
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	return api.reader.GetWalletToken(ctx, addresses)
 }
@@ -327,22 +331,22 @@ func (api *API) GetCachedPrices(ctx context.Context) (map[string]map[string]floa
 
 func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return fetchTokenMarketValues(symbols, currencies)
+	return api.s.cryptoCompare.fetchTokenMarketValues(symbols, currencies)
 }
 
 func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
 	log.Debug("call to GetHourlyMarketValues")
-	return fetchHourlyMarketValues(symbol, currency, limit, aggregate)
+	return api.s.cryptoCompare.fetchHourlyMarketValues(symbol, currency, limit, aggregate)
 }
 
 func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
 	log.Debug("call to GetDailyMarketValues")
-	return fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
+	return api.s.cryptoCompare.fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
 }
 
 func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
 	log.Debug("call to FetchTokenDetails")
-	return fetchCryptoCompareTokenDetails(symbols)
+	return api.s.cryptoCompare.fetchTokenDetails(symbols)
 }
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

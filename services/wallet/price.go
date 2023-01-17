@@ -9,15 +9,16 @@ import (
 type PricesPerTokenAndCurrency = map[string]map[string]float64
 
 type PriceManager struct {
-	db *sql.DB
+	db            *sql.DB
+	cryptoCompare *CryptoCompare
 }
 
-func NewPriceManager(db *sql.DB) *PriceManager {
-	return &PriceManager{db: db}
+func NewPriceManager(db *sql.DB, cryptoCompare *CryptoCompare) *PriceManager {
+	return &PriceManager{db: db, cryptoCompare: cryptoCompare}
 }
 
 func (pm *PriceManager) FetchPrices(symbols []string, currencies []string) (PricesPerTokenAndCurrency, error) {
-	result, err := fetchCryptoComparePrices(symbols, currencies)
+	result, err := pm.cryptoCompare.fetchPrices(symbols, currencies)
 	if err != nil {
 		return nil, err
 	}

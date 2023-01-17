@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,6 +17,8 @@ import (
 
 const AssetLimit = 50
 const CollectionLimit = 300
+
+var OpenseaClientInstances = make(map[uint64]*OpenseaClient)
 
 var BaseURLs = map[uint64]string{
 	1: "https://api.opensea.io/api/v1",
@@ -109,18 +112,28 @@ type OpenseaCollection struct {
 }
 
 type OpenseaClient struct {
-	client *http.Client
-	url    string
-	apiKey string
+	client          *http.Client
+	url             string
+	apiKey          string
+	IsConnected     bool
+	IsConnectedLock sync.RWMutex
 }
 
 // new opensea client.
 func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
+	if client, ok := OpenseaClientInstances[chainID]; ok {
+		if client.apiKey == apiKey {
+			return client, nil
+		}
+	}
+
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
 	if url, ok := BaseURLs[chainID]; ok {
-		return &OpenseaClient{client: client, url: url, apiKey: apiKey}, nil
+		openseaClient := &OpenseaClient{client: client, url: url, apiKey: apiKey, IsConnected: true}
+		OpenseaClientInstances[chainID] = openseaClient
+		return openseaClient, nil
 	}
 
 	return nil, errors.New("ChainID not supported")
@@ -129,16 +142,20 @@ func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
 func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]OpenseaCollection, error) {
 	offset := 0
 	var collections []OpenseaCollection
+	o.IsConnectedLock.Lock()
+	defer o.IsConnectedLock.Unlock()
 	for {
 		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", o.url, owner, offset, CollectionLimit)
 		body, err := o.doOpenseaRequest(url)
 		if err != nil {
+			o.IsConnected = false
 			return nil, err
 		}
 
 		var tmp []OpenseaCollection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
+			o.IsConnected = false
 			return nil, err
 		}
 
@@ -148,22 +165,27 @@ func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]Open
 			break
 		}
 	}
+	o.IsConnected = true
 	return collections, nil
 }
 
 func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
 	offset := 0
 	var assets []OpenseaAsset
+	o.IsConnectedLock.Lock()
+	defer o.IsConnectedLock.Unlock()
 	for {
 		url := fmt.Sprintf("%s/assets?owner=%s&collection=%s&offset=%d&limit=%d", o.url, owner, collectionSlug, offset, AssetLimit)
 		body, err := o.doOpenseaRequest(url)
 		if err != nil {
+			o.IsConnected = false
 			return nil, err
 		}
 
 		container := OpenseaAssetContainer{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
+			o.IsConnected = false
 			return nil, err
 		}
 
@@ -183,6 +205,8 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 			break
 		}
 	}
+
+	o.IsConnected = true
 	return assets, nil
 }
 
@@ -191,6 +215,7 @@ func (o *OpenseaClient) doOpenseaRequest(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
 	req.Header.Set("X-API-KEY", o.apiKey)

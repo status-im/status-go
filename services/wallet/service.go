@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -14,11 +15,18 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
+
+type ConnectedResult struct {
+	Infura        map[uint64]bool `json:"infura"`
+	CryptoCompare bool            `json:"cryptoCompare"`
+	Opensea       map[uint64]bool `json:"opensea"`
+}
 
 // NewService initializes service instance.
 func NewService(
@@ -44,8 +52,9 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
-	priceManager := NewPriceManager(db)
-	reader := NewReader(rpcClient, tokenManager, priceManager, accountsDB, walletFeed)
+	cryptoCompare := NewCryptoCompare()
+	priceManager := NewPriceManager(db, cryptoCompare)
+	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -65,6 +74,7 @@ func NewService(
 		feed:                  accountFeed,
 		signals:               signals,
 		reader:                reader,
+		cryptoCompare:         cryptoCompare,
 	}
 }
 
@@ -89,6 +99,7 @@ type Service struct {
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
+	cryptoCompare         *CryptoCompare
 }
 
 // Start signals transmitter.
@@ -134,4 +145,21 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
+	infura := make(map[uint64]bool)
+	for chainID, client := range chain.ChainClientInstances {
+		infura[chainID] = client.IsConnected
+	}
+
+	opensea := make(map[uint64]bool)
+	for chainID, client := range OpenseaClientInstances {
+		opensea[chainID] = client.IsConnected
+	}
+	return &ConnectedResult{
+		Infura:        infura,
+		Opensea:       opensea,
+		CryptoCompare: s.cryptoCompare.IsConnected,
+	}
 }
