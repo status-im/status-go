@@ -51,7 +51,6 @@ var DefaultConfig = Config{
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
-	UDPPort:           9000,
 	AutoUpdate:        false,
 }
 
@@ -82,10 +81,6 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.MinPeersForRelay == 0 {
 		cfg.MinPeersForRelay = DefaultConfig.MinPeersForRelay
-	}
-
-	if cfg.UDPPort == 0 {
-		cfg.UDPPort = DefaultConfig.UDPPort
 	}
 
 	return cfg
