@@ -167,15 +167,15 @@ type Message struct {
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
 	// AlbumID for a collage of images
-	AlbumID string `json:"albumId,omitempty"`
+	AlbumID string `json:"albumId"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
 	// Image dimensions
-	ImageWidth  uint32 `json:"imageWidth,omitempty"`
-	ImageHeight uint32 `json:"imageHeight,omitempty"`
+	ImageWidth  uint32 `json:"imageWidth"`
+	ImageHeight uint32 `json:"imageHeight"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
