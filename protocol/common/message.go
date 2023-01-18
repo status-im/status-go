@@ -244,9 +244,9 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName                  string                           `json:"ensName"`
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
-		AlbumID                  string                           `json:"albumId,omitempty"`
-		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
-		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
+		AlbumID                  string                           `json:"albumId"`
+		ImageWidth               uint32                           `json:"imageWidth"`
+		ImageHeight              uint32                           `json:"imageHeight"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
