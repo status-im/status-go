@@ -997,6 +997,11 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		return
 	}
 
+	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
+	if err != nil {
+		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
+	}
+
 	err = m.importHistoryArchives(id, cancel)
 	if err != nil {
 		m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
@@ -1004,12 +1009,7 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		return
 	}
 
-	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
-	if err != nil {
-		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
-	}
 	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
-
 }
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage, id types.HexBytes) (*MessengerResponse, error) {
