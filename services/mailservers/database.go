@@ -46,17 +46,17 @@ func (m Mailserver) IDBytes() ([]byte, error) {
 	return node.ID().Bytes(), nil
 }
 
-func (m Mailserver) PeerID() (*peer.ID, error) {
+func (m Mailserver) PeerID() (peer.ID, error) {
 	if m.Version != 2 {
-		return nil, errors.New("not available")
+		return "", errors.New("not available")
 	}
 
 	pID, err := peer.Decode(m.UniqueID())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &pID, nil
+	return pID, nil
 }
 
 func (m Mailserver) UniqueID() string {

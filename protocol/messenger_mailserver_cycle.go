@@ -108,7 +108,8 @@ func (m *Messenger) disconnectMailserver() error {
 		if err != nil {
 			return err
 		}
-		err = m.transport.DropPeer(string(*peerID))
+
+		err = m.transport.DropPeer(peerID.String())
 		if err != nil {
 			m.logger.Warn("could not drop peer")
 			return err
