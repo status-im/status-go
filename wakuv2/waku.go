@@ -351,9 +351,11 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 
 				// Restarting DiscV5
 				if !latestConnStatus.IsOnline && isConnected {
+					waku.logger.Debug("Restarting DiscV5: offline and is connected")
 					isConnected = false
 					waku.node.DiscV5().Stop()
 				} else if latestConnStatus.IsOnline && !isConnected {
+					waku.logger.Debug("Restarting DiscV5: online and is not connected")
 					isConnected = true
 					if !waku.node.DiscV5().IsStarted() {
 						err := waku.node.DiscV5().Start(ctx)
