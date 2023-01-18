@@ -1,0 +1,13 @@
+{
+    "Rendezvous": false,
+    "NoDiscovery": false,
+    "ClusterConfig": {
+      "Enabled": true,
+      "Fleet": "none",
+      "BootNodes": [],
+      "TrustedMailServers": [],
+      "PushNotificationsServers": [],
+      "StaticNodes": []
+    }
+  }
+  
