@@ -141,6 +141,10 @@ message ChatMessage {
   ContactRequestSignature received_contact_request_signature = 16;
   bool contact_message = 17;
 
+  string album_id = 18;
+  uint32 image_width = 19;
+  uint32 image_height = 20;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
