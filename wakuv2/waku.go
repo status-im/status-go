@@ -1140,7 +1140,10 @@ func (w *Waku) Query(peerID peer.ID, topics []common.TopicType, from uint64, to 
 	defer cancel()
 
 	result, err := w.node.Store().Query(ctx, query, opts...)
-	if err != nil {
+	if err != nil && errors.Is(err, store.ErrEmptyResponse) {
+		// No messages
+		return nil, nil
+	} else if err != nil {
 		w.logger.Error("error querying storenode", zap.String("peerID", peerID.String()), zap.Error(err))
 		signal.SendHistoricMessagesRequestFailed(requestID, peerID, err)
 		return nil, err
