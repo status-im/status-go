@@ -123,9 +123,11 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 			if !canDeleteMessageForEveryone {
 				return nil, ErrInvalidDeletePermission
 			}
-			// only add DeletedBy when not deleted by message.From
-			deletedBy = contactIDFromPublicKey(m.IdentityPublicKey())
 		}
+
+		// only add DeletedBy when not deleted by message.From
+		deletedBy = contactIDFromPublicKey(m.IdentityPublicKey())
+
 		if !canDeleteMessageForEveryone {
 			return nil, ErrInvalidEditOrDeleteAuthor
 		}
