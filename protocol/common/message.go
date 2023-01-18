@@ -337,6 +337,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		ChatID          string                           `json:"chatId"`
 		Sticker         *protobuf.StickerMessage         `json:"sticker"`
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
+		AlbumID         string                           `json:"albumId"`
+		ImageWidth      uint64                           `json:"imageWidth"`
+		ImageHeight     uint64                           `json:"imageHeight"`
 		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
 	}{
@@ -359,6 +362,11 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText
+	if aux.ContentType == protobuf.ChatMessage_IMAGE {
+		m.AlbumID = aux.AlbumID
+		m.ImageWidth = uint32(aux.ImageWidth)
+		m.ImageHeight = uint32(aux.ImageHeight)
+	}
 	return nil
 }
 
