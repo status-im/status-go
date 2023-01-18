@@ -460,6 +460,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 	if contact.LastUpdated < message.LastUpdated {
 		contact.HasAddedUs = message.HasAddedUs
+		contact.ContactRequestState = ContactRequestState(message.ContactRequestState)
 	}
 
 	if contact.LastUpdatedLocally < message.LastUpdatedLocally {
