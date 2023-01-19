@@ -2,6 +2,7 @@ package appdatabase
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -56,6 +57,13 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	if err != nil {
 		return nil, err
 	}
+
+	// Migrate `settings.usernames` here, because current SQL implementation doesn't support `json_each`
+	err = MigrateEnsUsernames(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 
@@ -106,4 +114,95 @@ func GetDBFilename(db *sql.DB) (string, error) {
 	}
 
 	return "", errors.New("no main database found")
+}
+
+func MigrateEnsUsernames(db *sql.DB) error {
+
+	// 1. Check if ens_usernames table already exist
+
+	// row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name='ens_usernames')")
+	// tableExists := false
+	// err := row.Scan(&tableExists)
+
+	// if err != nil && err != sql.ErrNoRows {
+	// 	return err
+	// }
+
+	// if tableExists {
+	// 	return nil
+	// }
+
+	// -- 1. Create new ens_usernames table
+
+	// _, err = db.Exec(`CREATE TABLE IF NOT EXISTS ens_usernames (
+	// 	"username" TEXT NOT NULL,
+	// 	"chain_id" UNSIGNED BIGINT DEFAULT 1);`)
+
+	// if err != nil {
+	// 	log.Error("Migrating ens usernames: failed to create table", "err", err.Error())
+	// 	return err
+	// }
+
+	// -- 2. Move current `settings.usernames` to the new table
+	/*
+		INSERT INTO ens_usernames (username)
+			SELECT json_each.value FROM settings, json_each(usernames);
+	*/
+
+	rows, err := db.Query(`SELECT usernames FROM settings`)
+
+	if err != nil {
+		log.Error("Migrating ens usernames: failed to query 'settings.usernames'", "err", err.Error())
+		return err
+	}
+
+	defer rows.Close()
+
+	var usernames []string
+
+	for rows.Next() {
+		var usernamesJSON sql.NullString
+		err := rows.Scan(&usernamesJSON)
+
+		if err != nil {
+			return err
+		}
+
+		if !usernamesJSON.Valid {
+			continue
+		}
+
+		var list []string
+		err = json.Unmarshal([]byte(usernamesJSON.String), &list)
+		if err != nil {
+			return err
+		}
+
+		usernames = append(usernames, list...)
+	}
+
+	defaultChainID := 1
+
+	for _, username := range usernames {
+
+		var usernameAlreadyMigrated bool
+
+		row := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM ens_usernames WHERE username=? AND chain_id=?)`, username, defaultChainID)
+		err := row.Scan(&usernameAlreadyMigrated)
+
+		if err != nil {
+			return err
+		}
+
+		if usernameAlreadyMigrated {
+			continue
+		}
+
+		_, err = db.Exec(`INSERT INTO ens_usernames (username, chain_id) VALUES (?, ?)`, username, defaultChainID)
+		if err != nil {
+			log.Error("Migrating ens usernames: failed to insert username into new database", "ensUsername", username, "err", err.Error())
+		}
+	}
+
+	return nil
 }

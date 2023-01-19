@@ -2,6 +2,7 @@ package ens
 
 import (
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -30,13 +31,16 @@ import (
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *API {
+const StatusDomain = "stateofus.eth"
+
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *API {
 	return &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
@@ -45,6 +49,7 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
 		addrPerChain:    make(map[uint64]common.Address),
+		db:              NewEnsDatabase(appDb),
 
 		quit: make(chan struct{}),
 	}
@@ -67,12 +72,27 @@ type API struct {
 
 	quitOnce sync.Once
 	quit     chan struct{}
+
+	db       *Database
+	settings *accounts.Database // NOTE: Accounts db is here for compatibility. Remove when settings.usernames is dropped.
 }
 
 func (api *API) Stop() {
 	api.quitOnce.Do(func() {
 		close(api.quit)
 	})
+}
+
+func (api *API) GetEnsUsernames(ctx context.Context) ([]*UsernameDetails, error) {
+	return api.db.GetEnsUsernames()
+}
+
+func (api *API) Add(ctx context.Context, chainID uint64, username string) error {
+	return api.db.AddEnsUsername(UsernameDetails{username, chainID})
+}
+
+func (api *API) Remove(ctx context.Context, chainID uint64, username string) error {
+	return api.db.RemoveEnsUsername(username, chainID)
 }
 
 func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error) {
@@ -210,7 +230,7 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 		return addr, nil
 	}
 
-	registryAddr, err := api.OwnerOf(ctx, chainID, "stateofus.eth")
+	registryAddr, err := api.OwnerOf(ctx, chainID, StatusDomain)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -321,6 +341,13 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 	}
 
 	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+
+	err = api.Remove(ctx, chainID, fullDomainName(username))
+
+	if err != nil {
+		log.Warn("Releasing ENS username: transaction successful, but removing failed")
+	}
+
 	return tx.Hash().String(), nil
 }
 
@@ -399,6 +426,12 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 	}
 
 	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	err = api.Add(ctx, chainID, fullDomainName(username))
+
+	if err != nil {
+		log.Warn("Registering ENS username: transaction successful, but adding failed")
+	}
+
 	return tx.Hash().String(), nil
 }
 
@@ -499,6 +532,12 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 	}
 
 	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	err = api.Add(ctx, chainID, fullDomainName(username))
+
+	if err != nil {
+		log.Warn("Registering ENS username: transaction successful, but adding failed")
+	}
+
 	return tx.Hash().String(), nil
 }
 
@@ -648,4 +687,8 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
 	}
 	return arg
+}
+
+func fullDomainName(username string) string {
+	return username + "." + StatusDomain
 }
