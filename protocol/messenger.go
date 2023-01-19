@@ -720,6 +720,20 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
+	joinedCommunities, err := m.communitiesManager.Joined()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, joinedCommunity := range joinedCommunities {
+		// resume importing message history archives in case
+		// imports have been interrupted previously
+		err := m.resumeHistoryArchivesImport(joinedCommunity.ID())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if m.httpServer != nil {
 		err = m.httpServer.Start()
 		if err != nil {

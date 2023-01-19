@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
@@ -27,8 +26,6 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -1000,65 +997,19 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		return
 	}
 
-	importTicker := time.NewTicker(100 * time.Millisecond)
-	defer importTicker.Stop()
-
-importMessageArchivesLoop:
-	for {
-		select {
-		case <-cancel:
-			m.communitiesManager.LogStdout("interrupted importing history archive messages")
-			return
-		case <-importTicker.C:
-
-			archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(id)
-			if err != nil {
-				m.communitiesManager.LogStdout("couldn't get message archive IDs to import", zap.Error(err))
-				return
-			}
-
-			if len(archiveIDsToImport) == 0 {
-				m.communitiesManager.LogStdout("no message archives to import")
-				break importMessageArchivesLoop
-			}
-
-			m.communitiesManager.LogStdout(fmt.Sprintf("importing message archive, %d left", len(archiveIDsToImport)))
-
-			// only process one archive at a time, so in case of cancel we don't
-			// wait for all archives to be processed first
-			downloadedArchiveID := archiveIDsToImport[0]
-
-			archiveMessages, err := m.communitiesManager.ExtractMessagesFromHistoryArchive(id, downloadedArchiveID)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to extract history archive messages", zap.Error(err))
-				continue
-			}
-
-			response, err := m.handleArchiveMessages(archiveMessages, id)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
-				continue
-			}
-
-			err = m.communitiesManager.SetMessageArchiveIDImported(id, downloadedArchiveID, true)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
-				continue
-			}
-
-			if !response.IsEmpty() {
-				notifications := response.Notifications()
-				response.ClearNotifications()
-				signal.SendNewMessages(response)
-				localnotifications.PushMessages(notifications)
-			}
-		}
+	err = m.importHistoryArchives(id, cancel)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+		return
 	}
+
 	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
 	if err != nil {
 		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
 	}
 	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+
 }
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage, id types.HexBytes) (*MessengerResponse, error) {
@@ -1094,7 +1045,6 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(id))
 	err := m.handleImportedMessages(importedMessages)
 	if err != nil {
 		m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
