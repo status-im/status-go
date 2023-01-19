@@ -482,7 +482,8 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	m.mailPeersMutex.Unlock()
 
 	// Only evaluate connected peers once a mailserver has been set
-	// otherwise
+	// otherwise, we would attempt to retrieve history and end up with a mailserver
+	// not available error
 	if m.mailserverCycle.activeMailserver != nil {
 		for _, connectedPeer := range connectedPeers {
 			id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
