@@ -21,16 +21,17 @@ import (
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 
 func getFixedCurrencies() []string {
-	return []string{"usd"}
+	return []string{"USD"}
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
-	return &Reader{rpcClient, tokenManager, accountsDB, walletFeed, nil}
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+	return &Reader{rpcClient, tokenManager, priceManager, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
 	rpcClient    *rpc.Client
 	tokenManager *token.Manager
+	priceManager *PriceManager
 	accountsDB   *accounts.Database
 	walletFeed   *event.Feed
 	cancel       context.CancelFunc
@@ -167,7 +168,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	)
 
 	group.Add(func(parent context.Context) error {
-		prices, err = fetchCryptoComparePrices(tokenSymbols, currencies)
+		prices, err = r.priceManager.FetchPrices(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}

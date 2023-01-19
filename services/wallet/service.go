@@ -44,7 +44,8 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
-	reader := NewReader(rpcClient, tokenManager, accountsDB, walletFeed)
+	priceManager := NewPriceManager(db)
+	reader := NewReader(rpcClient, tokenManager, priceManager, accountsDB, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -57,6 +58,7 @@ func NewService(
 		openseaAPIKey:         openseaAPIKey,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
+		priceManager:          priceManager,
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
@@ -77,6 +79,7 @@ type Service struct {
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
+	priceManager          *PriceManager
 	started               bool
 	openseaAPIKey         string
 	gethManager           *account.GethManager
