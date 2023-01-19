@@ -317,7 +317,12 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 
 func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	log.Debug("call to FetchPrices")
-	return fetchCryptoComparePrices(symbols, currencies)
+	return api.s.priceManager.FetchPrices(symbols, currencies)
+}
+
+func (api *API) GetCachedPrices(ctx context.Context) (map[string]map[string]float64, error) {
+	log.Debug("call to GetCachedPrices")
+	return api.s.priceManager.GetCachedPrices()
 }
 
 func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
