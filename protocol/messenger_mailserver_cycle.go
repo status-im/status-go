@@ -479,43 +479,52 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 		m.mailserverCycle.peers[pID] = pInfo
 	}
+	m.mailPeersMutex.Unlock()
 
-	for _, connectedPeer := range connectedPeers {
-		id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
-		if err != nil {
-			m.logger.Error("failed to convert id to hex", zap.Error(err))
-			return err
-		}
-		if id == "" {
-			continue
-		}
-		pInfo, ok := m.mailserverCycle.peers[id]
-
-		if !ok || pInfo.status != connected {
-			m.logger.Info("peer connected", zap.String("peer", connectedPeer.UniqueID))
-			pInfo.status = connected
-			if pInfo.canConnectAfter.Before(time.Now()) {
-				pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
+	// Only evaluate connected peers once a mailserver has been set
+	// otherwise
+	if m.mailserverCycle.activeMailserver != nil {
+		for _, connectedPeer := range connectedPeers {
+			id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
+			if err != nil {
+				m.logger.Error("failed to convert id to hex", zap.Error(err))
+				return err
+			}
+			if id == "" {
+				continue
 			}
 
-			if m.mailserverCycle.activeMailserver != nil && id == m.mailserverCycle.activeMailserver.ID {
-				m.mailserverCycle.activeMailserver.FailedRequests = 0
-				m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
-				m.EmitMailserverAvailable()
-				signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
-			}
-			// Query mailserver
-			go func() {
-				_, err := m.performMailserverRequest(m.RequestAllHistoricMessages)
-				if err != nil {
-					m.logger.Error("could not perform mailserver request", zap.Error(err))
+			m.mailPeersMutex.Lock()
+			pInfo, ok := m.mailserverCycle.peers[id]
+			if !ok || pInfo.status != connected {
+				m.logger.Info("peer connected", zap.String("peer", connectedPeer.UniqueID))
+				pInfo.status = connected
+				if pInfo.canConnectAfter.Before(time.Now()) {
+					pInfo.canConnectAfter = time.Now().Add(defaultBackoff)
 				}
-			}()
+				m.mailserverCycle.peers[id] = pInfo
+				m.mailPeersMutex.Unlock()
 
-			m.mailserverCycle.peers[id] = pInfo
+				if id == m.mailserverCycle.activeMailserver.ID {
+					m.mailserverCycle.activeMailserver.FailedRequests = 0
+					m.logger.Info("mailserver available", zap.String("address", connectedPeer.UniqueID))
+					m.EmitMailserverAvailable()
+					signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver.Address, m.mailserverCycle.activeMailserver.ID)
+				}
+				// Query mailserver
+				go func() {
+					_, err := m.performMailserverRequest(m.RequestAllHistoricMessages)
+					if err != nil {
+						m.logger.Error("could not perform mailserver request", zap.Error(err))
+					}
+				}()
+
+			} else {
+				m.mailPeersMutex.Unlock()
+			}
 		}
 	}
-	m.mailPeersMutex.Unlock()
+
 	// Check whether we want to disconnect the mailserver
 	if m.mailserverCycle.activeMailserver != nil {
 		if m.mailserverCycle.activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
