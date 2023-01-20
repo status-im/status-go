@@ -555,6 +555,10 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
+					if bonderFees.Cmp(maxAmountIn.ToInt()) >= 0 {
+						continue
+					}
+
 					gasLimit := uint64(0)
 					if sendType.isTransfer() {
 						gasLimit, err = bridge.EstimateGas(network, dest, token, amountIn)
