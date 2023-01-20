@@ -332,6 +332,10 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		defer waku.wg.Done()
 
 		isConnected := false
+		lowPeers := false
+		minPeers := 3
+		var lowPeersTimestamp int64
+
 		for {
 			select {
 			case <-waku.quit:
@@ -363,6 +367,22 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 							waku.logger.Error("Could not start DiscV5", zap.Error(err))
 						}
 					}
+				}
+
+				if latestConnStatus.IsOnline && isConnected && waku.PeerCount() <= minPeers {
+					if !lowPeers {
+						lowPeers = true
+						lowPeersTimestamp = waku.timestamp()
+					} else if 5*int64(time.Minute) > (waku.timestamp() - lowPeersTimestamp) {
+						waku.logger.Debug("5 mins of low peers, restarting")
+						waku.node.DiscV5().Stop()
+						err := waku.node.DiscV5().Start(ctx)
+						if err != nil {
+							waku.logger.Error("Could not restart DiscV5", zap.Error(err))
+						}
+					}
+				} else {
+					lowPeers = false
 				}
 			}
 		}
