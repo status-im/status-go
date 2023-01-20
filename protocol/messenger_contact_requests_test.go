@@ -91,7 +91,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -116,7 +116,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -141,7 +141,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -181,7 +181,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
@@ -208,7 +208,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestLocalState)
 
 	// Make sure it's not returned as coming from us
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
@@ -239,7 +239,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Check contact request has been received
 	s.Require().NoError(err)
@@ -256,7 +256,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateDismissed, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateDismissed, resp.Contacts[0].ContactRequestLocalState)
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)
@@ -299,7 +299,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestLocalState)
 
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 1)
@@ -328,7 +328,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Check activity center notification is of the right type
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -355,7 +355,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequests[0].ID)
@@ -387,7 +387,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
@@ -403,12 +403,13 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().False(resp.Contacts[0].HasAddedUs)
-	s.Require().False(resp.Contacts[0].Added)
+	s.Require().False(resp.Contacts[0].hasAddedUs())
+	s.Require().False(resp.Contacts[0].added())
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -425,12 +426,13 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	s.Require().Equal(myID, resp.Contacts[0].ID)
 
-	s.Require().False(resp.Contacts[0].Added)
-	s.Require().False(resp.Contacts[0].HasAddedUs)
+	s.Require().False(resp.Contacts[0].added())
+	s.Require().False(resp.Contacts[0].hasAddedUs())
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequestOutOfOrder() {
@@ -465,7 +467,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	contacts := s.m.Contacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
 
 	retract := protobuf.RetractContactRequest{
 		Clock: 2,
@@ -476,7 +478,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	// Nothing should have changed
 	contacts = s.m.Contacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice() {
@@ -509,7 +511,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -531,7 +533,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -556,7 +558,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -593,7 +595,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Resend contact request with higher clock value
 	resp, err = s.m.SendContactRequest(context.Background(), request)
@@ -649,7 +651,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -675,7 +677,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -700,7 +702,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -720,16 +722,16 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	)
 	s.Require().NoError(err)
 
-	// Check activity center notification is of the right type
-	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
-	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
-
-	// Make sure the message is updated, sender s2de
+	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
 	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	// Check activity center notification is of the right type
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -737,7 +739,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 }
 
 func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact() {
@@ -772,7 +774,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -794,7 +796,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -839,7 +841,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptLegacyContactRequest(
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -864,7 +866,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptLegacyContactRequest(
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Accept contact request, receiver side
 	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(notification.Message.ID)})
@@ -880,7 +882,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptLegacyContactRequest(
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -911,7 +913,7 @@ func (s *MessengerContactRequestSuite) TestLegacyContactRequestNotifications() {
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -936,57 +938,7 @@ func (s *MessengerContactRequestSuite) TestLegacyContactRequestNotifications() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
-
-	// Send new contact request
-	resp, err = s.m.AddContact(context.Background(), request)
-	s.Require().NoError(err)
-
-	s.Require().NotNil(resp)
-
-	crRequest := &requests.SendContactRequest{
-		ID:      types.Hex2Bytes(contactID),
-		Message: "hello",
-	}
-
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-
-	// Send contact request
-	_, err = s.m.SendContactRequest(context.Background(), crRequest)
-	s.Require().NoError(err)
-
-	paginationResponse, err := theirMessenger.ActivityCenterNotifications("", 10)
-
-	s.Require().NoError(err)
-	s.Require().Len(paginationResponse.Notifications, 1)
-
-	// Wait for the message to reach its destination
-	resp, err = WaitOnMessengerResponse(
-		theirMessenger,
-		func(r *MessengerResponse) bool {
-			return len(r.ActivityCenterNotifications()) == 2
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
-
-	activityCenterNotifications := resp.ActivityCenterNotifications()
-	var newNotification, oldNotification *ActivityCenterNotification
-	if activityCenterNotifications[0].Message.ID == defaultContactRequestID(myID) {
-		oldNotification = activityCenterNotifications[0]
-		newNotification = activityCenterNotifications[1]
-	} else {
-		newNotification = activityCenterNotifications[0]
-		oldNotification = activityCenterNotifications[1]
-	}
-
-	s.Require().True(oldNotification.Dismissed)
-	s.Require().False(newNotification.Dismissed)
-
-	paginationResponse, err = theirMessenger.ActivityCenterNotifications("", 10)
-
-	s.Require().NoError(err)
-	s.Require().Len(paginationResponse.Notifications, 2)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
@@ -1012,7 +964,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -1037,7 +989,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Remove contact
 
@@ -1055,7 +1007,8 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 	s.Require().NoError(err)
 
 	// Make sure it's not a contact anymore
-	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Re-add user
 	resp, err = s.m.AddContact(context.Background(), request)
@@ -1085,7 +1038,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 }
 
@@ -1126,7 +1079,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestLegacyContactRequestForCo
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Accept latest contact request, receiver side
 	resp, err = theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
@@ -1134,7 +1087,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestLegacyContactRequestForCo
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts := theirMessenger.AddedContacts()
@@ -1160,5 +1113,168 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestLegacyContactRequestForCo
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
+}
+
+func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
+	alice1 := s.m
+	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	_, err = alice2.Start()
+	s.Require().NoError(err)
+
+	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
+
+	pairTwoDevices(&s.Suite, alice1, alice2)
+	pairTwoDevices(&s.Suite, alice2, alice1)
+
+	bob := s.newMessenger(s.shh)
+	_, err = bob.Start()
+	s.Require().NoError(err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+
+	request := &requests.AddContact{
+		ID: types.Hex2Bytes(contactID),
+	}
+
+	// Send contact request
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// it should show up on device 2
+	resp, err := WaitOnMessengerResponse(
+		alice2,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(resp.Contacts[0].ContactRequestLocalState, ContactRequestStateSent)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check activity center notification is of the right type
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Accept latest contact request, receiver side
+	resp, err = bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Make sure the sender is added to our contacts
+	contacts := bob.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Make sure we consider them a mutual contact, receiver side
+	mutualContacts := bob.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts = alice1.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		alice2,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts = alice2.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	resp, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().False(resp.Contacts[0].hasAddedUs())
+	s.Require().False(resp.Contacts[0].added())
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Check on bob side
+	resp, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+
+	alice2.logger.Info("MY KEY", zap.String("my-id", alice2.myHexIdentity()))
+
+	// Check on alice2 side
+	resp, err = WaitOnMessengerResponse(
+		alice2,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }

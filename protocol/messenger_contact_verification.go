@@ -29,7 +29,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	}
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("must be a mutual contact")
 	}
 
@@ -162,7 +162,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 
 	contactID := verifRequest.To
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("Can't find contact for canceling verification request")
 	}
 
@@ -272,7 +272,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	contactID := verifRequest.From
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("must be a mutual contact")
 	}
 
@@ -388,7 +388,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 	contactID := notification.ReplyMessage.From
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("must be a mutual contact")
 	}
 
@@ -496,7 +496,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 	contactID := notification.ReplyMessage.From
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("must be a mutual contact")
 	}
 
@@ -598,7 +598,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	}
 
 	contact, ok := m.allContacts.Load(verifRequest.From)
-	if !ok || !contact.Added || !contact.HasAddedUs {
+	if !ok || !contact.mutual() {
 		return nil, errors.New("must be a mutual contact")
 	}
 
@@ -744,7 +744,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.Added || !contact.HasAddedUs {
+	if !contact.mutual() {
 		m.logger.Debug("Received a verification request for a non added mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}
@@ -835,7 +835,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.Added || !contact.HasAddedUs {
+	if !contact.mutual() {
 		m.logger.Debug("Received a verification response for a non mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}
@@ -924,7 +924,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.Added || !contact.HasAddedUs {
+	if !contact.mutual() {
 		m.logger.Debug("Received a verification decline for a non mutual contact", zap.String("contactID", contactID))
 		return errors.New("must be a mutual contact")
 	}

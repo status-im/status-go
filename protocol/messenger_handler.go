@@ -71,7 +71,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
 	waitingForApproval := chat != nil && len(chat.InvitationAdmin) > 0
 	ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
-	isActive := messageState.CurrentMessageState.Contact.Added || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
+	isActive := messageState.CurrentMessageState.Contact.added() || messageState.CurrentMessageState.Contact.ID == ourKey || waitingForApproval
 	showPushNotification := isActive && messageState.CurrentMessageState.Contact.ID != ourKey
 
 	// wasUserAdded indicates whether the user has been added to the group with this update
@@ -227,7 +227,7 @@ func (m *Messenger) checkIfCreatorIsOurContact(group *v1protocol.Group) bool {
 	creator, err := group.Creator()
 	if err == nil {
 		contact, _ := m.allContacts.Load(creator)
-		return contact != nil && contact.ContactRequestState == ContactRequestStateMutual
+		return contact != nil && contact.mutual()
 	}
 	m.logger.Warn("failed to get creator from group", zap.String("group name", group.Name()), zap.String("group chat id", group.ChatID()), zap.Error(err))
 	return false
@@ -459,20 +459,46 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		}
 	}
 
-	if contact.LastUpdated < message.LastUpdated {
-		contact.HasAddedUs = message.HasAddedUs
-		contact.ContactRequestState = ContactRequestState(message.ContactRequestState)
+	if message.ContactRequestRemoteClock != 0 || message.ContactRequestLocalClock != 0 {
+		// Some local action about contact requests were performed,
+		// process them
+		contact.processSyncContactRequestState(
+			ContactRequestState(message.ContactRequestRemoteState),
+			uint64(message.ContactRequestRemoteClock),
+			ContactRequestState(message.ContactRequestLocalState),
+			uint64(message.ContactRequestLocalClock))
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+	} else if message.Added || message.HasAddedUs {
+		// NOTE(cammellos): this is for handling backward compatibility, old clients
+		// won't propagate ContactRequestRemoteClock or ContactRequestLocalClock
+
+		if message.Added && contact.LastUpdatedLocally < message.LastUpdatedLocally {
+			contact.ContactRequestSent(message.LastUpdatedLocally)
+		}
+
+		if message.HasAddedUs && contact.LastUpdated < message.LastUpdated {
+			contact.ContactRequestReceived(message.LastUpdated)
+		}
+
+		if message.Removed && contact.LastUpdatedLocally < message.LastUpdatedLocally {
+			err := m.removeContact(context.Background(), state.Response, contact.ID, false)
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	if contact.LastUpdatedLocally < message.LastUpdatedLocally {
+		// NOTE(cammellos): probably is cleaner to pass a flag
+		// to method to tell them not to sync, or factor out in different
+		// methods
 		contact.IsSyncing = true
 		defer func() {
 			contact.IsSyncing = false
 		}()
 
-		if message.Added {
-			contact.Added = true
-		}
 		if message.EnsName != "" && contact.EnsName != message.EnsName {
 			contact.EnsName = message.EnsName
 			publicKey, err := contact.PublicKey()
@@ -508,7 +534,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 					return err
 				}
 			} else {
-				contact.Unblock()
+				contact.Unblock(message.LastUpdatedLocally)
 			}
 		}
 		if chat != nil && message.Muted != chat.Muted {
@@ -525,13 +551,6 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 			}
 
 			state.Response.AddChat(chat)
-		}
-
-		if message.Removed {
-			err := m.removeContact(context.Background(), state.Response, contact.ID)
-			if err != nil {
-				return err
-			}
 		}
 
 		state.ModifiedContacts.Store(contact.ID, true)
@@ -636,7 +655,6 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 }
 
 func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, message protobuf.SyncChatMessagesRead) error {
-	m.logger.Info("HANDLING SYNC MESSAGES READ", zap.Any("ID", message.Id))
 	chat, ok := m.allChats.Load(message.Id)
 	if !ok {
 		return ErrChatNotFound
@@ -708,73 +726,117 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
-	contact := state.CurrentMessageState.Contact
+func (m *Messenger) handleAcceptContactRequest(
+	response *MessengerResponse,
+	contact *Contact,
+	originalRequest *common.Message,
+	message protobuf.AcceptContactRequest) (ContactRequestProcessingResponse, error) {
 
-	if contact.ContactRequestClock > message.Clock {
+	if contact.ContactRequestRemoteClock > message.Clock {
 		m.logger.Info("not handling accept since clock lower")
-		return nil
+		return ContactRequestProcessingResponse{}, nil
 	}
 
-	// TODO: Handle missing contact request message
-	request, err := m.persistence.MessageByID(message.Id)
+	// The contact request accepted wasn't found, a reason for this might
+	// be that we sent a legacy contact request/contact-update, or another
+	// device has sent it, and we haven't synchronized it
+	// TODO(cammellos): This might want to show a notification if we haven't
+	// added the user to contacts already
+	if originalRequest == nil {
+		return contact.ContactRequestAccepted(message.Clock), nil
+	}
+
+	if originalRequest.LocalChatID != contact.ID {
+		return ContactRequestProcessingResponse{}, errors.New("can't accept contact request not sent to user")
+	}
+
+	contact.ContactRequestAccepted(message.Clock)
+
+	originalRequest.ContactRequestState = common.ContactRequestStateAccepted
+
+	err := m.persistence.SetContactRequestState(originalRequest.ID, originalRequest.ContactRequestState)
+	if err != nil {
+		return ContactRequestProcessingResponse{}, err
+	}
+
+	response.AddMessage(originalRequest)
+	return ContactRequestProcessingResponse{}, nil
+}
+
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
+	originalRequest, err := m.persistence.MessageByID(message.Id)
+	if err != nil && err != common.ErrRecordNotFound {
+		return err
+	}
+
+	contact := state.CurrentMessageState.Contact
+
+	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, originalRequest, message)
 	if err != nil {
 		return err
 	}
 
-	if request.LocalChatID != state.CurrentMessageState.Contact.ID {
-		return errors.New("can't accept contact request not sent to user")
+	// If the state has changed from non-mutual contact, to mutual contact
+	// we want to notify the user
+	if processingResponse.newContactRequestReceived && contact.mutual() {
+		// We set the chat as active, this is currently the expected behavior
+		// for mobile, it might change as we implement further the activity
+		// center
+		chat, _, err := m.getOneToOneAndNextClock(contact)
+		if err != nil {
+			return err
+		}
+
+		if chat.LastClockValue < message.Clock {
+			chat.LastClockValue = message.Clock
+		}
+
+		// NOTE(cammellos): This will re-enable the chat if it was deleted, and only
+		// after we became contact, currently seems safe, but that needs
+		// discussing with UX.
+		if chat.DeletedAtClockValue < message.Clock {
+			chat.Active = true
+		}
+
+		state.Response.AddChat(chat)
+		state.AllChats.Store(chat.ID, chat)
 	}
 
-	contact.ContactRequestClock = message.Clock
+	// We only want to update a notification here, we don't want (yet) to
+	// create a new one
+	if originalRequest != nil {
+		// Update contact requests if existing, or create a new one
+		err = m.createContactRequestNotification(contact, state, originalRequest)
+		if err != nil {
+			m.logger.Warn("could not create contact request notification", zap.Error(err))
+		}
+	}
 
 	state.ModifiedContacts.Store(contact.ID, true)
 	state.AllContacts.Store(contact.ID, contact)
-
-	request.ContactRequestState = common.ContactRequestStateAccepted
-
-	err = m.persistence.SetContactRequestState(request.ID, request.ContactRequestState)
-	if err != nil {
-		return err
-	}
-
-	err = m.createContactRequestNotification(state.CurrentMessageState.Contact, state, request)
-	if err != nil {
-		m.logger.Warn("could not create contact request notification", zap.Error(err))
-	}
-
-	state.CurrentMessageState.Contact.ContactRequestAccepted()
-
-	state.Response.AddMessage(request)
 	return nil
 }
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
 	contact := state.CurrentMessageState.Contact
-	if contact.ContactRequestClock > message.Clock {
+
+	if contact.ID == m.myHexIdentity() {
+		m.logger.Debug("retraction coming from us, ignoring")
+		return nil
+	}
+
+	r := contact.ContactRequestRetracted(message.Clock)
+	if !r.processed {
 		m.logger.Info("not handling retract since clock lower")
 		return nil
 	}
 
-	mutualContactEnabled, err := m.settings.MutualContactEnabled()
-	if err != nil {
-		m.logger.Error("FAILED", zap.Error(err))
-		return err
-	}
-	// We remove from our old contacts only if mutual contacts are enabled
-	if mutualContactEnabled {
-		contact.Added = false
-
-	}
 	// We remove anything that's related to this contact request
-	err = m.persistence.RemoveAllContactRequestActivityCenterNotifications(contact.ID)
+	err := m.persistence.RemoveAllContactRequestActivityCenterNotifications(contact.ID)
 	if err != nil {
 		return err
 	}
 
-	contact.HasAddedUs = false
-	contact.ContactRequestClock = message.Clock
-	contact.ContactRequestRetracted()
 	state.ModifiedContacts.Store(contact.ID, true)
 
 	state.AllContacts.Store(contact.ID, contact)
@@ -818,30 +880,24 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 			contact.DisplayName = message.DisplayName
 		}
 
-		contact.HasAddedUs = true
-		contact.LastUpdated = message.Clock
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-		// Has the user added us?
-		if contact.ContactRequestState == ContactRequestStateNone {
-			contact.ContactRequestState = ContactRequestStateReceived
+		r := contact.ContactRequestReceived(message.ContactRequestClock)
+		if r.newContactRequestReceived {
 			err = m.createContactRequestNotification(contact, state, nil)
 			if err != nil {
 				m.logger.Warn("could not create contact request notification", zap.Error(err))
 			}
 
-			// Has the user replied to a default contact request
-		} else if contact.ContactRequestState == ContactRequestStateSent {
-			contact.ContactRequestState = ContactRequestStateMutual
-
 		}
+		contact.LastUpdated = message.Clock
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
 	}
 
 	if chat.LastClockValue < message.Clock {
 		chat.LastClockValue = message.Clock
 	}
 
-	if contact.ContactRequestState == ContactRequestStateMutual && chat.DeletedAtClockValue < message.Clock {
+	if contact.mutual() && chat.DeletedAtClockValue < message.Clock {
 		chat.Active = true
 	}
 
@@ -1485,6 +1541,29 @@ func (m *Messenger) updateLastMessage(chat *Chat) error {
 	return m.saveChat(chat)
 }
 
+func handleContactRequestChatMessage(receivedMessage *common.Message, contact *Contact, outgoing bool, logger *zap.Logger) (bool, error) {
+	receivedMessage.ContactRequestState = common.ContactRequestStatePending
+
+	var response ContactRequestProcessingResponse
+
+	if outgoing {
+		response = contact.ContactRequestSent(receivedMessage.Clock)
+	} else {
+		response = contact.ContactRequestReceived(receivedMessage.Clock)
+	}
+	if !response.processed {
+		logger.Info("not handling contact message since clock lower")
+		return false, nil
+
+	}
+
+	if contact.mutual() {
+		receivedMessage.ContactRequestState = common.ContactRequestStateAccepted
+	}
+
+	return response.newContactRequestReceived, nil
+}
+
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
@@ -1501,11 +1580,14 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	// is the message coming from us?
+	isSyncMessage := common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
+
+	if isSyncMessage {
 		receivedMessage.Seen = true
 	}
 
-	err := receivedMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := receivedMessage.PrepareContent(m.myHexIdentity())
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
@@ -1517,7 +1599,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			logger.Error("failed to get quoted message", zap.Error(err))
 		} else if err != nil {
 			return err
-		} else if repliedTo.From == common.PubkeyToHex(&m.identity.PublicKey) {
+		} else if repliedTo.From == m.myHexIdentity() {
 			receivedMessage.Replied = true
 		}
 	}
@@ -1564,44 +1646,44 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
 
-	if c, ok := m.allChats.Load(chat.ID); ok {
-		chat = c
-	}
-
-	// Set the LocalChatID for the message
-	receivedMessage.LocalChatID = chat.ID
-
 	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(receivedMessage.WhisperTimestamp), state.Response); err != nil {
 		return err
 	}
 
-	// Increase unviewed count
-	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
-		if !receivedMessage.Seen {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
-		}
-	} else {
-		// Our own message, mark as sent
+	// Our own message, mark as sent
+	if isSyncMessage {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
+	} else if !receivedMessage.Seen {
+		// Increase unviewed count
+		m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
 	}
 
 	contact := state.CurrentMessageState.Contact
 
-	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
-		if contact.ContactRequestClock > receivedMessage.Clock {
-			m.logger.Info("not handling contact message since clock lower")
-			return nil
-		}
-		receivedMessage.ContactRequestState = common.ContactRequestStatePending
-		contact.ContactRequestClock = receivedMessage.Clock
-		contact.ContactRequestReceived()
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-		err = m.createContactRequestNotification(state.CurrentMessageState.Contact, state, receivedMessage)
-		if err != nil {
-			return err
+	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
+
+		chatContact := contact
+		if isSyncMessage {
+			chatContact, err = m.BuildContact(chat.ID)
+			if err != nil {
+				return err
+			}
 		}
 
+		sendNotification, err := handleContactRequestChatMessage(receivedMessage, chatContact, isSyncMessage, m.logger)
+		if err != nil {
+			m.logger.Error("failed to handle contact request message", zap.Error(err))
+			return err
+		}
+		state.ModifiedContacts.Store(chatContact.ID, true)
+		state.AllContacts.Store(chatContact.ID, chatContact)
+
+		if sendNotification {
+			err = m.createContactRequestNotification(chatContact, state, receivedMessage)
+			if err != nil {
+				return err
+			}
+		}
 	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		chat.Highlight = true
 	}
@@ -1662,7 +1744,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 
-	if receivedMessage.EnsName != "" {
+	if !isSyncMessage && receivedMessage.EnsName != "" {
 		oldRecord, err := m.ensVerifier.Add(contact.ID, receivedMessage.EnsName, receivedMessage.Clock)
 		if err != nil {
 			m.logger.Warn("failed to verify ENS name", zap.Error(err))
@@ -1675,7 +1757,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		}
 	}
 
-	if contact.DisplayName != receivedMessage.DisplayName && len(receivedMessage.DisplayName) != 0 {
+	if !isSyncMessage && contact.DisplayName != receivedMessage.DisplayName && len(receivedMessage.DisplayName) != 0 {
 		contact.DisplayName = receivedMessage.DisplayName
 		state.ModifiedContacts.Store(contact.ID, true)
 	}
@@ -1996,7 +2078,7 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 		// We set the chat as inactive and will create a notification
 		// if it's not coming from a contact
 		contact, ok := m.allContacts.Load(chatID)
-		chat.Active = chat.Active || (ok && contact.Added)
+		chat.Active = chat.Active || (ok && contact.added())
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
 		chatID := chatEntity.GetChatId()
@@ -2213,7 +2295,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	// We don't want to store the profile images of other users, even if we don't display images.
 	inOurContacts, ok := m.allContacts.Load(state.CurrentMessageState.Contact.ID)
 
-	isContact := ok && inOurContacts.Added
+	isContact := ok && inOurContacts.added()
 	if viewFromNoOne && !isContact {
 		return nil
 	}
@@ -2373,7 +2455,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	}
 
 	// if it's from us, it's allowed
-	if contactIDFromPublicKey(&m.identity.PublicKey) == publicKey {
+	if m.myHexIdentity() == publicKey {
 		return true, nil
 	}
 
@@ -2394,7 +2476,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	}
 
 	// Otherwise we check if we added it
-	return contact.Added, nil
+	return contact.added(), nil
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {

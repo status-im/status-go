@@ -536,13 +536,13 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.identicon,
 			c.last_updated,
 			c.last_updated_locally,
-			c.added,
 			c.blocked,
 			c.removed,
-			c.has_added_us,
 			c.local_nickname,
 			c.contact_request_state,
-			c.contact_request_clock,
+                        c.contact_request_local_clock,
+			c.contact_request_remote_state,
+			c.contact_request_remote_clock,
 			i.image_type,
 			i.payload,
                         i.clock_value,
@@ -561,21 +561,21 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	for rows.Next() {
 
 		var (
-			contact             Contact
-			nickname            sql.NullString
-			contactRequestState sql.NullInt64
-			contactRequestClock sql.NullInt64
-			displayName         sql.NullString
-			imageType           sql.NullString
-			ensName             sql.NullString
-			ensVerified         sql.NullBool
-			added               sql.NullBool
-			blocked             sql.NullBool
-			removed             sql.NullBool
-			hasAddedUs          sql.NullBool
-			lastUpdatedLocally  sql.NullInt64
-			identityImageClock  sql.NullInt64
-			imagePayload        []byte
+			contact                   Contact
+			nickname                  sql.NullString
+			contactRequestLocalState  sql.NullInt64
+			contactRequestLocalClock  sql.NullInt64
+			contactRequestRemoteState sql.NullInt64
+			contactRequestRemoteClock sql.NullInt64
+			displayName               sql.NullString
+			imageType                 sql.NullString
+			ensName                   sql.NullString
+			ensVerified               sql.NullBool
+			blocked                   sql.NullBool
+			removed                   sql.NullBool
+			lastUpdatedLocally        sql.NullInt64
+			identityImageClock        sql.NullInt64
+			imagePayload              []byte
 		)
 
 		contact.Images = make(map[string]images.IdentityImage)
@@ -590,13 +590,13 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.Identicon,
 			&contact.LastUpdated,
 			&lastUpdatedLocally,
-			&added,
 			&blocked,
 			&removed,
-			&hasAddedUs,
 			&nickname,
-			&contactRequestState,
-			&contactRequestClock,
+			&contactRequestLocalState,
+			&contactRequestLocalClock,
+			&contactRequestRemoteState,
+			&contactRequestRemoteClock,
 			&imageType,
 			&imagePayload,
 			&identityImageClock,
@@ -611,12 +611,20 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact.LocalNickname = nickname.String
 		}
 
-		if contactRequestState.Valid {
-			contact.ContactRequestState = ContactRequestState(contactRequestState.Int64)
+		if contactRequestLocalState.Valid {
+			contact.ContactRequestLocalState = ContactRequestState(contactRequestLocalState.Int64)
 		}
 
-		if contactRequestClock.Valid {
-			contact.ContactRequestClock = uint64(contactRequestClock.Int64)
+		if contactRequestLocalClock.Valid {
+			contact.ContactRequestLocalClock = uint64(contactRequestLocalClock.Int64)
+		}
+
+		if contactRequestRemoteState.Valid {
+			contact.ContactRequestRemoteState = ContactRequestState(contactRequestRemoteState.Int64)
+		}
+
+		if contactRequestRemoteClock.Valid {
+			contact.ContactRequestRemoteClock = uint64(contactRequestRemoteClock.Int64)
 		}
 
 		if displayName.Valid {
@@ -631,10 +639,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact.ENSVerified = ensVerified.Bool
 		}
 
-		if added.Valid {
-			contact.Added = added.Bool
-		}
-
 		if blocked.Valid {
 			contact.Blocked = blocked.Bool
 		}
@@ -645,10 +649,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 
 		if lastUpdatedLocally.Valid {
 			contact.LastUpdatedLocally = uint64(lastUpdatedLocally.Int64)
-		}
-
-		if hasAddedUs.Valid {
-			contact.HasAddedUs = hasAddedUs.Bool
 		}
 
 		previousContact, ok := allContacts[contact.ID]
@@ -876,12 +876,12 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			last_updated_locally,
 			local_nickname,
 			contact_request_state,
-			contact_request_clock,
-			added,
+                        contact_request_local_clock,
+			contact_request_remote_state,
+			contact_request_remote_clock,
 			blocked,
 			removed,
 			verification_status,
-			has_added_us,
 			name,
 			photo,
 			tribute_to_talk
@@ -901,13 +901,13 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.LastUpdated,
 		contact.LastUpdatedLocally,
 		contact.LocalNickname,
-		contact.ContactRequestState,
-		contact.ContactRequestClock,
-		contact.Added,
+		contact.ContactRequestLocalState,
+		contact.ContactRequestLocalClock,
+		contact.ContactRequestRemoteState,
+		contact.ContactRequestRemoteClock,
 		contact.Blocked,
 		contact.Removed,
 		contact.VerificationStatus,
-		contact.HasAddedUs,
 		//TODO we need to drop these columns
 		"",
 		"",

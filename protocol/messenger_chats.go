@@ -12,6 +12,29 @@ import (
 	"strings"
 )
 
+func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, error) {
+	chat, ok := m.allChats.Load(contact.ID)
+	if !ok {
+		publicKey, err := contact.PublicKey()
+		if err != nil {
+			return nil, 0, err
+		}
+
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+
+		// We don't want to show the chat to the user by default
+		chat.Active = false
+
+		if err := m.saveChat(chat); err != nil {
+			return nil, 0, err
+		}
+		m.allChats.Store(chat.ID, chat)
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	return chat, clock, nil
+}
+
 func (m *Messenger) Chats() []*Chat {
 	var chats []*Chat
 
@@ -267,14 +290,11 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		if err != nil {
 			return nil, err
 		}
-		contact, ok := m.allContacts.Load(chatID)
-		if !ok {
-			var err error
-			contact, err = buildContactFromPkString(chatID)
-			if err != nil {
-				return nil, err
-			}
+		contact, err := m.BuildContact(chatID)
+		if err != nil {
+			return nil, err
 		}
+
 		contact.EnsName = ensName
 		contact.ENSVerified = true
 		err = m.persistence.SaveContact(contact, nil)

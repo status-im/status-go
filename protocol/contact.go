@@ -49,7 +49,7 @@ func (c *Contact) CanonicalName() string {
 }
 
 func (c *Contact) CanonicalImage(profilePicturesVisibility settings.ProfilePicturesVisibilityType) string {
-	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.Added) {
+	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.added()) {
 		return c.Identicon
 	}
 
@@ -111,12 +111,19 @@ type Contact struct {
 
 	Images map[string]images.IdentityImage `json:"images"`
 
-	Added      bool `json:"added"`
-	Blocked    bool `json:"blocked"`
-	HasAddedUs bool `json:"hasAddedUs"`
+	Blocked bool `json:"blocked"`
 
-	ContactRequestState ContactRequestState `json:"contactRequestState"`
-	ContactRequestClock uint64              `json:"contactRequestClock"`
+	// ContactRequestRemoteState is the state of the contact request
+	// on the contact's end
+	ContactRequestRemoteState ContactRequestState `json:"contactRequestRemoteState"`
+	// ContactRequestRemoteClock is the clock for incoming contact requests
+	ContactRequestRemoteClock uint64 `json:"contactRequestRemoteClock"`
+
+	// ContactRequestLocalState is the state of the contact request
+	// on our end
+	ContactRequestLocalState ContactRequestState `json:"contactRequestLocalState"`
+	// ContactRequestLocalClock is the clock for outgoing contact requests
+	ContactRequestLocalClock uint64 `json:"contactRequestLocalClock"`
 
 	IsSyncing bool
 	Removed   bool
@@ -153,71 +160,129 @@ func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
 	return crypto.UnmarshalPubkey(b)
 }
 
-func (c *Contact) Block() {
+func (c *Contact) Block(clock uint64) {
 	c.Blocked = true
-	c.Added = false
+	c.DismissContactRequest(clock)
 }
 
 func (c *Contact) BlockDesktop() {
 	c.Blocked = true
 }
 
-func (c *Contact) Unblock() {
+func (c *Contact) Unblock(clock uint64) {
 	c.Blocked = false
+	// Reset the contact request flow
+	c.RetractContactRequest(clock)
 }
 
-func (c *Contact) Remove() {
-	c.Added = false
-	c.Removed = true
+func (c *Contact) added() bool {
+	return c.ContactRequestLocalState == ContactRequestStateSent
 }
 
-func (c *Contact) Add() {
-	c.Added = true
+func (c *Contact) hasAddedUs() bool {
+	return c.ContactRequestRemoteState == ContactRequestStateReceived
+}
+
+func (c *Contact) mutual() bool {
+	return c.added() && c.hasAddedUs()
+}
+
+type ContactRequestProcessingResponse struct {
+	processed                 bool
+	newContactRequestReceived bool
+}
+
+func (c *Contact) ContactRequestSent(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestLocalClock {
+		return ContactRequestProcessingResponse{}
+	}
+
+	c.ContactRequestLocalClock = clock
+	c.ContactRequestLocalState = ContactRequestStateSent
+
 	c.Removed = false
+
+	return ContactRequestProcessingResponse{processed: true}
 }
 
-func (c *Contact) ContactRequestSent() {
-	switch c.ContactRequestState {
-	case ContactRequestStateNone, ContactRequestStateDismissed:
-		c.ContactRequestState = ContactRequestStateSent
-	case ContactRequestStateReceived:
-		c.ContactRequestState = ContactRequestStateMutual
+func (c *Contact) AcceptContactRequest(clock uint64) ContactRequestProcessingResponse {
+	// We treat accept the same as sent, that's because accepting a contact
+	// request that does not exist is possible if the instruction is coming from
+	// a different device, we'd rather assume that a contact requested existed
+	// and didn't reach our device than being in an inconsistent state
+	return c.ContactRequestSent(clock)
+}
+
+func (c *Contact) RetractContactRequest(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestLocalClock {
+		return ContactRequestProcessingResponse{}
 	}
+
+	// This is a symmetric action, we set both local & remote clock
+	// since we want everything before this point discarded, regardless
+	// the side it was sent from
+	c.ContactRequestLocalClock = clock
+	c.ContactRequestLocalState = ContactRequestStateNone
+	c.ContactRequestRemoteState = ContactRequestStateNone
+	c.ContactRequestRemoteClock = clock
+	c.Removed = true
+
+	return ContactRequestProcessingResponse{processed: true}
 }
 
-func (c *Contact) ContactRequestReceived() {
-	switch c.ContactRequestState {
+func (c *Contact) DismissContactRequest(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestLocalClock {
+		return ContactRequestProcessingResponse{}
+	}
+
+	c.ContactRequestLocalClock = clock
+	c.ContactRequestLocalState = ContactRequestStateDismissed
+
+	return ContactRequestProcessingResponse{processed: true}
+}
+
+// Remote actions
+
+func (c *Contact) ContactRequestRetracted(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestRemoteClock {
+		return ContactRequestProcessingResponse{}
+	}
+
+	// This is a symmetric action, we set both local & remote clock
+	// since we want everything before this point discarded, regardless
+	// the side it was sent from
+	c.ContactRequestRemoteClock = clock
+	c.ContactRequestRemoteState = ContactRequestStateNone
+	c.ContactRequestLocalClock = clock
+	c.ContactRequestLocalState = ContactRequestStateNone
+
+	return ContactRequestProcessingResponse{processed: true}
+}
+
+func (c *Contact) ContactRequestReceived(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestRemoteClock {
+		return ContactRequestProcessingResponse{}
+	}
+
+	r := ContactRequestProcessingResponse{processed: true}
+	c.ContactRequestRemoteClock = clock
+	switch c.ContactRequestRemoteState {
 	case ContactRequestStateNone:
-		c.ContactRequestState = ContactRequestStateReceived
-	case ContactRequestStateSent:
-		c.ContactRequestState = ContactRequestStateMutual
+		r.newContactRequestReceived = true
 	}
+	c.ContactRequestRemoteState = ContactRequestStateReceived
+
+	return r
 }
 
-func (c *Contact) ContactRequestAccepted() {
-	switch c.ContactRequestState {
-	case ContactRequestStateSent:
-		c.ContactRequestState = ContactRequestStateMutual
+func (c *Contact) ContactRequestAccepted(clock uint64) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestRemoteClock {
+		return ContactRequestProcessingResponse{}
 	}
-}
-
-func (c *Contact) AcceptContactRequest() {
-	switch c.ContactRequestState {
-	case ContactRequestStateReceived, ContactRequestStateDismissed:
-		c.ContactRequestState = ContactRequestStateMutual
-	}
-}
-
-func (c *Contact) RetractContactRequest() {
-	c.ContactRequestState = ContactRequestStateNone
-}
-
-func (c *Contact) ContactRequestRetracted() {
-	c.ContactRequestState = ContactRequestStateNone
-}
-
-func (c *Contact) DismissContactRequest() {
-	c.ContactRequestState = ContactRequestStateDismissed
+	// We treat received and accepted in the same way
+	// since the intention is clear on the other side
+	// and there's no difference
+	return c.ContactRequestReceived(clock)
 }
 
 func buildContactFromPkString(pkString string) (*Contact, error) {
@@ -267,11 +332,34 @@ func contactIDFromPublicKeyString(key string) (string, error) {
 	return contactIDFromPublicKey(pubKey), nil
 }
 
+func (c *Contact) processSyncContactRequestState(remoteState ContactRequestState, remoteClock uint64, localState ContactRequestState, localClock uint64) {
+	// We process the two separately, first local state
+	switch localState {
+	case ContactRequestStateDismissed:
+		c.DismissContactRequest(localClock)
+	case ContactRequestStateNone:
+		c.RetractContactRequest(localClock)
+	case ContactRequestStateSent:
+		c.ContactRequestSent(localClock)
+	}
+
+	// and later remote state
+	switch remoteState {
+	case ContactRequestStateReceived:
+		c.ContactRequestReceived(remoteClock)
+	case ContactRequestStateNone:
+		c.ContactRequestRetracted(remoteClock)
+	}
+}
+
 func (c *Contact) MarshalJSON() ([]byte, error) {
 	type Alias Contact
 	item := struct {
 		*Alias
-		CompressedKey string `json:"compressedKey"`
+		CompressedKey       string              `json:"compressedKey"`
+		Added               bool                `json:"added"`
+		ContactRequestState ContactRequestState `json:"contactRequestState"`
+		HasAddedUs          bool                `json:"hasAddedUs"`
 	}{
 		Alias: (*Alias)(c),
 	}
@@ -281,6 +369,17 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	item.CompressedKey = compressedKey
+
+	item.Added = c.added()
+	item.HasAddedUs = c.hasAddedUs()
+
+	if c.mutual() {
+		item.ContactRequestState = ContactRequestStateMutual
+	} else if c.added() {
+		item.ContactRequestState = ContactRequestStateSent
+	} else if c.hasAddedUs() {
+		item.ContactRequestState = ContactRequestStateReceived
+	}
 
 	return json.Marshal(item)
 }

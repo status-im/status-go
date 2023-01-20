@@ -26,7 +26,7 @@ func (m *Messenger) validateAddedGroupMembers(members []string) error {
 		}
 
 		contact, _ := m.allContacts.Load(contactID)
-		if contact == nil || !(contact.Added && contact.HasAddedUs) {
+		if contact == nil || !contact.mutual() {
 			return ErrGroupChatAddedContacts
 		}
 	}

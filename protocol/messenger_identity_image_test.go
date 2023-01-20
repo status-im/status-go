@@ -167,7 +167,8 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 		contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 		s.Require().NoError(err)
 
-		contact.Added = true
+		contact.ContactRequestLocalState = ContactRequestStateSent
+
 		s.alice.allContacts.Store(contact.ID, contact)
 	}
 

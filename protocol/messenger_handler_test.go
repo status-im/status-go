@@ -170,7 +170,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	contact, err := BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
 	s.Require().NoError(err)
 
-	contact.Added = true
+	contact.ContactRequestLocalState = ContactRequestStateSent
 
 	currentMessageState := &CurrentMessageState{
 		Contact: contact,

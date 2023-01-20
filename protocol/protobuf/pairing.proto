@@ -97,7 +97,10 @@ message SyncInstallationContactV2 {
   bool has_added_us = 13;
   int64 verification_status = 14;
   int64 trust_status = 15;
-  int64 contact_request_state = 16;
+  int64 contact_request_local_state = 16;
+  int64 contact_request_local_clock = 17;
+  int64 contact_request_remote_state = 18;
+  int64 contact_request_remote_clock = 19;
 }
 
 message SyncInstallationAccount {

@@ -74,7 +74,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
 	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -96,7 +96,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -121,7 +121,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 	// Make sure the sender is added to our contacts
 	contacts = theirMessenger.AddedContacts()
@@ -158,7 +158,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateMutual, resp.Contacts[0].ContactRequestState)
+	s.Require().True(resp.Contacts[0].mutual())
 
 }
 

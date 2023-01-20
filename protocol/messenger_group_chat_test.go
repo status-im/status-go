@@ -97,9 +97,8 @@ func makeMutualContact(origin *Messenger, contactPubkey *ecdsa.PublicKey) error 
 	if err != nil {
 		return err
 	}
-	contact.Added = true
-	contact.HasAddedUs = true
-	contact.ContactRequestState = ContactRequestStateMutual
+	contact.ContactRequestLocalState = ContactRequestStateSent
+	contact.ContactRequestRemoteState = ContactRequestStateReceived
 	origin.allContacts.Store(contact.ID, contact)
 
 	return nil

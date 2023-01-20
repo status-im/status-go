@@ -199,7 +199,7 @@ func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message 
 func (m *Messenger) backupContacts(ctx context.Context) []*protobuf.Backup {
 	var contacts []*protobuf.SyncInstallationContactV2
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		syncContact := m.syncBackupContact(ctx, contact)
+		syncContact := m.buildSyncContactMessage(contact)
 		if syncContact != nil {
 			contacts = append(contacts, syncContact)
 		}
@@ -267,12 +267,7 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 	return backupMessages, nil
 }
 
-// syncContact sync as contact with paired devices
-func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *protobuf.SyncInstallationContactV2 {
-	if contact.IsSyncing {
-		return nil
-	}
-
+func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInstallationContactV2 {
 	var ensName string
 	if contact.ENSVerified {
 		ensName = contact.EnsName
@@ -285,18 +280,22 @@ func (m *Messenger) syncBackupContact(ctx context.Context, contact *Contact) *pr
 	}
 
 	return &protobuf.SyncInstallationContactV2{
-		LastUpdatedLocally: contact.LastUpdatedLocally,
-		LastUpdated:        contact.LastUpdated,
-		Id:                 contact.ID,
-		EnsName:            ensName,
-		LocalNickname:      contact.LocalNickname,
-		Added:              contact.Added,
-		Blocked:            contact.Blocked,
-		Muted:              muted,
-		HasAddedUs:         contact.HasAddedUs,
-		Removed:            contact.Removed,
-		VerificationStatus: int64(contact.VerificationStatus),
-		TrustStatus:        int64(contact.TrustStatus),
+		LastUpdatedLocally:        contact.LastUpdatedLocally,
+		LastUpdated:               contact.LastUpdated,
+		Id:                        contact.ID,
+		EnsName:                   ensName,
+		LocalNickname:             contact.LocalNickname,
+		Added:                     contact.added(),
+		Blocked:                   contact.Blocked,
+		Muted:                     muted,
+		HasAddedUs:                contact.hasAddedUs(),
+		Removed:                   contact.Removed,
+		ContactRequestLocalState:  int64(contact.ContactRequestLocalState),
+		ContactRequestRemoteState: int64(contact.ContactRequestRemoteState),
+		ContactRequestRemoteClock: int64(contact.ContactRequestRemoteClock),
+		ContactRequestLocalClock:  int64(contact.ContactRequestLocalClock),
+		VerificationStatus:        int64(contact.VerificationStatus),
+		TrustStatus:               int64(contact.TrustStatus),
 	}
 }
 

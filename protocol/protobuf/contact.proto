@@ -9,6 +9,7 @@ message ContactUpdate {
   string ens_name = 2;
   string profile_image = 3;
   string display_name = 4;
+  uint64 contact_request_clock = 5;
 
   ContactRequestSignature sent_contact_request_signature = 14;
   ContactRequestSignature received_contact_request_signature = 15;

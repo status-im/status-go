@@ -1551,7 +1551,7 @@ func (m *Messenger) Init() error {
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
-		if !contact.Added || contact.Blocked {
+		if !contact.added() || contact.Blocked {
 			continue
 		}
 		publicKey, err := contact.PublicKey()
@@ -2318,7 +2318,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.ID != myID &&
-			(contact.LocalNickname != "" || contact.Added || contact.Blocked) {
+			(contact.LocalNickname != "" || contact.added() || contact.Blocked) {
 			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
 				return false
 			}
@@ -2720,32 +2720,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	}
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	var ensName string
-	if contact.ENSVerified {
-		ensName = contact.EnsName
-	}
-
-	oneToOneChat, ok := m.allChats.Load(contact.ID)
-	muted := false
-	if ok {
-		muted = oneToOneChat.Muted
-	}
-
-	syncMessage := &protobuf.SyncInstallationContactV2{
-		LastUpdatedLocally:  contact.LastUpdatedLocally,
-		LastUpdated:         contact.LastUpdated,
-		Id:                  contact.ID,
-		EnsName:             ensName,
-		LocalNickname:       contact.LocalNickname,
-		Added:               contact.Added,
-		Blocked:             contact.Blocked,
-		Muted:               muted,
-		Removed:             contact.Removed,
-		VerificationStatus:  int64(contact.VerificationStatus),
-		TrustStatus:         int64(contact.TrustStatus),
-		HasAddedUs:          contact.HasAddedUs,
-		ContactRequestState: int64(contact.ContactRequestState),
-	}
+	syncMessage := m.buildSyncContactMessage(contact)
 
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
@@ -4260,7 +4235,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		contact, ok := messageState.AllContacts.Load(id)
 		if ok {
 			contactsToSave = append(contactsToSave, contact)
-			messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
+			messageState.Response.AddContact(contact)
 		}
 		return true
 	})
@@ -4464,7 +4439,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.Added {
+			if contact.added() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true
@@ -5584,7 +5559,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var publicChatIDs []string
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.Added && !contact.Blocked {
+		if contact.added() && !contact.Blocked {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
@@ -5782,7 +5757,7 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.Added {
+			if contact.added() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true
@@ -6109,4 +6084,8 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 		}
 	}
 	return chunks
+}
+
+func (m *Messenger) myHexIdentity() string {
+	return common.PubkeyToHex(&m.identity.PublicKey)
 }

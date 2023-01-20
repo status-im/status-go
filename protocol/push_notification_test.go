@@ -295,9 +295,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	// Add alice has a contact
 	aliceContact := &Contact{
-		ID:      types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
-		EnsName: "Some Contact",
-		Added:   true,
+		ID:                       types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
+		EnsName:                  "Some Contact",
+		ContactRequestLocalState: ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(aliceContact.ID)})
@@ -441,9 +441,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Add alice has a contact
 	aliceContact := &Contact{
-		ID:      types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
-		EnsName: "Some Contact",
-		Added:   true,
+		ID:                       types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
+		EnsName:                  "Some Contact",
+		ContactRequestLocalState: ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(aliceContact.ID)})
@@ -451,9 +451,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Add frank has a contact
 	frankContact := &Contact{
-		ID:      types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
-		EnsName: "Some Contact",
-		Added:   true,
+		ID:                       types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
+		EnsName:                  "Some Contact",
+		ContactRequestLocalState: ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(frankContact.ID)})

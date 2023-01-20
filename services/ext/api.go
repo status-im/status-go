@@ -719,10 +719,6 @@ func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *reques
 	return api.service.messenger.RetractContactRequest(request)
 }
 
-func (api *PublicAPI) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RejectContactRequest(ctx, request)
-}
-
 func (api *PublicAPI) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DismissContactRequest(ctx, request)
 }

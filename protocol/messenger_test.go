@@ -1336,20 +1336,20 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 
 func (s *MessengerSuite) TestBlockContact() {
 	contact := Contact{
-		ID:          testPK,
-		EnsName:     "contact-name",
-		LastUpdated: 20,
-		Added:       true,
+		ID:                       testPK,
+		EnsName:                  "contact-name",
+		LastUpdated:              20,
+		ContactRequestLocalState: ContactRequestStateSent,
 	}
 
 	key2, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
 	contact2 := Contact{
-		ID:          common.PubkeyToHex(&key2.PublicKey),
-		EnsName:     "contact-name",
-		LastUpdated: 20,
-		Added:       true,
+		ID:                       common.PubkeyToHex(&key2.PublicKey),
+		EnsName:                  "contact-name",
+		LastUpdated:              20,
+		ContactRequestLocalState: ContactRequestStateSent,
 	}
 
 	chat1 := &Chat{
@@ -1530,7 +1530,7 @@ func (s *MessengerSuite) TestContactPersistence() {
 
 	s.Require().Equal(1, len(savedContacts))
 
-	s.Require().True(savedContacts[0].Added)
+	s.Require().True(savedContacts[0].added())
 }
 
 func (s *MessengerSuite) TestSharedSecretHandler() {

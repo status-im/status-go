@@ -119,7 +119,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	actualContact := response.Contacts[0]
 	s.Require().Equal(contact.ID, actualContact.ID)
-	s.Require().True(actualContact.Added)
+	s.Require().True(actualContact.added())
 
 	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(chat)
@@ -150,8 +150,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// mock added as mutual contact
 	contact.LastUpdated = 1
-	contact.HasAddedUs = true
-	contact.ContactRequestState = ContactRequestStateMutual
+	contact.ContactRequestReceived(1)
 	s.m.allContacts.Store(contact.ID, contact)
 
 	contact.LocalNickname = "Test Nickname"
@@ -258,10 +257,10 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().NotNil(statusChat)
 
-	s.Require().True(actualContact.Added)
+	s.Require().True(actualContact.added())
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
-	s.Require().True(actualContact.HasAddedUs)
-	s.Require().Equal(ContactRequestStateMutual, actualContact.ContactRequestState)
+	s.Require().True(actualContact.hasAddedUs())
+	s.Require().True(actualContact.mutual())
 
 	bookmarks, err := theirMessenger.browserDatabase.GetBookmarks()
 	s.Require().NoError(err)

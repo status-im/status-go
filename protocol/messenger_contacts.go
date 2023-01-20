@@ -23,7 +23,7 @@ func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*Messe
 	}
 
 	m.logger.Info("acceptContactRequest")
-	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, syncing)
+	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, syncing, false)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -53,7 +53,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 	chatID := request.ID.String()
 
-	response, err := m.addContact(chatID, "", "", "", "", false)
+	response, err := m.addContact(chatID, "", "", "", "", false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -98,38 +98,6 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	return response, nil
 }
 
-// NOTE: This sets HasAddedUs to false, so next time we receive a contact request it will be reset to true
-func (m *Messenger) RejectContactRequest(ctx context.Context, request *requests.RejectContactRequest) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey := request.ID.String()
-	contact, ok := m.allContacts.Load(pubKey)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(pubKey)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	contact.HasAddedUs = false
-
-	err = m.persistence.SaveContact(contact, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	m.allContacts.Store(contact.ID, contact)
-
-	response := &MessengerResponse{}
-	response.Contacts = []*Contact{contact}
-
-	return response, nil
-}
-
 func (m *Messenger) dismissContactRequest(requestID string, syncing bool) (*MessengerResponse, error) {
 	m.logger.Info("dismissContactRequest")
 	contactRequest, err := m.persistence.MessageByID(requestID)
@@ -137,19 +105,20 @@ func (m *Messenger) dismissContactRequest(requestID string, syncing bool) (*Mess
 		return nil, err
 	}
 
-	contact, ok := m.allContacts.Load(contactRequest.From)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(contactRequest.From)
-		if err != nil {
-			return nil, err
-		}
+	contact, err := m.BuildContact(contactRequest.From)
+	if err != nil {
+		return nil, err
 	}
 
 	response := &MessengerResponse{}
 
 	if !syncing {
-		contact.DismissContactRequest()
+		_, clock, err := m.getOneToOneAndNextClock(contact)
+		if err != nil {
+			return nil, err
+		}
+
+		contact.DismissContactRequest(clock)
 		err = m.persistence.SaveContact(contact, nil)
 		if err != nil {
 			return nil, err
@@ -221,22 +190,14 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	}
 
 	contact, _ := m.allContacts.Load(contactRequest.From)
-	contact.AcceptContactRequest()
 
-	chat, ok := m.allChats.Load(contact.ID)
-	if !ok {
-		publicKey, err := contact.PublicKey()
-		if err != nil {
-			return nil, err
-		}
-
-		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
-		chat.Active = false
-		if err := m.saveChat(chat); err != nil {
-			return nil, err
-		}
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return nil, err
 	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	contact.AcceptContactRequest(clock)
+
 	acceptContactRequest := &protobuf.AcceptContactRequest{
 		Id:    contactRequest.ID,
 		Clock: clock,
@@ -280,18 +241,20 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	}
 
 	response.AddMessage(contactRequest)
+	response.AddContact(contact)
 
 	return response, nil
 }
 
-func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, syncing bool) (*MessengerResponse, error) {
-	contact, ok := m.allContacts.Load(pubKey)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(pubKey)
-		if err != nil {
-			return nil, err
-		}
+func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, syncing bool, sendContactUpdate bool) (*MessengerResponse, error) {
+	contact, err := m.BuildContact(pubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return nil, err
 	}
 
 	if ensName != "" {
@@ -314,12 +277,9 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		contact.DisplayName = displayName
 	}
 
-	if !contact.Added {
-		contact.Add()
-	}
-	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+	contact.LastUpdatedLocally = clock
 
-	contact.ContactRequestSent()
+	contact.ContactRequestSent(clock)
 
 	if !syncing {
 		// We sync the contact with the other devices
@@ -329,7 +289,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		}
 	}
 
-	err := m.persistence.SaveContact(contact, nil)
+	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -384,13 +344,14 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		return nil, err
 	}
 
-	// Finally we send a contact update so they are notified we added them
-	response, err := m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.dispatchMessage)
-	if err != nil {
-		return nil, err
-	}
+	response := &MessengerResponse{}
 
-	if len(contactRequestID) != 0 {
+	if sendContactUpdate {
+		response, err = m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.dispatchMessage)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(contactRequestID) != 0 {
 		response, err = m.updateAcceptedContactRequest(response, contactRequestID)
 		if err != nil {
 			return nil, err
@@ -429,13 +390,14 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 
 	return response, nil
 }
+
 func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName, "", false)
+	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName, "", false, true)
 }
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
@@ -445,24 +407,30 @@ func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
 	return m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
 }
 
-func (m *Messenger) removeContact(ctx context.Context, response *MessengerResponse, pubKey string) error {
+func (m *Messenger) removeContact(ctx context.Context, response *MessengerResponse, pubKey string, sync bool) error {
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		return ErrContactNotFound
 	}
 
-	contact.RetractContactRequest()
-	contact.Remove()
-	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
-
-	err := m.persistence.SaveContact(contact, nil)
+	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return err
 	}
 
-	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
+	contact.RetractContactRequest(clock)
+	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
+
+	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
 		return err
+	}
+
+	if sync {
+		err = m.syncContact(context.Background(), contact, m.dispatchMessage)
+		if err != nil {
+			return err
+		}
 	}
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
@@ -496,7 +464,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
 	response := new(MessengerResponse)
 
-	err := m.removeContact(ctx, response, pubKey)
+	err := m.removeContact(ctx, response, pubKey, true)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +484,7 @@ func (m *Messenger) Contacts() []*Contact {
 func (m *Messenger) AddedContacts() []*Contact {
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.Added {
+		if contact.added() {
 			contacts = append(contacts, contact)
 		}
 		return true
@@ -527,7 +495,7 @@ func (m *Messenger) AddedContacts() []*Contact {
 func (m *Messenger) MutualContacts() []*Contact {
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.Added && contact.HasAddedUs {
+		if contact.mutual() {
 			contacts = append(contacts, contact)
 		}
 		return true
@@ -561,13 +529,9 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	pubKey := request.ID.String()
 	nickname := request.Nickname
 
-	contact, ok := m.allContacts.Load(pubKey)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(pubKey)
-		if err != nil {
-			return nil, err
-		}
+	contact, err := m.BuildContact(pubKey)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := m.addENSNameToContact(contact); err != nil {
@@ -578,7 +542,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	contact.LocalNickname = nickname
 	contact.LastUpdatedLocally = clock
 
-	err := m.persistence.SaveContact(contact, nil)
+	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -597,20 +561,17 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 }
 
 func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat, error) {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok {
-		var err error
-		contact, err = buildContactFromPkString(contactID)
-		if err != nil {
-			return nil, err
-		}
+	contact, err := m.BuildContact(contactID)
+	if err != nil {
+		return nil, err
+	}
 
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return nil, err
 	}
-	if isDesktopFunc {
-		contact.BlockDesktop()
-	} else {
-		contact.Block()
-	}
+
+	contact.Block(clock)
 
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
@@ -694,10 +655,16 @@ func (m *Messenger) UnblockContact(contactID string) error {
 		return nil
 	}
 
-	contact.Unblock()
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return err
+	}
+
+	contact.Unblock(clock)
+
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
-	err := m.persistence.SaveContact(contact, nil)
+	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
 		return err
 	}
@@ -733,7 +700,7 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 	// TODO: This should not be sending paired messages, as we do it above
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.Added {
+		if contact.added() {
 			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage, m.dispatchMessage); err != nil {
 				return false
 			}
@@ -763,30 +730,21 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
-	if !ok || !contact.Added {
+	if !ok || !contact.added() {
 		return nil, nil
 	}
 
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		publicKey, err := contact.PublicKey()
-		if err != nil {
-			return nil, err
-		}
-		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return nil, err
 	}
 
-	// TODO(samyoul) remove storing of an updated reference pointer?
-	m.allChats.Store(chat.ID, chat)
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
 	contactUpdate := &protobuf.ContactUpdate{
-		Clock:        clock,
-		DisplayName:  displayName,
-		EnsName:      ensName,
-		ProfileImage: profileImage,
+		Clock:               clock,
+		DisplayName:         displayName,
+		EnsName:             ensName,
+		ProfileImage:        profileImage,
+		ContactRequestClock: contact.ContactRequestLocalClock,
 	}
 	encodedMessage, err := proto.Marshal(contactUpdate)
 	if err != nil {
@@ -842,10 +800,8 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 	if !ok {
 		return nil, errors.New("contact not found")
 	}
-	contact.HasAddedUs = false
-	m.allContacts.Store(contact.ID, contact)
 	response := &MessengerResponse{}
-	err = m.removeContact(context.Background(), response, contact.ID)
+	err = m.removeContact(context.Background(), response, contact.ID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -860,20 +816,10 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 
 // Send message to remote account to remove our contact from their end.
 func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
-	chat, ok := m.allChats.Load(contact.ID)
-	if !ok {
-		pubKey, err := contact.PublicKey()
-		if err != nil {
-			return err
-		}
-
-		chat = OneToOneFromPublicKey(pubKey, m.getTimesource())
-		chat.Active = false
-		if err := m.saveChat(chat); err != nil {
-			return err
-		}
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return err
 	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	retractContactRequest := &protobuf.RetractContactRequest{
 		Clock: clock,
 	}
@@ -934,11 +880,11 @@ func defaultContactRequestID(contactID string) string {
 	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
 }
 
-func (m *Messenger) BuildContact(pubKey string) (*Contact, error) {
-	contact, ok := m.allContacts.Load(pubKey)
+func (m *Messenger) BuildContact(contactID string) (*Contact, error) {
+	contact, ok := m.allContacts.Load(contactID)
 	if !ok {
 		var err error
-		contact, err = buildContactFromPkString(pubKey)
+		contact, err = buildContactFromPkString(contactID)
 		if err != nil {
 			return nil, err
 		}

@@ -98,6 +98,11 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 		s.Require().Equal(actualContacts[1].ID, contactID1)
 	}
 
+	s.Require().Equal(ContactRequestStateSent, actualContacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateSent, actualContacts[1].ContactRequestLocalState)
+	s.Require().True(actualContacts[0].added())
+	s.Require().True(actualContacts[1].added())
+
 	// Backup
 
 	clock, err := bob1.BackupData(context.Background())
@@ -132,6 +137,8 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 		s.Require().Equal(actualContacts[0].ID, contactID2)
 		s.Require().Equal(actualContacts[1].ID, contactID1)
 	}
+	s.Require().Equal(ContactRequestStateSent, actualContacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateSent, actualContacts[1].ContactRequestLocalState)
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)

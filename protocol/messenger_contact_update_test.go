@@ -81,7 +81,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 	// It should add the contact
-	s.Require().True(contact.Added)
+	s.Require().True(contact.added())
 
 	// It should create a profile chat & a one to one chat
 	s.Require().Len(response.Chats(), 2)
@@ -104,7 +104,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(theirName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
-	s.Require().True(receivedContact.HasAddedUs)
+	s.Require().True(receivedContact.hasAddedUs())
 
 	newPicture := "new-picture"
 	err = theirMessenger.SendContactUpdates(context.Background(), newEnsName, newPicture)
@@ -147,7 +147,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	s.Require().Len(response.Chats(), 2)
 
 	// It should add the contact
-	s.Require().True(contact.Added)
+	s.Require().True(contact.added())
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -185,7 +185,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	s.Require().Len(response.Chats(), 2)
 
 	// It should add the contact
-	s.Require().True(contact.Added)
+	s.Require().True(contact.added())
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -197,39 +197,4 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 
 	receivedContact := response.Contacts[0]
 	s.Require().NotEmpty(receivedContact.LastUpdated)
-}
-
-func (s *MessengerContactUpdateSuite) TestRejectContactRequest() {
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-
-	theirMessenger := s.newMessenger(s.shh)
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
-
-	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contactID)})
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	s.Require().Len(response.Contacts, 1)
-	contact := response.Contacts[0]
-	// It should add the contact
-	s.Require().True(contact.Added)
-
-	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
-		s.m,
-		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 },
-		"contact request not received",
-	)
-	s.Require().NoError(err)
-
-	// Make sure HasAddedUs is set
-	receivedContact := response.Contacts[0]
-	s.Require().True(receivedContact.HasAddedUs)
-
-	response, err = s.m.RejectContactRequest(context.Background(), &requests.RejectContactRequest{ID: types.Hex2Bytes(contactID)})
-	s.Require().NoError(err)
-	s.Require().Len(response.Contacts, 1)
-	s.Require().Equal(response.Contacts[0].ID, contactID)
-	s.Require().False(response.Contacts[0].HasAddedUs)
 }
