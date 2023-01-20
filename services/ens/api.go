@@ -31,7 +31,6 @@ import (
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/rpcfilters"
@@ -73,8 +72,7 @@ type API struct {
 	quitOnce sync.Once
 	quit     chan struct{}
 
-	db       *Database
-	settings *accounts.Database // NOTE: Accounts db is here for compatibility. Remove when settings.usernames is dropped.
+	db *Database
 }
 
 func (api *API) Stop() {
