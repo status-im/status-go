@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -47,6 +48,8 @@ type Service struct {
 	visibleTokenSymbols      []string
 	visibleTokenSymbolsMutex sync.Mutex // Protects access to visibleSymbols
 }
+
+type chainIdentity uint64
 
 func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager) *Service {
 	return &Service{
@@ -198,80 +201,178 @@ func (src *tokenChainClientSource) BalanceAt(ctx context.Context, account common
 // GetBalanceHistory returns token count balance
 // TODO: fetch token to FIAT exchange rates and return FIAT balance
 func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, currency string, endTimestamp int64, timeInterval TimeInterval) ([]*DataPoint, error) {
-	allData := make(map[uint64][]*DataPoint)
+	allData := make(map[chainIdentity][]*DataPoint)
 	for _, chainID := range chainIDs {
 		data, err := s.balance.get(ctx, chainID, currency, address, endTimestamp, timeInterval)
 		if err != nil {
 			return nil, err
 		}
 		if len(data) > 0 {
-			allData[chainID] = data
+			allData[chainIdentity(chainID)] = data
 		}
 	}
 
-	return mergeDataPoints(allData)
+	return mergeDataPoints(allData, strideDuration(timeInterval))
 }
 
-// mergeDataPoints merges same block numbers from different chains which are incompatible due to different timelines
-// TODO: use time-based intervals instead of block numbers
-func mergeDataPoints(data map[uint64][]*DataPoint) ([]*DataPoint, error) {
+// mergeDataPoints merges close in time block numbers. Drops the ones that are not in a stride duration
+// this should improve merging balance data from different chains which are incompatible due to different timelines
+// and block length
+func mergeDataPoints(data map[chainIdentity][]*DataPoint, stride time.Duration) ([]*DataPoint, error) {
 	if len(data) == 0 {
 		return make([]*DataPoint, 0), nil
 	}
 
-	pos := make(map[uint64]int)
+	pos := make(map[chainIdentity]int)
 	for k := range data {
 		pos[k] = 0
 	}
 
 	res := make([]*DataPoint, 0)
-	done := false
-	for !done {
-		var minNo *big.Int
-		var timestamp uint64
-		// Take the smallest block number
-		for k := range data {
-			blockNo := new(big.Int).Set(data[k][pos[k]].BlockNumber.ToInt())
-			if minNo == nil {
-				minNo = new(big.Int).Set(blockNo)
-				// We use it only if we have a full match
-				timestamp = data[k][pos[k]].Timestamp
-			} else if blockNo.Cmp(minNo) < 0 {
-				minNo.Set(blockNo)
-			}
-		}
-		// If all chains have the same block number sum it; also increment the processed position
-		sumOfAll := big.NewInt(0)
-		for k := range data {
-			cur := data[k][pos[k]]
-			if cur.BlockNumber.ToInt().Cmp(minNo) == 0 {
-				pos[k]++
-				if sumOfAll != nil {
-					sumOfAll.Add(sumOfAll, cur.Value.ToInt())
-				}
-			} else {
-				sumOfAll = nil
-			}
-		}
-		// If sum of all make sense add it to the result otherwise ignore it
-		if sumOfAll != nil {
-			// TODO: convert to FIAT value
-			res = append(res, &DataPoint{
-				BlockNumber: (*hexutil.Big)(minNo),
-				Timestamp:   timestamp,
-				Value:       (*hexutil.Big)(sumOfAll),
-			})
-		}
+	strideStart := findFirstStrideWindow(data, stride)
+	for {
+		strideEnd := strideStart + int64(stride.Seconds())
+		// - Gather all points in the stride window starting with current pos
+		var strideIdentities map[chainIdentity][]timeIdentity
+		strideIdentities, pos = dataInStrideWindowAndNextPos(data, pos, strideEnd)
 
-		// Check if we reached the end of any chain
+		// Check if all chains have data
+		strideComplete := true
 		for k := range data {
-			if pos[k] == len(data[k]) {
-				done = true
+			_, strideComplete = strideIdentities[k]
+			if !strideComplete {
 				break
 			}
 		}
+		if strideComplete {
+			chainMaxBalance := make(map[chainIdentity]*DataPoint)
+			for chainID, identities := range strideIdentities {
+				for _, identity := range identities {
+					_, exists := chainMaxBalance[chainID]
+					if exists && (*big.Int)(identity.dataPoint(data).Value).Cmp((*big.Int)(chainMaxBalance[chainID].Value)) <= 0 {
+						continue
+					}
+					chainMaxBalance[chainID] = identity.dataPoint(data)
+				}
+			}
+			balance := big.NewInt(0)
+			for _, chainBalance := range chainMaxBalance {
+				balance.Add(balance, (*big.Int)(chainBalance.Value))
+			}
+			res = append(res, &DataPoint{
+				Timestamp:   uint64(strideEnd),
+				Value:       (*hexutil.Big)(balance),
+				BlockNumber: (*hexutil.Big)(getBlockID(chainMaxBalance)),
+			})
+		}
+
+		if allPastEnd(data, pos) {
+			return res, nil
+		}
+
+		strideStart = strideEnd
 	}
-	return res, nil
+}
+
+func getBlockID(chainBalance map[chainIdentity]*DataPoint) *big.Int {
+	var res *big.Int
+	for _, balance := range chainBalance {
+		if res == nil {
+			res = new(big.Int).Set(balance.BlockNumber.ToInt())
+		} else if res.Cmp(balance.BlockNumber.ToInt()) != 0 {
+			return nil
+		}
+	}
+
+	return res
+}
+
+type timeIdentity struct {
+	chain chainIdentity
+	index int
+}
+
+func (i timeIdentity) dataPoint(data map[chainIdentity][]*DataPoint) *DataPoint {
+	return data[i.chain][i.index]
+}
+
+func (i timeIdentity) atEnd(data map[chainIdentity][]*DataPoint) bool {
+	return (i.index + 1) == len(data[i.chain])
+}
+
+func (i timeIdentity) pastEnd(data map[chainIdentity][]*DataPoint) bool {
+	return i.index >= len(data[i.chain])
+}
+
+func allPastEnd(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int) bool {
+	for chainID := range pos {
+		if !(timeIdentity{chainID, pos[chainID]}).pastEnd(data) {
+			return false
+		}
+	}
+	return true
+}
+
+// findFirstStrideWindow returns the start of the first stride window
+// Tried to implement finding an optimal stride window but it was becoming too complicated and not worth it given that it will
+// potentially save the first and last stride but it is not guaranteed. Current implementation should give good results
+// as long as the the DataPoints are regular enough
+func findFirstStrideWindow(data map[chainIdentity][]*DataPoint, stride time.Duration) int64 {
+	pos := make(map[chainIdentity]int)
+	for k := range data {
+		pos[k] = 0
+	}
+
+	// Identify the current oldest and newest block
+	cur := sortTimeAsc(data, pos)
+	return int64(cur[0].dataPoint(data).Timestamp)
+}
+
+func copyMap[K comparable, V any](original map[K]V) map[K]V {
+	copy := make(map[K]V, len(original))
+	for key, value := range original {
+		copy[key] = value
+	}
+	return copy
+}
+
+// startPos might have indexes past the end of the data for a chain
+func dataInStrideWindowAndNextPos(data map[chainIdentity][]*DataPoint, startPos map[chainIdentity]int, endT int64) (identities map[chainIdentity][]timeIdentity, nextPos map[chainIdentity]int) {
+	pos := copyMap(startPos)
+	identities = make(map[chainIdentity][]timeIdentity)
+
+	// Identify the current oldest and newest block
+	lastLen := int(-1)
+	for lastLen < len(identities) {
+		lastLen = len(identities)
+		sorted := sortTimeAsc(data, pos)
+		for _, identity := range sorted {
+			if identity.dataPoint(data).Timestamp < uint64(endT) {
+				identities[identity.chain] = append(identities[identity.chain], identity)
+				pos[identity.chain]++
+			}
+		}
+	}
+	return identities, pos
+}
+
+// sortTimeAsc expect indexes in pos past the end of the data for a chain
+func sortTimeAsc(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int) []timeIdentity {
+	res := make([]timeIdentity, 0, len(data))
+	for k := range data {
+		identity := timeIdentity{
+			chain: k,
+			index: pos[k],
+		}
+		if !identity.pastEnd(data) {
+			res = append(res, identity)
+		}
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].dataPoint(data).Timestamp < res[j].dataPoint(data).Timestamp
+	})
+	return res
 }
 
 // updateBalanceHistoryForAllEnabledNetworks iterates over all enabled and supported networks for the s.visibleTokenSymbol
