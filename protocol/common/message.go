@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -226,6 +227,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ID                       string                           `json:"id"`
 		WhisperTimestamp         uint64                           `json:"whisperTimestamp"`
 		From                     string                           `json:"from"`
+		CompressedKey            string                           `json:"compressedKey"`
 		Alias                    string                           `json:"alias"`
 		Identicon                string                           `json:"identicon"`
 		Seen                     bool                             `json:"seen"`
@@ -308,6 +310,14 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactRequestState:      m.ContactRequestState,
 		ContactVerificationState: m.ContactVerificationState,
 	}
+	if item.From != "" {
+		compressedKey, err := multiformat.SerializeLegacyKey(item.From)
+		if err != nil {
+			return nil, err
+		}
+		item.CompressedKey = compressedKey
+	}
+
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
 			Pack: sticker.Pack,

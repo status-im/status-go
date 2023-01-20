@@ -770,6 +770,16 @@ func CompressPublicKey(key string) string {
 	return types.EncodeHex(crypto.CompressPubkey(pubKey))
 }
 
+// SerializeLegacyKey compresses an old format public key (0x04...) to the new one zQ...
+func SerializeLegacyKey(key string) string {
+	cpk, err := multiformat.SerializeLegacyKey(key)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cpk
+}
+
 // SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
 // For details on usage see specs https://specs.status.im/spec/2#public-key-serialization
 func MultiformatSerializePublicKey(key, outBase string) string {

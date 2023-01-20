@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -186,4 +187,22 @@ type Settings struct {
 	AutoMessageEnabled             bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                      string                        `json:"gifs/api-key"`
 	TestNetworksEnabled            bool                          `json:"test-networks-enabled?,omitempty"`
+}
+
+func (s Settings) MarshalJSON() ([]byte, error) {
+	type Alias Settings
+	item := struct {
+		Alias
+		CompressedKey string `json:"compressed-key"`
+	}{
+		Alias: (Alias)(s),
+	}
+
+	compressedKey, err := multiformat.SerializeLegacyKey(item.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	item.CompressedKey = compressedKey
+
+	return json.Marshal(item)
 }
