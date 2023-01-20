@@ -2005,9 +2005,10 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 
 	m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
 
+	// this wait groups tracks the ongoing task for a particular community
+	task.Waiter.Add(1)
+
 	go func() {
-		// this wait groups tracks the ongoing task for a particular community
-		task.Waiter.Add(1)
 		defer func() {
 			task.Waiter.Done()
 			m.communitiesManager.DeleteHistoryArchiveDownloadTask(communityID.String())

@@ -535,7 +535,11 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStatePending)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err := theirMessenger.UnreadActivityCenterNotifications("", 4, ActivityCenterNotificationTypeContactVerification)
+	notifications, err := theirMessenger.UnreadActivityCenterNotifications(
+		"",
+		4,
+		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
+	)
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 1)
 	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusPENDING)
@@ -561,7 +565,11 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateDeclined)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err = theirMessenger.UnreadActivityCenterNotifications("", 4, ActivityCenterNotificationTypeContactVerification)
+	notifications, err = theirMessenger.UnreadActivityCenterNotifications(
+		"",
+		4,
+		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
+	)
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 1)
 	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
@@ -629,7 +637,11 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err := theirMessenger.UnreadActivityCenterNotifications("", 4, ActivityCenterNotificationTypeContactVerification)
+	notifications, err := theirMessenger.UnreadActivityCenterNotifications(
+		"",
+		4,
+		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
+	)
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 1)
 	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusPENDING)

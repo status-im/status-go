@@ -1082,6 +1082,10 @@ func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
 
+func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
+	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount()
+}
+
 func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
 	return api.service.messenger.MarkAllActivityCenterNotificationsRead(ctx)
 }
@@ -1117,15 +1121,15 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 }
 
 func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
 func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
-func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityType, readType)
+func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
