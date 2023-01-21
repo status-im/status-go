@@ -2004,6 +2004,8 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			Type:    images.ImageType(payload),
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
+		message.ImageWidth = message.GetImageWidth()
+		message.ImageHeight = message.GetImageHeight()
 
 	} else if len(message.CommunityID) != 0 {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
