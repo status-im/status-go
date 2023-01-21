@@ -323,6 +323,10 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
 		item.DiscordMessage = discordMessage
 	}
+	
+	item.AlbumID = m.GetAlbumId()
+	item.ImageWidth = m.GetImageWidth()
+	item.ImageHeight = m.GetImageHeight()
 
 	return json.Marshal(item)
 }
