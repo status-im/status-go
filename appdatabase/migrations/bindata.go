@@ -44,6 +44,7 @@
 // 1672933930_switcher_card.up.sql (162B)
 // 1674056187_add_price_cache.up.sql (255B)
 // 1674136690_ens_usernames.up.sql (98B)
+// 1674291506_.up.sql (0)
 // doc.go (74B)
 
 package migrations
@@ -993,6 +994,26 @@ func _1674136690_ens_usernamesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1674291506_UpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+
+func _1674291506_UpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1674291506_UpSql,
+		"1674291506_.up.sql",
+	)
+}
+
+func _1674291506_UpSql() (*asset, error) {
+	bytes, err := _1674291506_UpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1674291506_.up.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1674291506, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -1192,6 +1213,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1674136690_ens_usernames.up.sql": _1674136690_ens_usernamesUpSql,
 
+	"1674291506_.up.sql": _1674291506_UpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1280,6 +1303,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1672933930_switcher_card.up.sql":                                  &bintree{_1672933930_switcher_cardUpSql, map[string]*bintree{}},
 	"1674056187_add_price_cache.up.sql":                                &bintree{_1674056187_add_price_cacheUpSql, map[string]*bintree{}},
 	"1674136690_ens_usernames.up.sql":                                  &bintree{_1674136690_ens_usernamesUpSql, map[string]*bintree{}},
+	"1674291506_.up.sql":                                               &bintree{_1674291506_UpSql, map[string]*bintree{}},
 	"doc.go":                                                           &bintree{docGo, map[string]*bintree{}},
 }}
 

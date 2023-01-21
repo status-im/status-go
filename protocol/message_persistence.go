@@ -212,6 +212,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 	var contactVerificationState sql.NullInt64
+	var albumID sql.NullString
+	var imageWidth sql.NullInt32
+	var imageHeight sql.NullInt32
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -248,9 +251,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Hash,
 		&image.Payload,
 		&image.Type,
-		&image.AlbumId,
-		&image.ImageWidth,
-		&image.ImageHeight,
+		&albumID,
+		&imageWidth,
+		&imageHeight,
 		&audio.DurationMs,
 		&communityID,
 		&serializedMentions,
@@ -363,6 +366,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			To:   uint32(gapTo.Int64),
 		}
 	}
+
+	if albumID.Valid {
+		message.AlbumID = albumID.String
+		message.ImageHeight = uint32(imageHeight.Int32)
+		message.ImageWidth = uint32(imageWidth.Int32)
+	}
+
 	if communityID.Valid {
 		message.CommunityID = communityID.String
 	}
@@ -484,9 +494,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		sticker.Hash,
 		image.Payload,
 		image.Type,
-		image.AlbumId,
-		image.ImageWidth,
-		image.ImageHeight,
+		message.AlbumID,
+		message.ImageWidth,
+		message.ImageHeight,
 		message.Base64Image,
 		audio.Payload,
 		audio.Type,
