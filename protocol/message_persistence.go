@@ -400,6 +400,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		img := protobuf.ImageMessage{
 			Payload: image.Payload,
 			Type:    image.Type,
+			AlbumId: image.AlbumId,
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
 

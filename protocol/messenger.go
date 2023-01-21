@@ -2002,6 +2002,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		image := protobuf.ImageMessage{
 			Payload: payload,
 			Type:    images.ImageType(payload),
+			AlbumId: message.AlbumID,
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 
