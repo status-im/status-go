@@ -120,8 +120,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.parsed_text,
 		m1.sticker_pack,
 		m1.sticker_hash,
-		m1.image_payload,
-		m1.image_type,
 		COALESCE(m1.image_album_id, ""),
 		COALESCE(m1.image_width, 0),
 		COALESCE(m1.image_height, 0),
