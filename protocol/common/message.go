@@ -339,6 +339,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
 		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
+		AlbumID         string                           `json:"albumId"`
+		ImageWidth      uint32                           `json:"imageWidth"`
+		ImageHeight     uint32                           `json:"imageHeight"`
 	}{
 		Alias: (*Alias)(m),
 	}
@@ -359,6 +362,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText
+	m.AlbumID = aux.AlbumID
+	m.ImageWidth = aux.ImageWidth
+	m.ImageHeight = aux.ImageHeight
 	return nil
 }
 
