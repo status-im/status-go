@@ -246,8 +246,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ParsedText,
 		&sticker.Pack,
 		&sticker.Hash,
-		&image.Payload,
-		&image.Type,
 		&image.AlbumId,
 		&message.ImageWidth,
 		&message.ImageHeight,
@@ -397,12 +395,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.CommandParameters = command
 
 	case protobuf.ChatMessage_IMAGE:
-		img := protobuf.ImageMessage{
-			Payload: image.Payload,
-			Type:    image.Type,
-			AlbumId: image.AlbumId,
-		}
-		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
+		message.Payload = &protobuf.ChatMessage_Image{Image: image}
+		//img := protobuf.ImageMessage{
+		//	Payload: image.Payload,
+		//	Type:    image.Type,
+		//	AlbumId: image.AlbumId,
+		//}
+		//message.Payload = &protobuf.ChatMessage_Image{Image: &img}
 
 	case protobuf.ChatMessage_DISCORD_MESSAGE:
 		message.Payload = &protobuf.ChatMessage_DiscordMessage{
