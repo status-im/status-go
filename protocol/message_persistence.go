@@ -121,8 +121,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.parsed_text,
 		m1.sticker_pack,
 		m1.sticker_hash,
-		m1.image_payload,
-		m1.image_type,
 		COALESCE(m1.album_id, ""),
 		COALESCE(m1.image_width, 0),
 		COALESCE(m1.image_height, 0),
@@ -207,9 +205,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
-	var albumID sql.NullString
-	var imageWidth sql.NullInt32
-	var imageHeight sql.NullInt32
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
@@ -252,11 +247,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ParsedText,
 		&sticker.Pack,
 		&sticker.Hash,
-		&image.Payload,
-		&image.Type,
-		&message.AlbumID,
-		&message.ImageWidth,
-		&message.ImageHeight,
+		&image.AlbumId,
+		&image.Width,
+		&image.Height,
 		&audio.DurationMs,
 		&communityID,
 		&serializedMentions,
@@ -374,20 +367,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			To:   uint32(gapTo.Int64),
 		}
 	}
+
 	if communityID.Valid {
 		message.CommunityID = communityID.String
-	}
-
-	if albumID.Valid {
-		message.AlbumID = albumID.String
-	}
-
-	if imageWidth.Valid {
-		message.ImageWidth = uint32(imageWidth.Int32)
-	}
-
-	if imageHeight.Valid {
-		message.ImageHeight = uint32(imageHeight.Int32)
 	}
 
 	if serializedMentions != nil {
@@ -419,11 +401,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.CommandParameters = command
 
 	case protobuf.ChatMessage_IMAGE:
-		img := protobuf.ImageMessage{
-			Payload: image.Payload,
-			Type:    image.Type,
-		}
-		message.Payload = &protobuf.ChatMessage_Image{Image: &img}
+		message.Payload = &protobuf.ChatMessage_Image{Image: image}
 
 	case protobuf.ChatMessage_DISCORD_MESSAGE:
 		message.Payload = &protobuf.ChatMessage_DiscordMessage{
@@ -507,9 +485,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		sticker.Hash,
 		image.Payload,
 		image.Type,
-		message.AlbumID,
-		message.ImageWidth,
-		message.ImageHeight,
+		image.AlbumId,
+		image.Width,
+		image.Height,
 		message.Base64Image,
 		audio.Payload,
 		audio.Type,
