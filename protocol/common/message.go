@@ -167,15 +167,15 @@ type Message struct {
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
 	// AlbumID for a collage of images
-	AlbumID string `json:"albumId,omitempty"`
+	LocalAlbumID string `json:"localAlbumId,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
 	// Image dimensions
-	ImageWidth  uint32 `json:"imageWidth,omitempty"`
-	ImageHeight uint32 `json:"imageHeight,omitempty"`
+	LocalImageWidth  uint32 `json:"localImageWidth,omitempty"`
+	LocalImageHeight uint32 `json:"localImageHeight,omitempty"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
@@ -245,8 +245,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
 		AlbumID                  string                           `json:"albumId,omitempty"`
+		LocalAlbumID             string                           `json:"localAlbumId,omitempty"`
 		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
+		LocalImageWidth          uint32                           `json:"localImageWidth,omitempty"`
 		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
+		LocalImageHeight         uint32                           `json:"localImageHeight,omitempty"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
@@ -288,9 +291,12 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName:                  m.EnsName,
 		DisplayName:              m.DisplayName,
 		Image:                    m.ImageLocalURL,
-		AlbumID:                  m.AlbumID,
+		AlbumID:                  m.AlbumId,
+		LocalAlbumID:             m.LocalAlbumID,
 		ImageWidth:               m.ImageWidth,
-		ImageHeight:              m.ImageHeight,
+		LocalImageWidth:          m.LocalImageWidth,
+		ImageHeight:              m.LocalImageHeight,
+		LocalImageHeight:         m.ImageHeight,
 		Audio:                    m.AudioLocalURL,
 		CommunityID:              m.CommunityID,
 		Timestamp:                m.Timestamp,
@@ -339,9 +345,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
 		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
-		AlbumID         string                           `json:"albumId"`
-		ImageWidth      uint32                           `json:"imageWidth"`
-		ImageHeight     uint32                           `json:"imageHeight"`
+		//AlbumID         string                           `json:"albumId"`
+		//ImageWidth      uint32                           `json:"imageWidth"`
+		//ImageHeight     uint32                           `json:"imageHeight"`
 	}{
 		Alias: (*Alias)(m),
 	}
@@ -362,9 +368,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText
-	m.AlbumID = aux.AlbumID
-	m.ImageWidth = aux.ImageWidth
-	m.ImageHeight = aux.ImageHeight
+	//m.LocalAlbumID = aux.AlbumID
+	//m.ImageWidth = aux.ImageWidth
+	//m.ImageHeight = aux.ImageHeight
 	return nil
 }
 
@@ -387,6 +393,8 @@ func (m *Message) parseImage() error {
 	if image == nil {
 		return errors.New("image empty")
 	}
+	//m.ImageWidth = m.LocalImageWidth
+	//m.ImageHeight = m.LocalImageHeight
 
 	payload := image.Payload
 
