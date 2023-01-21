@@ -4513,6 +4513,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
+		msg.ImageWidth = 2000
+		msg.ImageHeight = 2000
 	}
 	if msg.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
 
