@@ -270,7 +270,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Dismiss contact request, receiver side
-	resp, err = theirMessenger.DismissContactRequest(context.Background(), &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
+	resp, err = theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
 	s.Require().NoError(err)
 
 	// Check the contact state is correctly set
@@ -427,7 +427,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	mutualContacts = s.m.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
 
-	resp, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(contactID)})
+	resp, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
@@ -1038,7 +1038,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 	// Remove contact
 
-	_, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(contactID)})
+	_, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination

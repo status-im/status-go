@@ -695,16 +695,24 @@ func (api *PublicAPI) MarkAllReadInCommunity(communityID string) ([]string, erro
 	return api.service.messenger.MarkAllReadInCommunity(communityID)
 }
 
-func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddContact) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AddContact(ctx, request)
-}
-
 func (api *PublicAPI) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendContactRequest(ctx, request)
 }
 
+func (api *PublicAPI) AddContact(ctx context.Context, request *requests.AddContact) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddContact(ctx, request)
+}
+
 func (api *PublicAPI) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) DeclineContactRequest(ctx context.Context, request *requests.DeclineContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeclineContactRequest(ctx, request)
+}
+
+func (api *PublicAPI) CancelOutgoingContactRequest(ctx context.Context, request *requests.CancelOutgoingContactRequest) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelOutgoingContactRequest(ctx, request)
 }
 
 func (api *PublicAPI) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*protocol.MessengerResponse, error) {
@@ -717,10 +725,6 @@ func (api *PublicAPI) DismissLatestContactRequestForContact(ctx context.Context,
 
 func (api *PublicAPI) RetractContactRequest(ctx context.Context, request *requests.RetractContactRequest) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RetractContactRequest(request)
-}
-
-func (api *PublicAPI) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DismissContactRequest(ctx, request)
 }
 
 func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {

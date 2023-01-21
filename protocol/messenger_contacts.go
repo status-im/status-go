@@ -47,6 +47,140 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
+func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*MessengerResponse, error) {
+	m.logger.Info("declineContactRequest")
+	contactRequest, err := m.persistence.MessageByID(requestID)
+	if err != nil {
+		return nil, err
+	}
+
+	contact, err := m.BuildContact(contactRequest.From)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+
+	if !syncing {
+		_, clock, err := m.getOneToOneAndNextClock(contact)
+		if err != nil {
+			return nil, err
+		}
+
+		contact.DismissContactRequest(clock)
+		err = m.persistence.SaveContact(contact, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		response.AddContact(contact)
+	}
+	contactRequest.ContactRequestState = common.ContactRequestStateDismissed
+
+	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
+	if err != nil {
+		return nil, err
+	}
+
+	// update notification with the correct status
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+	if err != nil {
+		return nil, err
+	}
+	if notification != nil {
+		notification.Message = contactRequest
+		notification.Read = true
+		notification.Dismissed = true
+
+		err = m.addActivityCenterNotification(response, notification)
+		if err != nil {
+			m.logger.Error("failed to save notification", zap.Error(err))
+			return nil, err
+		}
+	}
+	response.AddMessage(contactRequest)
+	return response, nil
+}
+
+func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests.DeclineContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := m.declineContactRequest(request.ID.String(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), false, m.dispatchMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) cancelOutgoingContactRequest(ctx context.Context, ID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	// remove contact
+	err := m.removeContact(ctx, response, ID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// remove notification
+	notificationID := types.FromHex(defaultContactRequestID(ID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(notificationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if notification != nil {
+		err := m.persistence.DeleteActivityCenterNotification(notificationID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// retract contact
+	clock, _ := m.getLastClockWithRelatedChat()
+	retractContactRequest := &protobuf.RetractContactRequest{
+		Clock: clock,
+	}
+	encodedMessage, err := proto.Marshal(retractContactRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
+		LocalChatID:         ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) CancelOutgoingContactRequest(ctx context.Context, request *requests.CancelOutgoingContactRequest) (*MessengerResponse, error) {
+	err := request.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := m.cancelOutgoingContactRequest(ctx, request.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
@@ -55,7 +189,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 	chatID := request.ID.String()
 
-	response, err := m.addContact(chatID, "", "", "", "", false, false)
+	response, err := m.addContact(chatID, "", "", "", "", false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -100,82 +234,6 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	return response, nil
 }
 
-func (m *Messenger) dismissContactRequest(requestID string, syncing bool) (*MessengerResponse, error) {
-	m.logger.Info("dismissContactRequest")
-	contactRequest, err := m.persistence.MessageByID(requestID)
-	if err != nil {
-		return nil, err
-	}
-
-	contact, err := m.BuildContact(contactRequest.From)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &MessengerResponse{}
-
-	if !syncing {
-		_, clock, err := m.getOneToOneAndNextClock(contact)
-		if err != nil {
-			return nil, err
-		}
-
-		contact.DismissContactRequest(clock)
-		err = m.persistence.SaveContact(contact, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		response.AddContact(contact)
-	}
-	contactRequest.ContactRequestState = common.ContactRequestStateDismissed
-
-	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
-	if err != nil {
-		return nil, err
-	}
-
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
-	if err != nil {
-		return nil, err
-	}
-
-	if notification != nil {
-		notification.Message = contactRequest
-		notification.Read = true
-		notification.Dismissed = true
-
-		err = m.addActivityCenterNotification(response, notification)
-		if err != nil {
-			m.logger.Error("failed to save notification", zap.Error(err))
-			return nil, err
-		}
-	}
-
-	response.AddMessage(contactRequest)
-
-	return response, nil
-}
-
-func (m *Messenger) DismissContactRequest(ctx context.Context, request *requests.DismissContactRequest) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := m.dismissContactRequest(request.ID.String(), false)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), false, m.dispatchMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
 	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil {
@@ -198,8 +256,9 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	contact.AcceptContactRequest(clock)
 
+	messageID := defaultContactRequestID(common.PubkeyToHex(&m.identity.PublicKey))
 	acceptContactRequest := &protobuf.AcceptContactRequest{
-		Id:    contactRequest.ID,
+		Id:    messageID,
 		Clock: clock,
 	}
 	encodedMessage, err := proto.Marshal(acceptContactRequest)
@@ -256,13 +315,11 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	}
 
 	if ensName != "" {
-		clock := m.getTimesource().GetCurrentTime()
 		err := m.ensVerifier.ENSVerified(pubKey, ensName, clock)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	if err := m.addENSNameToContact(contact); err != nil {
 		return nil, err
 	}
@@ -276,7 +333,6 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	}
 
 	contact.LastUpdatedLocally = clock
-
 	contact.ContactRequestSent(clock)
 
 	if !syncing {
@@ -332,11 +388,13 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		return nil, err
 	}
 
+	// Get ENS name of a current user
 	ensName, err = m.settings.ENSName()
 	if err != nil {
 		return nil, err
 	}
 
+	// Get display name of a current user
 	displayName, err = m.settings.DisplayName()
 	if err != nil {
 		return nil, err
@@ -372,11 +430,13 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		}
 	}
 
+	// Sends a standalone ChatIdentity message
 	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
 	}
 
+	// Add chat
 	response.AddChat(profileChat)
 
 	_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
@@ -390,9 +450,64 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		return nil, err
 	}
 
+	// Add outgoing contact request notification
+	if len(contactRequestID) == 0 {
+		err = m.createOutgoingContactRequestNotification(response, contact, profileChat)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Add contact
 	response.AddContact(contact)
 
 	return response, nil
+}
+
+func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact) (*common.Message, error) {
+	if contact == nil {
+		return nil, errors.New("contact cannot be nil")
+	}
+
+	contactRequest := &common.Message{}
+	contactRequest.WhisperTimestamp = timestamp
+	contactRequest.Seen = false
+	contactRequest.Text = "Please add me to your contacts"
+	contactRequest.From = contact.ID
+	contactRequest.LocalChatID = contact.ID
+	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
+	contactRequest.Clock = clock
+	contactRequest.ID = defaultContactRequestID(contact.ID)
+	contactRequest.ContactRequestState = common.ContactRequestStatePending
+
+	err := contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	return contactRequest, err
+}
+
+func (m *Messenger) createOutgoingContactRequestNotification(response *MessengerResponse, contact *Contact, chat *Chat) error {
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+	contactRequest, err := m.generateContactRequest(clock, timestamp, contact)
+	if err != nil {
+		return err
+	}
+
+	response.AddMessage(contactRequest)
+	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
+	if err != nil {
+		return err
+	}
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(contactRequest.ID),
+		Type:      ActivityCenterNotificationTypeContactRequest,
+		Name:      contact.CanonicalName(),
+		Author:    common.PubkeyToHex(&m.identity.PublicKey),
+		Message:   contactRequest,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		ChatID:    contact.ID,
+	}
+
+	return m.addActivityCenterNotification(response, notification)
 }
 
 func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
@@ -801,7 +916,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 	if err != nil {
 		return nil, err
 	}
-	contact, ok := m.allContacts.Load(request.ContactID.String())
+	contact, ok := m.allContacts.Load(request.ID.String())
 	if !ok {
 		return nil, errors.New("contact not found")
 	}
@@ -874,7 +989,7 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 		contactRequestID = defaultContactRequestID(request.ID.String())
 	}
 
-	return m.DismissContactRequest(ctx, &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 }
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
