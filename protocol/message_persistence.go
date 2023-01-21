@@ -205,9 +205,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
-	var albumID sql.NullString
-	var imageWidth sql.NullInt32
-	var imageHeight sql.NullInt32
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
@@ -251,9 +248,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Hash,
 		&image.Payload,
 		&image.Type,
-		&message.AlbumID,
-		&message.ImageWidth,
-		&message.ImageHeight,
+		&image.AlbumId,
+		&image.ImageWidth,
+		&image.ImageHeight,
 		&audio.DurationMs,
 		&communityID,
 		&serializedMentions,
@@ -368,18 +365,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 	if communityID.Valid {
 		message.CommunityID = communityID.String
-	}
-
-	if albumID.Valid {
-		message.AlbumID = albumID.String
-	}
-
-	if imageWidth.Valid {
-		message.ImageWidth = uint32(imageWidth.Int32)
-	}
-
-	if imageHeight.Valid {
-		message.ImageHeight = uint32(imageHeight.Int32)
 	}
 
 	if serializedMentions != nil {
@@ -499,9 +484,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		sticker.Hash,
 		image.Payload,
 		image.Type,
-		message.AlbumID,
-		message.ImageWidth,
-		message.ImageHeight,
+		image.AlbumId,
+		image.ImageWidth,
+		image.ImageHeight,
 		message.Base64Image,
 		audio.Payload,
 		audio.Type,
