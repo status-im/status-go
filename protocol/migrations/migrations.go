@@ -67,9 +67,9 @@
 // 1665479047_add_community_id_in_notifications.up.sql (169B)
 // 1665484435_add_encrypted_messages.up.sql (402B)
 // 1665560200_add_contact_verification_individual.up.sql (509B)
-// 1670921937_add_album_id.up.sql (55B)
 // 1673373000_add_replied.up.sql (67B)
 // 1673428910_add_image_width_height.up.sql (117B)
+// 1674307130_add_album_id.up.sql (61B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1480,26 +1480,6 @@ func _1665560200_add_contact_verification_individualUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1670921937_add_album_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xcc\x49\x2a\xcd\x8d\xcf\x4c\x51\x08\x73\x0c\x72\xf6\x70\x0c\xb2\xe6\x02\x04\x00\x00\xff\xff\x8d\x2a\x26\x80\x37\x00\x00\x00")
-
-func _1670921937_add_album_idUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1670921937_add_album_idUpSql,
-		"1670921937_add_album_id.up.sql",
-	)
-}
-
-func _1670921937_add_album_idUpSql() (*asset, error) {
-	bytes, err := _1670921937_add_album_idUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1670921937_add_album_id.up.sql", size: 55, mode: os.FileMode(0644), modTime: time.Unix(1674030904, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xae, 0x83, 0x58, 0xb7, 0x77, 0x5, 0xca, 0xe3, 0xda, 0x32, 0x8f, 0x7b, 0xa4, 0x2f, 0x4c, 0xaf, 0x5f, 0xfa, 0x94, 0x36, 0xe4, 0xf9, 0x7, 0xc6, 0xd6, 0xb7, 0x90, 0xf3, 0xe5, 0xb5, 0x3}}
-	return a, nil
-}
-
 var __1673373000_add_repliedUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x41\x0a\x84\x30\x0c\x05\xd0\xab\xfc\x7b\xcc\x2a\x9d\xa6\xab\x6f\x0b\x9a\xae\x45\x30\x88\xa0\x20\x0d\xde\xdf\x27\x34\x9d\x61\x92\xa8\x78\xc3\xc7\x7a\x7b\xc4\x76\x78\x40\x72\xc6\xbf\xb1\x4f\x15\xc3\x9f\xeb\xf4\x1d\xa9\x35\xaa\x54\x64\x2d\xd2\x69\x28\xc2\x45\x7f\x5f\x00\x00\x00\xff\xff\xe8\x90\x33\x73\x43\x00\x00\x00")
 
 func _1673373000_add_repliedUpSqlBytes() ([]byte, error) {
@@ -1537,6 +1517,26 @@ func _1673428910_add_image_width_heightUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1673428910_add_image_width_height.up.sql", size: 117, mode: os.FileMode(0644), modTime: time.Unix(1674030904, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0xda, 0x93, 0x2a, 0x9b, 0x6b, 0xb7, 0x96, 0xcd, 0xac, 0xf, 0xaf, 0x54, 0x89, 0x9e, 0x91, 0x5b, 0xd0, 0x4a, 0xa, 0x8d, 0x9e, 0x80, 0x66, 0x26, 0x9e, 0xb5, 0xa9, 0x8, 0xec, 0x2d, 0x6c}}
+	return a, nil
+}
+
+var __1674307130_add_album_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\xcc\x4d\x4c\x4f\x8d\x4f\xcc\x49\x2a\xcd\x8d\xcf\x4c\x51\x08\x73\x0c\x72\xf6\x70\x0c\xb2\xe6\x02\x04\x00\x00\xff\xff\xa5\xb9\xcd\x9e\x3d\x00\x00\x00")
+
+func _1674307130_add_album_idUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1674307130_add_album_idUpSql,
+		"1674307130_add_album_id.up.sql",
+	)
+}
+
+func _1674307130_add_album_idUpSql() (*asset, error) {
+	bytes, err := _1674307130_add_album_idUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1674307130_add_album_id.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1674307159, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd0, 0x27, 0xe8, 0xc2, 0xc6, 0x5, 0xf4, 0x3, 0xa7, 0xe, 0xcc, 0xb, 0x9d, 0x3, 0xfa, 0x5e, 0x66, 0xb5, 0xf3, 0x14, 0x45, 0x54, 0x1f, 0x1c, 0x3, 0xc7, 0x81, 0x5e, 0x9c, 0x7c, 0x3f, 0x22}}
 	return a, nil
 }
 
@@ -1805,11 +1805,11 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1665560200_add_contact_verification_individual.up.sql": _1665560200_add_contact_verification_individualUpSql,
 
-	"1670921937_add_album_id.up.sql": _1670921937_add_album_idUpSql,
-
 	"1673373000_add_replied.up.sql": _1673373000_add_repliedUpSql,
 
 	"1673428910_add_image_width_height.up.sql": _1673428910_add_image_width_heightUpSql,
+
+	"1674307130_add_album_id.up.sql": _1674307130_add_album_idUpSql,
 
 	"README.md": readmeMd,
 
@@ -1924,11 +1924,11 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1665479047_add_community_id_in_notifications.up.sql":                     &bintree{_1665479047_add_community_id_in_notificationsUpSql, map[string]*bintree{}},
 	"1665484435_add_encrypted_messages.up.sql":                                &bintree{_1665484435_add_encrypted_messagesUpSql, map[string]*bintree{}},
 	"1665560200_add_contact_verification_individual.up.sql":                   &bintree{_1665560200_add_contact_verification_individualUpSql, map[string]*bintree{}},
-	"1670921937_add_album_id.up.sql":                                          &bintree{_1670921937_add_album_idUpSql, map[string]*bintree{}},
 	"1673373000_add_replied.up.sql":                                           &bintree{_1673373000_add_repliedUpSql, map[string]*bintree{}},
 	"1673428910_add_image_width_height.up.sql":                                &bintree{_1673428910_add_image_width_heightUpSql, map[string]*bintree{}},
-	"README.md": &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":    &bintree{docGo, map[string]*bintree{}},
+	"1674307130_add_album_id.up.sql":                                          &bintree{_1674307130_add_album_idUpSql, map[string]*bintree{}},
+	"README.md":                                                               &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                  &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
