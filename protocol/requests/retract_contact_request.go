@@ -9,11 +9,11 @@ import (
 var ErrRetractContactRequestInvalidContactID = errors.New("retract-contact-request: invalid id")
 
 type RetractContactRequest struct {
-	ContactID types.HexBytes `json:"contactId"`
+	ID types.HexBytes `json:"id"`
 }
 
 func (a *RetractContactRequest) Validate() error {
-	if len(a.ContactID) == 0 {
+	if len(a.ID) == 0 {
 		return ErrRetractContactRequestInvalidContactID
 	}
 

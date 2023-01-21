@@ -95,7 +95,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 
 	if notification.Type == ActivityCenterNotificationTypeNewOneToOne ||
 		notification.Type == ActivityCenterNotificationTypeNewPrivateGroupChat {
-		// Delete other notifications so it pop us again if not currently dismissed
+		// Delete other notifications, so it pops us again if it was not dismissed
 		_, err = tx.Exec(`DELETE FROM activity_center_notifications WHERE id = ? AND (dismissed OR accepted)`, notification.ID)
 		if err != nil {
 			return err
@@ -865,11 +865,10 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 }
 
 func (db sqlitePersistence) RemoveAllContactRequestActivityCenterNotifications(chatID string) error {
-	_, err := db.db.Exec(`
-				DELETE FROM activity_center_notifications
-	WHERE
-	chat_id = ?
-	AND notification_type = ?
-	`, chatID, ActivityCenterNotificationTypeContactRequest)
+	_, err := db.db.Exec(
+		`DELETE FROM activity_center_notifications WHERE chat_id = ? AND notification_type = ?`,
+		chatID,
+		ActivityCenterNotificationTypeContactRequest,
+	)
 	return err
 }
