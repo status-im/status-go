@@ -166,13 +166,13 @@ type Message struct {
 	AudioPath string `json:"audioPath,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
-	// AlbumID for a collage of images
-	AlbumID string `json:"albumId,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
 
+	// AlbumID for a collage of images
+	AlbumID string `json:"albumId,omitempty"`
 	// Image dimensions
 	ImageWidth  uint32 `json:"imageWidth,omitempty"`
 	ImageHeight uint32 `json:"imageHeight,omitempty"`
@@ -321,6 +321,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 
 	if image := m.GetImage(); image != nil {
 		item.ImageAlbumID = image.AlbumId
+		item.ImageWidth = image.Width
+		item.ImageHeight = image.Height
 	}
 
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
@@ -362,7 +364,10 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 
 	if aux.ContentType == protobuf.ChatMessage_IMAGE {
 		m.Payload = &protobuf.ChatMessage_Image{
-			Image: &protobuf.ImageMessage{AlbumId: aux.ImageAlbumID},
+			Image: &protobuf.ImageMessage{
+				AlbumId: aux.ImageAlbumID,
+				Width:   aux.ImageWidth,
+				Height:  aux.ImageHeight},
 		}
 	}
 
@@ -372,8 +377,6 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText
-	m.ImageWidth = aux.ImageWidth
-	m.ImageHeight = aux.ImageHeight
 	return nil
 }
 

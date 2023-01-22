@@ -14,6 +14,8 @@ message ImageMessage {
   bytes payload = 1;
   ImageType type = 2;
   string album_id = 3;
+  uint32 width = 4;
+  uint32 height = 5;
 }
 
 message AudioMessage {
@@ -141,9 +143,6 @@ message ChatMessage {
   ContactRequestSignature sent_contact_request_signature = 15;
   ContactRequestSignature received_contact_request_signature = 16;
   bool contact_message = 17;
-
-  uint32 image_width = 18;
-  uint32 image_height = 19;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
