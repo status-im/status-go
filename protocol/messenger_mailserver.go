@@ -21,7 +21,7 @@ import (
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 
-var mailserverRequestTimeout = 10 * time.Second
+var mailserverRequestTimeout = 30 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 var mailserverMaxTries uint = 2
 var mailserverMaxFailedRequests uint = 2
