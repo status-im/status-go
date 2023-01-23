@@ -1999,8 +1999,9 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 
 	// Create new task
 	task := &communities.HistoryArchiveDownloadTask{
-		Cancel: make(chan struct{}),
-		Waiter: *new(sync.WaitGroup),
+		CancelChan: make(chan struct{}),
+		Waiter:     *new(sync.WaitGroup),
+		Cancelled:  false,
 	}
 
 	m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
@@ -2009,11 +2010,8 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	task.Waiter.Add(1)
 
 	go func() {
-		defer func() {
-			task.Waiter.Done()
-			m.communitiesManager.DeleteHistoryArchiveDownloadTask(communityID.String())
-		}()
-		err := m.importHistoryArchives(communityID, task.Cancel)
+		defer task.Waiter.Done()
+		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
 			m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
 		}

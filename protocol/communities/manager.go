@@ -61,8 +61,23 @@ type Manager struct {
 }
 
 type HistoryArchiveDownloadTask struct {
-	Cancel chan struct{}
-	Waiter sync.WaitGroup
+	CancelChan chan struct{}
+	Waiter     sync.WaitGroup
+	m          sync.RWMutex
+	Cancelled  bool
+}
+
+func (t *HistoryArchiveDownloadTask) IsCancelled() bool {
+	t.m.RLock()
+	defer t.m.RUnlock()
+	return t.Cancelled
+}
+
+func (t *HistoryArchiveDownloadTask) Cancel() {
+	t.m.Lock()
+	defer t.m.Unlock()
+	t.Cancelled = true
+	close(t.CancelChan)
 }
 
 func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {

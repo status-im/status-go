@@ -941,30 +941,28 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
 
 				// Cancel ongoing download/import task
-				if currentTask != nil {
-					close(currentTask.Cancel)
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
 					currentTask.Waiter.Wait()
 				}
 
 				// Create new task
 				task := &communities.HistoryArchiveDownloadTask{
-					Cancel: make(chan struct{}),
-					Waiter: *new(sync.WaitGroup),
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
 				}
 
 				m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
 
 				// this wait groups tracks the ongoing task for a particular community
 				task.Waiter.Add(1)
-				defer func() {
-					task.Waiter.Done()
-					m.communitiesManager.DeleteHistoryArchiveDownloadTask(communityID.String())
-				}()
+				defer task.Waiter.Done()
 
 				// this wait groups tracks all ongoing tasks across communities
 				m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
-				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.Cancel)
+				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.CancelChan)
 			}(currentTask, id)
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
@@ -1186,14 +1184,15 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 				go func(currentTask *communities.HistoryArchiveDownloadTask) {
 
 					// Cancel ongoing download/import task
-					if currentTask != nil {
-						close(currentTask.Cancel)
+					if currentTask != nil && !currentTask.IsCancelled() {
+						currentTask.Cancel()
 						currentTask.Waiter.Wait()
 					}
 
 					task := &communities.HistoryArchiveDownloadTask{
-						Cancel: make(chan struct{}),
-						Waiter: *new(sync.WaitGroup),
+						CancelChan: make(chan struct{}),
+						Waiter:     *new(sync.WaitGroup),
+						Cancelled:  false,
 					}
 					m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
 
@@ -1203,7 +1202,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 					m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 					defer m.downloadHistoryArchiveTasksWaitGroup.Done()
 
-					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.Cancel)
+					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
 				}(currentTask)
 
 				clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
