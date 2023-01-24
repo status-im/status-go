@@ -763,6 +763,8 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+		notification.Read = true
+
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
 			m.logger.Warn("failed to save notification", zap.Error(saveErr))
@@ -794,6 +796,8 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		notification.Read = true
+
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
 			m.logger.Warn("failed to save notification", zap.Error(saveErr))
