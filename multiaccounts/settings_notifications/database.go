@@ -257,7 +257,7 @@ func (ns *NotificationsSettings) SetMessagePreview(value int) error {
 func (ns *NotificationsSettings) GetExMuteAllMessages(id string) (result bool, err error) {
 	err = ns.db.QueryRow(ns.buildSelectQuery(columnExMuteAllMessages), id).Scan(&result)
 	if err != nil && err == sql.ErrNoRows {
-		return defaultExMuteAllMessagesValue, err
+		return defaultExMuteAllMessagesValue, nil
 	}
 	return result, err
 }
@@ -265,7 +265,7 @@ func (ns *NotificationsSettings) GetExMuteAllMessages(id string) (result bool, e
 func (ns *NotificationsSettings) GetExPersonalMentions(id string) (result string, err error) {
 	err = ns.db.QueryRow(ns.buildSelectQuery(columnExPersonalMentions), id).Scan(&result)
 	if err != nil && err == sql.ErrNoRows {
-		return defaultExPersonalMentionsValue, err
+		return defaultExPersonalMentionsValue, nil
 	}
 	return result, err
 }
@@ -273,7 +273,7 @@ func (ns *NotificationsSettings) GetExPersonalMentions(id string) (result string
 func (ns *NotificationsSettings) GetExGlobalMentions(id string) (result string, err error) {
 	err = ns.db.QueryRow(ns.buildSelectQuery(columnExGlobalMentions), id).Scan(&result)
 	if err != nil && err == sql.ErrNoRows {
-		return defaultExGlobalMentionsValue, err
+		return defaultExGlobalMentionsValue, nil
 	}
 	return result, err
 }
@@ -281,7 +281,7 @@ func (ns *NotificationsSettings) GetExGlobalMentions(id string) (result string, 
 func (ns *NotificationsSettings) GetExOtherMessages(id string) (result string, err error) {
 	err = ns.db.QueryRow(ns.buildSelectQuery(columnExOtherMessages), id).Scan(&result)
 	if err != nil && err == sql.ErrNoRows {
-		return defaultExOtherMessagesValue, err
+		return defaultExOtherMessagesValue, nil
 	}
 	return result, err
 }
