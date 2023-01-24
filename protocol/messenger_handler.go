@@ -837,7 +837,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		chat.LastClockValue = message.Clock
 	}
 
-	if contact.ContactRequestState == ContactRequestStateMutual {
+	if contact.ContactRequestState == ContactRequestStateMutual && chat.DeletedAtClockValue < message.Clock {
 		chat.Active = true
 	}
 
