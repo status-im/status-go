@@ -138,7 +138,10 @@ type Messenger struct {
 	mailserversDatabase        *mailserversDB.Database
 	browserDatabase            *browsers.Database
 	httpServer                 *server.MediaServer
-	quit                       chan struct{}
+
+	quit   chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	importingCommunities map[string]bool
 
@@ -423,6 +426,8 @@ func NewMessenger(
 
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.db)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	messenger = &Messenger{
 		config:                     &c,
 		node:                       node,
@@ -459,6 +464,8 @@ func NewMessenger(
 		mailserversDatabase:      c.mailserversDatabase,
 		account:                  c.account,
 		quit:                     make(chan struct{}),
+		ctx:                      ctx,
+		cancel:                   cancel,
 		requestedCommunitiesLock: sync.RWMutex{},
 		requestedCommunities:     make(map[string]*transport.Filter),
 		importingCommunities:     make(map[string]bool),
@@ -1571,6 +1578,7 @@ func (m *Messenger) Init() error {
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
+	m.cancel()
 	m.downloadHistoryArchiveTasksWaitGroup.Wait()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
