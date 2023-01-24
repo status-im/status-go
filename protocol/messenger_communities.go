@@ -552,6 +552,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Timestamp:        m.getTimesource().GetCurrentTime(),
 		CommunityID:      community.IDString(),
 		MembershipStatus: ActivityCenterMembershipStatusPending,
+		Read:             true,
 	}
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
