@@ -250,6 +250,8 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 		notification.ContactVerificationStatus = verification.RequestStatusCANCELED
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateCanceled
+		notification.Read = true
+
 		err = m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
 		if err != nil {
 			return nil, err
@@ -357,6 +359,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateAccepted
 		notification.ReplyMessage = replyMessage
+		notification.Read = true
 
 		err := m.persistence.UpdateActivityCenterNotificationFields(notification.ID, message, replyMessage, verification.RequestStatusACCEPTED)
 		if err != nil {
@@ -451,6 +454,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 
 	notification.ContactVerificationStatus = verification.RequestStatusTRUSTED
 	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
+	notification.Read = true
 
 	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
 	if err != nil {
@@ -556,6 +560,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 
 	notification.ContactVerificationStatus = verification.RequestStatusUNTRUSTWORTHY
 	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
+	notification.Read = true
 
 	err = m.persistence.UpdateActivityCenterNotificationFields(notification.ID, notification.Message, notification.ReplyMessage, notification.ContactVerificationStatus)
 	if err != nil {
@@ -668,6 +673,8 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		}
 
 		notification.ContactVerificationStatus = verification.RequestStatusDECLINED
+		notification.Read = true
+
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateDeclined
 		err = m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, message)
@@ -1040,6 +1047,7 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 		Timestamp:                 chatMessage.WhisperTimestamp,
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
+		Read:                      true, // Always true for outgoing
 	}
 
 	return m.addActivityCenterNotification(response, notification)
@@ -1056,6 +1064,7 @@ func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contac
 		Timestamp:                 messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
+		Read:                      vr.RequestStatus != verification.RequestStatusPENDING, // Unread only for pending incomming
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)
