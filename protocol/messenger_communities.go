@@ -2233,6 +2233,19 @@ func (m *Messenger) ExtractDiscordDataFromImportFiles(filesToImport []string) (*
 
 	for _, fileToImport := range filesToImport {
 		filePath := strings.Replace(fileToImport, "file://", "", -1)
+
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			errors[fileToImport] = discord.Error(err.Error())
+			continue
+		}
+
+		fileSize := fileInfo.Size()
+		if fileSize > discord.MaxImportFileSizeBytes {
+			errors[fileToImport] = discord.Error(discord.ErrImportFileTooBig.Error())
+			continue
+		}
+
 		bytes, err := os.ReadFile(filePath)
 		if err != nil {
 			errors[fileToImport] = discord.Error(err.Error())
