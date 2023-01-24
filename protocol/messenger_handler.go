@@ -285,8 +285,9 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 				if err != nil {
 					return err
 				}
-				//  we mark the notification as dismissed
+				//  we mark the notification as dismissed & read
 				notification.Dismissed = true
+				notification.Read = true
 				// We remove it from the response, since the client has never seen it, better to just remove it
 				found := messageState.Response.RemoveActivityCenterNotification(notification.Message.ID)
 				// Otherwise, it means we have already passed it to the client, so we add it with a `dismissed` flag
@@ -351,6 +352,7 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		Author:    messageState.CurrentMessageState.Contact.ID,
 		Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:    contact.ID,
+		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)

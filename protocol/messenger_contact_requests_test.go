@@ -110,6 +110,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
@@ -162,6 +163,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() {
 	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
@@ -227,6 +229,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
@@ -258,6 +261,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequests[0].ID)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
 	s.Require().Equal(common.ContactRequestStateDismissed, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
 	// Make sure the sender is not added to our contacts

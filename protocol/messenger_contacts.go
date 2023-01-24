@@ -170,11 +170,13 @@ func (m *Messenger) dismissContactRequest(requestID string, syncing bool) (*Mess
 	}
 
 	if notification != nil {
+		notification.Message = contactRequest
+		notification.Read = true
+
 		err := m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, contactRequest)
 		if err != nil {
 			return nil, err
 		}
-		notification.Message = contactRequest
 
 		response.AddActivityCenterNotification(notification)
 	}
@@ -262,11 +264,13 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	}
 
 	if notification != nil {
+		notification.Message = contactRequest
+		notification.Read = true
+
 		err := m.persistence.UpdateActivityCenterNotificationMessage(notification.ID, contactRequest)
 		if err != nil {
 			return nil, err
 		}
-		notification.Message = contactRequest
 
 		response.AddActivityCenterNotification(notification)
 	}
