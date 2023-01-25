@@ -263,3 +263,21 @@ func (kp *KeyPairs) DeleteKeycard(kcUID string) (err error) {
 
 	return err
 }
+
+func (kp *KeyPairs) DeleteKeypair(keyUID string) (err error) {
+	delete, err := kp.db.Prepare(`
+		DELETE
+		FROM
+			keypairs
+		WHERE
+			key_uid = ?
+	`)
+	if err != nil {
+		return err
+	}
+	defer delete.Close()
+
+	_, err = delete.Exec(keyUID)
+
+	return err
+}

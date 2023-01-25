@@ -486,6 +486,10 @@ func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
 	return api.db.DeleteKeycard(kcUID)
 }
 
+func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
+	return api.db.DeleteKeypair(keyUID)
+}
+
 func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
 	return api.db.UpdateKeycardUID(oldKcUID, newKcUID)
 }
