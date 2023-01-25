@@ -847,6 +847,14 @@ func ConvertToKeycardAccount(keyStoreDir, accountData, settingsJSON, password, n
 	return makeJSONResponse(nil)
 }
 
+func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string {
+	err := statusBackend.ConvertToRegularAccount(mnemonic, currPassword, newPassword)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}
+
 func ImageServerTLSCert() string {
 	cert, err := server.PublicTLSCert()
 

@@ -317,8 +317,8 @@ func (db *Database) UpdateAccount(account Account) error {
 	return err
 }
 
-func (db *Database) UpdateAccountKeycardPairing(account Account) error {
-	_, err := db.db.Exec("UPDATE accounts SET keycardPairing = ? WHERE keyUid = ?", account.KeycardPairing, account.KeyUID)
+func (db *Database) UpdateAccountKeycardPairing(keyUID string, keycardPairing string) error {
+	_, err := db.db.Exec("UPDATE accounts SET keycardPairing = ? WHERE keyUid = ?", keycardPairing, keyUID)
 	return err
 }
 

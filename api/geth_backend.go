@@ -565,7 +565,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 }
 
 func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
-	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account)
+	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
 		return err
 	}
@@ -648,6 +648,87 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 	_ = b.accountManager.DeleteAccount(keyStoreDir, walletRootAddress, true)
 
 	return nil
+}
+
+func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+	accountInfo, err := b.accountManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return err
+	}
+
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(accountInfo.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, newPassword)
+	if err != nil {
+		return err
+	}
+
+	db, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	knownAccounts, err := db.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	// We add these two paths, cause others will be added via `StoreAccount` function call
+	const pathWalletRoot = "m/44'/60'/0'/0"
+	const pathEIP1581 = "m/43'/60'/1581'"
+	var paths []string
+	paths = append(paths, pathWalletRoot, pathEIP1581)
+	for _, acc := range knownAccounts {
+		if accountInfo.KeyUID == acc.KeyUID {
+			paths = append(paths, acc.Path)
+		}
+	}
+
+	_, err = b.accountManager.AccountsGenerator().StoreAccount(accountInfo.ID, currPassword)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.accountManager.AccountsGenerator().StoreDerivedAccounts(accountInfo.ID, currPassword, paths)
+	if err != nil {
+		return err
+	}
+
+	err = b.multiaccountsDB.UpdateAccountKeycardPairing(accountInfo.KeyUID, "")
+	if err != nil {
+		return err
+	}
+
+	err = db.DeleteKeypair(accountInfo.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	err = db.SaveSettingField(settings.KeycardInstanceUID, "")
+	if err != nil {
+		return err
+	}
+
+	err = db.SaveSettingField(settings.KeycardPairedOn, 0)
+	if err != nil {
+		return err
+	}
+
+	err = db.SaveSettingField(settings.KeycardPairing, "")
+	if err != nil {
+		return err
+	}
+
+	err = b.closeAppDB()
+	if err != nil {
+		return err
+	}
+
+	return b.ChangeDatabasePassword(accountInfo.KeyUID, currPassword, newPassword)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
