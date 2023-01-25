@@ -1,4 +1,4 @@
-package wallet
+package thirdparty
 
 import (
 	"encoding/json"
@@ -119,7 +119,7 @@ func (c *CryptoCompare) DoQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *CryptoCompare) fetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (c *CryptoCompare) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	chunks := chunkSymbols(symbols)
 	result := make(map[string]map[string]float64)
 	realCurrencies := renameSymbols(currencies)
@@ -153,7 +153,7 @@ func (c *CryptoCompare) fetchPrices(symbols []string, currencies []string) (map[
 	return result, nil
 }
 
-func (c *CryptoCompare) fetchTokenDetails(symbols []string) (map[string]Coin, error) {
+func (c *CryptoCompare) FetchTokenDetails(symbols []string) (map[string]Coin, error) {
 	url := fmt.Sprintf("%s/data/all/coinlist", cryptocompareURL)
 	resp, err := c.DoQuery(url)
 	if err != nil {
@@ -181,7 +181,7 @@ func (c *CryptoCompare) fetchTokenDetails(symbols []string) (map[string]Coin, er
 	return coins, nil
 }
 
-func (c *CryptoCompare) fetchTokenMarketValues(symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
+func (c *CryptoCompare) FetchTokenMarketValues(symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
 	realCurrencies := renameSymbols(currencies)
 	realSymbols := renameSymbols(symbols)
 	item := map[string]map[string]MarketCoinValues{}
@@ -214,7 +214,7 @@ func (c *CryptoCompare) fetchTokenMarketValues(symbols []string, currencies []st
 	return item, nil
 }
 
-func (c *CryptoCompare) fetchHourlyMarketValues(symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
+func (c *CryptoCompare) FetchHourlyMarketValues(symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
 	item := []TokenHistoricalPairs{}
 
 	url := fmt.Sprintf("%s/data/v2/histohour?fsym=%s&tsym=%s&aggregate=%d&limit=%d&extraParams=Status.im", cryptocompareURL, getRealSymbol(symbol), currency, aggregate, limit)
@@ -240,7 +240,7 @@ func (c *CryptoCompare) fetchHourlyMarketValues(symbol string, currency string, 
 	return item, nil
 }
 
-func (c *CryptoCompare) fetchDailyMarketValues(symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
+func (c *CryptoCompare) FetchDailyMarketValues(symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
 	item := []TokenHistoricalPairs{}
 
 	url := fmt.Sprintf("%s/data/v2/histoday?fsym=%s&tsym=%s&aggregate=%d&limit=%d&allData=%v&extraParams=Status.im", cryptocompareURL, getRealSymbol(symbol), currency, aggregate, limit, allData)

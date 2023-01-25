@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -25,7 +26,7 @@ func getFixedCurrencies() []string {
 	return []string{"USD"}
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, cryptoCompare *CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, cryptoCompare *thirdparty.CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
 	return &Reader{rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed, nil}
 }
 
@@ -33,7 +34,7 @@ type Reader struct {
 	rpcClient     *rpc.Client
 	tokenManager  *token.Manager
 	priceManager  *PriceManager
-	cryptoCompare *CryptoCompare
+	cryptoCompare *thirdparty.CryptoCompare
 	accountsDB    *accounts.Database
 	walletFeed    *event.Feed
 	cancel        context.CancelFunc
@@ -179,8 +180,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	var (
 		group             = async.NewAtomicGroup(ctx)
 		prices            = map[string]map[string]float64{}
-		tokenDetails      = map[string]Coin{}
-		tokenMarketValues = map[string]map[string]MarketCoinValues{}
+		tokenDetails      = map[string]thirdparty.Coin{}
+		tokenMarketValues = map[string]map[string]thirdparty.MarketCoinValues{}
 		balances          = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	)
 
@@ -193,7 +194,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenDetails, err = r.cryptoCompare.fetchTokenDetails(tokenSymbols)
+		tokenDetails, err = r.cryptoCompare.FetchTokenDetails(tokenSymbols)
 		if err != nil {
 			return err
 		}
@@ -201,7 +202,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.cryptoCompare.fetchTokenMarketValues(tokenSymbols, currencies)
+		tokenMarketValues, err = r.cryptoCompare.FetchTokenMarketValues(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}

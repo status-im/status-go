@@ -4,21 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 type PricesPerTokenAndCurrency = map[string]map[string]float64
 
 type PriceManager struct {
 	db            *sql.DB
-	cryptoCompare *CryptoCompare
+	cryptoCompare *thirdparty.CryptoCompare
 }
 
-func NewPriceManager(db *sql.DB, cryptoCompare *CryptoCompare) *PriceManager {
+func NewPriceManager(db *sql.DB, cryptoCompare *thirdparty.CryptoCompare) *PriceManager {
 	return &PriceManager{db: db, cryptoCompare: cryptoCompare}
 }
 
 func (pm *PriceManager) FetchPrices(symbols []string, currencies []string) (PricesPerTokenAndCurrency, error) {
-	result, err := pm.cryptoCompare.fetchPrices(symbols, currencies)
+	result, err := pm.cryptoCompare.FetchPrices(symbols, currencies)
 	if err != nil {
 		return nil, err
 	}

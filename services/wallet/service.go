@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -53,10 +54,10 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
-	cryptoCompare := NewCryptoCompare()
+	cryptoCompare := thirdparty.NewCryptoCompare()
 	priceManager := NewPriceManager(db, cryptoCompare)
 	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
-	history := history.NewService(db, walletFeed, rpcClient, tokenManager)
+	history := history.NewService(db, walletFeed, rpcClient, tokenManager, cryptoCompare)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -102,7 +103,7 @@ type Service struct {
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
-	cryptoCompare         *CryptoCompare
+	cryptoCompare         *thirdparty.CryptoCompare
 	history               *history.Service
 }
 
@@ -110,6 +111,7 @@ type Service struct {
 func (s *Service) Start() error {
 	s.transferController.Start()
 	err := s.signals.Start()
+	s.history.Start()
 	s.started = true
 	return err
 }

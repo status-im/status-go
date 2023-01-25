@@ -497,7 +497,7 @@ func TestBalanceHistoryValidateBalanceValuesAndCacheHit(t *testing.T) {
 				n := reqBlkNos[i]
 
 				if value, contains := requestedBalance[n]; contains {
-					require.Equal(t, value.Cmp(balanceData[resIdx].Value.ToInt()), 0)
+					require.Equal(t, value.Cmp(balanceData[resIdx].Balance.ToInt()), 0)
 					resIdx++
 				}
 				blockHeaderRequestCount := dataSource.requestedBlocks[n].headerInfoRequests
@@ -508,7 +508,7 @@ func TestBalanceHistoryValidateBalanceValuesAndCacheHit(t *testing.T) {
 
 			// Check that balance values are in order
 			for i := 1; i < len(balanceData); i++ {
-				require.Greater(t, balanceData[i].Value.ToInt().Cmp(balanceData[i-1].Value.ToInt()), 0, "expected balanceData[%d] > balanceData[%d] for interval %d", i, i-1, testInput.interval)
+				require.Greater(t, balanceData[i].Balance.ToInt().Cmp(balanceData[i-1].Balance.ToInt()), 0, "expected balanceData[%d] > balanceData[%d] for interval %d", i, i-1, testInput.interval)
 			}
 			requestedBalance = make(map[int64]*big.Int)
 		})

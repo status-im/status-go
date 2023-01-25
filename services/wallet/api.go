@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -129,27 +130,15 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
 }
 
-func (api *API) StartBalanceHistory(ctx context.Context) error {
-	api.s.history.StartBalanceHistory()
-	return nil
-}
-
-func (api *API) StopBalanceHistory(ctx context.Context) error {
-	api.s.history.Stop()
-	return nil
-}
-
 func (api *API) UpdateVisibleTokens(ctx context.Context, symbols []string) error {
 	api.s.history.UpdateVisibleTokens(symbols)
 	return nil
 }
 
 // GetBalanceHistory retrieves token balance history for token identity on multiple chains
-// TODO: pass parameters by GetBalanceHistoryParameters struct
-// TODO: expose endTimestamp parameter
-func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, currency string, timeInterval history.TimeInterval) ([]*history.DataPoint, error) {
+func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, timeInterval history.TimeInterval) ([]*history.ValuePoint, error) {
 	endTimestamp := time.Now().UTC().Unix()
-	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, currency, endTimestamp, timeInterval)
+	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, tokenSymbol, currencySymbol, endTimestamp, timeInterval)
 }
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
@@ -353,24 +342,24 @@ func (api *API) GetCachedPrices(ctx context.Context) (map[string]map[string]floa
 	return api.s.priceManager.GetCachedPrices()
 }
 
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]thirdparty.MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return api.s.cryptoCompare.fetchTokenMarketValues(symbols, currencies)
+	return api.s.cryptoCompare.FetchTokenMarketValues(symbols, currencies)
 }
 
-func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
+func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]thirdparty.TokenHistoricalPairs, error) {
 	log.Debug("call to GetHourlyMarketValues")
-	return api.s.cryptoCompare.fetchHourlyMarketValues(symbol, currency, limit, aggregate)
+	return api.s.cryptoCompare.FetchHourlyMarketValues(symbol, currency, limit, aggregate)
 }
 
-func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
+func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.TokenHistoricalPairs, error) {
 	log.Debug("call to GetDailyMarketValues")
-	return api.s.cryptoCompare.fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
+	return api.s.cryptoCompare.FetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
 }
 
-func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
+func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.Coin, error) {
 	log.Debug("call to FetchTokenDetails")
-	return api.s.cryptoCompare.fetchTokenDetails(symbols)
+	return api.s.cryptoCompare.FetchTokenDetails(symbols)
 }
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

@@ -6,12 +6,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 func setupTestPriceDB(t *testing.T) (*PriceManager, func()) {
 	db, err := appdatabase.InitializeDB(":memory:", "wallet-price-tests-", 1)
 	require.NoError(t, err)
-	return NewPriceManager(db, NewCryptoCompare()), func() {
+	return NewPriceManager(db, thirdparty.NewCryptoCompare()), func() {
 		require.NoError(t, db.Close())
 	}
 }
