@@ -9,7 +9,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/verification"
 )
 
 func (db sqlitePersistence) DeleteActivityCenterNotification(id []byte) error {
@@ -711,39 +710,6 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationMessage(id types.HexBytes, message *common.Message) error {
-	encodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ? WHERE id = ?`, encodedMessage, id)
-	return err
-
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationContactVerificationStatus(id types.HexBytes, status verification.RequestStatus) error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET contact_verification_status = ? WHERE id = ?`, status, id)
-	return err
-
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationFields(id types.HexBytes, message *common.Message, replyMessage *common.Message, status verification.RequestStatus) error {
-	encodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	encodedReplyMessage, err := json.Marshal(replyMessage)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ?, reply_message = ?, contact_verification_status = ? WHERE id = ?`, encodedMessage, encodedReplyMessage, status, id)
-	return err
-
 }
 
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
