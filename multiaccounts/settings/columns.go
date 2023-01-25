@@ -402,6 +402,11 @@ var (
 		dBColumnName:   "wallet_root_address",
 		valueHandler:   AddressHandler,
 	}
+	MasterAddress = SettingField{
+		reactFieldName: "address",
+		dBColumnName:   "address",
+		valueHandler:   AddressHandler,
+	}
 
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,

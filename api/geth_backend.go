@@ -604,6 +604,26 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
+	masterAddress, err := accountDB.GetMasterAddress()
+	if err != nil {
+		return err
+	}
+
+	dappsAddress, err := accountDB.GetDappsAddress()
+	if err != nil {
+		return err
+	}
+
+	eip1581Address, err := accountDB.GetEIP1581Address()
+	if err != nil {
+		return err
+	}
+
+	walletRootAddress, err := accountDB.GetWalletRootAddress()
+	if err != nil {
+		return err
+	}
+
 	err = b.closeAppDB()
 	if err != nil {
 		return err
@@ -614,13 +634,18 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 		return err
 	}
 
+	// We need to delete all accounts for the keypair which is being migrated
+	// no need to check for the error below cause if this action fails from
+	// whichever reason the account is still successfully migrated
 	for _, acc := range knownAccounts {
 		if account.KeyUID == acc.KeyUID {
-			// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
-			// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
-			_ = b.accountManager.DeleteAccount(keyStoreDir, acc.Address)
+			_ = b.accountManager.DeleteAccount(keyStoreDir, acc.Address, true)
 		}
 	}
+	_ = b.accountManager.DeleteAccount(keyStoreDir, masterAddress, true)
+	_ = b.accountManager.DeleteAccount(keyStoreDir, dappsAddress, true)
+	_ = b.accountManager.DeleteAccount(keyStoreDir, eip1581Address, true)
+	_ = b.accountManager.DeleteAccount(keyStoreDir, walletRootAddress, true)
 
 	return nil
 }
