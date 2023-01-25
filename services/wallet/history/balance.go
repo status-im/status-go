@@ -87,9 +87,9 @@ type DataSource interface {
 }
 
 type DataPoint struct {
-	Value       *hexutil.Big `json:"value"`
-	Timestamp   uint64       `json:"time"`
-	BlockNumber *hexutil.Big `json:"blockNumber"`
+	Balance     *hexutil.Big
+	Timestamp   uint64
+	BlockNumber *hexutil.Big
 }
 
 func strideDuration(timeInterval TimeInterval) time.Duration {
@@ -113,7 +113,7 @@ func (b *Balance) fetchAndCache(ctx context.Context, source DataSource, address 
 				return nil, nil, err
 			}
 			return &DataPoint{
-				Value:       (*hexutil.Big)(cached[0].balance),
+				Balance:     (*hexutil.Big)(cached[0].balance),
 				Timestamp:   uint64(cached[0].timestamp),
 				BlockNumber: (*hexutil.Big)(cached[0].block),
 			}, blockNo, nil
@@ -156,7 +156,7 @@ func (b *Balance) fetchAndCache(ctx context.Context, source DataSource, address 
 	}
 
 	var dataPoint DataPoint
-	dataPoint.Value = (*hexutil.Big)(currentBalance)
+	dataPoint.Balance = (*hexutil.Big)(currentBalance)
 	dataPoint.Timestamp = uint64(timestamp)
 	return &dataPoint, blockNo, nil
 }
@@ -241,7 +241,7 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 	points := make([]*DataPoint, 0, len(cached)+1)
 	for _, entry := range cached {
 		dataPoint := DataPoint{
-			Value:       (*hexutil.Big)(entry.balance),
+			Balance:     (*hexutil.Big)(entry.balance),
 			Timestamp:   uint64(entry.timestamp),
 			BlockNumber: (*hexutil.Big)(entry.block),
 		}
@@ -254,7 +254,7 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 	}
 	if len(lastCached) > 0 && len(cached) > 0 && lastCached[0].block.Cmp(cached[len(cached)-1].block) > 0 {
 		points = append(points, &DataPoint{
-			Value:       (*hexutil.Big)(lastCached[0].balance),
+			Balance:     (*hexutil.Big)(lastCached[0].balance),
 			Timestamp:   uint64(lastCached[0].timestamp),
 			BlockNumber: (*hexutil.Big)(lastCached[0].block),
 		})

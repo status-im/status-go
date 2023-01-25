@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"math/big"
 	"sort"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -44,14 +46,16 @@ type Service struct {
 	serviceContext context.Context
 	cancelFn       context.CancelFunc
 
+	exchange *Exchange
+
 	timer                    *time.Timer
 	visibleTokenSymbols      []string
-	visibleTokenSymbolsMutex sync.Mutex // Protects access to visibleSymbols
+	visibleTokenSymbolsMutex sync.Mutex
 }
 
 type chainIdentity uint64
 
-func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager) *Service {
+func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, cryptoCompare *thirdparty.CryptoCompare) *Service {
 	return &Service{
 		balance:        NewBalance(NewBalanceDB(db)),
 		db:             db,
@@ -59,6 +63,7 @@ func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, 
 		rpcClient:      rpcClient,
 		networkManager: rpcClient.NetworkManager,
 		tokenManager:   tokenManager,
+		exchange:       NewExchange(cryptoCompare),
 	}
 }
 
@@ -78,7 +83,7 @@ func (s *Service) triggerEvent(eventType walletevent.EventType, account statusty
 	})
 }
 
-func (s *Service) StartBalanceHistory() {
+func (s *Service) Start() {
 	go func() {
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
 		s.timer = time.NewTimer(balanceHistoryUpdateInterval)
@@ -198,40 +203,125 @@ func (src *tokenChainClientSource) BalanceAt(ctx context.Context, account common
 	return balance, err
 }
 
+type ValuePoint struct {
+	Value       float64      `json:"value"`
+	Timestamp   uint64       `json:"time"`
+	BlockNumber *hexutil.Big `json:"blockNumber"`
+}
+
 // GetBalanceHistory returns token count balance
-// TODO: fetch token to FIAT exchange rates and return FIAT balance
-func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, currency string, endTimestamp int64, timeInterval TimeInterval) ([]*DataPoint, error) {
+func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, endTimestamp int64, timeInterval TimeInterval) ([]*ValuePoint, error) {
+	// Retrieve cached data for all chains
 	allData := make(map[chainIdentity][]*DataPoint)
 	for _, chainID := range chainIDs {
-		data, err := s.balance.get(ctx, chainID, currency, address, endTimestamp, timeInterval)
+		data, err := s.balance.get(ctx, chainID, tokenSymbol, address, endTimestamp, timeInterval)
 		if err != nil {
 			return nil, err
 		}
 		if len(data) > 0 {
 			allData[chainIdentity(chainID)] = data
+		} else {
+			return make([]*ValuePoint, 0), nil
 		}
 	}
 
-	return mergeDataPoints(allData, strideDuration(timeInterval))
+	data, err := mergeDataPoints(allData, strideDuration(timeInterval))
+	if err != nil {
+		return nil, err
+	} else if len(data) == 0 {
+		return make([]*ValuePoint, 0), nil
+	}
+
+	// Check if historical exchange rate for data point is present and fetch remaining if not
+	lastDayTime := time.Unix(int64(data[len(data)-1].Timestamp), 0).UTC()
+	currentTime := time.Now().UTC()
+	currentDayStart := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 0, 0, 0, 0, time.UTC)
+	if lastDayTime.After(currentDayStart) {
+		// No chance to have today, use the previous day value for the last data point
+		lastDayTime = lastDayTime.AddDate(0, 0, -1)
+	}
+
+	_, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, lastDayTime)
+	if err != nil {
+		err := s.exchange.FetchAndCacheMissingRates(tokenSymbol, currencySymbol)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	decimals, err := s.decimalsForToken(tokenSymbol, chainIDs[0])
+	if err != nil {
+		return nil, err
+	}
+	weisInOneMain := big.NewFloat(math.Pow(10, float64(decimals)))
+
+	var res []*ValuePoint
+	for _, d := range data {
+		dayTime := time.Unix(int64(d.Timestamp), 0).UTC()
+		if dayTime.After(currentDayStart) {
+			// No chance to have today, use the previous day value for the last data point
+			dayTime = lastDayTime
+		}
+		dayValue, err := s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, dayTime)
+		if err != nil {
+			log.Warn("Echange rate missing for", dayTime, "- err", err)
+			continue
+		}
+
+		// The big.Int values are discarded, hence copy the original values
+		res = append(res, &ValuePoint{
+			Timestamp:   d.Timestamp,
+			Value:       tokenToValue((*big.Int)(d.Balance), dayValue, weisInOneMain),
+			BlockNumber: d.BlockNumber,
+		})
+	}
+	return res, nil
+}
+
+func (s *Service) decimalsForToken(tokenSymbol string, chainID uint64) (int, error) {
+	network := s.networkManager.Find(chainID)
+	if network == nil {
+		return 0, errors.New("network not found")
+	}
+	token := s.tokenManager.FindToken(network, tokenSymbol)
+	if token == nil {
+		return 0, errors.New("token not found")
+	}
+	return int(token.Decimals), nil
+}
+
+func tokenToValue(tokenCount *big.Int, mainDenominationValue float32, weisInOneMain *big.Float) float64 {
+	weis := new(big.Float).SetInt(tokenCount)
+	mainTokens := new(big.Float).Quo(weis, weisInOneMain)
+	mainTokenValue := new(big.Float).SetFloat64(float64(mainDenominationValue))
+	res, accuracy := new(big.Float).Mul(mainTokens, mainTokenValue).Float64()
+	if res == 0 && accuracy == big.Below {
+		return math.SmallestNonzeroFloat64
+	} else if res == math.Inf(1) && accuracy == big.Above {
+		return math.Inf(1)
+	}
+
+	return res
 }
 
 // mergeDataPoints merges close in time block numbers. Drops the ones that are not in a stride duration
 // this should improve merging balance data from different chains which are incompatible due to different timelines
 // and block length
 func mergeDataPoints(data map[chainIdentity][]*DataPoint, stride time.Duration) ([]*DataPoint, error) {
+	// Special cases
 	if len(data) == 0 {
 		return make([]*DataPoint, 0), nil
-	}
-
-	pos := make(map[chainIdentity]int)
-	for k := range data {
-		pos[k] = 0
+	} else if len(data) == 1 {
+		for k := range data {
+			return data[k], nil
+		}
 	}
 
 	res := make([]*DataPoint, 0)
-	strideStart := findFirstStrideWindow(data, stride)
+	strideStart, pos := findFirstStrideWindow(data, stride)
 	for {
 		strideEnd := strideStart + int64(stride.Seconds())
+
 		// - Gather all points in the stride window starting with current pos
 		var strideIdentities map[chainIdentity][]timeIdentity
 		strideIdentities, pos = dataInStrideWindowAndNextPos(data, pos, strideEnd)
@@ -249,7 +339,7 @@ func mergeDataPoints(data map[chainIdentity][]*DataPoint, stride time.Duration) 
 			for chainID, identities := range strideIdentities {
 				for _, identity := range identities {
 					_, exists := chainMaxBalance[chainID]
-					if exists && (*big.Int)(identity.dataPoint(data).Value).Cmp((*big.Int)(chainMaxBalance[chainID].Value)) <= 0 {
+					if exists && (*big.Int)(identity.dataPoint(data).Balance).Cmp((*big.Int)(chainMaxBalance[chainID].Balance)) <= 0 {
 						continue
 					}
 					chainMaxBalance[chainID] = identity.dataPoint(data)
@@ -257,11 +347,17 @@ func mergeDataPoints(data map[chainIdentity][]*DataPoint, stride time.Duration) 
 			}
 			balance := big.NewInt(0)
 			for _, chainBalance := range chainMaxBalance {
-				balance.Add(balance, (*big.Int)(chainBalance.Value))
+				balance.Add(balance, (*big.Int)(chainBalance.Balance))
 			}
+
+			// if last stride, the timestamp might be in the future
+			if strideEnd > time.Now().UTC().Unix() {
+				strideEnd = time.Now().UTC().Unix()
+			}
+
 			res = append(res, &DataPoint{
 				Timestamp:   uint64(strideEnd),
-				Value:       (*hexutil.Big)(balance),
+				Balance:     (*hexutil.Big)(balance),
 				BlockNumber: (*hexutil.Big)(getBlockID(chainMaxBalance)),
 			})
 		}
@@ -313,19 +409,17 @@ func allPastEnd(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int) 
 	return true
 }
 
-// findFirstStrideWindow returns the start of the first stride window
-// Tried to implement finding an optimal stride window but it was becoming too complicated and not worth it given that it will
-// potentially save the first and last stride but it is not guaranteed. Current implementation should give good results
-// as long as the the DataPoints are regular enough
-func findFirstStrideWindow(data map[chainIdentity][]*DataPoint, stride time.Duration) int64 {
-	pos := make(map[chainIdentity]int)
+// findFirstStrideWindow returns the start of the first stride window (timestamp and all positions)
+//
+// Note: tried to implement finding an optimal stride window but it was becoming too complicated and not worth it given that it will potentially save the first and last stride but it is not guaranteed. Current implementation should give good results as long as the the DataPoints are regular enough
+func findFirstStrideWindow(data map[chainIdentity][]*DataPoint, stride time.Duration) (firstTimestamp int64, pos map[chainIdentity]int) {
+	pos = make(map[chainIdentity]int)
 	for k := range data {
 		pos[k] = 0
 	}
 
-	// Identify the current oldest and newest block
 	cur := sortTimeAsc(data, pos)
-	return int64(cur[0].dataPoint(data).Timestamp)
+	return int64(cur[0].dataPoint(data).Timestamp), pos
 }
 
 func copyMap[K comparable, V any](original map[K]V) map[K]V {

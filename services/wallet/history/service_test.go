@@ -1,14 +1,49 @@
 package history
 
 import (
+	"context"
+	"math"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/params"
+	statusRPC "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/transactions/fake"
 
 	"github.com/stretchr/testify/require"
 )
+
+func setupDummyServiceNoDependencies(t *testing.T) (service *Service, closeFn func()) {
+	db, err := appdatabase.InitializeDB(":memory:", "wallet-history-service-tests", 1)
+	require.NoError(t, err)
+	cryptoCompare := thirdparty.NewCryptoCompare()
+
+	// Creating a dummy status node to simulate what it's done in get_status_node.go
+	upstreamConfig := params.UpstreamRPCConfig{
+		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
+		Enabled: true,
+	}
+
+	txServiceMockCtrl := gomock.NewController(t)
+	server, _ := fake.NewTestServer(txServiceMockCtrl)
+	client := gethrpc.DialInProc(server)
+
+	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
+	require.NoError(t, err)
+
+	return NewService(db, nil, rpcClient, nil, cryptoCompare), func() {
+		require.NoError(t, db.Close())
+	}
+}
 
 type TestDataPoint struct {
 	value       int64
@@ -29,7 +64,7 @@ func prepareTestData(data []TestDataPoint) map[chainIdentity][]*DataPoint {
 		res[entry.chainID] = append(res[entry.chainID], &DataPoint{
 			BlockNumber: (*hexutil.Big)(big.NewInt(data[i].blockNumber)),
 			Timestamp:   data[i].timestamp,
-			Value:       (*hexutil.Big)(big.NewInt(data[i].value)),
+			Balance:     (*hexutil.Big)(big.NewInt(data[i].value)),
 		})
 	}
 	return res
@@ -51,7 +86,7 @@ func getBlockNumbers(data []*DataPoint) []int64 {
 func getValues(data []*DataPoint) []int64 {
 	res := make([]int64, 0)
 	for _, entry := range data {
-		res = append(res, entry.Value.ToInt().Int64())
+		res = append(res, entry.Balance.ToInt().Int64())
 	}
 	return res
 }
@@ -148,7 +183,7 @@ func TestServiceMergeDataPointsOneChain(t *testing.T) {
 	require.Equal(t, 3, len(res))
 	require.Equal(t, []int64{105, 115, 125}, getBlockNumbers(res))
 	require.Equal(t, []int64{1, 2, 3}, getValues(res))
-	require.Equal(t, []int64{115, 125, 135}, getTimestamps(res))
+	require.Equal(t, []int64{105, 115, 125}, getTimestamps(res), "Expect no merging for one chain")
 }
 
 func TestServiceMergeDataPointsDropAll(t *testing.T) {
@@ -185,8 +220,9 @@ func TestServiceFindFirstStrideWindowFirstForAllChainInOneStride(t *testing.T) {
 		{value: 1, timestamp: 110, blockNumber: 103, chainID: 2},
 	})
 
-	startTimestamp := findFirstStrideWindow(testData, strideDuration)
+	startTimestamp, pos := findFirstStrideWindow(testData, strideDuration)
 	require.Equal(t, testData[1][0].Timestamp, uint64(startTimestamp))
+	require.Equal(t, map[chainIdentity]int{1: 0, 2: 0, 3: 0}, pos)
 }
 
 func TestServiceSortTimeAsc(t *testing.T) {
@@ -213,4 +249,33 @@ func TestServiceAtEnd(t *testing.T) {
 	require.True(t, sorted[1].atEnd(testData))
 	sorted = sortTimeAsc(testData, map[chainIdentity]int{1: 1, 2: 0})
 	require.True(t, sorted[1].atEnd(testData))
+}
+
+func TestServiceTokenToValue(t *testing.T) {
+	weisInOneMain := big.NewFloat(math.Pow(10, 18.0))
+	res := tokenToValue(big.NewInt(12345), 1000, weisInOneMain)
+	require.Equal(t, 0.000000000012345, res)
+
+	in, ok := new(big.Int).SetString("1234567890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", 10)
+	require.True(t, ok)
+	res = tokenToValue(in, 10000, weisInOneMain)
+	require.Equal(t, 1.23456789e+112, res)
+
+	res = tokenToValue(big.NewInt(1000000000000000000), 1.0, weisInOneMain)
+	require.Equal(t, 1.0, res)
+
+	res = tokenToValue(big.NewInt(1), 1.23456789, weisInOneMain)
+	require.InEpsilonf(t, 1.23456789e-18, res, 1.0e-8, "Expects error for handling such low values")
+
+	res = tokenToValue(new(big.Int).Exp(big.NewInt(10), big.NewInt(254), nil), 100000, weisInOneMain)
+	require.Equal(t, 1e+241, res, "Expect exponent 254-18+5")
+}
+
+func TestServiceGetBalanceHistoryNoData(t *testing.T) {
+	service, closeFn := setupDummyServiceNoDependencies(t)
+	defer closeFn()
+
+	res, err := service.GetBalanceHistory(context.Background(), []uint64{777}, common.HexToAddress(`0x1`), "ETH", "EUR", time.Now().Unix(), BalanceHistory1Year)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(res))
 }
