@@ -324,7 +324,7 @@ func TestKeypairs(t *testing.T) {
 	require.NoError(t, err)
 	locked = true
 	for _, kp := range rows {
-		if kp.KeyUID == keyPair1.KeyUID {
+		if kp.KeycardUID == keycardUID {
 			locked = kp.KeycardLocked
 		}
 	}
@@ -337,11 +337,25 @@ func TestKeypairs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rows))
 	// Test if correct keycard is deleted
-	deletedKeyPair1 := true
+	deletedKeyCard := true
 	for _, kp := range rows {
-		if kp.KeyUID == keyPair1.KeyUID {
-			deletedKeyPair1 = false
+		if kp.KeycardUID == keycardUID {
+			deletedKeyCard = false
 		}
 	}
-	require.Equal(t, true, deletedKeyPair1)
+	require.Equal(t, true, deletedKeyCard)
+
+	// Test detleting a keypair
+	err = db.DeleteKeypair(keyPair2.KeyUID)
+	require.NoError(t, err)
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	// Test if correct keycard is deleted
+	deletedKeyPair2And3 := true
+	for _, kp := range rows {
+		if kp.KeyUID == keyPair2.KeyUID {
+			deletedKeyPair2And3 = false
+		}
+	}
+	require.Equal(t, true, deletedKeyPair2And3)
 }
