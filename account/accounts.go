@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -606,7 +607,7 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 	return nil
 }
 
-func (m *Manager) DeleteAccount(keyDirPath string, address types.Address) error {
+func (m *Manager) DeleteAccount(keyDirPath string, address types.Address, ignoreCase bool) error {
 	var err error
 	var foundKeyFile string
 	err = filepath.Walk(keyDirPath, func(path string, fileInfo os.FileInfo, err error) error {
@@ -629,8 +630,14 @@ func (m *Manager) DeleteAccount(keyDirPath string, address types.Address) error 
 			return fmt.Errorf("failed to read key file: %s", e)
 		}
 
-		if types.HexToAddress("0x"+accountKey.Address).Hex() == address.Hex() {
-			foundKeyFile = path
+		if ignoreCase {
+			if strings.EqualFold("0x"+accountKey.Address, address.String()) {
+				foundKeyFile = path
+			}
+		} else {
+			if types.HexToAddress("0x"+accountKey.Address).Hex() == address.Hex() {
+				foundKeyFile = path
+			}
 		}
 
 		return nil
