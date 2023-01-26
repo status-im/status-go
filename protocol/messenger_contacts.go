@@ -272,7 +272,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return nil, saveErr
 		}
 

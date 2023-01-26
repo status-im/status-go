@@ -1131,7 +1131,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return saveErr
 		}
 		state.Response.AddActivityCenterNotification(notification)
@@ -1268,7 +1268,7 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
 	if saveErr != nil {
-		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		m.logger.Error("failed to save notification", zap.Error(saveErr))
 		return saveErr
 	}
 	state.Response.AddActivityCenterNotification(notification)
@@ -1703,7 +1703,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
 	err := m.persistence.SaveActivityCenterNotification(notification)
 	if err != nil {
-		m.logger.Warn("failed to save notification", zap.Error(err))
+		m.logger.Error("failed to save notification", zap.Error(err))
 		return err
 	}
 	response.AddActivityCenterNotification(notification)

@@ -249,7 +249,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return nil, saveErr
 		}
 		response.AddActivityCenterNotification(notification)
@@ -360,7 +360,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return nil, saveErr
 		}
 
@@ -457,7 +457,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
 	if saveErr != nil {
-		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		m.logger.Error("failed to save notification", zap.Error(saveErr))
 		return nil, saveErr
 	}
 
@@ -565,7 +565,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
 	if saveErr != nil {
-		m.logger.Warn("failed to save notification", zap.Error(saveErr))
+		m.logger.Error("failed to save notification", zap.Error(saveErr))
 		return nil, saveErr
 	}
 
@@ -677,7 +677,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return nil, saveErr
 		}
 

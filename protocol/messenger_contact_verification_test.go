@@ -571,18 +571,15 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStatePending)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err := theirMessenger.UnreadActivityCenterNotifications(
-		"",
-		4,
-		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
-	)
+	notification, err := theirMessenger.ActivityCenterNotification(types.FromHex(verificationRequestID))
+
 	s.Require().NoError(err)
-	s.Require().Greater(len(notifications.Notifications), 1)
-	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusPENDING)
-	s.Require().Equal(notifications.Notifications[0].Message.ContactVerificationState, common.ContactVerificationStatePending)
-	s.Require().Equal(notifications.Notifications[0].Read, false)
-	s.Require().Equal(notifications.Notifications[0].Accepted, false)
-	s.Require().Equal(notifications.Notifications[0].Dismissed, false)
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.ContactVerificationStatus, verification.RequestStatusPENDING)
+	s.Require().Equal(notification.Message.ContactVerificationState, common.ContactVerificationStatePending)
+	s.Require().Equal(notification.Read, false)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, false)
 
 	resp, err = theirMessenger.DeclineContactVerificationRequest(context.Background(), verificationRequestID)
 
@@ -607,18 +604,15 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateDeclined)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err = theirMessenger.UnreadActivityCenterNotifications(
-		"",
-		4,
-		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
-	)
+	notification, err = theirMessenger.ActivityCenterNotification(types.FromHex(verificationRequestID))
+
 	s.Require().NoError(err)
-	s.Require().Greater(len(notifications.Notifications), 1)
-	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusDECLINED)
-	s.Require().Equal(notifications.Notifications[0].Message.ContactVerificationState, common.ContactVerificationStateDeclined)
-	s.Require().Equal(notifications.Notifications[0].Read, true)
-	s.Require().Equal(notifications.Notifications[0].Accepted, false)
-	s.Require().Equal(notifications.Notifications[0].Dismissed, true)
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.ContactVerificationStatus, verification.RequestStatusDECLINED)
+	s.Require().Equal(notification.Message.ContactVerificationState, common.ContactVerificationStateDeclined)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, true)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
