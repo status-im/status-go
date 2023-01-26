@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -607,47 +606,6 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 	return nil
 }
 
-func (m *Manager) DeleteAccount(keyDirPath string, address types.Address, ignoreCase bool) error {
-	var err error
-	var foundKeyFile string
-	err = filepath.Walk(keyDirPath, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
-			return nil
-		}
-
-		rawKeyFile, e := ioutil.ReadFile(path)
-		if e != nil {
-			return fmt.Errorf("invalid account key file: %v", e)
-		}
-
-		var accountKey struct {
-			Address string `json:"address"`
-		}
-		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
-			return fmt.Errorf("failed to read key file: %s", e)
-		}
-
-		if ignoreCase {
-			if strings.EqualFold("0x"+accountKey.Address, address.String()) {
-				foundKeyFile = path
-			}
-		} else {
-			if types.HexToAddress("0x"+accountKey.Address).Hex() == address.Hex() {
-				foundKeyFile = path
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("cannot traverse key store folder: %v", err)
-	}
-
-	if len(foundKeyFile) == 0 {
-		return ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", address.Hex())}
-	}
-	return os.Remove(foundKeyFile)
+func (m *Manager) DeleteAccount(address types.Address, password string) error {
+	return m.keystore.Delete(types.Account{Address: address}, password)
 }
