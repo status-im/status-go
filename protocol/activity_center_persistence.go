@@ -377,7 +377,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	a.contact_verification_status,
 	c.name,
 	a.author,
-	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
+	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor
 	FROM activity_center_notifications a
 	LEFT JOIN chats c
 	ON
