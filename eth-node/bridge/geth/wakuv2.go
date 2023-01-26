@@ -1,6 +1,7 @@
 package gethbridge
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"time"
@@ -178,7 +179,7 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 	return errors.New("DEPRECATED")
 }
 
-func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
+func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
 	var options []store.HistoryRequestOption
 
 	peer, err := peer.Decode(string(peerID))
@@ -203,7 +204,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(peerID []byte, r types.Messages
 		topics = append(topics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(peer, topics, uint64(r.From), uint64(r.To), options)
+	pbCursor, err := w.waku.Query(ctx, peer, topics, uint64(r.From), uint64(r.To), options)
 	if err != nil {
 		return nil, err
 	}

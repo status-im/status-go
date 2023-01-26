@@ -492,7 +492,7 @@ func (t *Transport) createMessagesRequestV2(
 		})
 
 		go func() {
-			storeCursor, err = t.waku.RequestStoreMessages(peerID, r)
+			storeCursor, err = t.waku.RequestStoreMessages(ctx, peerID, r)
 			resultCh <- struct {
 				storeCursor *types.StoreRequestCursor
 				err         error
@@ -507,7 +507,7 @@ func (t *Transport) createMessagesRequestV2(
 		}
 	} else {
 		go func() {
-			_, err = t.waku.RequestStoreMessages(peerID, r)
+			_, err = t.waku.RequestStoreMessages(ctx, peerID, r)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))
 			}

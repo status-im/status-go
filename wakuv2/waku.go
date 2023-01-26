@@ -1118,7 +1118,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return hash, nil
 }
 
-func (w *Waku) Query(peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
@@ -1136,15 +1136,12 @@ func (w *Waku) Query(peerID peer.ID, topics []common.TopicType, from uint64, to 
 		Topic:         relay.DefaultWakuTopic,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
 	result, err := w.node.Store().Query(ctx, query, opts...)
 	if err != nil && errors.Is(err, store.ErrEmptyResponse) {
 		// No messages
 		return nil, nil
 	} else if err != nil {
-		w.logger.Error("error querying storenode", zap.String("peerID", peerID.String()), zap.Error(err))
+		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
 		signal.SendHistoricMessagesRequestFailed(requestID, peerID, err)
 		return nil, err
 	}
