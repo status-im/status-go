@@ -41,8 +41,6 @@ var (
 	ErrFailedQuery = errors.New("failed to resolve the query")
 
 	ErrFutureMessage = errors.New("message timestamp in the future")
-
-	ErrEmptyResponse = errors.New("empty store response")
 )
 
 type WakuSwap interface {
