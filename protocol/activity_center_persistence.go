@@ -120,7 +120,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status, read) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus, notification.Read)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status, read, accepted, dismissed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus, notification.Read, notification.Accepted, notification.Dismissed)
 	return err
 }
 
@@ -381,7 +381,6 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	LEFT JOIN chats c
 	ON
 	c.id = a.chat_id
-	WHERE NOT a.dismissed
 	%s
 	%s
 	%s

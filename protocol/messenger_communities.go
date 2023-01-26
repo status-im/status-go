@@ -765,6 +765,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
 		notification.Read = true
+		notification.Accepted = true
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
@@ -798,6 +799,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		notification.Read = true
+		notification.Dismissed = true
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {

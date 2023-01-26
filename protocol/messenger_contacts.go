@@ -172,10 +172,11 @@ func (m *Messenger) dismissContactRequest(requestID string, syncing bool) (*Mess
 	if notification != nil {
 		notification.Message = contactRequest
 		notification.Read = true
+		notification.Dismissed = true
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
+			m.logger.Error("failed to save notification", zap.Error(saveErr))
 			return nil, saveErr
 		}
 
@@ -267,6 +268,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	if notification != nil {
 		notification.Message = contactRequest
 		notification.Read = true
+		notification.Accepted = true
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {

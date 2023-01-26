@@ -356,6 +356,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		message.ContactVerificationState = common.ContactVerificationStateAccepted
 		notification.ReplyMessage = replyMessage
 		notification.Read = true
+		notification.Accepted = true
 
 		saveErr := m.persistence.SaveActivityCenterNotification(notification)
 		if saveErr != nil {
@@ -452,6 +453,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 	notification.ContactVerificationStatus = verification.RequestStatusTRUSTED
 	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
 	notification.Read = true
+	notification.Accepted = true
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
 	if saveErr != nil {
@@ -559,6 +561,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 	notification.ContactVerificationStatus = verification.RequestStatusUNTRUSTWORTHY
 	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
 	notification.Read = true
+	notification.Accepted = true
 
 	saveErr := m.persistence.SaveActivityCenterNotification(notification)
 	if saveErr != nil {
@@ -667,6 +670,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	if notification != nil {
 		notification.ContactVerificationStatus = verification.RequestStatusDECLINED
 		notification.Read = true
+		notification.Dismissed = true
 
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateDeclined
@@ -1044,6 +1048,8 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
 		Read:                      true, // Always true for outgoing
+		Accepted:                  vr.RequestStatus == verification.RequestStatusACCEPTED || vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
+		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
 	}
 
 	return m.addActivityCenterNotification(response, notification)
@@ -1061,6 +1067,8 @@ func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contac
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
 		Read:                      vr.RequestStatus != verification.RequestStatusPENDING, // Unread only for pending incomming
+		Accepted:                  vr.RequestStatus == verification.RequestStatusACCEPTED || vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
+		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)

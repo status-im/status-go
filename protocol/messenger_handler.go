@@ -353,6 +353,8 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:    contact.ID,
 		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
+		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)
