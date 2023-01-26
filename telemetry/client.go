@@ -43,6 +43,7 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 			"messageId":      message.ID,
 			"sentAt":         sshMessage.Timestamp,
 			"topic":          filter.Topic.String(),
+			"messageType":    message.Type.String(),
 			"receiverKeyUID": c.keyUID,
 			"nodeName":       c.nodeName,
 		})
