@@ -707,7 +707,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
-	_, changes, err := s.manager.CreateChat(community.ID(), chat, true)
+	_, changes, err := s.manager.CreateChat(community.ID(), chat, true, "")
 	if err != nil {
 		return nil, "", err
 	}

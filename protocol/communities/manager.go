@@ -504,7 +504,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -513,6 +513,10 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 		return nil, nil, ErrOrgNotFound
 	}
 	chatID := uuid.New().String()
+	if thirdPartyID != "" {
+		chatID = chatID + thirdPartyID
+	}
+
 	changes, err := community.CreateChat(chatID, chat)
 	if err != nil {
 		return nil, nil, err
@@ -598,7 +602,11 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 	if community == nil {
 		return nil, nil, ErrOrgNotFound
 	}
+
 	categoryID := uuid.New().String()
+	if request.ThirdPartyID != "" {
+		categoryID = categoryID + request.ThirdPartyID
+	}
 
 	// Remove communityID prefix from chatID if exists
 	for i, cid := range request.ChatIDs {
