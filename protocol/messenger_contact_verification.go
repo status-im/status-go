@@ -1047,8 +1047,8 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 		Timestamp:                 chatMessage.WhisperTimestamp,
 		ChatID:                    contact.ID,
 		ContactVerificationStatus: vr.RequestStatus,
-		Read:                      true, // Always true for outgoing
-		Accepted:                  vr.RequestStatus == verification.RequestStatusACCEPTED || vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
+		Read:                      vr.RequestStatus != verification.RequestStatusACCEPTED, // Mark as Unread Accepted notification because we are waiting for the asnwer
+		Accepted:                  vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
 		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
 	}
 
