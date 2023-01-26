@@ -160,10 +160,12 @@ type ImportProgress struct {
 	ErrorsCount     uint                            `json:"errorsCount"`
 	WarningsCount   uint                            `json:"warningsCount"`
 	Stopped         bool                            `json:"stopped"`
+	TotalChunkCount int                             `json:"totalChunksCount,omitempty"`
+	CurrentChunk    int                             `json:"currentChunk,omitempty"`
 	m               sync.Mutex
 }
 
-func (progress *ImportProgress) Init(tasks []ImportTask) {
+func (progress *ImportProgress) Init(totalChunkCount int, tasks []ImportTask) {
 	progress.Progress = 0
 	progress.Tasks = make([]*ImportTaskProgress, 0)
 	for _, task := range tasks {
@@ -180,6 +182,8 @@ func (progress *ImportProgress) Init(tasks []ImportTask) {
 	progress.ErrorsCount = 0
 	progress.WarningsCount = 0
 	progress.Stopped = false
+	progress.TotalChunkCount = totalChunkCount
+	progress.CurrentChunk = 0
 }
 
 func (progress *ImportProgress) Stop() {

@@ -13,6 +13,7 @@ type CreateCommunityCategory struct {
 	CommunityID  types.HexBytes `json:"communityId"`
 	CategoryName string         `json:"categoryName"`
 	ChatIDs      []string       `json:"chatIds"`
+	ThirdPartyID string         `json:"thirdPartyID,omitempty"`
 }
 
 func (j *CreateCommunityCategory) Validate() error {
