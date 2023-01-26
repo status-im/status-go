@@ -57,11 +57,12 @@ type WakuNodeParameters struct {
 
 	logger *zap.Logger
 
-	enableRelay      bool
-	enableFilter     bool
-	isFilterFullNode bool
-	filterOpts       []filter.Option
-	wOpts            []pubsub.Option
+	noDefaultWakuTopic bool
+	enableRelay        bool
+	enableFilter       bool
+	isFilterFullNode   bool
+	filterOpts         []filter.Option
+	wOpts              []pubsub.Option
 
 	minRelayPeersToPublish int
 
@@ -262,6 +263,15 @@ func (w *WakuNodeParameters) GetPrivKey() *crypto.PrivKey {
 func WithLibP2POptions(opts ...libp2p.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.libP2POpts = opts
+		return nil
+	}
+}
+
+// NoDefaultWakuTopic will stop the node from subscribing to the default
+// pubsub topic automatically
+func NoDefaultWakuTopic() WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.noDefaultWakuTopic = true
 		return nil
 	}
 }

@@ -308,12 +308,14 @@ func (w *WakuNode) Start(ctx context.Context) error {
 			return err
 		}
 
-		sub, err := w.Relay().Subscribe(ctx)
-		if err != nil {
-			return err
-		}
+		if !w.opts.noDefaultWakuTopic {
+			sub, err := w.Relay().Subscribe(ctx)
+			if err != nil {
+				return err
+			}
 
-		w.Broadcaster().Unregister(&relay.DefaultWakuTopic, sub.C)
+			w.Broadcaster().Unregister(&relay.DefaultWakuTopic, sub.C)
+		}
 	}
 
 	w.store = w.storeFactory(w)
@@ -573,17 +575,19 @@ func (w *WakuNode) startStore(ctx context.Context) error {
 			peerIDs = append(peerIDs, pID)
 		}
 
-		w.wg.Add(1)
-		go func() {
-			defer w.wg.Done()
+		if !w.opts.noDefaultWakuTopic {
+			w.wg.Add(1)
+			go func() {
+				defer w.wg.Done()
 
-			ctxWithTimeout, ctxCancel := context.WithTimeout(ctx, 20*time.Second)
-			defer ctxCancel()
-			if _, err := w.store.(store.Store).Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), peerIDs); err != nil {
-				w.log.Error("Could not resume history", zap.Error(err))
-				time.Sleep(10 * time.Second)
-			}
-		}()
+				ctxWithTimeout, ctxCancel := context.WithTimeout(ctx, 20*time.Second)
+				defer ctxCancel()
+				if _, err := w.store.(store.Store).Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), peerIDs); err != nil {
+					w.log.Error("Could not resume history", zap.Error(err))
+					time.Sleep(10 * time.Second)
+				}
+			}()
+		}
 	}
 	return nil
 }

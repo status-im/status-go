@@ -206,9 +206,10 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	}
 
 	if historyResponseRPC.Response == nil {
-		logger.Error("empty response")
-		metrics.RecordStoreError(store.ctx, "emptyRpcResponseFailure")
-		return nil, ErrEmptyResponse
+		// Empty response
+		return &pb.HistoryResponse{
+			PagingInfo: &pb.PagingInfo{},
+		}, nil
 	}
 
 	metrics.RecordMessage(ctx, "retrieved", len(historyResponseRPC.Response.Messages))

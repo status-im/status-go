@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -311,11 +312,10 @@ func (wakuPX *WakuPeerExchange) cleanCache() {
 	wakuPX.enrCache = r
 }
 
-func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) {
+func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) error {
 	iterator, err := wakuPX.disc.Iterator()
 	if err != nil {
-		wakuPX.log.Debug("obtaining iterator", zap.Error(err))
-		return
+		return fmt.Errorf("obtaining iterator: %w", err)
 	}
 	defer iterator.Close()
 
@@ -346,6 +346,8 @@ func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) {
 		}
 		wakuPX.enrCacheMutex.Unlock()
 	}
+
+	return nil
 }
 
 func (wakuPX *WakuPeerExchange) runPeerExchangeDiscv5Loop(ctx context.Context) {
@@ -367,7 +369,11 @@ restartLoop:
 	for {
 		select {
 		case <-ch:
-			wakuPX.iterate(ctx)
+			err := wakuPX.iterate(ctx)
+			if err != nil {
+				wakuPX.log.Debug("iterating peer exchange", zap.Error(err))
+				time.Sleep(2 * time.Second)
+			}
 			ch <- struct{}{}
 		case <-ticker.C:
 			wakuPX.cleanCache()
