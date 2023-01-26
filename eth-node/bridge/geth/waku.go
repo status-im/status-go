@@ -1,6 +1,7 @@
 package gethbridge
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"time"
@@ -254,7 +255,7 @@ func (w *gethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
-func (w *gethWakuWrapper) RequestStoreMessages(peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
+func (w *gethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest) (*types.StoreRequestCursor, error) {
 	return nil, errors.New("not implemented")
 }
 func (w *gethWakuWrapper) ConnectionChanged(_ connection.State) {}
