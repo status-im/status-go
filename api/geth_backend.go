@@ -564,7 +564,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
+func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
 		return err
@@ -639,13 +639,13 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account 
 	// whichever reason the account is still successfully migrated
 	for _, acc := range knownAccounts {
 		if account.KeyUID == acc.KeyUID {
-			_ = b.accountManager.DeleteAccount(keyStoreDir, acc.Address, true)
+			_ = b.accountManager.DeleteAccount(acc.Address, newPassword)
 		}
 	}
-	_ = b.accountManager.DeleteAccount(keyStoreDir, masterAddress, true)
-	_ = b.accountManager.DeleteAccount(keyStoreDir, dappsAddress, true)
-	_ = b.accountManager.DeleteAccount(keyStoreDir, eip1581Address, true)
-	_ = b.accountManager.DeleteAccount(keyStoreDir, walletRootAddress, true)
+	_ = b.accountManager.DeleteAccount(masterAddress, newPassword)
+	_ = b.accountManager.DeleteAccount(dappsAddress, newPassword)
+	_ = b.accountManager.DeleteAccount(eip1581Address, newPassword)
+	_ = b.accountManager.DeleteAccount(walletRootAddress, newPassword)
 
 	return nil
 }

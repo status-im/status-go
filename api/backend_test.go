@@ -614,46 +614,125 @@ func TestDeleteMultiaccount(t *testing.T) {
 }
 
 func TestConvertAccount(t *testing.T) {
-	backend := NewGethStatusBackend()
-	password := "123123"
+	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	const password = "111111"        // represents password for a regular user
+	const keycardPassword = "222222" // represents password for a keycard user
+	const pathMaster = "m"
+	const pathWalletRoot = "m/44'/60'/0'/0"
+	const pathEIP1581Root = "m/43'/60'/1581'"
+	const pathEIP1581Chat = "m/43'/60'/1581'/0/0"
+	const pathDefaultWalletAccount = "m/44'/60'/0'/0/0"
+	const customWalletPath1 = "m/44'/60'/0'/0/1"
+	const customWalletPath2 = "m/44'/60'/0'/0/2"
+	var allGeneratedPaths []string
+	allGeneratedPaths = append(allGeneratedPaths, customWalletPath1, customWalletPath2, pathWalletRoot, pathEIP1581Root, pathDefaultWalletAccount)
+
+	var err error
+
+	keystoreContainsFileForAccount := func(keyStoreDir string, hexAddress string) bool {
+		addrWithoutPrefix := strings.ToLower(hexAddress[2:])
+		found := false
+		err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !fileInfo.IsDir() && strings.Contains(strings.ToUpper(path), strings.ToUpper(addrWithoutPrefix)) {
+				found = true
+			}
+			return nil
+		})
+		return found
+	}
+
 	rootDataDir, err := os.MkdirTemp("", "test-keystore-dir")
 	require.NoError(t, err)
 	defer os.Remove(rootDataDir)
 
 	keyStoreDir := filepath.Join(rootDataDir, "keystore")
 
+	utils.Init()
+	backend := NewGethStatusBackend()
 	backend.rootDataDir = rootDataDir
-
-	err = backend.AccountManager().InitKeystore(keyStoreDir)
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-
-	const path = "m/44'/60'/0'/0"
-	backend.AccountManager()
-	accs, err := backend.AccountManager().
-		AccountsGenerator().
-		GenerateAndDeriveAddresses(12, 1, "", []string{path})
+	config.DataDir = rootDataDir
+	config.KeyStoreDir = keyStoreDir
+	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+	err = backend.StartNode(config)
 	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
 
-	generateAccount := accs[0]
-	accountInfo, err := backend.AccountManager().
-		AccountsGenerator().
-		StoreAccount(generateAccount.ID, password)
+	genAccInfo, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
+	assert.NoError(t, err)
+
+	accountInfo, err := backend.AccountManager().AccountsGenerator().StoreAccount(genAccInfo.ID, password)
+	assert.NoError(t, err)
+
+	found := keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
 	require.NoError(t, err)
+	require.True(t, found)
+
+	derivedAccounts, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(genAccInfo.ID, password, allGeneratedPaths)
+	assert.NoError(t, err)
+
+	accs, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(genAccInfo.ID, []string{pathMaster})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(accs))
+	masterAddress := accs[pathMaster].Address
+	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	var accountsToStore []*accounts.Account
+	accountsToStore = append(accountsToStore, &accounts.Account{
+		Address:   types.HexToAddress(masterAddress),
+		KeyUID:    genAccInfo.KeyUID,
+		Type:      accounts.AccountTypeGenerated,
+		PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
+		Path:      pathEIP1581Chat,
+		Wallet:    false,
+		Chat:      false,
+		Name:      "GeneratedAccount",
+	})
+
+	for p, dAccInfo := range derivedAccounts {
+		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		require.NoError(t, err)
+		require.True(t, found)
+
+		if p == pathDefaultWalletAccount ||
+			p == customWalletPath1 ||
+			p == customWalletPath2 {
+			accountsToStore = append(accountsToStore, &accounts.Account{
+				Address:     types.HexToAddress(dAccInfo.Address),
+				KeyUID:      genAccInfo.KeyUID,
+				Wallet:      false,
+				Chat:        false,
+				Path:        p,
+				Name:        "derivacc" + p,
+				Hidden:      false,
+				DerivedFrom: masterAddress,
+				Removed:     false,
+			})
+		}
+	}
 
 	account := multiaccounts.Account{
 		Name:      "foo",
 		Timestamp: 1,
-		KeyUID:    generateAccount.KeyUID,
+		KeyUID:    genAccInfo.KeyUID,
 	}
 
 	err = backend.ensureAppDBOpened(account, password)
 	require.NoError(t, err)
 
 	s := settings.Settings{
-		Address:           types.HexToAddress(accountInfo.Address),
+		Address:           types.HexToAddress(masterAddress),
 		CurrentNetwork:    "mainnet_rpc",
-		DappsAddress:      types.HexToAddress(accountInfo.Address),
-		EIP1581Address:    types.HexToAddress(accountInfo.Address),
+		DappsAddress:      types.HexToAddress(derivedAccounts[pathDefaultWalletAccount].Address),
+		EIP1581Address:    types.HexToAddress(derivedAccounts[pathEIP1581Root].Address),
 		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:            account.KeyUID,
 		LatestDerivedPath: 0,
@@ -663,24 +742,13 @@ func TestConvertAccount(t *testing.T) {
 		PreviewPrivacy:    false,
 		PublicKey:         accountInfo.PublicKey,
 		SigningPhrase:     "yurt joey vibe",
-		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
-
-	acc := accounts.Account{
-		Address:   types.HexToAddress(generateAccount.Address),
-		KeyUID:    generateAccount.KeyUID,
-		Type:      accounts.AccountTypeGenerated,
-		PublicKey: types.Hex2Bytes(generateAccount.PublicKey),
-		Path:      path,
-		Wallet:    false,
-		Chat:      false,
-		Name:      "GeneratedAccount",
+		WalletRootAddress: types.HexToAddress(derivedAccounts[pathWalletRoot].Address),
 	}
 
-	accounts := []*accounts.Account{&acc}
 	err = backend.saveAccountsAndSettings(
 		s,
 		&params.NodeConfig{},
-		accounts)
+		accountsToStore)
 	require.NoError(t, err)
 
 	err = backend.OpenAccounts()
@@ -693,8 +761,6 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, 3, len(files))
 
-	keycardPassword := "0xcafecafe"
-
 	keycardAccount := account
 	keycardAccount.KeycardPairing = "pairing"
 
@@ -704,42 +770,59 @@ func TestConvertAccount(t *testing.T) {
 		KeycardPairing:     "pairing",
 	}
 
-	addrWithoutPrefix := strings.ToLower(generateAccount.Address[2:len(generateAccount.Address)])
-	found := false
-	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !fileInfo.IsDir() && strings.Contains(path, addrWithoutPrefix) {
-			found = true
-		}
-		return nil
-	})
-
-	require.NoError(t, err)
-	require.True(t, found)
-
-	err = backend.ConvertToKeycardAccount(keyStoreDir, keycardAccount, keycardSettings, password, keycardPassword)
+	// Converting to a keycard account
+	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, password, keycardPassword)
 	require.NoError(t, err)
 
-	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !fileInfo.IsDir() && strings.Contains(path, addrWithoutPrefix) {
-			found = false
-		}
-		return nil
-	})
-
+	// Validating results of converting to a keycard account.
+	// All keystore files for the account which is migrated need to be removed.
+	found = keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
 	require.NoError(t, err)
-	require.True(t, found)
+	require.False(t, found)
 
+	for _, dAccInfo := range derivedAccounts {
+		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		require.NoError(t, err)
+		require.False(t, found)
+	}
+
+	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
+	require.NoError(t, err)
+	require.False(t, found)
+
+	// Ensure we're able to open the DB
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
 
-	b := NewGethStatusBackend()
-	require.NoError(t, b.OpenAccounts())
+	b1 := NewGethStatusBackend()
+	require.NoError(t, b1.OpenAccounts())
+
+	// Converting to a regular account
+	err = backend.ConvertToRegularAccount(mnemonic, keycardPassword, password)
+	require.NoError(t, err)
+
+	// Validating results of converting to a regular account.
+	// All keystore files for need to be created.
+	found = keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	for _, dAccInfo := range derivedAccounts {
+		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		require.NoError(t, err)
+		require.True(t, found)
+	}
+
+	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	// Ensure we're able to open the DB
+	err = backend.ensureAppDBOpened(keycardAccount, password)
+	require.NoError(t, err)
+
+	b2 := NewGethStatusBackend()
+	require.NoError(t, b2.OpenAccounts())
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
