@@ -381,6 +381,37 @@ func (o *Community) initialize() {
 	}
 }
 
+type TokenType uint8
+
+const (
+	ERC721 TokenType = iota
+	ERC20
+)
+
+type DeployState uint8
+
+const (
+	Failed DeployState = iota
+	InProgress
+	Deployed
+)
+
+type CommunityToken struct {
+	TokenType          TokenType   `json:"tokenType"`
+	CommunityID        string      `json:"communityId"`
+	Address            string      `json:"address"`
+	Name               string      `json:"name"`
+	Symbol             string      `json:"symbol"`
+	Description        string      `json:"description"`
+	Supply             int         `json:"supply"`
+	InfiniteSupply     bool        `json:"infiniteSupply"`
+	Transferable       bool        `json:"transferable"`
+	RemoteSelfDestruct bool        `json:"remoteSelfDestruct"`
+	ChainID            int         `json:"chainId"`
+	DeployState        DeployState `json:"deployState"`
+	Base64Image        string      `json:"image"`
+}
+
 type CommunitySettings struct {
 	CommunityID                  string `json:"communityId"`
 	HistoryArchiveSupportEnabled bool   `json:"historyArchiveSupportEnabled"`

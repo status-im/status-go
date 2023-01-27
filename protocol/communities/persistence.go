@@ -827,3 +827,41 @@ func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string,
 	}
 	return ids, nil
 }
+
+func (p *Persistence) GetCommunityTokens(communityID string, chainID int) ([]*CommunityToken, error) {
+	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply,
+	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64
+	FROM community_tokens WHERE community_id = ? AND chain_id = ?`, communityID, chainID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := []*CommunityToken{}
+
+	for rows.Next() {
+		token := CommunityToken{}
+		err := rows.Scan(&token.CommunityID, &token.Address, &token.TokenType, &token.Name,
+			&token.Symbol, &token.Description, &token.Supply, &token.InfiniteSupply, &token.Transferable,
+			&token.RemoteSelfDestruct, &token.ChainID, &token.DeployState, &token.Base64Image)
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, &token)
+	}
+	return tokens, nil
+}
+
+func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
+	_, err := p.db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply,
+		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
+		token.Symbol, token.Description, token.Supply, token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
+		token.ChainID, token.DeployState, token.Base64Image)
+	return err
+}
+
+func (p *Persistence) UpdateCommunityTokenState(contractAddress string, deployState DeployState) error {
+	_, err := p.db.Exec(`UPDATE community_tokens SET deploy_state = ? WHERE address = ?`, deployState, contractAddress)
+	return err
+}

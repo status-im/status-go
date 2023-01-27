@@ -1270,6 +1270,18 @@ func (api *PublicAPI) BuildContact(publicKey string) (*protocol.Contact, error) 
 	return api.service.messenger.BuildContact(publicKey)
 }
 
+func (api *PublicAPI) GetCommunityTokens(communityID string, chainID int) ([]*communities.CommunityToken, error) {
+	return api.service.messenger.GetCommunityTokens(communityID, chainID)
+}
+
+func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) error {
+	return api.service.messenger.AddCommunityToken(token)
+}
+
+func (api *PublicAPI) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
+	return api.service.messenger.UpdateCommunityTokenState(contractAddress, deployState)
+}
+
 // -----
 // HELPER
 // -----
