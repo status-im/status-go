@@ -1129,10 +1129,10 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			MembershipStatus: ActivityCenterMembershipStatusPending,
 		}
 
-		saveErr := m.persistence.SaveActivityCenterNotification(notification)
-		if saveErr != nil {
-			m.logger.Error("failed to save notification", zap.Error(saveErr))
-			return saveErr
+		err = m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Error("failed to save notification", zap.Error(err))
+			return err
 		}
 		state.Response.AddActivityCenterNotification(notification)
 	} else {
@@ -1148,10 +1148,10 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			} else {
 				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 			}
-			saveErr := m.persistence.SaveActivityCenterNotification(notification)
-			if saveErr != nil {
-				m.logger.Warn("failed to update notification", zap.Error(saveErr))
-				return saveErr
+			err = m.persistence.SaveActivityCenterNotification(notification)
+			if err != nil {
+				m.logger.Warn("failed to update notification", zap.Error(err))
+				return err
 			}
 			state.Response.AddActivityCenterNotification(notification)
 		}
@@ -1228,10 +1228,10 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}
-		saveErr := m.persistence.SaveActivityCenterNotification(notification)
-		if saveErr != nil {
-			m.logger.Warn("failed to update notification", zap.Error(saveErr))
-			return saveErr
+		err = m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to update notification", zap.Error(err))
+			return err
 		}
 		state.Response.AddActivityCenterNotification(notification)
 	}
@@ -1266,10 +1266,10 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 		CommunityID: string(requestToLeaveProto.CommunityId),
 	}
 
-	saveErr := m.persistence.SaveActivityCenterNotification(notification)
-	if saveErr != nil {
-		m.logger.Error("failed to save notification", zap.Error(saveErr))
-		return saveErr
+	err = m.persistence.SaveActivityCenterNotification(notification)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return err
 	}
 	state.Response.AddActivityCenterNotification(notification)
 

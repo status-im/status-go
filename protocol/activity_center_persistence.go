@@ -318,8 +318,7 @@ type activityCenterQueryParams struct {
 
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
-
-	var wheres string
+	var conditions []string
 
 	cursor := params.cursor
 	ids := params.ids
@@ -331,13 +330,13 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	accepted := params.accepted
 
 	if cursor != "" {
-		wheres += " AND cursor <= ?" // nolint: goconst
+		conditions = append(conditions, "cursor <= ?")
 		args = append(args, cursor)
 	}
 
 	if len(ids) != 0 {
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		wheres += fmt.Sprintf(" AND a.id IN (%s)", inVector) // nolint: goconst
+		conditions = append(conditions, fmt.Sprintf("a.id IN (%s)", inVector))
 		for _, id := range ids {
 			args = append(args, id)
 		}
@@ -345,34 +344,38 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 
 	switch read {
 	case ActivityCenterQueryParamsReadRead:
-		wheres += " AND a.read = 1" // nolint: goconst
+		conditions = append(conditions, "a.read = 1")
 	case ActivityCenterQueryParamsReadUnread:
-		wheres += " AND NOT a.read" // nolint: goconst
+		conditions = append(conditions, "NOT a.read")
 	}
 
 	if !accepted {
-		wheres += " AND NOT a.accepted" // nolint: goconst
+		conditions = append(conditions, "NOT a.accepted")
 	}
 
 	if chatID != "" {
-		wheres += " AND a.chat_id = ?" // nolint: goconst
+		conditions = append(conditions, "a.chat_id = ?")
 		args = append(args, chatID)
 	}
 
 	if author != "" {
-		wheres += " AND a.author = ?" // nolint: goconst
+		conditions = append(conditions, "a.author = ?")
 		args = append(args, author)
 	}
 
-	if len(activityCenterTypes) != 0 {
+	if len(activityCenterTypes) > 0 {
 		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
-		wheres += fmt.Sprintf(" AND a.notification_type IN (%s)", inVector) // nolint: goconst
+		conditions = append(conditions, fmt.Sprintf("a.notification_type IN (%s)", inVector))
 		for _, activityCenterType := range activityCenterTypes {
 			args = append(args, activityCenterType)
 		}
 	}
 
-	wheres = strings.Replace(wheres, "AND", "WHERE", 1)
+	var conditionsString string
+	if len(conditions) > 0 {
+		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
 	query := fmt.Sprintf( // nolint: gosec
 		`
 	SELECT
@@ -397,7 +400,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	ON
 	c.id = a.chat_id
 	%s
-	ORDER BY cursor DESC`, wheres)
+	ORDER BY cursor DESC`, conditionsString)
 
 	if limit != 0 {
 		args = append(args, limit)
