@@ -3,9 +3,10 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"sync"
 
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
@@ -25,8 +26,6 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -120,8 +119,10 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		wasUserAdded = true
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
-		// unless is coming from us or a contact or were waiting for approval
-		newChat.Active = isActive
+		// unless is coming from us or a contact or were waiting for approval.
+		// Also, as message MEMBER_JOINED may come from member(not creator, not our contact)
+		// reach earlier than CHAT_CREATED from creator, we need check if creator is our contact
+		newChat.Active = isActive || m.checkIfCreatorIsOurContact(group)
 		newChat.ReceivedInvitationAdmin = senderID
 		chat = &newChat
 
@@ -155,6 +156,16 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 
 		// Show push notifications when our key is added to members list and chat is Active
 		showPushNotification = showPushNotification && wasUserAdded
+	}
+	maxClockVal := uint64(0)
+	for _, event := range group.Events() {
+		if event.ClockValue > maxClockVal {
+			maxClockVal = event.ClockValue
+		}
+	}
+
+	if chat.LastClockValue < maxClockVal {
+		chat.LastClockValue = maxClockVal
 	}
 
 	// Only create a message notification when the user is added, not when removed
@@ -212,6 +223,16 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	return nil
 }
 
+func (m *Messenger) checkIfCreatorIsOurContact(group *v1protocol.Group) bool {
+	creator, err := group.Creator()
+	if err == nil {
+		contact, _ := m.allContacts.Load(creator)
+		return contact != nil && contact.ContactRequestState == ContactRequestStateMutual
+	}
+	m.logger.Warn("failed to get creator from group", zap.String("group name", group.Name()), zap.String("group chat id", group.ChatID()), zap.Error(err))
+	return false
+}
+
 func (m *Messenger) createMessageNotification(chat *Chat, messageState *ReceivedMessageState) {
 
 	var notificationType ActivityCenterType
@@ -231,7 +252,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		CommunityID: chat.CommunityID,
 	}
 
-	err := m.addActivityCenterNotification(messageState, notification)
+	err := m.addActivityCenterNotification(messageState.Response, notification)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 	}
@@ -332,7 +353,7 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		ChatID:    contact.ID,
 	}
 
-	return m.addActivityCenterNotification(messageState, notification)
+	return m.addActivityCenterNotification(messageState.Response, notification)
 }
 
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
@@ -377,7 +398,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, message.Mentioned)
+		m.updateUnviewedCounts(chat, message.Mentioned || message.Replied)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -406,28 +427,10 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) error {
-	for _, contact := range message.Contacts {
-		err := m.HandleSyncInstallationContact(state, *contact)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, community := range message.Communities {
-		err := m.handleSyncCommunity(state, *community)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
-	removedOrBlcoked := message.Removed || message.Blocked
+	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
-	if !ok && (message.Added || message.Muted) && !removedOrBlcoked {
+	if !ok && (message.Added || message.Muted) && !removedOrBlocked {
 		pubKey, err := common.HexToPubkey(message.Id)
 		if err != nil {
 			return err
@@ -454,6 +457,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 	if contact.LastUpdated < message.LastUpdated {
 		contact.HasAddedUs = message.HasAddedUs
+		contact.ContactRequestState = ContactRequestState(message.ContactRequestState)
 	}
 
 	if contact.LastUpdatedLocally < message.LastUpdatedLocally {
@@ -619,7 +623,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 		}
 	}
 
-	response, err := m.deactivateChat(message.Id, message.Clock, false)
+	response, err := m.deactivateChat(message.Id, message.Clock, false, true)
 	if err != nil {
 		return err
 	}
@@ -833,7 +837,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		chat.LastClockValue = message.Clock
 	}
 
-	if contact.ContactRequestState == ContactRequestStateMutual {
+	if contact.ContactRequestState == ContactRequestStateMutual && chat.DeletedAtClockValue < message.Clock {
 		chat.Active = true
 	}
 
@@ -905,7 +909,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && settings != nil && settings.HistoryArchiveSupportEnabled {
+	if m.torrentClientReady() && settings != nil && settings.HistoryArchiveSupportEnabled {
 		signedByOwnedCommunity, err := m.communitiesManager.IsAdminCommunity(communityPubKey)
 		if err != nil {
 			return err
@@ -918,75 +922,140 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		if err != nil {
 			return err
 		}
+		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
+		if err != nil {
+			return err
+		}
 		// We are only interested in a community archive magnet link
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
 		if !signedByOwnedCommunity && joinedCommunity && clock >= lastClock {
+			if lastSeenMagnetlink == magnetlink {
+				m.communitiesManager.LogStdout("already processed this magnetlink")
+				return nil
+			}
 
 			m.communitiesManager.UnseedHistoryArchiveTorrent(id)
-			m.downloadHistoryArchiveTasksWaitGroup.Add(1)
-			go func() {
+			currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(id.String())
+
+			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
+
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				// Create new task
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+
+				m.communitiesManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
+
+				// this wait groups tracks the ongoing task for a particular community
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				// this wait groups tracks all ongoing tasks across communities
+				m.downloadHistoryArchiveTasksWaitGroup.Add(1)
 				defer m.downloadHistoryArchiveTasksWaitGroup.Done()
-				downloadedArchiveIDs, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
-				if err != nil {
-					logMsg := "failed to download history archive data"
-					if err == communities.ErrTorrentTimedout {
-						m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
-						downloadedArchiveIDs, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink)
-						if err != nil {
-							m.communitiesManager.LogStdout(logMsg, zap.Error(err))
-							return
-						}
-					} else {
-						m.communitiesManager.LogStdout(logMsg, zap.Error(err))
-						return
-					}
-				}
-
-				messagesToHandle, err := m.communitiesManager.ExtractMessagesFromHistoryArchives(id, downloadedArchiveIDs)
-				if err != nil {
-					log.Println("failed to extract history archive messages", err)
-					m.logger.Debug("failed to extract history archive messages", zap.Error(err))
-					return
-				}
-
-				importedMessages := make(map[transport.Filter][]*types.Message, 0)
-				otherMessages := make(map[transport.Filter][]*types.Message, 0)
-
-				for filter, messages := range messagesToHandle {
-					for _, message := range messages {
-						if message.ThirdPartyID != "" {
-							importedMessages[filter] = append(importedMessages[filter], message)
-						} else {
-							otherMessages[filter] = append(otherMessages[filter], message)
-						}
-					}
-				}
-
-				err = m.handleImportedMessages(importedMessages)
-				if err != nil {
-					log.Println("failed to handle imported messages", err)
-					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
-				}
-
-				response, err := m.handleRetrievedMessages(otherMessages, false)
-				if err != nil {
-					log.Println("failed to write history archive messages to database", err)
-					m.logger.Debug("failed to write history archive messages to database", zap.Error(err))
-				}
-				if !response.IsEmpty() {
-					notifications := response.Notifications()
-					response.ClearNotifications()
-					signal.SendNewMessages(response)
-					localnotifications.PushMessages(notifications)
-				}
-				m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
-			}()
+				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.CancelChan)
+			}(currentTask, id)
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
 		}
 	}
 	return nil
+}
+
+func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
+	downloadTaskInfo, err := m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+	if err != nil {
+		logMsg := "failed to download history archive data"
+		if err == communities.ErrTorrentTimedout {
+			m.communitiesManager.LogStdout("torrent has timed out, trying once more...")
+			downloadTaskInfo, err = m.communitiesManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+			if err != nil {
+				m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+				return
+			}
+		} else {
+			m.communitiesManager.LogStdout(logMsg, zap.Error(err))
+			return
+		}
+	}
+
+	if downloadTaskInfo.Cancelled {
+		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
+			m.communitiesManager.LogStdout(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		}
+		return
+	}
+
+	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
+	if err != nil {
+		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
+	}
+
+	err = m.importHistoryArchives(id, cancel)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+		return
+	}
+
+	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+}
+
+func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage, id types.HexBytes) (*MessengerResponse, error) {
+
+	messagesToHandle := make(map[transport.Filter][]*types.Message)
+
+	for _, message := range archiveMessages {
+		filter := m.transport.FilterByTopic(message.Topic)
+		if filter != nil {
+			shhMessage := &types.Message{
+				Sig:          message.Sig,
+				Timestamp:    uint32(message.Timestamp),
+				Topic:        types.BytesToTopic(message.Topic),
+				Payload:      message.Payload,
+				Padding:      message.Padding,
+				Hash:         message.Hash,
+				ThirdPartyID: message.ThirdPartyId,
+			}
+			messagesToHandle[*filter] = append(messagesToHandle[*filter], shhMessage)
+		}
+	}
+
+	importedMessages := make(map[transport.Filter][]*types.Message, 0)
+	otherMessages := make(map[transport.Filter][]*types.Message, 0)
+
+	for filter, messages := range messagesToHandle {
+		for _, message := range messages {
+			if message.ThirdPartyID != "" {
+				importedMessages[filter] = append(importedMessages[filter], message)
+			} else {
+				otherMessages[filter] = append(otherMessages[filter], message)
+			}
+		}
+	}
+
+	err := m.handleImportedMessages(importedMessages)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to handle imported messages", zap.Error(err))
+		return nil, err
+	}
+
+	response, err := m.handleRetrievedMessages(otherMessages, false)
+	if err != nil {
+		m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto protobuf.CommunityCancelRequestToJoin) error {
@@ -1103,8 +1172,42 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 		if len(response.Communities()) > 0 {
-			state.Response.AddCommunity(response.Communities()[0])
-			state.Response.AddCommunitySettings(response.CommunitiesSettings()[0])
+			communitySettings := response.CommunitiesSettings()[0]
+			community := response.Communities()[0]
+			state.Response.AddCommunity(community)
+			state.Response.AddCommunitySettings(communitySettings)
+
+			magnetlink := requestToJoinResponseProto.MagnetUri
+			if m.torrentClientReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+
+				currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(community.IDString())
+				go func(currentTask *communities.HistoryArchiveDownloadTask) {
+
+					// Cancel ongoing download/import task
+					if currentTask != nil && !currentTask.IsCancelled() {
+						currentTask.Cancel()
+						currentTask.Waiter.Wait()
+					}
+
+					task := &communities.HistoryArchiveDownloadTask{
+						CancelChan: make(chan struct{}),
+						Waiter:     *new(sync.WaitGroup),
+						Cancelled:  false,
+					}
+					m.communitiesManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+
+					task.Waiter.Add(1)
+					defer task.Waiter.Done()
+
+					m.downloadHistoryArchiveTasksWaitGroup.Add(1)
+					defer m.downloadHistoryArchiveTasksWaitGroup.Done()
+
+					m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
+				}(currentTask)
+
+				clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
+				return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)
+			}
 		}
 	}
 
@@ -1257,20 +1360,28 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return errors.New("chat not found")
 	}
 
-	// Check edit is valid
+	var canDeleteMessageForEveryone = false
 	if originalMessage.From != deleteMessage.From {
-		return errors.New("invalid delete, not the right author")
+		if chat.ChatType == ChatTypeCommunityChat {
+			fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
+			if err != nil {
+				return err
+			}
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(chat.CommunityID, fromPublicKey)
+			if !canDeleteMessageForEveryone {
+				return ErrInvalidDeletePermission
+			}
+		}
+		// Check edit is valid
+		if !canDeleteMessageForEveryone {
+			return errors.New("invalid delete, not the right author")
+		}
 	}
 
 	// Update message and return it
 	originalMessage.Deleted = true
 
 	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
-	if err != nil {
-		return err
-	}
-
-	err = m.persistence.SetHideOnMessage(deleteMessage.MessageId)
 	if err != nil {
 		return err
 	}
@@ -1288,7 +1399,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			return err
 		}
 
-		if chat.LastMessage != nil && chat.LastMessage.Seen == false && chat.OneToOne() && !chat.Active {
+		if chat.LastMessage != nil && !chat.LastMessage.Seen && chat.OneToOne() && !chat.Active {
 			m.createMessageNotification(chat, state)
 		}
 	}
@@ -1343,6 +1454,12 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return err
 	}
 
+	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+		if err := m.updateLastMessage(chat); err != nil {
+			return err
+		}
+	}
+
 	state.Response.AddMessage(originalMessage)
 	state.Response.AddChat(chat)
 
@@ -1351,7 +1468,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 func (m *Messenger) updateLastMessage(chat *Chat) error {
 	// Get last message that is not hidden
-	messages, _, err := m.persistence.MessageByChatID(chat.ID, "", 1)
+	messages, err := m.persistence.LatestMessageByChatID(chat.ID)
 	if err != nil {
 		return err
 	}
@@ -1388,6 +1505,19 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
+
+	// If the message is a reply, we check if it's a reply to one of own own messages
+	if receivedMessage.ResponseTo != "" {
+		repliedTo, err := m.persistence.MessageByID(receivedMessage.ResponseTo)
+		if err != nil && (err == sql.ErrNoRows || err == common.ErrRecordNotFound) {
+			logger.Error("failed to get quoted message", zap.Error(err))
+		} else if err != nil {
+			return err
+		} else if repliedTo.From == common.PubkeyToHex(&m.identity.PublicKey) {
+			receivedMessage.Replied = true
+		}
+	}
+
 	chat, err := m.matchChatEntity(receivedMessage)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
@@ -1444,7 +1574,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		if !receivedMessage.Seen {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned)
+			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
 		}
 	} else {
 		// Our own message, mark as sent
@@ -1500,9 +1630,9 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if receivedMessage.Deleted && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
+	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
 		// Get last message that is not hidden
-		messages, _, err := m.persistence.MessageByChatID(receivedMessage.LocalChatID, "", 1)
+		messages, err := m.persistence.LatestMessageByChatID(receivedMessage.LocalChatID)
 		if err != nil {
 			return err
 		}
@@ -1566,13 +1696,13 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	return nil
 }
 
-func (m *Messenger) addActivityCenterNotification(state *ReceivedMessageState, notification *ActivityCenterNotification) error {
+func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
 	err := m.persistence.SaveActivityCenterNotification(notification)
 	if err != nil {
 		m.logger.Warn("failed to save notification", zap.Error(err))
 		return err
 	}
-	state.Response.AddActivityCenterNotification(notification)
+	response.AddActivityCenterNotification(notification)
 	return nil
 }
 
@@ -1599,6 +1729,28 @@ func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMes
 		},
 	}
 	return m.handleCommandMessage(messageState, message)
+}
+
+func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting) error {
+	settingField, err := m.extractSyncSetting(message)
+	if err != nil {
+		return err
+	}
+	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME && settingField != nil {
+		oldDisplayName, err := m.settings.DisplayName()
+		if err != nil {
+			return err
+		}
+		if oldDisplayName != message.GetValueString() {
+			m.account.Name = message.GetValueString()
+			err = m.multiAccounts.SaveAccount(*m.account)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	messageState.Response.AddSetting(settingField)
+	return nil
 }
 
 func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState, command protobuf.RequestTransaction) error {
@@ -2239,9 +2391,9 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	return contact.Added, nil
 }
 
-func (m *Messenger) updateUnviewedCounts(chat *Chat, mentioned bool) {
+func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 	chat.UnviewedMessagesCount++
-	if mentioned {
+	if mentionedOrReplied {
 		chat.UnviewedMentionsCount++
 	}
 }

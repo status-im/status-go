@@ -26,9 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol/pb"
-	"github.com/status-im/go-waku/waku/v2/utils"
+	"github.com/waku-org/go-waku/waku/v2/payload"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -202,7 +201,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Topic:   req.Topic,
 	}
 
-	var keyInfo *node.KeyInfo = new(node.KeyInfo)
+	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
 
 	// Set key that is used to sign the message
 	if len(req.Sig) > 0 {
@@ -214,7 +213,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
-		keyInfo.Kind = node.Symmetric
+		keyInfo.Kind = payload.Symmetric
 
 		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
@@ -229,7 +228,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	// Set asymmetric key that is used to encrypt the message
 	if pubKeyGiven {
-		keyInfo.Kind = node.Asymmetric
+		keyInfo.Kind = payload.Asymmetric
 
 		var pubK *ecdsa.PublicKey
 		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
@@ -240,7 +239,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	var version uint32 = 1 // Use wakuv1 encryption
 
-	p := new(node.Payload)
+	p := new(payload.Payload)
 	p.Data = req.Payload
 	p.Key = keyInfo
 
@@ -253,7 +252,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Payload:      payload,
 		Version:      version,
 		ContentTopic: req.Topic.ContentTopic(),
-		Timestamp:    utils.GetUnixEpoch(),
+		Timestamp:    api.w.timestamp(),
 		Ephemeral:    req.Ephemeral,
 	}
 

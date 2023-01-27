@@ -68,6 +68,7 @@ func (p *Parser) Inline(currBlock ast.Node, data []byte) {
 
 const pkLength = 132
 const compressedPkPrefixLen = 3
+const systemMentionLength = 7
 
 func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
 	data = data[offset:]
@@ -96,10 +97,7 @@ func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
 		mention.Literal = data[1 : pkLength+1]
 
 		return i, mention
-	} else if n >= compressedPkPrefixLen+1 {
-		if data[1] != 'z' || data[2] != 'Q' || data[3] != '3' {
-			return 0, nil
-		}
+	} else if n >= compressedPkPrefixLen+1 && (data[1] == 'z' || data[2] == 'Q' || data[3] == '3') {
 
 		i := 1
 		for _, c := range data[1:] {
@@ -117,6 +115,29 @@ func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
 
 		mention := &ast.Mention{}
 		mention.Literal = data[1:i]
+		return i, mention
+	} else if n >= systemMentionLength+1 {
+		// need to start with 0x and can't end with 0
+		if data[1] != '0' || data[2] != 'x' || data[systemMentionLength] == '0' {
+			return 0, nil
+		}
+
+		i := 3
+		for i < systemMentionLength+1 {
+			if !isValidSystemTagChar(data[i]) {
+				return 0, nil
+			}
+			i++
+		}
+
+		// Check there's a space
+		if n != systemMentionLength+1 && !isValidTerminatingMentionChar(data[systemMentionLength+1]) {
+			return 0, nil
+		}
+
+		mention := &ast.Mention{}
+		mention.Literal = data[1 : systemMentionLength+1]
+
 		return i, mention
 	}
 

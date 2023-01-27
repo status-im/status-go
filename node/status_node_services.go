@@ -211,6 +211,10 @@ func (b *StatusNode) AccountService() *accountssvc.Service {
 	return b.accountsSrvc
 }
 
+func (b *StatusNode) BrowserService() *browsers.Service {
+	return b.browsersSrvc
+}
+
 func (b *StatusNode) WakuService() *waku.Waku {
 	return b.wakuSrvc
 }
@@ -282,16 +286,15 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Port:                 nodeConfig.WakuV2Config.Port,
 			LightClient:          nodeConfig.WakuV2Config.LightClient,
 			KeepAliveInterval:    nodeConfig.WakuV2Config.KeepAliveInterval,
-			RelayNodes:           nodeConfig.ClusterConfig.RelayNodes,
-			StoreNodes:           nodeConfig.ClusterConfig.StoreNodes,
-			FilterNodes:          nodeConfig.ClusterConfig.FilterNodes,
-			LightpushNodes:       nodeConfig.ClusterConfig.LightpushNodes,
+			Rendezvous:           nodeConfig.Rendezvous,
+			WakuNodes:            nodeConfig.ClusterConfig.WakuNodes,
 			PeerExchange:         nodeConfig.WakuV2Config.PeerExchange,
 			EnableStore:          nodeConfig.WakuV2Config.EnableStore,
 			StoreCapacity:        nodeConfig.WakuV2Config.StoreCapacity,
 			StoreSeconds:         nodeConfig.WakuV2Config.StoreSeconds,
 			DiscoveryLimit:       nodeConfig.WakuV2Config.DiscoveryLimit,
 			DiscV5BootstrapNodes: nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
+			Nameserver:           nodeConfig.WakuV2Config.Nameserver,
 			EnableDiscV5:         nodeConfig.WakuV2Config.EnableDiscV5,
 			UDPPort:              nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:           nodeConfig.WakuV2Config.AutoUpdate,
@@ -307,7 +310,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 		}
 		logging.SetAllLoggers(lvl)
 
-		w, err := wakuv2.New(nodeConfig.NodeKey, cfg, logutils.ZapLogger(), b.appDB)
+		w, err := wakuv2.New(nodeConfig.NodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource())
 
 		if err != nil {
 			return nil, err
@@ -394,7 +397,7 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService() *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB)
 	}
 	return b.ensSrvc
 }

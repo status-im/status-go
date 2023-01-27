@@ -147,6 +147,13 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
+
+	// mock added as mutual contact
+	contact.LastUpdated = 1
+	contact.HasAddedUs = true
+	contact.ContactRequestState = ContactRequestStateMutual
+	s.m.allContacts.Store(contact.ID, contact)
+
 	contact.LocalNickname = "Test Nickname"
 	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
@@ -172,7 +179,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	chat2.DeletedAtClockValue = 1
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
-	_, err = s.m.deactivateChat(removedChatID, 0, true)
+	_, err = s.m.deactivateChat(removedChatID, 0, true, true)
 	s.Require().NoError(err)
 
 	// pair
@@ -210,7 +217,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// sync
-	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image")
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
 
 	var allChats []*Chat
@@ -253,6 +260,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().True(actualContact.Added)
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
+	s.Require().True(actualContact.HasAddedUs)
+	s.Require().Equal(ContactRequestStateMutual, actualContact.ContactRequestState)
 
 	bookmarks, err := theirMessenger.browserDatabase.GetBookmarks()
 	s.Require().NoError(err)

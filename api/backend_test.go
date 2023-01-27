@@ -474,7 +474,7 @@ func TestLoginWithKey(t *testing.T) {
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
 	}
-	tmpdir, err := ioutil.TempDir("", "login-with-key-test-")
+	tmpdir, err := os.MkdirTemp("", "login-with-key-test-")
 	require.NoError(t, err)
 	defer os.Remove(tmpdir)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
@@ -517,7 +517,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
 	}
-	tmpdir, err := ioutil.TempDir("", "verify-database-password-")
+	tmpdir, err := os.MkdirTemp("", "verify-database-password-")
 	require.NoError(t, err)
 	defer os.Remove(tmpdir)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
@@ -540,7 +540,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 func TestDeleteMultiaccount(t *testing.T) {
 	backend := NewGethStatusBackend()
 
-	rootDataDir, err := ioutil.TempDir("", "test-keystore-dir")
+	rootDataDir, err := os.MkdirTemp("", "test-keystore-dir")
 	require.NoError(t, err)
 	defer os.Remove(rootDataDir)
 
@@ -616,7 +616,7 @@ func TestDeleteMultiaccount(t *testing.T) {
 func TestConvertAccount(t *testing.T) {
 	backend := NewGethStatusBackend()
 	password := "123123"
-	rootDataDir, err := ioutil.TempDir("", "test-keystore-dir")
+	rootDataDir, err := os.MkdirTemp("", "test-keystore-dir")
 	require.NoError(t, err)
 	defer os.Remove(rootDataDir)
 
@@ -812,7 +812,7 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 
 	srcFolder := "../static/test-0.97.3-account/"
 
-	tmpdir, err := ioutil.TempDir("", "login-and-migrations-with-existing-users")
+	tmpdir, err := os.MkdirTemp("", "login-and-migrations-with-existing-users")
 	require.NoError(t, err)
 	defer os.Remove(tmpdir)
 

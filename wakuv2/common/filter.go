@@ -165,28 +165,26 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	topic, err := ExtractTopicFromContentTopic(recvMessage.Envelope.Message().ContentTopic)
-	if err != nil {
-		log.Trace(err.Error(), "topic", recvMessage.Envelope.Message().ContentTopic)
-		return false
+	var matched bool
+	candidates := fs.GetWatchersByTopic(recvMessage.Topic)
+
+	if len(candidates) == 0 {
+		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "topic", recvMessage.Topic.String())
 	}
 
-	var matched bool
-
-	candidates := fs.GetWatchersByTopic(*topic)
 	for _, watcher := range candidates {
 		matched = true
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
-				log.Trace("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
+				log.Debug("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
 		} else {
 			matched = watcher.MatchMessage(decodedMsg)
 		}
 
 		if matched && decodedMsg != nil {
-			log.Trace("processing message: decrypted", "hash", recvMessage.Hash().Hex())
+			log.Debug("processing message: decrypted", "hash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}

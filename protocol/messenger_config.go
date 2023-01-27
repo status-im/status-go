@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 )
 
@@ -32,10 +33,9 @@ type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
 	CommunityInfoFound(community *communities.Community)
 	MessengerResponse(response *MessengerResponse)
-	HistoryRequestStarted(requestID string, numBatches int)
-	HistoryRequestBatchProcessed(requestID string, batchIndex int, batchNum int)
-	HistoryRequestCompleted(requestID string)
-	HistoryRequestFailed(requestID string, err error)
+	HistoryRequestStarted(numBatches int)
+	HistoryRequestCompleted()
+
 	BackupPerformed(uint64)
 	HistoryArchivesProtocolEnabled()
 	HistoryArchivesProtocolDisabled()
@@ -45,12 +45,17 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
+	ImportingHistoryArchiveMessages(communityID string)
 	StatusUpdatesTimedOut(statusUpdates *[]UserStatus)
 	DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError)
 	DiscordCommunityImportProgress(importProgress *discord.ImportProgress)
 	DiscordCommunityImportFinished(communityID string)
 	DiscordCommunityImportCancelled(communityID string)
+	SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse)
+	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
+	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
 }
 
 type config struct {

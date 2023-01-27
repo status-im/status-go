@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -14,10 +15,18 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
+
+type ConnectedResult struct {
+	Infura        map[uint64]bool `json:"infura"`
+	CryptoCompare bool            `json:"cryptoCompare"`
+	Opensea       map[uint64]bool `json:"opensea"`
+}
 
 // NewService initializes service instance.
 func NewService(
@@ -35,11 +44,17 @@ func NewService(
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
+	walletFeed := &event.Feed{}
+	signals := &walletevent.SignalsTransmitter{
+		Publisher: walletFeed,
+	}
 	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
-	transferController := transfer.NewTransferController(db, rpcClient, accountFeed)
-
+	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
+	cryptoCompare := NewCryptoCompare()
+	priceManager := NewPriceManager(db, cryptoCompare)
+	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -52,9 +67,14 @@ func NewService(
 		openseaAPIKey:         openseaAPIKey,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
+		priceManager:          priceManager,
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
+		feed:                  accountFeed,
+		signals:               signals,
+		reader:                reader,
+		cryptoCompare:         cryptoCompare,
 	}
 }
 
@@ -69,17 +89,23 @@ type Service struct {
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
+	priceManager          *PriceManager
 	started               bool
 	openseaAPIKey         string
 	gethManager           *account.GethManager
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
 	stickers              *stickers.Service
+	feed                  *event.Feed
+	signals               *walletevent.SignalsTransmitter
+	reader                *Reader
+	cryptoCompare         *CryptoCompare
 }
 
 // Start signals transmitter.
 func (s *Service) Start() error {
-	err := s.transferController.Start()
+	s.transferController.Start()
+	err := s.signals.Start()
 	s.started = true
 	return err
 }
@@ -89,10 +115,12 @@ func (s *Service) GetFeed() *event.Feed {
 	return s.transferController.TransferFeed
 }
 
-// Stop reactor, signals transmitter and close db.
+// Stop reactor and close db.
 func (s *Service) Stop() error {
 	log.Info("wallet will be stopped")
+	s.signals.Stop()
 	s.transferController.Stop()
+	s.reader.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil
@@ -117,4 +145,21 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
+	infura := make(map[uint64]bool)
+	for chainID, client := range chain.ChainClientInstances {
+		infura[chainID] = client.IsConnected
+	}
+
+	opensea := make(map[uint64]bool)
+	for chainID, client := range OpenseaClientInstances {
+		opensea[chainID] = client.IsConnected
+	}
+	return &ConnectedResult{
+		Infura:        infura,
+		Opensea:       opensea,
+		CryptoCompare: s.cryptoCompare.IsConnected,
+	}
 }

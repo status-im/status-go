@@ -300,12 +300,12 @@ func (t *TopicPool) limitFastMode(timeout time.Duration) chan struct{} {
 }
 
 // ConfirmAdded called when peer was added by p2p Server.
-// 1. Skip a peer if it not in our peer table
-// 2. Add a peer to a cache.
-// 3. Disconnect a peer if it was connected after we reached max limit of peers.
-//    (we can't know in advance if peer will be connected, thats why we allow
+//  1. Skip a peer if it not in our peer table
+//  2. Add a peer to a cache.
+//  3. Disconnect a peer if it was connected after we reached max limit of peers.
+//     (we can't know in advance if peer will be connected, thats why we allow
 //     to overflow for short duration)
-// 4. Switch search to slow mode if it is running.
+//  4. Switch search to slow mode if it is running.
 func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -475,9 +475,9 @@ func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.No
 
 // processFoundNode called when node is discovered by kademlia search query
 // 2 important conditions
-// 1. every time when node is processed we need to update discoveredTime.
-//    peer will be considered as valid later only if it was discovered < 60m ago
-// 2. if peer is connected or if max limit is reached we are not a adding peer to p2p server
+//  1. every time when node is processed we need to update discoveredTime.
+//     peer will be considered as valid later only if it was discovered < 60m ago
+//  2. if peer is connected or if max limit is reached we are not a adding peer to p2p server
 func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()

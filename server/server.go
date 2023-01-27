@@ -34,6 +34,18 @@ func (s *Server) getHost() string {
 	return fmt.Sprintf("%s:%d", s.hostname, s.GetPort())
 }
 
+func (s *Server) GetHostname() string {
+	return s.hostname
+}
+
+func (s *Server) GetCert() *tls.Certificate {
+	return s.cert
+}
+
+func (s *Server) GetLogger() *zap.Logger {
+	return s.logger
+}
+
 func (s *Server) mustGetHost() string {
 	return fmt.Sprintf("%s:%d", s.hostname, s.MustGetPort())
 }

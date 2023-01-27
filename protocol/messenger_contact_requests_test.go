@@ -643,7 +643,11 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			contactRequests, _, err := theirMessenger.PendingContactRequests("", 10)
+			if err != nil {
+				return false
+			}
+			return len(contactRequests) == 1
 		},
 		"no messages",
 	)

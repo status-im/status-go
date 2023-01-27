@@ -1,7 +1,6 @@
 package profiling
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestProfilingCPU(t *testing.T) {
-	dir, err := ioutil.TempDir("", "profiling")
+	dir, err := os.MkdirTemp("", "profiling")
 	require.NoError(t, err)
 
 	err = StartCPUProfile(dir)
@@ -39,7 +38,7 @@ func TestProfilingCPU(t *testing.T) {
 }
 
 func TestProfilingMem(t *testing.T) {
-	dir, err := ioutil.TempDir("", "profiling")
+	dir, err := os.MkdirTemp("", "profiling")
 	require.NoError(t, err)
 
 	err = WriteHeapFile(dir)

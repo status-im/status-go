@@ -25,6 +25,10 @@ LEFT JOIN discord_message_authors dm_author
 ON        dm.author_id = dm_author.id
 LEFT JOIN discord_message_attachments dm_attachment
 ON        dm.id = dm_attachment.discord_message_id
+LEFT JOIN discord_messages m2_dm
+ON        m2.discord_message_id = m2_dm.id
+LEFT JOIN discord_message_authors m2_dm_author
+ON        m2_dm.author_id = m2_dm_author.id
 `
 
 var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
@@ -64,6 +68,9 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		sticker_hash,
 		image_payload,
 		image_type,
+		album_id,
+		image_width,
+		image_height,
 		image_base64,
 		audio_payload,
 		audio_type,
@@ -92,6 +99,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		contact_request_state,
 		contact_verification_status,
 		mentioned,
+		replied,
     discord_message_id`
 }
 
@@ -114,6 +122,9 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.sticker_hash,
 		m1.image_payload,
 		m1.image_type,
+		COALESCE(m1.album_id, ""),
+		COALESCE(m1.image_width, 0),
+		COALESCE(m1.image_height, 0),
 		COALESCE(m1.audio_duration_ms,0),
 		m1.community_id,
 		m1.mentions,
@@ -138,6 +149,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.contact_request_state,
 		m1.contact_verification_status,
 		m1.mentioned,
+		m1.replied,
     COALESCE(m1.discord_message_id, ""),
     COALESCE(dm.author_id, ""),
     COALESCE(dm.type, ""),
@@ -162,8 +174,13 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.community_id,
 		m2.id,
         m2.content_type,
+        m2.deleted,
 		c.alias,
-		c.identicon`
+		c.identicon,
+    COALESCE(m2.discord_message_id, ""),
+		COALESCE(m2_dm_author.name, ""),
+		COALESCE(m2_dm_author.nickname, ""),
+		COALESCE(m2_dm_author.avatar_url, "")`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsCount() int {
@@ -182,11 +199,15 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedFrom sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
+	var quotedDeleted sql.NullBool
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
+	var albumID sql.NullString
+	var imageWidth sql.NullInt32
+	var imageHeight sql.NullInt32
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
@@ -203,6 +224,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		Author:      &protobuf.DiscordMessageAuthor{},
 		Reference:   &protobuf.DiscordMessageReference{},
 		Attachments: []*protobuf.DiscordMessageAttachment{},
+	}
+
+	quotedDiscordMessage := &protobuf.DiscordMessage{
+		Author: &protobuf.DiscordMessageAuthor{},
 	}
 
 	attachment := &protobuf.DiscordMessageAttachment{}
@@ -226,6 +251,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Hash,
 		&image.Payload,
 		&image.Type,
+		&message.AlbumID,
+		&message.ImageWidth,
+		&message.ImageHeight,
 		&audio.DurationMs,
 		&communityID,
 		&serializedMentions,
@@ -250,6 +278,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&contactRequestState,
 		&contactVerificationState,
 		&message.Mentioned,
+		&message.Replied,
 		&discordMessage.Id,
 		&discordMessage.Author.Id,
 		&discordMessage.Type,
@@ -274,8 +303,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedCommunityID,
 		&quotedID,
 		&ContentType,
+		&quotedDeleted,
 		&alias,
 		&identicon,
+		&quotedDiscordMessage.Id,
+		&quotedDiscordMessage.Author.Name,
+		&quotedDiscordMessage.Author.Nickname,
+		&quotedDiscordMessage.Author.AvatarUrl,
 	}
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
@@ -303,13 +337,24 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if quotedText.Valid {
-		message.QuotedMessage = &common.QuotedMessage{
-			ID:          quotedID.String,
-			ContentType: ContentType.Int64,
-			From:        quotedFrom.String,
-			Text:        quotedText.String,
-			ParsedText:  quotedParsedText,
-			CommunityID: quotedCommunityID.String,
+		if quotedDeleted.Bool {
+			message.QuotedMessage = &common.QuotedMessage{
+				ID:      quotedID.String,
+				Deleted: quotedDeleted.Bool,
+			}
+		} else {
+			message.QuotedMessage = &common.QuotedMessage{
+				ID:          quotedID.String,
+				ContentType: ContentType.Int64,
+				From:        quotedFrom.String,
+				Text:        quotedText.String,
+				ParsedText:  quotedParsedText,
+				CommunityID: quotedCommunityID.String,
+				Deleted:     quotedDeleted.Bool,
+			}
+			if message.QuotedMessage.ContentType == int64(protobuf.ChatMessage_DISCORD_MESSAGE) {
+				message.QuotedMessage.DiscordMessage = quotedDiscordMessage
+			}
 		}
 	}
 	message.Alias = alias.String
@@ -323,6 +368,18 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 	if communityID.Valid {
 		message.CommunityID = communityID.String
+	}
+
+	if albumID.Valid {
+		message.AlbumID = albumID.String
+	}
+
+	if imageWidth.Valid {
+		message.ImageWidth = uint32(imageWidth.Int32)
+	}
+
+	if imageHeight.Valid {
+		message.ImageHeight = uint32(imageHeight.Int32)
 	}
 
 	if serializedMentions != nil {
@@ -442,6 +499,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		sticker.Hash,
 		image.Payload,
 		image.Type,
+		message.AlbumID,
+		message.ImageWidth,
+		message.ImageHeight,
 		message.Base64Image,
 		audio.Payload,
 		audio.Type,
@@ -470,6 +530,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.ContactRequestState,
 		message.ContactVerificationState,
 		message.Mentioned,
+		message.Replied,
 		discordMessage.Id,
 	}, nil
 }
@@ -620,6 +681,61 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) {
+	var id string
+	err := db.db.QueryRow(
+		fmt.Sprintf(
+			`
+			SELECT
+				id
+			FROM
+				user_messages m1
+			WHERE
+				m1.local_chat_id = ? AND NOT(m1.seen) AND NOT(m1.hide) AND NOT(m1.deleted) AND NOT(m1.deleted_for_me)
+			ORDER BY %s ASC
+			LIMIT 1
+		`, cursor),
+		chatID).Scan(&id)
+
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// Get last chat message that is not hide or deleted or deleted_for_me
+func (db sqlitePersistence) LatestMessageByChatID(chatID string) ([]*common.Message, error) {
+	args := []interface{}{chatID}
+	where := `WHERE
+                NOT(m1.hide) AND NOT(m1.deleted) AND NOT(m1.deleted_for_me) AND m1.local_chat_id = ?
+            ORDER BY cursor DESC
+            LIMIT ?`
+
+	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
+
+	rows, err := db.db.Query(
+		query,
+		append(args, 2)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result, _, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 1 {
+		result = result[:1]
+	}
+	return result, nil
+}
+
 func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, error) {
 	var clock uint64
 	err := db.db.QueryRow(
@@ -722,11 +838,11 @@ func (db sqlitePersistence) LatestContactRequestIDs() (map[string]common.Contact
 			LIMIT 20
 		`, cursor), protobuf.ChatMessage_CONTACT_REQUEST)
 
-	defer rows.Close()
-
 	if err != nil {
 		return res, err
 	}
+
+	defer rows.Close()
 
 	for rows.Next() {
 		var id string
@@ -922,10 +1038,20 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
        ON
        dm.author_id = dm_author.id
 
-      LEFT JOIN 
+       LEFT JOIN 
               discord_message_attachments dm_attachment
-      ON        
-      dm.id = dm_attachment.discord_message_id
+			 ON        
+       dm.id = dm_attachment.discord_message_id
+
+			 LEFT JOIN 
+							discord_messages m2_dm
+			 ON        
+			 m2.discord_message_id = m2_dm.id
+
+				LEFT JOIN 
+							discord_message_authors m2_dm_author
+			 ON        
+			 m2_dm.author_id = m2_dm_author.id
 
  			WHERE
  				pm.pinned = 1
@@ -1458,7 +1584,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
                    highlight = 0
 		WHERE id = ?`, id, id, id)
 
@@ -1486,7 +1612,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		_ = tx.Rollback()
 	}()
 
-	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned)`, chatID, clock)
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied)`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1496,12 +1622,12 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	mentionedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND mentioned`, chatID, clock)
+	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied)`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	mentioned, err := mentionedResult.RowsAffected()
+	mentionedOrReplied, err := mentionedOrRepliedResult.RowsAffected()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1515,7 +1641,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned or replied)),
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 
@@ -1523,7 +1649,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	return (seen + mentioned), mentioned, nil
+	return (seen + mentionedOrReplied), mentionedOrReplied, nil
 }
 
 func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
@@ -1580,7 +1706,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND mentioned AND id IN (" + inVector + ")" // nolint: gosec
+	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND (mentioned OR replied) AND id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -1592,7 +1718,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		return 0, 0, err
 	}
 
-	q = "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND id IN (" + inVector + ")" // nolint: gosec
+	q = "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND NOT(replied) AND id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -1614,7 +1740,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND mentioned),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 	return countWithMentions + countNoMentions, countWithMentions, err
@@ -1677,7 +1803,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) (
 		UPDATE chats
 		SET
 			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id),
-			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND mentioned)`)
+			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (mentioned OR replied))`)
 	if err != nil {
 		return nil, err
 	}
@@ -2119,7 +2245,7 @@ func (db sqlitePersistence) ClearHistoryFromSyncMessage(chat *Chat, currentClock
 }
 
 // Deactivate chat sets a chat as inactive and clear its history
-func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64) (err error) {
+func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64, doClearHistory bool) (err error) {
 	var tx *sql.Tx
 
 	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
@@ -2135,18 +2261,21 @@ func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64)
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
-	err = db.deactivateChat(chat, currentClockValue, tx)
+	err = db.deactivateChat(chat, currentClockValue, tx, doClearHistory)
 
 	return
 }
 
-func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx, doClearHistory bool) error {
 	chat.Active = false
 	err := db.saveChat(tx, *chat)
 	if err != nil {
 		return err
 	}
 
+	if !doClearHistory {
+		return nil
+	}
 	return db.clearHistory(chat, currentClockValue, tx, true)
 }
 
@@ -2330,6 +2459,7 @@ func SortByClock(msgs HasClocks) {
 
 func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bool) ([]*common.Message, error) {
 	messageIdx := make(map[string]*common.Message, 0)
+	var messages common.Messages
 	for rows.Next() {
 		// There's a possibility of multiple rows per message if the
 		// message has a discordMessage and the discordMessage has multiple
@@ -2352,16 +2482,12 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bo
 
 		if msg, ok := messageIdx[message.ID]; !ok {
 			messageIdx[message.ID] = &message
+			messages = append(messages, &message)
 		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
 			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.Messages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, nil
@@ -2370,8 +2496,8 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bo
 func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.Message, []string, error) {
 
 	var cursors []string
+	var messages common.Messages
 	messageIdx := make(map[string]*common.Message, 0)
-
 	for rows.Next() {
 		// There's a possibility of multiple rows per message if the
 		// message has a discordMessage and the discordMessage has multiple
@@ -2390,16 +2516,12 @@ func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]
 		if msg, ok := messageIdx[message.ID]; !ok {
 			messageIdx[message.ID] = &message
 			cursors = append(cursors, cursor)
+			messages = append(messages, &message)
 		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
 			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.Messages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, cursors, nil
@@ -2408,6 +2530,7 @@ func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]
 func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]*common.PinnedMessage, []string, error) {
 
 	var cursors []string
+	var messages common.PinnedMessages
 	messageIdx := make(map[string]*common.PinnedMessage, 0)
 
 	for rows.Next() {
@@ -2427,17 +2550,13 @@ func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Row
 				PinnedBy: pinnedBy,
 			}
 			messageIdx[message.ID] = pinnedMessage
+			messages = append(messages, pinnedMessage)
 			cursors = append(cursors, cursor)
 		} else if discordMessage := msg.Message.GetDiscordMessage(); discordMessage != nil {
 			msg.Message.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
-			messageIdx[message.ID] = msg
 		}
 	}
 
-	var messages common.PinnedMessages
-	for _, message := range messageIdx {
-		messages = append(messages, message)
-	}
 	SortByClock(messages)
 
 	return messages, cursors, nil

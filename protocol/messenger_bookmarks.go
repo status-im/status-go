@@ -14,7 +14,7 @@ func (m *Messenger) AddBookmark(ctx context.Context, bookmark browsers.Bookmark)
 	if err != nil {
 		return err
 	}
-	return m.SyncBookmark(ctx, &bmr)
+	return m.SyncBookmark(ctx, &bmr, m.dispatchMessage)
 }
 
 func (m *Messenger) RemoveBookmark(ctx context.Context, url string) error {
@@ -28,7 +28,7 @@ func (m *Messenger) RemoveBookmark(ctx context.Context, url string) error {
 	if err != nil {
 		return err
 	}
-	return m.SyncBookmark(ctx, bmr)
+	return m.SyncBookmark(ctx, bmr, m.dispatchMessage)
 }
 
 func (m *Messenger) UpdateBookmark(ctx context.Context, oldURL string, bookmark browsers.Bookmark) error {
@@ -36,7 +36,7 @@ func (m *Messenger) UpdateBookmark(ctx context.Context, oldURL string, bookmark 
 	if err != nil {
 		return err
 	}
-	return m.SyncBookmark(ctx, &bookmark)
+	return m.SyncBookmark(ctx, &bookmark, m.dispatchMessage)
 }
 
 func (m *Messenger) GarbageCollectRemovedBookmarks() error {

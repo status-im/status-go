@@ -305,9 +305,6 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 						nextClock = tempNextClock
 						// Extra 5 sec wait (broadcast receiving delay)
 						waitDuration = tempNextClock + fiveMinutes + 5 - uint64(time.Now().Unix())
-						if waitDuration < 0 {
-							waitDuration = 0
-						}
 					} else {
 						m.timeoutStatusUpdates(referenceClock, tempNextClock)
 						waitDuration = 0

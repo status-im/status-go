@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raulk/clock"
+	"github.com/elastic/gosigar"
+	"github.com/benbjohnson/clock"
 )
 
 // ErrNotSupported is returned when the watchdog does not support the requested
@@ -102,6 +103,7 @@ var (
 	// See: https://github.com/golang/go/issues/19812
 	// See: https://github.com/prometheus/client_golang/issues/403
 	memstatsFn = runtime.ReadMemStats
+	sysmemFn   = (*gosigar.Mem).Get
 )
 
 type notifeeEntry struct {
@@ -189,7 +191,8 @@ func HeapDriven(limit uint64, minGOGC int, policyCtor PolicyCtor) (err error, st
 		// get the initial effective GOGC; guess it's 100 (default), and restore
 		// it to whatever it actually was. This works because SetGCPercent
 		// returns the previous value.
-		originalGOGC := debug.SetGCPercent(debug.SetGCPercent(100))
+		originalGOGC := debug.SetGCPercent(100)
+		debug.SetGCPercent(originalGOGC)
 		currGOGC := originalGOGC
 
 		var memstats runtime.MemStats
@@ -242,6 +245,44 @@ func HeapDriven(limit uint64, minGOGC int, policyCtor PolicyCtor) (err error, st
 				memstats.HeapAlloc, heapMarked, memstats.NextGC, next, currGOGC)
 		}
 	}()
+
+	return nil, stop
+}
+
+// SystemDriven starts a singleton system-driven watchdog.
+//
+// The system-driven watchdog keeps a threshold, above which GC will be forced.
+// The watchdog polls the system utilization at the specified frequency. When
+// the actual utilization exceeds the threshold, a GC is forced.
+//
+// This threshold is calculated by querying the policy every time that GC runs,
+// either triggered by the runtime, or forced by us.
+func SystemDriven(limit uint64, frequency time.Duration, policyCtor PolicyCtor) (err error, stopFn func()) {
+	if limit == 0 {
+		var sysmem gosigar.Mem
+		if err := sysmemFn(&sysmem); err != nil {
+			return fmt.Errorf("failed to get system memory stats: %w", err), nil
+		}
+		limit = sysmem.Total
+	}
+
+	policy, err := policyCtor(limit)
+	if err != nil {
+		return fmt.Errorf("failed to construct policy with limit %d: %w", limit, err), nil
+	}
+
+	if err := start(UtilizationSystem); err != nil {
+		return err, nil
+	}
+
+	_watchdog.wg.Add(1)
+	var sysmem gosigar.Mem
+	go pollingWatchdog(policy, frequency, limit, func() (uint64, error) {
+		if err := sysmemFn(&sysmem); err != nil {
+			return 0, err
+		}
+		return sysmem.ActualUsed, nil
+	})
 
 	return nil, stop
 }

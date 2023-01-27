@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -22,7 +21,7 @@ import (
 // tolerance is how many seconds of potentially out-of-order messages we want to fetch
 var tolerance uint32 = 60
 
-var mailserverRequestTimeout = 10 * time.Second
+var mailserverRequestTimeout = 30 * time.Second
 var oneMonthInSeconds uint32 = 31 * 24 * 60 * 60
 var mailserverMaxTries uint = 2
 var mailserverMaxFailedRequests uint = 2
@@ -440,12 +439,9 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		syncedTopics = append(syncedTopics, topicData)
 	}
 
-	requestID := uuid.NewRandom().String()
-
-	m.logger.Debug("syncing topics", zap.Any("batches", batches), zap.Any("requestId", requestID))
-
+	m.logger.Debug("syncing topics", zap.Any("batches", batches))
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, len(batches))
+		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
 
 	batchKeys := make([]int, 0, len(batches))
@@ -460,21 +456,14 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		i++
 		err := m.processMailserverBatch(batch)
 		if err != nil {
-			m.logger.Error("error syncing topics", zap.Any("requestId", requestID), zap.Error(err))
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-			}
+			m.logger.Error("error syncing topics", zap.Error(err))
 			return nil, err
-		}
-
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, i, len(batches))
 		}
 	}
 
 	m.logger.Debug("topics synced")
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
 	err = m.mailserversDatabase.AddTopics(syncedTopics)
@@ -675,27 +664,18 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			From:    chat.SyncedFrom - defaultSyncPeriod,
 			Topics:  topics,
 		}
-
-		requestID := uuid.NewRandom().String()
-
 		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
 		err = m.processMailserverBatch(batch)
 		if err != nil {
-
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-			}
 			return nil, err
 		}
 
 		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
-			m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+			m.config.messengerSignalsHandler.HistoryRequestCompleted()
 		}
-
 		if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
 			chat.SyncedFrom = batch.From
 		}
@@ -752,23 +732,17 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		Topics:  topics,
 	}
 
-	requestID := uuid.NewRandom().String()
-
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted(requestID, 1)
+		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
 	err = m.processMailserverBatch(batch)
 	if err != nil {
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestFailed(requestID, err)
-		}
 		return err
 	}
 
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestBatchProcessed(requestID, 1, 1)
-		m.config.messengerSignalsHandler.HistoryRequestCompleted(requestID)
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
 	return m.persistence.DeleteMessages(messageIDs)
@@ -826,6 +800,7 @@ func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
 }
 
 func (m *Messenger) ConnectionChanged(state connection.State) {
+	m.transport.ConnectionChanged(state)
 	if !m.connectionState.Offline && state.Offline {
 		m.sender.StopDatasync()
 	}

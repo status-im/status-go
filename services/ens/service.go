@@ -1,6 +1,8 @@
 package ens
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
@@ -10,13 +12,13 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *Service {
 	return &Service{
 		rpcClient,
 		accountsManager,
 		rpcFiltersSrvc,
 		config,
-		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config),
+		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb),
 	}
 }
 

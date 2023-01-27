@@ -3,6 +3,7 @@ package stickers
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/zenthangplus/goccm"
 	"olympos.io/encoding/edn"
@@ -24,6 +25,7 @@ import (
 )
 
 const maxConcurrentRequests = 3
+const requestTimeout = time.Duration(5) * time.Second
 
 // ConnectionType constants
 type stickerStatus int
@@ -297,8 +299,11 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 }
 
 func (api *API) fetchPackData(stickerType *stickers.StickerType, packID *big.Int, translateHashes bool) (*StickerPack, error) {
-	callOpts := &bind.CallOpts{Context: api.ctx, Pending: false}
 
+	timeoutContext, timeoutCancel := context.WithTimeout(api.ctx, requestTimeout)
+	defer timeoutCancel()
+
+	callOpts := &bind.CallOpts{Context: timeoutContext, Pending: false}
 	packData, err := stickerType.GetPackData(callOpts, packID)
 	if err != nil {
 		return nil, err

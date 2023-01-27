@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -49,18 +48,15 @@ type Transactor struct {
 	sendTxTimeout  time.Duration
 	rpcCallTimeout time.Duration
 	networkID      uint64
-
-	addrLock   *AddrLocker
-	localNonce sync.Map
-	log        log.Logger
+	nonce          *Nonce
+	log            log.Logger
 }
 
 // NewTransactor returns a new Manager.
 func NewTransactor() *Transactor {
 	return &Transactor{
-		addrLock:      &AddrLocker{},
 		sendTxTimeout: sendTxTimeout,
-		localNonce:    sync.Map{},
+		nonce:         NewNonce(),
 		log:           log.New("package", "status-go/transactions.Manager"),
 	}
 }
@@ -74,6 +70,11 @@ func (t *Transactor) SetNetworkID(networkID uint64) {
 func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcWrapper = newRPCWrapper(rpcClient, rpcClient.UpstreamChainID)
 	t.rpcCallTimeout = timeout
+}
+
+func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, func(inc bool, n uint64), error) {
+	wrapper := newRPCWrapper(rpcClient, chainID)
+	return t.nonce.Next(wrapper, from)
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
@@ -104,20 +105,13 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	signer := gethtypes.NewLondonSigner(chainID)
 
 	tx := t.buildTransaction(args)
-	t.addrLock.LockAddr(args.From)
-	defer func() {
-		// nonce should be incremented only if tx completed without error
-		// and if no other transactions have been sent while signing the current one.
-		if err == nil {
-			t.localNonce.Store(args.From, uint64(*args.Nonce)+1)
-		}
-		t.addrLock.UnlockAddr(args.From)
-	}()
-
-	expectedNonce, err := t.getTransactionNonce(args)
+	expectedNonce, unlock, err := t.nonce.Next(t.rpcWrapper, args.From)
 	if err != nil {
 		return hash, err
 	}
+	defer func() {
+		unlock(err == nil, expectedNonce)
+	}()
 
 	if tx.Nonce() != expectedNonce {
 		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
@@ -134,7 +128,6 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	if err := t.rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
 	}
-
 	return types.Hash(signedTx.Hash()), nil
 }
 
@@ -145,15 +138,11 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 
 	validatedArgs = args
 
-	t.addrLock.LockAddr(args.From)
-	defer func() {
-		t.addrLock.UnlockAddr(args.From)
-	}()
-
-	nonce, err := t.getTransactionNonce(validatedArgs)
+	nonce, unlock, err := t.nonce.Next(t.rpcWrapper, args.From)
 	if err != nil {
 		return validatedArgs, hash, err
 	}
+	defer unlock(false, 0)
 
 	gasPrice := (*big.Int)(args.GasPrice)
 	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
@@ -250,51 +239,29 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
-	t.addrLock.LockAddr(args.From)
-	var localNonce uint64
-	if val, ok := t.localNonce.Load(args.From); ok {
-		localNonce = val.(uint64)
-	}
-	var nonce uint64
-	defer func() {
-		// nonce should be incremented only if tx completed without error
-		// if upstream node returned nonce higher than ours we will stick to it
-		if err == nil && args.Nonce == nil {
-			t.localNonce.Store(args.From, nonce+1)
-		}
-		t.addrLock.UnlockAddr(args.From)
 
+	nonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
+	if err != nil {
+		return hash, err
+	}
+	if args.Nonce != nil {
+		nonce = uint64(*args.Nonce)
+	}
+	defer func() {
+		unlock(err == nil, nonce)
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
-	if args.Nonce == nil {
-
-		nonce, err = rpcWrapper.PendingNonceAt(ctx, common.Address(args.From))
-		if err != nil {
-			return hash, err
-		}
-		// if upstream node returned nonce higher than ours we will use it, as it probably means
-		// that another client was used for sending transactions
-		if localNonce > nonce {
-			nonce = localNonce
-		}
-	} else {
-		nonce = uint64(*args.Nonce)
-	}
 	gasPrice := (*big.Int)(args.GasPrice)
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
-		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
-		defer cancel()
 		gasPrice, err = rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
 			return hash, err
 		}
 	}
-
 	chainID := big.NewInt(int64(rpcWrapper.chainID))
 	value := (*big.Int)(args.Value)
-
 	var gas uint64
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
@@ -325,15 +292,13 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 			gas = defaultGas
 		}
 	}
-
 	tx := t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
-
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
+	// ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	// defer cancel()
 
 	if err := rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
@@ -403,36 +368,6 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 	}
 
 	return tx
-}
-
-func (t *Transactor) getTransactionNonce(args SendTxArgs) (newNonce uint64, err error) {
-	var (
-		localNonce  uint64
-		remoteNonce uint64
-	)
-
-	// get the local nonce
-	if val, ok := t.localNonce.Load(args.From); ok {
-		localNonce = val.(uint64)
-	}
-
-	// get the remote nonce
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
-	remoteNonce, err = t.rpcWrapper.PendingNonceAt(ctx, common.Address(args.From))
-	if err != nil {
-		return newNonce, err
-	}
-
-	// if upstream node returned nonce higher than ours we will use it, as it probably means
-	// that another client was used for sending transactions
-	if remoteNonce > localNonce {
-		newNonce = remoteNonce
-	} else {
-		newNonce = localNonce
-	}
-
-	return newNonce, nil
 }
 
 func (t *Transactor) logNewTx(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {

@@ -247,6 +247,79 @@ func TestMessageByChatID(t *testing.T) {
 	)
 }
 
+func TestFirstUnseenMessageIDByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	messageID, err := p.FirstUnseenMessageID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, "", messageID)
+
+	err = p.SaveMessages([]*common.Message{
+		{
+			ID:          "1",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 1,
+				Text:  "some-text"},
+			From: "me",
+			Seen: true,
+		},
+		{
+			ID:          "2",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 2,
+				Text:  "some-text"},
+			From: "me",
+			Seen: false,
+		},
+		{
+			ID:          "3",
+			LocalChatID: testPublicChatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: 3,
+				Text:  "some-text"},
+			From: "me",
+			Seen: false,
+		},
+	})
+	require.NoError(t, err)
+
+	messageID, err = p.FirstUnseenMessageID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, "2", messageID)
+}
+
+func TestLatestMessageByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+
+	id := strconv.Itoa(10)
+	err = insertMinimalDeletedMessage(p, id)
+	require.NoError(t, err)
+	ids = append(ids, id)
+
+	id = strconv.Itoa(11)
+	err = insertMinimalDeletedForMeMessage(p, id)
+	require.NoError(t, err)
+	ids = append(ids, id)
+
+	m, err := p.LatestMessageByChatID(testPublicChatID)
+	require.NoError(t, err)
+	require.Equal(t, m[0].ID, ids[9])
+}
+
 func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -440,7 +513,32 @@ func TestMessageReplies(t *testing.T) {
 		From: "3",
 	}
 
-	messages := []*common.Message{message1, message2, message3}
+	// Message that is deleted
+	message4 := &common.Message{
+		ID:          "id-4",
+		LocalChatID: chatID,
+		Deleted:     true,
+		ChatMessage: protobuf.ChatMessage{
+			Text:  "content-4",
+			Clock: uint64(4),
+		},
+		From: "2",
+	}
+
+	// Message replied to a deleted message. It will not have QuotedMessage info
+	message5 := &common.Message{
+		ID:          "id-5",
+		LocalChatID: chatID,
+		ChatMessage: protobuf.ChatMessage{
+			Text:       "content-4",
+			Clock:      uint64(5),
+			ResponseTo: "id-4",
+		},
+		From: "3",
+	}
+
+	// messages := []*common.Message{message1, message2, message3}
+	messages := []*common.Message{message1, message2, message3, message4, message5}
 
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
@@ -448,14 +546,18 @@ func TestMessageReplies(t *testing.T) {
 	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
 	require.NoError(t, err)
 
-	require.Equal(t, "non-existing", retrievedMessages[0].ResponseTo)
-	require.Nil(t, retrievedMessages[0].QuotedMessage)
-
-	require.Equal(t, "id-1", retrievedMessages[1].ResponseTo)
-	require.Equal(t, &common.QuotedMessage{ID: "id-1", From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
-
-	require.Equal(t, "", retrievedMessages[2].ResponseTo)
+	require.Equal(t, "non-existing", retrievedMessages[2].ResponseTo)
 	require.Nil(t, retrievedMessages[2].QuotedMessage)
+
+	require.Equal(t, "id-1", retrievedMessages[3].ResponseTo)
+	require.Equal(t, &common.QuotedMessage{ID: "id-1", From: "1", Text: "content-1"}, retrievedMessages[3].QuotedMessage)
+
+	require.Equal(t, "", retrievedMessages[4].ResponseTo)
+	require.Nil(t, retrievedMessages[4].QuotedMessage)
+
+	// We have a ResponseTo, but no QuotedMessage only gives the ID and Deleted
+	require.Equal(t, "id-4", retrievedMessages[0].ResponseTo)
+	require.Equal(t, &common.QuotedMessage{ID: "id-4", Deleted: true}, retrievedMessages[0].QuotedMessage)
 }
 
 func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
@@ -781,6 +883,26 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 	}})
 }
 
+func insertMinimalDeletedMessage(p *sqlitePersistence, id string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		Deleted:     true,
+		LocalChatID: testPublicChatID,
+		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		From:        "me",
+	}})
+}
+
+func insertMinimalDeletedForMeMessage(p *sqlitePersistence, id string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:           id,
+		DeletedForMe: true,
+		LocalChatID:  testPublicChatID,
+		ChatMessage:  protobuf.ChatMessage{Text: "some-text"},
+		From:         "me",
+	}})
+}
+
 func insertDiscordMessageWithAttachments(p *sqlitePersistence, id string, discordMessageID string) error {
 	err := insertMinimalDiscordMessage(p, id, discordMessageID)
 	if err != nil {
@@ -1102,7 +1224,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	publicChat.LastMessage = &lastMessage
 	publicChat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(publicChat, currentClockValue)
+	err = p.DeactivateChat(publicChat, currentClockValue, true)
 
 	// It does not set deleted at for a public chat
 	require.NoError(t, err)
@@ -1171,7 +1293,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	chat.LastMessage = &lastMessage
 	chat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(chat, currentClockValue)
+	err = p.DeactivateChat(chat, currentClockValue, true)
 
 	// It does set deleted at for a public chat
 	require.NoError(t, err)
@@ -1364,20 +1486,28 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
 	require.NoError(t, err)
 
-	cursor, notifications, err := p.UnreadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+		"",
+		2,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 
-	cursor, notifications, err = p.ReadActivityCenterNotifications("", 2, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		"",
+		2,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 }
 
-func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
+func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -1422,16 +1552,47 @@ func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, notifications, err := p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	// Don't filter by type if the array of types is empty.
+	_, notifications, err := p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{},
+	)
+	require.NoError(t, err)
+	require.Len(t, notifications, 3)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID2, notifications[1].ID)
+	require.Equal(t, nID1, notifications[2].ID)
+
+	_, notifications, err = p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.UnreadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	_, notifications, err = p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.Equal(t, nID1, notifications[1].ID)
+
+	_, notifications, err = p.UnreadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeNewOneToOne},
+	)
+	require.NoError(t, err)
+	require.Len(t, notifications, 3)
+	require.Equal(t, nID3, notifications[0].ID)
+	require.Equal(t, nID2, notifications[1].ID)
+	require.Equal(t, nID1, notifications[2].ID)
 
 	// Mark all notifications as read.
 	for _, notification := range allNotifications {
@@ -1439,12 +1600,20 @@ func TestActivityCenterReadUnreadFilterByType(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeNewOneToOne)
+	_, notifications, err = p.ReadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.ReadActivityCenterNotifications(initialCursor, limit, ActivityCenterNotificationTypeMention)
+	_, notifications, err = p.ReadActivityCenterNotifications(
+		initialCursor,
+		limit,
+		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
@@ -1516,34 +1685,54 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch UNREAD notifications, first page.
-	cursor, notifications, err := p.UnreadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+		initialOrFinalCursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID5, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
 	// Fetch next pages.
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 	require.Empty(t, cursor)
 
 	// Fetch READ notifications, first page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(initialOrFinalCursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		initialOrFinalCursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID4, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
 	// Fetch next page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(cursor, 1, ActivityCenterNotificationTypeNewOneToOne)
+	cursor, notifications, err = p.ReadActivityCenterNotifications(
+		cursor,
+		1,
+		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)

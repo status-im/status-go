@@ -142,7 +142,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices
-	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image")
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
 
 	// Wait and check that saved addresses are synced

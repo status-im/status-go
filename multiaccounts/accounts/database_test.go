@@ -201,7 +201,7 @@ func TestKeypairs(t *testing.T) {
 		KeycardUID:        "00000000000000000000000000000001",
 		KeycardName:       "Card01",
 		KeycardLocked:     false,
-		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}},
+		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}, {0x04}},
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000001",
 	}
 	keyPair2 := keypairs.KeyPair{
@@ -211,11 +211,20 @@ func TestKeypairs(t *testing.T) {
 		AccountsAddresses: []types.Address{{0x01}, {0x02}},
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
 	}
+	keyPair3 := keypairs.KeyPair{
+		KeycardUID:        "00000000000000000000000000000003",
+		KeycardName:       "Card02 Copy",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x01}, {0x02}},
+		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
+	}
 
 	// Test adding key pairs
 	err := db.AddMigratedKeyPair(keyPair1.KeycardUID, keyPair1.KeycardName, keyPair1.KeyUID, keyPair1.AccountsAddresses)
 	require.NoError(t, err)
 	err = db.AddMigratedKeyPair(keyPair2.KeycardUID, keyPair2.KeycardName, keyPair2.KeyUID, keyPair2.AccountsAddresses)
+	require.NoError(t, err)
+	err = db.AddMigratedKeyPair(keyPair3.KeycardUID, keyPair3.KeycardName, keyPair3.KeyUID, keyPair3.AccountsAddresses)
 	require.NoError(t, err)
 
 	// Test reading migrated key pairs
@@ -245,6 +254,28 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, keyPair1.KeycardLocked, rows[0].KeycardLocked)
 	require.Equal(t, len(keyPair1.AccountsAddresses), len(rows[0].AccountsAddresses))
 
+	rows, err = db.GetAllKnownKeycards()
+	require.NoError(t, err)
+	require.Equal(t, 3, len(rows))
+	for _, kp := range rows {
+		if kp.KeycardUID == keyPair1.KeycardUID {
+			require.Equal(t, keyPair1.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair1.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair1.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair1.AccountsAddresses), len(kp.AccountsAddresses))
+		} else if kp.KeycardUID == keyPair2.KeycardUID {
+			require.Equal(t, keyPair2.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair2.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair2.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair2.AccountsAddresses), len(kp.AccountsAddresses))
+		} else {
+			require.Equal(t, keyPair3.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair3.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair3.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair3.AccountsAddresses), len(kp.AccountsAddresses))
+		}
+	}
+
 	// Test seting a new keycard name
 	err = db.SetKeycardName(keyPair1.KeycardUID, "Card101")
 	require.NoError(t, err)
@@ -270,6 +301,17 @@ func TestKeypairs(t *testing.T) {
 		}
 	}
 	require.Equal(t, true, locked)
+
+	// Test detleting accounts (addresses) for a certain keycard
+	const numOfAccountsToRemove = 2
+	require.Greater(t, len(keyPair1.AccountsAddresses), numOfAccountsToRemove)
+	accountsToRemove := keyPair1.AccountsAddresses[:numOfAccountsToRemove]
+	err = db.RemoveMigratedAccountsForKeycard(keyPair1.KeycardUID, accountsToRemove)
+	require.NoError(t, err)
+	rows, err = db.GetMigratedKeyPairByKeyUID(keyPair1.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rows))
+	require.Equal(t, len(keyPair1.AccountsAddresses)-numOfAccountsToRemove, len(rows[0].AccountsAddresses))
 
 	// Test update keycard uid
 	err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID)

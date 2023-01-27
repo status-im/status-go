@@ -3,6 +3,7 @@ package bridge
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -45,4 +46,8 @@ func (s *SimpleBridge) Send(sendArgs *TransactionBridge, verifiedAccount *accoun
 
 func (s *SimpleBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {
 	return amountIn, nil
+}
+
+func (s *SimpleBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
+	return nil
 }

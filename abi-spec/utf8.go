@@ -241,7 +241,7 @@ func Utf8decode(str string) ([]byte, error) {
 	byteCount := len(byteArray)
 	byteIndex := 0
 	var codePoints []rune
-	for true {
+	for {
 		codePoint, goOn, err := decodeSymbol(byteArray, byteCount, &byteIndex)
 		if err != nil {
 			return nil, err

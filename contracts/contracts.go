@@ -12,6 +12,7 @@ import (
 	hopBridge "github.com/status-im/status-go/contracts/hop/bridge"
 	hopSwap "github.com/status-im/status-go/contracts/hop/swap"
 	hopWrapper "github.com/status-im/status-go/contracts/hop/wrapper"
+	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
@@ -59,6 +60,18 @@ func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common
 	}
 
 	return registrar.NewUsernameRegistrar(
+		contractAddr,
+		backend,
+	)
+}
+
+func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (*ierc20.IERC20, error) {
+	backend, err := c.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ierc20.NewIERC20(
 		contractAddr,
 		backend,
 	)

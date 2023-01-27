@@ -3,6 +3,10 @@ package bridge
 import (
 	"math/big"
 
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -10,11 +14,19 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
+	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
+		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
+		return ethTypes.SignTx(tx, s, verifiedAccount.AccountKey.PrivateKey)
+	}
+}
+
 type TransactionBridge struct {
 	BridgeName string
 	ChainID    uint64
 	SimpleTx   *transactions.SendTxArgs
 	HopTx      *HopTxArgs
+	CbridgeTx  *CBridgeTxArgs
 }
 
 func (t *TransactionBridge) Value() *big.Int {
@@ -22,6 +34,8 @@ func (t *TransactionBridge) Value() *big.Int {
 		return t.SimpleTx.Value.ToInt()
 	} else if t.HopTx != nil {
 		return t.HopTx.Amount.ToInt()
+	} else if t.CbridgeTx != nil {
+		return t.CbridgeTx.Amount.ToInt()
 	}
 
 	return big.NewInt(0)
@@ -32,6 +46,8 @@ func (t *TransactionBridge) From() types.Address {
 		return t.SimpleTx.From
 	} else if t.HopTx != nil {
 		return t.HopTx.From
+	} else if t.CbridgeTx != nil {
+		return t.CbridgeTx.From
 	}
 
 	return types.HexToAddress("0x0")
@@ -42,6 +58,8 @@ func (t *TransactionBridge) To() types.Address {
 		return *t.SimpleTx.To
 	} else if t.HopTx != nil {
 		return types.Address(t.HopTx.Recipient)
+	} else if t.CbridgeTx != nil {
+		return types.Address(t.HopTx.Recipient)
 	}
 
 	return types.HexToAddress("0x0")
@@ -51,6 +69,8 @@ func (t *TransactionBridge) Data() types.HexBytes {
 	if t.SimpleTx != nil && t.SimpleTx.To != nil {
 		return t.SimpleTx.Data
 	} else if t.HopTx != nil {
+		return types.HexBytes("")
+	} else if t.CbridgeTx != nil {
 		return types.HexBytes("")
 	}
 
@@ -64,4 +84,5 @@ type Bridge interface {
 	EstimateGas(from *params.Network, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
+	GetContractAddress(network *params.Network, token *token.Token) *common.Address
 }

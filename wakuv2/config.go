@@ -31,11 +31,10 @@ type Config struct {
 	KeepAliveInterval    int      `toml:",omitempty"`
 	MinPeersForRelay     int      `toml:",omitempty"`
 	LightClient          bool     `toml:",omitempty"`
-	RelayNodes           []string `toml:",omitempty"`
-	StoreNodes           []string `toml:",omitempty"`
-	FilterNodes          []string `toml:",omitempty"`
-	LightpushNodes       []string `toml:",omitempty"`
+	WakuNodes            []string `toml:",omitempty"`
+	Rendezvous           bool     `toml:",omitempty"`
 	DiscV5BootstrapNodes []string `toml:",omitempty"`
+	Nameserver           string   `toml:",omitempty"`
 	EnableDiscV5         bool     `toml:",omitempty"`
 	DiscoveryLimit       int      `toml:",omitempty"`
 	AutoUpdate           bool     `toml:",omitempty"`
@@ -52,7 +51,6 @@ var DefaultConfig = Config{
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
-	UDPPort:           9000,
 	AutoUpdate:        false,
 }
 
@@ -83,10 +81,6 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.MinPeersForRelay == 0 {
 		cfg.MinPeersForRelay = DefaultConfig.MinPeersForRelay
-	}
-
-	if cfg.UDPPort == 0 {
-		cfg.UDPPort = DefaultConfig.UDPPort
 	}
 
 	return cfg

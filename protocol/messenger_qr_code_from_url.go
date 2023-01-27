@@ -15,6 +15,7 @@ type QROptions struct {
 	AllowProfileImage    bool   `json:"withLogo"`
 }
 
+
 type WriterCloserByteBuffer struct {
 	*bytes.Buffer
 }

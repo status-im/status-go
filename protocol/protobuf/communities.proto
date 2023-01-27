@@ -17,6 +17,7 @@ message CommunityMember {
     UNKNOWN_ROLE = 0;
     ROLE_ALL = 1;
     ROLE_MANAGE_USERS = 2;
+    ROLE_MODERATE_CONTENT = 3;
   }
   repeated Roles roles = 1;
 }
@@ -98,6 +99,7 @@ message CommunityRequestToJoinResponse {
   bool accepted = 3;
   bytes grant = 4;
   bytes community_id = 5;
+  string magnet_uri = 6;
 }
 
 message CommunityRequestToLeave {

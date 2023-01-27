@@ -43,7 +43,7 @@ func TestProfilePicturesVisibilityProtobufFactory(t *testing.T) {
 	for _, c := range cs {
 		a := require.New(t)
 
-		rm, err := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock, "0x123def")
+		rm, _, err := profilePicturesVisibilityProtobufFactory(c.Input.Value, c.Input.Clock, "0x123def")
 		a.NoError(err, c.Name)
 
 		ppvp := new(protobuf.SyncSetting)

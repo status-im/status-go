@@ -19,6 +19,7 @@ import (
 
 var (
 	ErrChatNotFound            = errors.New("can't find chat")
+	ErrCommunityNotFound       = errors.New("can't find community")
 	ErrCommunitiesNotSupported = errors.New("communities are not supported")
 	ErrChatTypeNotSupported    = errors.New("chat type not supported")
 )
@@ -226,6 +227,10 @@ func (api *API) GetChat(ctx context.Context, communityID types.HexBytes, chatID 
 		return nil, err
 	}
 
+	if messengerChat == nil {
+		return nil, ErrChatNotFound
+	}
+
 	result, err := api.toAPIChat(messengerChat, community, pubKey)
 	if err != nil {
 		return nil, err
@@ -324,24 +329,26 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 
 func getChatMembers(sourceChat *protocol.Chat, community *communities.Community, userPubKey string) (map[string]Member, error) {
 	result := make(map[string]Member)
-	if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
-		for _, m := range sourceChat.Members {
-			result[m.ID] = Member{
-				Admin:  m.Admin,
+	if sourceChat != nil {
+		if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
+			for _, m := range sourceChat.Members {
+				result[m.ID] = Member{
+					Admin:  m.Admin,
+					Joined: true,
+				}
+			}
+			return result, nil
+		}
+
+		if sourceChat.ChatType == protocol.ChatTypeOneToOne {
+			result[sourceChat.ID] = Member{
 				Joined: true,
 			}
+			result[userPubKey] = Member{
+				Joined: true,
+			}
+			return result, nil
 		}
-		return result, nil
-	}
-
-	if sourceChat.ChatType == protocol.ChatTypeOneToOne {
-		result[sourceChat.ID] = Member{
-			Joined: true,
-		}
-		result[userPubKey] = Member{
-			Joined: true,
-		}
-		return result, nil
 	}
 
 	if community != nil {
@@ -361,6 +368,20 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	}
 
 	return nil, nil
+}
+
+func (api *API) getCommunityByID(id string) (*communities.Community, error) {
+	communityID, err := hexutil.Decode(id)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := api.s.messenger.GetCommunityByID(communityID)
+	if community == nil && err == nil {
+		return nil, ErrCommunityNotFound
+	}
+
+	return community, err
 }
 
 func (chat *Chat) populateCommunityFields(community *communities.Community) error {
@@ -398,7 +419,14 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 	}
 
 	if len(communityID) != 0 {
-		fullChatID = string(communityID.Bytes()) + chatID
+		id := string(communityID.Bytes())
+
+		if chatID == "" {
+			community, err := api.getCommunityByID(id)
+			return nil, community, err
+		}
+
+		fullChatID = id + chatID
 	}
 
 	messengerChat := api.s.messenger.Chat(fullChatID)
@@ -408,12 +436,9 @@ func (api *API) getChatAndCommunity(pubKey string, communityID types.HexBytes, c
 
 	var community *communities.Community
 	if messengerChat.CommunityID != "" {
-		communityID, err := hexutil.Decode(messengerChat.CommunityID)
-		if err != nil {
-			return nil, nil, err
-		}
+		var err error
+		community, err = api.getCommunityByID(messengerChat.CommunityID)
 
-		community, err = api.s.messenger.GetCommunityByID(communityID)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 type transactionState string
@@ -158,7 +159,7 @@ func (s *Service) StartWalletWatcher() {
 	}
 
 	s.walletTransmitter.quit = make(chan struct{})
-	events := make(chan transfer.Event, 10)
+	events := make(chan walletevent.Event, 10)
 	sub := s.walletTransmitter.publisher.Subscribe(events)
 
 	s.walletTransmitter.wg.Add(1)

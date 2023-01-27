@@ -2,9 +2,12 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
+
+	"github.com/rmg/iso4217"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -19,9 +22,8 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	reader := NewReader(s)
 	router := NewRouter(s)
-	return &API{s, reader, router}
+	return &API{s, s.reader, router}
 }
 
 // API is class with methods available over RPC.
@@ -31,12 +33,16 @@ type API struct {
 	router *Router
 }
 
-func (api *API) StartWallet(ctx context.Context, chainIDs []uint64) error {
-	return api.reader.Start(ctx, chainIDs)
+func (api *API) StartWallet(ctx context.Context) error {
+	return api.reader.Start()
 }
 
-func (api *API) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
-	return api.reader.GetWallet(ctx, chainIDs)
+func (api *API) CheckConnected(ctx context.Context) *ConnectedResult {
+	return api.s.CheckConnected(ctx)
+}
+
+func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	return api.reader.GetWalletToken(ctx, addresses)
 }
 
 type DerivedAddress struct {
@@ -313,29 +319,34 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
 }
 
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currency string) (map[string]float64, error) {
+func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	log.Debug("call to FetchPrices")
-	return fetchCryptoComparePrices(symbols, currency)
+	return api.s.priceManager.FetchPrices(symbols, currencies)
 }
 
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]MarketCoinValues, error) {
+func (api *API) GetCachedPrices(ctx context.Context) (map[string]map[string]float64, error) {
+	log.Debug("call to GetCachedPrices")
+	return api.s.priceManager.GetCachedPrices()
+}
+
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return fetchTokenMarketValues(symbols, currency)
+	return api.s.cryptoCompare.fetchTokenMarketValues(symbols, currencies)
 }
 
 func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]TokenHistoricalPairs, error) {
 	log.Debug("call to GetHourlyMarketValues")
-	return fetchHourlyMarketValues(symbol, currency, limit, aggregate)
+	return api.s.cryptoCompare.fetchHourlyMarketValues(symbol, currency, limit, aggregate)
 }
 
 func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]TokenHistoricalPairs, error) {
 	log.Debug("call to GetDailyMarketValues")
-	return fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
+	return api.s.cryptoCompare.fetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
 }
 
 func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]Coin, error) {
 	log.Debug("call to FetchTokenDetails")
-	return fetchCryptoCompareTokenDetails(symbols)
+	return api.s.cryptoCompare.fetchTokenDetails(symbols)
 }
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
@@ -348,9 +359,20 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
 }
 
-func (api *API) GetSuggestedRoutes(ctx context.Context, sendType SendType, account common.Address, amountIn *hexutil.Big, tokenSymbol string, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs []uint64, gasFeeMode GasFeeMode) (*SuggestedRoutes, error) {
+func (api *API) GetSuggestedRoutes(
+	ctx context.Context,
+	sendType SendType,
+	account common.Address,
+	amountIn *hexutil.Big,
+	tokenSymbol string,
+	disabledFromChainIDs,
+	disabledToChaindIDs,
+	preferedChainIDs []uint64,
+	gasFeeMode GasFeeMode,
+	fromLockedAmount map[uint64]*hexutil.Big,
+) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode)
+	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
 func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
@@ -510,4 +532,20 @@ func (api *API) getDerivedAddress(id string, derivedPath string) (*DerivedAddres
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, password string) (*MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
+}
+
+func (api *API) IsCurrencyFiat(name string) bool {
+	code, _ := iso4217.ByName(strings.ToUpper(name))
+
+	return (code != 0)
+}
+
+func (api *API) GetFiatCurrencyMinorUnit(name string) (int, error) {
+	code, minor := iso4217.ByName(strings.ToUpper(name))
+
+	if code == 0 {
+		return code, errors.New("Unknown currency: " + name)
+	}
+
+	return minor, nil
 }

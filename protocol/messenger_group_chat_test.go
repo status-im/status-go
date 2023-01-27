@@ -82,7 +82,9 @@ func (s *MessengerGroupChatSuite) createEmptyGroupChat(creator *Messenger, name 
 func (s *MessengerGroupChatSuite) verifyGroupChatCreated(member *Messenger, expectedChatActive bool) {
 	response, err := WaitOnMessengerResponse(
 		member,
-		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		func(r *MessengerResponse) bool {
+			return len(r.Chats()) == 1 && r.Chats()[0].Active == expectedChatActive
+		},
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
@@ -97,6 +99,7 @@ func makeMutualContact(origin *Messenger, contactPubkey *ecdsa.PublicKey) error 
 	}
 	contact.Added = true
 	contact.HasAddedUs = true
+	contact.ContactRequestState = ContactRequestStateMutual
 	origin.allContacts.Store(contact.ID, contact)
 
 	return nil
@@ -255,20 +258,26 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	admin := s.startNewMessenger()
 	memberA := s.startNewMessenger()
 	memberB := s.startNewMessenger()
-	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
+	memberC := s.startNewMessenger()
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
 	s.makeMutualContacts(admin, memberB)
+	s.makeMutualContacts(admin, memberC)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", members)
 	s.verifyGroupChatCreated(memberA, true)
 	s.verifyGroupChatCreated(memberB, true)
+	s.verifyGroupChatCreated(memberC, true)
 
-	_, err := memberA.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err := memberA.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().Error(err)
 
 	// only admin can remove members from the group
-	_, err = admin.RemoveMemberFromGroupChat(context.Background(), groupChat.ID, common.PubkeyToHex(&memberB.identity.PublicKey))
+	_, err = admin.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
+		common.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	// ensure removal is propagated to other members
@@ -285,6 +294,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(memberA.Shutdown())
 	defer s.NoError(memberB.Shutdown())
+	defer s.NoError(memberC.Shutdown())
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
@@ -329,6 +339,20 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Equal("test_member_group", response.Chats()[0].Name)
 	s.Require().Equal("#F0F0F0", response.Chats()[0].Color)
+
+	inputMessage := buildTestMessage(*groupChat)
+
+	_, err = admin.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	response, err = WaitOnMessengerResponse(
+		member,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
 
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(member.Shutdown())

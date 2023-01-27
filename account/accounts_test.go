@@ -23,11 +23,11 @@ const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
 	accManager := NewGethManager()
-	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
 	require.NoError(t, err)
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
-	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts_empty")
+	emptyKeyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts_empty")
 	require.NoError(t, err)
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
@@ -102,7 +102,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 // TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
 // can handle accounts before introduction of EIP55.
 func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
-	keyStoreDir, err := ioutil.TempDir("", "status-accounts-test")
+	keyStoreDir, err := os.MkdirTemp("", "status-accounts-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
@@ -143,7 +143,7 @@ type testAccount struct {
 func (s *ManagerTestSuite) SetupTest() {
 	s.accManager = NewGethManager()
 
-	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	keyStoreDir, err := os.MkdirTemp(os.TempDir(), "accounts")
 	s.Require().NoError(err)
 	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))
 	s.keydir = keyStoreDir

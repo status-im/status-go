@@ -1,0 +1,112 @@
+package filter
+
+import (
+	"sync"
+
+	v2 "github.com/waku-org/go-waku/waku/v2"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/timesource"
+)
+
+type FilterMap struct {
+	sync.RWMutex
+	timesource  timesource.Timesource
+	items       map[string]Filter
+	broadcaster v2.Broadcaster
+}
+
+type FilterMapItem struct {
+	Key   string
+	Value Filter
+}
+
+func NewFilterMap(broadcaster v2.Broadcaster, timesource timesource.Timesource) *FilterMap {
+	return &FilterMap{
+		timesource:  timesource,
+		items:       make(map[string]Filter),
+		broadcaster: broadcaster,
+	}
+}
+
+func (fm *FilterMap) Set(key string, value Filter) {
+	fm.Lock()
+	defer fm.Unlock()
+
+	fm.items[key] = value
+}
+
+func (fm *FilterMap) Get(key string) (Filter, bool) {
+	fm.Lock()
+	defer fm.Unlock()
+
+	value, ok := fm.items[key]
+
+	return value, ok
+}
+
+func (fm *FilterMap) Delete(key string) {
+	fm.Lock()
+	defer fm.Unlock()
+
+	close(fm.items[key].Chan)
+	delete(fm.items, key)
+}
+
+func (fm *FilterMap) RemoveAll() {
+	fm.Lock()
+	defer fm.Unlock()
+
+	for k, v := range fm.items {
+		close(v.Chan)
+		delete(fm.items, k)
+	}
+}
+
+func (fm *FilterMap) Items() <-chan FilterMapItem {
+	c := make(chan FilterMapItem)
+
+	f := func() {
+		fm.RLock()
+		defer fm.RUnlock()
+
+		for k, v := range fm.items {
+			c <- FilterMapItem{k, v}
+		}
+		close(c)
+	}
+	go f()
+
+	return c
+}
+
+func (fm *FilterMap) Notify(msg *pb.WakuMessage, requestId string) {
+	fm.RLock()
+	defer fm.RUnlock()
+
+	filter, ok := fm.items[requestId]
+	if !ok {
+		// We do this because the key for the filter is set to the requestId received from the filter protocol.
+		// This means we do not need to check the content filter explicitly as all MessagePushs already contain
+		// the requestId of the coresponding filter.
+		return
+	}
+
+	envelope := protocol.NewEnvelope(msg, fm.timesource.Now().UnixNano(), filter.Topic)
+
+	// Broadcasting message so it's stored
+	fm.broadcaster.Submit(envelope)
+
+	if msg.ContentTopic == "" {
+		filter.Chan <- envelope
+	}
+
+	// TODO: In case of no topics we should either trigger here for all messages,
+	// or we should not allow such filter to exist in the first place.
+	for _, contentTopic := range filter.ContentFilters {
+		if msg.ContentTopic == contentTopic {
+			filter.Chan <- envelope
+			break
+		}
+	}
+}

@@ -34,6 +34,10 @@ type Token struct {
 	// to be traded.
 	Decimals uint   `json:"decimals"`
 	ChainID  uint64 `json:"chainId"`
+	// PegSymbol indicates that the token is pegged to some fiat currency, using the
+	// ISO 4217 alphabetic code. For example, an empty string means it is not
+	// pegged, while "USD" means it's pegged to the United States Dollar.
+	PegSymbol string `json:"pegSymbol"`
 }
 
 func (t *Token) IsNative() bool {
@@ -75,14 +79,22 @@ func NewTokenManager(
 	return tokenManager
 }
 
+func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
+	if address == nativeChainAddress {
+		return true
+	}
+	tokensMap, ok := tokenStore[chainID]
+	if !ok {
+		return false
+	}
+	_, ok = tokensMap[address]
+
+	return ok
+}
+
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
 	if tokenSymbol == network.NativeCurrencySymbol {
-		return &Token{
-			Address:  common.HexToAddress("0x"),
-			Symbol:   network.NativeCurrencySymbol,
-			Decimals: uint(network.NativeCurrencyDecimals),
-			Name:     network.NativeCurrencyName,
-		}
+		return tm.ToToken(network)
 	}
 
 	tokens, err := tm.GetTokens(network.ChainID)
@@ -115,6 +127,24 @@ func (tm *Manager) FindSNT(chainID uint64) *Token {
 	}
 
 	return nil
+}
+
+func (tm *Manager) GetAllTokens() ([]*Token, error) {
+	result := make([]*Token, 0)
+	for _, tokens := range tokenStore {
+		for _, token := range tokens {
+			result = append(result, token)
+		}
+	}
+
+	tokens, err := tm.GetCustoms()
+	if err != nil {
+		return nil, err
+	}
+
+	result = append(result, tokens...)
+
+	return result, nil
 }
 
 func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
@@ -244,6 +274,16 @@ func (tm *Manager) Toggle(chainID uint64, address common.Address) error {
 	return err
 }
 
+func (tm *Manager) ToToken(network *params.Network) *Token {
+	return &Token{
+		Address:  common.HexToAddress("0x"),
+		Name:     network.NativeCurrencyName,
+		Symbol:   network.NativeCurrencySymbol,
+		Decimals: uint(network.NativeCurrencyDecimals),
+		ChainID:  network.ChainID,
+	}
+}
+
 func (tm *Manager) GetVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
 	customTokens, err := tm.GetCustoms()
 	if err != nil {
@@ -258,13 +298,7 @@ func (tm *Manager) GetVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
 		}
 
 		rst[chainID] = make([]*Token, 0)
-		rst[chainID] = append(rst[chainID], &Token{
-			Address:  common.HexToAddress("0x"),
-			Name:     network.NativeCurrencyName,
-			Symbol:   network.NativeCurrencySymbol,
-			Decimals: uint(network.NativeCurrencyDecimals),
-			ChainID:  chainID,
-		})
+		rst[chainID] = append(rst[chainID], tm.ToToken(network))
 	}
 	rows, err := tm.db.Query("SELECT chain_id, address FROM visible_tokens")
 	if err != nil {
@@ -371,10 +405,10 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 		response[account][token] = &sumHex
 		mu.Unlock()
 	}
-
 	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
+
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
 
 		if err == nil {
@@ -450,6 +484,9 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 					account := accounts[accountIdx]
 					token := tokens[tokenIdx]
 					client := clients[clientIdx]
+					if !tm.inStore(token, client.ChainID) {
+						continue
+					}
 					group.Add(func(parent context.Context) error {
 						ctx, cancel := context.WithTimeout(parent, requestTimeout)
 						defer cancel()
@@ -461,6 +498,140 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 							return nil
 						}
 						updateBalance(account, token, balance)
+						return nil
+					})
+				}
+			}
+		}
+
+	}
+	select {
+	case <-group.WaitAsync():
+	case <-parent.Done():
+		return nil, parent.Err()
+	}
+	return response, group.Error()
+}
+
+func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	var (
+		group    = async.NewAtomicGroup(parent)
+		mu       sync.Mutex
+		response = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
+	)
+
+	updateBalance := func(chainID uint64, account common.Address, token common.Address, balance *big.Int) {
+		mu.Lock()
+		if _, ok := response[chainID]; !ok {
+			response[chainID] = map[common.Address]map[common.Address]*hexutil.Big{}
+		}
+
+		if _, ok := response[chainID][account]; !ok {
+			response[chainID][account] = map[common.Address]*hexutil.Big{}
+		}
+
+		if _, ok := response[chainID][account][token]; !ok {
+			zeroHex := hexutil.Big(*big.NewInt(0))
+			response[chainID][account][token] = &zeroHex
+		}
+		sum := big.NewInt(0).Add(response[chainID][account][token].ToInt(), balance)
+		sumHex := hexutil.Big(*sum)
+		response[chainID][account][token] = &sumHex
+		mu.Unlock()
+	}
+
+	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
+	for clientIdx := range clients {
+		client := clients[clientIdx]
+
+		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
+		if err == nil {
+			fetchChainBalance := false
+			var tokenChunks [][]common.Address
+			chunkSize := 100
+			for i := 0; i < len(tokens); i += chunkSize {
+				end := i + chunkSize
+				if end > len(tokens) {
+					end = len(tokens)
+				}
+
+				tokenChunks = append(tokenChunks, tokens[i:end])
+			}
+
+			for _, token := range tokens {
+				if token == nativeChainAddress {
+					fetchChainBalance = true
+				}
+			}
+			if fetchChainBalance {
+				group.Add(func(parent context.Context) error {
+					ctx, cancel := context.WithTimeout(parent, requestTimeout)
+					defer cancel()
+					res, err := ethScanContract.EtherBalances(&bind.CallOpts{
+						Context: ctx,
+					}, accounts)
+					if err != nil {
+						log.Error("can't fetch chain balance", err)
+						return nil
+					}
+					for idx, account := range accounts {
+						balance := new(big.Int)
+						balance.SetBytes(res[idx].Data)
+						updateBalance(client.ChainID, account, common.HexToAddress("0x"), balance)
+					}
+
+					return nil
+				})
+			}
+
+			for accountIdx := range accounts {
+				account := accounts[accountIdx]
+				for idx := range tokenChunks {
+					chunk := tokenChunks[idx]
+					group.Add(func(parent context.Context) error {
+						ctx, cancel := context.WithTimeout(parent, requestTimeout)
+						defer cancel()
+						res, err := ethScanContract.TokensBalance(&bind.CallOpts{
+							Context: ctx,
+						}, account, chunk)
+						if err != nil {
+							log.Error("can't fetch erc20 token balance", "account", account, "error", err)
+							return nil
+						}
+
+						for idx, token := range chunk {
+							if !res[idx].Success {
+								continue
+							}
+							balance := new(big.Int)
+							balance.SetBytes(res[idx].Data)
+							updateBalance(client.ChainID, account, token, balance)
+						}
+						return nil
+					})
+				}
+			}
+		} else {
+			for tokenIdx := range tokens {
+				for accountIdx := range accounts {
+					// Below, we set account, token and client from idx on purpose to avoid override
+					account := accounts[accountIdx]
+					token := tokens[tokenIdx]
+					if !tm.inStore(token, client.ChainID) {
+						continue
+					}
+					client := clients[clientIdx]
+					group.Add(func(parent context.Context) error {
+						ctx, cancel := context.WithTimeout(parent, requestTimeout)
+						defer cancel()
+						balance, err := tm.GetBalance(ctx, client, account, token)
+
+						if err != nil {
+							log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
+
+							return nil
+						}
+						updateBalance(client.ChainID, account, token, balance)
 						return nil
 					})
 				}

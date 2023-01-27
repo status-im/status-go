@@ -36,9 +36,9 @@ func TestPendingTransactions(t *testing.T) {
 		To:             common.Address{2},
 		Type:           RegisterENS,
 		AdditionalData: "someuser.stateofus.eth",
-		Value:          bigint.BigInt{big.NewInt(123)},
-		GasLimit:       bigint.BigInt{big.NewInt(21000)},
-		GasPrice:       bigint.BigInt{big.NewInt(1)},
+		Value:          bigint.BigInt{Int: big.NewInt(123)},
+		GasLimit:       bigint.BigInt{Int: big.NewInt(21000)},
+		GasPrice:       bigint.BigInt{Int: big.NewInt(1)},
 		ChainID:        777,
 	}
 

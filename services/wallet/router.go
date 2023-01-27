@@ -2,15 +2,24 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
+	"strings"
 	"sync"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
@@ -27,12 +36,21 @@ const (
 	ENSRelease
 	ENSSetPubKey
 	StickersBuy
+	Bridge
 )
 const EstimateUsername = "RandomUsername"
 const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
 
 func (s SendType) isTransfer() bool {
 	return s == Transfer
+}
+
+func (s SendType) isAvailableBetween(from, to *params.Network) bool {
+	if s != Bridge {
+		return true
+	}
+
+	return from.ChainID != to.ChainID
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
@@ -92,19 +110,27 @@ func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 
 var zero = big.NewInt(0)
 
 type Path struct {
-	BridgeName    string
-	From          *params.Network
-	To            *params.Network
-	MaxAmountIn   *hexutil.Big
-	AmountIn      *hexutil.Big
-	AmountOut     *hexutil.Big
-	GasAmount     uint64
-	GasFees       *SuggestedFees
-	BonderFees    *hexutil.Big
-	TokenFees     *big.Float
-	Cost          *big.Float
-	Preferred     bool
-	EstimatedTime TransactionEstimation
+	BridgeName              string
+	From                    *params.Network
+	To                      *params.Network
+	MaxAmountIn             *hexutil.Big
+	AmountIn                *hexutil.Big
+	AmountInLocked          bool
+	AmountOut               *hexutil.Big
+	GasAmount               uint64
+	GasFees                 *SuggestedFees
+	BonderFees              *hexutil.Big
+	TokenFees               *big.Float
+	Cost                    *big.Float
+	EstimatedTime           TransactionEstimation
+	ApprovalRequired        bool
+	ApprovalGasFees         *big.Float
+	ApprovalAmountRequired  *hexutil.Big
+	ApprovalContractAddress *common.Address
+}
+
+func (p *Path) Equal(o *Path) bool {
+	return p.From.ChainID == o.From.ChainID && p.To.ChainID == o.To.ChainID
 }
 
 type Graph = []*Node
@@ -135,7 +161,7 @@ func buildGraph(AmountIn *big.Int, routes []*Path, level int, sourceChainIDs []u
 
 		newRoutes := make([]*Path, 0)
 		for _, r := range routes {
-			if r.From.ChainID == route.From.ChainID && r.To.ChainID == route.To.ChainID {
+			if route.Equal(r) {
 				continue
 			}
 			newRoutes = append(newRoutes, r)
@@ -159,30 +185,112 @@ func buildGraph(AmountIn *big.Int, routes []*Path, level int, sourceChainIDs []u
 	return graph
 }
 
-func (n Node) findBest(level int) ([]*Path, *big.Float) {
-	if len(n.Children) == 0 {
-		if n.Path == nil {
-			return []*Path{}, big.NewFloat(0)
-		}
-		return []*Path{n.Path}, n.Path.Cost
-	}
+func (n Node) buildAllRoutes() [][]*Path {
+	res := make([][]*Path, 0)
 
-	var best []*Path
-	bestTotalCost := big.NewFloat(math.Inf(1))
+	if len(n.Children) == 0 && n.Path != nil {
+		res = append(res, []*Path{n.Path})
+	}
 
 	for _, node := range n.Children {
-		routes, totalCost := node.findBest(level + 1)
-		if totalCost.Cmp(bestTotalCost) < 0 {
-			best = routes
-			bestTotalCost = totalCost
+		for _, route := range node.buildAllRoutes() {
+			extendedRoute := route
+			if n.Path != nil {
+				extendedRoute = append([]*Path{n.Path}, route...)
+			}
+			res = append(res, extendedRoute)
 		}
 	}
 
-	if n.Path == nil {
-		return best, bestTotalCost
+	return res
+}
+
+func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
+	if len(fromLockedAmount) == 0 {
+		return routes
 	}
 
-	return append([]*Path{n.Path}, best...), new(big.Float).Add(bestTotalCost, n.Path.Cost)
+	filteredRoutesLevel1 := make([][]*Path, 0)
+	for _, route := range routes {
+		routeOk := true
+		fromIncluded := make(map[uint64]bool)
+		fromExcluded := make(map[uint64]bool)
+		for chainID, amount := range fromLockedAmount {
+			if amount.ToInt().Cmp(zero) == 0 {
+				fromExcluded[chainID] = false
+			} else {
+				fromIncluded[chainID] = false
+			}
+
+		}
+		for _, path := range route {
+			if _, ok := fromExcluded[path.From.ChainID]; ok {
+				routeOk = false
+				break
+			}
+			if _, ok := fromIncluded[path.From.ChainID]; ok {
+				fromIncluded[path.From.ChainID] = true
+			}
+		}
+		for _, value := range fromIncluded {
+			if !value {
+				routeOk = false
+				break
+			}
+		}
+
+		if routeOk {
+			filteredRoutesLevel1 = append(filteredRoutesLevel1, route)
+		}
+	}
+
+	filteredRoutesLevel2 := make([][]*Path, 0)
+	for _, route := range filteredRoutesLevel1 {
+		routeOk := true
+		for _, path := range route {
+			if amount, ok := fromLockedAmount[path.From.ChainID]; ok {
+				requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
+				restAmountIn := big.NewInt(0)
+
+				for _, otherPath := range route {
+					if path.Equal(otherPath) {
+						continue
+					}
+					restAmountIn = new(big.Int).Add(otherPath.MaxAmountIn.ToInt(), restAmountIn)
+				}
+				if restAmountIn.Cmp(requiredAmountIn) >= 0 {
+					path.AmountIn = amount
+					path.AmountInLocked = true
+				} else {
+					routeOk = false
+					break
+				}
+			}
+		}
+		if routeOk {
+			filteredRoutesLevel2 = append(filteredRoutesLevel2, route)
+		}
+	}
+
+	return filteredRoutesLevel2
+}
+
+func findBest(routes [][]*Path) []*Path {
+	var best []*Path
+	bestCost := big.NewFloat(math.Inf(1))
+	for _, route := range routes {
+		currentCost := big.NewFloat(0)
+		for _, path := range route {
+			currentCost = new(big.Float).Add(currentCost, path.Cost)
+		}
+
+		if currentCost.Cmp(bestCost) == -1 {
+			best = route
+			bestCost = currentCost
+		}
+	}
+
+	return best
 }
 
 type SuggestedRoutes struct {
@@ -192,7 +300,11 @@ type SuggestedRoutes struct {
 	NativeChainTokenPrice float64
 }
 
-func newSuggestedRoutes(amountIn *big.Int, candidates []*Path) *SuggestedRoutes {
+func newSuggestedRoutes(
+	amountIn *big.Int,
+	candidates []*Path,
+	fromLockedAmount map[uint64]*hexutil.Big,
+) *SuggestedRoutes {
 	if len(candidates) == 0 {
 		return &SuggestedRoutes{
 			Candidates: candidates,
@@ -204,14 +316,19 @@ func newSuggestedRoutes(amountIn *big.Int, candidates []*Path) *SuggestedRoutes 
 		Path:     nil,
 		Children: buildGraph(amountIn, candidates, 0, []uint64{}),
 	}
-	best, _ := node.findBest(0)
+	routes := node.buildAllRoutes()
+	routes = filterRoutes(routes, amountIn, fromLockedAmount)
+	best := findBest(routes)
 
 	if len(best) > 0 {
+		sort.Slice(best, func(i, j int) bool {
+			return best[i].AmountInLocked
+		})
 		rest := new(big.Int).Set(amountIn)
 		for _, path := range best {
 			diff := new(big.Int).Sub(rest, path.MaxAmountIn.ToInt())
 			if diff.Cmp(zero) >= 0 {
-				path.AmountIn = path.MaxAmountIn
+				path.AmountIn = (*hexutil.Big)(path.MaxAmountIn.ToInt())
 			} else {
 				path.AmountIn = (*hexutil.Big)(new(big.Int).Set(rest))
 			}
@@ -228,11 +345,13 @@ func newSuggestedRoutes(amountIn *big.Int, candidates []*Path) *SuggestedRoutes 
 func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
 	simple := bridge.NewSimpleBridge(s.transactor)
-	hop := bridge.NewHopBridge(s.rpcClient)
+	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
+	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
 	bridges[simple.Name()] = simple
 	bridges[hop.Name()] = hop
+	bridges[cbridge.Name()] = cbridge
 
-	return &Router{s, bridges}
+	return &Router{s, bridges, s.rpcClient}
 }
 
 func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
@@ -246,8 +365,66 @@ func containsNetworkChainID(network *params.Network, chainIDs []uint64) bool {
 }
 
 type Router struct {
-	s       *Service
-	bridges map[string]bridge.Bridge
+	s         *Service
+	bridges   map[string]bridge.Bridge
+	rpcClient *rpc.Client
+}
+
+func (r *Router) requireApproval(ctx context.Context, bridge bridge.Bridge, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (bool, *big.Int, uint64, *common.Address, error) {
+	if token.IsNative() {
+		return false, nil, 0, nil, nil
+	}
+	contractMaker := &contracts.ContractMaker{RPCClient: r.rpcClient}
+
+	bridgeAddress := bridge.GetContractAddress(network, token)
+	if bridgeAddress == nil {
+		return false, nil, 0, nil, nil
+	}
+
+	contract, err := contractMaker.NewERC20(network.ChainID, token.Address)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	allowance, err := contract.Allowance(&bind.CallOpts{
+		Context: ctx,
+	}, account, *bridgeAddress)
+
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	if allowance.Cmp(amountIn) >= 0 {
+		return false, nil, 0, nil, nil
+	}
+
+	ethClient, err := r.rpcClient.EthClient(network.ChainID)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	erc20ABI, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	data, err := erc20ABI.Pack("approve", bridgeAddress, amountIn)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  account,
+		To:    &token.Address,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
+
+	return true, amountIn, estimate, bridgeAddress, nil
+
 }
 
 func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -259,19 +436,18 @@ func (r *Router) getBalance(ctx context.Context, network *params.Network, token 
 	return r.s.tokenManager.GetBalance(ctx, clients[0], account, token.Address)
 }
 
-func (r *Router) estimateTimes(ctx context.Context, network *params.Network, gasFees *SuggestedFees, gasFeeMode GasFeeMode) TransactionEstimation {
-	if gasFeeMode == GasFeeLow {
-		return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasLow)
-	}
-
-	if gasFeeMode == GasFeeMedium {
-		return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasMedium)
-	}
-
-	return r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, gasFees.MaxFeePerGasHigh)
-}
-
-func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account common.Address, amountIn *big.Int, tokenSymbol string, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs []uint64, gasFeeMode GasFeeMode) (*SuggestedRoutes, error) {
+func (r *Router) suggestedRoutes(
+	ctx context.Context,
+	sendType SendType,
+	account common.Address,
+	amountIn *big.Int,
+	tokenSymbol string,
+	disabledFromChainIDs,
+	disabledToChaindIDs,
+	preferedChainIDs []uint64,
+	gasFeeMode GasFeeMode,
+	fromLockedAmount map[uint64]*hexutil.Big,
+) (*SuggestedRoutes, error) {
 	areTestNetworksEnabled, err := r.s.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
@@ -282,9 +458,13 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 		return nil, err
 	}
 
-	prices, err := fetchCryptoComparePrices([]string{"ETH", tokenSymbol}, "USD")
+	pricesMap, err := r.s.priceManager.FetchPrices([]string{"ETH", tokenSymbol}, []string{"USD"})
 	if err != nil {
 		return nil, err
+	}
+	prices := make(map[string]float64, 0)
+	for symbol, pricePerCurrency := range pricesMap {
+		prices[symbol] = pricePerCurrency["USD"]
 	}
 
 	var (
@@ -327,6 +507,14 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 				return err
 			}
 
+			maxAmountIn := (*hexutil.Big)(balance)
+			if amount, ok := fromLockedAmount[network.ChainID]; ok {
+				if amount.ToInt().Cmp(balance) == 1 {
+					return errors.New("locked amount cannot be bigger than balance")
+				}
+				maxAmountIn = amount
+			}
+
 			nativeBalance, err := r.getBalance(ctx, network, nativeToken, account)
 			if err != nil {
 				return err
@@ -345,7 +533,11 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					if len(preferedChainIDs) > 0 && !containsNetworkChainID(network, preferedChainIDs) {
+					if !sendType.isAvailableBetween(network, dest) {
+						continue
+					}
+
+					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest, preferedChainIDs) {
 						continue
 					}
 
@@ -353,7 +545,7 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					can, err := bridge.Can(network, dest, token, balance)
+					can, err := bridge.Can(network, dest, token, maxAmountIn.ToInt())
 					if err != nil || !can {
 						continue
 					}
@@ -378,37 +570,53 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 						continue
 					}
 
-					preferred := containsNetworkChainID(dest, preferedChainIDs)
+					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, bridge, account, network, token, amountIn)
+					if err != nil {
+						continue
+					}
+					approvalGasFees := new(big.Float).Mul(gweiToEth(maxFees), big.NewFloat((float64(approvalGasLimit))))
+
+					approvalGasCost := new(big.Float)
+					approvalGasCost.Mul(
+						approvalGasFees,
+						big.NewFloat(prices["ETH"]),
+					)
 
 					gasCost := new(big.Float)
 					gasCost.Mul(
 						new(big.Float).Mul(gweiToEth(maxFees), big.NewFloat((float64(gasLimit)))),
 						big.NewFloat(prices["ETH"]),
 					)
+
 					tokenFeesAsFloat := new(big.Float).Quo(
 						new(big.Float).SetInt(tokenFees),
 						big.NewFloat(math.Pow(10, float64(token.Decimals))),
 					)
 					tokenCost := new(big.Float)
 					tokenCost.Mul(tokenFeesAsFloat, big.NewFloat(prices[tokenSymbol]))
+
 					cost := new(big.Float)
 					cost.Add(tokenCost, gasCost)
+					cost.Add(cost, approvalGasCost)
 
 					mu.Lock()
 					candidates = append(candidates, &Path{
-						BridgeName:    bridge.Name(),
-						From:          network,
-						To:            dest,
-						MaxAmountIn:   (*hexutil.Big)(balance),
-						AmountIn:      (*hexutil.Big)(zero),
-						AmountOut:     (*hexutil.Big)(zero),
-						GasAmount:     gasLimit,
-						GasFees:       gasFees,
-						BonderFees:    (*hexutil.Big)(bonderFees),
-						TokenFees:     tokenFeesAsFloat,
-						Preferred:     preferred,
-						Cost:          cost,
-						EstimatedTime: estimatedTime,
+						BridgeName:              bridge.Name(),
+						From:                    network,
+						To:                      dest,
+						MaxAmountIn:             maxAmountIn,
+						AmountIn:                (*hexutil.Big)(zero),
+						AmountOut:               (*hexutil.Big)(zero),
+						GasAmount:               gasLimit,
+						GasFees:                 gasFees,
+						BonderFees:              (*hexutil.Big)(bonderFees),
+						TokenFees:               tokenFeesAsFloat,
+						Cost:                    cost,
+						EstimatedTime:           estimatedTime,
+						ApprovalRequired:        approvalRequired,
+						ApprovalGasFees:         approvalGasFees,
+						ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
+						ApprovalContractAddress: approvalContractAddress,
 					})
 					mu.Unlock()
 				}
@@ -419,7 +627,7 @@ func (r *Router) suggestedRoutes(ctx context.Context, sendType SendType, account
 
 	group.Wait()
 
-	suggestedRoutes := newSuggestedRoutes(amountIn, candidates)
+	suggestedRoutes := newSuggestedRoutes(amountIn, candidates, fromLockedAmount)
 	suggestedRoutes.TokenPrice = prices[tokenSymbol]
 	suggestedRoutes.NativeChainTokenPrice = prices["ETH"]
 	for _, path := range suggestedRoutes.Best {

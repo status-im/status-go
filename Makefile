@@ -17,14 +17,10 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
-  # Building on M1 is still not supported, so in the meantime we crosscompile by default to amd64
-  ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
-    FORCE_ARCH ?= amd64
-    GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=$(FORCE_ARCH)
-  endif
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
  GOBIN_SHARED_LIB_EXT := dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
 else
  GOBIN_SHARED_LIB_EXT := so
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
@@ -40,7 +36,7 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_TAGS ?= gowaku_skip_migrations
+BUILD_TAGS ?= 
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
@@ -141,9 +137,9 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		-target=ios -ldflags="-s -w" \
 		-tags 'nowatchdog $(BUILD_TAGS)' \
 		$(BUILD_FLAGS_MOBILE) \
-		-o build/bin/Statusgo.framework \
+		-o build/bin/Statusgo.xcframework \
 		github.com/status-im/status-go/mobile
-	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
+	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
@@ -272,8 +268,8 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
 	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
-	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
-	mv build/bin/Statusgo.framework.zip $(RELEASE_DIR)/status-go-ios.zip
+	zip -r build/bin/Statusgo.xcframework.zip build/bin/Statusgo.xcframework
+	mv build/bin/Statusgo.xcframework.zip $(RELEASE_DIR)/status-go-ios.zip
 	zip -r $(RELEASE_DIR)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 

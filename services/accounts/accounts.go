@@ -88,6 +88,10 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	return (*api.messenger).DeleteAccount(address)
 }
 
+func (api *API) DeleteAccountForMigratedKeypair(ctx context.Context, address types.Address) error {
+	return (*api.messenger).DeleteAccount(address)
+}
+
 func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
 	account := &accounts.Account{
 		Address: types.Address(common.HexToAddress(address)),
@@ -443,6 +447,19 @@ func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName str
 		_ = api.manager.DeleteAccount(keyStoreDir, addr)
 	}
 	return nil
+}
+
+func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, accountAddresses []string) error {
+	var addresses []types.Address
+	for _, addr := range accountAddresses {
+		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
+	}
+
+	return api.db.RemoveMigratedAccountsForKeycard(kcUID, addresses)
+}
+
+func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
+	return api.db.GetAllKnownKeycards()
 }
 
 func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {

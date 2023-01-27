@@ -18,11 +18,13 @@ const (
 )
 
 const MaxTaskErrorItemsCount = 3
+const MaxImportFileSizeBytes = 52428800
 
 var (
-	ErrNoChannelData  = errors.New("No channels to import messages from")
-	ErrNoMessageData  = errors.New("No messages to import")
-	ErrMarshalMessage = errors.New("Couldn't marshal discord message")
+	ErrNoChannelData    = errors.New("No channels to import messages from")
+	ErrNoMessageData    = errors.New("No messages to import")
+	ErrMarshalMessage   = errors.New("Couldn't marshal discord message")
+	ErrImportFileTooBig = fmt.Errorf("File is too big (max. %d MB)", MaxImportFileSizeBytes/1024/1024)
 )
 
 type MessageType string

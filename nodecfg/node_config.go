@@ -16,12 +16,8 @@ const BootNodes = "boot"
 const TrustedMailServers = "trusted_mailserver"
 const PushNotificationsServers = "pushnotification"
 const RendezvousNodes = "rendezvous"
-const RelayNodes = "relay"
-const StoreNodes = "store"
-const FilterNodes = "filter"
-const LightpushNodes = "lightpush"
-const WakuRendezvousNodes = "waku_rendezvous"
 const DiscV5BootstrapNodes = "discV5boot"
+const WakuNodes = "waku"
 
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
@@ -369,12 +365,8 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
 	nodeMap[RendezvousNodes] = c.ClusterConfig.RendezvousNodes
-	nodeMap[RelayNodes] = c.ClusterConfig.RelayNodes
-	nodeMap[StoreNodes] = c.ClusterConfig.StoreNodes
-	nodeMap[FilterNodes] = c.ClusterConfig.FilterNodes
-	nodeMap[LightpushNodes] = c.ClusterConfig.LightpushNodes
-	nodeMap[WakuRendezvousNodes] = c.ClusterConfig.WakuRendezvousNodes
 	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
+	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
 
 	for nodeType, nodes := range nodeMap {
 		for _, node := range nodes {
@@ -599,11 +591,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
 	nodeMap[RendezvousNodes] = &nodecfg.ClusterConfig.RendezvousNodes
-	nodeMap[RelayNodes] = &nodecfg.ClusterConfig.RelayNodes
-	nodeMap[StoreNodes] = &nodecfg.ClusterConfig.StoreNodes
-	nodeMap[FilterNodes] = &nodecfg.ClusterConfig.FilterNodes
-	nodeMap[LightpushNodes] = &nodecfg.ClusterConfig.LightpushNodes
-	nodeMap[WakuRendezvousNodes] = &nodecfg.ClusterConfig.WakuRendezvousNodes
+	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
 	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
 	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
 	if err != nil && err != sql.ErrNoRows {

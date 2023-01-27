@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/hop"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -84,12 +84,16 @@ type HopTxArgs struct {
 }
 
 type HopBridge struct {
+	transactor    *transactions.Transactor
+	tokenManager  *token.Manager
 	contractMaker *contracts.ContractMaker
 }
 
-func NewHopBridge(rpcClient *rpc.Client) *HopBridge {
+func NewHopBridge(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager) *HopBridge {
 	return &HopBridge{
 		contractMaker: &contracts.ContractMaker{RPCClient: rpcClient},
+		transactor:    transactor,
+		tokenManager:  tokenManager,
 	}
 }
 
@@ -158,46 +162,57 @@ func (h *HopBridge) EstimateGas(from, to *params.Network, token *token.Token, am
 	return 500000 + 1000, nil
 }
 
+func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
+	var address common.Address
+	if network.Layer == 1 {
+		address, _ = hop.L1BridgeContractAddress(network.ChainID, token.Symbol)
+	} else {
+		address, _ = hop.L2AmmWrapperContractAddress(network.ChainID, token.Symbol)
+	}
+
+	return &address
+}
+
 func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	networks, err := h.contractMaker.RPCClient.NetworkManager.Get(false)
+	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
+	if fromNetwork == nil {
+		return hash, err
+	}
+
+	nonce, unlock, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
 	if err != nil {
 		return hash, err
 	}
-	var fromNetwork *params.Network
-	for _, network := range networks {
-		if network.ChainID == sendArgs.ChainID {
-			fromNetwork = network
-			break
-		}
-	}
+	defer func() {
+		unlock(err == nil, nonce)
+	}()
+	argNonce := hexutil.Uint64(nonce)
+	sendArgs.HopTx.Nonce = &argNonce
 
+	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
 	if fromNetwork.Layer == 1 {
-		return h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
+		hash, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
 	}
-	return h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount)
+	hash, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
+	return hash, err
 }
 
-func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
-	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
-		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
-		return ethTypes.SignTx(tx, s, verifiedAccount.AccountKey.PrivateKey)
-	}
-}
-
-func (h *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	bridge, err := h.contractMaker.NewHopL1Bridge(chainID, sendArgs.Symbol)
+func (h *HopBridge) sendToL2(chainID uint64, hopArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey, token *token.Token) (hash types.Hash, err error) {
+	bridge, err := h.contractMaker.NewHopL1Bridge(chainID, hopArgs.Symbol)
 	if err != nil {
 		return hash, err
 	}
-	txOpts := sendArgs.ToTransactOpts(getSigner(chainID, sendArgs.From, verifiedAccount))
-	txOpts.Value = (*big.Int)(sendArgs.Amount)
+	txOpts := hopArgs.ToTransactOpts(getSigner(chainID, hopArgs.From, verifiedAccount))
+	if token.IsNative() {
+		txOpts.Value = (*big.Int)(hopArgs.Amount)
+	}
 	now := time.Now()
 	deadline := big.NewInt(now.Unix() + 604800)
 	tx, err := bridge.SendToL2(
 		txOpts,
-		big.NewInt(int64(sendArgs.ChainID)),
-		sendArgs.Recipient,
-		sendArgs.Amount.ToInt(),
+		big.NewInt(int64(hopArgs.ChainID)),
+		hopArgs.Recipient,
+		hopArgs.Amount.ToInt(),
 		big.NewInt(0),
 		deadline,
 		common.HexToAddress("0x0"),
@@ -210,22 +225,24 @@ func (h *HopBridge) sendToL2(chainID uint64, sendArgs *HopTxArgs, verifiedAccoun
 	return types.Hash(tx.Hash()), nil
 }
 
-func (h *HopBridge) swapAndSend(chainID uint64, sendArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	ammWrapper, err := h.contractMaker.NewHopL2AmmWrapper(chainID, sendArgs.Symbol)
+func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey, token *token.Token) (hash types.Hash, err error) {
+	ammWrapper, err := h.contractMaker.NewHopL2AmmWrapper(chainID, hopArgs.Symbol)
 	if err != nil {
 		return hash, err
 	}
 
-	txOpts := sendArgs.ToTransactOpts(getSigner(chainID, sendArgs.From, verifiedAccount))
-	txOpts.Value = (*big.Int)(sendArgs.Amount)
+	txOpts := hopArgs.ToTransactOpts(getSigner(chainID, hopArgs.From, verifiedAccount))
+	if token.IsNative() {
+		txOpts.Value = (*big.Int)(hopArgs.Amount)
+	}
 	now := time.Now()
 	deadline := big.NewInt(now.Unix() + 604800)
 	tx, err := ammWrapper.SwapAndSend(
 		txOpts,
-		big.NewInt(int64(sendArgs.ChainID)),
-		sendArgs.Recipient,
-		sendArgs.Amount.ToInt(),
-		sendArgs.BonderFee.ToInt(),
+		big.NewInt(int64(hopArgs.ChainID)),
+		hopArgs.Recipient,
+		hopArgs.Amount.ToInt(),
+		hopArgs.BonderFee.ToInt(),
 		big.NewInt(0),
 		deadline,
 		big.NewInt(0),

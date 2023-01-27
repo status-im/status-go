@@ -240,6 +240,23 @@ func serializeRoots(roots [][32]byte) []byte {
 	return result
 }
 
+func serializeCommitments(commitments []IDCommitment) []byte {
+	// serializes a seq of IDCommitments to a byte seq
+	// the serialization is based on https://github.com/status-im/nwaku/blob/37bd29fbc37ce5cf636734e7dd410b1ed27b88c8/waku/v2/protocol/waku_rln_relay/rln.nim#L142
+	// the order of serialization is |id_commitment_len<8>|id_commitment<var>|
+	var result []byte
+
+	inputLen := make([]byte, 8)
+	binary.LittleEndian.PutUint64(inputLen, uint64(len(commitments)))
+	result = append(result, inputLen...)
+
+	for _, idComm := range commitments {
+		result = append(result, idComm[:]...)
+	}
+
+	return result
+}
+
 func (r *RLN) VerifyWithRoots(data []byte, proof RateLimitProof, roots [][32]byte) (bool, error) {
 	proofBytes := proof.serialize(data)
 	proofBuf := toCBufferPtr(proofBytes)
@@ -261,6 +278,18 @@ func (r *RLN) InsertMember(idComm IDCommitment) error {
 	insertionSuccess := bool(C.set_next_leaf(r.ptr, idCommBuffer))
 	if !insertionSuccess {
 		return errors.New("could not insert member")
+	}
+	return nil
+}
+
+// Insert multiple members i.e., identity commitments starting from index
+// This proc is atomic, i.e., if any of the insertions fails, all the previous insertions are rolled back
+func (r *RLN) InsertMembers(index MembershipIndex, idComms []IDCommitment) error {
+	idCommBytes := serializeCommitments(idComms)
+	idCommBuffer := toCBufferPtr(idCommBytes)
+	insertionSuccess := bool(C.set_leaves_from(r.ptr, C.uintptr_t(index), idCommBuffer))
+	if !insertionSuccess {
+		return errors.New("could not insert members")
 	}
 	return nil
 }

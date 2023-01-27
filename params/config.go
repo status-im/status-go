@@ -189,8 +189,11 @@ type WakuV2Config struct {
 	// A name->libp2p_addr map for Wakuv2 custom nodes
 	CustomNodes map[string]string
 
-	// PeerExchange determines whether GossipSub Peer Exchange is enabled or not
+	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
 	PeerExchange bool
+
+	// Nameserver determines which nameserver will be used for dns discovery
+	Nameserver string
 
 	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
 	EnableDiscV5 bool
@@ -258,20 +261,8 @@ type ClusterConfig struct {
 	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
 
-	// RelayNodes is a list of wakuv2 relay nodes (libp2p)
-	RelayNodes []string
-
-	// StoreNodes is a list of wakuv2 store nodes (libp2p)
-	StoreNodes []string
-
-	// FilterNodes is a list of wakuv2 filter nodes (libp2p)
-	FilterNodes []string
-
-	// LightpushNodes is a list of wakuv2 lightpush nodes (libp2p)
-	LightpushNodes []string
-
-	// WakuRendezvousNodes is a list of go-waku rendezvous nodes to be used for ambient discovery
-	WakuRendezvousNodes []string
+	// WakuNodes is a list of waku2 multiaddresses
+	WakuNodes []string
 
 	// DiscV5Nodes is a list of enr to be used for ambient discovery
 	DiscV5BootstrapNodes []string

@@ -219,7 +219,11 @@ func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members 
 }
 
 func (api *PublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
+	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
+}
+
+func (api *PublicAPI) RemoveMembersFromGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, members)
 }
 
 func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
@@ -472,6 +476,14 @@ func (api *PublicAPI) UnbanUserFromCommunity(request *requests.UnbanUserFromComm
 	return api.service.messenger.UnbanUserFromCommunity(request)
 }
 
+func (api *PublicAPI) AddRoleToMember(request *requests.AddRoleToMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddRoleToMember(request)
+}
+
+func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveRoleFromMember(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()
@@ -561,6 +573,10 @@ type ApplicationStatusUpdatesResponse struct {
 	StatusUpdates []protocol.UserStatus `json:"statusUpdates"`
 }
 
+type ApplicationSwitcherCardsResponse struct {
+	SwitcherCards []protocol.SwitcherCard `json:"switcherCards"`
+}
+
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
 	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, cursor, limit)
 	if err != nil {
@@ -575,6 +591,10 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 
 func (api *PublicAPI) MessageByMessageID(messageID string) (*common.Message, error) {
 	return api.service.messenger.MessageByID(messageID)
+}
+
+func (api *PublicAPI) FirstUnseenMessageID(chatID string) (string, error) {
+	return api.service.messenger.FirstUnseenMessageID(chatID)
 }
 
 func (api *PublicAPI) AllMessagesFromChatWhichMatchTerm(chatID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
@@ -619,6 +639,25 @@ func (api *PublicAPI) StatusUpdates() (*ApplicationStatusUpdatesResponse, error)
 
 	return &ApplicationStatusUpdatesResponse{
 		StatusUpdates: statusUpdates,
+	}, nil
+}
+
+func (api *PublicAPI) UpsertSwitcherCard(request *requests.UpsertSwitcherCard) error {
+	return api.service.messenger.UpsertSwitcherCard(request)
+}
+
+func (api *PublicAPI) DeleteSwitcherCard(id string) error {
+	return api.service.messenger.DeleteSwitcherCard(id)
+}
+
+func (api *PublicAPI) SwitcherCards() (*ApplicationSwitcherCardsResponse, error) {
+	switcherCards, err := api.service.messenger.SwitcherCards()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationSwitcherCardsResponse{
+		SwitcherCards: switcherCards,
 	}, nil
 }
 
@@ -773,7 +812,7 @@ func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, pi
 }
 
 func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {
-	return api.service.messenger.SetDisplayName(displayName)
+	return api.service.messenger.SetDisplayName(displayName, true)
 }
 
 func (api *PublicAPI) MarkAsTrusted(ctx context.Context, contactID string) error {
@@ -808,24 +847,24 @@ func (api *PublicAPI) GetVerificationRequestSentTo(ctx context.Context, contactI
 	return api.service.messenger.GetVerificationRequestSentTo(ctx, contactID)
 }
 
-func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, contactID string) error {
-	return api.service.messenger.CancelVerificationRequest(ctx, contactID)
+func (api *PublicAPI) CancelVerificationRequest(ctx context.Context, id string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelVerificationRequest(ctx, id)
 }
 
-func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, contactID string, response string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptContactVerificationRequest(ctx, contactID, response)
+func (api *PublicAPI) AcceptContactVerificationRequest(ctx context.Context, id string, response string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptContactVerificationRequest(ctx, id, response)
 }
 
-func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeclineContactVerificationRequest(ctx, contactID)
+func (api *PublicAPI) DeclineContactVerificationRequest(ctx context.Context, id string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeclineContactVerificationRequest(ctx, id)
 }
 
-func (api *PublicAPI) VerifiedTrusted(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedTrusted(ctx, contactID)
+func (api *PublicAPI) VerifiedTrusted(ctx context.Context, request *requests.VerifiedTrusted) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedTrusted(ctx, request)
 }
 
-func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, contactID string) error {
-	return api.service.messenger.VerifiedUntrustworthy(ctx, contactID)
+func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *requests.VerifiedUntrustworthy) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.VerifiedUntrustworthy(ctx, request)
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
@@ -833,7 +872,7 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SyncDevices(ctx, name, picture)
+	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
 func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
@@ -1041,7 +1080,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, true)
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
@@ -1050,6 +1089,10 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 
 func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
+}
+
+func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
+	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount()
 }
 
 func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
@@ -1087,15 +1130,15 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 }
 
 func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
 func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, activityType)
+	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
 }
 
-func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityType protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityType, readType)
+func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
@@ -1168,8 +1211,12 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(peerID)
 }
 
-func (api *PublicAPI) Peers() map[string][]string {
+func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
 	return api.service.messenger.Peers()
+}
+
+func (api *PublicAPI) ListenAddresses() ([]string, error) {
+	return api.service.messenger.ListenAddresses()
 }
 
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {

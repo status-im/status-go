@@ -96,7 +96,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	s.Require().NoError(err)
 
 	// sync
-	err = s.m.SyncVerificationRequest(context.Background(), request)
+	err = s.m.SyncVerificationRequest(context.Background(), request, s.m.dispatchMessage)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -160,7 +160,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	s.Require().NoError(err)
 
 	// sync
-	err = s.m.SyncTrustedUser(context.Background(), "0x01", verification.TrustStatusTRUSTED)
+	err = s.m.SyncTrustedUser(context.Background(), "0x01", verification.TrustStatusTRUSTED, s.m.dispatchMessage)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination

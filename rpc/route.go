@@ -59,9 +59,11 @@ func BlockedMethods() []string {
 // the upstream node; the rest is considered to be routed to
 // the local node.
 // A list of supported methods:
-// curl --include \
-//    --header "Content-Type: application/json" \
-//    --header "Accept: application/json" 'https://api.infura.io/v1/jsonrpc/ropsten/methods'
+//
+//	curl --include \
+//	   --header "Content-Type: application/json" \
+//	   --header "Accept: application/json" 'https://api.infura.io/v1/jsonrpc/ropsten/methods'
+//
 // Although it's tempting to only list methods coming to the local node as there're fewer of them
 // but it's deceptive: we want to ensure that only known requests leave our zone of responsibility.
 // Also, we want new requests in newer Geth versions not to be accidentally routed to the upstream.

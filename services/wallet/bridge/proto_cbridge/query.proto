@@ -1,0 +1,27 @@
+syntax = "proto3";
+package cbridge;
+
+option go_package = "../cbridge";
+
+message Token {
+  string symbol = 1;  // upper case symbol
+  string address = 2;
+  int32 decimal = 3;
+  bool xfer_disabled = 4;  // if set to true, won't relay if this asset is src or dest
+}
+
+enum TransferHistoryStatus {
+  TRANSFER_UNKNOWN = 0;
+  TRANSFER_SUBMITTING = 1;                    // user: after calling mark transfer api
+  TRANSFER_FAILED = 2;                        // user: check if tx reverted when shown status is TRANSFER_SUBMITTING
+  TRANSFER_WAITING_FOR_SGN_CONFIRMATION = 3;  // relayer: on send tx success event
+  TRANSFER_WAITING_FOR_FUND_RELEASE = 4;      // relayer: mark send tx
+  TRANSFER_COMPLETED = 5;                     // relayer: on relay tx success event
+  TRANSFER_TO_BE_REFUNDED = 6;                // x: transfer rejected by sgn and waiting for withdraw api called
+  TRANSFER_REQUESTING_REFUND = 7;             // user: withdraw api has been called and withdraw is processing by sgn
+  TRANSFER_REFUND_TO_BE_CONFIRMED = 8;        // x: withdraw is approved by sgn
+  TRANSFER_CONFIRMING_YOUR_REFUND = 9;        // user: mark refund has been submitted on chain
+  TRANSFER_REFUNDED = 10;                     // relayer: on refund(withdraw liquidity actually) tx event
+  TRANSFER_DELAYED = 11;  // relayer has successfully called onchain relay() but the onchain contract decides that the amt is greater than
+                          // its delayThreshold
+}

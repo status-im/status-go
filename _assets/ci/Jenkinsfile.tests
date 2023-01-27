@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.3.3'
+library 'status-jenkins-lib@v1.6.4'
 
 pipeline {
   agent { label 'linux && x86_64 && go-1.18' }
@@ -14,8 +14,6 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
-    /* Go requires a certain directory structure */
-    checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
@@ -24,43 +22,59 @@ pipeline {
   }
 
   environment {
-    TARGET = 'linux'
-    GOPATH = "${env.WORKSPACE}"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
-    REPO   = 'src/github.com/status-im/status-go'
+    TARGET   = 'tests'
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    PATH     = "${PATH}:${GOPATH}/bin"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
   }
 
   stages {
-    stage('Prep') { steps { dir(env.REPO) { script {
-      println("Version:    ${utils.getVersion()}")
-      println("Git Branch: ${utils.branchName()}")
-      println("Git Commit: ${utils.gitCommit()}")
-    } } } }
-
-    stage('Setup') { steps { dir(env.REPO) {
-      sh 'make setup-build install-modvendor'
-    } } }
-
-    stage('Vendoring check') { steps { dir(env.REPO) {
-      /* fail build if vendoring hasn't been done */
-      sh 'make vendor'
-      sh 'git diff --exit-code --no-color --stat vendor/'
-    } } }
-
-    stage('Lint') { steps { dir(env.REPO) {
-      sh 'make lint'
-    } } }
-
-    stage('Canary') { steps { dir(env.REPO) {
-      sh 'make canary-test'
-    } } }
-
-    stage('Unit Tests') { steps { script { dir(env.REPO) {
-      docker.image('postgres:9.6-alpine').withRun(
-        '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
-      ) { c ->
-        sh 'make test-unit V=1'
+    stage('Prep') {
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
-    } } } }
+    }
+
+    stage('Vendor Check') {
+      steps { script {
+        nix.shell('make install-modvendor', pure: false)
+        nix.shell('make vendor', pure: false)
+        /* fail build if vendoring hasn't been done */
+        nix.shell('git diff --exit-code --no-color --stat vendor/')
+      } }
+    }
+
+
+    stage('Lint') {
+      steps { script {
+        nix.shell('make install-lint', pure: false)
+        nix.shell('make lint', pure: false)
+      } }
+    }
+
+    stage('Canary') {
+      steps { script {
+        nix.shell('make canary-test', pure: false)
+      } }
+    }
+
+    stage('Unit Tests') {
+      steps { script {
+        docker.image('postgres:9.6-alpine').withRun(
+          '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
+        ) { c ->
+          nix.shell('make test-unit V=1', pure: false)
+        }
+      } }
+    }
   } // stages
+
+  post {
+    always  { script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" } }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup { dir(env.TMPDIR) { deleteDir() } }
+  } // post
 } // pipeline

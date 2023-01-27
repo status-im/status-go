@@ -1,7 +1,6 @@
 package node
 
 import (
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -59,7 +58,7 @@ func TestStatusNodeStart(t *testing.T) {
 func TestStatusNodeWithDataDir(t *testing.T) {
 	var err error
 
-	dir, err := ioutil.TempDir("", "status-node-test")
+	dir, err := os.MkdirTemp("", "status-node-test")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, os.RemoveAll(dir))

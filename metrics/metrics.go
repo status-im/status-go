@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -23,8 +24,9 @@ func NewMetricsServer(port int, r metrics.Registry) *Server {
 	mux.Handle("/metrics", Handler(r))
 	p := Server{
 		server: &http.Server{
-			Addr:    fmt.Sprintf(":%d", port),
-			Handler: mux,
+			Addr:              fmt.Sprintf(":%d", port),
+			ReadHeaderTimeout: 5 * time.Second,
+			Handler:           mux,
 		},
 	}
 	return &p

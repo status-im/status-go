@@ -55,7 +55,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 }
 
 func TestNewConfigFromJSON(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "geth-config-tests")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 }
 
 func TestConfigWriteRead(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "geth-config-tests")
 	require.Nil(t, err)
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 

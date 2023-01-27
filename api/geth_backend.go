@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
@@ -704,6 +705,16 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 	if err != nil {
 		return err
 	}
+
+	// In case of setting up new account either way (creating new, importing seed phrase, keycard account...) we should not
+	// back up any data after login, as it was the case before, that's the reason why we're setting last backup time to the time
+	// when an account was created.
+	now := time.Now().Unix()
+	err = accdb.SetLastBackup(uint64(now))
+	if err != nil {
+		return err
+	}
+
 	return accdb.SaveAccounts(subaccs)
 }
 
@@ -1337,6 +1348,17 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 	}
 
 	return crypto.SignStringAsHex(content, selectedChatAccount.AccountKey.PrivateKey)
+}
+
+func (b *GethStatusBackend) Messenger() *protocol.Messenger {
+	node := b.StatusNode()
+	if node != nil {
+		accountService := node.AccountService()
+		if accountService != nil {
+			return accountService.GetMessenger()
+		}
+	}
+	return nil
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm

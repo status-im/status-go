@@ -5,6 +5,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -72,20 +73,12 @@ func (m *MessengerSignalsHandler) MessengerResponse(response *protocol.Messenger
 	PublisherSignalHandler{}.NewMessages(response)
 }
 
-func (m *MessengerSignalsHandler) HistoryRequestStarted(requestID string, numBatches int) {
-	signal.SendHistoricMessagesRequestStarted(requestID, numBatches)
+func (m *MessengerSignalsHandler) HistoryRequestStarted(numBatches int) {
+	signal.SendHistoricMessagesRequestStarted(numBatches)
 }
 
-func (m *MessengerSignalsHandler) HistoryRequestBatchProcessed(requestID string, batchIndex int, numBatches int) {
-	signal.SendHistoricMessagesRequestBatchProcessed(requestID, batchIndex, numBatches)
-}
-
-func (m *MessengerSignalsHandler) HistoryRequestFailed(requestID string, err error) {
-	signal.SendHistoricMessagesRequestFailed(requestID, err)
-}
-
-func (m *MessengerSignalsHandler) HistoryRequestCompleted(requestID string) {
-	signal.SendHistoricMessagesRequestCompleted(requestID)
+func (m *MessengerSignalsHandler) HistoryRequestCompleted() {
+	signal.SendHistoricMessagesRequestCompleted()
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesProtocolEnabled() {
@@ -120,6 +113,14 @@ func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, f
 	signal.SendHistoryArchiveDownloaded(communityID, from, to)
 }
 
+func (m *MessengerSignalsHandler) DownloadingHistoryArchivesStarted(communityID string) {
+	signal.SendDownloadingHistoryArchivesStarted(communityID)
+}
+
+func (m *MessengerSignalsHandler) ImportingHistoryArchiveMessages(communityID string) {
+	signal.SendImportingHistoryArchiveMessages(communityID)
+}
+
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesFinished(communityID string) {
 	signal.SendDownloadingHistoryArchivesFinished(communityID)
 }
@@ -142,4 +143,16 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
 	signal.SendDiscordCommunityImportCancelled(id)
+}
+
+func (m *MessengerSignalsHandler) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuFetchingBackupProgress(response)
+}
+
+func (m *MessengerSignalsHandler) SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuBackedUpProfile(response)
+}
+
+func (m *MessengerSignalsHandler) SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuBackedUpSettings(response)
 }

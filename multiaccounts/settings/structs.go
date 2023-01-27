@@ -9,8 +9,8 @@ import (
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, error)
-type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, error)
+type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
+type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
 // SyncProtobufFactory represents a collection of functionality to generate and parse *protobuf.SyncSetting

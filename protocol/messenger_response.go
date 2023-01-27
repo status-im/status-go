@@ -308,6 +308,10 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 	r.communitiesSettings[c.CommunityID] = c
 }
 
+func (r *MessengerResponse) AddSetting(s *settings.SyncSettingField) {
+	r.Settings = append(r.Settings, s)
+}
+
 func (r *MessengerResponse) AddBookmark(bookmark *browsers.Bookmark) {
 	r.Bookmarks = append(r.Bookmarks, bookmark)
 }

@@ -12,12 +12,14 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+type ColourHash [][2]int
+
 // Account stores public information about account.
 type Account struct {
 	Name           string                 `json:"name"`
 	Timestamp      int64                  `json:"timestamp"`
 	Identicon      string                 `json:"identicon"`
-	ColorHash      [][]int                `json:"colorHash"`
+	ColorHash      ColourHash             `json:"colorHash"`
 	ColorID        int64                  `json:"colorId"`
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
@@ -54,11 +56,11 @@ func (a *Account) ToProtobuf() *protobuf.MultiAccount {
 }
 
 func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
-	var colourHash [][]int
+	var colourHash ColourHash
 	for _, index := range ma.ColorHash {
-		var i []int
-		for _, is := range index.Index {
-			i = append(i, int(is))
+		var i [2]int
+		for n, is := range index.Index {
+			i[n] = int(is)
 		}
 
 		colourHash = append(colourHash, i)

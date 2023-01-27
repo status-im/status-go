@@ -1,7 +1,7 @@
 package encryption
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,7 +31,7 @@ type SQLLitePersistenceKeysStorageTestSuite struct {
 }
 
 func (s *SQLLitePersistenceKeysStorageTestSuite) SetupTest() {
-	dir, err := ioutil.TempDir("", "keys-storage-persistence")
+	dir, err := os.MkdirTemp("", "keys-storage-persistence")
 	s.Require().NoError(err)
 
 	key := "blahblahblah"

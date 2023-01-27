@@ -37,7 +37,7 @@ func blocksToViews(blocks map[common.Address]*LastKnownBlock) []LastKnownBlockVi
 		view := LastKnownBlockView{
 			Address: address,
 			Number:  block.Number,
-			Balance: bigint.BigInt{block.Balance},
+			Balance: bigint.BigInt{Int: block.Balance},
 			Nonce:   block.Nonce,
 		}
 		blocksViews = append(blocksViews, view)

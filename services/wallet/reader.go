@@ -2,219 +2,284 @@ package wallet
 
 import (
 	"context"
+	"math"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
-func NewReader(s *Service) *Reader {
-	return &Reader{s}
+// WalletTickReload emitted every 15mn to reload the wallet balance and history
+const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
+const EventWalletTickCheckConnected walletevent.EventType = "wallet-tick-check-connected"
+
+func getFixedCurrencies() []string {
+	return []string{"USD"}
+}
+
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, cryptoCompare *CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+	return &Reader{rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
-	s *Service
+	rpcClient     *rpc.Client
+	tokenManager  *token.Manager
+	priceManager  *PriceManager
+	cryptoCompare *CryptoCompare
+	accountsDB    *accounts.Database
+	walletFeed    *event.Feed
+	cancel        context.CancelFunc
 }
 
-type ReaderToken struct {
-	Token         *token.Token `json:"token"`
-	OraclePrice   float64      `json:"oraclePrice"`
-	CryptoBalance *hexutil.Big `json:"cryptoBalance"`
-	FiatBalance   *big.Float   `json:"fiatBalance"`
+type TokenMarketValues struct {
+	MarketCap       float64 `json:"marketCap"`
+	HighDay         float64 `json:"highDay"`
+	LowDay          float64 `json:"lowDay"`
+	ChangePctHour   float64 `json:"changePctHour"`
+	ChangePctDay    float64 `json:"changePctDay"`
+	ChangePct24hour float64 `json:"changePct24hour"`
+	Change24hour    float64 `json:"change24hour"`
+	Price           float64 `json:"price"`
 }
 
-type ReaderAccount struct {
-	Account      *accounts.Account              `json:"account"`
-	Collections  map[uint64][]OpenseaCollection `json:"collections"`
-	Tokens       map[uint64][]ReaderToken       `json:"tokens"`
-	Transactions map[uint64][]transfer.View     `json:"transactions"`
-
-	FiatBalance *big.Float `json:"fiatBalance"`
+type ChainBalance struct {
+	Balance *big.Float     `json:"balance"`
+	Address common.Address `json:"address"`
+	ChainID uint64         `json:"chainId"`
 }
 
-type Wallet struct {
-	Accounts            []ReaderAccount                  `json:"accounts"`
-	OnRamp              []CryptoOnRamp                   `json:"onRamp"`
-	SavedAddresses      map[uint64][]SavedAddress        `json:"savedAddresses"`
-	Tokens              map[uint64][]*token.Token        `json:"tokens"`
-	CustomTokens        []*token.Token                   `json:"customTokens"`
-	PendingTransactions map[uint64][]*PendingTransaction `json:"pendingTransactions"`
-
-	FiatBalance *big.Float `json:"fiatBalance"`
-	Currency    string     `json:"currency"`
+type Token struct {
+	Name                    string                       `json:"name"`
+	Symbol                  string                       `json:"symbol"`
+	Color                   string                       `json:"color"`
+	Decimals                uint                         `json:"decimals"`
+	BalancesPerChain        map[uint64]ChainBalance      `json:"balancesPerChain"`
+	Description             string                       `json:"description"`
+	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
+	BuiltOn                 string                       `json:"builtOn"`
+	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
+	PegSymbol               string                       `json:"pegSymbol"`
 }
 
-func getAddresses(accounts []*accounts.Account) []common.Address {
-	addresses := make([]common.Address, len(accounts))
-	for _, account := range accounts {
-		addresses = append(addresses, common.Address(account.Address))
-	}
-	return addresses
-}
+func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
+	res := make(map[string][]*token.Token)
 
-func (r *Reader) buildReaderAccount(
-	ctx context.Context,
-	chainIDs []uint64,
-	account *accounts.Account,
-	visibleTokens map[uint64][]*token.Token,
-	prices map[string]float64,
-	balances map[common.Address]*hexutil.Big,
-) (ReaderAccount, error) {
-	limit := int64(20)
-	toBlock := big.NewInt(0)
-
-	collections := make(map[uint64][]OpenseaCollection)
-	tokens := make(map[uint64][]ReaderToken)
-	transactions := make(map[uint64][]transfer.View)
-	accountFiatBalance := big.NewFloat(0)
-	for _, chainID := range chainIDs {
-		client, err := newOpenseaClient(chainID, r.s.openseaAPIKey)
-		if err == nil {
-			c, _ := client.fetchAllCollectionsByOwner(common.Address(account.Address))
-			collections[chainID] = c
+	for _, t := range tokens {
+		if _, ok := res[t.Symbol]; !ok {
+			res[t.Symbol] = make([]*token.Token, 0)
 		}
 
-		for _, token := range visibleTokens[chainID] {
-			oraclePrice := prices[token.Symbol]
-			cryptoBalance := balances[token.Address].ToInt()
-			fiatBalance := big.NewFloat(0).Mul(big.NewFloat(oraclePrice), new(big.Float).SetInt(cryptoBalance))
-			tokens[chainID] = append(tokens[chainID], ReaderToken{
-				Token:         token,
-				OraclePrice:   oraclePrice,
-				CryptoBalance: balances[token.Address],
-				FiatBalance:   fiatBalance,
-			})
-			accountFiatBalance = accountFiatBalance.Add(accountFiatBalance, fiatBalance)
-		}
-		t, err := r.s.transferController.GetTransfersByAddress(ctx, chainID, common.Address(account.Address), toBlock, limit, false)
-		if err == nil {
-			transactions[chainID] = t
-		}
-	}
-	return ReaderAccount{
-		Account:      account,
-		Collections:  collections,
-		Tokens:       tokens,
-		Transactions: transactions,
-		FiatBalance:  accountFiatBalance,
-	}, nil
-}
-
-func (r *Reader) Start(ctx context.Context, chainIDs []uint64) error {
-	accounts, err := r.s.accountsDB.GetAccounts()
-	if err != nil {
-		return err
+		res[t.Symbol] = append(res[t.Symbol], t)
 	}
 
-	return r.s.transferController.CheckRecentHistory(chainIDs, getAddresses(accounts))
+	return res
 }
 
-func (r *Reader) GetWallet(ctx context.Context, chainIDs []uint64) (*Wallet, error) {
-	currency, err := r.s.accountsDB.GetCurrency()
+func getTokenSymbols(tokens []*token.Token) []string {
+	tokensBySymbols := getTokenBySymbols(tokens)
+	res := make([]string, 0)
+	for symbol := range tokensBySymbols {
+		res = append(res, symbol)
+	}
+	return res
+}
+
+func getTokenAddresses(tokens []*token.Token) []common.Address {
+	set := make(map[common.Address]bool)
+	for _, token := range tokens {
+		set[token.Address] = true
+	}
+	res := make([]common.Address, 0)
+	for address := range set {
+		res = append(res, address)
+	}
+	return res
+}
+
+func (r *Reader) Start() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.walletFeed.Send(walletevent.Event{
+					Type: EventWalletTickCheckConnected,
+				})
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.walletFeed.Send(walletevent.Event{
+					Type: EventWalletTickReload,
+				})
+			}
+		}
+	}()
+	return nil
+}
+
+func (r *Reader) Stop() {
+	if r.cancel != nil {
+		r.cancel()
+	}
+}
+
+func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
+	networks, err := r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
 
-	tokensMap := make(map[uint64][]*token.Token)
-	for _, chainID := range chainIDs {
-		tokens, err := r.s.tokenManager.GetTokens(chainID)
+	chainIDs := make([]uint64, 0)
+	for _, network := range networks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	currencies := make([]string, 0)
+	currency, err := r.accountsDB.GetCurrency()
+	if err != nil {
+		return nil, err
+	}
+	currencies = append(currencies, currency)
+	currencies = append(currencies, getFixedCurrencies()...)
+
+	allTokens, err := r.tokenManager.GetAllTokens()
+	if err != nil {
+		return nil, err
+	}
+	for _, network := range networks {
+		allTokens = append(allTokens, r.tokenManager.ToToken(network))
+	}
+
+	tokenSymbols := getTokenSymbols(allTokens)
+	tokenAddresses := getTokenAddresses(allTokens)
+
+	var (
+		group             = async.NewAtomicGroup(ctx)
+		prices            = map[string]map[string]float64{}
+		tokenDetails      = map[string]Coin{}
+		tokenMarketValues = map[string]map[string]MarketCoinValues{}
+		balances          = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
+	)
+
+	group.Add(func(parent context.Context) error {
+		prices, err = r.priceManager.FetchPrices(tokenSymbols, currencies)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		tokensMap[chainID] = tokens
-	}
+		return nil
+	})
 
-	customTokens, err := r.s.tokenManager.GetCustoms()
-	if err != nil {
-		return nil, err
-	}
-
-	visibleTokens, err := r.s.tokenManager.GetVisible(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	tokenAddresses := make([]common.Address, 0)
-	tokenSymbols := make([]string, 0)
-	for _, tokens := range visibleTokens {
-		for _, token := range tokens {
-			tokenAddresses = append(tokenAddresses, token.Address)
-			tokenSymbols = append(tokenSymbols, token.Symbol)
-		}
-	}
-
-	accounts, err := r.s.accountsDB.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
-
-	prices, err := fetchCryptoComparePrices(tokenSymbols, currency)
-	if err != nil {
-		return nil, err
-	}
-
-	clients, err := chain.NewClients(r.s.rpcClient, chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	balances, err := r.s.tokenManager.GetBalances(ctx, clients, getAddresses(accounts), tokenAddresses)
-	if err != nil {
-		return nil, err
-	}
-
-	readerAccounts := make([]ReaderAccount, len(accounts))
-	walletFiatBalance := big.NewFloat(0)
-	for i, account := range accounts {
-		readerAccount, err := r.buildReaderAccount(
-			ctx,
-			chainIDs,
-			account,
-			visibleTokens,
-			prices,
-			balances[common.Address(account.Address)],
-		)
+	group.Add(func(parent context.Context) error {
+		tokenDetails, err = r.cryptoCompare.fetchTokenDetails(tokenSymbols)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		walletFiatBalance = walletFiatBalance.Add(walletFiatBalance, readerAccount.FiatBalance)
-		readerAccounts[i] = readerAccount
-	}
+		return nil
+	})
 
-	savedAddressesMap := make(map[uint64][]SavedAddress)
-	for _, chainID := range chainIDs {
-		savedAddresses, err := r.s.savedAddressesManager.GetSavedAddressesForChainID(chainID)
+	group.Add(func(parent context.Context) error {
+		tokenMarketValues, err = r.cryptoCompare.fetchTokenMarketValues(tokenSymbols, currencies)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		savedAddressesMap[chainID] = savedAddresses
-	}
+		return nil
+	})
 
-	onRamp, err := r.s.cryptoOnRampManager.Get()
+	group.Add(func(parent context.Context) error {
+		clients, err := chain.NewClients(r.rpcClient, chainIDs)
+		if err != nil {
+			return err
+		}
+
+		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	select {
+	case <-group.WaitAsync():
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	err = group.Error()
 	if err != nil {
 		return nil, err
 	}
+	result := make(map[common.Address][]Token)
+	for _, address := range addresses {
+		for symbol, tokens := range getTokenBySymbols(allTokens) {
+			balancesPerChain := make(map[uint64]ChainBalance)
+			decimals := tokens[0].Decimals
+			for _, token := range tokens {
+				hexBalance := balances[token.ChainID][address][token.Address]
+				balance := big.NewFloat(0.0)
+				if hexBalance != nil {
+					balance = new(big.Float).Quo(
+						new(big.Float).SetInt(hexBalance.ToInt()),
+						big.NewFloat(math.Pow(10, float64(decimals))),
+					)
+				}
+				balancesPerChain[token.ChainID] = ChainBalance{
+					Balance: balance,
+					Address: token.Address,
+					ChainID: token.ChainID,
+				}
+			}
 
-	pendingTransactions := make(map[uint64][]*PendingTransaction)
-	for _, chainID := range chainIDs {
-		pendingTx, err := r.s.transactionManager.getAllPendings([]uint64{chainID})
-		if err != nil {
-			return nil, err
+			marketValuesPerCurrency := make(map[string]TokenMarketValues)
+			for _, currency := range currencies {
+				marketValuesPerCurrency[currency] = TokenMarketValues{
+					MarketCap:       tokenMarketValues[symbol][currency].MKTCAP,
+					HighDay:         tokenMarketValues[symbol][currency].HIGHDAY,
+					LowDay:          tokenMarketValues[symbol][currency].LOWDAY,
+					ChangePctHour:   tokenMarketValues[symbol][currency].CHANGEPCTHOUR,
+					ChangePctDay:    tokenMarketValues[symbol][currency].CHANGEPCTDAY,
+					ChangePct24hour: tokenMarketValues[symbol][currency].CHANGEPCT24HOUR,
+					Change24hour:    tokenMarketValues[symbol][currency].CHANGE24HOUR,
+					Price:           prices[symbol][currency],
+				}
+			}
+
+			walletToken := Token{
+				Name:                    tokens[0].Name,
+				Color:                   tokens[0].Color,
+				Symbol:                  symbol,
+				BalancesPerChain:        balancesPerChain,
+				Decimals:                decimals,
+				Description:             tokenDetails[symbol].Description,
+				AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
+				BuiltOn:                 tokenDetails[symbol].BuiltOn,
+				MarketValuesPerCurrency: marketValuesPerCurrency,
+				PegSymbol:               tokens[0].PegSymbol,
+			}
+
+			result[address] = append(result[address], walletToken)
 		}
-		pendingTransactions[chainID] = pendingTx
 	}
-	return &Wallet{
-		Accounts:            readerAccounts,
-		OnRamp:              onRamp,
-		SavedAddresses:      savedAddressesMap,
-		Tokens:              tokensMap,
-		CustomTokens:        customTokens,
-		PendingTransactions: pendingTransactions,
-		Currency:            currency,
-		FiatBalance:         walletFiatBalance,
-	}, nil
+	return result, nil
 }

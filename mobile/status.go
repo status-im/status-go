@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/server/pairing"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -442,6 +443,7 @@ func SignMessage(rpcParams string) string {
 
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
+//
 //export SignTypedData
 func SignTypedData(data, address, password string) string {
 	var typed typeddata.TypedData
@@ -457,6 +459,7 @@ func SignTypedData(data, address, password string) string {
 }
 
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
+//
 //export HashTypedData
 func HashTypedData(data string) string {
 	var typed typeddata.TypedData
@@ -473,6 +476,7 @@ func HashTypedData(data string) string {
 
 // SignTypedDataV4 unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
+//
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
 	var typed apitypes.TypedData
@@ -485,6 +489,7 @@ func SignTypedDataV4(data, address, password string) string {
 }
 
 // HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
+//
 //export HashTypedDataV4
 func HashTypedDataV4(data string) string {
 	var typed apitypes.TypedData
@@ -586,7 +591,9 @@ func HashTransaction(txArgsJSON string) string {
 
 // HashMessage calculates the hash of a message to be safely signed by the keycard
 // The hash is calulcated as
-//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
+//	keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
 // This gives context to the signed message and prevents signing of transactions.
 func HashMessage(message string) string {
 	hash, err := api.HashMessage(message)
@@ -609,7 +616,7 @@ func StopCPUProfiling() string { //nolint: deadcode
 	return makeJSONResponse(err)
 }
 
-//WriteHeapProfile starts pprof for heap
+// WriteHeapProfile starts pprof for heap
 func WriteHeapProfile(dataDir string) string { //nolint: deadcode
 	err := profiling.WriteHeapFile(dataDir)
 	return makeJSONResponse(err)
@@ -675,6 +682,7 @@ func SetSignalEventCallback(cb unsafe.Pointer) {
 }
 
 // ExportNodeLogs reads current node log and returns content to a caller.
+//
 //export ExportNodeLogs
 func ExportNodeLogs() string {
 	node := statusBackend.StatusNode()
@@ -931,42 +939,40 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 	return string(data)
 }
 
-// GetConnectionStringForBeingBootstrapped starts a server.Receiving server.PairingServer
-// then generates a server.ConnectionParams. Used when the device is Logged out or has no Account keys
+// GetConnectionStringForBeingBootstrapped starts a pairing.Receiving pairing.PairingServer
+// then generates a pairing.ConnectionParams. Used when the device is Logged out or has no Account keys
 // and the device has no camera to read a QR code with
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Receiving, configJSON)
+	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Receiving, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 	return cs
 }
 
-// GetConnectionStringForBootstrappingAnotherDevice starts a server.Sending server.PairingServer
-// then generates a server.ConnectionParams. Used when the device is Logged in and therefore has Account keys
+// GetConnectionStringForBootstrappingAnotherDevice starts a pairing.Sending pairing.Server
+// then generates a pairing.ConnectionParams. Used when the device is Logged in and therefore has Account keys
 // and the device might not have a camera
 //
 // Example: A mobile or desktop device (devices that MAY have a camera but MUST have a screen)
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-
-	cs, err := server.StartUpPairingServer(statusBackend.GetMultiaccountDB(), server.Sending, configJSON)
+	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Sending, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 	return cs
 }
 
-// InputConnectionStringForBootstrapping starts a server.PairingClient
+// InputConnectionStringForBootstrapping starts a pairing.Client
 // The given server.ConnectionParams string will determine the server.Mode
 //
 // server.Mode = server.Sending
@@ -981,10 +987,10 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PairingPayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
 
-	err := server.StartUpPairingClient(statusBackend.GetMultiaccountDB(), cs, configJSON)
+	err := pairing.StartUpPairingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
 }
 
@@ -1080,4 +1086,10 @@ func ToChecksumAddress(address string) string {
 		log.Error("failed to convert to checksum address", "address", address, "error", err)
 	}
 	return address
+}
+
+func DeserializeAndCompressKey(DesktopKey string) string {
+	deserialisedKey := MultiformatDeserializePublicKey(DesktopKey, "f")
+	sanitisedKey := "0x" + deserialisedKey[5:]
+	return CompressPublicKey(sanitisedKey)
 }

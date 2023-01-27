@@ -1,14 +1,31 @@
 syntax = "proto3";
 
+import "sync_settings.proto";
+import 'application_metadata_message.proto';
+
 option go_package = "./;protobuf";
 package protobuf;
+
+/* `FetchingBackedUpDataDetails` is used to describe how many messages a single backup data structure consists of */
+message FetchingBackedUpDataDetails {
+  uint32 data_number = 1;
+  uint32 total_number = 2;
+}
 
 message Backup {
   uint64 clock = 1;
   string id = 2;
 
+/* this is what we already had */
   repeated SyncInstallationContactV2 contacts = 3;
   repeated SyncCommunity communities = 4;
+/* newly added details to be backed up to and fetched from waku */
+  FetchingBackedUpDataDetails contactsDetails = 5;
+  FetchingBackedUpDataDetails communitiesDetails = 6;
+  BackedUpProfile profile = 7;
+  FetchingBackedUpDataDetails profileDetails = 8;
+  SyncSetting setting = 9;
+  FetchingBackedUpDataDetails settingsDetails = 10;
 }
 
 message MultiAccount {
@@ -80,6 +97,7 @@ message SyncInstallationContactV2 {
   bool has_added_us = 13;
   int64 verification_status = 14;
   int64 trust_status = 15;
+  int64 contact_request_state = 16;
 }
 
 message SyncInstallationAccount {
@@ -105,6 +123,7 @@ message SyncCommunity {
   SyncCommunitySettings settings = 9;
   bool encrypted = 10;
   bool spectated = 11;
+  bytes encryption_keys = 12;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -253,4 +272,26 @@ message SyncContactRequestDecision {
     ACCEPTED = 0;
     DECLINED = 1;
   }
+}
+
+/* `BackedUpProfile` is used to describe profile of logged in user */
+message BackedUpProfile {
+  string key_uid = 1;
+  string display_name = 2;
+  uint64 display_name_clock = 3;
+  repeated SyncProfilePicture pictures = 4;
+}
+
+message RawMessage {
+  bytes payload = 1;
+  ApplicationMetadataMessage.Type messageType = 2;
+}
+
+message SyncRawMessage {
+  repeated RawMessage rawMessages = 1;
+
+  // we need these to be able to login
+  bytes subAccountsJsonBytes = 2;
+  bytes settingsJsonBytes = 3;
+  bytes nodeConfigJsonBytes = 4;
 }

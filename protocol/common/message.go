@@ -37,6 +37,10 @@ type QuotedMessage struct {
 	HasSticker bool `json:"sticker,omitempty"`
 	// CommunityID is the id of the community advertised
 	CommunityID string `json:"communityId,omitempty"`
+
+	Deleted bool `json:"deleted,omitempty"`
+
+	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 
 type CommandState int
@@ -65,7 +69,12 @@ const (
 	ContactVerificationStatePending ContactVerificationState = iota + 1
 	ContactVerificationStateAccepted
 	ContactVerificationStateDeclined
+	ContactVerificationStateTrusted
+	ContactVerificationStateUntrustworthy
+	ContactVerificationStateCanceled
 )
+
+const everyoneMentionTag = "0x00001"
 
 type CommandParameters struct {
 	// ID is the ID of the initial message
@@ -157,10 +166,16 @@ type Message struct {
 	AudioPath string `json:"audioPath,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
+	// AlbumID for a collage of images
+	AlbumID string `json:"albumId,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
+
+	// Image dimensions
+	ImageWidth  uint32 `json:"imageWidth,omitempty"`
+	ImageHeight uint32 `json:"imageHeight,omitempty"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
@@ -177,6 +192,9 @@ type Message struct {
 
 	// Mentioned is whether the user is mentioned in the message
 	Mentioned bool `json:"mentioned"`
+
+	// Replied is whether the user is replied to in the message
+	Replied bool `json:"replied"`
 
 	// Links is an array of links within given message
 	Links []string
@@ -226,6 +244,9 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName                  string                           `json:"ensName"`
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
+		AlbumID                  string                           `json:"albumId,omitempty"`
+		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
+		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
@@ -237,6 +258,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		MessageType              protobuf.MessageType             `json:"messageType"`
 		Mentions                 []string                         `json:"mentions,omitempty"`
 		Mentioned                bool                             `json:"mentioned,omitempty"`
+		Replied                  bool                             `json:"replied,omitempty"`
 		Links                    []string                         `json:"links,omitempty"`
 		EditedAt                 uint64                           `json:"editedAt,omitempty"`
 		Deleted                  bool                             `json:"deleted,omitempty"`
@@ -266,12 +288,16 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName:                  m.EnsName,
 		DisplayName:              m.DisplayName,
 		Image:                    m.ImageLocalURL,
+		AlbumID:                  m.AlbumID,
+		ImageWidth:               m.ImageWidth,
+		ImageHeight:              m.ImageHeight,
 		Audio:                    m.AudioLocalURL,
 		CommunityID:              m.CommunityID,
 		Timestamp:                m.Timestamp,
 		ContentType:              m.ContentType,
 		Mentions:                 m.Mentions,
 		Mentioned:                m.Mentioned,
+		Replied:                  m.Replied,
 		Links:                    m.Links,
 		MessageType:              m.MessageType,
 		CommandParameters:        m.CommandParameters,
@@ -463,7 +489,7 @@ func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkSt
 	switch n := node.(type) {
 	case *ast.Mention:
 		mention := string(n.Literal)
-		if mention == v.identity {
+		if mention == v.identity || mention == everyoneMentionTag {
 			v.mentioned = true
 		}
 		v.mentions = append(v.mentions, mention)

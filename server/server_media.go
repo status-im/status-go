@@ -28,7 +28,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	s := &MediaServer{
 		Server: NewServer(
 			globalCertificate,
-			localhost,
+			Localhost,
 			signal.SendMediaServerStarted,
 			logutils.ZapLogger().Named("MediaServer"),
 		),

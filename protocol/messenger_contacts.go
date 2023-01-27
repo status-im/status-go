@@ -37,7 +37,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), true)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), true, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (m *Messenger) DismissContactRequest(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), false)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), false, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 
 	if !syncing {
 		// We sync the contact with the other devices
-		err := m.syncContact(context.Background(), contact)
+		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -377,7 +377,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	}
 
 	// Finally we send a contact update so they are notified we added them
-	response, err := m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "")
+	response, err := m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +452,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return err
 	}
 
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -471,7 +471,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 	_, ok = m.allChats.Load(profileChatID)
 
 	if ok {
-		chatResponse, err := m.deactivateChat(profileChatID, 0, false)
+		chatResponse, err := m.deactivateChat(profileChatID, 0, false, true)
 		if err != nil {
 			return err
 		}
@@ -580,7 +580,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	response := &MessengerResponse{}
 	response.Contacts = []*Contact{contact}
 
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -621,7 +621,7 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 		m.allChats.Delete(buildProfileChatID(contact.ID))
 	}
 
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -696,7 +696,7 @@ func (m *Messenger) UnblockContact(contactID string) error {
 
 	m.allContacts.Store(contact.ID, contact)
 
-	err = m.syncContact(context.Background(), contact)
+	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -719,14 +719,14 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 		return err
 	}
 
-	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, profileImage); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, displayName, ensName, profileImage, m.dispatchMessage); err != nil {
 		return err
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.Added {
-			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage); err != nil {
+			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage, m.dispatchMessage); err != nil {
 				return false
 			}
 		}
@@ -748,10 +748,10 @@ func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, prof
 		return nil, err
 	}
 
-	return m.sendContactUpdate(ctx, chatID, displayName, ensName, profileImage)
+	return m.sendContactUpdate(ctx, chatID, displayName, ensName, profileImage, m.dispatchMessage)
 }
 
-func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, ensName, profileImage string) (*MessengerResponse, error) {
+func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, ensName, profileImage string, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
@@ -785,12 +785,14 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
 		ResendAutomatically: true,
-	})
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
 		return nil, err
 	}

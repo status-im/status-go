@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -144,6 +145,15 @@ INSERT INTO settings (
 		return err
 	}
 
+	if s.DisplayName != "" {
+		now := time.Now().Unix()
+		query := db.buildUpdateSyncClockQueryForField(DisplayName)
+		_, err := tx.Exec(query, uint64(now), uint64(now))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nodecfg.SaveConfigWithTx(tx, &n)
 }
 
@@ -263,9 +273,13 @@ func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, e
 	return result, nil
 }
 
-func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
+func (db *Database) buildUpdateSyncClockQueryForField(setting SettingField) string {
 	query := "UPDATE settings_sync_clock SET %s = ? WHERE synthetic_id = 'id' AND %s < ?"
-	query = fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
+	return fmt.Sprintf(query, setting.GetDBName(), setting.GetDBName())
+}
+
+func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) error {
+	query := db.buildUpdateSyncClockQueryForField(setting)
 
 	_, err := db.db.Exec(query, clock, clock)
 	return err
@@ -420,6 +434,14 @@ func (db *Database) GetDefaultSyncPeriod() (result uint32, err error) {
 
 func (db *Database) GetMessagesFromContactsOnly() (result bool, err error) {
 	err = db.makeSelectRow(MessagesFromContactsOnly).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) GetProfilePicturesShowTo() (result int64, err error) {
+	err = db.makeSelectRow(ProfilePicturesShowTo).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}

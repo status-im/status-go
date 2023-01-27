@@ -4,8 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"errors"
 	"io"
+	"math/big"
 
 	"golang.org/x/crypto/sha3"
 
@@ -21,7 +23,13 @@ const (
 	defaultECHDMACLength       = 16
 )
 
-var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
+var (
+	ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
+
+	letterRunes       = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	numberRunes       = []rune("0123456789")
+	alphanumericRunes = append(numberRunes, letterRunes...)
+)
 
 func HashPublicKey(pk *ecdsa.PublicKey) []byte {
 	return Shake256(crypto.CompressPubkey(pk))
@@ -99,4 +107,27 @@ func MakeECDHSharedKey(yourPrivateKey *ecdsa.PrivateKey, theirPubKey *ecdsa.Publ
 		defaultECHDSharedKeyLength,
 		defaultECHDMACLength,
 	)
+}
+
+func randomString(choice []rune, n int) (string, error) {
+	max := big.NewInt(int64(len(choice)))
+	rr := rand.Reader
+
+	b := make([]rune, n)
+	for i := range b {
+		pos, err := rand.Int(rr, max)
+		if err != nil {
+			return "", err
+		}
+		b[i] = choice[pos.Int64()]
+	}
+	return string(b), nil
+}
+
+func RandomAlphabeticalString(n int) (string, error) {
+	return randomString(letterRunes, n)
+}
+
+func RandomAlphanumericString(n int) (string, error) {
+	return randomString(alphanumericRunes, n)
 }

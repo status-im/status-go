@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,10 +50,11 @@ func (s *TransactorSuite) SetupTest() {
 
 	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
-	rpcClient, _ := rpc.NewClient(s.client, 1, params.UpstreamRPCConfig{}, nil, nil)
-	rpcClient.UpstreamChainID = 1
+
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
+	rpcClient, _ := rpc.NewClient(s.client, chainID, params.UpstreamRPCConfig{}, nil, nil)
+	rpcClient.UpstreamChainID = chainID
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
@@ -129,7 +131,7 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 	}
 
 	newTx := gethtypes.NewTx(txData)
-	chainID := big.NewInt(int64(1))
+	chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
 
 	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.AccountKey.PrivateKey)
 	s.NoError(err)
@@ -253,6 +255,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 // as the last step, we verify that if tx failed nonce is not updated
 func (s *TransactorSuite) TestLocalNonce() {
 	txCount := 3
+	chainID := s.nodeConfig.NetworkID
 	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
@@ -269,7 +272,7 @@ func (s *TransactorSuite) TestLocalNonce() {
 
 		_, err := s.manager.SendTransaction(args, selectedAccount)
 		s.NoError(err)
-		resultNonce, _ := s.manager.localNonce.Load(args.From)
+		resultNonce, _ := s.manager.nonce.localNonce[chainID].Load(args.From)
 		s.Equal(uint64(i)+1, resultNonce.(uint64))
 	}
 
@@ -284,7 +287,7 @@ func (s *TransactorSuite) TestLocalNonce() {
 	_, err := s.manager.SendTransaction(args, selectedAccount)
 	s.NoError(err)
 
-	resultNonce, _ := s.manager.localNonce.Load(args.From)
+	resultNonce, _ := s.manager.nonce.localNonce[chainID].Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 
 	testErr := errors.New("test")
@@ -296,7 +299,7 @@ func (s *TransactorSuite) TestLocalNonce() {
 
 	_, err = s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(err, testErr.Error())
-	resultNonce, _ = s.manager.localNonce.Load(args.From)
+	resultNonce, _ = s.manager.nonce.localNonce[chainID].Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 }
 
@@ -330,8 +333,6 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 	for _, scenario := range scenarios {
 		desc := fmt.Sprintf("local nonce: %d, tx nonce: %d, expect error: %v", scenario.localNonce, scenario.txNonce, scenario.expectError)
 		s.T().Run(desc, func(t *testing.T) {
-			s.manager.localNonce.Store(address, uint64(scenario.localNonce))
-
 			nonce := scenario.txNonce
 			from := address
 			to := address
@@ -340,7 +341,8 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
 			data := []byte{}
 			chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
-
+			s.manager.nonce.localNonce[s.nodeConfig.NetworkID] = &sync.Map{}
+			s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Store(address, uint64(scenario.localNonce))
 			args := SendTxArgs{
 				From:     from,
 				To:       &to,
@@ -376,12 +378,13 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			if scenario.expectError {
 				s.Error(err)
 				// local nonce should not be incremented
-				resultNonce, _ := s.manager.localNonce.Load(args.From)
+				resultNonce, _ := s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Load(args.From)
 				s.Equal(uint64(scenario.localNonce), resultNonce.(uint64))
 			} else {
 				s.NoError(err)
 				// local nonce should be incremented
-				resultNonce, _ := s.manager.localNonce.Load(args.From)
+				resultNonce, _ := s.manager.nonce.localNonce[s.nodeConfig.NetworkID].Load(args.From)
+
 				s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 			}
 		})
