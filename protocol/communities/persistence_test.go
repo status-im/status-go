@@ -369,3 +369,58 @@ func (s *PersistenceSuite) TestUpdateCommunitySettings() {
 	s.NoError(err)
 	s.Equal(settings, rst)
 }
+
+func (s *PersistenceSuite) TestGetCommunityTokens() {
+	tokens, err := s.db.GetCommunityTokens("123", 1)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 0)
+
+	token := CommunityToken{
+		CommunityID:        "123",
+		TokenType:          ERC721,
+		Address:            "0x123",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             123,
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        InProgress,
+		Base64Image:        "ABCD",
+	}
+
+	token2 := CommunityToken{
+		CommunityID:        "345",
+		TokenType:          ERC721,
+		Address:            "0x345",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             345,
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            2,
+		DeployState:        Failed,
+		Base64Image:        "QWERTY",
+	}
+
+	err = s.db.AddCommunityToken(&token)
+	s.Require().NoError(err)
+	err = s.db.AddCommunityToken(&token2)
+	s.Require().NoError(err)
+
+	tokens, err = s.db.GetCommunityTokens("123", 1)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().Equal(token, *tokens[0])
+
+	err = s.db.UpdateCommunityTokenState("0x123", Deployed)
+	s.Require().NoError(err)
+	tokens, err = s.db.GetCommunityTokens("123", 1)
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().Equal(Deployed, tokens[0].DeployState)
+}

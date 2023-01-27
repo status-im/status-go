@@ -3283,3 +3283,15 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 
 	return wakuMessages, nil
 }
+
+func (m *Messenger) GetCommunityTokens(communityID string, chainID int) ([]*communities.CommunityToken, error) {
+	return m.communitiesManager.GetCommunityTokens(communityID, chainID)
+}
+
+func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) error {
+	return m.communitiesManager.AddCommunityToken(token)
+}
+
+func (m *Messenger) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
+	return m.communitiesManager.UpdateCommunityTokenState(contractAddress, deployState)
+}
