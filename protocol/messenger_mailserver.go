@@ -584,7 +584,7 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 				}
 
 				ctx, cancel := context.WithTimeout(m.ctx, mailserverRequestTimeout)
-				cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, nil, nil, w.topics, true)
+				cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.topics, true)
 				if err != nil {
 					logger.Error("failed to send request", zap.Error(err))
 					wg.Done()
