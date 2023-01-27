@@ -120,7 +120,21 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status, read, accepted, dismissed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus, notification.Read, notification.Accepted, notification.Dismissed)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status, read, accepted, dismissed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		notification.ID,
+		notification.Timestamp,
+		notification.Type,
+		notification.ChatID,
+		notification.CommunityID,
+		notification.MembershipStatus,
+		encodedMessage,
+		encodedReplyMessage,
+		notification.Author,
+		notification.ContactVerificationStatus,
+		notification.Read,
+		notification.Accepted,
+		notification.Dismissed,
+	)
 	return err
 }
 
@@ -305,7 +319,7 @@ type activityCenterQueryParams struct {
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
 
-	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere string
+	var wheres string
 
 	cursor := params.cursor
 	ids := params.ids
@@ -317,13 +331,13 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	accepted := params.accepted
 
 	if cursor != "" {
-		cursorWhere = "AND cursor <= ?" //nolint: goconst
+		wheres += " AND cursor <= ?" // nolint: goconst
 		args = append(args, cursor)
 	}
 
 	if len(ids) != 0 {
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		inQueryWhere = fmt.Sprintf(" AND a.id IN (%s)", inVector)
+		wheres += fmt.Sprintf(" AND a.id IN (%s)", inVector) // nolint: goconst
 		for _, id := range ids {
 			args = append(args, id)
 		}
@@ -331,33 +345,34 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 
 	switch read {
 	case ActivityCenterQueryParamsReadRead:
-		readWhere = "AND a.read = 1"
+		wheres += " AND a.read = 1" // nolint: goconst
 	case ActivityCenterQueryParamsReadUnread:
-		readWhere = "AND NOT(a.read)"
+		wheres += " AND NOT a.read" // nolint: goconst
 	}
 
 	if !accepted {
-		acceptedWhere = "AND NOT a.accepted"
+		wheres += " AND NOT a.accepted" // nolint: goconst
 	}
 
 	if chatID != "" {
-		inChatWhere = "AND a.chat_id = ?" //nolint: goconst
+		wheres += " AND a.chat_id = ?" // nolint: goconst
 		args = append(args, chatID)
 	}
 
 	if author != "" {
-		fromAuthorWhere = " AND a.author = ?"
+		wheres += " AND a.author = ?" // nolint: goconst
 		args = append(args, author)
 	}
 
 	if len(activityCenterTypes) != 0 {
 		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
-		inTypeWhere = fmt.Sprintf(" AND a.notification_type IN (%s)", inVector)
+		wheres += fmt.Sprintf(" AND a.notification_type IN (%s)", inVector) // nolint: goconst
 		for _, activityCenterType := range activityCenterTypes {
 			args = append(args, activityCenterType)
 		}
 	}
 
+	wheres = strings.Replace(wheres, "AND", "WHERE", 1)
 	query := fmt.Sprintf( // nolint: gosec
 		`
 	SELECT
@@ -382,13 +397,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	ON
 	c.id = a.chat_id
 	%s
-	%s
-	%s
-	%s
-	%s
-	%s
-	%s
-	ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere)
+	ORDER BY cursor DESC`, wheres)
 
 	if limit != 0 {
 		args = append(args, limit)
@@ -399,6 +408,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	if err != nil {
 		return "", nil, err
 	}
+
 	return db.unmarshalActivityCenterNotificationRows(rows)
 }
 

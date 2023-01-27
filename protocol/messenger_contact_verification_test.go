@@ -688,7 +688,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
 	)
 	s.Require().NoError(err)
-	s.Require().Greater(len(notifications.Notifications), 1)
+	s.Require().Greater(len(notifications.Notifications), 0)
 	s.Require().Equal(notifications.Notifications[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(common.ContactVerificationStatePending, notifications.Notifications[0].Message.ContactVerificationState)
 

@@ -1842,8 +1842,9 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, p.DismissActivityCenterNotifications([]types.HexBytes{nID2}))
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
-	// Dismissed notifications should not be returned
-	require.Len(t, notifications, 0)
+
+	require.Len(t, notifications, 1)
+	require.True(t, notifications[0].Dismissed)
 
 	// Insert new notification
 	notification = &ActivityCenterNotification{
@@ -1857,12 +1858,12 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Mark all as accepted
 	notifications, err = p.AcceptAllActivityCenterNotifications()
 	require.NoError(t, err)
-	require.Len(t, notifications, 1)
+	require.Len(t, notifications, 2)
 
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
-	// It should not return those
-	require.Len(t, notifications, 0)
+
+	require.Len(t, notifications, 1)
 
 	// Insert new notification
 	notification = &ActivityCenterNotification{
@@ -1877,8 +1878,10 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, p.DismissAllActivityCenterNotifications())
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
-	// It should not return those
-	require.Len(t, notifications, 0)
+
+	require.Len(t, notifications, 2)
+	require.True(t, notifications[0].Dismissed)
+	require.True(t, notifications[1].Dismissed)
 }
 
 func TestSaveCommunityChat(t *testing.T) {
