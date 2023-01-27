@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
@@ -13,9 +15,21 @@ type QROptions struct {
 	AllowProfileImage    bool   `json:"withLogo"`
 }
 
+type WriterCloserByteBuffer struct {
+	*bytes.Buffer
+}
+
+func (wc WriterCloserByteBuffer) Close() error {
+	return nil
+}
+
+func NewWriterCloserByteBuffer() *WriterCloserByteBuffer {
+	return &WriterCloserByteBuffer{bytes.NewBuffer([]byte{})}
+}
+
 func (m *Messenger) MakeQRWithOptions(options *requests.QROptions) error {
-	var logoFileStaticPath = "./logo.png"
 	var imageFolderBasePath = "../_assets/tests/"
+	var logoFileStaticPath = imageFolderBasePath + "logo.png"
 	var QRFileNameWithLogo = imageFolderBasePath + "LogoWithQR.png"
 	var QRFileNameWithOutLogo = imageFolderBasePath + "LogoWithoutQR.png"
 	var writerObject qrcode.Writer
@@ -53,67 +67,31 @@ func (m *Messenger) MakeQRWithOptions(options *requests.QROptions) error {
 // so far a QR code of 27 characters works anything below that does not produce the logo overlapping on the QR.
 // example url that works : "github.com/yeqown/go-qrcode"
 
-func (m *Messenger) MakeQRCodeFromURL(URL string, PublicKey string) error {
+func (m *Messenger) MakeQRCodeFromURL(URL string) ([]byte, error) {
 
-	//. need to figure out how to pass the image to superimpose on top of the QR code.
-	//	-> The image comes from status-go So I believe we could call the status-go method here only
-	//  -> To get user Image url we require the public key
-	//  -> I also recently found out that the user info is stored in the database(SQLite)
+	buf := NewWriterCloserByteBuffer()
 
-	//testing QR generation with Hardcoded paths for now
-	//var profileUrlPath string = "../img.png"
-
-	// we trust that the url is actually serving a png
-	// we then require the actual file because that's what this library demands
-
-	var fileNameStaticPath string = "./img.png"
-
-	//var profileUrlPath string = "https://cdn-icons-png.flaticon.com/512/3135/3135768.png"
-	//fileName := "profile-pic.png"
-	//f, err := os.Create(fileName)
-	//
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//defer f.Close()
-	//
-	//res, err := http.Get(profileUrlPath)
-	//
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//defer res.Body.Close()
-	//
-	//_, err = io.Copy(f, res.Body)
-	//
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	qrc, err := qrcode.NewWith(URL,
-		qrcode.WithEncodingMode(qrcode.EncModeAuto),
-		qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionMedium),
-	)
+	qrc, err := qrcode.New(URL)
 	if err != nil {
-		panic(err)
+		fmt.Printf("could not generate QRCode: %v", err)
+		return nil, nil
 	}
 
-	//1. need to figure out how to serve the generated QR code on the media http server
-	//2. once the url is ready have to return the url for the front end to consume
-
-	w, err := standard.New(
-		"./alisherOnLogo.png",
-		standard.WithLogoImageFilePNG(fileNameStaticPath),
-	)
+	w := standard.NewWithWriter(buf)
 	if err != nil {
-		panic(err)
+		fmt.Printf("standard.New failed: %v", err)
+		return nil, nil
 	}
 
 	if err = qrc.Save(w); err != nil {
-		panic(err)
+		fmt.Printf("could not save image: %v", err)
 	}
 
-	return err
+	return buf.Bytes(), err
+
+	// todo: move the QR generation logic over to the media server handler
+	// on the basis of a query string we decide which image to superimpose and other options etc
+	// I have no idea how we will decide which image to superimpose, perhaps a key which points to base64
+	// data in the database.?
+
 }

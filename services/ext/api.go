@@ -895,8 +895,12 @@ func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, chainID uint64, ad
 }
 
 // QR generation APIs
-func (api *PublicAPI) GenerateBasicQRCodeFromURL(ctx context.Context, request *requests.QROptions) error {
+func (api *PublicAPI) MakeQRWithOptions(ctx context.Context, request *requests.QROptions) error {
 	return api.service.messenger.MakeQRWithOptions(request)
+}
+
+func (api *PublicAPI) MakeQRButWithLessJazz(ctx context.Context) ([]byte, error) {
+	return api.service.messenger.MakeQRCodeFromURL("cs2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3")
 }
 
 // PushNotifications server endpoints

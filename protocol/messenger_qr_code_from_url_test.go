@@ -72,9 +72,9 @@ func (s *MakeQRCodeFromURLSuite) newMessenger(shh types.Waku) *Messenger {
 
 func (s *MakeQRCodeFromURLSuite) TestMotherOfAllTests() {
 	URLToTest := "2:5vd6SL:KFC:26gAouU6D6A4dCs9LK7jHmXZ3gjVdPczvX7yeusZRHTeR:3HxJ9Qr4H351dPoXjQYsdPX4tK6tV6TkdsHk1xMZEZmL:3"
-	PublicKey := "0x10aded70ffee"
 
-	err := s.m.MakeQRCodeFromURL(URLToTest, PublicKey)
+	out, err := s.m.MakeQRCodeFromURL(URLToTest)
+	s.Require().NotEmpty(out)
 	s.Require().NoError(err)
 
 	var optionsThatAllowProfileImage = &requests.QROptions{
