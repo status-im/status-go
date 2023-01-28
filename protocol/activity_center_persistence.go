@@ -9,7 +9,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/verification"
 )
 
 func (db sqlitePersistence) DeleteActivityCenterNotification(id []byte) error {
@@ -121,7 +120,21 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		}
 	}
 
-	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status) VALUES (?,?,?,?,?,?,?,?,?,?)`, notification.ID, notification.Timestamp, notification.Type, notification.ChatID, notification.CommunityID, notification.MembershipStatus, encodedMessage, encodedReplyMessage, notification.Author, notification.ContactVerificationStatus)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO activity_center_notifications (id, timestamp, notification_type, chat_id, community_id, membership_status, message, reply_message, author, contact_verification_status, read, accepted, dismissed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		notification.ID,
+		notification.Timestamp,
+		notification.Type,
+		notification.ChatID,
+		notification.CommunityID,
+		notification.MembershipStatus,
+		encodedMessage,
+		encodedReplyMessage,
+		notification.Author,
+		notification.ContactVerificationStatus,
+		notification.Read,
+		notification.Accepted,
+		notification.Dismissed,
+	)
 	return err
 }
 
@@ -305,8 +318,7 @@ type activityCenterQueryParams struct {
 
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var args []interface{}
-
-	var cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere string
+	var conditions []string
 
 	cursor := params.cursor
 	ids := params.ids
@@ -318,13 +330,13 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	accepted := params.accepted
 
 	if cursor != "" {
-		cursorWhere = "AND cursor <= ?" //nolint: goconst
+		conditions = append(conditions, "cursor <= ?")
 		args = append(args, cursor)
 	}
 
 	if len(ids) != 0 {
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		inQueryWhere = fmt.Sprintf(" AND a.id IN (%s)", inVector)
+		conditions = append(conditions, fmt.Sprintf("a.id IN (%s)", inVector))
 		for _, id := range ids {
 			args = append(args, id)
 		}
@@ -332,31 +344,36 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 
 	switch read {
 	case ActivityCenterQueryParamsReadRead:
-		readWhere = "AND a.read = 1"
+		conditions = append(conditions, "a.read = 1")
 	case ActivityCenterQueryParamsReadUnread:
-		readWhere = "AND NOT(a.read)"
+		conditions = append(conditions, "NOT a.read")
 	}
 
 	if !accepted {
-		acceptedWhere = "AND NOT a.accepted"
+		conditions = append(conditions, "NOT a.accepted")
 	}
 
 	if chatID != "" {
-		inChatWhere = "AND a.chat_id = ?" //nolint: goconst
+		conditions = append(conditions, "a.chat_id = ?")
 		args = append(args, chatID)
 	}
 
 	if author != "" {
-		fromAuthorWhere = " AND a.author = ?"
+		conditions = append(conditions, "a.author = ?")
 		args = append(args, author)
 	}
 
-	if len(activityCenterTypes) != 0 {
+	if len(activityCenterTypes) > 0 {
 		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
-		inTypeWhere = fmt.Sprintf(" AND a.notification_type IN (%s)", inVector)
+		conditions = append(conditions, fmt.Sprintf("a.notification_type IN (%s)", inVector))
 		for _, activityCenterType := range activityCenterTypes {
 			args = append(args, activityCenterType)
 		}
+	}
+
+	var conditionsString string
+	if len(conditions) > 0 {
+		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
@@ -382,15 +399,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	LEFT JOIN chats c
 	ON
 	c.id = a.chat_id
-	WHERE NOT a.dismissed
 	%s
-	%s
-	%s
-	%s
-	%s
-	%s
-	%s
-	ORDER BY cursor DESC`, cursorWhere, inQueryWhere, inChatWhere, fromAuthorWhere, inTypeWhere, readWhere, acceptedWhere)
+	ORDER BY cursor DESC`, conditionsString)
 
 	if limit != 0 {
 		args = append(args, limit)
@@ -401,6 +411,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	if err != nil {
 		return "", nil, err
 	}
+
 	return db.unmarshalActivityCenterNotificationRows(rows)
 }
 
@@ -711,39 +722,6 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationMessage(id types.HexBytes, message *common.Message) error {
-	encodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ? WHERE id = ?`, encodedMessage, id)
-	return err
-
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationContactVerificationStatus(id types.HexBytes, status verification.RequestStatus) error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET contact_verification_status = ? WHERE id = ?`, status, id)
-	return err
-
-}
-
-func (db sqlitePersistence) UpdateActivityCenterNotificationFields(id types.HexBytes, message *common.Message, replyMessage *common.Message, status verification.RequestStatus) error {
-	encodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	encodedReplyMessage, err := json.Marshal(replyMessage)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.db.Exec(`UPDATE activity_center_notifications SET message = ?, reply_message = ?, contact_verification_status = ? WHERE id = ?`, encodedMessage, encodedReplyMessage, status, id)
-	return err
-
 }
 
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {

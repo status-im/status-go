@@ -928,6 +928,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, false)
 
 	requestToJoin1 := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(requestToJoin1)
@@ -1013,6 +1016,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, true)
+	s.Require().Equal(notification.Dismissed, false)
 
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
@@ -1266,6 +1272,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, false)
 
 	requestToJoin1 := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(requestToJoin1)
@@ -1350,6 +1359,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, true)
+	s.Require().Equal(notification.Dismissed, false)
 
 	s.Require().Len(response.Communities(), 1)
 
@@ -1551,6 +1563,9 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Dismissed, false)
+	s.Require().Equal(notification.Accepted, false)
 
 	// Make sure clock is not empty
 	s.Require().NotEmpty(requestToJoin1.Clock)
@@ -1617,6 +1632,9 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().NotNil(notification)
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusDeclined)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, true)
 
 	// Check if admin sees requests correctly
 	requestsToJoin, err = s.bob.PendingRequestsToJoinForCommunity(community.ID())

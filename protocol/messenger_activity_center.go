@@ -235,6 +235,10 @@ func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids 
 	return nil, err
 }
 
+func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCenterNotification, error) {
+	return m.persistence.GetActivityCenterNotificationByID(id)
+}
+
 func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*ActivityCenterPaginationResponse, error) {
 	cursor, notifications, err := m.persistence.ActivityCenterNotifications(cursor, limit)
 	if err != nil {

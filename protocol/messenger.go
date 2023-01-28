@@ -3074,7 +3074,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 
 		err := m.persistence.SaveActivityCenterNotification(notification)
 		if err != nil {
-			m.logger.Warn("failed to save notification", zap.Error(err))
+			m.logger.Error("failed to save notification", zap.Error(err))
 			return err
 		}
 		r.Response.AddActivityCenterNotification(notification)

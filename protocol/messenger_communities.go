@@ -552,12 +552,13 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Timestamp:        m.getTimesource().GetCurrentTime(),
 		CommunityID:      community.IDString(),
 		MembershipStatus: ActivityCenterMembershipStatusPending,
+		Read:             true,
 	}
 
-	saveErr := m.persistence.SaveActivityCenterNotification(notification)
-	if saveErr != nil {
-		m.logger.Warn("failed to save notification", zap.Error(saveErr))
-		return nil, saveErr
+	err = m.persistence.SaveActivityCenterNotification(notification)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return nil, err
 	}
 	response.AddActivityCenterNotification(notification)
 
@@ -763,10 +764,13 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
-		saveErr := m.persistence.SaveActivityCenterNotification(notification)
-		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
-			return nil, saveErr
+		notification.Read = true
+		notification.Accepted = true
+
+		err = m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Error("failed to save notification", zap.Error(err))
+			return nil, err
 		}
 		response.AddActivityCenterNotification(notification)
 	}
@@ -794,10 +798,13 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
-		saveErr := m.persistence.SaveActivityCenterNotification(notification)
-		if saveErr != nil {
-			m.logger.Warn("failed to save notification", zap.Error(saveErr))
-			return nil, saveErr
+		notification.Read = true
+		notification.Dismissed = true
+
+		err = m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Error("failed to save notification", zap.Error(err))
+			return nil, err
 		}
 		response.AddActivityCenterNotification(notification)
 	}
