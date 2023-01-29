@@ -72,7 +72,6 @@ type Chat struct {
 	// Denormalized fields
 	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount uint            `json:"unviewedMentionsCount"`
-	UnviewedRepliesCount  uint            `json:"unviewedRepliesCount"`
 	LastMessage           *common.Message `json:"lastMessage"`
 
 	// Group chat fields
@@ -152,7 +151,6 @@ type ChatPreview struct {
 	// Denormalized fields
 	UnviewedMessagesCount uint `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount uint `json:"unviewedMentionsCount"`
-	UnviewedRepliesCount  uint `json:"unviewedRepliesCount"`
 
 	// Generated username name of the chat for one-to-ones
 	Alias string `json:"alias,omitempty"`
