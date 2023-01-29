@@ -2372,6 +2372,7 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	chat.LastMessage = nil
 	chat.UnviewedMessagesCount = 0
 	chat.UnviewedMentionsCount = 0
+	chat.UnviewedRepliesCount = 0
 	chat.Highlight = true
 
 	err := db.deleteMessagesByChatID(chat.ID, tx)
