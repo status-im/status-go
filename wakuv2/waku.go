@@ -963,7 +963,7 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
 	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
-	logger.Info("AddSymKeyFromPassword! done pbkdf2.Key", zap.Any("derived", derived))
+	logger.Info("AddSymKeyFromPassword! done pbkdf2.Key")
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
 	logger.Info("AddSymKeyFromPassword! done w.keyMu.Lock")
@@ -981,7 +981,7 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 func (w *Waku) HasSymKey(id string) bool {
 	w.keyMu.RLock()
 	defer w.keyMu.RUnlock()
-	logutils.ZapLogger().Info("HasSymKey!", zap.String("id", id), zap.Any("w.symKeys", w.symKeys))
+	logutils.ZapLogger().Info("HasSymKey!", zap.String("id", id))
 	return w.symKeys[id] != nil
 }
 
