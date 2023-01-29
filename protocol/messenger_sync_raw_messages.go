@@ -22,7 +22,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 	logger.Info("sync messages processing", zap.Int("count", len(rawMessages)))
 
 	for _, rawMessage := range rawMessages {
-		logger.Info("HandleSyncRawMessage")
+		logger.Info("HandleSyncRawMessage", zap.Int("type", int(rawMessage.GetMessageType())))
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 			var message protobuf.ContactUpdate
