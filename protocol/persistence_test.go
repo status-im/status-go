@@ -1561,7 +1561,7 @@ func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
 		[]ActivityCenterType{},
 	)
 	require.NoError(t, err)
-	require.Equal(t, notificationCount, 5)
+	require.Equal(t, notificationCount, uint64(5))
 
 	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
 		[]ActivityCenterType{
@@ -1569,7 +1569,7 @@ func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, notificationCount, 1)
+	require.Equal(t, notificationCount, uint64(1))
 
 	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
 		[]ActivityCenterType{
@@ -1578,7 +1578,7 @@ func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, notificationCount, 2)
+	require.Equal(t, notificationCount, uint64(2))
 }
 
 func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
