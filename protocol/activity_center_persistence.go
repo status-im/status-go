@@ -827,7 +827,7 @@ func (db sqlitePersistence) buildActivityCenterNotificationsCountQuery(isAccepte
 	var inTypeWhere string
 	if len(activityTypes) != 0 {
 		inVector := strings.Repeat("?, ", len(activityTypes)-1) + "?"
-		inTypeWhere = fmt.Sprintf(" AND a.notification_type IN (%s)", inVector)
+		inTypeWhere = fmt.Sprintf(" AND notification_type IN (%s)", inVector)
 		for _, activityCenterType := range activityTypes {
 			args = append(args, activityCenterType)
 		}
