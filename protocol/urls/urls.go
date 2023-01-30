@@ -71,6 +71,11 @@ func LinkPreviewWhitelist() []Site {
 			ImageSite: false,
 		},
 		{
+			Title:     "YouTube with subdomain",
+			Address:   "www.youtube.com",
+			ImageSite: false,
+		},
+		{
 			Title:     "YouTube shortener",
 			Address:   "youtu.be",
 			ImageSite: false,
