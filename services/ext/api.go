@@ -1082,8 +1082,8 @@ func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
 
-func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
-	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount()
+func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []protocol.ActivityCenterType) (uint64, error) {
+	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
 func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {

@@ -1507,6 +1507,80 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	require.Equal(t, nID2, notifications[0].ID)
 }
 
+func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	allNotifications := []*ActivityCenterNotification{
+		{
+			ID:        types.HexBytes("1"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("2"),
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("3"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("4"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("5"),
+			Type:      ActivityCenterNotificationTypeContactRequest,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+	}
+
+	for _, notification := range allNotifications {
+		err = p.SaveActivityCenterNotification(notification)
+		require.NoError(t, err)
+	}
+
+	notificationCount, err := p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(5))
+
+	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{
+			ActivityCenterNotificationTypeNewOneToOne,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(1))
+
+	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{
+			ActivityCenterNotificationTypeNewOneToOne,
+			ActivityCenterNotificationTypeContactRequest,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(2))
+}
+
 func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

@@ -16,8 +16,8 @@ func (m *Messenger) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return m.persistence.UnreadActivityCenterNotificationsCount()
 }
 
-func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
-	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount()
+func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []ActivityCenterType) (uint64, error) {
+	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
 func toHexBytes(b [][]byte) []types.HexBytes {
