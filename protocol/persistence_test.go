@@ -1545,7 +1545,7 @@ func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
 			Timestamp: 1,
 		},
 		{
-			ID:        types.HexBytes("4"),
+			ID:        types.HexBytes("5"),
 			Type:      ActivityCenterNotificationTypeContactRequest,
 			ChatID:    chat.ID,
 			Timestamp: 1,
