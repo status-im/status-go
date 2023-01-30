@@ -828,7 +828,10 @@ func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
 	return makeJSONResponse(nil)
 }
 
-func ConvertToKeycardAccount(accountData, settingsJSON, password, newPassword string) string {
+// Adding this function to fix issues we have for mobile app after adding `ConvertToKeycardAccountDesktop`.
+// Please if you need this function consider using `ConvertToKeycardAccountDesktop` instead.
+// At the end would be good to have only a single function for converting an account to a keycard account.
+func ConvertToKeycardAccount(keyStoreDir, accountData, settingsJSON, password, newPassword string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
@@ -840,7 +843,26 @@ func ConvertToKeycardAccount(accountData, settingsJSON, password, newPassword st
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.ConvertToKeycardAccount(account, settings, password, newPassword)
+	err = statusBackend.ConvertToKeycardAccount(keyStoreDir, account, settings, password, newPassword)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}
+
+func ConvertToKeycardAccountDesktop(accountData, settingsJSON, password, newPassword string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var settings settings.Settings
+	err = json.Unmarshal([]byte(settingsJSON), &settings)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.ConvertToKeycardAccountDesktop(account, settings, password, newPassword)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

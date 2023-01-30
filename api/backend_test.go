@@ -771,7 +771,7 @@ func TestConvertAccount(t *testing.T) {
 	}
 
 	// Converting to a keycard account
-	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, password, keycardPassword)
+	err = backend.ConvertToKeycardAccountDesktop(keycardAccount, keycardSettings, password, keycardPassword)
 	require.NoError(t, err)
 
 	// Validating results of converting to a keycard account.

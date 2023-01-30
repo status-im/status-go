@@ -564,7 +564,71 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
+// Adding this function to fix issues we have for mobile app after adding `ConvertToKeycardAccountDesktop`.
+// Please if you need this function consider using `ConvertToKeycardAccountDesktop` instead.
+// At the end would be good to have only a single function for converting an account to a keycard account.
+func (b *GethStatusBackend) ConvertToKeycardAccount(keyStoreDir string, account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
+	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(account, password)
+	if err != nil {
+		return err
+	}
+
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSettingField(settings.KeycardPairing, s.KeycardPairing)
+	if err != nil {
+		return err
+	}
+
+	err = accountDB.SaveSettingField(settings.Mnemonic, nil)
+	if err != nil {
+		return err
+	}
+
+	knownAccounts, err := accountDB.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	err = b.closeAppDB()
+	if err != nil {
+		return err
+	}
+
+	err = b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	for _, acc := range knownAccounts {
+		if account.KeyUID == acc.KeyUID {
+			// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
+			// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
+			_ = b.accountManager.DeleteAccount(keyStoreDir, acc.Address, true)
+		}
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) ConvertToKeycardAccountDesktop(account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
 		return err
@@ -639,13 +703,13 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	// whichever reason the account is still successfully migrated
 	for _, acc := range knownAccounts {
 		if account.KeyUID == acc.KeyUID {
-			_ = b.accountManager.DeleteAccount(acc.Address, newPassword)
+			_ = b.accountManager.DeleteAccountNew(acc.Address, newPassword)
 		}
 	}
-	_ = b.accountManager.DeleteAccount(masterAddress, newPassword)
-	_ = b.accountManager.DeleteAccount(dappsAddress, newPassword)
-	_ = b.accountManager.DeleteAccount(eip1581Address, newPassword)
-	_ = b.accountManager.DeleteAccount(walletRootAddress, newPassword)
+	_ = b.accountManager.DeleteAccountNew(masterAddress, newPassword)
+	_ = b.accountManager.DeleteAccountNew(dappsAddress, newPassword)
+	_ = b.accountManager.DeleteAccountNew(eip1581Address, newPassword)
+	_ = b.accountManager.DeleteAccountNew(walletRootAddress, newPassword)
 
 	return nil
 }

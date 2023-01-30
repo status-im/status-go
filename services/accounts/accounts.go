@@ -78,7 +78,7 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 		return err
 	}
 	if acc.Type != accounts.AccountTypeWatch {
-		err = api.manager.DeleteAccount(address, "")
+		err = api.manager.DeleteAccount(api.config.KeyStoreDir, address, true)
 		var e *account.ErrCannotLocateKeyFile
 		if err != nil && !errors.As(err, &e) {
 			return err
@@ -444,7 +444,7 @@ func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName str
 	for _, addr := range addresses {
 		// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
 		// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
-		_ = api.manager.DeleteAccount(addr, "")
+		_ = api.manager.DeleteAccountNew(addr, "")
 	}
 	return nil
 }
