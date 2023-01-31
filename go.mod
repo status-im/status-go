@@ -77,7 +77,7 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/rmg/iso4217 v1.0.0
-	github.com/waku-org/go-waku v0.4.1-0.20230130112841-5ff87d8e6550
+	github.com/waku-org/go-waku v0.4.1-0.20230131145040-6169a44c242f
 )
 
 require (
