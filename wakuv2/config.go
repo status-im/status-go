@@ -42,6 +42,7 @@ type Config struct {
 	EnableStore          bool     `toml:",omitempty"`
 	StoreCapacity        int      `toml:",omitempty"`
 	StoreSeconds         int      `toml:",omitempty"`
+	TelemetryServerURL   string   `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

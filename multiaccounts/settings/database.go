@@ -618,3 +618,7 @@ func (db *Database) GetTestNetworksEnabled() (result bool, err error) {
 	}
 	return result, err
 }
+
+func (db *Database) GetTelemetryServerURL() (string, error) {
+	return db.makeSelectString(TelemetryServerURL)
+}

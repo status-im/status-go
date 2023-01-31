@@ -368,6 +368,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		}
 	}()
 
+	go waku.telemetryBandwidthStats(cfg.TelemetryServerURL)
 	go waku.runFilterMsgLoop()
 	go waku.runRelayMsgLoop()
 	go waku.runPeerExchangeLoop()
@@ -548,6 +549,28 @@ func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, ma mu
 		err = w.node.Host().Network().ClosePeer(peerInfo.ID)
 		if err != nil {
 			w.logger.Error("could not close connections to peer", zap.Any("peer", peerInfo.ID), zap.Error(err))
+		}
+	}
+}
+
+func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
+	if telemetryServerURL == "" {
+		return
+	}
+
+	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL, w.node.ID())
+
+	ticker := time.NewTicker(time.Second * 20)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.quit:
+			return
+		case <-ticker.C:
+			storeStats := w.bandwidthCounter.GetBandwidthForProtocol(store.StoreID_v20beta4)
+			relayStats := w.bandwidthCounter.GetBandwidthForProtocol(relay.WakuRelayID_v200)
+			go telemetry.PushProtocolStats(relayStats, storeStats)
 		}
 	}
 }
