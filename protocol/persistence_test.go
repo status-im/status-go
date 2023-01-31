@@ -180,7 +180,7 @@ func TestMessageByChatID(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
-			From: "me",
+			From: testPK,
 		})
 
 		// Add some other chats.
@@ -192,7 +192,7 @@ func TestMessageByChatID(t *testing.T) {
 					Clock: uint64(i),
 				},
 
-				From: "me",
+				From: testPK,
 			})
 		}
 	}
@@ -208,7 +208,7 @@ func TestMessageByChatID(t *testing.T) {
 				Clock: uint64(i),
 			},
 
-			From: "me",
+			From: testPK,
 		})
 	}
 
@@ -263,7 +263,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: 1,
 				Text:  "some-text"},
-			From: "me",
+			From: testPK,
 			Seen: true,
 		},
 		{
@@ -272,7 +272,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: 2,
 				Text:  "some-text"},
-			From: "me",
+			From: testPK,
 			Seen: false,
 		},
 		{
@@ -281,7 +281,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: 3,
 				Text:  "some-text"},
-			From: "me",
+			From: testPK,
 			Seen: false,
 		},
 	})
@@ -339,7 +339,7 @@ func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
 				Clock: uint64(i),
 			},
 			WhisperTimestamp: uint64(i + 10),
-			From:             "me",
+			From:             testPK,
 		})
 	}
 
@@ -370,12 +370,12 @@ func TestPinMessageByChatID(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
-			From: "me",
+			From: testPK,
 		})
 
 		// Pin this message
 		if i%100 == 0 {
-			from := "me"
+			from := testPK
 			if i == 100 {
 				from = "them"
 			}
@@ -397,7 +397,7 @@ func TestPinMessageByChatID(t *testing.T) {
 				unpinMessage := &common.PinMessage{
 					ID:          strconv.Itoa(i),
 					LocalChatID: chatID,
-					From:        "me",
+					From:        testPK,
 				}
 				pinMessage.MessageId = strconv.Itoa(i)
 				unpinMessage.Clock = 333
@@ -409,7 +409,7 @@ func TestPinMessageByChatID(t *testing.T) {
 				pinMessage2 := &common.PinMessage{
 					ID:          strconv.Itoa(i),
 					LocalChatID: chatID,
-					From:        "me",
+					From:        testPK,
 				}
 				pinMessage2.MessageId = strconv.Itoa(i)
 				pinMessage2.Clock = 222
@@ -427,7 +427,7 @@ func TestPinMessageByChatID(t *testing.T) {
 					Clock: uint64(i),
 				},
 
-				From: "me",
+				From: testPK,
 			})
 		}
 	}
@@ -472,7 +472,7 @@ func TestPinMessageByChatID(t *testing.T) {
 
 	require.Equal(t, "them", result[len(result)-1].PinnedBy)
 	for i := 0; i < len(result)-1; i++ {
-		require.Equal(t, "me", result[i].PinnedBy)
+		require.Equal(t, testPK, result[i].PinnedBy)
 	}
 }
 
@@ -578,7 +578,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 			ChatMessage: protobuf.ChatMessage{
 				Clock: clock,
 			},
-			From: "me",
+			From: testPK,
 		})
 	}
 
@@ -879,7 +879,7 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		ID:          id,
 		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 	}})
 }
 
@@ -889,7 +889,7 @@ func insertMinimalDeletedMessage(p *sqlitePersistence, id string) error {
 		Deleted:     true,
 		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 	}})
 }
 
@@ -899,7 +899,7 @@ func insertMinimalDeletedForMeMessage(p *sqlitePersistence, id string) error {
 		DeletedForMe: true,
 		LocalChatID:  testPublicChatID,
 		ChatMessage:  protobuf.ChatMessage{Text: "some-text"},
-		From:         "me",
+		From:         testPK,
 	}})
 }
 
@@ -949,7 +949,7 @@ func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessage
 	return p.SaveMessages([]*common.Message{{
 		ID:          id,
 		LocalChatID: testPublicChatID,
-		From:        "me",
+		From:        testPK,
 		ChatMessage: protobuf.ChatMessage{
 			Text:        "some-text",
 			ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
@@ -1021,7 +1021,7 @@ func TestSaveMentions(t *testing.T) {
 		ID:          "1",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 		Mentions:    []string{pkString},
 	}
 
@@ -1156,7 +1156,7 @@ func TestSaveLinks(t *testing.T) {
 		ID:          "1",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 		Links:       []string{"https://github.com/status-im/status-mobile"},
 	}
 
@@ -1214,7 +1214,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 		ID:          "0x01",
 		LocalChatID: publicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 	}
 	lastMessage.Clock = 20
 
@@ -1284,7 +1284,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 		ID:          "0x01",
 		LocalChatID: chat.ID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
-		From:        "me",
+		From:        testPK,
 	}
 	lastMessage.Clock = 20
 
@@ -1505,6 +1505,80 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
+}
+
+func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	allNotifications := []*ActivityCenterNotification{
+		{
+			ID:        types.HexBytes("1"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("2"),
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("3"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("4"),
+			Type:      ActivityCenterNotificationTypeMention,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+		{
+			ID:        types.HexBytes("5"),
+			Type:      ActivityCenterNotificationTypeContactRequest,
+			ChatID:    chat.ID,
+			Timestamp: 1,
+		},
+	}
+
+	for _, notification := range allNotifications {
+		err = p.SaveActivityCenterNotification(notification)
+		require.NoError(t, err)
+	}
+
+	notificationCount, err := p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(5))
+
+	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{
+			ActivityCenterNotificationTypeNewOneToOne,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(1))
+
+	notificationCount, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
+		[]ActivityCenterType{
+			ActivityCenterNotificationTypeNewOneToOne,
+			ActivityCenterNotificationTypeContactRequest,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, notificationCount, uint64(2))
 }
 
 func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {

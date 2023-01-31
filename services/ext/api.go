@@ -1082,8 +1082,8 @@ func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
 
-func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount() (uint64, error) {
-	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount()
+func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []protocol.ActivityCenterType) (uint64, error) {
+	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
 func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
@@ -1249,6 +1249,10 @@ func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDisc
 
 func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
 	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
+}
+
+func (api *PublicAPI) BuildContact(publicKey string) (*protocol.Contact, error) {
+	return api.service.messenger.BuildContact(publicKey)
 }
 
 // -----

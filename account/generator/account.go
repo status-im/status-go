@@ -3,8 +3,10 @@ package generator
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/json"
 	"time"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
@@ -65,6 +67,24 @@ type AccountInfo struct {
 	Address    string `json:"address"`
 }
 
+func (a AccountInfo) MarshalJSON() ([]byte, error) {
+	type Alias AccountInfo
+	item := struct {
+		Alias
+		CompressedKey string `json:"compressedKey"`
+	}{
+		Alias: (Alias)(a),
+	}
+
+	compressedKey, err := multiformat.SerializeLegacyKey(item.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	item.CompressedKey = compressedKey
+
+	return json.Marshal(item)
+}
+
 // IdentifiedAccountInfo contains AccountInfo and the ID of an account.
 type IdentifiedAccountInfo struct {
 	AccountInfo
@@ -77,10 +97,30 @@ type IdentifiedAccountInfo struct {
 	KeyUID string `json:"keyUid"`
 }
 
-func (iai *IdentifiedAccountInfo) ToMultiAccount() *multiaccounts.Account {
+func (i IdentifiedAccountInfo) MarshalJSON() ([]byte, error) {
+	accountInfoJSON, err := i.AccountInfo.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	type info struct {
+		ID     string `json:"id"`
+		KeyUID string `json:"keyUid"`
+	}
+	infoJSON, err := json.Marshal(info{
+		ID:     i.ID,
+		KeyUID: i.KeyUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	infoJSON[0] = ','
+	return append(accountInfoJSON[:len(accountInfoJSON)-1], infoJSON...), nil
+}
+
+func (i *IdentifiedAccountInfo) ToMultiAccount() *multiaccounts.Account {
 	return &multiaccounts.Account{
 		Timestamp: time.Now().Unix(),
-		KeyUID:    iai.KeyUID,
+		KeyUID:    i.KeyUID,
 	}
 }
 
@@ -90,9 +130,27 @@ type GeneratedAccountInfo struct {
 	Mnemonic string `json:"mnemonic"`
 }
 
-func (a GeneratedAccountInfo) toGeneratedAndDerived(derived map[string]AccountInfo) GeneratedAndDerivedAccountInfo {
+func (g GeneratedAccountInfo) MarshalJSON() ([]byte, error) {
+	accountInfoJSON, err := g.IdentifiedAccountInfo.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	type info struct {
+		Mnemonic string `json:"mnemonic"`
+	}
+	infoJSON, err := json.Marshal(info{
+		Mnemonic: g.Mnemonic,
+	})
+	if err != nil {
+		return nil, err
+	}
+	infoJSON[0] = ','
+	return append(accountInfoJSON[:len(accountInfoJSON)-1], infoJSON...), nil
+}
+
+func (g GeneratedAccountInfo) toGeneratedAndDerived(derived map[string]AccountInfo) GeneratedAndDerivedAccountInfo {
 	return GeneratedAndDerivedAccountInfo{
-		GeneratedAccountInfo: a,
+		GeneratedAccountInfo: g,
 		Derived:              derived,
 	}
 }
@@ -101,4 +159,22 @@ func (a GeneratedAccountInfo) toGeneratedAndDerived(derived map[string]AccountIn
 type GeneratedAndDerivedAccountInfo struct {
 	GeneratedAccountInfo
 	Derived map[string]AccountInfo `json:"derived"`
+}
+
+func (g GeneratedAndDerivedAccountInfo) MarshalJSON() ([]byte, error) {
+	accountInfoJSON, err := g.GeneratedAccountInfo.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	type info struct {
+		Derived map[string]AccountInfo `json:"derived"`
+	}
+	infoJSON, err := json.Marshal(info{
+		Derived: g.Derived,
+	})
+	if err != nil {
+		return nil, err
+	}
+	infoJSON[0] = ','
+	return append(accountInfoJSON[:len(accountInfoJSON)-1], infoJSON...), nil
 }

@@ -933,3 +933,15 @@ func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.
 func defaultContactRequestID(contactID string) string {
 	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
 }
+
+func (m *Messenger) BuildContact(pubKey string) (*Contact, error) {
+	contact, ok := m.allContacts.Load(pubKey)
+	if !ok {
+		var err error
+		contact, err = buildContactFromPkString(pubKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return contact, nil
+}

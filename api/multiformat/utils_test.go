@@ -291,3 +291,20 @@ func TestDeserialisePublicKey(t *testing.T) {
 		require.NoError(t, err, c.Description)
 	}
 }
+
+func TestSerializeLegacyKey(t *testing.T) {
+
+	key := "0x04deaafa03e3a646e54a36ec3f6968c1d3686847d88420f00c0ab6ee517ee1893398fca28aacd2af74f2654738c21d10bad3d88dc64201ebe0de5cf1e313970d3d"
+	expected := "zQ3shudJrBctPznsRLvbsCtvZFTdi3b34uzYDuqE9Wq9m9T1C"
+
+	res, err := SerializeLegacyKey(key)
+
+	require.NoError(t, err)
+	require.Equal(t, expected, res)
+
+	wrongKey := key[3:]
+
+	_, err = SerializeLegacyKey(wrongKey)
+
+	require.Error(t, err)
+}

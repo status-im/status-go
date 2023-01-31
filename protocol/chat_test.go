@@ -127,6 +127,7 @@ func (s *ChatTestSuite) TestSerializeJSON() {
 	message := &common.Message{}
 	chat := &Chat{}
 
+	message.From = "0x04deaafa03e3a646e54a36ec3f6968c1d3686847d88420f00c0ab6ee517ee1893398fca28aacd2af74f2654738c21d10bad3d88dc64201ebe0de5cf1e313970d3d"
 	message.Clock = 1
 	message.Text = "`some markdown text`"
 	s.Require().NoError(message.PrepareContent(""))

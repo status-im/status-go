@@ -1342,6 +1342,16 @@ func (s *MessengerSuite) TestBlockContact() {
 		Added:       true,
 	}
 
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	contact2 := Contact{
+		ID:          common.PubkeyToHex(&key2.PublicKey),
+		EnsName:     "contact-name",
+		LastUpdated: 20,
+		Added:       true,
+	}
+
 	chat1 := &Chat{
 		ID:                    contact.ID,
 		Name:                  "chat-name",
@@ -1385,7 +1395,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(s.m.SaveChat(chat2))
 	s.Require().NoError(s.m.SaveChat(chat3))
 
-	_, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
+	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
 
 	messages := []*common.Message{
@@ -1418,7 +1428,7 @@ func (s *MessengerSuite) TestBlockContact() {
 				Clock:       3,
 			},
 			Seen: false,
-			From: "test",
+			From: contact2.ID,
 		},
 		{
 			ID:          "test-4",
@@ -1429,7 +1439,7 @@ func (s *MessengerSuite) TestBlockContact() {
 				Clock:       4,
 			},
 			Seen: false,
-			From: "test",
+			From: contact2.ID,
 		},
 		{
 			ID:          "test-5",
@@ -1440,7 +1450,7 @@ func (s *MessengerSuite) TestBlockContact() {
 				Clock:       5,
 			},
 			Seen: true,
-			From: "test",
+			From: contact2.ID,
 		},
 		{
 			ID:          "test-6",
@@ -1462,7 +1472,7 @@ func (s *MessengerSuite) TestBlockContact() {
 				Clock:       7,
 			},
 			Seen: false,
-			From: "test",
+			From: contact2.ID,
 		},
 	}
 
@@ -1470,8 +1480,9 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(err)
 
 	response, err := s.m.BlockContact(contact.ID)
-	chats := response.Chats()
 	s.Require().NoError(err)
+
+	chats := response.Chats()
 
 	var actualChat2, actualChat3 *Chat
 	for idx := range chats {
@@ -2235,7 +2246,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 			Text:        "test-1",
 			Clock:       1,
 		},
-		From: "from-field",
+		From: testPK,
 	}
 
 	_, err := json.Marshal(message)

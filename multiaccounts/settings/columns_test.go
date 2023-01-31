@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,16 @@ func TestSyncSettingField_MarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, c.Expected, js)
 	}
+}
+
+func TestJSONEncoding(t *testing.T) {
+	settings := Settings{
+		PublicKey: "0x04deaafa03e3a646e54a36ec3f6968c1d3686847d88420f00c0ab6ee517ee1893398fca28aacd2af74f2654738c21d10bad3d88dc64201ebe0de5cf1e313970d3d",
+	}
+	encoded, err := json.Marshal(settings)
+	require.NoError(t, err)
+
+	require.True(t, strings.Contains(string(encoded), "\"compressed-key\":\"zQ3shudJrBctPznsRLvbsCtvZFTdi3b34uzYDuqE9Wq9m9T1C\""))
 }
 
 // TestGetFieldFromProtobufType checks if all the protobuf.SyncSetting_Type_value are assigned to a SettingField

@@ -204,8 +204,8 @@ func TestServiceSortTimeAsc(t *testing.T) {
 func TestServiceAtEnd(t *testing.T) {
 	testData := prepareTestData([]TestDataPoint{
 		{value: 1, timestamp: 101, blockNumber: 101, chainID: 1},
-		{value: 1, timestamp: 101, blockNumber: 101, chainID: 2},
-		{value: 1, timestamp: 102, blockNumber: 102, chainID: 1},
+		{value: 1, timestamp: 103, blockNumber: 103, chainID: 2},
+		{value: 1, timestamp: 105, blockNumber: 105, chainID: 1},
 	})
 
 	sorted := sortTimeAsc(testData, map[chainIdentity]int{1: 0, 2: 0})

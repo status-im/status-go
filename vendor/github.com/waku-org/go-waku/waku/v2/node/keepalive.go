@@ -86,7 +86,9 @@ func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peer peer.I
 			w.keepAliveMutex.Unlock()
 			logger.Debug("could not ping", zap.Error(res.Error))
 		} else {
+			w.keepAliveMutex.Lock()
 			delete(w.keepAliveFails, peer)
+			w.keepAliveMutex.Unlock()
 		}
 	case <-ctx.Done():
 		w.keepAliveMutex.Lock()

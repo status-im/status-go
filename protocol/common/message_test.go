@@ -1,8 +1,10 @@
 package common
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -127,4 +129,16 @@ func TestPrepareSimplifiedText(t *testing.T) {
 	simplifiedText, err := message.GetSimplifiedText("", canonicalNames)
 	require.NoError(t, err)
 	require.Equal(t, "hey "+canonicalName1+" "+canonicalName2, simplifiedText)
+}
+
+func TestMarshalMessageJSON(t *testing.T) {
+	message := &Message{}
+	from, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	message.From = PubkeyToHex(&from.PublicKey)
+
+	encodedMessage, err := json.Marshal(message)
+
+	require.NoError(t, err)
+	require.True(t, strings.Contains(string(encodedMessage), "compressedKey\":\"zQ"))
 }

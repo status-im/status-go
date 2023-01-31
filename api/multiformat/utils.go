@@ -2,6 +2,7 @@ package multiformat
 
 import (
 	"crypto/elliptic"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -17,6 +18,7 @@ const (
 	secp256k1KeyType   = 0xe7
 	bls12p381g1KeyType = 0xea
 	bls12p381g2KeyType = 0xeb
+	legacyKeyLength    = 132
 )
 
 // SerializePublicKey serialises a non-serialised multibase encoded multicodec identified EC public key
@@ -63,6 +65,17 @@ func DeserializePublicKey(key, outputBase string) (string, error) {
 	pk = prependKeyIdentifier(pk, kt, i)
 
 	return multibaseEncode(outputBase, pk)
+}
+
+// SerializeLegacyKey converts a secp251k1 uncompressed key to
+// a base58 compressed key
+func SerializeLegacyKey(key string) (string, error) {
+	if len(key) != legacyKeyLength {
+		return "", errors.New("invalid key length")
+	}
+
+	keyWithPrefix := fmt.Sprintf("0x%x01%s", secp256k1KeyType, key[2:])
+	return SerializePublicKey(keyWithPrefix, "z")
 }
 
 // getPublicKeyType wrapper for the `varint.FromUvarint()` func

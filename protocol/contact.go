@@ -2,7 +2,9 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -263,4 +265,22 @@ func contactIDFromPublicKeyString(key string) (string, error) {
 	}
 
 	return contactIDFromPublicKey(pubKey), nil
+}
+
+func (c *Contact) MarshalJSON() ([]byte, error) {
+	type Alias Contact
+	item := struct {
+		*Alias
+		CompressedKey string `json:"compressedKey"`
+	}{
+		Alias: (*Alias)(c),
+	}
+
+	compressedKey, err := multiformat.SerializeLegacyKey(item.ID)
+	if err != nil {
+		return nil, err
+	}
+	item.CompressedKey = compressedKey
+
+	return json.Marshal(item)
 }
