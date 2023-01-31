@@ -256,7 +256,20 @@ func (d *DiscoveryV5) iterate(ctx context.Context) error {
 		return fmt.Errorf("obtaining iterator: %w", err)
 	}
 
-	defer iterator.Close()
+	closeCh := make(chan struct{}, 1)
+	defer close(closeCh)
+
+	// Closing iterator when context is cancelled or function is returning
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		select {
+		case <-ctx.Done():
+			iterator.Close()
+		case <-closeCh:
+			iterator.Close()
+		}
+	}()
 
 	for {
 		if ctx.Err() != nil {
