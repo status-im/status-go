@@ -399,6 +399,15 @@ func (api *API) GetSuggestedRoutes(
 	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
+func (api *API) GetDerivedAddressForPath(ctx context.Context, password string, derivedFrom string, path string) (*DerivedAddress, error) {
+	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getDerivedAddress(info.ID, path)
+}
+
 func (api *API) GetDerivedAddressesForPath(ctx context.Context, password string, derivedFrom string, path string, pageSize int, pageNumber int) ([]*DerivedAddress, error) {
 	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
 	if err != nil {
