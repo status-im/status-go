@@ -75,7 +75,7 @@ func ValidateEditMessage(message protobuf.EditMessage) error {
 	return ValidateText(message.Text)
 }
 
-func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
+func ValidateDeleteMessage(message protobuf.DeleteMessage, forceDeletion bool) error {
 	if len(message.ChatId) == 0 {
 		return errors.New("chat-id can't be empty")
 	}
@@ -83,7 +83,7 @@ func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
 		return errors.New("message-id can't be empty")
 	}
 
-	if message.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP {
+	if message.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE || (forceDeletion || message.MessageType == protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP) {
 		return errors.New("unknown message type")
 	}
 

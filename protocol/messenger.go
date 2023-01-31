@@ -3444,7 +3444,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							SigPubKey:     publicKey,
 						}
 
-						err = m.HandleDeleteMessage(messageState, deleteMessage)
+						err = m.HandleDeleteMessage(messageState, deleteMessage, false)
 						if err != nil {
 							logger.Warn("failed to handle DeleteMessage", zap.Error(err))
 							allMessagesProcessed = false
@@ -3480,6 +3480,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandlePinMessage(messageState, pinMessage)
 						if err != nil {
 							logger.Warn("failed to handle PinMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.DeletePinnedMessage:
+						deletePinnedMessageProto := msg.ParsedMessage.Interface().(protobuf.DeleteMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deletePinnedMessageProto)
+						deletePinnedMessage := DeleteMessage{
+							DeleteMessage: deletePinnedMessageProto,
+							From:          contact.ID,
+							ID:            messageID,
+							SigPubKey:     publicKey,
+						}
+						err = m.HandleDeletePinnedMessage(messageState, deletePinnedMessage)
+						if err != nil {
+							logger.Warn("failed to handle DeletePinnedMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
