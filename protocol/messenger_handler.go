@@ -1753,7 +1753,9 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 			}
 		}
 	}
-	messageState.Response.AddSetting(settingField)
+	if settingField != nil {
+		messageState.Response.AddSetting(settingField)
+	}
 	return nil
 }
 
