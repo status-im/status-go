@@ -1277,7 +1277,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	resp, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	resp, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
