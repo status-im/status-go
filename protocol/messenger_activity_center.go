@@ -20,6 +20,10 @@ func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount(activityTy
 	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
+func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
+	return m.persistence.HasUnseenActivityCenterNotifications()
+}
+
 func toHexBytes(b [][]byte) []types.HexBytes {
 	hb := make([]types.HexBytes, len(b))
 
@@ -38,6 +42,10 @@ func fromHexBytes(hb []types.HexBytes) [][]byte {
 	}
 
 	return b
+}
+
+func (m *Messenger) MarkAsSeenActivityCenterNotifications() error {
+	return m.persistence.MarkAsSeenActivityCenterNotifications()
 }
 
 func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {

@@ -135,6 +135,12 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.Accepted,
 		notification.Dismissed,
 	)
+
+	// When we have inserted or updated unread notification - mark whole activity_center_settings as unseen
+	if err == nil && !notification.Read {
+		_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 0`)
+	}
+
 	return err
 }
 
@@ -871,5 +877,17 @@ func (db sqlitePersistence) RemoveAllContactRequestActivityCenterNotifications(c
 	chat_id = ?
 	AND notification_type = ?
 	`, chatID, ActivityCenterNotificationTypeContactRequest)
+	return err
+}
+
+func (db sqlitePersistence) HasUnseenActivityCenterNotifications() (bool, error) {
+	row := db.db.QueryRow(`SELECT has_seen FROM activity_center_states`)
+	hasSeen := true
+	err := row.Scan(&hasSeen)
+	return !hasSeen, err
+}
+
+func (db sqlitePersistence) MarkAsSeenActivityCenterNotifications() error {
+	_, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = 1`)
 	return err
 }
