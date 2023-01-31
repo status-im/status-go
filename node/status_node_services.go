@@ -107,7 +107,12 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 
 	if config.WakuV2Config.Enabled {
-		waku2Service, err := b.wakuV2Service(config)
+		telemetryServerURL, err := accDB.GetTelemetryServerURL()
+		if err != nil {
+			return err
+		}
+
+		waku2Service, err := b.wakuV2Service(config, telemetryServerURL)
 		if err != nil {
 			return err
 		}
@@ -278,7 +283,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 
 }
 
-func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServerURL string) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
 			MaxMessageSize:       wakucommon.DefaultMaxMessageSize,
@@ -298,6 +303,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			EnableDiscV5:         nodeConfig.WakuV2Config.EnableDiscV5,
 			UDPPort:              nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:           nodeConfig.WakuV2Config.AutoUpdate,
+			TelemetryServerURL:   telemetryServerURL,
 		}
 
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
