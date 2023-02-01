@@ -72,23 +72,35 @@ func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 	return accounts, nil
 }
 
-func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
-	acc, err := api.db.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-	if acc.Type != accounts.AccountTypeWatch {
-		err = api.manager.DeleteAccount(address, "")
-		var e *account.ErrCannotLocateKeyFile
-		if err != nil && !errors.As(err, &e) {
+func (api *API) DeleteAccount(ctx context.Context, address types.Address, password string) error {
+	if len(password) > 0 {
+		acc, err := api.db.GetAccountByAddress(address)
+		if err != nil {
 			return err
+		}
+		if acc.Type != accounts.AccountTypeWatch {
+			err = api.manager.DeleteAccount(address, password)
+			var e *account.ErrCannotLocateKeyFile
+			if err != nil && !errors.As(err, &e) {
+				return err
+			}
+
+			allAccountsOfKeypairWithKeyUID, err := api.db.GetAccountsByKeyUID(acc.KeyUID)
+			if err != nil {
+				return err
+			}
+
+			lastAcccountOfKeypairWithTheSameKey := len(allAccountsOfKeypairWithKeyUID) == 1
+			if lastAcccountOfKeypairWithTheSameKey {
+				err = api.manager.DeleteAccount(types.Address(common.HexToAddress(acc.DerivedFrom)), password)
+				var e *account.ErrCannotLocateKeyFile
+				if err != nil && !errors.As(err, &e) {
+					return err
+				}
+			}
 		}
 	}
 
-	return (*api.messenger).DeleteAccount(address)
-}
-
-func (api *API) DeleteAccountForMigratedKeypair(ctx context.Context, address types.Address) error {
 	return (*api.messenger).DeleteAccount(address)
 }
 
@@ -429,7 +441,7 @@ func (api *API) VerifyPassword(password string) bool {
 	return err == nil
 }
 
-func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, keyStoreDir string) error {
+func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
 	var addresses []types.Address
 	for _, addr := range accountAddresses {
 		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
@@ -441,10 +453,13 @@ func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName str
 	}
 
 	// Once we migrate a keypair, corresponding keystore files need to be deleted.
-	for _, addr := range addresses {
-		// This action deletes an account from the keystore, no need to check for error in this context here, cause if this
-		// action fails from whichever reason the account is still successfully migrated since keystore won't be used any more.
-		_ = api.manager.DeleteAccount(addr, "")
+	if len(password) > 0 {
+		for _, addr := range addresses {
+			err = api.manager.DeleteAccount(addr, password)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
