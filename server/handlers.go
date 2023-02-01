@@ -5,21 +5,16 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"golang.org/x/image/draw"
+	qrcodeutils "github.com/status-im/status-go/qrcode"
 	"image"
-	"image/jpeg"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-
-	"github.com/btcsuite/btcutil/base58"
 	"github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
-    
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
@@ -42,10 +37,7 @@ const (
 	// Handler routes for pairing
 	accountImagesPath = "/accountImages"
 	contactImagesPath = "/contactImages"
-
-	QRImagePath         = "/QRImages"
-	QRImageWithLogoPath = "/QRImagesWithLogo"
-
+	generateQRCode    = "/GenerateQRCode"
 )
 
 type QROptions struct {
@@ -135,159 +127,63 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 	}
 }
 
-func centreImageOverImage(QRCode, profileImage []byte) ([]byte, error) {
-	QRImg, _, err := image.Decode(bytes.NewReader(QRCode))
-	if err != nil {
-		return nil, err
-	}
-
-	profileImg, _, err := image.Decode(bytes.NewReader(profileImage))
-	if err != nil {
-		return nil, err
-	}
-
-	// This should centre the profile image over the QR code
-	QRSize := QRImg.Bounds().Size()
-	QRMiddle := image.Pt(QRSize.X/2, QRSize.Y/2)
-
-	profileImgSize := profileImg.Bounds().Size()
-	PIMiddle := image.Pt(profileImgSize.X/2, profileImgSize.Y/2)
-
-	outputImg := image.NewRGBA(QRImg.Bounds())
-	draw.Draw(outputImg, QRImg.Bounds(), QRImg, image.Point{}, draw.Src)
-	draw.Draw(outputImg, profileImg.Bounds().Add(QRMiddle).Sub(PIMiddle), profileImg, image.Point{}, draw.Over)
-
-	outWriter := new(bytes.Buffer)
-	err = jpeg.Encode(outWriter, outputImg, &jpeg.Options{jpeg.DefaultQuality})
-	if err != nil {
-		return nil, err
-	}
-
-	return outWriter.Bytes(), nil
-}
-
-func handleQRImageWithLogo(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
+func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-
 		qrURLBase64Encoded, ok := params["qrurl"]
 		if !ok || len(qrURLBase64Encoded) == 0 {
 			logger.Error("no qr url provided")
 			return
 		}
-
 		qrURLBase64Decoded, err := base64.StdEncoding.DecodeString(qrURLBase64Encoded[0])
 		if err != nil {
 			logger.Error("error decoding string from base64", zap.Error(err))
-
 		}
-
-		keyUids, ok := params["keyUid"]
-		if !ok || len(keyUids) == 0 {
-			logger.Error("no keyUid")
-			return
+		level, ok := params["level"]
+		// Default error correction level
+		correctionLevel := qrcode.ErrorCorrectionMedium
+		if ok && len(level) == 1 {
+			switch level[0] {
+			case "4":
+				correctionLevel = qrcode.ErrorCorrectionHighest
+				break
+			case "1":
+				correctionLevel = qrcode.ErrorCorrectionLow
+				break
+			case "3":
+				correctionLevel = qrcode.ErrorCorrectionQuart
+				break
+			}
 		}
-		imageNames, ok := params["imageName"]
-		if !ok || len(imageNames) == 0 {
-			logger.Error("no imageName")
-			return
-		}
-
-		spew.Dump(params, qrURLBase64Decoded, keyUids[0], imageNames[0])
-
-		identityImageObjectFromDB, err := multiaccountsDB.GetIdentityImage(keyUids[0], imageNames[0])
-
-		if err != nil {
-			fmt.Printf("could not GetIdentityImage for keyuid and imagename: %v", err)
-		}
-
-		identityImage, _, err := image.Decode(bytes.NewReader(identityImageObjectFromDB.Payload))
-
-		if err != nil {
-			fmt.Printf("could not decode identityImageObjectFromDB: %v", err)
-		}
-
 		buf := NewWriterCloserByteBuffer()
-
-		qrc, err := qrcode.New(string(qrURLBase64Decoded))
-
-		if err != nil {
-			fmt.Printf("could not generate QRCode: %v", err)
-		}
-
-		nw := standard.NewWithWriter(buf,
-			standard.WithLogoImage(identityImage),
+		qrc, err := qrcode.NewWith(string(qrURLBase64Decoded),
+			qrcode.WithEncodingMode(qrcode.EncModeAuto),
+			qrcode.WithErrorCorrectionLevel(correctionLevel),
 		)
-
-		if err != nil {
-			fmt.Printf("standard.New failed: %v", err)
-		}
-
-		if err = qrc.Save(nw); err != nil {
-			fmt.Printf("could not save image: %v", err)
-		}
-
-		payload := buf.Bytes()
-
-		mime, err := images.ImageMime(payload)
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
-	}
-}
-
-func handleQRImage(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		params := r.URL.Query()
-
-		qrURLBase64Encoded, ok := params["qrurl"]
-		if !ok || len(qrURLBase64Encoded) == 0 {
-			logger.Error("no qr url provided")
-			return
-		}
-
-		qrURLBase64Decoded, err := base64.StdEncoding.DecodeString(qrURLBase64Encoded[0])
-		if err != nil {
-			logger.Error("error decoding string from base64", zap.Error(err))
-
-		}
-
-		// what happens here is that everytime someone hits this url we
-		// generate a QR in go and then serve the bytes,
-		// the bytes are technically in memory here...
-		// would love to do something later where we trigger generation of the bytes separately and
-		// the serving of the QR separately.
-		// only problem is I don't know where would we store the bytes in the meanwhile....76
-
-		buf := NewWriterCloserByteBuffer()
-
-		qrc, err := qrcode.New(string(qrURLBase64Decoded))
 		if err != nil {
 			fmt.Printf("could not generate QRCode: %v", err)
 		}
-
 		nw := standard.NewWithWriter(buf)
-		if err != nil {
-			fmt.Printf("standard.New failed: %v", err)
-		}
-
 		if err = qrc.Save(nw); err != nil {
 			fmt.Printf("could not save image: %v", err)
 		}
-
 		payload := buf.Bytes()
-
+		logo, err := qrcodeutils.GetLogoImage(multiaccountsDB, params)
+		if err == nil {
+			qrWidth, qrHeight, _ := qrcodeutils.GetImageDimensions(payload)
+			logo, err = qrcodeutils.ResizeImage(logo, qrWidth/5, qrHeight/5)
+			payload = qrcodeutils.SuperimposeImage(payload, logo)
+		}
+		size, ok := params["size"]
+		if ok && len(size) == 1 {
+			size, err := strconv.Atoi(size[0])
+			if err == nil {
+				payload, err = qrcodeutils.ResizeImage(payload, size, size)
+			}
+		}
 		mime, err := images.ImageMime(payload)
-
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-store")
-        
 		_, err = w.Write(payload)
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
