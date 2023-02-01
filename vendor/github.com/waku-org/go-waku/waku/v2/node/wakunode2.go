@@ -112,7 +112,6 @@ func defaultStoreFactory(w *WakuNode) store.Store {
 // New is used to instantiate a WakuNode using a set of WakuNodeOptions
 func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	params := new(WakuNodeParameters)
-
 	params.libP2POpts = DefaultLibP2POptions
 
 	opts = append(DefaultWakuNodeOptions, opts...)
@@ -121,6 +120,10 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if params.logger == nil {
+		params.logger = utils.Logger()
 	}
 
 	if params.privKey == nil {

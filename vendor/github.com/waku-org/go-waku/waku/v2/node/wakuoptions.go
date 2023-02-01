@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -29,6 +30,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Default userAgent
@@ -111,7 +113,6 @@ type WakuNodeOption func(*WakuNodeParameters) error
 // Default options used in the libp2p node
 var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithDiscoverParams(150),
-	WithLogger(utils.Logger()),
 }
 
 // MultiAddresses return the list of multiaddresses configured in the node
@@ -138,6 +139,15 @@ func (w WakuNodeParameters) AddressFactory() basichost.AddrsFactory {
 func WithLogger(l *zap.Logger) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.logger = l
+		logging.SetPrimaryCore(l.Core())
+		return nil
+	}
+}
+
+// WithLogLevel is a WakuNodeOption that sets the log level for go-waku
+func WithLogLevel(lvl zapcore.Level) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		logging.SetAllLoggers(logging.LogLevel(lvl))
 		return nil
 	}
 }

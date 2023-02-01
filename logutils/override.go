@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -67,13 +69,23 @@ func enableRootLog(levelStr string, handler log.Handler) error {
 		levelStr = "INFO"
 	}
 
-	level, err := log.LvlFromString(strings.ToLower(levelStr))
+	levelStr = strings.ToLower(levelStr)
+
+	level, err := log.LvlFromString(levelStr)
 	if err != nil {
 		return err
 	}
 
 	filteredHandler := log.LvlFilterHandler(level, handler)
 	log.Root().SetHandler(filteredHandler)
+
+	// go-libp2p logger
+	lvl, err := logging.LevelFromString(levelStr)
+	if err != nil {
+		return err
+	}
+
+	logging.SetAllLoggers(lvl)
 
 	return nil
 }

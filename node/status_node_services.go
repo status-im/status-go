@@ -8,8 +8,6 @@ import (
 
 	"github.com/status-im/status-go/server"
 
-	logging "github.com/ipfs/go-log"
-
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -309,12 +307,6 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
 			cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
 		}
-
-		lvl, err := logging.LevelFromString("info")
-		if err != nil {
-			panic(err)
-		}
-		logging.SetAllLoggers(lvl)
 
 		w, err := wakuv2.New(nodeConfig.NodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource())
 
