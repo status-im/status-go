@@ -1045,6 +1045,17 @@ github.com/xeipuuv/gojsonschema
 # github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673
 ## explicit
 github.com/xrash/smetrics
+# github.com/yeqown/go-qrcode/v2 v2.2.1
+## explicit; go 1.18
+github.com/yeqown/go-qrcode/v2
+# github.com/yeqown/go-qrcode/writer/standard v1.2.1
+## explicit; go 1.17
+github.com/yeqown/go-qrcode/writer/standard
+github.com/yeqown/go-qrcode/writer/standard/imgkit
+# github.com/yeqown/reedsolomon v1.0.0
+## explicit
+github.com/yeqown/reedsolomon
+github.com/yeqown/reedsolomon/binary
 # github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 ## explicit; go 1.14
 github.com/zenthangplus/goccm
