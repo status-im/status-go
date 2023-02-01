@@ -54,6 +54,8 @@ message DeleteMessage {
 
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 5;
+
+  string deleted_by = 6;
 }
 
 message DeleteForMeMessage {

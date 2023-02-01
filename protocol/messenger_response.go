@@ -23,6 +23,7 @@ import (
 type RemovedMessage struct {
 	ChatID    string `json:"chatId"`
 	MessageID string `json:"messageId"`
+	DeletedBy string `json:"deletedBy,omitempty"`
 }
 
 type ClearedHistory struct {

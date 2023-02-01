@@ -90,6 +90,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replace_message,
 		edited_at,
 		deleted,
+		deleted_by,
 		deleted_for_me,
 		rtl,
 		line_count,
@@ -140,6 +141,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.replace_message,
 		m1.edited_at,
 		m1.deleted,
+		m1.deleted_by,
 		m1.deleted_for_me,
 		m1.rtl,
 		m1.line_count,
@@ -212,6 +214,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var gapTo sql.NullInt64
 	var editedAt sql.NullInt64
 	var deleted sql.NullBool
+	var deletedBy sql.NullString
 	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 	var contactVerificationState sql.NullInt64
@@ -269,6 +272,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Replace,
 		&editedAt,
 		&deleted,
+		&deletedBy,
 		&deletedForMe,
 		&message.RTL,
 		&message.LineCount,
@@ -322,6 +326,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if deleted.Valid {
 		message.Deleted = deleted.Bool
+	}
+
+	if deletedBy.Valid {
+		message.DeletedBy = deletedBy.String
 	}
 
 	if deletedForMe.Valid {
@@ -521,6 +529,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Replace,
 		int64(message.EditedAt),
 		message.Deleted,
+		message.DeletedBy,
 		message.DeletedForMe,
 		message.RTL,
 		message.LineCount,

@@ -1440,6 +1440,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 
 	// Update message and return it
 	originalMessage.Deleted = true
+	originalMessage.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
 
 	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
 	if err != nil {
@@ -1464,7 +1465,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID})
+	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
 

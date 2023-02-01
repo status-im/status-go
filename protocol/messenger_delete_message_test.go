@@ -96,6 +96,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().Len(sendResponse.Messages(), 0)
 	s.Require().Len(sendResponse.RemovedMessages(), 1)
 	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
+	s.Require().Equal(sendResponse.RemovedMessages()[0].DeletedBy, "")
 	s.Require().Len(sendResponse.Chats(), 1)
 	// LastMessage is removed
 	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
