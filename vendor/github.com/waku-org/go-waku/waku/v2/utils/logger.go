@@ -44,6 +44,9 @@ func InitLogger(encoding string, output string) {
 		if len(outputParts) == 2 {
 			cfg.File = outputParts[1]
 		} else {
+			if len(outputParts) > 2 || outputParts[0] != "file" {
+				panic("invalid output format")
+			}
 			cfg.File = "./waku.log"
 		}
 	}
@@ -51,4 +54,6 @@ func InitLogger(encoding string, output string) {
 	logging.SetupLogging(cfg)
 
 	log = logging.Logger("gowaku").Desugar()
+
+	logging.SetAllLoggers(logging.LevelInfo)
 }

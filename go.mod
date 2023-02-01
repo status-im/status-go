@@ -25,7 +25,7 @@ require (
 	github.com/hashicorp/go-version v1.2.0
 	github.com/imdario/mergo v0.3.12
 	github.com/ipfs/go-cid v0.3.2
-	github.com/ipfs/go-log v1.0.5
+	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
@@ -75,9 +75,10 @@ require github.com/fogleman/gg v1.3.0
 
 require (
 	github.com/gorilla/sessions v1.2.1
+	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/rmg/iso4217 v1.0.0
-	github.com/waku-org/go-waku v0.4.1-0.20230131145040-6169a44c242f
+	github.com/waku-org/go-waku v0.4.1-0.20230202011116-c3b5ab95abae
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 )
@@ -151,7 +152,6 @@ require (
 	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
-	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/klauspost/compress v1.15.10 // indirect

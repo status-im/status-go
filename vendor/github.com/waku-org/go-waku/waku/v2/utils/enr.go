@@ -1,13 +1,9 @@
 package utils
 
 import (
-	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
-	"net"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -46,95 +42,6 @@ func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 	}
 
 	return v
-}
-
-// GetENRandIP returns a enr Node and TCP address obtained from a multiaddress. priv key and protocols supported
-func GetENRandIP(addrs []multiaddr.Multiaddr, wakuFlags WakuEnrBitfield, privK *ecdsa.PrivateKey) (*enode.Node, error) {
-	r := &enr.Record{}
-	for _, addr := range addrs {
-		storeInMultiaddrsKey := false
-		var multiaddrItems []multiaddr.Multiaddr
-		_, err := addr.ValueForProtocol(multiaddr.P_WS)
-		if err == nil {
-			storeInMultiaddrsKey = true
-			multiaddrItems = append(multiaddrItems, addr)
-		}
-
-		_, err = addr.ValueForProtocol(multiaddr.P_WSS)
-		if err == nil {
-			storeInMultiaddrsKey = true
-			multiaddrItems = append(multiaddrItems, addr)
-		}
-
-		if !storeInMultiaddrsKey {
-			var ip string
-			dns4, err := addr.ValueForProtocol(multiaddr.P_DNS4)
-			if err != nil {
-				ip, err = addr.ValueForProtocol(multiaddr.P_IP4)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				netIP, err := net.ResolveIPAddr("ip4", dns4)
-				if err != nil {
-					return nil, err
-				}
-				ip = netIP.String()
-			}
-
-			portStr, err := addr.ValueForProtocol(multiaddr.P_TCP)
-			if err != nil {
-				return nil, err
-			}
-
-			port, err := strconv.Atoi(portStr)
-			if err != nil {
-				return nil, err
-			}
-
-			if port > 0 && port <= math.MaxUint16 {
-				r.Set(enr.TCP(uint16(port))) // lgtm [go/incorrect-integer-conversion]
-			} else {
-				return nil, fmt.Errorf("could not set port %d", port)
-			}
-
-			r.Set(enr.IP(net.ParseIP(ip)))
-		} else {
-			p2p, err := addr.ValueForProtocol(multiaddr.P_P2P)
-			if err != nil {
-				return nil, err
-			}
-
-			p2pAddr, err := multiaddr.NewMultiaddr("/p2p/" + p2p)
-			if err != nil {
-				return nil, fmt.Errorf("could not create p2p addr: %w", err)
-			}
-
-			var fieldRaw []byte
-			for _, ma := range multiaddrItems {
-				maRaw := ma.Decapsulate(p2pAddr).Bytes()
-				maSize := make([]byte, 2)
-				binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
-
-				fieldRaw = append(fieldRaw, maSize...)
-				fieldRaw = append(fieldRaw, maRaw...)
-			}
-
-			if len(fieldRaw) != 0 {
-				r.Set(enr.WithEntry(MultiaddrENRField, fieldRaw))
-			}
-		}
-	}
-
-	r.Set(enr.WithEntry(WakuENRField, wakuFlags))
-	err := enode.SignV4(r, privK)
-	if err != nil {
-		return nil, err
-	}
-
-	node, err := enode.New(enode.ValidSchemes, r)
-
-	return node, err
 }
 
 // EnodeToMultiaddress converts an enode into a multiaddress
