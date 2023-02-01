@@ -5,16 +5,14 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	qrcodeutils "github.com/status-im/status-go/qrcode"
-	qrcode "github.com/yeqown/go-qrcode/v2"
 	"image"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
+	qrcode "github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/ipfs"
@@ -23,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/protocol/images"
+	qrcodeutils "github.com/status-im/status-go/qrcode"
 )
 
 const (
@@ -430,13 +429,10 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 			switch level[0] {
 			case "4":
 				correctionLevel = qrcode.ErrorCorrectionHighest
-				break
 			case "1":
 				correctionLevel = qrcode.ErrorCorrectionLow
-				break
 			case "3":
 				correctionLevel = qrcode.ErrorCorrectionQuart
-				break
 			}
 		}
 		buf := NewWriterCloserByteBuffer()
@@ -455,17 +451,21 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 		logo, err := qrcodeutils.GetLogoImage(multiaccountsDB, params)
 		if err == nil {
 			qrWidth, qrHeight, _ := qrcodeutils.GetImageDimensions(payload)
-			logo, err = qrcodeutils.ResizeImage(logo, qrWidth/5, qrHeight/5)
+			logo, _ = qrcodeutils.ResizeImage(logo, qrWidth/5, qrHeight/5)
 			payload = qrcodeutils.SuperimposeImage(payload, logo)
 		}
 		size, ok := params["size"]
 		if ok && len(size) == 1 {
 			size, err := strconv.Atoi(size[0])
 			if err == nil {
-				payload, err = qrcodeutils.ResizeImage(payload, size, size)
+				payload, _ = qrcodeutils.ResizeImage(payload, size, size)
 			}
 		}
 		mime, err := images.ImageMime(payload)
+		if err != nil {
+			fmt.Printf("could not generate image from payload: %v", err)
+		}
+
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-store")
 		_, err = w.Write(payload)

@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/yeqown/go-qrcode/v2"
-	xdraw "golang.org/x/image/draw"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
 	"net/url"
 	"os"
+
+	xdraw "golang.org/x/image/draw"
+
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 const (
-	defaultPadding  = 20
-	correctionLevel = qrcode.ErrorCorrectionMedium
+	defaultPadding = 20
 )
 
 func GetImageDimensions(imgBytes []byte) (int, int, error) {
@@ -55,7 +55,10 @@ func ToLogoImageFromBytes(imageBytes []byte, padding int) []byte {
 	draw.Draw(white, bounds.Add(image.Pt(centerX-bounds.Dx()/2, centerY-bounds.Dy()/2)), circle, image.ZP, draw.Over)
 	// Encode image to png format and save in a bytes
 	var resultImg bytes.Buffer
-	png.Encode(&resultImg, white)
+	err = png.Encode(&resultImg, white)
+	if err != nil {
+		return nil
+	}
 	resultBytes := resultImg.Bytes()
 	return resultBytes
 }
@@ -146,9 +149,9 @@ func GetLogoImage(multiaccountsDB *multiaccounts.Database, params url.Values) ([
 
 	if identityImageObjectFromDB == nil {
 		return ToLogoImageFromBytes(staticLogoFileBytes, GetPadding(staticLogoFileBytes)), nil
-	} else {
-		return ToLogoImageFromBytes(identityImageObjectFromDB.Payload, GetPadding(identityImageObjectFromDB.Payload)), nil
 	}
+
+	return ToLogoImageFromBytes(identityImageObjectFromDB.Payload, GetPadding(identityImageObjectFromDB.Payload)), nil
 
 }
 
