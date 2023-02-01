@@ -4548,7 +4548,6 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	}
 	if msg.ContentType == protobuf.ChatMessage_STICKER {
 		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
-
 	}
 }
 
