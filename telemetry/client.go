@@ -46,6 +46,7 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 			"messageType":    message.Type.String(),
 			"receiverKeyUID": c.keyUID,
 			"nodeName":       c.nodeName,
+			"messageSize":    len(sshMessage.Payload),
 		})
 	}
 	body, _ := json.Marshal(postBody)
