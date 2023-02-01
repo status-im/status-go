@@ -643,10 +643,10 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
-	// Make sure it's not returned as coming from us
+	// Make sure it's returned
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
 	s.Require().NoError(err)
-	s.Require().Len(contactRequests, 0)
+	s.Require().Len(contactRequests, 1)
 
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
