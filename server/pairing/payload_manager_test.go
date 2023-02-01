@@ -70,7 +70,7 @@ func makeKeystores(t *testing.T) (string, string, func()) {
 
 	keyStoreDir = filepath.Join(keyStoreDir, "keystore", keyUID)
 	// TODO test case where the keystore dir does not yet exist because the device is new
-	emptyKeyStoreDir = filepath.Join(emptyKeyStoreDir, "keystore", keyUID)
+	emptyKeyStoreDir = filepath.Join(emptyKeyStoreDir, "keystore")
 
 	err = os.MkdirAll(keyStoreDir, 0777)
 	require.NoError(t, err)
@@ -301,7 +301,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// TEST PairingPayloadRepository 2 StoreToSource()
-	keys := getFiles(pms.T(), pms.config2.KeystorePath)
+	keys := getFiles(pms.T(), filepath.Join(pms.config2.KeystorePath, pms.config2.KeyUID))
 
 	pms.Require().Len(keys, 2)
 	pms.Require().Len(keys[utils.GetAccount1PKFile()], 489)
@@ -326,6 +326,9 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().Exactly(expected.Name, acc.Name)
 	pms.Require().Exactly(expected.Timestamp, acc.Timestamp)
 	pms.Require().Len(acc.Images, 2)
+
+	err = ppr2.StoreToSource()
+	pms.Require().ErrorIs(err, ErrKeyFileAlreadyExists)
 }
 
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {

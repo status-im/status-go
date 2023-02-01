@@ -3,6 +3,7 @@ package pairing
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,6 +19,10 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+)
+
+var (
+	ErrKeyFileAlreadyExists = errors.New("key file already exists")
 )
 
 // PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
@@ -475,10 +480,16 @@ func (apr *AccountPayloadRepository) storeKeys(keyStorePath string) error {
 			return fmt.Errorf("no known Key UID")
 		}
 		keyStorePath = filepath.Join(keyStorePath, apr.multiaccount.KeyUID)
-
-		err := os.MkdirAll(keyStorePath, 0777)
-		if err != nil {
+		_, err := os.Stat(keyStorePath)
+		if os.IsNotExist(err) {
+			err := os.MkdirAll(keyStorePath, 0777)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
 			return err
+		} else {
+			return ErrKeyFileAlreadyExists
 		}
 	}
 
