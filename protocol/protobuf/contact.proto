@@ -2,7 +2,13 @@ syntax = "proto3";
 
 option go_package = "./;protobuf";
 package protobuf;
-import "chat_message.proto";
+
+message ContactRequestPropagatedState {
+  uint64 local_clock = 1;
+  uint64 local_state = 2;
+  uint64 remote_clock = 3;
+  uint64 remote_state = 4;
+}
 
 message ContactUpdate {
   uint64 clock = 1;
@@ -10,9 +16,7 @@ message ContactUpdate {
   string profile_image = 3;
   string display_name = 4;
   uint64 contact_request_clock = 5;
-
-  ContactRequestSignature sent_contact_request_signature = 14;
-  ContactRequestSignature received_contact_request_signature = 15;
+  ContactRequestPropagatedState contact_request_propagated_state = 6;
 }
 
 message AcceptContactRequest {

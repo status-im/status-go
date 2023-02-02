@@ -740,11 +740,12 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 	}
 
 	contactUpdate := &protobuf.ContactUpdate{
-		Clock:               clock,
-		DisplayName:         displayName,
-		EnsName:             ensName,
-		ProfileImage:        profileImage,
-		ContactRequestClock: contact.ContactRequestLocalClock,
+		Clock:                         clock,
+		DisplayName:                   displayName,
+		EnsName:                       ensName,
+		ProfileImage:                  profileImage,
+		ContactRequestClock:           contact.ContactRequestLocalClock,
+		ContactRequestPropagatedState: contact.ContactRequestPropagatedState(),
 	}
 	encodedMessage, err := proto.Marshal(contactUpdate)
 	if err != nil {

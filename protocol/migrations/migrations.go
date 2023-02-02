@@ -1558,7 +1558,7 @@ func _1674210659_add_contact_request_local_clockUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674210659_add_contact_request_local_clock.up.sql", size: 691, mode: os.FileMode(0644), modTime: time.Unix(1675272378, 0)}
+	info := bindataFileInfo{name: "1674210659_add_contact_request_local_clock.up.sql", size: 691, mode: os.FileMode(0644), modTime: time.Unix(1675361522, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x72, 0x39, 0xfe, 0x72, 0x98, 0xfc, 0x91, 0x20, 0x10, 0xe8, 0xf5, 0xac, 0x79, 0xa8, 0x1c, 0xca, 0x7b, 0x35, 0xa, 0xc1, 0x56, 0x49, 0x9a, 0xfc, 0xbd, 0x64, 0x9d, 0xdf, 0xd2, 0x60, 0x70}}
 	return a, nil
 }
@@ -1598,7 +1598,7 @@ func _1675272329_fix_protocol_migrationUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1675272329_fix_protocol_migration.up.sql", size: 183, mode: os.FileMode(0644), modTime: time.Unix(1675272611, 0)}
+	info := bindataFileInfo{name: "1675272329_fix_protocol_migration.up.sql", size: 183, mode: os.FileMode(0644), modTime: time.Unix(1675361522, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0xe0, 0x11, 0x4c, 0x66, 0x55, 0x72, 0xd3, 0xe6, 0x98, 0xa4, 0xe7, 0x44, 0xf9, 0x3b, 0x3a, 0x3f, 0xd9, 0x91, 0x1e, 0x4f, 0xfc, 0x56, 0x63, 0xe5, 0xa4, 0x83, 0xfc, 0x7c, 0xcf, 0x18, 0x99}}
 	return a, nil
 }

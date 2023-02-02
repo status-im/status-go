@@ -4,6 +4,7 @@ option go_package = "./;protobuf";
 package protobuf;
 
 import "enums.proto";
+import "contact.proto";
 
 message StickerMessage {
   string hash = 1;
@@ -142,9 +143,7 @@ message ChatMessage {
   // Message author's display name, introduced in version 1
   string display_name = 14;
 
-  ContactRequestSignature sent_contact_request_signature = 15;
-  ContactRequestSignature received_contact_request_signature = 16;
-  bool contact_message = 17;
+  ContactRequestPropagatedState contact_request_propagated_state = 15;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
@@ -164,9 +163,4 @@ message ChatMessage {
     DISCORD_MESSAGE = 12;
     IDENTITY_VERIFICATION = 13;
   }
-}
-
-message ContactRequestSignature {
-  bytes signature = 1;
-  uint64 timestamp = 2;
 }

@@ -326,3 +326,21 @@ func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage
 
 	return nil
 }
+
+func (m *Messenger) addContactRequestPropagatedState(message *common.Message) error {
+	chat, ok := m.allChats.Load(message.LocalChatID)
+	if !ok {
+		return ErrChatNotFound
+	}
+	if !chat.OneToOne() {
+		return nil
+	}
+
+	contact, err := m.BuildContact(chat.ID)
+	if err != nil {
+		return err
+	}
+
+	message.ContactRequestPropagatedState = contact.ContactRequestPropagatedState()
+	return nil
+}

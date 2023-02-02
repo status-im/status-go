@@ -732,6 +732,7 @@ func (m *Messenger) handleAcceptContactRequest(
 	originalRequest *common.Message,
 	message protobuf.AcceptContactRequest) (ContactRequestProcessingResponse, error) {
 
+        m.logger.Info("received contact request", zap.Uint64("clock-sent", message.Clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
 	if contact.ContactRequestRemoteClock > message.Clock {
 		m.logger.Info("not handling accept since clock lower")
 		return ContactRequestProcessingResponse{}, nil
@@ -740,8 +741,6 @@ func (m *Messenger) handleAcceptContactRequest(
 	// The contact request accepted wasn't found, a reason for this might
 	// be that we sent a legacy contact request/contact-update, or another
 	// device has sent it, and we haven't synchronized it
-	// TODO(cammellos): This might want to show a notification if we haven't
-	// added the user to contacts already
 	if originalRequest == nil {
 		return contact.ContactRequestAccepted(message.Clock), nil
 	}
@@ -817,14 +816,13 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
-	contact := state.CurrentMessageState.Contact
-
+func (m *Messenger) handleRetractContactRequest(contact *Contact, message protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
 		m.logger.Debug("retraction coming from us, ignoring")
 		return nil
 	}
 
+	m.logger.Debug("handling retracted contact request", zap.Uint64("clock", message.Clock))
 	r := contact.ContactRequestRetracted(message.Clock)
 	if !r.processed {
 		m.logger.Info("not handling retract since clock lower")
@@ -837,9 +835,18 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 		return err
 	}
 
-	state.ModifiedContacts.Store(contact.ID, true)
+	m.allContacts.Store(contact.ID, contact)
 
-	state.AllContacts.Store(contact.ID, contact)
+	return nil
+}
+
+func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
+	contact := state.CurrentMessageState.Contact
+	err := m.handleRetractContactRequest(contact, message)
+	if err != nil {
+		return err
+	}
+	state.ModifiedContacts.Store(contact.ID, true)
 
 	return nil
 }
@@ -868,6 +875,29 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 	}
 
 	logger.Info("Handling contact update")
+
+	if message.ContactRequestPropagatedState != nil {
+		result := contact.ContactRequestPropagatedStateReceived(message.ContactRequestPropagatedState)
+		if result.sendBackState {
+			// This is a bit dangerous, since it might trigger a ping-pong of contact updates
+			// also it should backoff/debounce
+			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", m.dispatchMessage)
+			if err != nil {
+				return err
+			}
+
+		}
+		if result.newContactRequestReceived {
+			err = m.createContactRequestNotification(contact, state, nil)
+			if err != nil {
+				return err
+			}
+
+		}
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+
+	}
 
 	if contact.LastUpdated < message.Clock {
 		logger.Info("Updating contact")
@@ -1675,6 +1705,27 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	contact := state.CurrentMessageState.Contact
 
+	// If we receive some propagated state from someone who's not
+	// our paired device, we handle it
+	if receivedMessage.ContactRequestPropagatedState != nil && !isSyncMessage {
+		result := contact.ContactRequestPropagatedStateReceived(receivedMessage.ContactRequestPropagatedState)
+		if result.sendBackState {
+			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", m.dispatchMessage)
+			if err != nil {
+				return err
+			}
+		}
+		if result.newContactRequestReceived {
+			err = m.createContactRequestNotification(contact, state, receivedMessage)
+			if err != nil {
+				return err
+			}
+
+		}
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+	}
+
 	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
 
 		chatContact := contact
@@ -1747,11 +1798,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	// If the chat is not active, create a notification in the center
-	if !receivedMessage.Deleted && chat.OneToOne() && !chat.Active && receivedMessage.ContentType != protobuf.ChatMessage_CONTACT_REQUEST {
-		m.createMessageNotification(chat, state)
 	}
 
 	// Set in the modified maps chat

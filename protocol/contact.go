@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 )
 
@@ -22,6 +23,9 @@ const (
 	ContactRequestStateNone ContactRequestState = iota
 	ContactRequestStateMutual
 	ContactRequestStateSent
+	// Received is a confusing state, we should use
+	// sent for both, since they are now stored in different
+	// states
 	ContactRequestStateReceived
 	ContactRequestStateDismissed
 )
@@ -187,9 +191,14 @@ func (c *Contact) mutual() bool {
 	return c.added() && c.hasAddedUs()
 }
 
+func (c *Contact) dismissed() bool {
+	return c.ContactRequestLocalState == ContactRequestStateDismissed
+}
+
 type ContactRequestProcessingResponse struct {
 	processed                 bool
 	newContactRequestReceived bool
+	sendBackState             bool
 }
 
 func (c *Contact) ContactRequestSent(clock uint64) ContactRequestProcessingResponse {
@@ -243,28 +252,35 @@ func (c *Contact) DismissContactRequest(clock uint64) ContactRequestProcessingRe
 
 // Remote actions
 
-func (c *Contact) ContactRequestRetracted(clock uint64) ContactRequestProcessingResponse {
+func (c *Contact) contactRequestRetracted(clock uint64, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
 	if clock <= c.ContactRequestRemoteClock {
-		return ContactRequestProcessingResponse{}
+		return r
 	}
 
 	// This is a symmetric action, we set both local & remote clock
 	// since we want everything before this point discarded, regardless
-	// the side it was sent from
+	// the side it was sent from. The only exception is when the contact
+	// request has been explicitly dismissed, in which case we don't
+	// change state
+	if c.ContactRequestLocalState != ContactRequestStateDismissed {
+		c.ContactRequestLocalClock = clock
+		c.ContactRequestLocalState = ContactRequestStateNone
+	}
 	c.ContactRequestRemoteClock = clock
 	c.ContactRequestRemoteState = ContactRequestStateNone
-	c.ContactRequestLocalClock = clock
-	c.ContactRequestLocalState = ContactRequestStateNone
-
-	return ContactRequestProcessingResponse{processed: true}
+	r.processed = true
+	return r
 }
 
-func (c *Contact) ContactRequestReceived(clock uint64) ContactRequestProcessingResponse {
-	if clock <= c.ContactRequestRemoteClock {
-		return ContactRequestProcessingResponse{}
-	}
+func (c *Contact) ContactRequestRetracted(clock uint64) ContactRequestProcessingResponse {
+	return c.contactRequestRetracted(clock, ContactRequestProcessingResponse{})
+}
 
-	r := ContactRequestProcessingResponse{processed: true}
+func (c *Contact) contactRequestReceived(clock uint64, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
+	if clock <= c.ContactRequestRemoteClock {
+		return r
+	}
+	r.processed = true
 	c.ContactRequestRemoteClock = clock
 	switch c.ContactRequestRemoteState {
 	case ContactRequestStateNone:
@@ -273,6 +289,10 @@ func (c *Contact) ContactRequestReceived(clock uint64) ContactRequestProcessingR
 	c.ContactRequestRemoteState = ContactRequestStateReceived
 
 	return r
+}
+
+func (c *Contact) ContactRequestReceived(clock uint64) ContactRequestProcessingResponse {
+	return c.contactRequestReceived(clock, ContactRequestProcessingResponse{})
 }
 
 func (c *Contact) ContactRequestAccepted(clock uint64) ContactRequestProcessingResponse {
@@ -382,4 +402,57 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(item)
+}
+
+// ContactRequestPropagatedStateReceived handles the propagation of state from
+// the other end.
+func (c *Contact) ContactRequestPropagatedStateReceived(state *protobuf.ContactRequestPropagatedState) ContactRequestProcessingResponse {
+
+	// It's inverted, as their local states is our remote state
+	expectedLocalState := ContactRequestState(state.RemoteState)
+	expectedLocalClock := state.RemoteClock
+
+	remoteState := ContactRequestState(state.LocalState)
+	remoteClock := state.LocalClock
+
+	response := ContactRequestProcessingResponse{}
+
+	// If we notice that the state is not consistent, and their clock is
+	// outdated, we send back the state so they can catch up.
+	if expectedLocalClock < c.ContactRequestLocalClock && expectedLocalState != c.ContactRequestLocalState {
+		response.processed = true
+		response.sendBackState = true
+	}
+
+	// If they expect our state to be more up-to-date, we only
+	// trust it if the state is set to None, in this case we can trust
+	// it, since a retraction can be initiated by both parties
+	if expectedLocalClock > c.ContactRequestLocalClock && c.ContactRequestLocalState != ContactRequestStateDismissed && expectedLocalState == ContactRequestStateNone {
+		response.processed = true
+		c.ContactRequestLocalClock = expectedLocalClock
+		c.ContactRequestLocalState = ContactRequestStateNone
+		// We set they remote state, as this was an implicit retraction
+		// potentially
+		c.ContactRequestRemoteState = ContactRequestStateNone
+	}
+
+	// We always trust this
+	if remoteClock > c.ContactRequestRemoteClock {
+		if remoteState == ContactRequestStateSent {
+			response = c.contactRequestReceived(remoteClock, response)
+		} else if remoteState == ContactRequestStateNone {
+			response = c.contactRequestRetracted(remoteClock, response)
+		}
+	}
+
+	return response
+}
+
+func (c *Contact) ContactRequestPropagatedState() *protobuf.ContactRequestPropagatedState {
+	return &protobuf.ContactRequestPropagatedState{
+		LocalClock:  c.ContactRequestLocalClock,
+		LocalState:  uint64(c.ContactRequestLocalState),
+		RemoteClock: c.ContactRequestRemoteClock,
+		RemoteState: uint64(c.ContactRequestRemoteState),
+	}
 }

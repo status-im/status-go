@@ -1276,3 +1276,398 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact request
+// 3) Alice restores state on a different device
+// 4) Alice sends a contact request to bob
+// Bob will need to help Alice recover her state, since as far as he can see
+// that's an already accepted contact request
+func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest() {
+	// Alice sends a contact request to bob
+	alice1 := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+
+	request := &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Bob accepts the contact request
+	_, err = bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	// Alice receives the accepted confirmation
+	resp, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts := alice1.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Alice resets her device
+	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	_, err = alice2.Start()
+	s.Require().NoError(err)
+
+	// adds bob again to her device
+	request = &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice2.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Bob should be a mutual contact with alice, nothing has changed
+	s.Require().Len(bob.MutualContacts(), 1)
+
+	// Alice retrieves her messages, she should have been notified by
+	// dear bobby that they were contacts
+	resp, err = WaitOnMessengerResponse(
+		alice2,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().True(resp.Contacts[0].mutual())
+}
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact request
+// 3) Alice restores state on a different device
+// 4) Bob sends a message to alice
+// Alice will show a contact request from bob
+func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactRequest() {
+	// Alice sends a contact request to bob
+	alice1 := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+
+	request := &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Bob accepts the contact request
+	_, err = bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	// Alice receives the accepted confirmation
+	resp, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts := alice1.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Alice resets her device
+	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	_, err = alice2.Start()
+	s.Require().NoError(err)
+
+	// We want to facilitate the discovery of the x3dh bundl here, since bob does not know about alice device
+
+	alice2Bundle, err := alice2.encryptor.GetBundle(alice2.identity)
+	s.Require().NoError(err)
+
+	_, err = bob.encryptor.ProcessPublicBundle(bob.identity, alice2Bundle)
+	s.Require().NoError(err)
+
+	// Bob sends a chat message to alice
+
+	var chat Chat
+	chats := bob.Chats()
+	for i, c := range chats {
+		if c.ID == alice1.myHexIdentity() && c.OneToOne() {
+			chat = *chats[i]
+		}
+	}
+	s.Require().NotNil(chat)
+
+	inputMessage := buildTestMessage(chat)
+	_, err = bob.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	// Alice retrieves the chat message, it should be
+	resp, err = WaitOnMessengerResponse(
+		alice2,
+		func(r *MessengerResponse) bool {
+			return len(r.ActivityCenterNotifications()) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Len(resp.Contacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+}
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact request
+// 3) Bob goes offline
+// 4) Alice retracts the contact request
+// 5) Alice adds bob back to her contacts
+// 6) Bob goes online, they receive 4 and 5 in the correct order
+func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrder() {
+	// Alice sends a contact request to bob
+	alice1 := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+
+	request := &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Bob accepts the contact request
+	_, err = bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	// Alice receives the accepted confirmation
+	resp, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts := alice1.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	s.Require().NoError(err)
+
+	// adds bob again to her device
+	request = &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+}
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact request
+// 3) Bob goes offline
+// 4) Alice retracts the contact request
+// 5) Alice adds bob back to her contacts
+// 6) Bob goes online, they receive 4 and 5 in the wrong order
+func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder() {
+	// Alice sends a contact request to bob
+	alice1 := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	myID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+
+	request := &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	resp, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Bob accepts the contact request
+	_, err = bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+
+	// Alice receives the accepted confirmation
+	resp, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts := alice1.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	s.Require().NoError(err)
+
+	// adds bob again to her device
+	request = &requests.AddContact{
+		ID: types.Hex2Bytes(bobID),
+	}
+
+	_, err = alice1.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Get alice perspective of bob
+	bobFromAlice := alice1.AddedContacts()[0]
+
+	// Get bob perspective of alice
+	aliceFromBob := bob.MutualContacts()[0]
+
+	s.Require().NotNil(bobFromAlice)
+	s.Require().NotNil(aliceFromBob)
+
+	// We can't simulate out-of-order messages easily, so we need to do
+	// things manually here
+
+	result := aliceFromBob.ContactRequestPropagatedStateReceived(bobFromAlice.ContactRequestPropagatedState())
+	s.Require().True(result.newContactRequestReceived)
+
+}

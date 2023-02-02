@@ -1992,6 +1992,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
+	err = m.addContactRequestPropagatedState(message)
+	if err != nil {
+		return nil, err
+	}
+
 	encodedMessage, err := m.encodeChatEntity(chat, message)
 	if err != nil {
 		return nil, err
