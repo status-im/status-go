@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type contactTest struct {
@@ -381,7 +382,7 @@ func TestContactContactRequestRetracted(t *testing.T) {
 		{
 			actualLocalState:    ContactRequestStateDismissed,
 			actualRemoteState:   ContactRequestStateNone,
-			expectedLocalState:  ContactRequestStateNone,
+			expectedLocalState:  ContactRequestStateDismissed,
 			expectedRemoteState: ContactRequestStateNone,
 			expectedAdded:       false,
 			expectedHasAddedUs:  false,
@@ -390,7 +391,7 @@ func TestContactContactRequestRetracted(t *testing.T) {
 		{
 			actualLocalState:    ContactRequestStateDismissed,
 			actualRemoteState:   ContactRequestStateReceived,
-			expectedLocalState:  ContactRequestStateNone,
+			expectedLocalState:  ContactRequestStateDismissed,
 			expectedRemoteState: ContactRequestStateNone,
 			expectedAdded:       false,
 			expectedHasAddedUs:  false,
@@ -558,4 +559,153 @@ func TestMarshalContactJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, strings.Contains(string(encodedContact), "compressedKey\":\"zQ"))
 
+}
+
+func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirSide(t *testing.T) {
+	// We receive a message with expected contact request state != our state
+	// and clock < our clock, we ping back the user to reach consistency
+
+	c := &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+
+	result := c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 0,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  1,
+		},
+	)
+
+	require.True(t, result.sendBackState)
+
+	// if the state is the same, it should not send back a message
+
+	c = &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateNone
+	c.ContactRequestLocalClock = 1
+
+	result = c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 0,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  1,
+		},
+	)
+
+	require.False(t, result.sendBackState)
+
+	// If the clock is the same, it should not send back a message
+	c = &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+
+	result = c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 1,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  1,
+		},
+	)
+
+	require.False(t, result.sendBackState)
+
+}
+
+func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSide(t *testing.T) {
+	// We receive a message with expected contact request state == none
+	// and clock > our clock. We consider this a retraction, unless we are in the dismissed state, since that should be only changed by a trusted device
+
+	c := &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+
+	c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 2,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  1,
+		},
+	)
+
+	require.False(t, c.added())
+
+	// But if it's dismissed, we don't change it
+	c = &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateDismissed
+	c.ContactRequestLocalClock = 1
+
+	c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 1,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  2,
+		},
+	)
+
+	require.False(t, c.added())
+	require.True(t, c.dismissed())
+
+	// or if it's lower clock
+
+	c = &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+
+	c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateNone),
+			RemoteClock: 1,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  0,
+		},
+	)
+
+	require.True(t, c.added())
+}
+
+func TestContactContactRequestPropagatedStateReceivedOutOfDateRemoteState(t *testing.T) {
+	// We receive a message with newer remote state, we process it as we would for a normal contact request
+
+	c := &Contact{}
+
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+
+	c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateSent),
+			RemoteClock: 1,
+			LocalState:  uint64(ContactRequestStateSent),
+			LocalClock:  1,
+		},
+	)
+
+	require.True(t, c.added())
+	require.True(t, c.mutual())
+
+	// and retraction
+	c = &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateSent
+	c.ContactRequestLocalClock = 1
+	c.ContactRequestRemoteState = ContactRequestStateReceived
+	c.ContactRequestRemoteClock = 1
+
+	c.ContactRequestPropagatedStateReceived(
+		&protobuf.ContactRequestPropagatedState{
+			RemoteState: uint64(ContactRequestStateSent),
+			RemoteClock: 1,
+			LocalState:  uint64(ContactRequestStateNone),
+			LocalClock:  2,
+		},
+	)
+
+	require.False(t, c.added())
+	require.False(t, c.hasAddedUs())
+	require.False(t, c.mutual())
 }

@@ -325,6 +325,8 @@ func (c *Chat) NextClockAndTimestamp(timesource common.TimeSource) (uint64, uint
 	} else {
 		clock = clock + 1
 	}
+	c.LastClockValue = clock
+
 	return clock, timestamp
 }
 
