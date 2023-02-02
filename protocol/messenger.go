@@ -2006,12 +2006,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
-
-		image := protobuf.ImageMessage{
-			Payload: payload,
-			Type:    images.ImageType(payload),
-		}
-		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
+		imageMessage := message.GetImage()
+		imageMessage.Payload = payload
+		imageMessage.Type = images.ImageType(payload)
+		message.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
 
 	} else if len(message.CommunityID) != 0 {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)

@@ -87,6 +87,9 @@ func buildImageMessage(s *MessengerShareMessageSuite, chat Chat) *common.Message
 	image := protobuf.ImageMessage{
 		Payload: payload,
 		Type:    protobuf.ImageType_JPEG,
+		AlbumId: "some-album-id",
+		Width:   1200,
+		Height:  1000,
 	}
 	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 	return message

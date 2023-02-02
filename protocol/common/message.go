@@ -167,16 +167,10 @@ type Message struct {
 	AudioPath string `json:"audioPath,omitempty"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
-	// AlbumID for a collage of images
-	AlbumID string `json:"albumId,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
 	StickerLocalURL string `json:"stickerLocalUrl,omitempty"`
-
-	// Image dimensions
-	ImageWidth  uint32 `json:"imageWidth,omitempty"`
-	ImageHeight uint32 `json:"imageHeight,omitempty"`
 
 	// CommunityID is the id of the community to advertise
 	CommunityID string `json:"communityId,omitempty"`
@@ -293,9 +287,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName:                  m.EnsName,
 		DisplayName:              m.DisplayName,
 		Image:                    m.ImageLocalURL,
-		AlbumID:                  m.AlbumID,
-		ImageWidth:               m.ImageWidth,
-		ImageHeight:              m.ImageHeight,
 		Audio:                    m.AudioLocalURL,
 		CommunityID:              m.CommunityID,
 		Timestamp:                m.Timestamp,
@@ -334,6 +325,12 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		item.AudioDurationMs = audio.DurationMs
 	}
 
+	if image := m.GetImage(); image != nil {
+		item.AlbumID = image.AlbumId
+		item.ImageWidth = image.Width
+		item.ImageHeight = image.Height
+	}
+
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
 		item.DiscordMessage = discordMessage
 	}
@@ -353,6 +350,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
 		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
+		AlbumID         string                           `json:"albumId"`
+		ImageWidth      uint32                           `json:"imageWidth"`
+		ImageHeight     uint32                           `json:"imageHeight"`
 	}{
 		Alias: (*Alias)(m),
 	}
@@ -367,6 +367,16 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 			Audio: &protobuf.AudioMessage{DurationMs: aux.AudioDurationMs},
 		}
 	}
+
+	if aux.ContentType == protobuf.ChatMessage_IMAGE {
+		m.Payload = &protobuf.ChatMessage_Image{
+			Image: &protobuf.ImageMessage{
+				AlbumId: aux.AlbumID,
+				Width:   aux.ImageWidth,
+				Height:  aux.ImageHeight},
+		}
+	}
+
 	m.ResponseTo = aux.ResponseTo
 	m.EnsName = aux.EnsName
 	m.DisplayName = aux.DisplayName
