@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
-	"fmt"
 	"image"
 	"net/http"
 	"net/url"
@@ -441,11 +440,11 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 			qrcode.WithErrorCorrectionLevel(correctionLevel),
 		)
 		if err != nil {
-			fmt.Printf("could not generate QRCode: %v", err)
+			logger.Error("could not generate QRCode", zap.Error(err))
 		}
 		nw := standard.NewWithWriter(buf)
 		if err = qrc.Save(nw); err != nil {
-			fmt.Printf("could not save image: %v", err)
+			logger.Error("could not save image", zap.Error(err))
 		}
 		payload := buf.Bytes()
 		logo, err := qrcodeutils.GetLogoImage(multiaccountsDB, params)
@@ -463,7 +462,7 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 		}
 		mime, err := images.ImageMime(payload)
 		if err != nil {
-			fmt.Printf("could not generate image from payload: %v", err)
+			logger.Error("could not generate image from payload", zap.Error(err))
 		}
 
 		w.Header().Set("Content-Type", mime)
