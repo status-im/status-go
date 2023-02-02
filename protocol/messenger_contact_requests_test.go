@@ -1260,8 +1260,6 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
-	alice2.logger.Info("MY KEY", zap.String("my-id", alice2.myHexIdentity()))
-
 	// Check on alice2 side
 	resp, err = WaitOnMessengerResponse(
 		alice2,

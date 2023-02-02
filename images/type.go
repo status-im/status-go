@@ -3,34 +3,33 @@ package images
 import (
 	"errors"
 
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func ImageType(buf []byte) protobuf.ImageType {
-	switch images.GetType(buf) {
-	case images.JPEG:
+func GetProtobufImageType(buf []byte) protobuf.ImageType {
+	switch GetType(buf) {
+	case JPEG:
 		return protobuf.ImageType_JPEG
-	case images.PNG:
+	case PNG:
 		return protobuf.ImageType_PNG
-	case images.GIF:
+	case GIF:
 		return protobuf.ImageType_GIF
-	case images.WEBP:
+	case WEBP:
 		return protobuf.ImageType_WEBP
 	default:
 		return protobuf.ImageType_UNKNOWN_IMAGE_TYPE
 	}
 }
 
-func ImageMime(buf []byte) (string, error) {
-	switch images.GetType(buf) {
-	case images.JPEG:
+func GetProtobufImageMime(buf []byte) (string, error) {
+	switch GetType(buf) {
+	case JPEG:
 		return "image/jpeg", nil
-	case images.PNG:
+	case PNG:
 		return "image/png", nil
-	case images.GIF:
+	case GIF:
 		return "image/gif", nil
-	case images.WEBP:
+	case WEBP:
 		return "image/webp", nil
 	default:
 		return "", errors.New("mime type not found")

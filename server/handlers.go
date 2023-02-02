@@ -14,12 +14,12 @@ import (
 	"github.com/yeqown/go-qrcode/writer/standard"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
-	"github.com/status-im/status-go/protocol/images"
 	qrcodeutils "github.com/status-im/status-go/qrcode"
 )
 
@@ -110,7 +110,7 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(payload)
+		mime, err := images.GetProtobufImageMime(payload)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -173,7 +173,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(payload)
+		mime, err := images.GetProtobufImageMime(payload)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -267,7 +267,7 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(image)
+		mime, err := images.GetProtobufImageMime(image)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -306,7 +306,7 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(image)
+		mime, err := images.GetProtobufImageMime(image)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -339,7 +339,7 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			logger.Error("empty image")
 			return
 		}
-		mime, err := images.ImageMime(image)
+		mime, err := images.GetProtobufImageMime(image)
 		if err != nil {
 			logger.Error("failed to get mime", zap.Error(err))
 		}
@@ -460,7 +460,7 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 				payload, _ = qrcodeutils.ResizeImage(payload, size, size)
 			}
 		}
-		mime, err := images.ImageMime(payload)
+		mime, err := images.GetProtobufImageMime(payload)
 		if err != nil {
 			logger.Error("could not generate image from payload", zap.Error(err))
 		}

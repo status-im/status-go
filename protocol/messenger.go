@@ -8,8 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"image"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -33,12 +31,11 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/anonmetrics"
-	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -48,7 +45,6 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
-	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -77,10 +73,6 @@ const (
 
 	publicChat  chatContext = "public-chat"
 	privateChat chatContext = "private-chat"
-
-	maxChatMessageImageSize = 400000
-	resizeTargetImageSize   = 350000
-	idealTargetImageSize    = 50000
 )
 
 const messageResendMinDelay = 30
@@ -922,7 +914,7 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName)
 	if err != nil {
 		return err
 	}
@@ -1002,7 +994,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 
 	}
 
-	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName)
 	if err != nil {
 		return err
 	}
@@ -1035,7 +1027,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *userimage.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
@@ -1053,7 +1045,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 	}
 
 	// Check we have at least one image or a display name
-	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName)
 	if err != nil {
 		return false, err
 	}
@@ -1134,11 +1126,11 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 }
 
 // adaptIdentityImageToProtobuf Adapts a images.IdentityImage to protobuf.IdentityImage
-func (m *Messenger) adaptIdentityImageToProtobuf(img *userimage.IdentityImage) *protobuf.IdentityImage {
+func (m *Messenger) adaptIdentityImageToProtobuf(img *images.IdentityImage) *protobuf.IdentityImage {
 	return &protobuf.IdentityImage{
 		Payload:    img.Payload,
 		SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
-		ImageType:  images.ImageType(img.Payload),
+		ImageType:  images.GetProtobufImageType(img.Payload),
 	}
 }
 
@@ -1159,7 +1151,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 	case publicChat:
 		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
 
-		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName)
 		if err != nil {
 			return err
 		}
@@ -1170,7 +1162,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 
 		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
 
-		ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
+		ciis[images.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
 		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
@@ -1944,53 +1936,6 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
-func (m *Messenger) OpenAndAdjustImage(inputImage userimage.CroppedImage, crop bool) ([]byte, error) {
-	file, err := os.Open(inputImage.ImagePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	payload, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	img, err := userimage.Decode(inputImage.ImagePath)
-	if err != nil {
-		return nil, err
-	}
-
-	if crop {
-		cropRect := image.Rectangle{
-			Min: image.Point{X: inputImage.X, Y: inputImage.Y},
-			Max: image.Point{X: inputImage.X + inputImage.Width, Y: inputImage.Y + inputImage.Height},
-		}
-		img, err = userimage.Crop(img, cropRect)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	bb := bytes.NewBuffer([]byte{})
-	err = userimage.CompressToFileLimits(bb, img, userimage.FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// We keep the smallest one
-	if len(payload) > len(bb.Bytes()) {
-		payload = bb.Bytes()
-	}
-
-	if len(payload) > maxChatMessageImageSize {
-		return nil, errors.New("image too large")
-	}
-
-	return payload, nil
-}
-
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
@@ -2001,16 +1946,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	message.DisplayName = displayName
 	if len(message.ImagePath) != 0 {
 
-		payload, err := m.OpenAndAdjustImage(userimage.CroppedImage{ImagePath: message.ImagePath}, false)
-
+		err := message.LoadImage()
 		if err != nil {
 			return nil, err
 		}
-		imageMessage := message.GetImage()
-		imageMessage.Payload = payload
-		imageMessage.Type = images.ImageType(payload)
-		message.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
-
 	} else if len(message.CommunityID) != 0 {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
 		if err != nil {
@@ -2029,25 +1968,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 		message.ContentType = protobuf.ChatMessage_COMMUNITY
 	} else if len(message.AudioPath) != 0 {
-		file, err := os.Open(message.AudioPath)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		payload, err := ioutil.ReadAll(file)
-		if err != nil {
-			return nil, err
-
-		}
-		audioMessage := message.GetAudio()
-		if audioMessage == nil {
-			return nil, errors.New("no audio has been passed")
-		}
-		audioMessage.Payload = payload
-		audioMessage.Type = audio.Type(payload)
-		message.Payload = &protobuf.ChatMessage_Audio{Audio: audioMessage}
-		err = os.Remove(message.AudioPath)
+		err := message.LoadAudio()
 		if err != nil {
 			return nil, err
 		}
@@ -6082,6 +6003,10 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 		}
 	}
 	return chunks
+}
+
+func (m *Messenger) ImageServerURL() string {
+	return m.httpServer.MakeImageServerURL()
 }
 
 func (m *Messenger) myHexIdentity() string {
