@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -310,7 +310,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
 }
 
-func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image userimage.CroppedImage) (*MessengerResponse, error) {
+func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name string, color string, image images.CroppedImage) (*MessengerResponse, error) {
 	logger := m.logger.With(zap.String("site", "EditGroupChat"))
 	logger.Info("Editing group chat details", zap.String("chatID", chatID), zap.String("name", name), zap.String("color", color))
 
@@ -363,7 +363,7 @@ func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name strin
 	}
 
 	if len(image.ImagePath) > 0 {
-		payload, err := m.OpenAndAdjustImage(image, true)
+		payload, err := images.OpenAndAdjustImage(image, true)
 
 		if err != nil {
 			return nil, err

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -19,6 +21,7 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -656,4 +659,40 @@ func (m *Message) GetSenderPubKey() (*ecdsa.PublicKey, error) {
 	}
 
 	return nil, errors.New("no Message.SigPubKey or Message.From set unable to get public key")
+}
+
+func (m *Message) LoadAudio() error {
+	file, err := os.Open(m.AudioPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	payload, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+
+	}
+	audioMessage := m.GetAudio()
+	if audioMessage == nil {
+		return errors.New("no audio has been passed")
+	}
+	audioMessage.Payload = payload
+	audioMessage.Type = audio.Type(payload)
+	m.Payload = &protobuf.ChatMessage_Audio{Audio: audioMessage}
+	return os.Remove(m.AudioPath)
+}
+
+func (m *Message) LoadImage() error {
+	payload, err := images.OpenAndAdjustImage(images.CroppedImage{ImagePath: m.ImagePath}, false)
+
+	if err != nil {
+		return err
+	}
+	imageMessage := m.GetImage()
+	imageMessage.Payload = payload
+	imageMessage.Type = images.GetProtobufImageType(payload)
+	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
+
+	return nil
 }

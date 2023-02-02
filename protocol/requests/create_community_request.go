@@ -4,8 +4,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	userimages "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/images"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -40,18 +39,18 @@ type CreateCommunity struct {
 	ImageAy                      int                                  `json:"imageAy"`
 	ImageBx                      int                                  `json:"imageBx"`
 	ImageBy                      int                                  `json:"imageBy"`
-	Banner                       userimages.CroppedImage              `json:"banner"`
+	Banner                       images.CroppedImage                  `json:"banner"`
 	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
 	PinMessageAllMembersEnabled  bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
 	Encrypted                    bool                                 `json:"encrypted,omitempty"`
 	Tags                         []string                             `json:"tags,omitempty"`
 }
 
-func adaptIdentityImageToProtobuf(img userimages.IdentityImage) *protobuf.IdentityImage {
+func adaptIdentityImageToProtobuf(img images.IdentityImage) *protobuf.IdentityImage {
 	return &protobuf.IdentityImage{
 		Payload:    img.Payload,
 		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
-		ImageType:  images.ImageType(img.Payload),
+		ImageType:  images.GetProtobufImageType(img.Payload),
 	}
 }
 
@@ -99,7 +98,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		ciis := make(map[string]*protobuf.IdentityImage)
 		if c.Image != "" {
 			log.Info("has-image", "image", c.Image)
-			imgs, err := userimages.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
+			imgs, err := images.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +108,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		}
 		if c.Banner.ImagePath != "" {
 			log.Info("has-banner", "image", c.Banner.ImagePath)
-			img, err := userimages.GenerateBannerImage(c.Banner.ImagePath, c.Banner.X, c.Banner.Y, c.Banner.X+c.Banner.Width, c.Banner.Y+c.Banner.Height)
+			img, err := images.GenerateBannerImage(c.Banner.ImagePath, c.Banner.X, c.Banner.Y, c.Banner.X+c.Banner.Width, c.Banner.Y+c.Banner.Height)
 			if err != nil {
 				return nil, err
 			}
