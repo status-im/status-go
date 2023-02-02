@@ -564,6 +564,19 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
+func (b *GethStatusBackend) tryToDeleteAccount(address types.Address, password, newPassword string) error {
+	err := b.accountManager.DeleteAccount(address, newPassword)
+	if err != nil {
+		err = b.accountManager.DeleteAccount(address, password)
+		if err != nil && err.Error() != "no key for given address or file" {
+			b.log.Error("error on deleting account", "err", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
@@ -639,13 +652,32 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	// whichever reason the account is still successfully migrated
 	for _, acc := range knownAccounts {
 		if account.KeyUID == acc.KeyUID {
-			_ = b.accountManager.DeleteAccount(acc.Address, newPassword)
+			err = b.tryToDeleteAccount(acc.Address, password, newPassword)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	_ = b.accountManager.DeleteAccount(masterAddress, newPassword)
-	_ = b.accountManager.DeleteAccount(dappsAddress, newPassword)
-	_ = b.accountManager.DeleteAccount(eip1581Address, newPassword)
-	_ = b.accountManager.DeleteAccount(walletRootAddress, newPassword)
+
+	err = b.tryToDeleteAccount(masterAddress, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	err = b.tryToDeleteAccount(dappsAddress, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	err = b.tryToDeleteAccount(eip1581Address, password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	err = b.tryToDeleteAccount(walletRootAddress, password, newPassword)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
