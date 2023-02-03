@@ -22,6 +22,14 @@ import (
 
 const signatureLength = 65
 
+type Permission struct {
+	PermissionID string
+	Hidden       bool
+	IsAllowedTo  protobuf.CommunityPermission_AllowedTypes
+	HoldsTokens  bool
+	ChatIds      []string
+}
+
 type Config struct {
 	PrivateKey                    *ecdsa.PrivateKey
 	CommunityDescription          *protobuf.CommunityDescription
@@ -37,6 +45,7 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
+	Permissions                   []*Permission
 }
 
 type Community struct {
@@ -210,6 +219,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		CommunityAdminSettings      CommunityAdminSettings               `json:"adminSettings"`
 		Encrypted                   bool                                 `json:"encrypted"`
 		BanList                     []string                             `json:"banList"`
+		CommunityPermissions        map[string]Permission                `json:"communityPermissions"`
 	}{
 		ID:                          o.ID(),
 		Admin:                       o.IsAdmin(),
@@ -227,6 +237,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Muted:                       o.config.Muted,
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
+		CommunityPermissions:        make(map[string]Permission),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -256,6 +267,17 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Position:    int(c.Position),
 			}
 			communityItem.Chats[id] = chat
+		}
+		for id, p := range o.config.CommunityDescription.CommunityPermissions {
+			permission := Permission{
+				PermissionID: p.PermissionId,
+				IsAllowedTo:  p.IsAllowedTo,
+				Hidden:       p.Hidden,
+				HoldsTokens:  p.HoldsTokens,
+				ChatIds:      p.ChatIds,
+			}
+
+			communityItem.CommunityPermissions[id] = permission
 		}
 		communityItem.Members = o.config.CommunityDescription.Members
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
@@ -416,6 +438,10 @@ type CommunityChanges struct {
 	// ShouldMemberJoin indicates whether the user should leave this community
 	// automatically
 	ShouldMemberLeave bool `json:"memberRemoved"`
+
+	CommunityPermissionsRemoved  []string                                 `json:"communityPermissionsRemoved"`
+	CommunityPermissionsAdded    map[string]*protobuf.CommunityPermission `json:"communityPermissionsAdded`
+	CommunityPermissionsModified map[string]*protobuf.CommunityPermission `json:"communityPermissionsModified`
 }
 
 func (c *CommunityChanges) HasNewMember(identity string) bool {

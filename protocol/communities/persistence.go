@@ -817,3 +817,107 @@ func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string,
 	}
 	return ids, nil
 }
+
+func (p *Persistence) SaveCommunityPermission(communityID types.HexBytes, permission *Permission) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	_, err = tx.Exec(`INSERT INTO communities_permissions (
+		permission_id,
+		community_id,
+		hide,
+		is_allowed_to,
+		holds_tokens
+	  ) VALUES (?, ?, ?, ?)`,
+		permission.PermissionID,
+		communityID.String(),
+		permission.Hidden,
+		permission.IsAllowedTo,
+		permission.HoldsTokens,
+	)
+
+	if err != nil {
+		return err
+	}
+	for _, id := range permission.ChatIds {
+		_, err = tx.Exec(`INSERT INTO communities_permissions_chats (
+			permission_id,
+			chat_id
+			) VALUES (?, ?)`,
+			permission.PermissionID,
+			id,
+		)
+
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func (p *Persistence) UpdateCommunityPermission(permission *Permission) error {
+	_, err := p.db.Exec(`UPDATE communities_permissions SET
+    hide = ?,
+    is_allowed_to = ?,
+    holds_tokens = ?
+    WHERE permission_id = ?`,
+		permission.Hidden,
+		permission.IsAllowedTo,
+		permission.HoldsTokens,
+		permission.PermissionID,
+	)
+	return err
+}
+
+func (p *Persistence) DeleteCommunityPermission(permissionID string) error {
+	_, err := p.db.Exec("DELETE FROM communities_permissions WHERE permission_id = ?", permissionID)
+	return err
+}
+
+func (p *Persistence) GetCommunityPermissions(communityID types.HexBytes) ([]*Permission, error) {
+	rows, err := p.db.Query(`SELECT * FROM communities_permissions WHERE community_id = ?`, communityID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			// Don't shadow original error
+			_ = rows.Close()
+			return
+
+		}
+		err = rows.Close()
+	}()
+
+	permissions := []*Permission{}
+	for rows.Next() {
+		var permissionID string
+		var isAllowedTo int32
+		var hidden, holdsTokens bool
+
+		err := rows.Scan(&permissionID, &hidden, &isAllowedTo, &holdsTokens)
+		if err != nil {
+			return nil, err
+		}
+
+		permission := &Permission{
+			PermissionID: permissionID,
+			Hidden:       hidden,
+			IsAllowedTo:  protobuf.CommunityPermission_AllowedTypes(isAllowedTo),
+			HoldsTokens:  holdsTokens,
+		}
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, nil
+}
