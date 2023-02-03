@@ -1035,8 +1035,10 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
-	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Equal(communities.RequestToJoinStateAccepted, response.RequestsToJoinCommunity[0].State)
 
+	s.Require().Len(response.Communities(), 1)
 	aliceCommunity := response.Communities()[0]
 
 	s.Require().Equal(community.ID(), aliceCommunity.ID())

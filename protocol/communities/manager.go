@@ -1036,19 +1036,20 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	return requestToJoin, nil
 }
 
-func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) error {
+func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
+	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if community == nil {
-		return ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
 
 	communityDescriptionBytes, err := proto.Marshal(request.Community)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// We need to wrap `request.Community` in an `ApplicationMetadataMessage`
@@ -1063,23 +1064,33 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 
 	appMetadataMsg, err := proto.Marshal(metadataMessage)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = community.UpdateCommunityDescription(signer, request.Community, appMetadataMsg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if request.Accepted {
-		return m.markRequestToJoin(&m.identity.PublicKey, community)
+		err = m.markRequestToJoin(&m.identity.PublicKey, community)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+
+		err = m.persistence.SetRequestToJoinState(pkString, community.ID(), RequestToJoinStateDeclined)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(&m.identity.PublicKey), community.ID(), RequestToJoinStateDeclined)
+
+	return m.persistence.GetRequestToJoinByPkAndCommunityID(pkString, community.ID())
 }
 
 func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *protobuf.CommunityRequestToLeave) error {
