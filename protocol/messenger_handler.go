@@ -1221,9 +1221,13 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		return errors.New("invalid community id")
 	}
 
-	err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, &requestToJoinResponseProto)
+	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, &requestToJoinResponseProto)
 	if err != nil {
 		return err
+	}
+
+	if updatedRequest != nil {
+		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, updatedRequest)
 	}
 
 	if requestToJoinResponseProto.Accepted {
