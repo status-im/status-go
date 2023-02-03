@@ -50,6 +50,7 @@ message CommunityDescription {
   string outro_message = 12;
   bool encrypted = 13;
   repeated string tags = 14;
+  map<string, CommunityPermission> community_permissions = 15;
 }
 
 message CommunityAdminSettings {
@@ -62,6 +63,7 @@ message CommunityChat {
   ChatIdentity identity = 3;
   string category_id = 4;
   int32 position = 5;
+  repeated string permission_ids = 6;
 }
 
 message CommunityCategory {
@@ -110,6 +112,23 @@ message CommunityRequestToLeave {
 message CommunityMessageArchiveMagnetlink {
   uint64 clock = 1;
   string magnet_uri = 2;
+}
+
+message CommunityPermission {
+  enum AllowedTypes {
+    BECOME_AN_ADMIN = 0;
+    BECOME_MEMBER = 1;
+    MODERATE = 2;
+    MEMBER = 3;
+    VIEW_AND_POST = 4;
+    VIEW_ONLY = 5;
+  }
+  string community_id = 1;
+  string permission_id = 2;
+  AllowedTypes is_allowed_to = 3;
+  bool hidden = 4;
+  bool holds_tokens = 5;
+  repeated string chat_ids = 6;
 }
 
 message WakuMessage {
