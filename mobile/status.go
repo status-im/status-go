@@ -1003,7 +1003,7 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 //
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
-func InputConnectionStringForBootstrapping(cs, configJSON string) string {
+func InputConnectionStringForBootstrapping(cs string, configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}

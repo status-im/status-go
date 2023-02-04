@@ -4,16 +4,15 @@ package pairing
 type EventType string
 
 const (
+
+	// both client and server
 	EventConnectionError EventType = "connection-error"
-
 	EventConnectionSuccess EventType = "connection-success"
-
 	EventTransferError EventType = "transfer-error"
-
 	EventTransferSuccess EventType = "transfer-success"
 
+	// Only receiver side
 	EventProcessSuccess EventType = "process-success"
-
 	EventProcessError EventType = "process-error"
 )
 

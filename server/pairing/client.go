@@ -267,7 +267,7 @@ func (c *Client) getChallenge() error {
 	return err
 }
 
-func StartUpPairingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+func StartUpPairingClient(backend *api.GethStatusBackend, cs string, configJSON string) error {
 	c, err := setupClient(backend, cs, configJSON)
 	if err != nil {
 		return err
