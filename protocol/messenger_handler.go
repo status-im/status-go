@@ -346,7 +346,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			messageState.CurrentMessageState.Message.Clock,
 			messageState.CurrentMessageState.WhisperTimestamp,
 			contact,
-			"Please add me to your contacts",
 		)
 		if err != nil {
 			return err

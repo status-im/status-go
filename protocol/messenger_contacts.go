@@ -23,7 +23,7 @@ func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*Messe
 	}
 
 	m.logger.Info("acceptContactRequest")
-	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, "", syncing, false)
+	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, nil, syncing, false)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -189,13 +189,26 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 	chatID := request.ID.String()
 
+	// send message
+	chatMessage := &common.Message{}
+	chatMessage.ChatId = chatID
+	chatMessage.Text = request.Message
+	chatMessage.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
+	chatMessage.ContactRequestState = common.ContactRequestStatePending
+
+	messageResponse, err := m.sendChatMessage(ctx, chatMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// create contact
 	response, err := m.addContact(
 		chatID,
 		"",
 		"",
 		"",
 		"",
-		request.Message,
+		chatMessage,
 		false,
 		true,
 	)
@@ -222,6 +235,11 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = response.Merge(messageResponse)
+	if err != nil {
+		return nil, err
 	}
 
 	return response, nil
@@ -298,7 +316,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	return response, nil
 }
 
-func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool) (*MessengerResponse, error) {
+func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestMessage *common.Message, syncing bool, sendContactUpdate bool) (*MessengerResponse, error) {
 	contact, err := m.BuildContact(pubKey)
 	if err != nil {
 		return nil, err
@@ -441,7 +459,21 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 
 	// Add outgoing contact request notification
 	if len(contactRequestID) == 0 {
-		err = m.createOutgoingContactRequestNotification(response, contact, profileChat, contactRequestText)
+		if contactRequestMessage == nil {
+			clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+			contactRequestMessage, err = m.generateContactRequest(clock, timestamp, contact)
+			if err != nil {
+				return nil, err
+			}
+
+			response.AddMessage(contactRequestMessage)
+			err = m.persistence.SaveMessages([]*common.Message{contactRequestMessage})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		err = m.createOutgoingContactRequestNotification(response, contactRequestMessage, contact)
 		if err != nil {
 			return nil, err
 		}
@@ -453,7 +485,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	return response, nil
 }
 
-func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string) (*common.Message, error) {
+func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact) (*common.Message, error) {
 	if contact == nil {
 		return nil, errors.New("contact cannot be nil")
 	}
@@ -461,7 +493,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest := &common.Message{}
 	contactRequest.WhisperTimestamp = timestamp
 	contactRequest.Seen = false
-	contactRequest.Text = text
+	contactRequest.Text = "Please add me to your contacts"
 	contactRequest.From = contact.ID
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
@@ -473,25 +505,13 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	return contactRequest, err
 }
 
-func (m *Messenger) createOutgoingContactRequestNotification(response *MessengerResponse, contact *Contact, chat *Chat, text string) error {
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, text)
-	if err != nil {
-		return err
-	}
-
-	response.AddMessage(contactRequest)
-	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-	if err != nil {
-		return err
-	}
-
+func (m *Messenger) createOutgoingContactRequestNotification(response *MessengerResponse, contactRequestMessage *common.Message, contact *Contact) error {
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(contactRequest.ID),
+		ID:        types.FromHex(contactRequestMessage.ID),
 		Type:      ActivityCenterNotificationTypeContactRequest,
 		Name:      contact.CanonicalName(),
 		Author:    common.PubkeyToHex(&m.identity.PublicKey),
-		Message:   contactRequest,
+		Message:   contactRequestMessage,
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		ChatID:    contact.ID,
 	}
@@ -511,7 +531,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		request.Nickname,
 		request.DisplayName,
 		"",
-		"Please add me to your contacts",
+		nil,
 		false,
 		true,
 	)
