@@ -566,6 +566,11 @@ func (r *Router) suggestedRoutes(
 					}
 					requiredNativeBalance := new(big.Int).Mul(gweiToWei(maxFees), big.NewInt(int64(gasLimit)))
 
+					// Removed the required fees from maxAMount in case of native token tx
+					if token.IsNative() {
+						maxAmountIn = (*hexutil.Big)(new(big.Int).Sub(maxAmountIn.ToInt(), requiredNativeBalance))
+					}
+
 					if nativeBalance.Cmp(requiredNativeBalance) <= 0 {
 						continue
 					}
