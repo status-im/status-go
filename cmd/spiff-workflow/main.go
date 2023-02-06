@@ -318,7 +318,6 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 }
 
 func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
-        os.RemoveAll("./tmp")
 	backend.UpdateRootDataDir("./tmp")
 	manager := backend.AccountManager()
 	if err := manager.InitKeystore("./tmp"); err != nil {
@@ -332,16 +331,23 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	generator := manager.AccountsGenerator()
 	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
 	if err != nil {
+		logger.Error("failed import mnemonic", err)
 		return err
 	}
+
 
 	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
 	if err != nil {
+		logger.Error("failed derive", err)
 		return err
 	}
 
+        var exist bool
 	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
-	if err != nil {
+        if err != nil && err.Error() == "account already exists" {
+          exist = true
+        } else if err != nil {
+		logger.Error("failed store derive", err)
 		return err
 	}
 
@@ -382,13 +388,10 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	fmt.Println(nodeConfig)
 	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
-	if err != nil {
-		logger.Error("start node", err)
-		return err
-	}
-
-	return nil
+        if !exist {
+	  return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
+        }
+	return backend.StartNodeWithAccount(account, "", nodeConfig)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
