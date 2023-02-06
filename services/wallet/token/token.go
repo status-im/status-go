@@ -44,6 +44,7 @@ func (t *Token) IsNative() bool {
 	return t.Address == nativeChainAddress
 }
 
+// Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
 	db             *sql.DB
 	RPCClient      *rpc.Client
@@ -56,27 +57,41 @@ func NewTokenManager(
 	networkManager *network.Manager,
 ) *Manager {
 	tokenManager := &Manager{db, RPCClient, networkManager}
-	// Check the networks' custom tokens to see if we must update the tokenStore
-	networks := networkManager.GetConfiguredNetworks()
+
+	overrideTokensInPlace(networkManager.GetConfiguredNetworks(), tokenStore)
+
+	return tokenManager
+}
+
+// overrideTokensInPlace overrides tokens in the store with the ones from the networks
+// BEWARE: overridden tokens will have their original address removed and replaced by the one in networks
+func overrideTokensInPlace(networks []params.Network, store map[uint64]map[common.Address]*Token) {
 	for _, network := range networks {
 		if len(network.TokenOverrides) == 0 {
 			continue
 		}
 
+		// Map from original address to overridden address
+		overriddenMap := make(map[common.Address]common.Address, len(network.TokenOverrides))
+		tokensMap, ok := store[network.ChainID]
+		if !ok {
+			continue
+		}
 		for _, overrideToken := range network.TokenOverrides {
-			tokensMap, ok := tokenStore[network.ChainID]
-			if !ok {
-				continue
-			}
 			for _, token := range tokensMap {
 				if token.Symbol == overrideToken.Symbol {
-					token.Address = overrideToken.Address
+					overriddenMap[token.Address] = overrideToken.Address
 				}
 			}
 		}
-	}
+		for originalAddress, newAddress := range overriddenMap {
+			newToken := *tokensMap[originalAddress]
+			tokensMap[newAddress] = &newToken
+			newToken.Address = newAddress
 
-	return tokenManager
+			delete(tokensMap, originalAddress)
+		}
+	}
 }
 
 func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
