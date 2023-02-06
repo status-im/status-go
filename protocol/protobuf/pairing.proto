@@ -225,12 +225,15 @@ message SyncWalletAccounts {
 }
 
 message SyncSavedAddress {
+  reserved 4;
   bytes  address = 1;
   string name = 2;
   bool   favourite = 3;
-  uint64 chain_id = 4;
   bool   removed = 5;
   uint64 update_clock = 7;
+  string chain_short_names = 8;
+  string ens = 9;
+  bool   is_test= 10;
 }
 
 message SyncCommunitySettings {

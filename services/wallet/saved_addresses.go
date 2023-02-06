@@ -15,16 +15,18 @@ type savedAddressMeta struct {
 
 type SavedAddress struct {
 	Address common.Address `json:"address"`
-	// TODO: Add Emoji and Networks
-	// Emoji    string         `json:"emoji"`
-	Name      string `json:"name"`
-	Favourite bool   `json:"favourite"`
-	ChainID   uint64 `json:"chainId"`
+	// TODO: Add Emoji
+	// Emoji	string		   `json:"emoji"`
+	Name            string `json:"name"`
+	Favourite       bool   `json:"favourite"`
+	ChainShortNames string `json:"chainShortNames"` // used with address only, not with ENSName
+	ENSName         string `json:"ens"`
+	IsTest          bool   `json:"isTest"`
 	savedAddressMeta
 }
 
 func (s *SavedAddress) ID() string {
-	return fmt.Sprintf("%s-%d", s.Address.Hex(), s.ChainID)
+	return fmt.Sprintf("%s-%s-%t", s.Address.Hex(), s.ENSName, s.IsTest)
 }
 
 type SavedAddressesManager struct {
@@ -35,7 +37,7 @@ func NewSavedAddressesManager(db *sql.DB) *SavedAddressesManager {
 	return &SavedAddressesManager{db: db}
 }
 
-const rawQueryColumnsOrder = "address, name, favourite, network_id, removed, update_clock"
+const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test"
 
 // getSavedAddressesFromDBRows retrieves all data based on SELECT Query using rawQueryColumnsOrder
 func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
@@ -43,7 +45,7 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
 	for rows.Next() {
 		sa := SavedAddress{}
 		// based on rawQueryColumnsOrder
-		err := rows.Scan(&sa.Address, &sa.Name, &sa.Favourite, &sa.ChainID, &sa.Removed, &sa.UpdateClock)
+		err := rows.Scan(&sa.Address, &sa.Name, &sa.Favourite, &sa.Removed, &sa.UpdateClock, &sa.ChainShortNames, &sa.ENSName, &sa.IsTest)
 		if err != nil {
 			return nil, err
 		}
@@ -54,8 +56,13 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
 	return addresses, nil
 }
 
-func (sam *SavedAddressesManager) GetSavedAddressesForChainID(chainID uint64) ([]SavedAddress, error) {
-	rows, err := sam.db.Query(fmt.Sprintf("SELECT %s FROM saved_addresses WHERE network_id = ? AND removed != 1", rawQueryColumnsOrder), chainID)
+func (sam *SavedAddressesManager) getSavedAddresses(condition string) ([]SavedAddress, error) {
+	var whereCondition string
+	if condition != "" {
+		whereCondition = fmt.Sprintf("WHERE %s", condition)
+	}
+
+	rows, err := sam.db.Query(fmt.Sprintf("SELECT %s FROM saved_addresses %s", rawQueryColumnsOrder, whereCondition))
 	if err != nil {
 		return nil, err
 	}
@@ -66,29 +73,16 @@ func (sam *SavedAddressesManager) GetSavedAddressesForChainID(chainID uint64) ([
 }
 
 func (sam *SavedAddressesManager) GetSavedAddresses() ([]SavedAddress, error) {
-	rows, err := sam.db.Query(fmt.Sprintf("SELECT %s FROM saved_addresses WHERE removed != 1", rawQueryColumnsOrder))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	addresses, err := getSavedAddressesFromDBRows(rows)
-	return addresses, err
+	return sam.getSavedAddresses("removed != 1")
 }
 
 // GetRawSavedAddresses provides access to the soft-delete and sync metadata
 func (sam *SavedAddressesManager) GetRawSavedAddresses() ([]SavedAddress, error) {
-	rows, err := sam.db.Query(fmt.Sprintf("SELECT %s FROM saved_addresses", rawQueryColumnsOrder))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return getSavedAddressesFromDBRows(rows)
+	return sam.getSavedAddresses("")
 }
 
 func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx) error {
-	sqlStatement := "INSERT OR REPLACE INTO saved_addresses (network_id, address, name, favourite, removed, update_clock) VALUES (?, ?, ?, ?, ?, ?)"
+	sqlStatement := "INSERT OR REPLACE INTO saved_addresses (address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 	var err error
 	var insert *sql.Stmt
 	if tx != nil {
@@ -100,7 +94,7 @@ func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx
 		return err
 	}
 	defer insert.Close()
-	_, err = insert.Exec(sa.ChainID, sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock)
+	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName, sa.IsTest)
 	return err
 }
 
@@ -113,12 +107,12 @@ func (sam *SavedAddressesManager) UpdateMetadataAndUpsertSavedAddress(sa SavedAd
 	return sa.UpdateClock, nil
 }
 
-func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(ChainID uint64, Address common.Address, updateClock uint64) (newer bool, tx *sql.Tx, err error) {
+func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(address common.Address, ens string, isTest bool, updateClock uint64) (newer bool, tx *sql.Tx, err error) {
 	tx, err = sam.db.Begin()
 	if err != nil {
 		return false, nil, err
 	}
-	row := tx.QueryRow("SELECT update_clock FROM saved_addresses WHERE network_id = ? AND address = ?", ChainID, Address)
+	row := tx.QueryRow("SELECT update_clock FROM saved_addresses WHERE address = ? AND is_test = ? AND ens_name = ?", address, isTest, ens)
 	if err != nil {
 		return false, tx, err
 	}
@@ -128,11 +122,11 @@ func (sam *SavedAddressesManager) startTransactionAndCheckIfNewerChange(ChainID 
 	if err != nil {
 		return err == sql.ErrNoRows, tx, err
 	}
-	return dbUpdateClock <= updateClock, tx, nil
+	return dbUpdateClock < updateClock, tx, nil
 }
 
 func (sam *SavedAddressesManager) AddSavedAddressIfNewerUpdate(sa SavedAddress, updateClock uint64) (insertedOrUpdated bool, err error) {
-	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(sa.ChainID, sa.Address, updateClock)
+	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(sa.Address, sa.ENSName, sa.IsTest, updateClock)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -153,8 +147,11 @@ func (sam *SavedAddressesManager) AddSavedAddressIfNewerUpdate(sa SavedAddress, 
 	return true, err
 }
 
-func (sam *SavedAddressesManager) DeleteSavedAddressIfNewerUpdate(chainID uint64, address common.Address, updateClock uint64) (deleted bool, err error) {
-	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(chainID, address, updateClock)
+func (sam *SavedAddressesManager) DeleteSavedAddress(address common.Address, ens string, isTest bool, updateClock uint64) (deleted bool, err error) {
+	if err != nil {
+		return false, err
+	}
+	newer, tx, err := sam.startTransactionAndCheckIfNewerChange(address, ens, isTest, updateClock)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -166,32 +163,22 @@ func (sam *SavedAddressesManager) DeleteSavedAddressIfNewerUpdate(chainID uint64
 		return false, err
 	}
 
-	var insert *sql.Stmt
-	insert, err = tx.Prepare(`INSERT OR REPLACE INTO saved_addresses (network_id, address, name, favourite, removed, update_clock) VALUES (?, ?, "", 0, 1, ?)`)
+	update, err := tx.Prepare(`UPDATE saved_addresses SET removed = 1, update_clock = ? WHERE address = ? AND is_test = ? AND ens_name = ?`)
 	if err != nil {
 		return false, err
 	}
-	defer insert.Close()
-	_, err = insert.Exec(chainID, address, updateClock)
+	defer update.Close()
+	res, err := update.Exec(updateClock, address, isTest, ens)
 	if err != nil {
 		return false, err
 	}
 
-	return true, nil
-}
+	nRows, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
 
-func (sam *SavedAddressesManager) DeleteSavedAddress(chainID uint64, address common.Address) (updatedClock uint64, err error) {
-	insert, err := sam.db.Prepare(`INSERT OR REPLACE INTO saved_addresses (network_id, address, name, favourite, removed, update_clock) VALUES (?, ?, "", 0, 1, ?)`)
-	if err != nil {
-		return 0, err
-	}
-	defer insert.Close()
-	updateClock := uint64(time.Now().Unix())
-	_, err = insert.Exec(chainID, address, updateClock)
-	if err != nil {
-		return 0, err
-	}
-	return updateClock, nil
+	return nRows > 0, nil
 }
 
 func (sam *SavedAddressesManager) DeleteSoftRemovedSavedAddresses(threshold uint64) error {

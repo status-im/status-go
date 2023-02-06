@@ -1,9 +1,7 @@
 package transfer
 
 import (
-	"io/ioutil"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,13 +14,10 @@ import (
 )
 
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-transactions-tests-")
-	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
+	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 	return &TransactionManager{db, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 

@@ -20,12 +20,13 @@ func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddre
 	return m.syncNewSavedAddress(ctx, &sa, updatedClock, m.dispatchMessage)
 }
 
-func (m *Messenger) DeleteSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address) error {
-	updatedClock, err := m.savedAddressesManager.DeleteSavedAddress(chainID, address)
+func (m *Messenger) DeleteSavedAddress(ctx context.Context, address gethcommon.Address, ens string, isTest bool) error {
+	updateClock := uint64(time.Now().Unix())
+	_, err := m.savedAddressesManager.DeleteSavedAddress(address, ens, isTest, updateClock)
 	if err != nil {
 		return err
 	}
-	return m.syncDeletedSavedAddress(ctx, chainID, address, updatedClock, m.dispatchMessage)
+	return m.syncDeletedSavedAddress(ctx, address, ens, isTest, updateClock, m.dispatchMessage)
 }
 
 func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
@@ -62,26 +63,30 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage pr
 
 func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *wallet.SavedAddress, updateClock uint64, rawMessageHandler RawMessageHandler) error {
 	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
-		Address:     savedAddress.Address.Bytes(),
-		Name:        savedAddress.Name,
-		Favourite:   savedAddress.Favourite,
-		ChainId:     savedAddress.ChainID,
-		UpdateClock: updateClock,
+		Address:         savedAddress.Address.Bytes(),
+		Name:            savedAddress.Name,
+		Favourite:       savedAddress.Favourite,
+		Removed:         savedAddress.Removed,
+		UpdateClock:     savedAddress.UpdateClock,
+		ChainShortNames: savedAddress.ChainShortNames,
+		Ens:             savedAddress.ENSName,
+		IsTest:          savedAddress.IsTest,
 	}, rawMessageHandler)
 }
 
-func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, chainID uint64, address gethcommon.Address, updateClock uint64, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, address gethcommon.Address, ens string, isTest bool, updateClock uint64, rawMessageHandler RawMessageHandler) error {
 	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
 		Address:     address.Bytes(),
-		ChainId:     chainID,
 		UpdateClock: updateClock,
 		Removed:     true,
+		IsTest:      isTest,
+		Ens:         ens,
 	}, rawMessageHandler)
 }
 
 func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.SavedAddress, rawMessageHandler RawMessageHandler) (err error) {
 	if savedAddress.Removed {
-		if err = m.syncDeletedSavedAddress(ctx, savedAddress.ChainID, savedAddress.Address, savedAddress.UpdateClock, rawMessageHandler); err != nil {
+		if err = m.syncDeletedSavedAddress(ctx, savedAddress.Address, savedAddress.ENSName, savedAddress.IsTest, savedAddress.UpdateClock, rawMessageHandler); err != nil {
 			return err
 		}
 	} else {
@@ -95,18 +100,20 @@ func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.Sa
 func (m *Messenger) handleSyncSavedAddress(state *ReceivedMessageState, syncMessage protobuf.SyncSavedAddress) (err error) {
 	address := gethcommon.BytesToAddress(syncMessage.Address)
 	if syncMessage.Removed {
-		_, err = m.savedAddressesManager.DeleteSavedAddressIfNewerUpdate(syncMessage.ChainId,
-			address, syncMessage.UpdateClock)
+		_, err = m.savedAddressesManager.DeleteSavedAddress(
+			address, syncMessage.Ens, syncMessage.IsTest, syncMessage.UpdateClock)
 		if err != nil {
 			return err
 		}
-		state.Response.AddSavedAddress(&wallet.SavedAddress{ChainID: syncMessage.ChainId, Address: address})
+		state.Response.AddSavedAddress(&wallet.SavedAddress{Address: address, ENSName: syncMessage.Ens, IsTest: syncMessage.IsTest})
 	} else {
 		sa := wallet.SavedAddress{
-			Address:   address,
-			Name:      syncMessage.Name,
-			Favourite: syncMessage.Favourite,
-			ChainID:   syncMessage.ChainId,
+			Address:         address,
+			Name:            syncMessage.Name,
+			Favourite:       syncMessage.Favourite,
+			ChainShortNames: syncMessage.ChainShortNames,
+			ENSName:         syncMessage.Ens,
+			IsTest:          syncMessage.IsTest,
 		}
 
 		_, err = m.savedAddressesManager.AddSavedAddressIfNewerUpdate(sa, syncMessage.UpdateClock)
