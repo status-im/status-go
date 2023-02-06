@@ -1,8 +1,6 @@
 package token
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,17 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/params"
 )
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-token-tests-")
-	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-token-tests", sqlite.ReducedKDFIterationsNumber)
+	db, err := appdatabase.InitializeDB(":memory:", "wallet-token-tests", 1)
 	require.NoError(t, err)
 	return &Manager{db, nil, nil}, func() {
 		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 
@@ -55,4 +50,59 @@ func TestCustoms(t *testing.T) {
 	rst, err = manager.GetCustoms()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
+}
+
+func TestTokenOverride(t *testing.T) {
+	networks := []params.Network{
+		{
+			ChainID:   1,
+			ChainName: "TestChain1",
+			TokenOverrides: []params.TokenOverride{
+				{
+					Symbol:  "SNT",
+					Address: common.Address{11},
+				},
+			},
+		}, {
+			ChainID:   2,
+			ChainName: "TestChain2",
+			TokenOverrides: []params.TokenOverride{
+				{
+					Symbol:  "STT",
+					Address: common.Address{33},
+				},
+			},
+		},
+	}
+	testTokenStore := map[uint64]map[common.Address]*Token{
+		1: {
+			common.Address{1}: {
+				Address: common.Address{1},
+				Symbol:  "SNT",
+			},
+			common.Address{2}: {
+				Address: common.Address{2},
+				Symbol:  "TNT",
+			},
+		},
+		2: {
+			common.Address{3}: {
+				Address: common.Address{3},
+				Symbol:  "STT",
+			},
+			common.Address{4}: {
+				Address: common.Address{4},
+				Symbol:  "TTT",
+			},
+		},
+	}
+	overrideTokensInPlace(networks, testTokenStore)
+	_, found := testTokenStore[1][common.Address{1}]
+	require.False(t, found)
+	require.Equal(t, common.Address{11}, testTokenStore[1][common.Address{11}].Address)
+	require.Equal(t, common.Address{2}, testTokenStore[1][common.Address{2}].Address)
+	_, found = testTokenStore[2][common.Address{3}]
+	require.False(t, found)
+	require.Equal(t, common.Address{33}, testTokenStore[2][common.Address{33}].Address)
+	require.Equal(t, common.Address{4}, testTokenStore[2][common.Address{4}].Address)
 }
