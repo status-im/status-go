@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -120,7 +124,24 @@ func (s *SyncRawMessageHandler) HandleRawMessage(account *multiaccounts.Account,
 	//TODO we need a better way(e.g. pass from client when doing local pair?) to handle this, following is a temporary solution
 	nodeConfig.LogDir = nodeConfig.RootDataDir
 	nodeConfig.LogFile = "geth.log"
-
+	nodeConfig.LogLevel = "DEBUG"
+	nodeConfig.LogEnabled = true
+	nodeConfig.LogMobileSystem = false
+	nodeConfig.LogToStderr = true
+	logSettings := logutils.LogSettings{
+		Enabled:         true,
+		MobileSystem:    false,
+		Level:           nodeConfig.LogLevel,
+		File:            filepath.Join(nodeConfig.LogDir, nodeConfig.LogFile),
+		MaxSize:         0,
+		MaxBackups:      0,
+		CompressRotated: false,
+	}
+	if err = logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+		return err
+	}
+	logger := logutils.ZapLogger()
+	logger.Debug("StartNodeWithAccountAndInitialConfig", zap.String("keystorePath", keystorePath), zap.String("newKeystoreDir", newKeystoreDir), zap.String("nodeConfig.RootDataDir", nodeConfig.RootDataDir), zap.String("nodeConfig.KeyStoreDir", nodeConfig.KeyStoreDir))
 	err = s.backend.StartNodeWithAccountAndInitialConfig(*account, password, *setting, nodeConfig, subAccounts)
 	if err != nil {
 		return err
