@@ -1341,13 +1341,13 @@ func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*c
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 
-func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage EditMessage) error {
+func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage EditMessage) error {
 	if err := ValidateEditMessage(editMessage.EditMessage); err != nil {
 		return err
 	}
 	messageID := editMessage.MessageId
 	// Check if it's already in the response
-	originalMessage := response.GetMessage(messageID)
+	originalMessage := state.Response.GetMessage(messageID)
 	// otherwise pull from database
 	if originalMessage == nil {
 		var err error
@@ -1391,8 +1391,18 @@ func (m *Messenger) HandleEditMessage(response *MessengerResponse, editMessage E
 			return err
 		}
 	}
-	response.AddMessage(originalMessage)
-	response.AddChat(chat)
+	responseTo, err := m.persistence.MessageByID(originalMessage.ResponseTo)
+
+	if err != nil && err != common.ErrRecordNotFound {
+		return err
+	}
+
+	err = state.updateExistingActivityCenterNotification(m.identity.PublicKey, m, originalMessage, responseTo)
+	if err != nil {
+		return err
+	}
+	state.Response.AddMessage(originalMessage)
+	state.Response.AddChat(chat)
 
 	return nil
 }

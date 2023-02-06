@@ -2940,6 +2940,30 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	return nil
 }
 
+// updateExistingActivityCenterNotification updates AC notification if it exists and hasn't been read yet
+func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message) error {
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(message.ID))
+	if err != nil {
+		return err
+	}
+
+	if notification == nil || notification.Read {
+		return nil
+	}
+
+	notification.Message = message
+	notification.ReplyMessage = responseTo
+
+	err = m.persistence.SaveActivityCenterNotification(notification)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return err
+	}
+	r.Response.AddActivityCenterNotification(notification)
+
+	return nil
+}
+
 // addNewActivityCenterNotification takes a common.Message and generates a new ActivityCenterNotification and appends it to the
 // []Response.ActivityCenterNotifications if the message is m.New
 func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message) error {
@@ -3194,7 +3218,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	defer m.handleMessagesMutex.Unlock()
 
 	messageState := m.buildMessageState()
-	response := messageState.Response
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
@@ -3320,7 +3343,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							ID:          messageID,
 							SigPubKey:   publicKey,
 						}
-						err = m.HandleEditMessage(response, editMessage)
+						err = m.HandleEditMessage(messageState, editMessage)
 						if err != nil {
 							logger.Warn("failed to handle EditMessage", zap.Error(err))
 							allMessagesProcessed = false

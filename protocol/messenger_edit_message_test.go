@@ -252,15 +252,17 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 		From: wrongContact.ID,
 	}
 
-	response = &MessengerResponse{}
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		AllChats: &chatMap{},
+	}
+	state.AllChats.Store(ourChat.ID, ourChat)
 
-	err = s.m.HandleEditMessage(response, editMessage)
+	err = s.m.HandleEditMessage(state, editMessage)
 	// It should error as the user can't edit this message
 	s.Require().Error(err)
 
 	// Edit with a newer clock value
-
-	response = &MessengerResponse{}
 
 	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
@@ -276,15 +278,15 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 		From: contact.ID,
 	}
 
-	err = s.m.HandleEditMessage(response, editMessage)
+	err = s.m.HandleEditMessage(state, editMessage)
 	s.Require().NoError(err)
 	// It save the edit
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().NotNil(response.Chats()[0].LastMessage)
-	s.Require().NotEmpty(response.Chats()[0].LastMessage.EditedAt)
+	s.Require().Len(state.Response.Messages(), 1)
+	s.Require().Len(state.Response.Chats(), 1)
+	s.Require().NotNil(state.Response.Chats()[0].LastMessage)
+	s.Require().NotEmpty(state.Response.Chats()[0].LastMessage.EditedAt)
 
-	editedMessage = response.Messages()[0]
+	editedMessage = state.Response.Messages()[0]
 
 	// In-between edit
 	editMessage = EditMessage{
@@ -298,13 +300,13 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 		From: contact.ID,
 	}
 
-	response = &MessengerResponse{}
+	state.Response = &MessengerResponse{}
 
-	err = s.m.HandleEditMessage(response, editMessage)
+	err = s.m.HandleEditMessage(state, editMessage)
 	// It should error as the user can't edit this message
 	s.Require().NoError(err)
 	// It discards the edit
-	s.Require().Len(response.Messages(), 0)
+	s.Require().Len(state.Response.Messages(), 0)
 }
 
 func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
@@ -336,16 +338,17 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 		},
 		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
-
-	response := &MessengerResponse{}
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
 
 	// Handle edit first
-	err = s.m.HandleEditMessage(response, editMessage)
+	err = s.m.HandleEditMessage(state, editMessage)
 	s.Require().NoError(err)
 
 	// Handle chat message
-	response = &MessengerResponse{}
-	state := &ReceivedMessageState{
+	response := &MessengerResponse{}
+	state = &ReceivedMessageState{
 		Response: response,
 		CurrentMessageState: &CurrentMessageState{
 			Message:          inputMessage.ChatMessage,
