@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -79,7 +80,17 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
+
 	nodeConfig := s.backend.StatusNode().Config()
+	dataDir := nodeConfig.DataDir
+	disabledDataDir := nodeConfig.ShhextConfig.BackupDisabledDataDir
+	defer func() {
+		// restore data dir
+		nodeConfig.DataDir = dataDir
+		nodeConfig.ShhextConfig.BackupDisabledDataDir = disabledDataDir
+	}()
+	nodeConfig.DataDir = strings.Replace(dataDir, nodeConfig.RootDataDir, "", 1)
+	nodeConfig.ShhextConfig.BackupDisabledDataDir = strings.Replace(disabledDataDir, nodeConfig.RootDataDir, "", 1)
 	if syncRawMessage.NodeConfigJsonBytes, err = json.Marshal(nodeConfig); err != nil {
 		return nil, err
 	}
@@ -99,12 +110,16 @@ func (s *SyncRawMessageHandler) HandleRawMessage(account *multiaccounts.Account,
 		return err
 	}
 
+	//TODO root data dir should be passed from client, following is a temporary solution
 	nodeConfig.RootDataDir = filepath.Dir(keystorePath)
-	nodeConfig.DataDir = filepath.Join(nodeConfig.RootDataDir, filepath.Base(nodeConfig.DataDir))
-	nodeConfig.KeyStoreDir = newKeystoreDir
+	nodeConfig.KeyStoreDir = filepath.Join(filepath.Base(keystorePath), account.KeyUID)
 	installationID := uuid.New().String()
 	nodeConfig.ShhextConfig.InstallationID = installationID
 	setting.InstallationID = installationID
+
+	//TODO we need a better way(e.g. pass from client when doing local pair?) to handle this, following is a temporary solution
+	nodeConfig.LogDir = nodeConfig.RootDataDir
+	nodeConfig.LogFile = "geth.log"
 
 	err = s.backend.StartNodeWithAccountAndInitialConfig(*account, password, *setting, nodeConfig, subAccounts)
 	if err != nil {
