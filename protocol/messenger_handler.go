@@ -1610,10 +1610,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	if chat.ReadMessagesAtClockValue >= receivedMessage.Clock {
-		receivedMessage.Seen = true
-	}
-
 	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
 	if err != nil {
 		return err
