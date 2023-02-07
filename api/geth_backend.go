@@ -386,21 +386,26 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
+
+        b.log.Info("LOGIN ACCOUNT 1", "password", password,"node config", inputNodeCfg)
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
+        b.log.Info("LOGIN ACCOUNT 2", "password", password,"node config", inputNodeCfg)
 
 	err = b.loadNodeConfig(inputNodeCfg)
 	if err != nil {
 		return err
 	}
 
+        b.log.Info("LOGIN ACCOUNT 3", "password", password,"node config", inputNodeCfg)
 	err = b.setupLogSettings()
 	if err != nil {
 		return err
 	}
 
+        b.log.Info("LOGIN ACCOUNT 4", "password", password,"node config", inputNodeCfg)
 	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -425,15 +430,18 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		MainAccount:    walletAddr,
 	}
 
+        b.log.Info("LOGIN ACCOUNT 5", "password", password,"node config", inputNodeCfg)
 	err = b.StartNode(b.config)
 	if err != nil {
 		return err
 	}
 
+        b.log.Info("LOGIN ACCOUNT 6", "password", password,"node config", inputNodeCfg)
 	err = b.SelectAccount(login)
 	if err != nil {
 		return err
 	}
+        b.log.Info("LOGIN ACCOUNT 7", "password", password,"node config", inputNodeCfg)
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		return err
