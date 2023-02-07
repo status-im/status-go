@@ -20,6 +20,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
+var ErrNoDiscV5Listener = errors.New("no discv5 listener")
+
+
 type DiscoveryV5 struct {
 	sync.RWMutex
 
@@ -180,6 +183,10 @@ func (d *DiscoveryV5) Start(ctx context.Context) error {
 }
 
 func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
+	if d.listener == nil {
+		return ErrNoDiscV5Listener
+	}
+
 	return d.listener.SetFallbackNodes(nodes)
 }
 
@@ -243,7 +250,7 @@ func evaluateNode(node *enode.Node) bool {
 
 func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
 	if d.listener == nil {
-		return nil, errors.New("no discv5 listener")
+		return nil, ErrNoDiscV5Listener
 	}
 
 	iterator := d.listener.RandomNodes()
