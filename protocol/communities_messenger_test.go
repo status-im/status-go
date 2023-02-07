@@ -1183,6 +1183,8 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	response, err = s.alice.CancelRequestToJoinCommunity(requestToCancel)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity[0].State)
 
 	// pull to make sure it has been saved
 	cancelRequestsToJoin, err := s.alice.MyCanceledRequestsToJoin()

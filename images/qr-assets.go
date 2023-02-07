@@ -276,8 +276,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"tests": {nil, map[string]*bintree{
 			"qr": {nil, map[string]*bintree{
 				"QRWithLogo.png": {_assetsTestsQrQrwithlogoPng, map[string]*bintree{}},
-				"defaultQR.png": {_assetsTestsQrDefaultqrPng, map[string]*bintree{}},
-				"status.png": {_assetsTestsQrStatusPng, map[string]*bintree{}},
+				"defaultQR.png":  {_assetsTestsQrDefaultqrPng, map[string]*bintree{}},
+				"status.png":     {_assetsTestsQrStatusPng, map[string]*bintree{}},
 			}},
 		}},
 	}},
