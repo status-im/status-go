@@ -193,9 +193,23 @@ func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err er
 }
 
 func FakeGenericImageLinkPreviewData(title string, link string) (previewData LinkPreviewData, err error) {
-	u, _ := url.Parse(link)
+	url, err := url.Parse(link)
+	if err != nil {
+		return previewData, fmt.Errorf("Failed to parse link %s", link)
+	}
+
+	res, err := httpClient.Head(link)
+	if err != nil {
+		return previewData, fmt.Errorf("Failed to get HEAD from link %s", link)
+	}
+
+	if res.StatusCode != 200 {
+		return previewData, fmt.Errorf("Image link %s is not available", link)
+	}
+
 	previewData.Title = title
-	previewData.Site = strings.ToLower(u.Hostname())
+	previewData.Site = strings.ToLower(url.Hostname())
+	previewData.ContentType = res.Header.Get("Content-type")
 	previewData.ThumbnailURL = link
 	previewData.Height = 0
 	previewData.Width = 0
