@@ -131,12 +131,15 @@ func (api *API) GetRecentGifs() (recentGifs []Gif, err error) {
 	if err != nil {
 		return nil, err
 	}
+	recentGifs = make([]Gif, 0)
 	savedRecentGifs := []Gif{}
-	err = json.Unmarshal(gifs, &savedRecentGifs)
-	if err != nil {
-		return nil, err
+	if len(gifs) > 0 {
+		err = json.Unmarshal(gifs, &savedRecentGifs)
+		if err != nil {
+			return nil, err
+		}
+		recentGifs = savedRecentGifs
 	}
-	recentGifs = savedRecentGifs
 	return recentGifs, nil
 }
 
