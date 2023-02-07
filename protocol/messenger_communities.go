@@ -685,6 +685,8 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.RequestsToJoinCommunity = append(response.RequestsToJoinCommunity, requestToJoin)
+
 	return response, nil
 }
 

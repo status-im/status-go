@@ -1042,6 +1042,7 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 		return nil, nil, err
 	}
 
+	dbRequest.State = RequestToJoinStateCanceled
 	if err := m.markRequestToJoinAsCanceled(pk, community); err != nil {
 		return nil, nil, err
 	}
