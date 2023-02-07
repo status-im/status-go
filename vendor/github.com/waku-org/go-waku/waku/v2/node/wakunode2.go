@@ -91,6 +91,7 @@ type WakuNode struct {
 	protocolEventSub       event.Subscription
 	identificationEventSub event.Subscription
 	addressChangesSub      event.Subscription
+	enrChangeCh            chan struct{}
 
 	keepAliveMutex sync.Mutex
 	keepAliveFails map[peer.ID]int
@@ -234,6 +235,8 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		return nil, err
 	}
 
+	w.enrChangeCh = make(chan struct{}, 10)
+
 	if params.connStatusC != nil {
 		w.connStatusChan = params.connStatusC
 	}
@@ -253,6 +256,7 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 			return
 		case <-first:
 			w.log.Info("listening", logging.MultiAddrs("multiaddr", addrs...))
+			w.enrChangeCh <- struct{}{}
 		case <-w.addressChangesSub.Out():
 			newAddrs := w.ListenAddresses()
 			diff := false
@@ -270,6 +274,7 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 				addrs = newAddrs
 				w.log.Info("listening addresses update received", logging.MultiAddrs("multiaddr", addrs...))
 				_ = w.setupENR(ctx, addrs)
+				w.enrChangeCh <- struct{}{}
 			}
 		}
 	}
@@ -403,6 +408,8 @@ func (w *WakuNode) Stop() {
 
 	w.host.Close()
 
+	close(w.enrChangeCh)
+
 	w.wg.Wait()
 }
 
@@ -419,13 +426,12 @@ func (w *WakuNode) ID() string {
 func (w *WakuNode) watchENRChanges(ctx context.Context) {
 	defer w.wg.Done()
 
-	timer := time.NewTicker(1 * time.Second)
 	var prevNodeVal string
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-timer.C:
+		case <-w.enrChangeCh:
 			if w.localNode != nil {
 				currNodeVal := w.localNode.Node().String()
 				if prevNodeVal != currNodeVal {

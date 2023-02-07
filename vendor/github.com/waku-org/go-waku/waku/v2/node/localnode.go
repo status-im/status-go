@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"math/rand"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -22,6 +24,33 @@ func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey) (*enode.LocalNode, error
 		return nil, err
 	}
 	return enode.NewLocalNode(db, priv), nil
+}
+
+func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = errors.New("could not write enr record")
+		}
+	}()
+
+	var fieldRaw []byte
+	for _, addr := range addrAggr {
+		maRaw := addr.Bytes()
+		maSize := make([]byte, 2)
+		binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
+
+		fieldRaw = append(fieldRaw, maSize...)
+		fieldRaw = append(fieldRaw, maRaw...)
+	}
+
+	if len(fieldRaw) != 0 {
+		localnode.Set(enr.WithEntry(utils.MultiaddrENRField, fieldRaw))
+	}
+
+	// This is to trigger the signing record err due to exceeding 300bytes limit
+	_ = localnode.Node()
+
+	return nil
 }
 
 func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, shouldAutoUpdate bool, log *zap.Logger) error {
@@ -67,47 +96,37 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 		}
 	}
 
-	// Adding extra multiaddresses. It will to add as many multiaddresses as possible
-	// without exceeding the enr max size of 300bytes
-	var addrAggr []ma.Multiaddr
+	// Randomly shuffle multiaddresses
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
+
+	// Adding extra multiaddresses. Should probably not exceed the enr max size of 300bytes
 	var err error
+	failedOnceWritingENR := false
+	couldWriteENRatLeastOnce := false
+	successIdx := -1
 	for i := len(multiaddrs) - 1; i >= 0; i-- {
-		addrAggr = append(addrAggr, multiaddrs[0:i]...)
-		err = func() (err error) {
-			defer func() {
-				if e := recover(); e != nil {
-					err = errors.New("could not write enr record")
-				}
-			}()
-
-			var fieldRaw []byte
-			for _, addr := range addrAggr {
-				maRaw := addr.Bytes()
-				maSize := make([]byte, 2)
-				binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
-
-				fieldRaw = append(fieldRaw, maSize...)
-				fieldRaw = append(fieldRaw, maRaw...)
-			}
-
-			if len(fieldRaw) != 0 {
-				localnode.Set(enr.WithEntry(utils.MultiaddrENRField, fieldRaw))
-			}
-
-			// This is to trigger the signing record err due to exceeding 300bytes limit
-			_ = localnode.Node()
-
-			return nil
-		}()
-
+		err = writeMultiaddressField(localnode, multiaddrs[0:i])
 		if err == nil {
+			couldWriteENRatLeastOnce = true
+			successIdx = i
 			break
+		} else {
+			failedOnceWritingENR = true
 		}
 	}
 
-	// In case multiaddr could not be populated at all
-	if err != nil {
-		localnode.Delete(enr.WithEntry(utils.MultiaddrENRField, struct{}{}))
+	if failedOnceWritingENR {
+		if !couldWriteENRatLeastOnce {
+			// In case multiaddr could not be populated at all
+			localnode.Delete(enr.WithEntry(utils.MultiaddrENRField, struct{}{}))
+		} else {
+			// Could write a subset of multiaddresses but not all
+			err = writeMultiaddressField(localnode, multiaddrs[0:successIdx])
+			if err != nil {
+				return errors.New("could not write new ENR")
+			}
+		}
 	}
 
 	return nil
