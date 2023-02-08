@@ -929,10 +929,18 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 
+	if b.accountManager.GetManager() == nil {
+		err = b.accountManager.InitKeystore(config.KeyStoreDir)
+		if err != nil {
+			return err
+		}
+	}
+
 	manager := b.accountManager.GetManager()
 	if manager == nil {
 		return errors.New("ethereum accounts.Manager is nil")
 	}
+
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		// The peers discovery protocols are started manually after
 		// `node.ready` signal is sent.
