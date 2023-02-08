@@ -617,7 +617,9 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirS
 
 func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSide(t *testing.T) {
 	// We receive a message with expected contact request state == none
-	// and clock > our clock. We consider this a retraction, unless we are in the dismissed state, since that should be only changed by a trusted device
+	// and clock > our clock. We consider this a retraction, unless we are
+	// in the dismissed state, since that should be only changed by a
+	// trusted device
 
 	c := &Contact{}
 	c.ContactRequestLocalState = ContactRequestStateSent

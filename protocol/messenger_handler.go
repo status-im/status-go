@@ -732,9 +732,9 @@ func (m *Messenger) handleAcceptContactRequest(
 	originalRequest *common.Message,
 	message protobuf.AcceptContactRequest) (ContactRequestProcessingResponse, error) {
 
-        m.logger.Info("received contact request", zap.Uint64("clock-sent", message.Clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
+	m.logger.Debug("received contact request", zap.Uint64("clock-sent", message.Clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
 	if contact.ContactRequestRemoteClock > message.Clock {
-		m.logger.Info("not handling accept since clock lower")
+		m.logger.Debug("not handling accept since clock lower")
 		return ContactRequestProcessingResponse{}, nil
 	}
 
@@ -825,7 +825,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 	m.logger.Debug("handling retracted contact request", zap.Uint64("clock", message.Clock))
 	r := contact.ContactRequestRetracted(message.Clock)
 	if !r.processed {
-		m.logger.Info("not handling retract since clock lower")
+		m.logger.Debug("not handling retract since clock lower")
 		return nil
 	}
 
@@ -846,7 +846,9 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 	if err != nil {
 		return err
 	}
-	state.ModifiedContacts.Store(contact.ID, true)
+	if contact.ID != m.myHexIdentity() {
+		state.ModifiedContacts.Store(contact.ID, true)
+	}
 
 	return nil
 }
@@ -874,11 +876,13 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		chat.Active = false
 	}
 
-	logger.Info("Handling contact update")
+	logger.Debug("Handling contact update")
 
 	if message.ContactRequestPropagatedState != nil {
+		logger.Debug("handling contact request propagated state", zap.Any("state before update", contact.ContactRequestPropagatedState()))
 		result := contact.ContactRequestPropagatedStateReceived(message.ContactRequestPropagatedState)
 		if result.sendBackState {
+			logger.Debug("sending back state")
 			// This is a bit dangerous, since it might trigger a ping-pong of contact updates
 			// also it should backoff/debounce
 			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", m.dispatchMessage)
@@ -888,19 +892,21 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		}
 		if result.newContactRequestReceived {
+			logger.Debug("creating contact request notification")
 			err = m.createContactRequestNotification(contact, state, nil)
 			if err != nil {
 				return err
 			}
 
 		}
+		logger.Debug("handled propagated state", zap.Any("state after update", contact.ContactRequestPropagatedState()))
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 
 	}
 
 	if contact.LastUpdated < message.Clock {
-		logger.Info("Updating contact")
+		logger.Debug("Updating contact")
 		if contact.EnsName != message.EnsName {
 			contact.EnsName = message.EnsName
 			contact.ENSVerified = false
