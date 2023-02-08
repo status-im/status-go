@@ -149,11 +149,14 @@ func (api *API) GetFavoriteGifs() (favoriteGifs []Gif, err error) {
 	if err != nil {
 		return nil, err
 	}
+	favoriteGifs = make([]Gif, 0)
 	savedFavGifs := []Gif{}
-	err = json.Unmarshal(gifs, &savedFavGifs)
-	if err != nil {
-		return nil, err
+	if len(gifs) > 0 {
+		err = json.Unmarshal(gifs, &savedFavGifs)
+		if err != nil {
+			return nil, err
+		}
+		favoriteGifs = savedFavGifs
 	}
-	favoriteGifs = savedFavGifs
 	return favoriteGifs, nil
 }
