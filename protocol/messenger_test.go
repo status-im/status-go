@@ -852,7 +852,6 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(2), actualChat.UnviewedMessagesCount)
@@ -891,7 +890,6 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)

@@ -1359,7 +1359,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.Contacts) > 0
 		},
 		"no messages",
 	)

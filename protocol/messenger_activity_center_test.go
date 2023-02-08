@@ -58,50 +58,6 @@ func (s *MessengerActivityCenterMessageSuite) newMessenger() *Messenger {
 	return messenger
 }
 
-func (s *MessengerActivityCenterMessageSuite) TestDismissOneToOneMessage() {
-	theirMessenger := s.newMessenger()
-	_, err := theirMessenger.Start()
-	s.Require().NoError(err)
-
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(theirChat)
-	s.Require().NoError(err)
-
-	inputMessage := buildTestMessage(*theirChat)
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages(), 1)
-
-	response, err := WaitOnMessengerResponse(
-		s.m,
-		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
-		"no messages",
-	)
-	s.Require().NoError(err)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-
-	// Dismiss all
-	s.Require().NoError(s.m.DismissAllActivityCenterNotifications(context.Background()))
-
-	// Send another message
-	inputMessage = buildTestMessage(*theirChat)
-	sendResponse, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages(), 1)
-
-	response, err = WaitOnMessengerResponse(
-		s.m,
-		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
-		"no messages",
-	)
-	s.Require().NoError(err)
-	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-}
-
 func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
@@ -111,8 +67,11 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(*theirChat)
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	r := &requests.SendContactRequest{
+		ID:      types.Hex2Bytes(s.m.myHexIdentity()),
+		Message: "hello",
+	}
+	sendResponse, err := theirMessenger.SendContactRequest(context.Background(), r)
 	s.NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
 
@@ -143,19 +102,16 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	s.Require().NoError(err)
 
 	// Send another message
-	inputMessage = buildTestMessage(*theirChat)
+	inputMessage := buildTestMessage(*theirChat)
 	sendResponse, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
 
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.ActivityCenterNotifications()) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-
 }

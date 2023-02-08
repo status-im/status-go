@@ -431,8 +431,11 @@ func (c *Contact) ContactRequestPropagatedStateReceived(state *protobuf.ContactR
 		response.processed = true
 		c.ContactRequestLocalClock = expectedLocalClock
 		c.ContactRequestLocalState = ContactRequestStateNone
-		// We set they remote state, as this was an implicit retraction
-		// potentially
+		// We set the remote state, as this was an implicit retraction
+		// potentially, for example this could happen if they
+		// sent a retraction earier, but we never received it,
+		// or one of our paired devices has retracted the contact request
+		// but we never synced with them.
 		c.ContactRequestRemoteState = ContactRequestStateNone
 	}
 

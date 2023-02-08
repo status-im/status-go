@@ -1221,9 +1221,9 @@ func (w *Waku) Stop() error {
 }
 
 func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
-        if envelope == nil {
-          return nil, errors.New("nil envelope error")
-        }
+	if envelope == nil {
+		return nil, errors.New("nil envelope error")
+	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	envelopeErrors := make([]common.EnvelopeError, 0)
