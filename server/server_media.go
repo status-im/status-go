@@ -105,10 +105,20 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeQRURL(qurul string) string {
+func (s *MediaServer) MakeQRURL(qurul string,
+	allowProfileImage string,
+	level string,
+	size string,
+	keyUID string,
+	imageName string) string {
 	u := s.MakeBaseURL()
 	u.Path = generateQRCode
-	u.RawQuery = url.Values{"qurul": {qurul}}.Encode()
+	u.RawQuery = url.Values{"url": {qurul},
+		"level":             {level},
+		"allowProfileImage": {allowProfileImage},
+		"size":              {size},
+		"keyUid":            {keyUID},
+		"imageName":         {imageName}}.Encode()
 
 	return u.String()
 }

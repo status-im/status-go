@@ -3,15 +3,12 @@ package server
 import (
 	"bytes"
 	"database/sql"
-	"encoding/base64"
 	"image"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	qrcode "github.com/yeqown/go-qrcode/v2"
-	"github.com/yeqown/go-qrcode/writer/standard"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
@@ -20,7 +17,6 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
-	qrcodeutils "github.com/status-im/status-go/qrcode"
 )
 
 const (
@@ -39,25 +35,6 @@ const (
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
-
-type QROptions struct {
-	URL                  string `json:"url"`
-	ErrorCorrectionLevel string `json:"errorCorrectionLevel"`
-	Capacity             string `json:"capacity"`
-	AllowProfileImage    bool   `json:"withLogo"`
-}
-
-type WriterCloserByteBuffer struct {
-	*bytes.Buffer
-}
-
-func (wc WriterCloserByteBuffer) Close() error {
-	return nil
-}
-
-func NewWriterCloserByteBuffer() *WriterCloserByteBuffer {
-	return &WriterCloserByteBuffer{bytes.NewBuffer([]byte{})}
-}
 
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -412,62 +389,19 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFun
 func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		qrURLBase64Encoded, ok := params["qrurl"]
-		if !ok || len(qrURLBase64Encoded) == 0 {
-			logger.Error("no qr url provided")
-			return
-		}
-		qrURLBase64Decoded, err := base64.StdEncoding.DecodeString(qrURLBase64Encoded[0])
-		if err != nil {
-			logger.Error("error decoding string from base64", zap.Error(err))
-		}
-		level, ok := params["level"]
-		// Default error correction level
-		correctionLevel := qrcode.ErrorCorrectionMedium
-		if ok && len(level) == 1 {
-			switch level[0] {
-			case "4":
-				correctionLevel = qrcode.ErrorCorrectionHighest
-			case "1":
-				correctionLevel = qrcode.ErrorCorrectionLow
-			case "3":
-				correctionLevel = qrcode.ErrorCorrectionQuart
-			}
-		}
-		buf := NewWriterCloserByteBuffer()
-		qrc, err := qrcode.NewWith(string(qrURLBase64Decoded),
-			qrcode.WithEncodingMode(qrcode.EncModeAuto),
-			qrcode.WithErrorCorrectionLevel(correctionLevel),
-		)
-		if err != nil {
-			logger.Error("could not generate QRCode", zap.Error(err))
-		}
-		nw := standard.NewWithWriter(buf)
-		if err = qrc.Save(nw); err != nil {
-			logger.Error("could not save image", zap.Error(err))
-		}
-		payload := buf.Bytes()
-		logo, err := qrcodeutils.GetLogoImage(multiaccountsDB, params)
-		if err == nil {
-			qrWidth, qrHeight, _ := qrcodeutils.GetImageDimensions(payload)
-			logo, _ = qrcodeutils.ResizeImage(logo, qrWidth/5, qrHeight/5)
-			payload = qrcodeutils.SuperimposeImage(payload, logo)
-		}
-		size, ok := params["size"]
-		if ok && len(size) == 1 {
-			size, err := strconv.Atoi(size[0])
-			if err == nil {
-				payload, _ = qrcodeutils.ResizeImage(payload, size, size)
-			}
-		}
+
+		payload := generateQRBytes(params, logger, multiaccountsDB)
 		mime, err := images.GetProtobufImageMime(payload)
+
 		if err != nil {
 			logger.Error("could not generate image from payload", zap.Error(err))
 		}
 
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-store")
+
 		_, err = w.Write(payload)
+
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
 		}
