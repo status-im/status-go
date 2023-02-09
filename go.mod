@@ -78,7 +78,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/rmg/iso4217 v1.0.0
-	github.com/waku-org/go-waku v0.4.1-0.20230209130305-c55a979af4d9
+	github.com/waku-org/go-waku v0.4.1-0.20230209220220-57d707ff5068
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 )
