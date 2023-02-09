@@ -554,6 +554,21 @@ func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityC
 	return api.service.messenger.DeleteCommunityCategory(request)
 }
 
+// CreateCommunityPermission creates a permission within particular community
+func (api *PublicAPI) CreateCommunityPermission(request *requests.CreateCommunityPermission) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityPermission(request)
+}
+
+// DeleteCommunityPermission deleted a permission within a particular community and removes this permission from any chat that has it
+func (api *PublicAPI) DeleteCommunityPermission(request *requests.DeleteCommunityPermission) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteCommunityPermission(request)
+}
+
+// GetCommunityPermissions returns all permissions within a particular community
+func (api *PublicAPI) GetCommunityPermissions(request *requests.GetCommunityPermissions) ([]*communities.Permission, error) {
+	return api.service.messenger.GetCommunityPermissions(request)
+}
+
 type ApplicationMessagesResponse struct {
 	Messages []*common.Message `json:"messages"`
 	Cursor   string            `json:"cursor"`

@@ -767,6 +767,81 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return community, changes, nil
 }
 
+func (m *Manager) CreateCommunityPermission(request *requests.CreateCommunityPermission, publish bool) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	permissionID := uuid.New().String()
+
+	permission, changes, err := community.CreateCommunityPermission(permissionID,
+		int32(request.IsAllowedTo),
+		request.Private,
+		request.ChatIDs)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunityPermission(request.CommunityID, permission)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	if publish {
+		m.publish(&Subscription{Community: community})
+	}
+
+	return community, changes, nil
+}
+
+func (m *Manager) DeleteCommunityPermission(request *requests.DeleteCommunityPermission) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	changes, err := community.DeleteCommunityPermission(request.PermissionID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Advertise changes
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
+func (m *Manager) GetCommunityPermissions(request *requests.GetCommunityPermissions) ([]*Permission, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	return community.config.Permissions, nil
+}
+
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
 	id := crypto.CompressPubkey(signer)
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)

@@ -126,8 +126,7 @@ message CommunityPermission {
   string community_id = 1;
   string permission_id = 2;
   AllowedTypes is_allowed_to = 3;
-  bool hidden = 4;
-  bool holds_tokens = 5;
+  bool private = 4;
   repeated string chat_ids = 6;
 }
 

@@ -12,8 +12,7 @@ var ErrCreateCommunityPermissionInvalidCommunityID = errors.New("create-communit
 type CreateCommunityPermission struct {
 	CommunityID types.HexBytes                            `json:"communityId"`
 	IsAllowedTo protobuf.CommunityPermission_AllowedTypes `json:"isAllowedTo"`
-	Hidden      bool                                      `json:"hidden"`
-	HoldsTokens bool                                      `json:"holdsTokens"`
+	Private     bool                                      `json:"private"`
 	ChatIDs     []string                                  `json:"chatIds"`
 }
 

@@ -24,9 +24,8 @@ const signatureLength = 65
 
 type Permission struct {
 	PermissionID string
-	Hidden       bool
+	Private      bool
 	IsAllowedTo  protobuf.CommunityPermission_AllowedTypes
-	HoldsTokens  bool
 	ChatIds      []string
 }
 
@@ -272,8 +271,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			permission := Permission{
 				PermissionID: p.PermissionId,
 				IsAllowedTo:  p.IsAllowedTo,
-				Hidden:       p.Hidden,
-				HoldsTokens:  p.HoldsTokens,
+				Private:      p.Private,
 				ChatIds:      p.ChatIds,
 			}
 

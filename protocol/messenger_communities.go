@@ -644,6 +644,51 @@ func (m *Messenger) DeleteCommunityCategory(request *requests.DeleteCommunityCat
 	return &response, nil
 }
 
+func (m *Messenger) CreateCommunityPermission(request *requests.CreateCommunityPermission) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.CreateCommunityPermission(request, true)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) DeleteCommunityPermission(request *requests.DeleteCommunityPermission) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+	community, changes, err := m.communitiesManager.DeleteCommunityPermission(request)
+	if err != nil {
+		return nil, err
+	}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
+}
+
+func (m *Messenger) GetCommunityPermissions(request *requests.GetCommunityPermissions) ([]*communities.Permission, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	permissions, err := m.communitiesManager.GetCommunityPermissions(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return permissions, nil
+}
+
 func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

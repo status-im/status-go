@@ -834,15 +834,13 @@ func (p *Persistence) SaveCommunityPermission(communityID types.HexBytes, permis
 	_, err = tx.Exec(`INSERT INTO communities_permissions (
 		permission_id,
 		community_id,
-		hide,
-		is_allowed_to,
-		holds_tokens
+		permission_private,
+		is_allowed_to
 	  ) VALUES (?, ?, ?, ?)`,
 		permission.PermissionID,
 		communityID.String(),
-		permission.Hidden,
+		permission.Private,
 		permission.IsAllowedTo,
-		permission.HoldsTokens,
 	)
 
 	if err != nil {
@@ -866,13 +864,11 @@ func (p *Persistence) SaveCommunityPermission(communityID types.HexBytes, permis
 
 func (p *Persistence) UpdateCommunityPermission(permission *Permission) error {
 	_, err := p.db.Exec(`UPDATE communities_permissions SET
-    hide = ?,
+    permission_private = ?,
     is_allowed_to = ?,
-    holds_tokens = ?
     WHERE permission_id = ?`,
-		permission.Hidden,
+		permission.Private,
 		permission.IsAllowedTo,
-		permission.HoldsTokens,
 		permission.PermissionID,
 	)
 	return err
@@ -903,18 +899,17 @@ func (p *Persistence) GetCommunityPermissions(communityID types.HexBytes) ([]*Pe
 	for rows.Next() {
 		var permissionID string
 		var isAllowedTo int32
-		var hidden, holdsTokens bool
+		var private bool
 
-		err := rows.Scan(&permissionID, &hidden, &isAllowedTo, &holdsTokens)
+		err := rows.Scan(&permissionID, &private, &isAllowedTo)
 		if err != nil {
 			return nil, err
 		}
 
 		permission := &Permission{
 			PermissionID: permissionID,
-			Hidden:       hidden,
+			Private:      private,
 			IsAllowedTo:  protobuf.CommunityPermission_AllowedTypes(isAllowedTo),
-			HoldsTokens:  holdsTokens,
 		}
 		permissions = append(permissions, permission)
 	}
