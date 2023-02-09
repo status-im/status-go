@@ -408,9 +408,9 @@ func (w *WakuNode) Stop() {
 
 	w.host.Close()
 
-	close(w.enrChangeCh)
-
 	w.wg.Wait()
+
+	close(w.enrChangeCh)
 }
 
 // Host returns the libp2p Host used by the WakuNode
