@@ -75,7 +75,7 @@ func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
 		if !enr.IsNotFound(err) {
 			return nil, err
-		} else {
+		} else if len(multiaddrRaw) == 0 {
 			// No multiaddr entry on enr
 			return result, nil
 		}
