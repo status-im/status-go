@@ -64,7 +64,7 @@ func (m *Messenger) SetDisplayName(displayName string, publishChange bool) error
 	}
 
 	m.account.Name = displayName // We might need to do the same when syncing settings?
-	err = m.multiAccounts.SaveAccount(*m.account)
+	err = m.multiAccounts.SaveAccount(m.account)
 	if err != nil {
 		return err
 	}

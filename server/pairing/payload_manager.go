@@ -512,7 +512,7 @@ func (apr *AccountPayloadRepository) storeKeys(keyStorePath string) error {
 }
 
 func (apr *AccountPayloadRepository) storeMultiAccount() error {
-	return apr.multiaccountsDB.SaveAccount(*apr.multiaccount)
+	return apr.multiaccountsDB.SaveAccount(apr.multiaccount)
 }
 
 type RawMessagePayloadManager struct {

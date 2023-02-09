@@ -1896,7 +1896,7 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 		}
 		if oldDisplayName != message.GetValueString() {
 			m.account.Name = message.GetValueString()
-			err = m.multiAccounts.SaveAccount(*m.account)
+			err = m.multiAccounts.SaveAccount(m.account)
 			if err != nil {
 				return err
 			}

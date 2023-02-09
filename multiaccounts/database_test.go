@@ -27,7 +27,7 @@ func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	expected := Account{Name: "string", KeyUID: "string", ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
-	require.NoError(t, db.SaveAccount(expected))
+	require.NoError(t, db.SaveAccount(&expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, accounts, 1)
@@ -38,7 +38,7 @@ func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	expected := Account{KeyUID: "string", ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
-	require.NoError(t, db.SaveAccount(expected))
+	require.NoError(t, db.SaveAccount(&expected))
 	expected.Name = "chars"
 	require.NoError(t, db.UpdateAccount(expected))
 	rst, err := db.GetAccounts()
@@ -53,7 +53,8 @@ func TestLoginUpdate(t *testing.T) {
 
 	accounts := []Account{{Name: "first", KeyUID: "0x1", KDFIterations: sqlite.ReducedKDFIterationsNumber}, {Name: "second", KeyUID: "0x2", KDFIterations: sqlite.ReducedKDFIterationsNumber}}
 	for _, acc := range accounts {
-		require.NoError(t, db.SaveAccount(acc))
+		toSave := acc
+		require.NoError(t, db.SaveAccount(&toSave))
 	}
 	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].KeyUID, 100))
 	require.NoError(t, db.UpdateAccountTimestamp(accounts[1].KeyUID, 10))
@@ -158,7 +159,8 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200}]`
 
 	for _, a := range testAccs {
-		require.NoError(t, db.SaveAccount(a))
+		toSave := a
+		require.NoError(t, db.SaveAccount(&toSave))
 	}
 
 	seedTestDBWithIdentityImages(t, db, keyUID)
@@ -182,8 +184,8 @@ func TestDatabase_GetAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10}
-	require.NoError(t, db.SaveAccount(expected))
+	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	require.NoError(t, db.SaveAccount(&expected))
 
 	account, err := db.GetAccount(expected.KeyUID)
 	require.NoError(t, err)
@@ -201,7 +203,7 @@ func TestDatabase_SaveAccountWithIdentityImages(t *testing.T) {
 		ColorID:   10,
 		Images:    images.SampleIdentityImages(),
 	}
-	require.NoError(t, db.SaveAccount(expected))
+	require.NoError(t, db.SaveAccount(&expected))
 
 	account, err := db.GetAccount(expected.KeyUID)
 	require.NoError(t, err)

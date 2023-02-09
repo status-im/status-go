@@ -129,7 +129,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 	}
 
 	initKeys(pms.T(), keystore1)
-	err := db1.SaveAccount(expected)
+	err := db1.SaveAccount(&expected)
 	pms.Require().NoError(err)
 
 	pms.config1 = &AccountPayloadManagerConfig{

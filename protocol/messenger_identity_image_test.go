@@ -122,7 +122,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 	keyUID := s.generateKeyUID(&m.identity.PublicKey)
 	m.account = &multiaccounts.Account{KeyUID: keyUID}
 
-	err := m.multiAccounts.SaveAccount(multiaccounts.Account{Name: "string", KeyUID: keyUID})
+	err := m.multiAccounts.SaveAccount(&multiaccounts.Account{Name: "string", KeyUID: keyUID})
 	s.NoError(err)
 }
 

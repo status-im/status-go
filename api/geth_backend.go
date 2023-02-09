@@ -183,7 +183,7 @@ func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
 	if b.multiaccountsDB == nil {
 		return errors.New("accounts db wasn't initialized")
 	}
-	return b.multiaccountsDB.SaveAccount(account)
+	return b.multiaccountsDB.SaveAccount(&account)
 }
 
 func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string) error {
@@ -292,21 +292,28 @@ func (b *GethStatusBackend) setupLogSettings() error {
 	return nil
 }
 
-// StartNodeWithKey instead of loading addresses from database this method derives address from key
-// and uses it in application.
-// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
-// with small variants for keycard, this created too many bugs
-func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+func (b *GethStatusBackend) getKDFFromDB(acc *multiaccounts.Account) error {
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
 			return err
 		}
-
 		acc.KDFIterations = kdfIterations
 	}
+	return nil
+}
 
-	err := b.ensureAppDBOpened(acc, password)
+// StartNodeWithKey instead of loading addresses from database this method derives address from key
+// and uses it in application.
+// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
+// with small variants for keycard, this created too many bugs
+func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	err := b.getKDFFromDB(&acc)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -386,7 +393,12 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
-	err := b.ensureAppDBOpened(acc, password)
+	err := b.getKDFFromDB(&acc)
+	if err != nil {
+		return err
+	}
+
+	err = b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
