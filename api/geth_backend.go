@@ -1289,32 +1289,34 @@ func (b *GethStatusBackend) ConnectionChange(typ string, expensive bool) {
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
 func (b *GethStatusBackend) AppStateChange(state string) {
+	var messenger *protocol.Messenger
 	s, err := parseAppState(state)
 	if err != nil {
 		log.Error("AppStateChange failed, ignoring", "error", err)
 		return // and do nothing
 	}
 
-	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
-	if b.statusNode != nil {
-		wakuext := b.statusNode.WakuExtService()
-
-		if wakuext != nil {
-			messenger := wakuext.Messenger()
-
-			if messenger != nil {
-				if s == appStateForeground {
-					messenger.ToForeground()
-				} else {
-					messenger.ToBackground()
-				}
-			}
-		}
-
+	if b.statusNode.WakuV2ExtService() != nil {
+		messenger = b.statusNode.WakuV2ExtService().Messenger()
 	}
 
+	if b.statusNode.WakuExtService() != nil {
+		messenger = b.statusNode.WakuExtService().Messenger()
+	}
+
+	if b.statusNode != nil {
+		if messenger != nil {
+			if s == appStateForeground {
+				messenger.ToForeground()
+			} else {
+				messenger.ToBackground()
+			}
+		} else {
+			log.Warn("messenger nil, not reporting app state change")
+		}
+	}
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }

@@ -4444,6 +4444,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.ContentType == protobuf.ChatMessage_IMAGE {
 		msg.ImageLocalURL = s.MakeImageURL(msg.ID)
 	}
+
 	if msg.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
 
 		dm := msg.GetDiscordMessage()
