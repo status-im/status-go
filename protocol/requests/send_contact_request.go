@@ -3,14 +3,17 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/api/multiformat"
 )
 
 var ErrSendContactRequestInvalidID = errors.New("send-contact-request: invalid id")
 var ErrSendContactRequestInvalidMessage = errors.New("send-contact-request: invalid message")
 
+const legacyKeyLength    = 132
+
+
 type SendContactRequest struct {
-	ID      types.HexBytes `json:"id"`
+	ID      string          `json:"id"`
 	Message string         `json:"message"`
 }
 
@@ -24,4 +27,15 @@ func (a *SendContactRequest) Validate() error {
 	}
 
 	return nil
+}
+
+func ConvertCompressedToLegacyKey(k string) (string, error) {
+  if len(k) == legacyKeyLength {
+    return k, nil
+  }
+  return multiformat.DeserializeCompressedKey(k)
+}
+
+func (a *SendContactRequest) HexID() (string, error) {
+  return ConvertCompressedToLegacyKey(a.ID)
 }

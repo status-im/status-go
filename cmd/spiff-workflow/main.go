@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
-	wakuextn "github.com/status-im/status-go/services/wakuext"
+	waku2extn "github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -123,13 +123,13 @@ func main() {
 		return
 	}
 
-	wakuextservice := backend.StatusNode().WakuExtService()
+	wakuextservice := backend.StatusNode().WakuV2ExtService()
 	if wakuextservice == nil {
 		logger.Error("wakuext not available")
 		return
 	}
 
-	wakuext := wakuextn.NewPublicAPI(wakuextservice)
+	wakuext := waku2extn.NewPublicAPI(wakuextservice)
 
 	// This will start the push notification server as well as
 	// the config is set to Enabled
@@ -152,13 +152,13 @@ func getDefaultDataDir() string {
 
 func setupLogging(config *params.NodeConfig) {
 	if *logLevel != "" {
-		config.LogLevel = *logLevel
+		config.LogLevel = "DEBUG"
 	}
 
 	logSettings := logutils.LogSettings{
 		Enabled:         config.LogEnabled,
 		MobileSystem:    config.LogMobileSystem,
-		Level:           config.LogLevel,
+		Level:           "DEBUG",
 		File:            config.LogFile,
 		MaxSize:         config.LogMaxSize,
 		MaxBackups:      config.LogMaxBackups,
@@ -266,7 +266,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
-	nodeConfig.LogLevel = "ERROR"
+	nodeConfig.LogLevel = "DEBUG"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
         nodeConfig.HTTPEnabled = true
         nodeConfig.HTTPPort = 8545
@@ -292,12 +292,17 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
+        nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
+	nodeConfig.ClusterConfig.WakuNodes = nodes
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
+
 	nodeConfig.EnableNTPSync = true
-	nodeConfig.WakuConfig = params.WakuConfig{
-		Enabled:     true,
-		LightClient: true,
-		MinimumPoW:  0.000001,
-	}
+        nodeConfig.WakuV2Config = params.WakuV2Config{
+          Enabled: true,
+          EnableDiscV5: true,
+          DiscoveryLimit: 20,
+          UDPPort: 9002,
+        }
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      "",

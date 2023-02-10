@@ -350,7 +350,10 @@ func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (
 		return nil, err
 	}
 
-        chatID := request.ID.String()
+        chatID, err := request.HexID()
+        if err != nil {
+          return nil, err
+        }
 
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {

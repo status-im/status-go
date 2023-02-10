@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -34,13 +35,22 @@ func (m *Messenger) validateAddedGroupMembers(members []string) error {
 }
 
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
-	if err := m.validateAddedGroupMembers(members); err != nil {
+        var convertedKeyMembers []string
+        for _, m := range members {
+          k, err := requests.ConvertCompressedToLegacyKey(m)
+          if err != nil {
+            return nil, err
+          }
+          convertedKeyMembers = append(convertedKeyMembers, k)
+
+        }
+	if err := m.validateAddedGroupMembers(convertedKeyMembers); err != nil {
 		return nil, err
 	}
 
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
-	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
+	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", convertedKeyMembers))
 	chat := CreateGroupChat(m.getTimesource())
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
@@ -57,8 +67,8 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 
 	// Add members
-	if len(members) > 0 {
-		event := v1protocol.NewMembersAddedEvent(members, clock)
+	if len(convertedKeyMembers) > 0 {
+		event := v1protocol.NewMembersAddedEvent(convertedKeyMembers, clock)
 		event.ChatID = chat.ID
 		err = event.Sign(m.identity)
 		if err != nil {

@@ -280,7 +280,7 @@ func (b *GethStatusBackend) setupLogSettings() error {
 	logSettings := logutils.LogSettings{
 		Enabled:         b.config.LogEnabled,
 		MobileSystem:    b.config.LogMobileSystem,
-		Level:           b.config.LogLevel,
+		Level:           "DEBUG",
 		File:            b.config.LogFile,
 		MaxSize:         b.config.LogMaxSize,
 		MaxBackups:      b.config.LogMaxBackups,
@@ -866,6 +866,11 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	}
 
 	if inputNodeCfg != nil {
+          if conf != nil && conf.ShhextConfig.InstallationID != "" {
+            inputNodeCfg.ShhextConfig.InstallationID = conf.ShhextConfig.InstallationID
+          }
+
+
 		conf, err = b.OverwriteNodeConfigValues(conf, inputNodeCfg)
 		if err != nil {
 			return err

@@ -53,7 +53,10 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		return nil, err
 	}
 
-	chatID := request.ID.String()
+	chatID, err := request.HexID()
+        if err != nil {
+          return nil, err
+        }
 
 	response, err := m.addContact(chatID, "", "", "", "", false, false)
 	if err != nil {

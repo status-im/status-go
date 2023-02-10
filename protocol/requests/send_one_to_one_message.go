@@ -3,14 +3,13 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 var ErrSendOneToOneMessageInvalidID = errors.New("send-one-to-one-message: invalid id")
 var ErrSendOneToOneMessageInvalidMessage = errors.New("send-one-to-one-message: invalid message")
 
 type SendOneToOneMessage struct {
-	ID      types.HexBytes `json:"id"`
+	ID      string `json:"id"`
 	Message string         `json:"message"`
 }
 
@@ -24,4 +23,8 @@ func (a *SendOneToOneMessage) Validate() error {
 	}
 
 	return nil
+}
+
+func (a *SendOneToOneMessage) HexID() (string, error) {
+  return ConvertCompressedToLegacyKey(a.ID)
 }

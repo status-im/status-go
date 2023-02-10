@@ -25,6 +25,15 @@ The server will be listening on `localhost:8545` and it will respond to RPC call
 
 ### Sending a message
 
+First add the user as a contact:
+
+```
+   curl -XPOST http://localhost:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"wakuext_sendContactRequest","params":[{"id": "0x04d3c86dfc77b195b705e1831935066076018aa0d7c40044829801ebbfe9b06480ce4662072bf16a3ca7cb8f6289207614deceaf7d33e099dfc9281610375fec08", "message": "hello"}],"id":1}'
+```
+
+Accept the contact request in the receiving device (you should see a notification in the activity center)
+
+
 ```
 curl -XPOST http://localhost:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"wakuext_sendOneToOneMessage","params":[{"id": "0x04e431a0baaac2602052f259d4304371d0e0d86cb024497899cf3e82211ff17a9723d8ca67b6575a700086b2aa6ab0df4dab1f8e94114912f269fc6b1ee6764a58", "message": "hello"}],"id":1}'
 ```
