@@ -5,7 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -61,7 +60,8 @@ func makeCookieStore() (*sessions.CookieStore, error) {
 // NewPairingServer returns a *Server init from the given *Config
 func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, error) {
 	logger := logutils.ZapLogger().Named("Server")
-	pm, err := NewAccountPayloadManager(config.EK, config.AccountPayloadManagerConfig, logger)
+	accountPayloadManagerConfig := config.AccountPayloadManagerConfig
+	pm, err := NewAccountPayloadManager(config.EK, accountPayloadManagerConfig, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 		return nil, err
 	}
 
-	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, config.EK, backend, config.KeystorePath)
+	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, config.EK, backend, accountPayloadManagerConfig.GetNodeConfig(), accountPayloadManagerConfig.GetSettingCurrentNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -189,13 +189,12 @@ func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfi
 // StartUpPairingServer generates a Server, starts the pairing server in the correct mode
 // and returns the ConnectionParams string to allow a Client to make a successful connection.
 func StartUpPairingServer(backend *api.GethStatusBackend, mode Mode, configJSON string) (string, error) {
-	var conf PayloadSourceConfig
-	err := json.Unmarshal([]byte(configJSON), &conf)
+	conf, err := NewPayloadSourceForServer(configJSON, mode)
 	if err != nil {
 		return "", err
 	}
 
-	ps, err := MakeFullPairingServer(backend, mode, &conf)
+	ps, err := MakeFullPairingServer(backend, mode, conf)
 	if err != nil {
 		return "", err
 	}

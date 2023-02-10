@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -76,7 +75,7 @@ func NewPairingClient(backend *api.GethStatusBackend, c *ConnectionParams, confi
 		return nil, err
 	}
 
-	rmpm, err := NewRawMessagePayloadManager(logutils.ZapLogger().Named("Client"), pm.accountPayload, c.aesKey, backend, config.KeystorePath)
+	rmpm, err := NewRawMessagePayloadManager(logutils.ZapLogger().Named("Client"), pm.accountPayload, c.aesKey, backend, config.GetNodeConfig(), config.GetSettingCurrentNetwork())
 	if err != nil {
 		return nil, err
 	}
@@ -280,19 +279,18 @@ func StartUpPairingClient(backend *api.GethStatusBackend, cs, configJSON string)
 }
 
 func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (*Client, error) {
-	var conf PayloadSourceConfig
-	err := json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return nil, err
-	}
-
 	ccp := new(ConnectionParams)
-	err = ccp.FromString(cs)
+	err := ccp.FromString(cs)
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := NewPairingClient(backend, ccp, &AccountPayloadManagerConfig{backend.GetMultiaccountDB(), &conf})
+	conf, err := NewPayloadSourceForClient(configJSON, ccp.serverMode)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := NewPairingClient(backend, ccp, &AccountPayloadManagerConfig{backend.GetMultiaccountDB(), conf})
 	if err != nil {
 		return nil, err
 	}

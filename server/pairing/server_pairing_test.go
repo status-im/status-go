@@ -41,6 +41,10 @@ func (s *PairingServerSuite) TestMultiBackgroundForeground() {
 	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.PS.MakeBaseURL().String()) // nolint: gosimple
 }
 
+func newAccountPayloadManagerConfig() *AccountPayloadManagerConfig {
+	return &AccountPayloadManagerConfig{}
+}
+
 func (s *PairingServerSuite) TestMultiTimeout() {
 	s.PS.SetTimeout(20)
 
@@ -101,9 +105,7 @@ func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 		err = ccp.FromString(qr)
 		s.Require().NoError(err)
 
-		c, err := NewPairingClient(nil, ccp, &AccountPayloadManagerConfig{
-			PayloadSourceConfig: &PayloadSourceConfig{KeystorePath: ""},
-		})
+		c, err := NewPairingClient(nil, ccp, newAccountPayloadManagerConfig())
 		s.Require().NoError(err)
 
 		// Compare cert values
@@ -164,9 +166,7 @@ func (s *PairingServerSuite) sendingSetup() *Client {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewPairingClient(nil, ccp, &AccountPayloadManagerConfig{
-		PayloadSourceConfig: &PayloadSourceConfig{KeystorePath: ""},
-	})
+	c, err := NewPairingClient(nil, ccp, newAccountPayloadManagerConfig())
 	s.Require().NoError(err)
 
 	// Replace PairingClient.PayloadManager with a MockEncryptOnlyPayloadManager
@@ -277,9 +277,7 @@ func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewPairingClient(nil, ccp, &AccountPayloadManagerConfig{
-		PayloadSourceConfig: &PayloadSourceConfig{KeystorePath: ""},
-	})
+	c, err := NewPairingClient(nil, ccp, newAccountPayloadManagerConfig())
 	s.Require().NoError(err)
 
 	thing, err := makeThingToSay()

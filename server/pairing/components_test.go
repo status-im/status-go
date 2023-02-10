@@ -114,15 +114,11 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	require.NoError(t, err)
 
 	tpsc.PS, err = NewPairingServer(nil, &Config{
-		PK:       &tpsc.EphemeralPK.PublicKey,
-		EK:       tpsc.EphemeralAES,
-		Cert:     &tpsc.Cert,
-		Hostname: tpsc.OutboundIP.String(),
-		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{
-			PayloadSourceConfig: &PayloadSourceConfig{
-				KeystorePath: "",
-			},
-		}})
+		PK:                          &tpsc.EphemeralPK.PublicKey,
+		EK:                          tpsc.EphemeralAES,
+		Cert:                        &tpsc.Cert,
+		Hostname:                    tpsc.OutboundIP.String(),
+		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{}})
 	require.NoError(t, err)
 }
 

@@ -297,5 +297,4 @@ message SyncRawMessage {
   // we need these to be able to login
   bytes subAccountsJsonBytes = 2;
   bytes settingsJsonBytes = 3;
-  bytes nodeConfigJsonBytes = 4;
 }
