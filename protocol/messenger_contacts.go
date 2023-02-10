@@ -23,7 +23,9 @@ func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*Messe
 	}
 
 	m.logger.Info("acceptContactRequest")
-	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, syncing, false)
+	// We send a contact update for compatibility with 0.90 desktop, once that's
+	// not an issue anymore, we can set the last bool flag to `false`
+	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, syncing, true)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -351,8 +353,14 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		if err != nil {
 			return nil, err
 		}
-	} else if len(contactRequestID) != 0 {
-		response, err = m.updateAcceptedContactRequest(response, contactRequestID)
+	}
+
+	if len(contactRequestID) != 0 {
+		updatedResponse, err := m.updateAcceptedContactRequest(response, contactRequestID)
+		if err != nil {
+			return nil, err
+		}
+		err = response.Merge(updatedResponse)
 		if err != nil {
 			return nil, err
 		}

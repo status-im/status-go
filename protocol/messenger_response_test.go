@@ -55,11 +55,6 @@ func TestMessengerResponseMergeNotImplemented(t *testing.T) {
 	response1 := &MessengerResponse{}
 
 	response2 := &MessengerResponse{
-		Contacts: []*Contact{{}},
-	}
-	require.Error(t, response1.Merge(response2))
-
-	response2 = &MessengerResponse{
 		Installations: []*multidevice.Installation{{}},
 	}
 	require.Error(t, response1.Merge(response2))

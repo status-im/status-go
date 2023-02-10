@@ -257,8 +257,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 // Merge takes another response and appends the new Chats & new Messages and replaces
 // the existing Messages & Chats if they have the same ID
 func (r *MessengerResponse) Merge(response *MessengerResponse) error {
-	if len(response.Contacts)+
-		len(response.Installations)+
+	if len(response.Installations)+
 		len(response.EmojiReactions)+
 		len(response.Invitations)+
 		len(response.RequestsToJoinCommunity)+
@@ -573,6 +572,12 @@ func (r *MessengerResponse) AddContact(c *Contact) {
 	}
 
 	r.Contacts = append(r.Contacts, c)
+}
+
+func (r *MessengerResponse) AddContacts(contacts []*Contact) {
+	for idx := range contacts {
+		r.AddContact(contacts[idx])
+	}
 }
 
 func (r *MessengerResponse) SetMessages(messages []*common.Message) {
