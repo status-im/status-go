@@ -197,3 +197,9 @@ func (cp *ConnectionParams) URL() (*url.URL, error) {
 	}
 	return u, nil
 }
+
+func IsValidConnectionString(cs string) error {
+	ccp := ConnectionParams{}
+	err := ccp.FromString(cs)
+	return err
+}
