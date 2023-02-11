@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -46,6 +47,7 @@ var zeroAddress = types.Address{}
 // Manager represents account manager interface.
 type Manager struct {
 	mu       sync.RWMutex
+	Keydir   string
 	keystore types.KeyStore
 
 	accountsGenerator *generator.Generator
@@ -546,6 +548,7 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 		return nil
 	}
 
+	keyDirPath = strings.TrimSuffix(keyDirPath, "/")
 	keyParent, keyDirName := filepath.Split(keyDirPath)
 
 	// backupKeyDirName used to store existing keys before final write
