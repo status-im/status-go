@@ -539,9 +539,14 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
 	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID))
 	config := b.StatusNode().Config()
+	keyDir := ""
+	if config == nil {
+		keyDir = b.accountManager.Keydir
+	} else {
+		keyDir = config.KeyStoreDir
+	}
 
-	if config != nil {
-		keyDir := config.KeyStoreDir
+	if keyDir != "" {
 		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
 		if err != nil {
 			return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
