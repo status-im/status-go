@@ -1012,8 +1012,12 @@ func InputConnectionStringForBootstrapping(cs string, configJSON string) string 
 	return makeJSONResponse(err)
 }
 
-func IsValidConnectionString(cs string) string {
-	return pairing.IsValidConnectionString(cs).Error()
+func ValidateConnectionString(cs string) string {
+	err := pairing.ValidateConnectionString(cs)
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func EncodeTransfer(to string, value string) string {
