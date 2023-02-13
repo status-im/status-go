@@ -1082,6 +1082,8 @@ func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
 
+// UnreadAndAcceptedActivityCenterNotificationsCount is a temporary endpoint to
+// support the mobile client needs.
 func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []protocol.ActivityCenterType) (uint64, error) {
 	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
@@ -1117,6 +1119,10 @@ func (api *PublicAPI) AcceptActivityCenterNotifications(ctx context.Context, ids
 func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
 	_, err := api.service.messenger.DismissActivityCenterNotifications(ctx, ids, true)
 	return err
+}
+
+func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
+	return api.service.messenger.DeleteActivityCenterNotifications(ctx, ids, false)
 }
 
 func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {

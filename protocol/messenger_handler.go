@@ -895,7 +895,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 	}
 
 	// We remove anything that's related to this contact request
-	err := m.persistence.RemoveAllContactRequestActivityCenterNotifications(contact.ID)
+	err := m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
 	if err != nil {
 		return err
 	}
