@@ -262,7 +262,7 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 	return m.persistence.ActiveContactRequestNotification(contactID)
 }
 
-func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message) error {
+func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
 
 	if contactRequest == nil || contactRequest.ContactRequestState == common.ContactRequestStatePending {
 		notification, err := m.PendingNotificationContactRequest(contact.ID)
@@ -330,7 +330,12 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 		contactRequest.Clock = messageState.CurrentMessageState.Message.Clock
 		contactRequest.ID = defaultID
-		contactRequest.ContactRequestState = common.ContactRequestStatePending
+
+		if contact.mutual() {
+			contactRequest.ContactRequestState = common.ContactRequestStateAccepted
+		} else {
+			contactRequest.ContactRequestState = common.ContactRequestStatePending
+		}
 		err = contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			return err
@@ -342,6 +347,10 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 		if err != nil {
 			return err
 		}
+	}
+
+	if !createNewNotification {
+		return nil
 	}
 
 	notification := &ActivityCenterNotification{
@@ -801,11 +810,9 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 		state.AllChats.Store(chat.ID, chat)
 	}
 
-	// We only want to update a notification here, we don't want (yet) to
-	// create a new one
 	if originalRequest != nil {
 		// Update contact requests if existing, or create a new one
-		err = m.createContactRequestNotification(contact, state, originalRequest)
+		err = m.createContactRequestNotification(contact, state, originalRequest, processingResponse.newContactRequestReceived)
 		if err != nil {
 			m.logger.Warn("could not create contact request notification", zap.Error(err))
 		}
@@ -892,8 +899,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		}
 		if result.newContactRequestReceived {
-			logger.Debug("creating contact request notification")
-			err = m.createContactRequestNotification(contact, state, nil)
+			err = m.createContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				return err
 			}
@@ -906,7 +912,6 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 	}
 
 	if contact.LastUpdated < message.Clock {
-		logger.Debug("Updating contact")
 		if contact.EnsName != message.EnsName {
 			contact.EnsName = message.EnsName
 			contact.ENSVerified = false
@@ -918,7 +923,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		r := contact.ContactRequestReceived(message.ContactRequestClock)
 		if r.newContactRequestReceived {
-			err = m.createContactRequestNotification(contact, state, nil)
+			err = m.createContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				m.logger.Warn("could not create contact request notification", zap.Error(err))
 			}
@@ -1722,7 +1727,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			}
 		}
 		if result.newContactRequestReceived {
-			err = m.createContactRequestNotification(contact, state, receivedMessage)
+			err = m.createContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
@@ -1751,7 +1756,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		state.AllContacts.Store(chatContact.ID, chatContact)
 
 		if sendNotification {
-			err = m.createContactRequestNotification(chatContact, state, receivedMessage)
+			err = m.createContactRequestNotification(chatContact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}

@@ -100,7 +100,7 @@ func (m *Messenger) handleSyncSavedAddress(state *ReceivedMessageState, syncMess
 		if err != nil {
 			return err
 		}
-		state.Response.SavedAddresses = append(state.Response.SavedAddresses, &wallet.SavedAddress{ChainID: syncMessage.ChainId, Address: address})
+		state.Response.AddSavedAddress(&wallet.SavedAddress{ChainID: syncMessage.ChainId, Address: address})
 	} else {
 		sa := wallet.SavedAddress{
 			Address:   address,
@@ -113,7 +113,7 @@ func (m *Messenger) handleSyncSavedAddress(state *ReceivedMessageState, syncMess
 		if err != nil {
 			return err
 		}
-		state.Response.SavedAddresses = append(state.Response.SavedAddresses, &sa)
+		state.Response.AddSavedAddress(&sa)
 	}
 	return
 }

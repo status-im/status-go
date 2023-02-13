@@ -108,40 +108,40 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
 	s.Require().NoError(err)
-	s.Require().Len(response.EmojiReactions, 1)
+	s.Require().Len(response.EmojiReactions(), 1)
 
-	emojiID := response.EmojiReactions[0].ID()
+	emojiID := response.EmojiReactions()[0].ID()
 
 	// Wait for the emoji to arrive to alice
 	response, err = WaitOnMessengerResponse(
 		alice,
-		func(r *MessengerResponse) bool { return len(r.EmojiReactions) > 0 },
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions()) == 1 },
 		"no emoji",
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.EmojiReactions, 1)
-	s.Require().Equal(response.EmojiReactions[0].ID(), emojiID)
-	s.Require().Equal(response.EmojiReactions[0].Type, protobuf.EmojiReaction_SAD)
+	s.Require().Len(response.EmojiReactions(), 1)
+	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
+	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
 
 	// Retract the emoji
 	response, err = bob.SendEmojiReactionRetraction(context.Background(), emojiID)
 	s.Require().NoError(err)
-	s.Require().Len(response.EmojiReactions, 1)
-	s.Require().True(response.EmojiReactions[0].Retracted)
+	s.Require().Len(response.EmojiReactions(), 1)
+	s.Require().True(response.EmojiReactions()[0].Retracted)
 
 	// Wait for the emoji to arrive to alice
 	response, err = WaitOnMessengerResponse(
 		alice,
-		func(r *MessengerResponse) bool { return len(r.EmojiReactions) > 0 },
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions()) == 1 },
 		"no emoji",
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.EmojiReactions, 1)
-	s.Require().Equal(response.EmojiReactions[0].ID(), emojiID)
-	s.Require().Equal(response.EmojiReactions[0].Type, protobuf.EmojiReaction_SAD)
-	s.Require().True(response.EmojiReactions[0].Retracted)
+	s.Require().Len(response.EmojiReactions(), 1)
+	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
+	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
+	s.Require().True(response.EmojiReactions()[0].Retracted)
 	s.Require().NoError(bob.Shutdown())
 }
 
@@ -198,7 +198,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		alice,
-		func(r *MessengerResponse) bool { return len(r.EmojiReactions) > 0 },
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions()) == 1 },
 		"no emoji reaction received",
 	)
 	s.Require().NoError(err)

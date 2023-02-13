@@ -106,7 +106,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 			return err
 		}
 
-		if response.VerificationRequests != nil {
+		if len(response.VerificationRequests()) == 1 {
 			return nil
 		}
 		return errors.New("Not received all verification requests")

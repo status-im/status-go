@@ -61,8 +61,7 @@ func (s *MessengerContactRequestSuite) newMessenger(shh types.Waku) *Messenger {
 	return messenger
 }
 
-// NOTE(cammellos): Disabling for hotfix
-func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequest() { //nolint: unused
+func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //nolint: unused
 
 	messageText := "hello!"
 
@@ -156,7 +155,7 @@ func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequest() { //
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -172,9 +171,18 @@ func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequest() { //
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	var message *common.Message
+
+	for _, m := range resp.Messages() {
+		if m.ID == contactRequests[0].ID {
+			message = m
+		}
+	}
+	s.Require().NotNil(message)
+
+	s.Require().Equal(message.ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -278,8 +286,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	s.Require().Len(contacts, 0)
 }
 
-// NOTE(cammellos): Disabling for hotfix
-func (s *MessengerContactRequestSuite) testReceiveAcceptAndRetractContactRequest() { //nolint: unused
+func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest() { //nolint: unused
 
 	messageText := "hello!"
 
@@ -376,7 +383,7 @@ func (s *MessengerContactRequestSuite) testReceiveAcceptAndRetractContactRequest
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0 && len(r.Contacts) > 0
+			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1 && len(r.Contacts) == 1
 		},
 		"no messages",
 	)
@@ -393,9 +400,18 @@ func (s *MessengerContactRequestSuite) testReceiveAcceptAndRetractContactRequest
 
 	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	var message *common.Message
+
+	for _, m := range resp.Messages() {
+		if m.ID == contactRequests[0].ID {
+			message = m
+		}
+	}
+	s.Require().NotNil(message)
+
+	s.Require().Equal(message.ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -483,8 +499,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
 }
 
-// NOTE(cammellos): disabling for hotfix
-func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequestTwice() { //nolint: unused
+func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice() { //nolint: unused
 
 	messageText := "hello!"
 
@@ -575,7 +590,7 @@ func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequestTwice()
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -588,9 +603,19 @@ func (s *MessengerContactRequestSuite) testReceiveAndAcceptContactRequestTwice()
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Len(resp.Messages(), 2)
+
+	var message *common.Message
+
+	for _, m := range resp.Messages() {
+		if m.ID == contactRequests[0].ID {
+			message = m
+		}
+	}
+	s.Require().NotNil(message)
+
+	s.Require().Equal(message.ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -660,11 +685,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			contactRequests, _, err := theirMessenger.PendingContactRequests("", 10)
-			if err != nil {
-				return false
-			}
-			return len(contactRequests) == 1
+			return len(r.Contacts) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -719,7 +740,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -727,26 +748,33 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	// We receive two messages, one for the default contact request, that
+	// is dispatched for backward compatibility, and one for the updated
+	// contact request that we sent
 	s.Require().Len(resp.Messages(), 2)
-	// TODO(cammellos): This code duplicates contact requests
-	// this is a known issue, we want to merge this quickly
-	// for RC(1.21), but will be addresse immediately after
-	/*
-		s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-		s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	var message *common.Message
 
-		// Check activity center notification is of the right type
-		s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
-		s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
-		s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	for _, m := range resp.Messages() {
+		if m.ID == contactRequests[0].ID {
+			message = m
+		}
+	}
+	s.Require().NotNil(message)
+	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
-		// Make sure we consider them a mutual contact, sender side
-		mutualContacts = s.m.MutualContacts()
-		s.Require().Len(mutualContacts, 1)
+	// Check activity center notification is of the right type
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
-		// Check the contact state is correctly set
-		s.Require().Len(resp.Contacts, 1)
-		s.Require().True(resp.Contacts[0].mutual()) */
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts = s.m.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
 }
 
 func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact() {
@@ -1049,8 +1077,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 }
 
-// NOTE(cammellos): Disabling for hotfix
-func (s *MessengerContactRequestSuite) testAcceptLatestLegacyContactRequestForContact() { // nolint: unused
+func (s *MessengerContactRequestSuite) TestAcceptLatestLegacyContactRequestForContact() { // nolint: unused
 
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
