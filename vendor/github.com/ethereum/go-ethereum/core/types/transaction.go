@@ -52,6 +52,7 @@ const (
 	ArbitrumSubmitRetryableTxType = 105
 	ArbitrumInternalTxType        = 106
 	ArbitrumLegacyTxType          = 120
+	OptimismDepositTxType         = 126
 )
 
 // Transaction is an Ethereum transaction.
