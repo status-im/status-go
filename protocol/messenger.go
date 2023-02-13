@@ -2959,12 +2959,10 @@ func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKe
 	notification.Message = message
 	notification.ReplyMessage = responseTo
 
-	err = m.persistence.SaveActivityCenterNotification(notification)
+	err = m.addActivityCenterNotification(r.Response, notification)
 	if err != nil {
-		m.logger.Error("failed to save notification", zap.Error(err))
 		return err
 	}
-	r.Response.AddActivityCenterNotification(notification)
 
 	return nil
 }
@@ -2995,12 +2993,10 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			Author:       message.From,
 		}
 
-		err := m.persistence.SaveActivityCenterNotification(notification)
+		err := m.addActivityCenterNotification(r.Response, notification)
 		if err != nil {
-			m.logger.Error("failed to save notification", zap.Error(err))
 			return err
 		}
-		r.Response.AddActivityCenterNotification(notification)
 	}
 
 	return nil

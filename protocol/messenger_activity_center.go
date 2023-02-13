@@ -24,6 +24,10 @@ func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
 	return m.persistence.HasUnseenActivityCenterNotifications()
 }
 
+func (m *Messenger) GetActivityCenterState() (*ActivityCenterState, error) {
+	return m.persistence.GetActivityCenterState()
+}
+
 func toHexBytes(b [][]byte) []types.HexBytes {
 	hb := make([]types.HexBytes, len(b))
 
@@ -44,25 +48,50 @@ func fromHexBytes(hb []types.HexBytes) [][]byte {
 	return b
 }
 
-func (m *Messenger) MarkAsSeenActivityCenterNotifications() error {
-	return m.persistence.MarkAsSeenActivityCenterNotifications()
+func (m *Messenger) MarkAsSeenActivityCenterNotifications() (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+	err := m.persistence.MarkAsSeenActivityCenterNotifications()
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+
+	response.SetActivityCenterState(state)
+	return response, nil
 }
 
-func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
+func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
 	if m.hasPairedDevices() {
 		ids, err := m.persistence.GetNotReadActivityCenterNotificationIds()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		_, err = m.MarkActivityCenterNotificationsRead(ctx, toHexBytes(ids), true)
-		return err
+		return nil, err
 	}
 
-	return m.persistence.MarkAllActivityCenterNotificationsRead()
+	err := m.persistence.MarkAllActivityCenterNotificationsRead()
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+
+	response.SetActivityCenterState(state)
+	return response, nil
 }
 
 func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
 	err := m.persistence.MarkActivityCenterNotificationsRead(ids)
 	if err != nil {
 		return nil, err
@@ -91,12 +120,33 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ,
 		ResendAutomatically: true,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, err
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+
+	response.SetActivityCenterState(state)
+	return response, nil
 }
 
-func (m *Messenger) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
-	return m.persistence.MarkActivityCenterNotificationsUnread(ids)
+func (m *Messenger) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+	err := m.persistence.MarkActivityCenterNotificationsUnread(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+
+	response.SetActivityCenterState(state)
+	return response, nil
 }
 
 func (m *Messenger) processActivityCenterNotifications(notifications []*ActivityCenterNotification, addNotifications bool) (*MessengerResponse, error) {

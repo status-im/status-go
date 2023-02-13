@@ -1826,7 +1826,6 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Check we have no unseen messages
 	state, err := p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), state.Unread)
 	require.True(t, state.HasSeen)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
@@ -1885,7 +1884,6 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Check we have unseen notifications
 	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), state.Unread)
 	require.False(t, state.HasSeen)
 
 	// Mark first one as read
@@ -1972,7 +1970,6 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Check we still have unseen notifications
 	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), state.Unread)
 	require.False(t, state.HasSeen)
 
 	// Mark as unseen
@@ -1982,7 +1979,6 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Check we have no unseen notifications
 	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), state.Unread)
 	require.True(t, state.HasSeen)
 }
 

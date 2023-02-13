@@ -293,7 +293,7 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 				// Otherwise, it means we have already passed it to the client, so we add it with a `dismissed` flag
 				// so it can clean up
 				if !found {
-					messageState.Response.AddActivityCenterNotification(notification)
+					messageState.Response.AddActivityCenterNotification(notification) // TODO: does we need here to update state?
 				}
 			}
 		}
@@ -1249,12 +1249,11 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			MembershipStatus: ActivityCenterMembershipStatusPending,
 		}
 
-		err = m.persistence.SaveActivityCenterNotification(notification)
+		err = m.addActivityCenterNotification(state.Response, notification)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return err
 		}
-		state.Response.AddActivityCenterNotification(notification)
 	} else {
 		// Activity Center notification, updating existing for accespted/declined
 		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
@@ -1268,12 +1267,11 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			} else {
 				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 			}
-			err = m.persistence.SaveActivityCenterNotification(notification)
+			err = m.addActivityCenterNotification(state.Response, notification)
 			if err != nil {
-				m.logger.Warn("failed to update notification", zap.Error(err))
+				m.logger.Error("failed to save notification", zap.Error(err))
 				return err
 			}
-			state.Response.AddActivityCenterNotification(notification)
 		}
 	}
 
@@ -1352,12 +1350,11 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}
-		err = m.persistence.SaveActivityCenterNotification(notification)
+		err = m.addActivityCenterNotification(state.Response, notification)
 		if err != nil {
 			m.logger.Warn("failed to update notification", zap.Error(err))
 			return err
 		}
-		state.Response.AddActivityCenterNotification(notification)
 	}
 
 	return nil
@@ -1390,12 +1387,11 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 		CommunityID: string(requestToLeaveProto.CommunityId),
 	}
 
-	err = m.persistence.SaveActivityCenterNotification(notification)
+	err = m.addActivityCenterNotification(state.Response, notification)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return err
 	}
-	state.Response.AddActivityCenterNotification(notification)
 
 	return nil
 }
@@ -1883,7 +1879,15 @@ func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, n
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return err
 	}
+
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		m.logger.Error("failed to obtain activity center state", zap.Error(err))
+		return err
+	}
+
 	response.AddActivityCenterNotification(notification)
+	response.SetActivityCenterState(state)
 	return nil
 }
 

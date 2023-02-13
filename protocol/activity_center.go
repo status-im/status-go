@@ -64,8 +64,7 @@ type ActivityCenterPaginationResponse struct {
 }
 
 type ActivityCenterState struct {
-	Unread  uint64 `json:"unread"`
-	HasSeen bool   `json:"hasSeen"`
+	HasSeen bool `json:"hasSeen"`
 }
 
 func (n *ActivityCenterNotification) Valid() error {

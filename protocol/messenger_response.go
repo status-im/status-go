@@ -261,7 +261,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.trustStatus)+
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
-		len(r.SavedAddresses) == 0 &&
+		len(r.savedAddresses) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil
 }
@@ -521,8 +521,8 @@ func (r *MessengerResponse) ActivityCenterNotifications() []*ActivityCenterNotif
 	return ns
 }
 
-func (r *MessengerResponse) SetActivityCenterState(activityCenterState ActivityCenterState) {
-	r.activityCenterState = &activityCenterState
+func (r *MessengerResponse) SetActivityCenterState(activityCenterState *ActivityCenterState) {
+	r.activityCenterState = activityCenterState
 }
 
 func (r *MessengerResponse) ActivityCenterState() *ActivityCenterState {

@@ -1086,20 +1086,23 @@ func (api *PublicAPI) HasUnseenActivityCenterNotifications() (bool, error) {
 	return api.service.messenger.HasUnseenActivityCenterNotifications()
 }
 
-func (api *PublicAPI) MarkAsSeenActivityCenterNotifications() error {
+func (api *PublicAPI) GetActivityCenterState() (*protocol.ActivityCenterState, error) {
+	return api.service.messenger.GetActivityCenterState()
+}
+
+func (api *PublicAPI) MarkAsSeenActivityCenterNotifications() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAsSeenActivityCenterNotifications()
 }
 
-func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) error {
+func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAllActivityCenterNotificationsRead(ctx)
 }
 
-func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes) error {
-	_, err := api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, true)
-	return err
+func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, true)
 }
 
-func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
+func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkActivityCenterNotificationsUnread(ids)
 }
 
