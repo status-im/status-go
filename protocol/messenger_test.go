@@ -2431,13 +2431,21 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 
 // WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
-	var response *MessengerResponse
-	return response, tt.RetryWithBackOff(func() error {
+	response := &MessengerResponse{}
+	err := tt.RetryWithBackOff(func() error {
 		var err error
-		response, err = m.RetrieveAll()
+		r, err := m.RetrieveAll()
+		if err := response.Merge(r); err != nil {
+			panic(err)
+		}
+
 		if err == nil && !condition(response) {
 			err = errors.New(errorMessage)
 		}
 		return err
 	})
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }

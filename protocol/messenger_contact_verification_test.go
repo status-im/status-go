@@ -19,8 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-// NOTE(cammellos): Disabling for hotfix
-func testMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unused
+func TestMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unused
 	suite.Run(t, new(MessengerVerificationRequests))
 }
 
@@ -136,7 +135,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0 && len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -149,9 +148,18 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Len(resp.Messages(), 2)
+	var message *common.Message
+
+	for _, m := range resp.Messages() {
+		if m.ID == contactRequests[0].ID {
+			message = m
+		}
+	}
+	s.Require().NotNil(message)
+
+	s.Require().Equal(message.ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -175,8 +183,8 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	verificationRequestID := resp.VerificationRequests[0].ID
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
@@ -187,13 +195,13 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
@@ -213,10 +221,10 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().NoError(err)
 
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
-	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusACCEPTED)
+	s.Require().NotEmpty(resp.VerificationRequests()[0].RepliedAt)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -237,20 +245,20 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0
+			return len(r.VerificationRequests()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 
 	messages := resp.Messages()
 	s.Require().Len(messages, 2)
 	var originalMessage *common.Message
 	var replyMessage *common.Message
 
-	if messages[0].ID == resp.VerificationRequests[0].ID {
+	if messages[0].ID == resp.VerificationRequests()[0].ID {
 		originalMessage = messages[0]
 		replyMessage = messages[1]
 	} else {
@@ -300,8 +308,8 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	verificationRequestID := resp.VerificationRequests[0].ID
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
@@ -312,13 +320,13 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
@@ -338,10 +346,10 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	s.Require().NoError(err)
 
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
-	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusACCEPTED)
+	s.Require().NotEmpty(resp.VerificationRequests()[0].RepliedAt)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -362,13 +370,13 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0
+			return len(r.VerificationRequests()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 
 	messages := resp.Messages()
 	s.Require().Len(messages, 2)
@@ -413,8 +421,8 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	verificationRequestID := resp.VerificationRequests[0].ID
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().NotEmpty(resp.Messages()[0].OutgoingStatus)
@@ -425,13 +433,13 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
@@ -451,10 +459,10 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	s.Require().NoError(err)
 
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusACCEPTED)
-	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusACCEPTED)
+	s.Require().NotEmpty(resp.VerificationRequests()[0].RepliedAt)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -475,20 +483,20 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0
+			return len(r.VerificationRequests()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 
 	messages := resp.Messages()
 	s.Require().Len(messages, 2)
 	var originalMessage *common.Message
 	var replyMessage *common.Message
 
-	if messages[0].ID == resp.VerificationRequests[0].ID {
+	if messages[0].ID == resp.VerificationRequests()[0].ID {
 		originalMessage = messages[0]
 		replyMessage = messages[1]
 	} else {
@@ -540,8 +548,8 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	verificationRequestID := resp.VerificationRequests[0].ID
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(challenge, resp.Messages()[0].Text)
@@ -551,13 +559,13 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
@@ -588,10 +596,10 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 	s.Require().NotNil(resp)
 
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusDECLINED)
-	s.Require().NotEmpty(resp.VerificationRequests[0].RepliedAt)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusDECLINED)
+	s.Require().NotEmpty(resp.VerificationRequests()[0].RepliedAt)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -619,13 +627,13 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0
+			return len(r.VerificationRequests()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateDeclined)
@@ -651,8 +659,8 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	verificationRequestID := resp.VerificationRequests[0].ID
+	s.Require().Len(resp.VerificationRequests(), 1)
+	verificationRequestID := resp.VerificationRequests()[0].ID
 
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(challenge, resp.Messages()[0].Text)
@@ -662,13 +670,13 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusPENDING)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
@@ -699,21 +707,21 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	s.Require().NotNil(resp)
 
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
-	s.Require().Equal(resp.VerificationRequests[0].RequestStatus, verification.RequestStatusCANCELED)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
+	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusCANCELED)
 
 	// Check canceled state on the receiver's side
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.VerificationRequests) > 0 && len(r.ActivityCenterNotifications()) > 0
+			return len(r.VerificationRequests()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.VerificationRequests, 1)
-	s.Require().Equal(resp.VerificationRequests[0].ID, verificationRequestID)
+	s.Require().Len(resp.VerificationRequests(), 1)
+	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactVerification)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ContactVerificationStatus, verification.RequestStatusCANCELED)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)

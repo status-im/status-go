@@ -4261,7 +4261,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	}
 
 	for _, emojiReaction := range messageState.EmojiReactions {
-		messageState.Response.EmojiReactions = append(messageState.Response.EmojiReactions, emojiReaction)
+		messageState.Response.AddEmojiReaction(emojiReaction)
 	}
 
 	for _, groupChatInvitation := range messageState.GroupChatInvitations {
@@ -5684,7 +5684,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		return nil, err
 	}
 
-	response.EmojiReactions = []*EmojiReaction{emojiR}
+	response.AddEmojiReaction(emojiR)
 	response.AddChat(chat)
 
 	err = m.persistence.SaveEmojiReaction(emojiR)
@@ -5772,7 +5772,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	// Update MessengerResponse
 	response := MessengerResponse{}
 	emojiR.Retracted = true
-	response.EmojiReactions = []*EmojiReaction{emojiR}
+	response.AddEmojiReaction(emojiR)
 	response.AddChat(chat)
 
 	// Persist retraction state for emoji reaction

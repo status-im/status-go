@@ -23,6 +23,10 @@ type SavedAddress struct {
 	savedAddressMeta
 }
 
+func (s *SavedAddress) ID() string {
+	return fmt.Sprintf("%s-%d", s.Address.Hex(), s.ChainID)
+}
+
 type SavedAddressesManager struct {
 	db *sql.DB
 }

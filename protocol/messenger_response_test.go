@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
 
 func TestMessengerResponseMergeChats(t *testing.T) {
@@ -55,16 +54,6 @@ func TestMessengerResponseMergeNotImplemented(t *testing.T) {
 	response1 := &MessengerResponse{}
 
 	response2 := &MessengerResponse{
-		Installations: []*multidevice.Installation{{}},
-	}
-	require.Error(t, response1.Merge(response2))
-
-	response2 = &MessengerResponse{
-		EmojiReactions: []*EmojiReaction{{}},
-	}
-	require.Error(t, response1.Merge(response2))
-
-	response2 = &MessengerResponse{
 		Invitations: []*GroupChatInvitation{{}},
 	}
 	require.Error(t, response1.Merge(response2))

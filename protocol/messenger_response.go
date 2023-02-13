@@ -34,7 +34,6 @@ type ClearedHistory struct {
 type MessengerResponse struct {
 	Contacts                      []*Contact
 	Installations                 []*multidevice.Installation
-	EmojiReactions                []*EmojiReaction
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
 	RequestsToJoinCommunity       []*communities.RequestToJoin
@@ -44,11 +43,9 @@ type MessengerResponse struct {
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
 	Accounts                      []*accounts.Account
-	VerificationRequests          []*verification.Request
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
-	SavedAddresses                []*wallet.SavedAddress
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -67,7 +64,10 @@ type MessengerResponse struct {
 	currentStatus               *UserStatus
 	statusUpdates               map[string]UserStatus
 	clearedHistories            map[string]*ClearedHistory
+	verificationRequests        map[string]*verification.Request
 	trustStatus                 map[string]verification.TrustStatus
+	emojiReactions              map[string]*EmojiReaction
+	savedAddresses              map[string]*wallet.SavedAddress
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -108,7 +108,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
-		EmojiReactions:          r.EmojiReactions,
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
@@ -118,10 +117,10 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Settings:                r.Settings,
 		IdentityImages:          r.IdentityImages,
 		Accounts:                r.Accounts,
-		VerificationRequests:    r.VerificationRequests,
-		SavedAddresses:          r.SavedAddresses,
 
 		Messages:                      r.Messages(),
+		VerificationRequests:          r.VerificationRequests(),
+		SavedAddresses:                r.SavedAddresses(),
 		Notifications:                 r.Notifications(),
 		Chats:                         r.Chats(),
 		Communities:                   r.Communities(),
@@ -131,6 +130,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		ClearedHistories:              r.ClearedHistories(),
 		ActivityCenterNotifications:   r.ActivityCenterNotifications(),
 		PinMessages:                   r.PinMessages(),
+		EmojiReactions:                r.EmojiReactions(),
 		StatusUpdates:                 r.StatusUpdates(),
 		DiscordCategories:             r.DiscordCategories,
 		DiscordChannels:               r.DiscordChannels,
@@ -197,6 +197,14 @@ func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
 	return notifications
 }
 
+func (r *MessengerResponse) VerificationRequests() []*verification.Request {
+	var verifications []*verification.Request
+	for _, v := range r.verificationRequests {
+		verifications = append(verifications, v)
+	}
+	return verifications
+}
+
 func (r *MessengerResponse) PinMessages() []*common.PinMessage {
 	var pinMessages []*common.PinMessage
 	for _, pm := range r.pinMessages {
@@ -236,7 +244,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Settings)+
 		len(r.Installations)+
 		len(r.Invitations)+
-		len(r.EmojiReactions)+
+		len(r.emojiReactions)+
 		len(r.communities)+
 		len(r.CommunityChanges)+
 		len(r.removedChats)+
@@ -248,24 +256,20 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
 		len(r.trustStatus)+
-		len(r.VerificationRequests)+
+		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
-		len(r.SavedAddresses) == 0 &&
+		len(r.savedAddresses) == 0 &&
 		r.currentStatus == nil
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
 // the existing Messages & Chats if they have the same ID
 func (r *MessengerResponse) Merge(response *MessengerResponse) error {
-	if len(response.Installations)+
-		len(response.EmojiReactions)+
-		len(response.Invitations)+
+	if len(response.Invitations)+
 		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
-		len(response.EmojiReactions)+
 		len(response.Bookmarks)+
 		len(response.clearedHistories)+
-		len(response.VerificationRequests)+
 		len(response.DiscordChannels)+
 		len(response.DiscordCategories) != 0 {
 		return ErrNotImplemented
@@ -276,11 +280,15 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddRemovedMessages(response.RemovedMessages())
 	r.AddNotifications(response.Notifications())
 	r.AddMessages(response.Messages())
+	r.AddContacts(response.Contacts)
 	r.AddCommunities(response.Communities())
 	r.AddPinMessages(response.PinMessages())
-	r.AddVerificationRequests(response.VerificationRequests)
+	r.AddVerificationRequests(response.VerificationRequests())
 	r.AddTrustStatuses(response.trustStatus)
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
+	r.AddEmojiReactions(response.EmojiReactions())
+	r.AddInstallations(response.Installations)
+	r.AddSavedAddresses(response.SavedAddresses())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 
 	return nil
@@ -323,7 +331,11 @@ func (r *MessengerResponse) AddBookmarks(bookmarks []*browsers.Bookmark) {
 }
 
 func (r *MessengerResponse) AddVerificationRequest(vr *verification.Request) {
-	r.VerificationRequests = append(r.VerificationRequests, vr)
+	if r.verificationRequests == nil {
+		r.verificationRequests = make(map[string]*verification.Request)
+	}
+
+	r.verificationRequests[vr.ID] = vr
 }
 
 func (r *MessengerResponse) AddVerificationRequests(vrs []*verification.Request) {
@@ -362,6 +374,50 @@ func (r *MessengerResponse) AddChats(chats []*Chat) {
 	for _, c := range chats {
 		r.AddChat(c)
 	}
+}
+
+func (r *MessengerResponse) AddEmojiReactions(ers []*EmojiReaction) {
+	for _, e := range ers {
+		r.AddEmojiReaction(e)
+	}
+}
+
+func (r *MessengerResponse) AddEmojiReaction(er *EmojiReaction) {
+	if r.emojiReactions == nil {
+		r.emojiReactions = make(map[string]*EmojiReaction)
+	}
+
+	r.emojiReactions[er.ID()] = er
+}
+
+func (r *MessengerResponse) EmojiReactions() []*EmojiReaction {
+	var ers []*EmojiReaction
+	for _, er := range r.emojiReactions {
+		ers = append(ers, er)
+	}
+	return ers
+}
+
+func (r *MessengerResponse) AddSavedAddresses(ers []*wallet.SavedAddress) {
+	for _, e := range ers {
+		r.AddSavedAddress(e)
+	}
+}
+
+func (r *MessengerResponse) AddSavedAddress(er *wallet.SavedAddress) {
+	if r.savedAddresses == nil {
+		r.savedAddresses = make(map[string]*wallet.SavedAddress)
+	}
+
+	r.savedAddresses[er.ID()] = er
+}
+
+func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
+	var ers []*wallet.SavedAddress
+	for _, er := range r.savedAddresses {
+		ers = append(ers, er)
+	}
+	return ers
 }
 
 func (r *MessengerResponse) AddNotification(n *localnotifications.Notification) {
@@ -577,6 +633,24 @@ func (r *MessengerResponse) AddContact(c *Contact) {
 func (r *MessengerResponse) AddContacts(contacts []*Contact) {
 	for idx := range contacts {
 		r.AddContact(contacts[idx])
+	}
+}
+
+func (r *MessengerResponse) AddInstallation(i *multidevice.Installation) {
+
+	for idx, i1 := range r.Installations {
+		if i1.ID == i.ID {
+			r.Installations[idx] = i
+			return
+		}
+	}
+
+	r.Installations = append(r.Installations, i)
+}
+
+func (r *MessengerResponse) AddInstallations(installations []*multidevice.Installation) {
+	for idx := range installations {
+		r.AddInstallation(installations[idx])
 	}
 }
 

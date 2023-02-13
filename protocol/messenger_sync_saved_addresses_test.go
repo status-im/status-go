@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -149,8 +150,10 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses) == 2 {
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*r.SavedAddresses[0], *r.SavedAddresses[1]}, savedAddressDataIsEqual))
+			fmt.Println("LENG", len(r.SavedAddresses()))
+			if len(r.SavedAddresses()) == 2 {
+				sas := r.SavedAddresses()
+				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
 				return true
 			}
 			return false
@@ -193,8 +196,9 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncSavedAddresses() {
 	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses) == 2 {
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*r.SavedAddresses[0], *r.SavedAddresses[1]}, savedAddressDataIsEqual))
+			if len(r.SavedAddresses()) == 2 {
+				sas := r.SavedAddresses()
+				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
 				return true
 			}
 			return false
@@ -237,8 +241,9 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddresses() {
 	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses) == 2 {
-				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*r.SavedAddresses[0], *r.SavedAddresses[1]}, savedAddressDataIsEqual))
+			if len(r.SavedAddresses()) == 2 {
+				sas := r.SavedAddresses()
+				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))
 				return true
 			}
 			return false
@@ -259,12 +264,12 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncDeletesOfSavedAddresses() {
 	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			if len(r.SavedAddresses) == 1 {
+			if len(r.SavedAddresses()) == 1 {
 				// We expect the deleted event to report only address and chain ID
-				s.Require().Equal(sa1.Address, r.SavedAddresses[0].Address)
-				s.Require().Equal(sa1.ChainID, r.SavedAddresses[0].ChainID)
-				s.Require().Equal("", r.SavedAddresses[0].Name)
-				s.Require().Equal(false, r.SavedAddresses[0].Favourite)
+				s.Require().Equal(sa1.Address, r.SavedAddresses()[0].Address)
+				s.Require().Equal(sa1.ChainID, r.SavedAddresses()[0].ChainID)
+				s.Require().Equal("", r.SavedAddresses()[0].Name)
+				s.Require().Equal(false, r.SavedAddresses()[0].Favourite)
 				return true
 			}
 			return false

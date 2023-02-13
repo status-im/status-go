@@ -115,9 +115,9 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, err
 	}
 
-	response := &MessengerResponse{
-		VerificationRequests: []*verification.Request{verifRequest},
-	}
+	response := &MessengerResponse{}
+
+	response.AddVerificationRequest(verifRequest)
 
 	err = m.createOrUpdateOutgoingContactVerificationNotification(contact, response, verifRequest, chatMessage, nil)
 	if err != nil {
@@ -332,9 +332,9 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	if err != nil {
 		return nil, err
 	}
-	resp := &MessengerResponse{
-		VerificationRequests: []*verification.Request{verifRequest},
-	}
+	resp := &MessengerResponse{}
+
+	resp.AddVerificationRequest(verifRequest)
 
 	replyMessage, err := m.createLocalContactVerificationMessage(response, chat, rawMessage.ID, common.ContactVerificationStateAccepted)
 	if err != nil {
