@@ -75,10 +75,15 @@ func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
 		if !enr.IsNotFound(err) {
 			return nil, err
-		} else if len(multiaddrRaw) < 2 {
+		} else {
 			// No multiaddr entry on enr
 			return result, nil
 		}
+	}
+
+	if len(multiaddrRaw) < 2 {
+		// There was no error loading the multiaddr field, but its length is incorrect
+		return result, nil
 	}
 
 	hostInfo, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
