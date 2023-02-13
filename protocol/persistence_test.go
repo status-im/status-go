@@ -1824,9 +1824,10 @@ func TestActivityCenterPersistence(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	// Check we have no unseen messages
-	unseen, err := p.HasUnseenActivityCenterNotifications()
+	state, err := p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.False(t, unseen)
+	require.Equal(t, uint64(0), state.Unread)
+	require.True(t, state.HasSeen)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	message := &common.Message{}
@@ -1882,9 +1883,10 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.Equal(t, uint64(2), count)
 
 	// Check we have unseen notifications
-	unseen, err = p.HasUnseenActivityCenterNotifications()
+	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.True(t, unseen)
+	require.Equal(t, uint64(2), state.Unread)
+	require.False(t, state.HasSeen)
 
 	// Mark first one as read
 	require.NoError(t, p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID1}))
@@ -1968,18 +1970,20 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.True(t, notifications[1].Dismissed)
 
 	// Check we still have unseen notifications
-	unseen, err = p.HasUnseenActivityCenterNotifications()
+	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.True(t, unseen)
+	require.Equal(t, uint64(0), state.Unread)
+	require.False(t, state.HasSeen)
 
 	// Mark as unseen
 	err = p.MarkAsSeenActivityCenterNotifications()
 	require.NoError(t, err)
 
 	// Check we have no unseen notifications
-	unseen, err = p.HasUnseenActivityCenterNotifications()
+	state, err = p.GetActivityCenterState()
 	require.NoError(t, err)
-	require.False(t, unseen)
+	require.Equal(t, uint64(0), state.Unread)
+	require.True(t, state.HasSeen)
 }
 
 func TestSaveCommunityChat(t *testing.T) {

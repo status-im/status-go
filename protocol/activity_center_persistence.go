@@ -891,3 +891,21 @@ func (db sqlitePersistence) MarkAsSeenActivityCenterNotifications() error {
 	_, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = 1`)
 	return err
 }
+
+func (db sqlitePersistence) GetActivityCenterState() (*ActivityCenterState, error) {
+	unread, err := db.UnreadActivityCenterNotificationsCount()
+	if err != nil {
+		return nil, err
+	}
+
+	unseen, err := db.HasUnseenActivityCenterNotifications()
+	if err != nil {
+		return nil, err
+	}
+
+	state := &ActivityCenterState{
+		Unread:  unread,
+		HasSeen: !unseen,
+	}
+	return state, nil
+}
