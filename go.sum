@@ -1958,8 +1958,8 @@ github.com/spf13/viper v1.4.0/go.mod h1:PTJ7Z/lr49W6bUbkmS1V3by4uWynFiR9p7+dSq/y
 github.com/spf13/viper v1.7.0/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYtiU2nF0Q8ZkGyuEPYETXkCY=
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
-github.com/status-im/go-ethereum v1.10.25-status.3 h1:otbW2SCLmNNXAT8uqtrhxq0jRlwQeDA3Tqrhz+LMX3M=
-github.com/status-im/go-ethereum v1.10.25-status.3/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
+github.com/status-im/go-ethereum v1.10.25-status.4 h1:Ff35UseaP49DK2RRpSLo3DL7NUmMKzicQ/7/yub6gfU=
+github.com/status-im/go-ethereum v1.10.25-status.4/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
 github.com/status-im/go-multiaddr-ethv4 v1.2.4 h1:7fw0Y48TJXEqx4fOHlDOUiM/uBq9zG5w4x975Mjh4E0=
 github.com/status-im/go-multiaddr-ethv4 v1.2.4/go.mod h1:PDh4D7h5CvecPIy0ji0rLNwTnzzEcyz9uTPHD42VyH4=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
