@@ -41,6 +41,39 @@ func (s *PairingServerSuite) TestMultiBackgroundForeground() {
 	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.PS.MakeBaseURL().String()) // nolint: gosimple
 }
 
+func (s *PairingServerSuite) TestMultiTimeout() {
+	s.PS.SetTimeout(20)
+
+	err := s.PS.Start()
+	s.Require().NoError(err)
+
+	s.PS.ToBackground()
+	s.PS.ToForeground()
+	s.PS.ToBackground()
+	s.PS.ToBackground()
+	s.PS.ToForeground()
+	s.PS.ToForeground()
+
+	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.PS.MakeBaseURL().String()) // nolint: gosimple
+
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToBackground()
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToForeground()
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToBackground()
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToBackground()
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToForeground()
+	time.Sleep(7 * time.Millisecond)
+	s.PS.ToForeground()
+
+	// Wait for timeout to expire
+	time.Sleep(40 * time.Millisecond)
+	s.Require().False(s.PS.IsRunning())
+}
+
 func (s *PairingServerSuite) TestPairingServer_StartPairing() {
 	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
 	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralAES)

@@ -18,15 +18,18 @@ type Server struct {
 	cert      *tls.Certificate
 	hostname  string
 	handlers  HandlerPatternMap
+
 	portManger
+	*timeoutManager
 }
 
 func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int), logger *zap.Logger) Server {
 	return Server{
-		logger:     logger,
-		cert:       cert,
-		hostname:   hostname,
-		portManger: newPortManager(logger.Named("Server"), afterPortChanged),
+		logger:         logger,
+		cert:           cert,
+		hostname:       hostname,
+		portManger:     newPortManager(logger.Named("Server"), afterPortChanged),
+		timeoutManager: newTimeoutManager(logger),
 	}
 }
 
@@ -72,6 +75,9 @@ func (s *Server) listenAndServe() {
 	}
 
 	s.isRunning = true
+	defer func() { s.isRunning = false }()
+
+	s.StartTimeout(func() { s.Stop() })
 
 	err = s.server.Serve(listener)
 	if err != http.ErrServerClosed {
@@ -82,11 +88,10 @@ func (s *Server) listenAndServe() {
 		}
 		return
 	}
-
-	s.isRunning = false
 }
 
 func (s *Server) resetServer() {
+	s.StopTimeout()
 	s.server = new(http.Server)
 	s.ResetPort()
 }
@@ -112,11 +117,16 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop() error {
+	s.StopTimeout()
 	if s.server != nil {
 		return s.server.Shutdown(context.Background())
 	}
 
 	return nil
+}
+
+func (s *Server) IsRunning() bool {
+	return s.isRunning
 }
 
 func (s *Server) ToForeground() {
