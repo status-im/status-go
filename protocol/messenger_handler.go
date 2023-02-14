@@ -1913,16 +1913,12 @@ func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMes
 }
 
 func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting) error {
-	settingField, err := m.extractSyncSetting(message)
+	settingField, err := m.extractAndSaveSyncSetting(message)
 	if err != nil {
 		return err
 	}
 	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME && settingField != nil {
-		oldDisplayName, err := m.settings.DisplayName()
-		if err != nil {
-			return err
-		}
-		if oldDisplayName != message.GetValueString() {
+		if m.account.Name != message.GetValueString() {
 			m.account.Name = message.GetValueString()
 			err = m.multiAccounts.SaveAccount(*m.account)
 			if err != nil {
