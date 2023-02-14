@@ -218,6 +218,13 @@ func TestKeypairs(t *testing.T) {
 		AccountsAddresses: []types.Address{{0x01}, {0x02}},
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
 	}
+	keyPair4 := keypairs.KeyPair{
+		KeycardUID:        "00000000000000000000000000000004",
+		KeycardName:       "Card04",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}},
+		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000004",
+	}
 
 	// Test adding key pairs
 	err := db.AddMigratedKeyPair(keyPair1.KeycardUID, keyPair1.KeycardName, keyPair1.KeyUID, keyPair1.AccountsAddresses)
@@ -226,22 +233,31 @@ func TestKeypairs(t *testing.T) {
 	require.NoError(t, err)
 	err = db.AddMigratedKeyPair(keyPair3.KeycardUID, keyPair3.KeycardName, keyPair3.KeyUID, keyPair3.AccountsAddresses)
 	require.NoError(t, err)
+	err = db.AddMigratedKeyPair(keyPair3.KeycardUID, keyPair3.KeycardName, keyPair3.KeyUID, []types.Address{{0x03}})
+	require.NoError(t, err)
+	err = db.AddMigratedKeyPair(keyPair4.KeycardUID, keyPair4.KeycardName, keyPair4.KeyUID, keyPair4.AccountsAddresses)
+	require.NoError(t, err)
 
 	// Test reading migrated key pairs
 	rows, err := db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
-	require.Equal(t, 2, len(rows))
+	require.Equal(t, 3, len(rows))
 	for _, kp := range rows {
 		if kp.KeyUID == keyPair1.KeyUID {
 			require.Equal(t, keyPair1.KeycardUID, kp.KeycardUID)
 			require.Equal(t, keyPair1.KeycardName, kp.KeycardName)
 			require.Equal(t, keyPair1.KeycardLocked, kp.KeycardLocked)
 			require.Equal(t, len(keyPair1.AccountsAddresses), len(kp.AccountsAddresses))
-		} else {
+		} else if kp.KeyUID == keyPair2.KeyUID { // keypair 2 and 3, cause 3 is a copy of 2
 			require.Equal(t, keyPair2.KeycardUID, kp.KeycardUID)
 			require.Equal(t, keyPair2.KeycardName, kp.KeycardName)
 			require.Equal(t, keyPair2.KeycardLocked, kp.KeycardLocked)
-			require.Equal(t, len(keyPair2.AccountsAddresses), len(kp.AccountsAddresses))
+			require.Equal(t, len(keyPair2.AccountsAddresses)+1, len(kp.AccountsAddresses)) // Add 1, cause one account is additionally added for the same keypair.
+		} else {
+			require.Equal(t, keyPair4.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair4.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair4.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair4.AccountsAddresses), len(kp.AccountsAddresses))
 		}
 	}
 
@@ -256,7 +272,7 @@ func TestKeypairs(t *testing.T) {
 
 	rows, err = db.GetAllKnownKeycards()
 	require.NoError(t, err)
-	require.Equal(t, 3, len(rows))
+	require.Equal(t, 4, len(rows))
 	for _, kp := range rows {
 		if kp.KeycardUID == keyPair1.KeycardUID {
 			require.Equal(t, keyPair1.KeycardUID, kp.KeycardUID)
@@ -268,11 +284,16 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, keyPair2.KeycardName, kp.KeycardName)
 			require.Equal(t, keyPair2.KeycardLocked, kp.KeycardLocked)
 			require.Equal(t, len(keyPair2.AccountsAddresses), len(kp.AccountsAddresses))
-		} else {
+		} else if kp.KeycardUID == keyPair3.KeycardUID {
 			require.Equal(t, keyPair3.KeycardUID, kp.KeycardUID)
 			require.Equal(t, keyPair3.KeycardName, kp.KeycardName)
 			require.Equal(t, keyPair3.KeycardLocked, kp.KeycardLocked)
-			require.Equal(t, len(keyPair3.AccountsAddresses), len(kp.AccountsAddresses))
+			require.Equal(t, len(keyPair3.AccountsAddresses)+1, len(kp.AccountsAddresses)) // Add 1, cause one account is additionally added.
+		} else {
+			require.Equal(t, keyPair4.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keyPair4.KeycardName, kp.KeycardName)
+			require.Equal(t, keyPair4.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keyPair4.AccountsAddresses), len(kp.AccountsAddresses))
 		}
 	}
 
@@ -312,6 +333,22 @@ func TestKeypairs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rows))
 	require.Equal(t, len(keyPair1.AccountsAddresses)-numOfAccountsToRemove, len(rows[0].AccountsAddresses))
+
+	// Test deleting accounts one by one, with the last deleted account keycard should be delete as well
+	for _, addr := range keyPair4.AccountsAddresses {
+		err = db.RemoveMigratedAccountsForKeycard(keyPair4.KeycardUID, []types.Address{addr})
+		require.NoError(t, err)
+	}
+	rows, err = db.GetAllMigratedKeyPairs()
+	require.NoError(t, err)
+	// Test if correct keycard is deleted
+	deletedKeyPair4 := true
+	for _, kp := range rows {
+		if kp.KeycardUID == keyPair4.KeycardUID {
+			deletedKeyPair4 = false
+		}
+	}
+	require.Equal(t, true, deletedKeyPair4)
 
 	// Test update keycard uid
 	err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID)
