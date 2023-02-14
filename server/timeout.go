@@ -79,7 +79,7 @@ func (e *exitQueueManager) add(exit chan struct{}) {
 	e.queue = append(e.queue, exit)
 }
 
-// empty sends a signal to evert exit channel in the queue and then resets the queue
+// empty sends a signal to every exit channel in the queue and then resets the queue
 func (e *exitQueueManager) empty() {
 	e.queueLock.Lock()
 	defer e.queueLock.Unlock()

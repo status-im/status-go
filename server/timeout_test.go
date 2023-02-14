@@ -38,13 +38,14 @@ func TestTimeoutManager(t *testing.T) {
 			t.Error(err)
 		}
 
-		tm.SetTimeout(uint(to.Int64() * 10))
+		tm.SetTimeout(uint(to.Int64() * 20))
 
 		if b.Int64() == 1 {
 			tm.StartTimeout(t.FailNow)
 		} else {
 			tm.StopTimeout()
 		}
+		tm.StopTimeout()
 	}
 
 	// test StopTimeout() prevents termination func

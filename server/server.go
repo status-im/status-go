@@ -75,9 +75,13 @@ func (s *Server) listenAndServe() {
 	}
 
 	s.isRunning = true
-	defer func() { s.isRunning = false }()
 
-	s.StartTimeout(func() { s.Stop() })
+	s.StartTimeout(func() {
+		err := s.Stop()
+		if err != nil {
+			s.logger.Error("PairingServer termination fail", zap.Error(err))
+		}
+	})
 
 	err = s.server.Serve(listener)
 	if err != http.ErrServerClosed {
@@ -88,6 +92,7 @@ func (s *Server) listenAndServe() {
 		}
 		return
 	}
+	s.isRunning = false
 }
 
 func (s *Server) resetServer() {
