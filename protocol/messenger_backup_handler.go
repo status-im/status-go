@@ -145,7 +145,7 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 		return nil
 	}
 
-	settingField, err := m.extractSyncSetting(message)
+	settingField, err := m.extractAndSaveSyncSetting(message)
 	if err != nil {
 		m.logger.Warn("failed to handle SyncSetting from backed up message", zap.Error(err))
 		return nil
