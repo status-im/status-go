@@ -106,13 +106,16 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
+	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.Hex2Bytes(contact.ID)})
 	s.Require().NoError(err)
+
+	s.Require().Len(response.Contacts, 1)
+	s.Require().Equal(response.Contacts[0].ID, contact.ID)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && r.Contacts[0].ID == contact.ID },
+		func(r *MessengerResponse) bool { return len(r.Contacts) == 1 && r.Contacts[0].ID == contact.ID },
 		"contact not received",
 	)
 	s.Require().NoError(err)
@@ -120,6 +123,28 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	actualContact := response.Contacts[0]
 	s.Require().Equal(contact.ID, actualContact.ID)
 	s.Require().True(actualContact.added())
+
+	// Simulate update from contact
+	contact.LastUpdated = 10
+	contact.DisplayName = "display-name"
+
+	s.Require().NoError(s.m.persistence.SaveContacts([]*Contact{contact}))
+	// Trigger syncing of contact
+	err = s.m.syncContact(context.Background(), contact, s.m.dispatchMessage)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Contacts) == 1 && r.Contacts[0].ID == contact.ID },
+		"contact not received",
+	)
+	s.Require().NoError(err)
+	actualContact = response.Contacts[0]
+	s.Require().Equal(contact.ID, actualContact.ID)
+	// Make sure lastupdated is **not** synced
+	s.Require().Equal(uint64(0), actualContact.LastUpdated)
+	s.Require().Equal("display-name", actualContact.DisplayName)
 
 	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(chat)

@@ -101,6 +101,7 @@ message SyncInstallationContactV2 {
   int64 contact_request_local_clock = 17;
   int64 contact_request_remote_state = 18;
   int64 contact_request_remote_clock = 19;
+  string display_name = 20;
 }
 
 message SyncInstallationAccount {

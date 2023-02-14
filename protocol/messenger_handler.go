@@ -499,6 +499,29 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 	}
 
+	// Sync last updated field
+	// We don't set `LastUpdated`, since that would cause some issues
+	// as `LastUpdated` tracks both display name & picture.
+	// The case where it would break is as follow:
+	// 1) User A pairs A1 with device A2.
+	// 2) User B publishes display name and picture with LastUpdated = 3.
+	// 3) Device A1 receives message from step 2.
+	// 4) Device A1 syncs with A2 (which has not received message from step 3).
+	// 5) Device A2 saves Display name and sets LastUpdated = 3,
+	//    note that picture has not been set as it's not synced.
+	// 6) Device A2 receives the message from 2. because LastUpdated is 3
+	//    it will be discarded, A2 will not have B's picture.
+	// The correct solution is to either sync profile image (expensive)
+	// or split the clock for image/display name, so they can be synced
+	// independently.
+	if contact.LastUpdated < message.LastUpdated {
+		if message.DisplayName != "" {
+			contact.DisplayName = message.DisplayName
+		}
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+	}
+
 	if contact.LastUpdatedLocally < message.LastUpdatedLocally {
 		// NOTE(cammellos): probably is cleaner to pass a flag
 		// to method to tell them not to sync, or factor out in different

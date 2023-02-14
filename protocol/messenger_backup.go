@@ -283,6 +283,7 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 		LastUpdatedLocally:        contact.LastUpdatedLocally,
 		LastUpdated:               contact.LastUpdated,
 		Id:                        contact.ID,
+		DisplayName:               contact.DisplayName,
 		EnsName:                   ensName,
 		LocalNickname:             contact.LocalNickname,
 		Added:                     contact.added(),
