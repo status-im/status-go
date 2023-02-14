@@ -29,7 +29,7 @@ func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int
 		cert:           cert,
 		hostname:       hostname,
 		portManger:     newPortManager(logger.Named("Server"), afterPortChanged),
-		timeoutManager: newTimeoutManager(logger),
+		timeoutManager: newTimeoutManager(),
 	}
 }
 

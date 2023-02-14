@@ -5,19 +5,10 @@ import (
 	"math/big"
 	"testing"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 func TestTimeoutManager(t *testing.T) {
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.FunctionKey = "X"
-	logger, err := config.Build()
-	if err != nil {
-		t.Error(err)
-	}
-
-	tm := newTimeoutManager(logger)
+	tm := newTimeoutManager()
 
 	// test 0 timeout means timeout does not occur
 	tm.SetTimeout(0)
