@@ -76,7 +76,7 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 }
 
 // extractSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
-func (m *Messenger) extractSyncSetting(syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
+func (m *Messenger) extractAndSaveSyncSetting(syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
 	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
 	if err != nil {
 		m.logger.Error(
