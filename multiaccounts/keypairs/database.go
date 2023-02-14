@@ -76,13 +76,17 @@ func (kp *KeyPairs) processResult(rows *sql.Rows, groupByKeycard bool) ([]*KeyPa
 func (kp *KeyPairs) getAllRows(groupByKeycard bool) ([]*KeyPair, error) {
 	rows, err := kp.db.Query(`
 		SELECT
-			keycard_uid,
-			keycard_name,
-			keycard_locked,
-			account_address,
-			key_uid
+			k.keycard_uid,
+			k.keycard_name,
+			k.keycard_locked,
+			ka.account_address,
+			k.key_uid
 		FROM
-			keypairs
+			keycards AS k 
+		LEFT JOIN 
+			keycards_accounts AS ka 
+		ON 
+			k.keycard_uid = ka.keycard_uid
 		ORDER BY
 			key_uid
 	`)
@@ -104,18 +108,22 @@ func (kp *KeyPairs) GetAllMigratedKeyPairs() ([]*KeyPair, error) {
 
 func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error) {
 	rows, err := kp.db.Query(`
-		SELECT
-			keycard_uid,
-			keycard_name,
-			keycard_locked,
-			account_address,
-			key_uid
+		SELECT 
+			k.keycard_uid,
+			k.keycard_name,
+			k.keycard_locked,
+			ka.account_address,
+			k.key_uid
 		FROM
-			keypairs
+			keycards AS k 
+		LEFT JOIN 
+			keycards_accounts AS ka 
+		ON 
+			k.keycard_uid = ka.keycard_uid
 		WHERE
-			key_uid = ?
+			k.key_uid = ?
 		ORDER BY
-			keycard_uid
+			k.keycard_uid
 	`, keyUID)
 	if err != nil {
 		return nil, err
@@ -127,8 +135,8 @@ func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error
 
 func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID string, accountAddresses []types.Address) (err error) {
 	var (
-		tx     *sql.Tx
-		insert *sql.Stmt
+		tx          *sql.Tx
+		insertKcAcc *sql.Stmt
 	)
 	tx, err = kp.db.Begin()
 	if err != nil {
@@ -142,28 +150,59 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare(`
+	var tmpKeyUID string
+	err = tx.QueryRow(`SELECT keycard_uid FROM keycards WHERE keycard_uid = ?`, kcUID).Scan(&tmpKeyUID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			insertKc, err := tx.Prepare(`
+			INSERT INTO
+				keycards
+				(
+					keycard_uid,
+					keycard_name,
+					keycard_locked,
+					key_uid
+				)
+			VALUES
+				(?, ?, ?, ?);
+			`)
+
+			if err != nil {
+				return err
+			}
+
+			defer insertKc.Close()
+
+			_, err = insertKc.Exec(kcUID, kpName, false, KeyUID)
+			if err != nil {
+				return err
+			}
+
+		} else {
+			return err
+		}
+	}
+
+	insertKcAcc, err = tx.Prepare(`
 		INSERT INTO
-			keypairs
+			keycards_accounts
 			(
 				keycard_uid,
-				keycard_name,
-				keycard_locked,
-				account_address,
-				key_uid
+				account_address
 			)
 		VALUES
-			(?, ?, ?, ?, ?);
+			(?, ?);
 	`)
+
 	if err != nil {
 		return err
 	}
-	defer insert.Close()
+	defer insertKcAcc.Close()
 
 	for i := range accountAddresses {
 		addr := accountAddresses[i]
 
-		_, err = insert.Exec(kcUID, kpName, false, addr, KeyUID)
+		_, err = insertKcAcc.Exec(kcUID, addr)
 		if err != nil {
 			return err
 		}
@@ -171,12 +210,54 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 	return nil
 }
 
+func (kp *KeyPairs) getAccountsForKeycard(kcUID string) ([]types.Address, error) {
+	var accountAddresses []types.Address
+
+	rows, err := kp.db.Query(`SELECT account_address FROM keycards_accounts WHERE keycard_uid = ?`, kcUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var accAddress types.Address
+		err = rows.Scan(&accAddress)
+		if err != nil {
+			return nil, err
+		}
+		accountAddresses = append(accountAddresses, accAddress)
+	}
+
+	return accountAddresses, nil
+}
+
 func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddresses []types.Address) (err error) {
+	dbAccountAddresses, err := kp.getAccountsForKeycard(kcUID)
+	if err != nil {
+		return err
+	}
+	deleteKeycard := true
+	for _, dbAddr := range dbAccountAddresses {
+		found := false
+		for _, addr := range accountAddresses {
+			if dbAddr == addr {
+				found = true
+			}
+		}
+		if !found {
+			deleteKeycard = false
+		}
+	}
+
+	if deleteKeycard {
+		return kp.DeleteKeycard(kcUID)
+	}
+
 	inVector := strings.Repeat(",?", len(accountAddresses)-1)
 	query := `
 		DELETE
 		FROM
-			keypairs
+			keycards_accounts
 		WHERE
 			keycard_uid = ?
 		AND
@@ -200,27 +281,8 @@ func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddres
 	return err
 }
 
-func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string) (err error) {
-	update, err := kp.db.Prepare(`
-		UPDATE
-			keypairs
-		SET
-			keycard_name = ?
-		WHERE
-			keycard_uid = ?
-	`)
-	if err != nil {
-		return err
-	}
-	defer update.Close()
-
-	_, err = update.Exec(kpName, kcUID)
-
-	return err
-}
-
 func (kp *KeyPairs) execUpdateQuery(kcUID string, field string, value interface{}) (err error) {
-	sql := fmt.Sprintf(`UPDATE keypairs SET %s = ? WHERE keycard_uid = ?`, field) // nolint: gosec
+	sql := fmt.Sprintf(`UPDATE keycards SET %s = ? WHERE keycard_uid = ?`, field) // nolint: gosec
 
 	update, err := kp.db.Prepare(sql)
 
@@ -246,11 +308,15 @@ func (kp *KeyPairs) UpdateKeycardUID(oldKcUID string, newKcUID string) (err erro
 	return kp.execUpdateQuery(oldKcUID, "keycard_uid", newKcUID)
 }
 
+func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string) (err error) {
+	return kp.execUpdateQuery(kcUID, "keycard_name", kpName)
+}
+
 func (kp *KeyPairs) DeleteKeycard(kcUID string) (err error) {
 	delete, err := kp.db.Prepare(`
 		DELETE
 		FROM
-			keypairs
+			keycards
 		WHERE
 			keycard_uid = ?
 	`)
@@ -268,7 +334,7 @@ func (kp *KeyPairs) DeleteKeypair(keyUID string) (err error) {
 	delete, err := kp.db.Prepare(`
 		DELETE
 		FROM
-			keypairs
+			keycards
 		WHERE
 			key_uid = ?
 	`)
