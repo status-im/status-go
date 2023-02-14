@@ -144,6 +144,24 @@ func (tm *Manager) FindSNT(chainID uint64) *Token {
 	return nil
 }
 
+func (tm *Manager) GetAllTokensAndNativeCurrencies() ([]*Token, error) {
+	allTokens, err := tm.GetAllTokens()
+	if err != nil {
+		return nil, err
+	}
+
+	networks, err := tm.RPCClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, network := range networks {
+		allTokens = append(allTokens, tm.ToToken(network))
+	}
+
+	return allTokens, nil
+}
+
 func (tm *Manager) GetAllTokens() ([]*Token, error) {
 	result := make([]*Token, 0)
 	for _, tokens := range tokenStore {

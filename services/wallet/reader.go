@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
+
+	"github.com/status-im/status-go/services/wallet/price"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -26,14 +28,14 @@ func getFixedCurrencies() []string {
 	return []string{"USD"}
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *PriceManager, cryptoCompare *thirdparty.CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *price.Manager, cryptoCompare *thirdparty.CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
 	return &Reader{rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
 	rpcClient     *rpc.Client
 	tokenManager  *token.Manager
-	priceManager  *PriceManager
+	priceManager  *price.Manager
 	cryptoCompare *thirdparty.CryptoCompare
 	accountsDB    *accounts.Database
 	walletFeed    *event.Feed
@@ -276,7 +278,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
 				BuiltOn:                 tokenDetails[symbol].BuiltOn,
 				MarketValuesPerCurrency: marketValuesPerCurrency,
-				PegSymbol:               tokens[0].PegSymbol,
+				PegSymbol:               token.GetTokenPegSymbol(symbol),
 			}
 
 			result[address] = append(result[address], walletToken)

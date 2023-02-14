@@ -2,13 +2,10 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
-
-	"github.com/rmg/iso4217"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -18,6 +15,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -337,11 +335,6 @@ func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []
 	return api.s.priceManager.FetchPrices(symbols, currencies)
 }
 
-func (api *API) GetCachedPrices(ctx context.Context) (map[string]map[string]float64, error) {
-	log.Debug("call to GetCachedPrices")
-	return api.s.priceManager.GetCachedPrices()
-}
-
 func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]thirdparty.MarketCoinValues, error) {
 	log.Debug("call to FetchMarketValues")
 	return api.s.cryptoCompare.FetchTokenMarketValues(symbols, currencies)
@@ -556,18 +549,12 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *Mu
 	return api.s.transactionManager.createMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
 }
 
-func (api *API) IsCurrencyFiat(name string) bool {
-	code, _ := iso4217.ByName(strings.ToUpper(name))
-
-	return (code != 0)
+func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
+	log.Debug("call to GetCachedCurrencyFormats")
+	return api.s.currency.GetCachedCurrencyFormats()
 }
 
-func (api *API) GetFiatCurrencyMinorUnit(name string) (int, error) {
-	code, minor := iso4217.ByName(strings.ToUpper(name))
-
-	if code == 0 {
-		return code, errors.New("Unknown currency: " + name)
-	}
-
-	return minor, nil
+func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
+	log.Debug("call to FetchAllCurrencyFormats")
+	return api.s.currency.FetchAllCurrencyFormats()
 }
