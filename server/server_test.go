@@ -80,6 +80,7 @@ func (s *ServerURLSuite) TestServer_MakeImageURL() {
 	s.Require().Equal(
 		"https://127.0.0.1:1337/messages/images?messageId=0x10aded70ffee",
 		s.server.MakeImageURL("0x10aded70ffee"))
+
 	s.testNoPort(
 		"https://127.0.0.1:80/messages/images?messageId=0x10aded70ffee",
 		s.serverNoPort.MakeImageURL("0x10aded70ffee"))
