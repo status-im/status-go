@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"io/ioutil"
@@ -42,39 +42,39 @@ func TestPendingTransactions(t *testing.T) {
 		ChainID:        777,
 	}
 
-	rst, err := manager.getAllPendings([]uint64{777})
+	rst, err := manager.GetAllPending([]uint64{777})
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	rst, err = manager.getPendingByAddress([]uint64{777}, trx.From)
+	rst, err = manager.GetPendingByAddress([]uint64{777}, trx.From)
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	err = manager.addPending(trx)
+	err = manager.AddPending(trx)
 	require.NoError(t, err)
 
-	rst, err = manager.getPendingByAddress([]uint64{777}, trx.From)
+	rst, err = manager.GetPendingByAddress([]uint64{777}, trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
 
-	rst, err = manager.getAllPendings([]uint64{777})
+	rst, err = manager.GetAllPending([]uint64{777})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
 
-	rst, err = manager.getPendingByAddress([]uint64{777}, common.Address{2})
+	rst, err = manager.GetPendingByAddress([]uint64{777}, common.Address{2})
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	err = manager.deletePending(777, trx.Hash)
+	err = manager.DeletePending(777, trx.Hash)
 	require.NoError(t, err)
 
-	rst, err = manager.getPendingByAddress([]uint64{777}, trx.From)
+	rst, err = manager.GetPendingByAddress([]uint64{777}, trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 
-	rst, err = manager.getAllPendings([]uint64{777})
+	rst, err = manager.GetAllPending([]uint64{777})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 }

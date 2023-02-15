@@ -1,4 +1,4 @@
-package wallet
+package transfer
 
 import (
 	"context"
@@ -29,6 +29,17 @@ type TransactionManager struct {
 	transactor  *transactions.Transactor
 	config      *params.NodeConfig
 	accountsDB  *accounts.Database
+}
+
+func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transactor *transactions.Transactor,
+	config *params.NodeConfig, accountsDB *accounts.Database) *TransactionManager {
+	return &TransactionManager{
+		db:          db,
+		gethManager: gethManager,
+		transactor:  transactor,
+		config:      config,
+		accountsDB:  accountsDB,
+	}
 }
 
 type MultiTransactionType uint8
@@ -67,44 +78,28 @@ const (
 )
 
 type PendingTransaction struct {
-	Hash               common.Hash    `json:"hash"`
-	Timestamp          uint64         `json:"timestamp"`
-	Value              bigint.BigInt  `json:"value"`
-	From               common.Address `json:"from"`
-	To                 common.Address `json:"to"`
-	Data               string         `json:"data"`
-	Symbol             string         `json:"symbol"`
-	GasPrice           bigint.BigInt  `json:"gasPrice"`
-	GasLimit           bigint.BigInt  `json:"gasLimit"`
-	Type               PendingTrxType `json:"type"`
-	AdditionalData     string         `json:"additionalData"`
-	ChainID            uint64         `json:"network_id"`
-	MultiTransactionID int64          `json:"multi_transaction_id"`
+	Hash               common.Hash            `json:"hash"`
+	Timestamp          uint64                 `json:"timestamp"`
+	Value              bigint.BigInt          `json:"value"`
+	From               common.Address         `json:"from"`
+	To                 common.Address         `json:"to"`
+	Data               string                 `json:"data"`
+	Symbol             string                 `json:"symbol"`
+	GasPrice           bigint.BigInt          `json:"gasPrice"`
+	GasLimit           bigint.BigInt          `json:"gasLimit"`
+	Type               PendingTrxType         `json:"type"`
+	AdditionalData     string                 `json:"additionalData"`
+	ChainID            uint64                 `json:"network_id"`
+	MultiTransactionID MultiTransactionIDType `json:"multi_transaction_id"`
 }
 
-func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTransaction, error) {
-	if len(chainIDs) == 0 {
-		return nil, errors.New("at least 1 chainID is required")
-	}
+const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
+								symbol, gas_price, gas_limit, type, additional_data,
+								network_id, COALESCE(multi_transaction_id, 0)
+							FROM pending_transactions
+							`
 
-	inVector := strings.Repeat("?, ", len(chainIDs)-1) + "?"
-	var parameters []interface{}
-	for _, c := range chainIDs {
-		parameters = append(parameters, c)
-	}
-
-	rows, err := tm.db.Query(fmt.Sprintf(`SELECT hash, timestamp, value, from_address, to_address, data,
-                                         symbol, gas_price, gas_limit, type, additional_data,
-										 network_id
-                                  FROM pending_transactions
-                                  WHERE network_id in (%s)`, inVector), parameters...)
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var transactions []*PendingTransaction
+func rowsToTransactions(rows *sql.Rows) (transactions []*PendingTransaction, err error) {
 	for rows.Next() {
 		transaction := &PendingTransaction{
 			Value:    bigint.BigInt{Int: new(big.Int)},
@@ -123,6 +118,7 @@ func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTrans
 			&transaction.Type,
 			&transaction.AdditionalData,
 			&transaction.ChainID,
+			&transaction.MultiTransactionID,
 		)
 		if err != nil {
 			return nil, err
@@ -130,11 +126,30 @@ func (tm *TransactionManager) getAllPendings(chainIDs []uint64) ([]*PendingTrans
 
 		transactions = append(transactions, transaction)
 	}
-
 	return transactions, nil
 }
 
-func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address common.Address) ([]*PendingTransaction, error) {
+func (tm *TransactionManager) GetAllPending(chainIDs []uint64) ([]*PendingTransaction, error) {
+	if len(chainIDs) == 0 {
+		return nil, errors.New("at least 1 chainID is required")
+	}
+
+	inVector := strings.Repeat("?, ", len(chainIDs)-1) + "?"
+	var parameters []interface{}
+	for _, c := range chainIDs {
+		parameters = append(parameters, c)
+	}
+
+	rows, err := tm.db.Query(fmt.Sprintf(selectFromPending+"WHERE network_id in (%s)", inVector), parameters...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return rowsToTransactions(rows)
+}
+
+func (tm *TransactionManager) GetPendingByAddress(chainIDs []uint64, address common.Address) ([]*PendingTransaction, error) {
 	if len(chainIDs) == 0 {
 		return nil, errors.New("at least 1 chainID is required")
 	}
@@ -147,52 +162,56 @@ func (tm *TransactionManager) getPendingByAddress(chainIDs []uint64, address com
 
 	parameters = append(parameters, address)
 
-	rows, err := tm.db.Query(fmt.Sprintf(`SELECT hash, timestamp, value, from_address, to_address, data,
-                                         symbol, gas_price, gas_limit, type, additional_data,
-										 network_id
-                                  FROM pending_transactions
-                                  WHERE network_id in (%s) AND from_address = ?`, inVector), parameters...)
+	rows, err := tm.db.Query(fmt.Sprintf(selectFromPending+"WHERE network_id in (%s) AND from_address = ?", inVector), parameters...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var transactions []*PendingTransaction
-	for rows.Next() {
-		transaction := &PendingTransaction{
-			Value:    bigint.BigInt{Int: new(big.Int)},
-			GasPrice: bigint.BigInt{Int: new(big.Int)},
-			GasLimit: bigint.BigInt{Int: new(big.Int)},
-		}
-		err := rows.Scan(&transaction.Hash,
-			&transaction.Timestamp,
-			(*bigint.SQLBigIntBytes)(transaction.Value.Int),
-			&transaction.From,
-			&transaction.To,
-			&transaction.Data,
-			&transaction.Symbol,
-			(*bigint.SQLBigIntBytes)(transaction.GasPrice.Int),
-			(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
-			&transaction.Type,
-			&transaction.AdditionalData,
-			&transaction.ChainID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		transactions = append(transactions, transaction)
-	}
-
-	return transactions, nil
+	return rowsToTransactions(rows)
 }
 
-func (tm *TransactionManager) addPending(transaction PendingTransaction) error {
+// GetPendingEntry returns sql.ErrNoRows if no pending transaction is found for the given identity
+func (tm *TransactionManager) GetPendingEntry(chainID uint64, hash common.Hash) (*PendingTransaction, error) {
+	row := tm.db.QueryRow(`SELECT timestamp, value, from_address, to_address, data,
+								symbol, gas_price, gas_limit, type, additional_data,
+								network_id, COALESCE(multi_transaction_id, 0)
+							FROM pending_transactions
+							WHERE network_id = ? AND hash = ?`, chainID, hash)
+	transaction := &PendingTransaction{
+		Hash:     hash,
+		Value:    bigint.BigInt{Int: new(big.Int)},
+		GasPrice: bigint.BigInt{Int: new(big.Int)},
+		GasLimit: bigint.BigInt{Int: new(big.Int)},
+		ChainID:  chainID,
+	}
+	err := row.Scan(
+		&transaction.Timestamp,
+		(*bigint.SQLBigIntBytes)(transaction.Value.Int),
+		&transaction.From,
+		&transaction.To,
+		&transaction.Data,
+		&transaction.Symbol,
+		(*bigint.SQLBigIntBytes)(transaction.GasPrice.Int),
+		(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
+		&transaction.Type,
+		&transaction.AdditionalData,
+		&transaction.ChainID,
+		&transaction.MultiTransactionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
+func (tm *TransactionManager) AddPending(transaction PendingTransaction) error {
 	insert, err := tm.db.Prepare(`INSERT OR REPLACE INTO pending_transactions
                                       (network_id, hash, timestamp, value, from_address, to_address,
-                                       data, symbol, gas_price, gas_limit, type, additional_data)
+                                       data, symbol, gas_price, gas_limit, type, additional_data, multi_transaction_id)
                                       VALUES
-                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -209,16 +228,17 @@ func (tm *TransactionManager) addPending(transaction PendingTransaction) error {
 		(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 		transaction.Type,
 		transaction.AdditionalData,
+		transaction.MultiTransactionID,
 	)
 	return err
 }
 
-func (tm *TransactionManager) deletePending(chainID uint64, hash common.Hash) error {
+func (tm *TransactionManager) DeletePending(chainID uint64, hash common.Hash) error {
 	_, err := tm.db.Exec(`DELETE FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash)
 	return err
 }
 
-func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *chain.ClientWithFallback) error {
+func (tm *TransactionManager) Watch(ctx context.Context, transactionHash common.Hash, client *chain.ClientWithFallback) error {
 	watchTxCommand := &watchTransactionCommand{
 		hash:   transactionHash,
 		client: client,
@@ -230,7 +250,7 @@ func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.
 	return watchTxCommand.Command()(commandContext)
 }
 
-func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
+func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
 	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
 	if err != nil {
 		return nil, err
@@ -267,7 +287,7 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 		if err != nil {
 			return nil, err
 		}
-		err = tm.addPending(PendingTransaction{
+		pendingTransaction := PendingTransaction{
 			Hash:               common.Hash(hash),
 			Timestamp:          uint64(time.Now().Unix()),
 			Value:              bigint.BigInt{Int: multiTransaction.FromAmount.ToInt()},
@@ -276,9 +296,10 @@ func (tm *TransactionManager) createMultiTransaction(ctx context.Context, multiT
 			Data:               tx.Data().String(),
 			Type:               WalletTransfer,
 			ChainID:            tx.ChainID,
-			MultiTransactionID: multiTransactionID,
+			MultiTransactionID: MultiTransactionIDType(multiTransactionID),
 			Symbol:             multiTransaction.FromAsset,
-		})
+		}
+		err = tm.AddPending(pendingTransaction)
 		if err != nil {
 			return nil, err
 		}

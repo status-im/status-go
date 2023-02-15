@@ -83,7 +83,7 @@ func TestDBProcessBlocks(t *testing.T) {
 			From:        common.Address{1},
 		},
 	}
-	require.NoError(t, db.SaveTranfers(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
+	require.NoError(t, db.SaveTransfers(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
 }
 
 func TestDBProcessTransfer(t *testing.T) {
@@ -97,13 +97,14 @@ func TestDBProcessTransfer(t *testing.T) {
 	tx := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	transfers := []Transfer{
 		{
-			ID:          common.Hash{1},
-			Type:        ethTransfer,
-			BlockHash:   header.Hash,
-			BlockNumber: header.Number,
-			Transaction: tx,
-			Receipt:     types.NewReceipt(nil, false, 100),
-			Address:     common.Address{1},
+			ID:                 common.Hash{1},
+			Type:               ethTransfer,
+			BlockHash:          header.Hash,
+			BlockNumber:        header.Number,
+			Transaction:        tx,
+			Receipt:            types.NewReceipt(nil, false, 100),
+			Address:            common.Address{1},
+			MultiTransactionID: 0,
 		},
 	}
 	nonce := int64(0)
@@ -113,7 +114,7 @@ func TestDBProcessTransfer(t *testing.T) {
 		Nonce:   &nonce,
 	}
 	require.NoError(t, db.ProcessBlocks(777, common.Address{1}, big.NewInt(1), lastBlock, []*DBHeader{header}))
-	require.NoError(t, db.ProcessTranfers(777, transfers, []*DBHeader{}))
+	require.NoError(t, db.ProcessTransfers(777, transfers, []*DBHeader{}))
 }
 
 func TestDBReorgTransfers(t *testing.T) {
@@ -140,8 +141,8 @@ func TestDBReorgTransfers(t *testing.T) {
 		Nonce:   &nonce,
 	}
 	require.NoError(t, db.ProcessBlocks(777, original.Address, original.Number, lastBlock, []*DBHeader{original}))
-	require.NoError(t, db.ProcessTranfers(777, []Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100"},
+	require.NoError(t, db.ProcessTransfers(777, []Transfer{
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
 	}, []*DBHeader{}))
 	nonce = int64(0)
 	lastBlock = &LastKnownBlock{
@@ -150,8 +151,8 @@ func TestDBReorgTransfers(t *testing.T) {
 		Nonce:   &nonce,
 	}
 	require.NoError(t, db.ProcessBlocks(777, replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
-	require.NoError(t, db.ProcessTranfers(777, []Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, "2100"},
+	require.NoError(t, db.ProcessTransfers(777, []Transfer{
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
 	}, []*DBHeader{original}))
 
 	all, err := db.GetTransfers(777, big.NewInt(0), nil)
@@ -193,7 +194,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		Nonce:   &nonce,
 	}
 	require.NoError(t, db.ProcessBlocks(777, headers[0].Address, headers[0].Number, lastBlock, headers))
-	require.NoError(t, db.ProcessTranfers(777, transfers, []*DBHeader{}))
+	require.NoError(t, db.ProcessTransfers(777, transfers, []*DBHeader{}))
 	rst, err := db.GetTransfers(777, big.NewInt(7), nil)
 	require.NoError(t, err)
 	require.Len(t, rst, 3)

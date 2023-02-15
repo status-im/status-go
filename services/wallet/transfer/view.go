@@ -34,7 +34,7 @@ type View struct {
 	To                   common.Address `json:"to"`
 	Contract             common.Address `json:"contract"`
 	NetworkID            uint64         `json:"networkId"`
-	MultiTransactionID   int64          `json:"multi_transaction_id"`
+	MultiTransactionID   int64          `json:"multiTransactionID"`
 	BaseGasFees          string         `json:"base_gas_fee"`
 }
 
@@ -87,6 +87,8 @@ func CastToTransferView(t Transfer) View {
 		from, to, amount := parseLog(t.Log)
 		view.From, view.To, view.Value = from, to, (*hexutil.Big)(amount)
 	}
+
+	view.MultiTransactionID = int64(t.MultiTransactionID)
 	return view
 }
 

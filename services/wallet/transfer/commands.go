@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"database/sql"
 	"math/big"
 	"strings"
 	"time"
@@ -168,10 +169,11 @@ type controlCommand struct {
 	feed               *event.Feed
 	errorsCount        int
 	nonArchivalRPCNode bool
+	transactionManager *TransactionManager
 }
 
 func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHDownloader, limit int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int))
+	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager)
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
@@ -262,6 +264,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
 		db:          c.db,
 	}
+
 	_, err = c.LoadTransfers(parent, downloader, 40)
 	if err != nil {
 		if c.NewError(err) {
@@ -333,12 +336,13 @@ func (c *controlCommand) Command() async.Command {
 }
 
 type transfersCommand struct {
-	db               *Database
-	eth              *ETHDownloader
-	block            *big.Int
-	address          common.Address
-	chainClient      *chain.ClientWithFallback
-	fetchedTransfers []Transfer
+	db                 *Database
+	eth                *ETHDownloader
+	block              *big.Int
+	address            common.Address
+	chainClient        *chain.ClientWithFallback
+	fetchedTransfers   []Transfer
+	transactionManager *TransactionManager
 }
 
 func (c *transfersCommand) Command() async.Command {
@@ -355,10 +359,36 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	err = c.db.SaveTranfers(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.block})
-	if err != nil {
-		log.Error("SaveTranfers error", "error", err)
-		return err
+	// Update MultiTransactionID from pending entry
+	for index := range allTransfers {
+		transfer := &allTransfers[index]
+		if transfer.MultiTransactionID == NoMultiTransactionID {
+			entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					log.Warn("Pending transaction not found for", c.chainClient.ChainID, transfer.ID)
+				} else {
+					return err
+				}
+			} else {
+				transfer.MultiTransactionID = entry.MultiTransactionID
+				if transfer.Receipt != nil && transfer.Receipt.Status == types.ReceiptStatusSuccessful {
+					// TODO: Nim logic was deleting pending previously, should we notify UI about it?
+					err := c.transactionManager.DeletePending(c.chainClient.ChainID, transfer.ID)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	if len(allTransfers) > 0 {
+		err = c.db.SaveTransfers(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.block})
+		if err != nil {
+			log.Error("SaveTransfers error", "error", err)
+			return err
+		}
 	}
 
 	c.fetchedTransfers = allTransfers
@@ -373,6 +403,7 @@ type loadTransfersCommand struct {
 	chainClient             *chain.ClientWithFallback
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
+	transactionManager      *TransactionManager
 }
 
 func (c *loadTransfersCommand) Command() async.Command {
@@ -382,8 +413,8 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, downloader *ETHDownloader, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, blocksByAddress)
+func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, downloader *ETHDownloader, limit int, blocksByAddress map[common.Address][]*big.Int, transactionManager *TransactionManager) (map[common.Address][]Transfer, error) {
+	return loadTransfers(ctx, c.accounts, c.block, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager)
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
@@ -393,7 +424,7 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 		signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
 		db:          c.db,
 	}
-	transfersByAddress, err := c.LoadTransfers(parent, downloader, 40, c.blocksByAddress)
+	transfersByAddress, err := c.LoadTransfers(parent, downloader, 40, c.blocksByAddress, c.transactionManager)
 	if err != nil {
 		return err
 	}
@@ -570,7 +601,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	}
 }
 
-func loadTransfers(ctx context.Context, accounts []common.Address, block *Block, db *Database, chainClient *chain.ClientWithFallback, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+func loadTransfers(ctx context.Context, accounts []common.Address, block *Block, db *Database, chainClient *chain.ClientWithFallback, limit int, blocksByAddress map[common.Address][]*big.Int, transactionManager *TransactionManager) (map[common.Address][]Transfer, error) {
 	start := time.Now()
 	group := async.NewGroup(ctx)
 
@@ -592,7 +623,8 @@ func loadTransfers(ctx context.Context, accounts []common.Address, block *Block,
 					signer:      types.NewLondonSigner(chainClient.ToBigInt()),
 					db:          db,
 				},
-				block: block,
+				block:              block,
+				transactionManager: transactionManager,
 			}
 			commands = append(commands, transfers)
 			group.Add(transfers.Command())

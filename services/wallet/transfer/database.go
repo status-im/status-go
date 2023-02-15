@@ -137,8 +137,8 @@ func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers [
 	return
 }
 
-// ProcessTranfers atomically adds/removes blocks and adds new tranfers.
-func (db *Database) ProcessTranfers(chainID uint64, transfers []Transfer, removed []*DBHeader) (err error) {
+// ProcessTransfers atomically adds/removes blocks and adds new transfers.
+func (db *Database) ProcessTransfers(chainID uint64, transfers []Transfer, removed []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -153,10 +153,12 @@ func (db *Database) ProcessTranfers(chainID uint64, transfers []Transfer, remove
 		}
 		_ = tx.Rollback()
 	}()
+
 	err = deleteHeaders(tx, removed)
 	if err != nil {
 		return
 	}
+
 	err = updateOrInsertTransfers(chainID, tx, transfers)
 	if err != nil {
 		return
@@ -164,11 +166,9 @@ func (db *Database) ProcessTranfers(chainID uint64, transfers []Transfer, remove
 	return
 }
 
-// SaveTranfers
-func (db *Database) SaveTranfers(chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
-	var (
-		tx *sql.Tx
-	)
+// SaveTransfers
+func (db *Database) SaveTransfers(chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
+	var tx *sql.Tx
 	tx, err = db.client.Begin()
 	if err != nil {
 		return err
@@ -389,8 +389,8 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 	}
 
 	insertTx, err := creator.Prepare(`INSERT OR IGNORE
-	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`)
+	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, multi_transaction_id)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`)
 	if err != nil {
 		return err
 	}
@@ -414,7 +414,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 					continue
 				}
 
-				_, err = insertTx.Exec(chainID, account, account, transfer.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log})
+				_, err = insertTx.Exec(chainID, account, account, transfer.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log}, transfer.MultiTransactionID)
 				if err != nil {
 					log.Error("error saving erc20transfer", "err", err)
 					return err
@@ -434,9 +434,9 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 	}
 
 	insert, err := creator.Prepare(`INSERT OR IGNORE INTO transfers
-        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee)
+        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id)
 	VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 			continue
 		}
 
-		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees)
+		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees, t.MultiTransactionID)
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)
 			return err

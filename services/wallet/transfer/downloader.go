@@ -18,12 +18,15 @@ import (
 
 // Type type of the asset that was transferred.
 type Type string
+type MultiTransactionIDType int64
 
 const (
 	ethTransfer   Type = "eth"
 	erc20Transfer Type = "erc20"
 
 	erc20TransferEventSignature = "Transfer(address,address,uint256)"
+
+	NoMultiTransactionID = MultiTransactionIDType(0)
 )
 
 var (
@@ -49,6 +52,8 @@ type Transfer struct {
 	// Log that was used to generate erc20 transfer. Nil for eth transfer.
 	Log         *types.Log `json:"log"`
 	BaseGasFees string
+	// Internal field that is used to track multi-transaction transfers.
+	MultiTransactionID MultiTransactionIDType `json:"multi_transaction_id"`
 }
 
 // ETHDownloader downloads regular eth transfers.
