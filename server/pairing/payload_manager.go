@@ -61,6 +61,9 @@ type PayloadSourceConfig struct {
 	// they are required in other cases
 	KeyUID   string `json:"keyUID"`
 	Password string `json:"password"`
+
+	// Timeout the number of milliseconds after which the pairing server will automatically terminate
+	Timeout uint `json:"timeout"`
 }
 
 // AccountPayloadManagerConfig represents the initialisation parameters required for a AccountPayloadManager

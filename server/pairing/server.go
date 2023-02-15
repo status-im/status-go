@@ -76,7 +76,7 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 		return nil, err
 	}
 
-	return &Server{Server: server.NewServer(
+	s := &Server{Server: server.NewServer(
 		config.Cert,
 		config.Hostname,
 		nil,
@@ -88,7 +88,10 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 		PayloadManager:           pm,
 		cookieStore:              cs,
 		rawMessagePayloadManager: rmpm,
-	}, nil
+	}
+	s.SetTimeout(config.Timeout)
+
+	return s, nil
 }
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
