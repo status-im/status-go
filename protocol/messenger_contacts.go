@@ -408,7 +408,13 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		return nil, err
 	}
 
-	return m.addContact(request.ID.String(), request.ENSName, request.Nickname, request.DisplayName, "", false, true)
+        id, err := request.HexID()
+        if err != nil {
+          return nil, err
+        }
+
+
+	return m.addContact(id, request.ENSName, request.Nickname, request.DisplayName, "", false, true)
 }
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
