@@ -114,7 +114,7 @@ func TestTransactionNotification(t *testing.T) {
 		Nonce:   &nonce,
 	}
 	require.NoError(t, walletDb.ProcessBlocks(1777, header.Address, big.NewInt(1), lastBlock, []*transfer.DBHeader{header}))
-	require.NoError(t, walletDb.ProcessTranfers(1777, transfers, []*transfer.DBHeader{}))
+	require.NoError(t, walletDb.ProcessTransfers(1777, transfers, []*transfer.DBHeader{}))
 
 	feed.Send(walletevent.Event{
 		Type:        transfer.EventRecentHistoryReady,

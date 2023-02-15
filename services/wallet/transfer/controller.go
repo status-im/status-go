@@ -17,24 +17,26 @@ import (
 )
 
 type Controller struct {
-	db           *Database
-	rpcClient    *rpc.Client
-	block        *Block
-	reactor      *Reactor
-	accountFeed  *event.Feed
-	TransferFeed *event.Feed
-	group        *async.Group
-	balanceCache *balanceCache
+	db                 *Database
+	rpcClient          *rpc.Client
+	block              *Block
+	reactor            *Reactor
+	accountFeed        *event.Feed
+	TransferFeed       *event.Feed
+	group              *async.Group
+	balanceCache       *balanceCache
+	transactionManager *TransactionManager
 }
 
-func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed) *Controller {
+func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed, transactionManager *TransactionManager) *Controller {
 	block := &Block{db}
 	return &Controller{
-		db:           NewDB(db),
-		block:        block,
-		rpcClient:    rpcClient,
-		accountFeed:  accountFeed,
-		TransferFeed: transferFeed,
+		db:                 NewDB(db),
+		block:              block,
+		rpcClient:          rpcClient,
+		accountFeed:        accountFeed,
+		TransferFeed:       transferFeed,
+		transactionManager: transactionManager,
 	}
 }
 
@@ -99,9 +101,10 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	c.reactor = &Reactor{
-		db:    c.db,
-		feed:  c.TransferFeed,
-		block: c.block,
+		db:                 c.db,
+		feed:               c.TransferFeed,
+		block:              c.block,
+		transactionManager: c.transactionManager,
 	}
 	err = c.reactor.start(chainClients, accounts)
 	if err != nil {
@@ -114,7 +117,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	return nil
 }
 
-// watchAccountsChanges subsribes to a feed and watches for changes in accounts list. If there are new or removed accounts
+// watchAccountsChanges subscribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
 func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*chain.ClientWithFallback, initial []common.Address) error {
 	accounts := make(chan []*accounts.Account, 1) // it may block if the rate of updates will be significantly higher
@@ -184,7 +187,7 @@ func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Clie
 	}
 
 	blocks := []*big.Int{transfer.BlockNumber}
-	err = c.db.SaveTranfers(rpcClient.UpstreamChainID, address, transfers, blocks)
+	err = c.db.SaveTransfers(rpcClient.UpstreamChainID, address, transfers, blocks)
 	if err != nil {
 		return err
 	}
@@ -260,10 +263,11 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 		log.Info("checking blocks again", "blocks", len(blocks))
 		if len(blocks) > 0 {
 			txCommand := &loadTransfersCommand{
-				accounts:    []common.Address{address},
-				db:          c.db,
-				block:       c.block,
-				chainClient: chainClient,
+				accounts:           []common.Address{address},
+				db:                 c.db,
+				block:              c.block,
+				chainClient:        chainClient,
+				transactionManager: c.transactionManager,
 			}
 
 			err = txCommand.Command()(ctx)

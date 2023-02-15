@@ -30,11 +30,12 @@ type BalanceReader interface {
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	db    *Database
-	block *Block
-	feed  *event.Feed
-	mu    sync.Mutex
-	group *async.Group
+	db                 *Database
+	block              *Block
+	feed               *event.Feed
+	mu                 sync.Mutex
+	group              *async.Group
+	transactionManager *TransactionManager
 }
 
 func (r *Reactor) newControlCommand(chainClient *chain.ClientWithFallback, accounts []common.Address) *controlCommand {
@@ -50,9 +51,10 @@ func (r *Reactor) newControlCommand(chainClient *chain.ClientWithFallback, accou
 			signer:      signer,
 			db:          r.db,
 		},
-		erc20:       NewERC20TransfersDownloader(chainClient, accounts, signer),
-		feed:        r.feed,
-		errorsCount: 0,
+		erc20:              NewERC20TransfersDownloader(chainClient, accounts, signer),
+		feed:               r.feed,
+		errorsCount:        0,
+		transactionManager: r.transactionManager,
 	}
 
 	return ctl
