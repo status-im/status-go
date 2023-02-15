@@ -1293,30 +1293,35 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	s, err := parseAppState(state)
 	if err != nil {
 		log.Error("AppStateChange failed, ignoring", "error", err)
-		return // and do nothing
+		return
 	}
 
 	b.appState = s
 
-	if b.statusNode.WakuV2ExtService() != nil {
-		messenger = b.statusNode.WakuV2ExtService().Messenger()
+	if b.statusNode == nil {
+		log.Warn("statusNode nil, not reporting app state change")
+		return
 	}
 
 	if b.statusNode.WakuExtService() != nil {
 		messenger = b.statusNode.WakuExtService().Messenger()
 	}
 
-	if b.statusNode != nil {
-		if messenger != nil {
-			if s == appStateForeground {
-				messenger.ToForeground()
-			} else {
-				messenger.ToBackground()
-			}
-		} else {
-			log.Warn("messenger nil, not reporting app state change")
-		}
+	if b.statusNode.WakuV2ExtService() != nil {
+		messenger = b.statusNode.WakuV2ExtService().Messenger()
 	}
+
+	if messenger == nil {
+		log.Warn("messenger nil, not reporting app state change")
+		return
+	}
+
+	if s == appStateForeground {
+		messenger.ToForeground()
+	} else {
+		messenger.ToBackground()
+	}
+
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }
