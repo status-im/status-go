@@ -222,15 +222,6 @@ func (m *Messenger) processAcceptedActivityCenterNotifications(ctx context.Conte
 	return m.processActivityCenterNotifications(notifications, !sync)
 }
 
-func (m *Messenger) AcceptAllActivityCenterNotifications(ctx context.Context) (*MessengerResponse, error) {
-	notifications, err := m.persistence.AcceptAllActivityCenterNotifications()
-	if err != nil {
-		return nil, err
-	}
-
-	return m.processAcceptedActivityCenterNotifications(ctx, notifications, true)
-}
-
 func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
 
 	if len(ids) == 0 {
@@ -243,20 +234,6 @@ func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids [
 	}
 
 	return m.processAcceptedActivityCenterNotifications(ctx, notifications, sync)
-}
-
-func (m *Messenger) DismissAllActivityCenterNotifications(ctx context.Context) error {
-	if m.hasPairedDevices() {
-		ids, err := m.persistence.GetToProcessActivityCenterNotificationIds()
-		if err != nil {
-			return err
-		}
-
-		_, err = m.DismissActivityCenterNotifications(ctx, toHexBytes(ids), true)
-		return err
-	}
-
-	return m.persistence.DismissAllActivityCenterNotifications()
 }
 
 func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {

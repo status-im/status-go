@@ -85,10 +85,6 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
-	// accept notification
-	_, err = s.m.AcceptAllActivityCenterNotifications(context.Background())
-	s.Require().NoError(err)
-
 	request := &requests.DeactivateChat{ID: response.Chats()[0].ID}
 	response, err = s.m.DeactivateChat(request)
 	s.Require().NoError(err)

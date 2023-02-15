@@ -1939,15 +1939,10 @@ func TestActivityCenterPersistence(t *testing.T) {
 	err = p.SaveActivityCenterNotification(notification)
 	require.NoError(t, err)
 
-	// Mark all as accepted
-	notifications, err = p.AcceptAllActivityCenterNotifications()
-	require.NoError(t, err)
-	require.Len(t, notifications, 2)
-
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
 
-	require.Len(t, notifications, 1)
+	require.Len(t, notifications, 2)
 
 	// Insert new notification
 	notification = &ActivityCenterNotification{

@@ -293,7 +293,7 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 				// Otherwise, it means we have already passed it to the client, so we add it with a `dismissed` flag
 				// so it can clean up
 				if !found {
-					messageState.Response.AddActivityCenterNotification(notification) // TODO: does we need here to update state?
+					messageState.Response.AddActivityCenterNotification(notification)
 				}
 			}
 		}
