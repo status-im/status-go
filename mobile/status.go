@@ -1012,6 +1012,14 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	return makeJSONResponse(err)
 }
 
+func ValidateConnectionString(cs string) string {
+	err := pairing.ValidateConnectionString(cs)
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 func EncodeTransfer(to string, value string) string {
 	result, err := abi_spec.EncodeTransfer(to, value)
 	if err != nil {
