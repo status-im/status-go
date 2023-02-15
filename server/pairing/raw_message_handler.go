@@ -8,12 +8,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

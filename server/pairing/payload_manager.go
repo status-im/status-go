@@ -9,16 +9,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/status-im/status-go/params"
-
-	"github.com/status-im/status-go/api"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

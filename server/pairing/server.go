@@ -9,12 +9,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/server"
-
 	"github.com/gorilla/sessions"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/server"
 )
 
 type Server struct {
