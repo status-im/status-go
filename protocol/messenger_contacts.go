@@ -480,15 +480,18 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 
 	contactRequest := &common.Message{}
 	contactRequest.WhisperTimestamp = timestamp
-	contactRequest.Seen = false
+	contactRequest.Seen = true
 	contactRequest.Text = text
 	contactRequest.From = contact.ID
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 	contactRequest.Clock = clock
 	contactRequest.ID = defaultContactRequestID(contact.ID)
-	contactRequest.ContactRequestState = common.ContactRequestStatePending
-
+	if contact.mutual() {
+		contactRequest.ContactRequestState = common.ContactRequestStateAccepted
+	} else {
+		contactRequest.ContactRequestState = common.ContactRequestStatePending
+	}
 	err := contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
 	return contactRequest, err
 }

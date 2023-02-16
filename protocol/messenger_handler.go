@@ -341,7 +341,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			}
 		}
 
-		// TODO(alwx):
 		// generate request message
 		contactRequest, err = m.generateContactRequest(
 			messageState.CurrentMessageState.Message.Clock,
@@ -349,26 +348,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			contact,
 			"Please add me to your contacts",
 		)
-
-		contactRequest = &common.Message{}
-
-		contactRequest.WhisperTimestamp = messageState.CurrentMessageState.WhisperTimestamp
-		contactRequest.Seen = true
-		contactRequest.Text = "Please add me to your contacts"
-		contactRequest.From = contact.ID
-		contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
-		contactRequest.Clock = messageState.CurrentMessageState.Message.Clock
-		contactRequest.ID = defaultID
-
-		if contact.mutual() {
-			contactRequest.ContactRequestState = common.ContactRequestStateAccepted
-		} else {
-			contactRequest.ContactRequestState = common.ContactRequestStatePending
-		}
-		err = contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
-		if err != nil {
-			return err
-		}
 
 		// save this message
 		messageState.Response.AddMessage(contactRequest)
@@ -951,7 +930,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		}
 		if result.newContactRequestReceived {
-			err = m.createContactRequestNotification(contact, state, nil, true)
+			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				return err
 			}
@@ -1780,7 +1759,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			err = m.createContactRequestNotification(contact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
