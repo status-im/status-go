@@ -738,7 +738,6 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chat
 		UPDATE activity_center_notifications
 		SET read = 1, dismissed = 1
 		WHERE NOT deleted
-			AND NOT dismissed
 			AND NOT accepted
 			AND chat_id = ?
 			AND notification_type != ?

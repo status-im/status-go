@@ -499,11 +499,13 @@ func TestDismissAllActivityCenterNotificationsFromChatID(t *testing.T) {
 	require.False(t, notif.Dismissed)
 	require.True(t, notif.Deleted)
 
-	// Ignores already dismissed.
+	// Do not ignore already dismissed, because notifications can become
+	// read/unread AND dismissed, and the method should still update the Read
+	// column.
 	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
 	require.NoError(t, err)
 	require.False(t, notif.Accepted)
-	require.False(t, notif.Read)
+	require.True(t, notif.Read)
 	require.True(t, notif.Dismissed)
 	require.False(t, notif.Deleted)
 
