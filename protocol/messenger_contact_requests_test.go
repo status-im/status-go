@@ -114,6 +114,16 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, false)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
 
+	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
+
+	notifications, err := theirMessenger.ActivityCenterNotifications("", 10)
+	s.Require().NoError(err)
+
+	s.Require().Len(notifications.Notifications, 1)
+
+	s.Require().NotNil(common.ContactRequestStatePending, notifications.Notifications[0].Message)
+	s.Require().Equal(common.ContactRequestStatePending, notifications.Notifications[0].Message.ContactRequestState)
+
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)

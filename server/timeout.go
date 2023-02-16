@@ -7,9 +7,9 @@ import (
 
 // timeoutManager represents a discrete encapsulation of timeout functionality.
 // this struct expose 3 functions:
-//  - SetTimeout
-//  - StartTimeout
-//  - StopTimeout
+//   - SetTimeout
+//   - StartTimeout
+//   - StopTimeout
 type timeoutManager struct {
 	// timeout number of milliseconds the timeout operation will run before executing the `terminate` func()
 	// 0 represents an inactive timeout
