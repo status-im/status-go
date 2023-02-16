@@ -197,7 +197,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		"",
 		request.Message,
 		false,
-		true,
+		false,
 		false,
 	)
 	if err != nil {

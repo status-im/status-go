@@ -681,10 +681,10 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
-	// Make sure it's returned
+	// Make sure it's not returned
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
 	s.Require().NoError(err)
-	s.Require().Len(contactRequests, 1)
+	s.Require().Len(contactRequests, 0)
 
 	// Make sure contact is added on the sender side
 	contacts := s.m.AddedContacts()
@@ -1603,7 +1603,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// adds bob again to her device
@@ -1689,7 +1689,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// adds bob again to her device

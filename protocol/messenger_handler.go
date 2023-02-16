@@ -350,6 +350,9 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			"Please add me to your contacts",
 			false,
 		)
+		if err != nil {
+			return err
+		}
 
 		// save this message
 		messageState.Response.AddMessage(contactRequest)
