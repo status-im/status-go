@@ -241,21 +241,6 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		return nil, err
 	}
 
-	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(chatID),
-		Type:      ActivityCenterNotificationTypeContactRequest,
-		Name:      "",
-		Author:    common.PubkeyToHex(&m.identity.PublicKey),
-		Message:   chatMessage,
-		Timestamp: m.getTimesource().GetCurrentTime(),
-		ChatID:    chatID,
-	}
-
-	err = m.addActivityCenterNotification(response, notification)
-	if err != nil {
-		return nil, err
-	}
-
 	return response, nil
 }
 
