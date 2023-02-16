@@ -1750,6 +1750,11 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 			}
 		}
 		if result.newContactRequestReceived {
+
+			if contact.hasAddedUs() && !contact.mutual() {
+				receivedMessage.ContactRequestState = common.ContactRequestStatePending
+			}
+
 			err = m.createContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
