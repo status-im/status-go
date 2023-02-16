@@ -274,6 +274,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			notification.Message = contactRequest
 			notification.Read = true
 			notification.Accepted = true
+			notification.Dismissed = false
 			err = m.persistence.SaveActivityCenterNotification(notification)
 			if err != nil {
 				return err
@@ -347,6 +348,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			messageState.CurrentMessageState.WhisperTimestamp,
 			contact,
 			"Please add me to your contacts",
+			false,
 		)
 
 		// save this message
