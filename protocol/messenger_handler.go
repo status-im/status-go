@@ -348,7 +348,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			messageState.CurrentMessageState.WhisperTimestamp,
 			contact,
 			"Please add me to your contacts",
-			false,
 		)
 		if err != nil {
 			return err
@@ -807,7 +806,9 @@ func (m *Messenger) handleAcceptContactRequest(
 	return ContactRequestProcessingResponse{}, nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
+	// TODO(alwx): remove message for incoming contact request
+
 	originalRequest, err := m.persistence.MessageByID(message.Id)
 	if err != nil && err != common.ErrRecordNotFound {
 		return err

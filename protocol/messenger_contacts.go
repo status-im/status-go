@@ -266,9 +266,9 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	contact.AcceptContactRequest(clock)
 
-	messageID := defaultContactRequestID(common.PubkeyToHex(&m.identity.PublicKey))
+	// TODO(alwx): acceptContactRequest.Id = defaultContactRequestID(common.PubkeyToHex(&m.identity.PublicKey))
 	acceptContactRequest := &protobuf.AcceptContactRequest{
-		Id:    messageID,
+		Id:    contactRequest.ID,
 		Clock: clock,
 	}
 	encodedMessage, err := proto.Marshal(acceptContactRequest)
@@ -474,7 +474,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	return response, nil
 }
 
-func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string, setLocalChatID bool) (*common.Message, error) {
+func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string) (*common.Message, error) {
 	if contact == nil {
 		return nil, errors.New("contact cannot be nil")
 	}
@@ -484,9 +484,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest.Seen = true
 	contactRequest.Text = text
 	contactRequest.From = contact.ID
-	if setLocalChatID {
-		contactRequest.LocalChatID = contact.ID
-	}
+	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 	contactRequest.Clock = clock
 	contactRequest.ID = defaultContactRequestID(contact.ID)
@@ -501,7 +499,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 
 func (m *Messenger) createOutgoingContactRequestNotification(response *MessengerResponse, contact *Contact, chat *Chat, text string) error {
 	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, text, true)
+	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, text)
 	if err != nil {
 		return err
 	}

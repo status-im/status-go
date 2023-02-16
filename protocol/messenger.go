@@ -3781,7 +3781,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling AcceptContactRequest")
 						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleAcceptContactRequest(messageState, message)
+						err = m.HandleAcceptContactRequest(messageState, message, senderID)
 						if err != nil {
 							logger.Warn("failed to handle AcceptContactRequest", zap.Error(err))
 							allMessagesProcessed = false
