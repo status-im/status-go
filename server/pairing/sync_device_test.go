@@ -140,7 +140,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
-	serverPayloadSourceConfig := PayloadSourceConfig{
+	serverPayloadSourceConfig := PairConfig{
 		KeystorePath: serverKeystoreDir,
 		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
 			KDFIterations:         expectedKDFIterations,
@@ -165,7 +165,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
-	clientPayloadSourceConfig := PayloadSourceConfig{
+	clientPayloadSourceConfig := PairConfig{
 		KeystorePath: clientKeystorePath,
 		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 			KeyUID:   clientActiveAccount.KeyUID,
@@ -203,7 +203,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
-	var config = PayloadSourceConfig{
+	var config = PairConfig{
 		KeystorePath: serverKeystorePath,
 		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 			KeyUID:   serverActiveAccount.KeyUID,
@@ -231,7 +231,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
-	clientPayloadSourceConfig := PayloadSourceConfig{
+	clientPayloadSourceConfig := PairConfig{
 		KeystorePath: clientKeystoreDir,
 		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
 			KDFIterations:         expectedKDFIterations,

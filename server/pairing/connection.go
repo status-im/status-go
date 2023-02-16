@@ -24,6 +24,14 @@ const (
 	Sending
 )
 
+// Role of device
+type Role int
+
+const (
+	Sender Role = iota + 1
+	Receiver
+)
+
 const (
 	connectionStringID = "cs"
 )

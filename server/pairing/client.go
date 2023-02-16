@@ -70,7 +70,15 @@ func NewPairingClient(backend *api.GethStatusBackend, c *ConnectionParams, confi
 		return nil, err
 	}
 
-	pm, err := NewAccountPayloadManager(c.aesKey, config, logutils.ZapLogger().Named("Client"))
+	var role Role
+	switch c.serverMode {
+	case Receiving:
+		role = Sender
+	case Sending:
+		role = Receiver
+	}
+	logger := logutils.ZapLogger().Named("Client")
+	pm, err := NewAccountPayloadManager(c.aesKey, config, logger, role)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +293,7 @@ func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (
 		return nil, err
 	}
 
-	conf, err := NewPayloadSourceForClient(configJSON, ccp.serverMode)
+	conf, err := NewPairConfigForClient(configJSON, ccp.serverMode)
 	if err != nil {
 		return nil, err
 	}

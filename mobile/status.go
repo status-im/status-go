@@ -964,7 +964,7 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PairConfig is expected"))
 	}
 	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Receiving, configJSON)
 	if err != nil {
@@ -981,7 +981,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PairConfig is expected"))
 	}
 	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Sending, configJSON)
 	if err != nil {
@@ -1005,7 +1005,7 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, PairConfig is expected"))
 	}
 
 	err := pairing.StartUpPairingClient(statusBackend, cs, configJSON)

@@ -134,7 +134,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 
 	pms.config1 = &AccountPayloadManagerConfig{
 		DB: db1,
-		PayloadSourceConfig: &PayloadSourceConfig{
+		PairConfig: &PairConfig{
 			KeystorePath: keystore1,
 			PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 				KeyUID:   keyUID,
@@ -145,7 +145,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 
 	pms.config2 = &AccountPayloadManagerConfig{
 		DB: db2,
-		PayloadSourceConfig: &PayloadSourceConfig{
+		PairConfig: &PairConfig{
 			KeystorePath: keystore2,
 			PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 				KeyUID:   keyUID,
@@ -164,7 +164,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 	pp := new(AccountPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadRepository(pp, pms.config1)
+	ppr, err := NewAccountPayloadRepository(pp, pms.config1, Sender)
 	pms.Require().NoError(err)
 	err = ppr.LoadFromSource()
 	pms.Require().NoError(err)
@@ -198,7 +198,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 	pp := new(AccountPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadRepository(pp, pms.config1)
+	ppr, err := NewAccountPayloadRepository(pp, pms.config1, Sender)
 	pms.Require().NoError(err)
 	err = ppr.LoadFromSource()
 	pms.Require().NoError(err)
@@ -228,7 +228,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pp := new(AccountPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadRepository(pp, pms.config1)
+	ppr, err := NewAccountPayloadRepository(pp, pms.config1, Sender)
 	pms.Require().NoError(err)
 	err = ppr.LoadFromSource()
 	pms.Require().NoError(err)
@@ -282,7 +282,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pp := new(AccountPayload)
 
 	// Make and LoadFromSource PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadRepository(pp, pms.config1)
+	ppr, err := NewAccountPayloadRepository(pp, pms.config1, Sender)
 	pms.Require().NoError(err)
 	err = ppr.LoadFromSource()
 	pms.Require().NoError(err)
@@ -303,7 +303,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// Make and Load PairingPayloadRepository 2
-	ppr2, err := NewAccountPayloadRepository(pp2, pms.config2)
+	ppr2, err := NewAccountPayloadRepository(pp2, pms.config2, Receiver)
 	require.NoError(pms.T(), err)
 	err = ppr2.StoreToSource()
 	pms.Require().NoError(err)

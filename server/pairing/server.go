@@ -60,7 +60,14 @@ func makeCookieStore() (*sessions.CookieStore, error) {
 func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, error) {
 	logger := logutils.ZapLogger().Named("Server")
 	accountPayloadManagerConfig := config.AccountPayloadManagerConfig
-	pm, err := NewAccountPayloadManager(config.EK, accountPayloadManagerConfig, logger)
+	var role Role
+	switch config.Mode {
+	case Receiving:
+		role = Receiver
+	case Sending:
+		role = Sender
+	}
+	pm, err := NewAccountPayloadManager(config.EK, accountPayloadManagerConfig, logger, role)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +151,7 @@ func (s *Server) startSendingData() error {
 }
 
 // MakeFullPairingServer generates a fully configured and randomly seeded Server
-func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfig *PayloadSourceConfig) (*Server, error) {
+func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfig *PairConfig) (*Server, error) {
 	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -180,7 +187,7 @@ func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfi
 			DB: backend.GetMultiaccountDB(),
 
 			// Things that can't be generated, but DO come from the app client
-			PayloadSourceConfig: storeConfig,
+			PairConfig: storeConfig,
 		},
 	})
 }
@@ -188,7 +195,7 @@ func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfi
 // StartUpPairingServer generates a Server, starts the pairing server in the correct mode
 // and returns the ConnectionParams string to allow a Client to make a successful connection.
 func StartUpPairingServer(backend *api.GethStatusBackend, mode Mode, configJSON string) (string, error) {
-	conf, err := NewPayloadSourceForServer(configJSON, mode)
+	conf, err := NewPairConfigForServer(configJSON, mode)
 	if err != nil {
 		return "", err
 	}

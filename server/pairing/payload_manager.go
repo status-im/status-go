@@ -22,10 +22,10 @@ import (
 )
 
 var (
-	ErrKeyFileAlreadyExists       = errors.New("key file already exists")
-	ErrKeyUIDEmptyAsSender        = errors.New("keyUID must be provided as sender")
-	ErrNodeConfigNilAsReceiver    = errors.New("node config must be provided as receiver")
-	ErrPayloadSourceConfigBothSet = errors.New("payloadSourceSenderConfig and payloadSourceReceiverConfig cannot be both set")
+	ErrKeyFileAlreadyExists            = errors.New("key file already exists")
+	ErrKeyUIDEmptyAsSender             = errors.New("keyUID must be provided as sender")
+	ErrNodeConfigNilAsReceiver         = errors.New("node config must be provided as receiver")
+	ErrPayloadSourceSenderConfigNotSet = errors.New("payloadSourceSenderConfig must be set")
 )
 
 // PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
@@ -66,9 +66,8 @@ type PayloadSourceReceiverConfig struct {
 	SettingCurrentNetwork string
 }
 
-// PayloadSourceConfig represents location and access data of the pairing payload
-// ONLY available from the application client
-type PayloadSourceConfig struct {
+// PairConfig represents a global level config
+type PairConfig struct {
 	// required for sender and receiver, there are some different cases:
 	// 1. for sender, KeystorePath must end with keyUID
 	// 2. for receiver, KeystorePath must not end with keyUID (because keyUID is not known yet)
@@ -79,10 +78,10 @@ type PayloadSourceConfig struct {
 	Timeout uint `json:"timeout"`
 }
 
-type payloadSourceUnmarshalCallback func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error)
+type pairConfigUnmarshalCallback func(conf *PairConfig) (*PairConfig, error)
 
-func NewPayloadSourceForClient(configJSON string, mode Mode) (*PayloadSourceConfig, error) {
-	return unmarshalPayloadSourceConfig(configJSON, func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
+func NewPairConfigForClient(configJSON string, mode Mode) (*PairConfig, error) {
+	return unmarshalPairConfigConfig(configJSON, func(conf *PairConfig) (*PairConfig, error) {
 		if mode == Sending && conf.NodeConfig == nil {
 			return nil, ErrNodeConfigNilAsReceiver
 		}
@@ -93,8 +92,8 @@ func NewPayloadSourceForClient(configJSON string, mode Mode) (*PayloadSourceConf
 	})
 }
 
-func NewPayloadSourceForServer(configJSON string, mode Mode) (*PayloadSourceConfig, error) {
-	return unmarshalPayloadSourceConfig(configJSON, func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
+func NewPairConfigForServer(configJSON string, mode Mode) (*PairConfig, error) {
+	return unmarshalPairConfigConfig(configJSON, func(conf *PairConfig) (*PairConfig, error) {
 		if mode == Sending && conf.KeyUID == "" {
 			return nil, ErrKeyUIDEmptyAsSender
 		}
@@ -105,15 +104,15 @@ func NewPayloadSourceForServer(configJSON string, mode Mode) (*PayloadSourceConf
 	})
 }
 
-func updateRootDataDirToNodeConfig(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
+func updateRootDataDirToNodeConfig(conf *PairConfig) (*PairConfig, error) {
 	if conf.PayloadSourceReceiverConfig != nil && conf.PayloadSourceReceiverConfig.NodeConfig != nil {
 		conf.NodeConfig.RootDataDir = conf.RootDataDir
 	}
 	return conf, nil
 }
 
-func unmarshalPayloadSourceConfig(configJSON string, successCallback payloadSourceUnmarshalCallback) (*PayloadSourceConfig, error) {
-	var conf = PayloadSourceConfig{}
+func unmarshalPairConfigConfig(configJSON string, successCallback pairConfigUnmarshalCallback) (*PairConfig, error) {
+	var conf = PairConfig{}
 	err := json.Unmarshal([]byte(configJSON), &conf)
 	if err != nil {
 		return nil, err
@@ -124,39 +123,39 @@ func unmarshalPayloadSourceConfig(configJSON string, successCallback payloadSour
 // AccountPayloadManagerConfig represents the initialisation parameters required for a AccountPayloadManager
 type AccountPayloadManagerConfig struct {
 	DB *multiaccounts.Database
-	*PayloadSourceConfig
+	*PairConfig
 }
 
 func (a *AccountPayloadManagerConfig) GetNodeConfig() *params.NodeConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
+	if a.PairConfig != nil && a.PairConfig.PayloadSourceReceiverConfig != nil {
 		return a.NodeConfig
 	}
 	return nil
 }
 
 func (a *AccountPayloadManagerConfig) GetSettingCurrentNetwork() string {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
+	if a.PairConfig != nil && a.PairConfig.PayloadSourceReceiverConfig != nil {
 		return a.SettingCurrentNetwork
 	}
 	return ""
 }
 
 func (a *AccountPayloadManagerConfig) GetPayloadSourceSenderConfig() *PayloadSourceSenderConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceSenderConfig != nil {
+	if a.PairConfig != nil && a.PairConfig.PayloadSourceSenderConfig != nil {
 		return a.PayloadSourceSenderConfig
 	}
 	return nil
 }
 
 func (a *AccountPayloadManagerConfig) GetPayloadSourceReceiverConfig() *PayloadSourceReceiverConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
+	if a.PairConfig != nil && a.PairConfig.PayloadSourceReceiverConfig != nil {
 		return a.PayloadSourceReceiverConfig
 	}
 	return nil
 }
 
 func (a *AccountPayloadManagerConfig) GetKeystorePath() string {
-	if a.PayloadSourceConfig != nil {
+	if a.PairConfig != nil {
 		return a.KeystorePath
 	}
 	return ""
@@ -172,7 +171,7 @@ type AccountPayloadManager struct {
 }
 
 // NewAccountPayloadManager generates a new and initialised AccountPayloadManager
-func NewAccountPayloadManager(aesKey []byte, config *AccountPayloadManagerConfig, logger *zap.Logger) (*AccountPayloadManager, error) {
+func NewAccountPayloadManager(aesKey []byte, config *AccountPayloadManagerConfig, logger *zap.Logger, role Role) (*AccountPayloadManager, error) {
 	l := logger.Named("AccountPayloadManager")
 	l.Debug("fired", zap.Binary("aesKey", aesKey), zap.Any("config", config))
 
@@ -183,7 +182,7 @@ func NewAccountPayloadManager(aesKey []byte, config *AccountPayloadManagerConfig
 
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
-	accountPayloadRepository, err := NewAccountPayloadRepository(p, config)
+	accountPayloadRepository, err := NewAccountPayloadRepository(p, config, role)
 	if err != nil {
 		return nil, err
 	}
@@ -455,28 +454,40 @@ type AccountPayloadRepository struct {
 	kdfIterations int
 }
 
-func NewAccountPayloadRepository(p *AccountPayload, config *AccountPayloadManagerConfig) (*AccountPayloadRepository, error) {
+func NewAccountPayloadRepository(p *AccountPayload, config *AccountPayloadManagerConfig, role Role) (*AccountPayloadRepository, error) {
 	ppr := &AccountPayloadRepository{
 		AccountPayload: p,
 	}
-
 	if config == nil {
 		return ppr, nil
 	}
-
 	ppr.multiaccountsDB = config.DB
-
-	if config.GetPayloadSourceSenderConfig() != nil && config.GetPayloadSourceReceiverConfig() != nil {
-		return nil, ErrPayloadSourceConfigBothSet
-	}
-	if config.GetPayloadSourceSenderConfig() != nil {
-		ppr.keyUID = config.KeyUID
-		ppr.password = config.Password
-	} else if config.GetPayloadSourceReceiverConfig() != nil {
-		ppr.kdfIterations = config.KDFIterations
-	}
 	ppr.keystorePath = config.GetKeystorePath()
+	switch role {
+	case Sender:
+		return setSenderAccountPayloadRepository(ppr, config)
+	case Receiver:
+		return setReceiverAccountPayloadRepository(ppr, config)
+	}
 	return ppr, nil
+}
+
+func setSenderAccountPayloadRepository(r *AccountPayloadRepository, config *AccountPayloadManagerConfig) (*AccountPayloadRepository, error) {
+	senderConfig := config.GetPayloadSourceSenderConfig()
+	if senderConfig == nil {
+		return nil, ErrPayloadSourceSenderConfigNotSet
+	}
+	r.keyUID = senderConfig.KeyUID
+	r.password = senderConfig.Password
+	return r, nil
+}
+
+func setReceiverAccountPayloadRepository(r *AccountPayloadRepository, config *AccountPayloadManagerConfig) (*AccountPayloadRepository, error) {
+	receiverConfig := config.GetPayloadSourceReceiverConfig()
+	if receiverConfig != nil {
+		r.kdfIterations = receiverConfig.KDFIterations
+	}
+	return r, nil
 }
 
 func (apr *AccountPayloadRepository) LoadFromSource() error {
