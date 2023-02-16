@@ -25,7 +25,7 @@ func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*Messe
 	m.logger.Info("acceptContactRequest")
 	// We send a contact update for compatibility with 0.90 desktop, once that's
 	// not an issue anymore, we can set the last bool flag to `false`
-	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, "", syncing, true)
+	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, "", syncing, true, false)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -198,6 +198,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		request.Message,
 		false,
 		true,
+		false,
 	)
 	if err != nil {
 		return nil, err
@@ -236,6 +237,21 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	}
 
 	err = response.Merge(messageResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(chatID),
+		Type:      ActivityCenterNotificationTypeContactRequest,
+		Name:      "",
+		Author:    common.PubkeyToHex(&m.identity.PublicKey),
+		Message:   chatMessage,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		ChatID:    chatID,
+	}
+
+	err = m.addActivityCenterNotification(response, notification)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +328,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	return response, nil
 }
 
-func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool) (*MessengerResponse, error) {
+func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
 	contact, err := m.BuildContact(pubKey)
 	if err != nil {
 		return nil, err
@@ -460,7 +476,7 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	}
 
 	// Add outgoing contact request notification
-	if len(contactRequestID) == 0 {
+	if createOutgoingContactRequestNotification {
 		err = m.createOutgoingContactRequestNotification(response, contact, profileChat, contactRequestText)
 		if err != nil {
 			return nil, err
@@ -538,6 +554,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		"",
 		"Please add me to your contacts",
 		false,
+		true,
 		true,
 	)
 }
