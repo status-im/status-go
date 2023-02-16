@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"go.uber.org/zap"
 )
@@ -18,11 +19,11 @@ type BandwidthTelemetryClient struct {
 	logger     *zap.Logger
 }
 
-func NewBandwidthTelemetryClient(logger *zap.Logger, serverURL string, hostID string) *BandwidthTelemetryClient {
+func NewBandwidthTelemetryClient(logger *zap.Logger, serverURL string) *BandwidthTelemetryClient {
 	return &BandwidthTelemetryClient{
 		serverURL:  serverURL,
 		httpClient: &http.Client{Timeout: time.Minute},
-		hostID:     hostID,
+		hostID:     uuid.NewString(),
 		logger:     logger.Named("bandwidth-telemetry"),
 	}
 }
