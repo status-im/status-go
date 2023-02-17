@@ -70,6 +70,8 @@ message PairInstallation {
   string installation_id = 2;
   string device_type = 3;
   string name = 4;
+  // following fields used for local pairing
+  uint32 version = 5;
 }
 
 message SyncInstallationContact {

@@ -2384,7 +2384,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
 	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background())
+	response, err := device1.SendPairInstallation(context.Background(), nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Len(response.Chats(), 1)

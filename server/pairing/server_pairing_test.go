@@ -182,7 +182,7 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware(
 	// Attempt to get the private key data, this should fail because there is no challenge
 	err := c.receiveAccountData()
 	s.Require().Error(err)
-	s.Require().Equal("status not ok, received '403 Forbidden'", err.Error())
+	s.Require().Equal("[client] status not ok when receiving account data, received '403 Forbidden'", err.Error())
 
 	err = c.getChallenge()
 	s.Require().NoError(err)
@@ -205,7 +205,7 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_
 	// Attempt to get the private key data, this should fail because there is no challenge
 	err := c.receiveAccountData()
 	s.Require().Error(err)
-	s.Require().Equal("status not ok, received '403 Forbidden'", err.Error())
+	s.Require().Equal("[client] status not ok when receiving account data, received '403 Forbidden'", err.Error())
 
 	// Get the challenge
 	err = c.getChallenge()
@@ -220,7 +220,7 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_
 	// behind the scenes the server will block the session if the client fails the challenge. There is no forgiveness!
 	err = c.receiveAccountData()
 	s.Require().Error(err)
-	s.Require().Equal("status not ok, received '403 Forbidden'", err.Error())
+	s.Require().Equal("[client] status not ok when receiving account data, received '403 Forbidden'", err.Error())
 
 	// Get the real challenge
 	err = c.getChallenge()
@@ -229,7 +229,7 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_
 	// Attempt to get the account data, should fail because the client is now blocked.
 	err = c.receiveAccountData()
 	s.Require().Error(err)
-	s.Require().Equal("status not ok, received '403 Forbidden'", err.Error())
+	s.Require().Equal("[client] status not ok when receiving account data, received '403 Forbidden'", err.Error())
 }
 
 func testHandler(t *testing.T) func(w http.ResponseWriter, r *http.Request) {

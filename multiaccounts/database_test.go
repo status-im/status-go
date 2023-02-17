@@ -182,7 +182,7 @@ func TestDatabase_GetAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10}
+	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 
 	account, err := db.GetAccount(expected.KeyUID)

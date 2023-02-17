@@ -19,7 +19,8 @@ import (
 type Server struct {
 	server.Server
 	PayloadManager
-	rawMessagePayloadManager *RawMessagePayloadManager
+	rawMessagePayloadManager   *RawMessagePayloadManager
+	installationPayloadManager *InstallationPayloadManager
 
 	pk   *ecdsa.PublicKey
 	ek   []byte
@@ -70,23 +71,28 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 		return nil, err
 	}
 
-	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, config.EK, backend, accountPayloadManagerConfig.GetNodeConfig(), accountPayloadManagerConfig.GetSettingCurrentNetwork())
+	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, config.EK, backend, accountPayloadManagerConfig.GetNodeConfig(), accountPayloadManagerConfig.GetSettingCurrentNetwork(), accountPayloadManagerConfig.GetDeviceType())
 	if err != nil {
 		return nil, err
 	}
 
+	ipm, err := NewInstallationPayloadManager(logger, config.EK, backend, accountPayloadManagerConfig.GetDeviceType())
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{Server: server.NewServer(
 		config.Cert,
 		config.Hostname,
 		nil,
 		logger,
 	),
-		pk:                       config.PK,
-		ek:                       config.EK,
-		mode:                     config.Mode,
-		PayloadManager:           pm,
-		cookieStore:              cs,
-		rawMessagePayloadManager: rmpm,
+		pk:                         config.PK,
+		ek:                         config.EK,
+		mode:                       config.Mode,
+		PayloadManager:             pm,
+		cookieStore:                cs,
+		rawMessagePayloadManager:   rmpm,
+		installationPayloadManager: ipm,
 	}
 	s.SetTimeout(config.GetTimeout())
 
@@ -122,9 +128,11 @@ func (s *Server) StartPairing() error {
 
 func (s *Server) startReceivingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingReceiveAccount:    handlePairingReceive(s),
+		pairingReceiveAccount:    handleReceiveAccount(s),
 		pairingChallenge:         handlePairingChallenge(s),
 		pairingSyncDeviceReceive: handleParingSyncDeviceReceive(s),
+		// send installation data back to sender
+		pairingSendInstallation: handleSendInstallation(s),
 	})
 	return s.Start()
 }
@@ -136,9 +144,11 @@ func (s *Server) startSendingData() error {
 	}
 
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingSendAccount:    challengeMiddleware(s, handlePairingSend(s)),
+		pairingSendAccount:    challengeMiddleware(s, handleSendAccount(s)),
 		pairingChallenge:      handlePairingChallenge(s),
 		pairingSyncDeviceSend: challengeMiddleware(s, handlePairingSyncDeviceSend(s)),
+		// receive installation data from receiver
+		pairingReceiveInstallation: challengeMiddleware(s, handleReceiveInstallation(s)),
 	})
 	return s.Start()
 }
@@ -165,6 +175,18 @@ func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfi
 	if err != nil {
 		return nil, err
 	}
+
+	accountPayloadManagerConfig := &AccountPayloadManagerConfig{
+		// Things that can't be generated, but DO NOT come from app client
+		DB: backend.GetMultiaccountDB(),
+
+		// Things that can't be generated, but DO come from the app client
+		PayloadSourceConfig: storeConfig,
+	}
+	if mode == Receiving {
+		updateLoggedInKeyUID(accountPayloadManagerConfig, backend)
+	}
+
 	return NewPairingServer(backend, &Config{
 		// Things that can be generated, and CANNOT come from the app client (well they could be this is better)
 		PK:       &tlsKey.PublicKey,
@@ -175,13 +197,7 @@ func MakeFullPairingServer(backend *api.GethStatusBackend, mode Mode, storeConfi
 		// Things that can't be generated, but DO come from the app client
 		Mode: mode,
 
-		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{
-			// Things that can't be generated, but DO NOT come from app client
-			DB: backend.GetMultiaccountDB(),
-
-			// Things that can't be generated, but DO come from the app client
-			PayloadSourceConfig: storeConfig,
-		},
+		AccountPayloadManagerConfig: accountPayloadManagerConfig,
 	})
 }
 

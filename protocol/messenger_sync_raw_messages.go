@@ -2,16 +2,16 @@ package protocol
 
 import (
 	"context"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
-
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/protobuf"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/signal"
-
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error)
@@ -198,6 +198,47 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				m.logger.Error("failed to handleSyncKeycards when HandleSyncRawMessages", zap.Error(err))
 				continue
+			}
+		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
+			var message protobuf.PairInstallation
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			identity := m.myHexIdentity()
+			installations := []*multidevice.Installation{
+				{
+					Identity:  identity,
+					ID:        message.InstallationId,
+					Version:   message.Version,
+					Enabled:   true,
+					Timestamp: int64(message.Clock),
+					InstallationMetadata: &multidevice.InstallationMetadata{
+						DeviceType: message.DeviceType,
+						Name:       message.Name,
+					},
+				}}
+			m.handleInstallations(installations)
+			// set WhisperTimestamp to pass the validation in HandlePairInstallation
+			state.CurrentMessageState = &CurrentMessageState{WhisperTimestamp: message.Clock}
+			err = m.HandlePairInstallation(state, message)
+			if err != nil {
+				return err
+			}
+
+			multidevice := m.encryptor.GetMultiDevice()
+			if multidevice == nil {
+				return errors.New("multidevice is nil")
+			}
+			_, err = multidevice.AddInstallations(m.IdentityPublicKeyCompressed(), int64(message.GetClock()), installations, true)
+			if err != nil {
+				return err
+			}
+			// if receiver already logged in before local pairing, we need force enable the installation,
+			// AddInstallations won't make sure enable it, e.g. installation maybe already exist in db but not enabled yet
+			err = m.EnableInstallation(message.InstallationId)
+			if err != nil {
+				return err
 			}
 		}
 	}

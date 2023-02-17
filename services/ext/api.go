@@ -868,7 +868,7 @@ func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *reques
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendPairInstallation(ctx)
+	return api.service.messenger.SendPairInstallation(ctx, nil)
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {

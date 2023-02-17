@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -24,7 +23,20 @@ func NewSyncRawMessageHandler(backend *api.GethStatusBackend) *SyncRawMessageHan
 	return &SyncRawMessageHandler{backend: backend}
 }
 
-func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error) {
+func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *RawMessageCollector, deviceType string) error {
+	messenger := s.backend.Messenger()
+	if messenger == nil {
+		return fmt.Errorf("messenger is nil when CollectInstallationData")
+	}
+	err := messenger.SetInstallationDeviceType(deviceType)
+	if err != nil {
+		return err
+	}
+	_, err = messenger.SendPairInstallation(context.TODO(), rawMessageCollector.dispatchMessage)
+	return err
+}
+
+func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) ([]byte, error) {
 	messenger := s.backend.Messenger()
 	if messenger == nil {
 		return nil, fmt.Errorf("messenger is nil when PrepareRawMessage")
@@ -47,13 +59,13 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	syncRawMessage := new(protobuf.SyncRawMessage)
-	for _, m := range rawMessageCollector.getRawMessages() {
-		rawMessage := new(protobuf.RawMessage)
-		rawMessage.Payload = m.Payload
-		rawMessage.MessageType = m.MessageType
-		syncRawMessage.RawMessages = append(syncRawMessage.RawMessages, rawMessage)
+
+	err = s.CollectInstallationData(rawMessageCollector, deviceType)
+	if err != nil {
+		return nil, err
 	}
+
+	syncRawMessage := rawMessageCollector.convertToSyncRawMessage()
 
 	accountService := s.backend.StatusNode().AccountService()
 	var (
@@ -80,32 +92,44 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID string) ([]byte, error)
 	return proto.Marshal(syncRawMessage)
 }
 
-func (s *SyncRawMessageHandler) HandleRawMessage(account *multiaccounts.Account, password string, nodeConfig *params.NodeConfig, settingCurrentNetwork string, payload []byte) error {
-	rawMessages, subAccounts, setting, err := s.unmarshalSyncRawMessage(payload)
+func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, rawMessagePayload []byte) error {
+	account := accountPayload.multiaccount
+	rawMessages, subAccounts, setting, err := s.unmarshalSyncRawMessage(rawMessagePayload)
 	if err != nil {
 		return err
 	}
 
-	s.backend.UpdateRootDataDir(nodeConfig.RootDataDir)
-	// because client don't know keyUID before received data, we need help client to update keystore dir
-	newKeystoreDir := filepath.Join(nodeConfig.KeyStoreDir, account.KeyUID)
-	nodeConfig.KeyStoreDir = newKeystoreDir
-	accountManager := s.backend.AccountManager()
-	err = accountManager.InitKeystore(filepath.Join(nodeConfig.RootDataDir, newKeystoreDir))
-	if err != nil {
-		return err
-	}
-	setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
-	setting.CurrentNetwork = settingCurrentNetwork
+	activeAccount, _ := s.backend.GetActiveAccount()
+	if activeAccount == nil { // not login yet
+		s.backend.UpdateRootDataDir(nodeConfig.RootDataDir)
+		// because client don't know keyUID before received data, we need help client to update keystore dir
+		keystoreDir := filepath.Join(nodeConfig.KeyStoreDir, account.KeyUID)
+		nodeConfig.KeyStoreDir = keystoreDir
+		if accountPayload.exist {
+			err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig)
+		} else {
+			accountManager := s.backend.AccountManager()
+			err = accountManager.InitKeystore(filepath.Join(nodeConfig.RootDataDir, keystoreDir))
+			if err != nil {
+				return err
+			}
+			setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
+			setting.CurrentNetwork = settingCurrentNetwork
 
-	err = s.backend.StartNodeWithAccountAndInitialConfig(*account, password, *setting, nodeConfig, subAccounts)
-	if err != nil {
-		return err
+			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *setting, nodeConfig, subAccounts)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	messenger := s.backend.Messenger()
 	if messenger == nil {
 		return fmt.Errorf("messenger is nil when HandleRawMessage")
+	}
+	err = messenger.SetInstallationDeviceType(deviceType)
+	if err != nil {
+		return err
 	}
 	return messenger.HandleSyncRawMessages(rawMessages)
 }
@@ -120,13 +144,17 @@ func (s *SyncRawMessageHandler) unmarshalSyncRawMessage(payload []byte) ([]*prot
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &subAccounts)
-	if err != nil {
-		return nil, nil, nil, err
+	if syncRawMessage.SubAccountsJsonBytes != nil {
+		err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &subAccounts)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
-	err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, &setting)
-	if err != nil {
-		return nil, nil, nil, err
+	if syncRawMessage.SettingsJsonBytes != nil {
+		err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, &setting)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 	return syncRawMessage.RawMessages, subAccounts, setting, nil
 }

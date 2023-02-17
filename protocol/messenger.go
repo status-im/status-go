@@ -750,16 +750,15 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	err = m.setInstallationHostname()
-	if err != nil {
-		return nil, err
-	}
-
 	return response, nil
 }
 
 func (m *Messenger) IdentityPublicKey() *ecdsa.PublicKey {
 	return &m.identity.PublicKey
+}
+
+func (m *Messenger) IdentityPublicKeyCompressed() []byte {
+	return crypto.CompressPubkey(m.IdentityPublicKey())
 }
 
 // cleanTopics remove any topic that does not have a Listen flag set
@@ -1572,6 +1571,11 @@ func (m *Messenger) Init() error {
 		m.allInstallations.Store(installation.ID, installation)
 	}
 
+	err = m.setInstallationHostname()
+	if err != nil {
+		return err
+	}
+
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
 	return err
 }
@@ -1767,6 +1771,10 @@ func (m *Messenger) hasPairedDevices() bool {
 	return count > 1
 }
 
+func (m *Messenger) HasPairedDevices() bool {
+	return m.hasPairedDevices()
+}
+
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
 func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMessage) error {
 	hasPairedDevices := m.hasPairedDevices()
@@ -1780,23 +1788,23 @@ func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMess
 	return nil
 }
 
-func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec common.RawMessage) ([]byte, error) {
+func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec common.RawMessage) (common.RawMessage, error) {
 	var err error
 	var id []byte
 
 	id, err = m.sender.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
 
 	if err != nil {
-		return nil, err
+		return spec, err
 	}
 	spec.ID = types.EncodeHex(id)
 	spec.SendCount++
 	err = m.persistence.SaveRawMessage(&spec)
 	if err != nil {
-		return nil, err
+		return spec, err
 	}
 
-	return id, nil
+	return spec, nil
 }
 
 func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
@@ -2505,7 +2513,7 @@ func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
 }
 
 // SendPairInstallation sends a pair installation message
-func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerResponse, error) {
+func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
 	var err error
 	var response MessengerResponse
 
@@ -2524,13 +2532,17 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 		Clock:          clock,
 		Name:           installation.InstallationMetadata.Name,
 		InstallationId: installation.ID,
-		DeviceType:     installation.InstallationMetadata.DeviceType}
+		DeviceType:     installation.InstallationMetadata.DeviceType,
+		Version:        installation.Version}
 	encodedMessage, err := proto.Marshal(pairMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = m.dispatchPairInstallationMessage(ctx, common.RawMessage{
+	if rawMessageHandler == nil {
+		rawMessageHandler = m.dispatchPairInstallationMessage
+	}
+	_, err = rawMessageHandler(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION,

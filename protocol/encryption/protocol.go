@@ -401,6 +401,10 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 	return p.multidevice.AddInstallations(bundle.GetIdentity(), bundle.GetTimestamp(), installations, enabled)
 }
 
+func (p *Protocol) GetMultiDevice() *multidevice.Multidevice {
+	return p.multidevice
+}
+
 // recoverInstallationsFromBundle extracts installations from the bundle.
 // It returns extracted installations and true if the installations
 // are ours, i.e. the bundle was created by our identity key.

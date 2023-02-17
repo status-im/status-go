@@ -27,6 +27,7 @@ var (
 	ErrKeyUIDEmptyAsSender        = errors.New("keyUID must be provided as sender")
 	ErrNodeConfigNilAsReceiver    = errors.New("node config must be provided as receiver")
 	ErrPayloadSourceConfigBothSet = errors.New("payloadSourceSenderConfig and payloadSourceReceiverConfig cannot be both set")
+	ErrLoggedInKeyUIDConflict     = errors.New("logged in keyUID not same as keyUID in payload")
 )
 
 // PayloadManager is the interface for PayloadManagers and wraps the basic functions for fulfilling payload management
@@ -74,6 +75,8 @@ type PayloadSourceConfig struct {
 	// 1. for sender, KeystorePath must end with keyUID
 	// 2. for receiver, KeystorePath must not end with keyUID (because keyUID is not known yet)
 	KeystorePath string `json:"keystorePath"`
+	// required for sender and receiver, SendPairInstallation need this information
+	DeviceType string `json:"deviceType"`
 	*PayloadSourceSenderConfig
 	*PayloadSourceReceiverConfig
 	// Timeout the number of milliseconds after which the pairing server will automatically terminate
@@ -126,6 +129,8 @@ func unmarshalPayloadSourceConfig(configJSON string, successCallback payloadSour
 type AccountPayloadManagerConfig struct {
 	DB *multiaccounts.Database
 	*PayloadSourceConfig
+	// only used for the receiver side
+	LoggedInKeyUID string
 }
 
 func (a *AccountPayloadManagerConfig) GetNodeConfig() *params.NodeConfig {
@@ -138,6 +143,13 @@ func (a *AccountPayloadManagerConfig) GetNodeConfig() *params.NodeConfig {
 func (a *AccountPayloadManagerConfig) GetSettingCurrentNetwork() string {
 	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
 		return a.SettingCurrentNetwork
+	}
+	return ""
+}
+
+func (a *AccountPayloadManagerConfig) GetDeviceType() string {
+	if a.PayloadSourceConfig != nil {
+		return a.DeviceType
 	}
 	return ""
 }
@@ -372,6 +384,8 @@ type AccountPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
+	//flag if account already exist before sync account
+	exist bool
 }
 
 func (ap *AccountPayload) ResetPayload() {
@@ -463,6 +477,8 @@ type AccountPayloadRepository struct {
 	keystorePath, keyUID string
 
 	kdfIterations int
+
+	loggedInKeyUID string
 }
 
 func NewAccountPayloadRepository(p *AccountPayload, config *AccountPayloadManagerConfig) (*AccountPayloadRepository, error) {
@@ -486,6 +502,7 @@ func NewAccountPayloadRepository(p *AccountPayload, config *AccountPayloadManage
 		ppr.kdfIterations = config.KDFIterations
 	}
 	ppr.keystorePath = config.GetKeystorePath()
+	ppr.loggedInKeyUID = config.LoggedInKeyUID
 	return ppr, nil
 }
 
@@ -548,16 +565,33 @@ func (apr *AccountPayloadRepository) loadKeys(keyStorePath string) error {
 }
 
 func (apr *AccountPayloadRepository) StoreToSource() error {
+	keyUID := apr.multiaccount.KeyUID
+	if apr.loggedInKeyUID != "" && apr.loggedInKeyUID != keyUID {
+		return ErrLoggedInKeyUIDConflict
+	}
+	if apr.loggedInKeyUID == keyUID {
+		// skip storing keys if user is logged in with the same key
+		return nil
+	}
+
 	err := apr.validateKeys(apr.password)
 	if err != nil {
 		return err
 	}
 
-	err = apr.storeKeys(apr.keystorePath)
-	if err != nil {
+	if err = apr.storeKeys(apr.keystorePath); err != nil && err != ErrKeyFileAlreadyExists {
 		return err
 	}
 
+	// skip storing multiaccount if key already exists
+	if err == ErrKeyFileAlreadyExists {
+		apr.exist = true
+		apr.multiaccount, err = apr.multiaccountsDB.GetAccount(keyUID)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	err = apr.storeMultiAccount()
 	if err != nil {
 		return err
@@ -641,7 +675,7 @@ type RawMessagePayloadManager struct {
 	payloadRepository *RawMessageRepository
 }
 
-func NewRawMessagePayloadManager(logger *zap.Logger, accountPayload *AccountPayload, aesKey []byte, backend *api.GethStatusBackend, nodeConfig *params.NodeConfig, settingCurrentNetwork string) (*RawMessagePayloadManager, error) {
+func NewRawMessagePayloadManager(logger *zap.Logger, accountPayload *AccountPayload, aesKey []byte, backend *api.GethStatusBackend, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string) (*RawMessagePayloadManager, error) {
 	l := logger.Named("RawMessagePayloadManager")
 	pem, err := NewPayloadEncryptionManager(aesKey, l)
 	if err != nil {
@@ -651,7 +685,7 @@ func NewRawMessagePayloadManager(logger *zap.Logger, accountPayload *AccountPayl
 		logger:                   l,
 		accountPayload:           accountPayload,
 		PayloadEncryptionManager: pem,
-		payloadRepository:        NewRawMessageRepository(backend, accountPayload, nodeConfig, settingCurrentNetwork),
+		payloadRepository:        NewRawMessageRepository(backend, accountPayload, nodeConfig, settingCurrentNetwork, deviceType),
 	}, nil
 }
 
@@ -683,15 +717,17 @@ type RawMessageRepository struct {
 	accountPayload        *AccountPayload
 	nodeConfig            *params.NodeConfig
 	settingCurrentNetwork string
+	deviceType            string
 }
 
-func NewRawMessageRepository(backend *api.GethStatusBackend, accountPayload *AccountPayload, config *params.NodeConfig, settingCurrentNetwork string) *RawMessageRepository {
+func NewRawMessageRepository(backend *api.GethStatusBackend, accountPayload *AccountPayload, config *params.NodeConfig, settingCurrentNetwork, deviceType string) *RawMessageRepository {
 	return &RawMessageRepository{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               make([]byte, 0),
 		accountPayload:        accountPayload,
 		nodeConfig:            config,
 		settingCurrentNetwork: settingCurrentNetwork,
+		deviceType:            deviceType,
 	}
 }
 
@@ -700,7 +736,7 @@ func (r *RawMessageRepository) LoadFromSource() error {
 	if account == nil || account.KeyUID == "" {
 		return fmt.Errorf("no known KeyUID when loading raw messages")
 	}
-	payload, err := r.syncRawMessageHandler.PrepareRawMessage(account.KeyUID)
+	payload, err := r.syncRawMessageHandler.PrepareRawMessage(account.KeyUID, r.deviceType)
 	if err != nil {
 		return err
 	}
@@ -713,5 +749,87 @@ func (r *RawMessageRepository) StoreToSource() error {
 	if accountPayload == nil || accountPayload.multiaccount == nil {
 		return fmt.Errorf("no known multiaccount when storing raw messages")
 	}
-	return r.syncRawMessageHandler.HandleRawMessage(accountPayload.multiaccount, accountPayload.password, r.nodeConfig, r.settingCurrentNetwork, r.payload)
+	return r.syncRawMessageHandler.HandleRawMessage(accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.payload)
+}
+
+type InstallationPayloadManager struct {
+	logger *zap.Logger
+	*PayloadEncryptionManager
+	installationPayloadRepository *InstallationPayloadRepository
+}
+
+func NewInstallationPayloadManager(logger *zap.Logger, aesKey []byte, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadManager, error) {
+	l := logger.Named("InstallationPayloadManager")
+	pem, err := NewPayloadEncryptionManager(aesKey, l)
+	if err != nil {
+		return nil, err
+	}
+	return &InstallationPayloadManager{
+		logger:                        l,
+		PayloadEncryptionManager:      pem,
+		installationPayloadRepository: NewInstallationPayloadRepository(backend, deviceType),
+	}, nil
+}
+
+func (i *InstallationPayloadManager) Mount() error {
+	err := i.installationPayloadRepository.LoadFromSource()
+	if err != nil {
+		return err
+	}
+	return i.Encrypt(i.installationPayloadRepository.payload)
+}
+
+func (i *InstallationPayloadManager) Receive(data []byte) error {
+	err := i.Decrypt(data)
+	if err != nil {
+		return err
+	}
+	i.installationPayloadRepository.payload = i.Received()
+	return i.installationPayloadRepository.StoreToSource()
+}
+
+func (i *InstallationPayloadManager) ResetPayload() {
+	i.installationPayloadRepository.payload = make([]byte, 0)
+	i.PayloadEncryptionManager.ResetPayload()
+}
+
+type InstallationPayloadRepository struct {
+	payload               []byte
+	syncRawMessageHandler *SyncRawMessageHandler
+	deviceType            string
+	backend               *api.GethStatusBackend
+}
+
+func NewInstallationPayloadRepository(backend *api.GethStatusBackend, deviceType string) *InstallationPayloadRepository {
+	return &InstallationPayloadRepository{
+		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
+		deviceType:            deviceType,
+		backend:               backend,
+	}
+}
+
+func (r *InstallationPayloadRepository) LoadFromSource() error {
+	rawMessageCollector := new(RawMessageCollector)
+	err := r.syncRawMessageHandler.CollectInstallationData(rawMessageCollector, r.deviceType)
+	if err != nil {
+		return err
+	}
+	r.payload, err = proto.Marshal(rawMessageCollector.convertToSyncRawMessage())
+	return err
+}
+
+func (r *InstallationPayloadRepository) StoreToSource() error {
+	messenger := r.backend.Messenger()
+	if messenger == nil {
+		return fmt.Errorf("messenger is nil when invoke InstallationPayloadRepository#StoreToSource")
+	}
+	rawMessages, _, _, err := r.syncRawMessageHandler.unmarshalSyncRawMessage(r.payload)
+	if err != nil {
+		return err
+	}
+	err = messenger.SetInstallationDeviceType(r.deviceType)
+	if err != nil {
+		return err
+	}
+	return messenger.HandleSyncRawMessages(rawMessages)
 }
