@@ -56,6 +56,7 @@ type MessengerResponse struct {
 	communities                 map[string]*communities.Community
 	communitiesSettings         map[string]*communities.CommunitySettings
 	activityCenterNotifications map[string]*ActivityCenterNotification
+	activityCenterState         *ActivityCenterState
 	messages                    map[string]*common.Message
 	pinMessages                 map[string]*common.PinMessage
 	discordMessages             map[string]*protobuf.DiscordMessage
@@ -94,6 +95,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Communities                   []*communities.Community             `json:"communities,omitempty"`
 		CommunitiesSettings           []*communities.CommunitySettings     `json:"communitiesSettings,omitempty"`
 		ActivityCenterNotifications   []*ActivityCenterNotification        `json:"activityCenterNotifications,omitempty"`
+		ActivityCenterState           *ActivityCenterState                 `json:"activityCenterState,omitempty"`
 		CurrentStatus                 *UserStatus                          `json:"currentStatus,omitempty"`
 		StatusUpdates                 []UserStatus                         `json:"statusUpdates,omitempty"`
 		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
@@ -129,6 +131,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		RemovedMessages:               r.RemovedMessages(),
 		ClearedHistories:              r.ClearedHistories(),
 		ActivityCenterNotifications:   r.ActivityCenterNotifications(),
+		ActivityCenterState:           r.ActivityCenterState(),
 		PinMessages:                   r.PinMessages(),
 		EmojiReactions:                r.EmojiReactions(),
 		StatusUpdates:                 r.StatusUpdates(),
@@ -259,7 +262,8 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
 		len(r.savedAddresses) == 0 &&
-		r.currentStatus == nil
+		r.currentStatus == nil &&
+		r.activityCenterState == nil
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
@@ -515,6 +519,14 @@ func (r *MessengerResponse) ActivityCenterNotifications() []*ActivityCenterNotif
 		ns = append(ns, n)
 	}
 	return ns
+}
+
+func (r *MessengerResponse) SetActivityCenterState(activityCenterState *ActivityCenterState) {
+	r.activityCenterState = activityCenterState
+}
+
+func (r *MessengerResponse) ActivityCenterState() *ActivityCenterState {
+	return r.activityCenterState
 }
 
 func (r *MessengerResponse) AddPinMessage(pm *common.PinMessage) {

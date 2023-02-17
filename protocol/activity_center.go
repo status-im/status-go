@@ -63,12 +63,15 @@ type ActivityCenterPaginationResponse struct {
 	Notifications []*ActivityCenterNotification `json:"notifications"`
 }
 
+type ActivityCenterState struct {
+	HasSeen bool `json:"hasSeen"`
+}
+
 func (n *ActivityCenterNotification) Valid() error {
 	if len(n.ID) == 0 || n.Type == 0 || n.Timestamp == 0 {
 		return ErrInvalidActivityCenterNotification
 	}
 	return nil
-
 }
 
 func showMentionOrReplyActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) (bool, ActivityCenterType) {
