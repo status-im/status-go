@@ -402,7 +402,7 @@ func TestContactContactRequestRetracted(t *testing.T) {
 	for testNum, tc := range tests {
 		contact := tc.Contact()
 
-		contact.ContactRequestRetracted(clock)
+		contact.ContactRequestRetracted(clock, false)
 		validateContactTest(t, contact, tc, testNum+1)
 
 	}
@@ -764,4 +764,19 @@ func TestPrimaryName(t *testing.T) {
 	contact.DisplayName = ""
 	require.Equal(t, "nickname", contact.PrimaryName())
 	require.Equal(t, "alias", contact.SecondaryName())
+}
+
+func TestProcessSyncContactRequestState(t *testing.T) {
+	c := &Contact{}
+	c.ContactRequestLocalState = ContactRequestStateNone
+	c.ContactRequestLocalClock = 1
+	c.ContactRequestRemoteState = ContactRequestStateNone
+	c.ContactRequestRemoteClock = 1
+
+	c.ProcessSyncContactRequestState(ContactRequestStateNone, 2, ContactRequestStateSent, 2)
+
+	// Here we need to confirm that resulting Local/RemoteState is equal
+	// to what comes from the contact sync message, otherwise it will be inconsistent
+	require.Equal(t, ContactRequestStateSent, c.ContactRequestLocalState)
+	require.Equal(t, ContactRequestStateNone, c.ContactRequestRemoteState)
 }

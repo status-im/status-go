@@ -483,7 +483,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	if message.ContactRequestRemoteClock != 0 || message.ContactRequestLocalClock != 0 {
 		// Some local action about contact requests were performed,
 		// process them
-		contact.processSyncContactRequestState(
+		contact.ProcessSyncContactRequestState(
 			ContactRequestState(message.ContactRequestRemoteState),
 			uint64(message.ContactRequestRemoteClock),
 			ContactRequestState(message.ContactRequestLocalState),
@@ -888,7 +888,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 	}
 
 	m.logger.Debug("handling retracted contact request", zap.Uint64("clock", message.Clock))
-	r := contact.ContactRequestRetracted(message.Clock)
+	r := contact.ContactRequestRetracted(message.Clock, false)
 	if !r.processed {
 		m.logger.Debug("not handling retract since clock lower")
 		return nil

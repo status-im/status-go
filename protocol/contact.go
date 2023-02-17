@@ -279,7 +279,7 @@ func (c *Contact) DismissContactRequest(clock uint64) ContactRequestProcessingRe
 
 // Remote actions
 
-func (c *Contact) contactRequestRetracted(clock uint64, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
+func (c *Contact) contactRequestRetracted(clock uint64, syncing bool, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
 	if clock <= c.ContactRequestRemoteClock {
 		return r
 	}
@@ -289,7 +289,7 @@ func (c *Contact) contactRequestRetracted(clock uint64, r ContactRequestProcessi
 	// the side it was sent from. The only exception is when the contact
 	// request has been explicitly dismissed, in which case we don't
 	// change state
-	if c.ContactRequestLocalState != ContactRequestStateDismissed {
+	if c.ContactRequestLocalState != ContactRequestStateDismissed && !syncing {
 		c.ContactRequestLocalClock = clock
 		c.ContactRequestLocalState = ContactRequestStateNone
 	}
@@ -299,8 +299,8 @@ func (c *Contact) contactRequestRetracted(clock uint64, r ContactRequestProcessi
 	return r
 }
 
-func (c *Contact) ContactRequestRetracted(clock uint64) ContactRequestProcessingResponse {
-	return c.contactRequestRetracted(clock, ContactRequestProcessingResponse{})
+func (c *Contact) ContactRequestRetracted(clock uint64, syncing bool) ContactRequestProcessingResponse {
+	return c.contactRequestRetracted(clock, syncing, ContactRequestProcessingResponse{})
 }
 
 func (c *Contact) contactRequestReceived(clock uint64, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
@@ -379,7 +379,7 @@ func contactIDFromPublicKeyString(key string) (string, error) {
 	return contactIDFromPublicKey(pubKey), nil
 }
 
-func (c *Contact) processSyncContactRequestState(remoteState ContactRequestState, remoteClock uint64, localState ContactRequestState, localClock uint64) {
+func (c *Contact) ProcessSyncContactRequestState(remoteState ContactRequestState, remoteClock uint64, localState ContactRequestState, localClock uint64) {
 	// We process the two separately, first local state
 	switch localState {
 	case ContactRequestStateDismissed:
@@ -395,7 +395,7 @@ func (c *Contact) processSyncContactRequestState(remoteState ContactRequestState
 	case ContactRequestStateReceived:
 		c.ContactRequestReceived(remoteClock)
 	case ContactRequestStateNone:
-		c.ContactRequestRetracted(remoteClock)
+		c.ContactRequestRetracted(remoteClock, true)
 	}
 }
 
@@ -481,7 +481,7 @@ func (c *Contact) ContactRequestPropagatedStateReceived(state *protobuf.ContactR
 		if remoteState == ContactRequestStateSent {
 			response = c.contactRequestReceived(remoteClock, response)
 		} else if remoteState == ContactRequestStateNone {
-			response = c.contactRequestRetracted(remoteClock, response)
+			response = c.contactRequestRetracted(remoteClock, false, response)
 		}
 	}
 
