@@ -3,7 +3,6 @@ package pairing
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,6 +31,8 @@ const pathDefaultWallet = pathWalletRoot + "/0"
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
 const keystoreDir = "keystore"
+
+const currentNetwork = "mainnet_rpc"
 
 func TestSyncDeviceSuite(t *testing.T) {
 	suite.Run(t, new(SyncDeviceSuite))
@@ -85,7 +86,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 
 	account.Name = settings.Name
 
-	nodeConfig, err := defaultNodeConfig(tmpdir, settings.InstallationID, account.KeyUID)
+	nodeConfig, err := defaultNodeConfig(settings.InstallationID, account.KeyUID)
 	require.NoError(s.T(), err)
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
@@ -135,9 +136,22 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	err = serverBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir)
-	configJSON := fmt.Sprintf(`{"KeystorePath":"%s"}`, serverKeystorePath)
-	cs, err := StartUpPairingServer(serverBackend, Receiving, configJSON)
+	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	require.NoError(s.T(), err)
+	expectedKDFIterations := 1024
+	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
+	serverPayloadSourceConfig := PayloadSourceConfig{
+		KeystorePath: serverKeystoreDir,
+		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
+			KDFIterations:         expectedKDFIterations,
+			NodeConfig:            serverNodeConfig,
+			RootDataDir:           serverTmpDir,
+			SettingCurrentNetwork: currentNetwork,
+		},
+	}
+	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
+	require.NoError(s.T(), err)
+	cs, err := StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 
 	// generate some data for the client
@@ -151,14 +165,16 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
-	var config = PayloadSourceConfig{
+	clientPayloadSourceConfig := PayloadSourceConfig{
 		KeystorePath: clientKeystorePath,
-		KeyUID:       clientActiveAccount.KeyUID,
-		Password:     s.password,
+		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
+			KeyUID:   clientActiveAccount.KeyUID,
+			Password: s.password,
+		},
 	}
-	configBytes, err := json.Marshal(config)
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(configBytes))
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), clientBackend.Logout())
 
@@ -171,6 +187,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
+	require.Equal(s.T(), serverActiveAccount.KDFIterations, expectedKDFIterations)
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
@@ -188,8 +205,10 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
 	var config = PayloadSourceConfig{
 		KeystorePath: serverKeystorePath,
-		KeyUID:       serverActiveAccount.KeyUID,
-		Password:     s.password,
+		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
+			KeyUID:   serverActiveAccount.KeyUID,
+			Password: s.password,
+		},
 	}
 	configBytes, err := json.Marshal(config)
 	require.NoError(s.T(), err)
@@ -208,9 +227,22 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir)
-	configJSON := fmt.Sprintf(`{"KeystorePath":"%s"}`, clientKeystorePath)
-	err = StartUpPairingClient(clientBackend, cs, configJSON)
+	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	require.NoError(s.T(), err)
+	expectedKDFIterations := 2048
+	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
+	clientPayloadSourceConfig := PayloadSourceConfig{
+		KeystorePath: clientKeystoreDir,
+		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
+			KDFIterations:         expectedKDFIterations,
+			NodeConfig:            clientNodeConfig,
+			RootDataDir:           clientTmpDir,
+			SettingCurrentNetwork: currentNetwork,
+		},
+	}
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
 	require.NoError(s.T(), serverBackend.Logout())
@@ -224,6 +256,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
+	require.Equal(s.T(), clientActiveAccount.KDFIterations, expectedKDFIterations)
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
@@ -273,18 +306,18 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	}
 	networkRawMessage := json.RawMessage(networksJSON)
 	settings.Networks = &networkRawMessage
-	settings.CurrentNetwork = "mainnet_rpc"
+	settings.CurrentNetwork = currentNetwork
 
 	return settings, nil
 }
 
-func defaultNodeConfig(tmpdir, installationID, keyUID string) (*params.NodeConfig, error) {
+func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "ERROR"
-	nodeConfig.DataDir = filepath.Join(tmpdir, "ethereum/mainnet_rpc")
-	nodeConfig.KeyStoreDir = filepath.Join(tmpdir, keystoreDir, keyUID)
+	nodeConfig.DataDir = filepath.Join("ethereum/mainnet_rpc")
+	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
 		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
