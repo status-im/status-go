@@ -774,10 +774,10 @@ func (m *Messenger) handleAcceptContactRequest(
 	response *MessengerResponse,
 	contact *Contact,
 	originalRequest *common.Message,
-	message protobuf.AcceptContactRequest) (ContactRequestProcessingResponse, error) {
+	clock uint64) (ContactRequestProcessingResponse, error) {
 
-	m.logger.Debug("received contact request", zap.Uint64("clock-sent", message.Clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
-	if contact.ContactRequestRemoteClock > message.Clock {
+	m.logger.Debug("received contact request", zap.Uint64("clock-sent", clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
+	if contact.ContactRequestRemoteClock > clock {
 		m.logger.Debug("not handling accept since clock lower")
 		return ContactRequestProcessingResponse{}, nil
 	}
@@ -786,14 +786,14 @@ func (m *Messenger) handleAcceptContactRequest(
 	// be that we sent a legacy contact request/contact-update, or another
 	// device has sent it, and we haven't synchronized it
 	if originalRequest == nil {
-		return contact.ContactRequestAccepted(message.Clock), nil
+		return contact.ContactRequestAccepted(clock), nil
 	}
 
 	if originalRequest.LocalChatID != contact.ID {
 		return ContactRequestProcessingResponse{}, errors.New("can't accept contact request not sent to user")
 	}
 
-	contact.ContactRequestAccepted(message.Clock)
+	contact.ContactRequestAccepted(clock)
 
 	originalRequest.ContactRequestState = common.ContactRequestStateAccepted
 
@@ -806,17 +806,16 @@ func (m *Messenger) handleAcceptContactRequest(
 	return ContactRequestProcessingResponse{}, nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
-	// TODO(alwx): remove message for incoming contact request
-
-	originalRequest, err := m.persistence.MessageByID(message.Id)
+// TODO(alwx)
+func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageState, clock uint64, contactRequestID string) error {
+	request, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil && err != common.ErrRecordNotFound {
 		return err
 	}
 
 	contact := state.CurrentMessageState.Contact
 
-	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, originalRequest, message)
+	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, request, clock)
 	if err != nil {
 		return err
 	}
@@ -832,14 +831,14 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 			return err
 		}
 
-		if chat.LastClockValue < message.Clock {
-			chat.LastClockValue = message.Clock
+		if chat.LastClockValue < clock {
+			chat.LastClockValue = clock
 		}
 
 		// NOTE(cammellos): This will re-enable the chat if it was deleted, and only
 		// after we became contact, currently seems safe, but that needs
 		// discussing with UX.
-		if chat.DeletedAtClockValue < message.Clock {
+		if chat.DeletedAtClockValue < clock {
 			chat.Active = true
 		}
 
@@ -847,9 +846,8 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 		state.AllChats.Store(chat.ID, chat)
 	}
 
-	if originalRequest != nil {
-		// Update contact requests if existing, or create a new one
-		err = m.createIncomingContactRequestNotification(contact, state, originalRequest, processingResponse.newContactRequestReceived)
+	if request != nil {
+		err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
 		if err != nil {
 			m.logger.Warn("could not create contact request notification", zap.Error(err))
 		}
@@ -857,6 +855,22 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 	state.ModifiedContacts.Store(contact.ID, true)
 	state.AllContacts.Store(contact.ID, contact)
+	return nil
+}
+
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
+	// outgoing contact requests are created on the side of a sender
+	err := m.handleAcceptContactRequestMessage(state, message.Clock, defaultContactRequestID(senderID))
+	if err != nil {
+		m.logger.Warn("could not accept contact request", zap.Error(err))
+	}
+
+	// legacy contact requests: the ones that are send with SendContactRequest
+	err = m.handleAcceptContactRequestMessage(state, message.Clock, message.Id)
+	if err != nil {
+		m.logger.Warn("could not accept contact request", zap.Error(err))
+	}
+
 	return nil
 }
 
