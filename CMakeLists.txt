@@ -6,7 +6,7 @@ SET(LIB_SHARED_FILE ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/libstatus${CMAKE_SHARE
 SET(LIB_HEADER_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/build/bin/)
 
 add_custom_command(OUTPUT  ${LIB_SHARED_FILE}
-                   COMMAND make FORCE_ARCH=${STATUSGO_FORCE_ARCH} statusgo-shared-library
+                   COMMAND make statusgo-shared-library
                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_target(statusgo_shared_target DEPENDS ${LIB_SHARED_FILE} ${CMAKE_CURRENT_SOURCE_DIR})
