@@ -558,7 +558,7 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 		return
 	}
 
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL, w.node.ID())
+	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
 
 	ticker := time.NewTicker(time.Second * 20)
 	defer ticker.Stop()
