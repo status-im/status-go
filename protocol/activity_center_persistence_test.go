@@ -51,13 +51,14 @@ func TestDeleteActivityCenterNotificationsWhenEmpty(t *testing.T) {
 		},
 	})
 
-	count, err := p.UnreadActivityCenterNotificationsCount()
+	var count uint64
+	count, _ = p.UnreadActivityCenterNotificationsCount()
 	require.Equal(t, uint64(1), count)
 
 	err = p.DeleteActivityCenterNotifications([]types.HexBytes{})
 	require.NoError(t, err)
 
-	count, err = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.UnreadActivityCenterNotificationsCount()
 	require.Equal(t, uint64(1), count)
 }
 
@@ -79,13 +80,14 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 		{Type: ActivityCenterNotificationTypeNewOneToOne},
 	})
 
-	count, err := p.UnreadActivityCenterNotificationsCount()
+	var count uint64
+	count, _ = p.UnreadActivityCenterNotificationsCount()
 	require.Equal(t, uint64(3), count)
 
 	err = p.DeleteActivityCenterNotifications([]types.HexBytes{notifications[1].ID, notifications[2].ID})
 	require.NoError(t, err)
 
-	count, err = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.UnreadActivityCenterNotificationsCount()
 	require.Equal(t, uint64(1), count)
 }
 
@@ -123,6 +125,7 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	chatMessages, _, err := p.MessageByChatID(chat.ID, "", 2)
+	require.NoError(t, err)
 	require.Len(t, chatMessages, 2)
 
 	nID1 := types.HexBytes("1")
@@ -234,14 +237,15 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 		},
 	}
 
-	for _, notif := range notifications {
+	var notif *ActivityCenterNotification
+	for _, notif = range notifications {
 		err = p.SaveActivityCenterNotification(notif)
 		require.NoError(t, err, notif.ID)
 	}
 
 	// Only notifications of type new private group chat and with Author equal to
 	// userPublicKey should be marked as accepted & read.
-	notif, err := p.GetActivityCenterNotificationByID(nID2)
+	_, err = p.GetActivityCenterNotificationByID(nID2)
 	require.NoError(t, err)
 	require.False(t, notifications[0].Accepted)
 	require.False(t, notifications[0].Read)
@@ -266,7 +270,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	}
 	err = p.SaveActivityCenterNotification(notif)
 	require.NoError(t, err)
-	notifications, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
 	require.NoError(t, err)
 	notif, err = p.GetActivityCenterNotificationByID(notif.ID)
 	require.NoError(t, err)
@@ -284,7 +288,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	}
 	err = p.SaveActivityCenterNotification(notif)
 	require.NoError(t, err)
-	notifications, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
 	require.NoError(t, err)
 	notif, err = p.GetActivityCenterNotificationByID(notif.ID)
 	require.NoError(t, err)
