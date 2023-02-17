@@ -1923,7 +1923,7 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 		return err
 	}
 	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME && settingField != nil {
-		if m.account.Name != message.GetValueString() {
+		if message.GetValueString() != "" && m.account.Name != message.GetValueString() {
 			m.account.Name = message.GetValueString()
 			err = m.multiAccounts.SaveAccount(*m.account)
 			if err != nil {
