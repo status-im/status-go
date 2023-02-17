@@ -16,7 +16,9 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/price"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -55,9 +57,10 @@ func NewService(
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
 	cryptoCompare := thirdparty.NewCryptoCompare()
-	priceManager := NewPriceManager(db, cryptoCompare)
+	priceManager := price.NewManager(cryptoCompare)
 	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, cryptoCompare)
+	currency := currency.NewService(db, walletFeed, tokenManager, priceManager)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -79,6 +82,7 @@ func NewService(
 		reader:                reader,
 		cryptoCompare:         cryptoCompare,
 		history:               history,
+		currency:              currency,
 	}
 }
 
@@ -93,7 +97,7 @@ type Service struct {
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
-	priceManager          *PriceManager
+	priceManager          *price.Manager
 	started               bool
 	openseaAPIKey         string
 	gethManager           *account.GethManager
@@ -105,11 +109,13 @@ type Service struct {
 	reader                *Reader
 	cryptoCompare         *thirdparty.CryptoCompare
 	history               *history.Service
+	currency              *currency.Service
 }
 
 // Start signals transmitter.
 func (s *Service) Start() error {
 	s.transferController.Start()
+	s.currency.Start()
 	err := s.signals.Start()
 	s.history.Start()
 	s.started = true
@@ -126,6 +132,7 @@ func (s *Service) Stop() error {
 	log.Info("wallet will be stopped")
 	s.signals.Stop()
 	s.transferController.Stop()
+	s.currency.Stop()
 	s.reader.Stop()
 	s.history.Stop()
 	s.started = false
