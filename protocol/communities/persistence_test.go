@@ -377,7 +377,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 
 	token := CommunityToken{
 		CommunityID:        "123",
-		TokenType:          ERC721,
+		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
 		Name:               "StatusToken",
 		Symbol:             "STT",
@@ -393,7 +393,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 
 	token2 := CommunityToken{
 		CommunityID:        "345",
-		TokenType:          ERC721,
+		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x345",
 		Name:               "StatusToken",
 		Symbol:             "STT",

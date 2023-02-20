@@ -23,6 +23,14 @@ message CommunityMember {
   repeated Roles roles = 1;
 }
 
+message CommunityTokenMetadata {
+  map<uint64, string> contract_addresses = 1;
+  string description = 2;
+  string image = 3;
+  CommunityTokenType tokenType = 4;
+  string symbol = 5;
+}
+
 message CommunityPermissions {
   enum Access {
     UNKNOWN_ACCESS = 0;
@@ -77,6 +85,7 @@ message CommunityDescription {
   bool encrypted = 13;
   repeated string tags = 14;
   map<string, CommunityTokenPermission> token_permissions = 15;
+  repeated CommunityTokenMetadata community_tokens_metadata = 16;
 }
 
 message CommunityAdminSettings {
