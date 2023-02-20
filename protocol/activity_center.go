@@ -29,6 +29,20 @@ const (
 	ActivityCenterNotificationTypeContactVerification
 )
 
+type ActivityCenterGroup int
+
+const (
+	ActivityCenterAll ActivityCenterGroup = iota
+	ActivityCenterMentions
+	ActivityCenterReplies
+	ActivityCenterMembership
+	ActivityCenterAdmin
+	ActivityCenterContactRequests
+	ActivityCenterIdentityVerification
+	ActivityCenterTransactions
+	ActivityCenterSystem
+)
+
 type ActivityCenterMembershipStatus int
 
 const (
@@ -72,6 +86,55 @@ func (n *ActivityCenterNotification) Valid() error {
 		return ErrInvalidActivityCenterNotification
 	}
 	return nil
+}
+func (g ActivityCenterGroup) NotificationTypes() []ActivityCenterType {
+	switch g {
+	case ActivityCenterAll:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeNewPrivateGroupChat,
+			ActivityCenterNotificationTypeMention,
+			ActivityCenterNotificationTypeReply,
+			ActivityCenterNotificationTypeContactRequest,
+			ActivityCenterNotificationTypeCommunityInvitation,
+			ActivityCenterNotificationTypeCommunityRequest,
+			ActivityCenterNotificationTypeCommunityMembershipRequest,
+			ActivityCenterNotificationTypeCommunityKicked,
+			ActivityCenterNotificationTypeContactVerification,
+		}
+	case ActivityCenterMentions:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeMention,
+		}
+	case ActivityCenterReplies:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeReply,
+		}
+	case ActivityCenterMembership:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeNewPrivateGroupChat,
+			ActivityCenterNotificationTypeCommunityInvitation,
+			ActivityCenterNotificationTypeCommunityRequest,
+			ActivityCenterNotificationTypeCommunityMembershipRequest,
+			ActivityCenterNotificationTypeCommunityKicked,
+		}
+	case ActivityCenterAdmin:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeCommunityMembershipRequest,
+		}
+	case ActivityCenterContactRequests:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeContactRequest,
+		}
+	case ActivityCenterIdentityVerification:
+		return []ActivityCenterType{
+			ActivityCenterNotificationTypeContactVerification,
+		}
+	case ActivityCenterTransactions:
+		return []ActivityCenterType{} // NOTE: for further proposes
+	case ActivityCenterSystem:
+		return []ActivityCenterType{} // NOTE: for further proposes
+	}
+	return []ActivityCenterType{}
 }
 
 func showMentionOrReplyActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) (bool, ActivityCenterType) {

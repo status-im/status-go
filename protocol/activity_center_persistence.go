@@ -562,6 +562,20 @@ func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit u
 	return db.activityCenterNotifications(params)
 }
 
+func (db sqlitePersistence) ActivityCenterNotificationsByGroup(cursor string, limit uint64, activityGroup ActivityCenterGroup, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
+	activityTypes := activityGroup.NotificationTypes()
+
+	params := activityCenterQueryParams{
+		activityCenterTypes: activityTypes,
+		cursor:              cursor,
+		limit:               limit,
+		read:                readType,
+		accepted:            true,
+	}
+
+	return db.activityCenterNotifications(params)
+}
+
 func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
