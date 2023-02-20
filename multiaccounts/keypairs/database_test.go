@@ -58,15 +58,18 @@ func TestKeypairs(t *testing.T) {
 	}
 
 	// Test adding key pairs
-	err := db.AddMigratedKeyPair(keyPair1.KeycardUID, keyPair1.KeycardName, keyPair1.KeyUID, keyPair1.AccountsAddresses)
+	err := db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair1)
 	require.NoError(t, err)
-	err = db.AddMigratedKeyPair(keyPair2.KeycardUID, keyPair2.KeycardName, keyPair2.KeyUID, keyPair2.AccountsAddresses)
+	err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair2)
 	require.NoError(t, err)
-	err = db.AddMigratedKeyPair(keyPair3.KeycardUID, keyPair3.KeycardName, keyPair3.KeyUID, keyPair3.AccountsAddresses)
+	err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair3)
 	require.NoError(t, err)
-	err = db.AddMigratedKeyPair(keyPair3.KeycardUID, keyPair3.KeycardName, keyPair3.KeyUID, []types.Address{{0x03}})
+	err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(KeyPair{
+		KeycardUID:        keyPair3.KeycardUID,
+		AccountsAddresses: []types.Address{{0x03}},
+	})
 	require.NoError(t, err)
-	err = db.AddMigratedKeyPair(keyPair4.KeycardUID, keyPair4.KeycardName, keyPair4.KeyUID, keyPair4.AccountsAddresses)
+	err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair4)
 	require.NoError(t, err)
 
 	// Test reading migrated key pairs

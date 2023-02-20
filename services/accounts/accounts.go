@@ -441,20 +441,25 @@ func (api *API) VerifyPassword(password string) bool {
 	return err == nil
 }
 
-func (api *API) AddMigratedKeyPair(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
-	var addresses []types.Address
+func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
+	kp := keypairs.KeyPair{
+		KeycardUID:    kcUID,
+		KeycardName:   kpName,
+		KeycardLocked: false,
+		KeyUID:        keyUID,
+	}
 	for _, addr := range accountAddresses {
-		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
+		kp.AccountsAddresses = append(kp.AccountsAddresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	err := api.db.AddMigratedKeyPair(kcUID, kpName, keyUID, addresses)
+	err := api.db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(kp)
 	if err != nil {
 		return err
 	}
 
 	// Once we migrate a keypair, corresponding keystore files need to be deleted.
 	if len(password) > 0 {
-		for _, addr := range addresses {
+		for _, addr := range kp.AccountsAddresses {
 			err = api.manager.DeleteAccount(addr, password)
 			if err != nil {
 				return err

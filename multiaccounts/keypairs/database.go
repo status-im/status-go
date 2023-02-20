@@ -133,7 +133,7 @@ func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error
 	return kp.processResult(rows, false)
 }
 
-func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID string, accountAddresses []types.Address) (err error) {
+func (kp *KeyPairs) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair KeyPair) (err error) {
 	var (
 		tx          *sql.Tx
 		insertKcAcc *sql.Stmt
@@ -151,7 +151,7 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 	}()
 
 	var tmpKeyUID string
-	err = tx.QueryRow(`SELECT keycard_uid FROM keycards WHERE keycard_uid = ?`, kcUID).Scan(&tmpKeyUID)
+	err = tx.QueryRow(`SELECT keycard_uid FROM keycards WHERE keycard_uid = ?`, keyPair.KeycardUID).Scan(&tmpKeyUID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			insertKc, err := tx.Prepare(`
@@ -173,7 +173,7 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 
 			defer insertKc.Close()
 
-			_, err = insertKc.Exec(kcUID, kpName, false, KeyUID)
+			_, err = insertKc.Exec(keyPair.KeycardUID, keyPair.KeycardName, keyPair.KeycardLocked, keyPair.KeyUID)
 			if err != nil {
 				return err
 			}
@@ -199,10 +199,10 @@ func (kp *KeyPairs) AddMigratedKeyPair(kcUID string, kpName string, KeyUID strin
 	}
 	defer insertKcAcc.Close()
 
-	for i := range accountAddresses {
-		addr := accountAddresses[i]
+	for i := range keyPair.AccountsAddresses {
+		addr := keyPair.AccountsAddresses[i]
 
-		_, err = insertKcAcc.Exec(kcUID, addr)
+		_, err = insertKcAcc.Exec(keyPair.KeycardUID, addr)
 		if err != nil {
 			return err
 		}
