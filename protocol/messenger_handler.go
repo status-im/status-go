@@ -806,8 +806,7 @@ func (m *Messenger) handleAcceptContactRequest(
 	return ContactRequestProcessingResponse{}, nil
 }
 
-// TODO(alwx)
-func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageState, clock uint64, contactRequestID string) error {
+func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageState, clock uint64, contactRequestID string, isOutgoing bool) error {
 	request, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil && err != common.ErrRecordNotFound {
 		return err
@@ -847,7 +846,15 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	}
 
 	if request != nil {
-		err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
+		if isOutgoing {
+			notification := m.generateOutgoingContactRequestNotification(contact, request)
+			err = m.addActivityCenterNotification(state.Response, notification)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
+		}
 		if err != nil {
 			m.logger.Warn("could not create contact request notification", zap.Error(err))
 		}
@@ -860,13 +867,13 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
 	// outgoing contact requests are created on the side of a sender
-	err := m.handleAcceptContactRequestMessage(state, message.Clock, defaultContactRequestID(senderID))
+	err := m.handleAcceptContactRequestMessage(state, message.Clock, defaultContactRequestID(senderID), true)
 	if err != nil {
 		m.logger.Warn("could not accept contact request", zap.Error(err))
 	}
 
 	// legacy contact requests: the ones that are send with SendContactRequest
-	err = m.handleAcceptContactRequestMessage(state, message.Clock, message.Id)
+	err = m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
 	if err != nil {
 		m.logger.Warn("could not accept contact request", zap.Error(err))
 	}

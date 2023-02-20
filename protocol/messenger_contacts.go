@@ -266,7 +266,6 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	contact.AcceptContactRequest(clock)
 
-	// TODO(alwx): acceptContactRequest.Id = defaultContactRequestID(common.PubkeyToHex(&m.identity.PublicKey))
 	acceptContactRequest := &protobuf.AcceptContactRequest{
 		Id:    contactRequest.ID,
 		Clock: clock,
@@ -462,7 +461,20 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 
 	// Add outgoing contact request notification
 	if createOutgoingContactRequestNotification {
-		err = m.createOutgoingContactRequestNotification(response, contact, profileChat, contactRequestText)
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		contactRequest, err := m.generateContactRequest(clock, timestamp, contact, contactRequestText)
+		if err != nil {
+			return nil, err
+		}
+
+		response.AddMessage(contactRequest)
+		err = m.persistence.SaveMessages([]*common.Message{contactRequest})
+		if err != nil {
+			return nil, err
+		}
+
+		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
+		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
 			return nil, err
 		}
@@ -497,30 +509,19 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	return contactRequest, err
 }
 
-func (m *Messenger) createOutgoingContactRequestNotification(response *MessengerResponse, contact *Contact, chat *Chat, text string) error {
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, text)
-	if err != nil {
-		return err
-	}
-
-	response.AddMessage(contactRequest)
-	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-	if err != nil {
-		return err
-	}
-
-	notification := &ActivityCenterNotification{
+func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact, contactRequest *common.Message) *ActivityCenterNotification {
+	return &ActivityCenterNotification{
 		ID:        types.FromHex(contactRequest.ID),
 		Type:      ActivityCenterNotificationTypeContactRequest,
 		Name:      contact.CanonicalName(),
-		Author:    common.PubkeyToHex(&m.identity.PublicKey),
+		Author:    m.myHexIdentity(),
 		Message:   contactRequest,
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		ChatID:    contact.ID,
+		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
+		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 	}
-
-	return m.addActivityCenterNotification(response, notification)
 }
 
 func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact) (*MessengerResponse, error) {
