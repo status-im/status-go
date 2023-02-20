@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 type BlocksRange struct {
@@ -63,7 +63,7 @@ func (b *Block) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) 
 	return nil
 }
 
-func (b *Block) setInitialBlocksRange(chainClient *chain.Client) error {
+func (b *Block) setInitialBlocksRange(chainClient *chain.ClientWithFallback) error {
 	accountsDB, err := accounts.NewDB(b.db)
 	if err != nil {
 		return err

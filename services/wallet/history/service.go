@@ -21,7 +21,7 @@ import (
 	statusrpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 
-	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -147,7 +147,7 @@ func (s *Service) isTokenVisible(tokenSymbol string) bool {
 
 // Native token implementation of DataSource interface
 type chainClientSource struct {
-	chainClient *chain.Client
+	chainClient *chain.ClientWithFallback
 	currency    string
 }
 
@@ -505,7 +505,7 @@ func (s *Service) updateBalanceHistoryForAllEnabledNetworks(ctx context.Context)
 				}
 
 				var dataSource DataSource
-				chainClient, err := chain.NewClient(s.rpcClient, network.ChainID)
+				chainClient, err := s.rpcClient.EthClient(network.ChainID)
 				if err != nil {
 					return err
 				}

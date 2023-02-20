@@ -16,9 +16,9 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 var requestTimeout = 20 * time.Second
@@ -393,7 +393,7 @@ func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
 	return err
 }
 
-func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address) (*big.Int, error) {
 	caller, err := ierc20.NewIERC20Caller(token, client)
 	if err != nil {
 		return nil, err
@@ -404,7 +404,7 @@ func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.Client, ac
 	}, account)
 }
 
-func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client *chain.Client, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
+func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
 	caller, err := ierc20.NewIERC20Caller(token, client)
 	if err != nil {
 		return nil, err
@@ -416,11 +416,11 @@ func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client *chain.Client, 
 	}, account)
 }
 
-func (tm *Manager) GetChainBalance(ctx context.Context, client *chain.Client, account common.Address) (*big.Int, error) {
+func (tm *Manager) GetChainBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address) (*big.Int, error) {
 	return client.BalanceAt(ctx, account, nil)
 }
 
-func (tm *Manager) GetBalance(ctx context.Context, client *chain.Client, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *Manager) GetBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address) (*big.Int, error) {
 	if token == nativeChainAddress {
 		return tm.GetChainBalance(ctx, client, account)
 	}
@@ -428,7 +428,7 @@ func (tm *Manager) GetBalance(ctx context.Context, client *chain.Client, account
 	return tm.GetTokenBalance(ctx, client, account, token)
 }
 
-func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalances(parent context.Context, clients []*chain.ClientWithFallback, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
@@ -558,7 +558,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.Client, 
 	return response, group.Error()
 }
 
-func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.Client, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.ClientWithFallback, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex

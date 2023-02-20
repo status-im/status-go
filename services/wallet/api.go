@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bridge"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -114,15 +114,15 @@ func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, 
 
 // GetTokensBalances return mapping of token balances for every account.
 func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	chainClient, err := chain.NewLegacyClient(api.s.rpcClient)
+	chainClient, err := api.s.rpcClient.EthClient(api.s.rpcClient.UpstreamChainID)
 	if err != nil {
 		return nil, err
 	}
-	return api.s.tokenManager.GetBalances(ctx, []*chain.Client{chainClient}, accounts, addresses)
+	return api.s.tokenManager.GetBalances(ctx, []*chain.ClientWithFallback{chainClient}, accounts, addresses)
 }
 
 func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	clients, err := chain.NewClients(api.s.rpcClient, chainIDs)
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (api *API) DeletePendingTransactionByChainID(ctx context.Context, chainID u
 }
 
 func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
-	chainClient, err := chain.NewLegacyClient(api.s.rpcClient)
+	chainClient, err := api.s.rpcClient.EthClient(api.s.rpcClient.UpstreamChainID)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Has
 }
 
 func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
-	chainClient, err := chain.NewClient(api.s.rpcClient, chainID)
+	chainClient, err := api.s.rpcClient.EthClient(chainID)
 	if err != nil {
 		return err
 	}

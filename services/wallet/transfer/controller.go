@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -55,7 +55,7 @@ func (c *Controller) Stop() {
 }
 
 func (c *Controller) SetInitialBlocksRange(chainIDs []uint64) error {
-	chainClients, err := chain.NewClients(c.rpcClient, chainIDs)
+	chainClients, err := c.rpcClient.EthClients(chainIDs)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		return err
 	}
 
-	chainClients, err := chain.NewClients(c.rpcClient, chainIDs)
+	chainClients, err := c.rpcClient.EthClients(chainIDs)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 
 // watchAccountsChanges subsribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
-func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*chain.Client, initial []common.Address) error {
+func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*chain.ClientWithFallback, initial []common.Address) error {
 	accounts := make(chan []*accounts.Account, 1) // it may block if the rate of updates will be significantly higher
 	sub := accountFeed.Subscribe(accounts)
 	defer sub.Unsubscribe()
@@ -164,7 +164,7 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 }
 
 func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Client, address common.Address, hash common.Hash) error {
-	chainClient, err := chain.NewClient(rpcClient, rpcClient.UpstreamChainID)
+	chainClient, err := rpcClient.EthClient(rpcClient.UpstreamChainID)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 	}
 
 	transfersCount := int64(len(rst))
-	chainClient, err := chain.NewClient(c.rpcClient, chainID)
+	chainClient, err := c.rpcClient.EthClient(c.rpcClient.UpstreamChainID)
 	if err != nil {
 		return nil, err
 	}

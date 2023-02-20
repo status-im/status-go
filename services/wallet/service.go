@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -15,7 +16,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -33,7 +33,7 @@ type Connection struct {
 }
 
 type ConnectedResult struct {
-	Blockchain   map[uint64]Connection `json:"blockchain"`
+	Blockchains  map[uint64]Connection `json:"blockchains"`
 	Market       Connection            `json:"market"`
 	Collectibles map[uint64]Connection `json:"collectibles"`
 }
@@ -166,11 +166,21 @@ func (s *Service) IsStarted() bool {
 }
 
 func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
-	blockchain := make(map[uint64]Connection)
-	for chainID, client := range chain.ChainClientInstances {
-		blockchain[chainID] = Connection{
-			Up:            client.IsConnected,
-			LastCheckedAt: client.LastCheckedAt,
+	networks, err := s.rpcClient.NetworkManager.Get(false)
+	blockchains := make(map[uint64]Connection)
+	if err == nil {
+		for _, network := range networks {
+			ethClient, err := s.rpcClient.EthClient(network.ChainID)
+			if err != nil {
+				blockchains[network.ChainID] = Connection{
+					Up:            true,
+					LastCheckedAt: time.Now().Unix(),
+				}
+			}
+			blockchains[network.ChainID] = Connection{
+				Up:            ethClient.IsConnected,
+				LastCheckedAt: ethClient.LastCheckedAt,
+			}
 		}
 	}
 
@@ -182,7 +192,7 @@ func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
 		}
 	}
 	return &ConnectedResult{
-		Blockchain:   blockchain,
+		Blockchains:  blockchains,
 		Collectibles: collectibles,
 		Market: Connection{
 			Up:            s.marketManager.IsConnected,
