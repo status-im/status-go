@@ -2708,3 +2708,44 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 	// Expecting 1 errors since there are no messages to be extracted
 	s.Require().Len(errs, 1)
 }
+
+func (s *MessengerCommunitiesSuite) TestCommunityTokensMetadata() {
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunitiesSettings(), 1)
+
+	community := response.Communities()[0]
+
+	tokensMetadata := community.CommunityTokensMetadata()
+	s.Require().Len(tokensMetadata, 0)
+
+	newToken := &protobuf.CommunityTokenMetadata{
+		ContractAddresses: map[uint64]string{3: "0xasd"},
+		Description:       "desc1",
+		Image:             "IMG1",
+		TokenType:         protobuf.CommunityTokenType_ERC721,
+		Symbol:            "SMB",
+	}
+
+	_, err = community.AddCommunityTokensMetadata(newToken)
+	s.Require().NoError(err)
+	tokensMetadata = community.CommunityTokensMetadata()
+	s.Require().Len(tokensMetadata, 1)
+
+	s.Require().Equal(tokensMetadata[0].ContractAddresses, newToken.ContractAddresses)
+	s.Require().Equal(tokensMetadata[0].Description, newToken.Description)
+	s.Require().Equal(tokensMetadata[0].Image, newToken.Image)
+	s.Require().Equal(tokensMetadata[0].TokenType, newToken.TokenType)
+	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
+}

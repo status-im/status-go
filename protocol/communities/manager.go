@@ -2701,6 +2701,34 @@ func (m *Manager) GetCommunityTokens(communityID string) ([]*CommunityToken, err
 }
 
 func (m *Manager) AddCommunityToken(token *CommunityToken) error {
+
+	community, err := m.GetByIDString(token.CommunityID)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return ErrOrgNotFound
+	}
+
+	tokenMetadata := &protobuf.CommunityTokenMetadata{
+		ContractAddresses: map[uint64]string{uint64(token.ChainID): token.Address},
+		Description:       token.Description,
+		Image:             token.Base64Image,
+		Symbol:            token.Symbol,
+		TokenType:         token.TokenType,
+	}
+	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	m.publish(&Subscription{Community: community})
+
 	return m.persistence.AddCommunityToken(token)
 }
 

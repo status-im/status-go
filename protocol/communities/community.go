@@ -95,24 +95,25 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                     types.HexBytes                                `json:"id"`
-		Verified               bool                                          `json:"verified"`
-		Chats                  map[string]CommunityChat                      `json:"chats"`
-		Categories             map[string]CommunityCategory                  `json:"categories"`
-		Name                   string                                        `json:"name"`
-		Description            string                                        `json:"description"`
-		IntroMessage           string                                        `json:"introMessage"`
-		OutroMessage           string                                        `json:"outroMessage"`
-		Tags                   []CommunityTag                                `json:"tags"`
-		Images                 map[string]images.IdentityImage               `json:"images"`
-		Color                  string                                        `json:"color"`
-		MembersCount           int                                           `json:"membersCount"`
-		EnsName                string                                        `json:"ensName"`
-		Link                   string                                        `json:"link"`
-		CommunityAdminSettings CommunityAdminSettings                        `json:"adminSettings"`
-		Encrypted              bool                                          `json:"encrypted"`
-		BanList                []string                                      `json:"banList"`
-		TokenPermissions       map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
+		ID                      types.HexBytes                                `json:"id"`
+		Verified                bool                                          `json:"verified"`
+		Chats                   map[string]CommunityChat                      `json:"chats"`
+		Categories              map[string]CommunityCategory                  `json:"categories"`
+		Name                    string                                        `json:"name"`
+		Description             string                                        `json:"description"`
+		IntroMessage            string                                        `json:"introMessage"`
+		OutroMessage            string                                        `json:"outroMessage"`
+		Tags                    []CommunityTag                                `json:"tags"`
+		Images                  map[string]images.IdentityImage               `json:"images"`
+		Color                   string                                        `json:"color"`
+		MembersCount            int                                           `json:"membersCount"`
+		EnsName                 string                                        `json:"ensName"`
+		Link                    string                                        `json:"link"`
+		CommunityAdminSettings  CommunityAdminSettings                        `json:"adminSettings"`
+		Encrypted               bool                                          `json:"encrypted"`
+		BanList                 []string                                      `json:"banList"`
+		TokenPermissions        map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
+		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -156,6 +157,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
+		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -214,6 +216,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Encrypted                   bool                                          `json:"encrypted"`
 		BanList                     []string                                      `json:"banList"`
 		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
+		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
 	}{
 		ID:                          o.ID(),
 		Admin:                       o.IsAdmin(),
@@ -267,6 +270,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
+		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -319,6 +323,15 @@ func (o *Community) IntroMessage() string {
 		return o.config.CommunityDescription.IntroMessage
 	}
 	return ""
+}
+
+func (o *Community) CommunityTokensMetadata() []*protobuf.CommunityTokenMetadata {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		return o.config.CommunityDescription.CommunityTokensMetadata
+	}
+	return nil
 }
 
 func (o *Community) Tags() []CommunityTag {
@@ -386,13 +399,6 @@ func (o *Community) initialize() {
 	}
 }
 
-type TokenType uint8
-
-const (
-	ERC721 TokenType = iota
-	ERC20
-)
-
 type DeployState uint8
 
 const (
@@ -402,19 +408,19 @@ const (
 )
 
 type CommunityToken struct {
-	TokenType          TokenType   `json:"tokenType"`
-	CommunityID        string      `json:"communityId"`
-	Address            string      `json:"address"`
-	Name               string      `json:"name"`
-	Symbol             string      `json:"symbol"`
-	Description        string      `json:"description"`
-	Supply             int         `json:"supply"`
-	InfiniteSupply     bool        `json:"infiniteSupply"`
-	Transferable       bool        `json:"transferable"`
-	RemoteSelfDestruct bool        `json:"remoteSelfDestruct"`
-	ChainID            int         `json:"chainId"`
-	DeployState        DeployState `json:"deployState"`
-	Base64Image        string      `json:"image"`
+	TokenType          protobuf.CommunityTokenType `json:"tokenType"`
+	CommunityID        string                      `json:"communityId"`
+	Address            string                      `json:"address"`
+	Name               string                      `json:"name"`
+	Symbol             string                      `json:"symbol"`
+	Description        string                      `json:"description"`
+	Supply             int                         `json:"supply"`
+	InfiniteSupply     bool                        `json:"infiniteSupply"`
+	Transferable       bool                        `json:"transferable"`
+	RemoteSelfDestruct bool                        `json:"remoteSelfDestruct"`
+	ChainID            int                         `json:"chainId"`
+	DeployState        DeployState                 `json:"deployState"`
+	Base64Image        string                      `json:"image"`
 }
 
 type CommunitySettings struct {
@@ -788,6 +794,18 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	return o.config.CommunityDescription, nil
 }
 
+func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (*protobuf.CommunityDescription, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+	o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, token)
+	o.increaseClock()
+
+	return o.config.CommunityDescription, nil
+}
+
 func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -915,6 +933,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	}
 	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
+	o.config.CommunityDescription.CommunityTokensMetadata = description.CommunityTokensMetadata
 	o.increaseClock()
 }
 

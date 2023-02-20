@@ -81,25 +81,26 @@ type Chat struct {
 }
 
 type ChannelGroup struct {
-	Type           ChannelGroupType                         `json:"channelGroupType"`
-	Name           string                                   `json:"name"`
-	Images         map[string]images.IdentityImage          `json:"images"`
-	Color          string                                   `json:"color"`
-	Chats          map[string]*Chat                         `json:"chats"`
-	Categories     map[string]communities.CommunityCategory `json:"categories"`
-	EnsName        string                                   `json:"ensName"`
-	Admin          bool                                     `json:"admin"`
-	Verified       bool                                     `json:"verified"`
-	Description    string                                   `json:"description"`
-	IntroMessage   string                                   `json:"introMessage"`
-	OutroMessage   string                                   `json:"outroMessage"`
-	Tags           []communities.CommunityTag               `json:"tags"`
-	Permissions    *protobuf.CommunityPermissions           `json:"permissions"`
-	Members        map[string]*protobuf.CommunityMember     `json:"members"`
-	CanManageUsers bool                                     `json:"canManageUsers"`
-	Muted          bool                                     `json:"muted"`
-	BanList        []string                                 `json:"banList"`
-	Encrypted      bool                                     `json:"encrypted"`
+	Type                    ChannelGroupType                         `json:"channelGroupType"`
+	Name                    string                                   `json:"name"`
+	Images                  map[string]images.IdentityImage          `json:"images"`
+	Color                   string                                   `json:"color"`
+	Chats                   map[string]*Chat                         `json:"chats"`
+	Categories              map[string]communities.CommunityCategory `json:"categories"`
+	EnsName                 string                                   `json:"ensName"`
+	Admin                   bool                                     `json:"admin"`
+	Verified                bool                                     `json:"verified"`
+	Description             string                                   `json:"description"`
+	IntroMessage            string                                   `json:"introMessage"`
+	OutroMessage            string                                   `json:"outroMessage"`
+	Tags                    []communities.CommunityTag               `json:"tags"`
+	Permissions             *protobuf.CommunityPermissions           `json:"permissions"`
+	Members                 map[string]*protobuf.CommunityMember     `json:"members"`
+	CanManageUsers          bool                                     `json:"canManageUsers"`
+	Muted                   bool                                     `json:"muted"`
+	BanList                 []string                                 `json:"banList"`
+	Encrypted               bool                                     `json:"encrypted"`
+	CommunityTokensMetadata []*protobuf.CommunityTokenMetadata       `json:"communityTokensMetadata"`
 }
 
 func NewAPI(service *Service) *API {
@@ -140,21 +141,22 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 	result := make(map[string]ChannelGroup)
 
 	result[pubKey] = ChannelGroup{
-		Type:         Personal,
-		Name:         "",
-		Images:       make(map[string]images.IdentityImage),
-		Color:        "",
-		Chats:        make(map[string]*Chat),
-		Categories:   make(map[string]communities.CommunityCategory),
-		EnsName:      "", // Not implemented yet in communities
-		Admin:        true,
-		Verified:     true,
-		Description:  "",
-		IntroMessage: "",
-		OutroMessage: "",
-		Tags:         []communities.CommunityTag{},
-		Permissions:  &protobuf.CommunityPermissions{},
-		Muted:        false,
+		Type:                    Personal,
+		Name:                    "",
+		Images:                  make(map[string]images.IdentityImage),
+		Color:                   "",
+		Chats:                   make(map[string]*Chat),
+		Categories:              make(map[string]communities.CommunityCategory),
+		EnsName:                 "", // Not implemented yet in communities
+		Admin:                   true,
+		Verified:                true,
+		Description:             "",
+		IntroMessage:            "",
+		OutroMessage:            "",
+		Tags:                    []communities.CommunityTag{},
+		Permissions:             &protobuf.CommunityPermissions{},
+		Muted:                   false,
+		CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
 	}
 
 	for _, chat := range channels {
@@ -171,24 +173,25 @@ func (api *API) GetChats(ctx context.Context) (map[string]ChannelGroup, error) {
 
 	for _, community := range unique(append(joinedCommunities, spectatedCommunities...)) {
 		chGrp := ChannelGroup{
-			Type:           Community,
-			Name:           community.Name(),
-			Color:          community.Color(),
-			Images:         make(map[string]images.IdentityImage),
-			Chats:          make(map[string]*Chat),
-			Categories:     make(map[string]communities.CommunityCategory),
-			Admin:          community.IsAdmin(),
-			Verified:       community.Verified(),
-			Description:    community.DescriptionText(),
-			IntroMessage:   community.IntroMessage(),
-			OutroMessage:   community.OutroMessage(),
-			Tags:           community.Tags(),
-			Permissions:    community.Description().Permissions,
-			Members:        community.Description().Members,
-			CanManageUsers: community.CanManageUsers(community.MemberIdentity()),
-			Muted:          community.Muted(),
-			BanList:        community.Description().BanList,
-			Encrypted:      community.Encrypted(),
+			Type:                    Community,
+			Name:                    community.Name(),
+			Color:                   community.Color(),
+			Images:                  make(map[string]images.IdentityImage),
+			Chats:                   make(map[string]*Chat),
+			Categories:              make(map[string]communities.CommunityCategory),
+			Admin:                   community.IsAdmin(),
+			Verified:                community.Verified(),
+			Description:             community.DescriptionText(),
+			IntroMessage:            community.IntroMessage(),
+			OutroMessage:            community.OutroMessage(),
+			Tags:                    community.Tags(),
+			Permissions:             community.Description().Permissions,
+			Members:                 community.Description().Members,
+			CanManageUsers:          community.CanManageUsers(community.MemberIdentity()),
+			Muted:                   community.Muted(),
+			BanList:                 community.Description().BanList,
+			Encrypted:               community.Encrypted(),
+			CommunityTokensMetadata: community.Description().CommunityTokensMetadata,
 		}
 
 		for t, i := range community.Images() {
