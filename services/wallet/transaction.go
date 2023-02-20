@@ -16,10 +16,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -218,7 +218,7 @@ func (tm *TransactionManager) deletePending(chainID uint64, hash common.Hash) er
 	return err
 }
 
-func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *chain.Client) error {
+func (tm *TransactionManager) watch(ctx context.Context, transactionHash common.Hash, client *chain.ClientWithFallback) error {
 	watchTxCommand := &watchTransactionCommand{
 		hash:   transactionHash,
 		client: client,
@@ -316,7 +316,7 @@ func (tm *TransactionManager) getVerifiedWalletAccount(address, password string)
 }
 
 type watchTransactionCommand struct {
-	client *chain.Client
+	client *chain.ClientWithFallback
 	hash   common.Hash
 }
 

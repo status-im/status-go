@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 )
@@ -43,8 +43,8 @@ type Client struct {
 	UpstreamChainID uint64
 
 	local      *gethrpc.Client
-	upstream   *gethrpc.Client
-	rpcClients map[uint64]*gethrpc.Client
+	upstream   *chain.ClientWithFallback
+	rpcClients map[uint64]*chain.ClientWithFallback
 
 	router         *router
 	NetworkManager *network.Manager
@@ -73,7 +73,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		local:          client,
 		NetworkManager: networkManager,
 		handlers:       make(map[string]Handler),
-		rpcClients:     make(map[uint64]*gethrpc.Client),
+		rpcClients:     make(map[uint64]*chain.ClientWithFallback),
 		log:            log,
 	}
 
@@ -81,10 +81,11 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		c.UpstreamChainID = upstreamChainID
 		c.upstreamEnabled = upstream.Enabled
 		c.upstreamURL = upstream.URL
-		c.upstream, err = gethrpc.Dial(c.upstreamURL)
+		upstreamClient, err := gethrpc.Dial(c.upstreamURL)
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
+		c.upstream = chain.NewSimpleClient(upstreamClient, upstreamChainID)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -92,21 +93,16 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 	return &c, nil
 }
 
-func (c *Client) getRPCClientWithCache(chainID uint64) (*gethrpc.Client, error) {
-	if !c.upstreamEnabled {
-		return c.local, nil
-	}
-
-	if c.UpstreamChainID == chainID {
-		return c.upstream, nil
-	}
-
+func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback, error) {
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
 		return rpcClient, nil
 	}
 
 	network := c.NetworkManager.Find(chainID)
 	if network == nil {
+		if c.UpstreamChainID == chainID {
+			return c.upstream, nil
+		}
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}
 
@@ -115,18 +111,40 @@ func (c *Client) getRPCClientWithCache(chainID uint64) (*gethrpc.Client, error) 
 		return nil, fmt.Errorf("dial upstream server: %s", err)
 	}
 
-	c.rpcClients[chainID] = rpcClient
-	return rpcClient, nil
+	var rpcFallbackClient *gethrpc.Client
+	if len(network.FallbackURL) > 0 {
+		rpcFallbackClient, err = gethrpc.Dial(network.FallbackURL)
+		if err != nil {
+			return nil, fmt.Errorf("dial upstream server: %s", err)
+		}
+	}
+
+	client := chain.NewClient(rpcClient, rpcFallbackClient, chainID)
+	c.rpcClients[chainID] = client
+	return client, nil
 }
 
 // Ethclient returns ethclient.Client per chain
-func (c *Client) EthClient(chainID uint64) (*ethclient.Client, error) {
-	rpcClient, err := c.getRPCClientWithCache(chainID)
+func (c *Client) EthClient(chainID uint64) (*chain.ClientWithFallback, error) {
+	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	return ethclient.NewClient(rpcClient), nil
+	return client, nil
+}
+
+func (c *Client) EthClients(chainIDs []uint64) ([]*chain.ClientWithFallback, error) {
+	clients := make([]*chain.ClientWithFallback, 0)
+	for _, chainID := range chainIDs {
+		client, err := c.getClientUsingCache(chainID)
+		if err != nil {
+			return nil, err
+		}
+		clients = append(clients, client)
+	}
+
+	return clients, nil
 }
 
 // UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.
@@ -139,9 +157,8 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 	if err != nil {
 		return err
 	}
-
 	c.Lock()
-	c.upstream = rpcClient
+	c.upstream = chain.NewSimpleClient(rpcClient, c.UpstreamChainID)
 	c.upstreamURL = url
 	c.Unlock()
 
@@ -195,11 +212,11 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 	}
 
 	if c.router.routeRemote(method) {
-		ethClient, err := c.getRPCClientWithCache(chainID)
+		client, err := c.getClientUsingCache(chainID)
 		if err != nil {
 			return err
 		}
-		return ethClient.CallContext(ctx, result, method, args...)
+		return client.CallContext(ctx, result, method, args...)
 	}
 
 	if c.local == nil {

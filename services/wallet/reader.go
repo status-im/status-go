@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
@@ -211,11 +210,10 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		clients, err := chain.NewClients(r.rpcClient, chainIDs)
+		clients, err := r.rpcClient.EthClients(chainIDs)
 		if err != nil {
 			return err
 		}
-
 		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
 			return err

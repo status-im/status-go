@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/services/wallet/chain"
+	"github.com/status-im/status-go/rpc/chain"
 )
 
 // Type type of the asset that was transferred.
@@ -53,7 +53,7 @@ type Transfer struct {
 
 // ETHDownloader downloads regular eth transfers.
 type ETHDownloader struct {
-	chainClient *chain.Client
+	chainClient *chain.ClientWithFallback
 	accounts    []common.Address
 	signer      types.Signer
 	db          *Database
@@ -92,7 +92,7 @@ func (d *ETHDownloader) GetTransfersByNumber(ctx context.Context, number *big.In
 	return rst, err
 }
 
-func getTransferByHash(ctx context.Context, client *chain.Client, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
+func getTransferByHash(ctx context.Context, client *chain.ClientWithFallback, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
 	transaction, _, err := client.TransactionByHash(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *chain.Client, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	return &ERC20TransfersDownloader{
 		client:    client,
@@ -214,7 +214,7 @@ func NewERC20TransfersDownloader(client *chain.Client, accounts []common.Address
 
 // ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
-	client   *chain.Client
+	client   *chain.ClientWithFallback
 	accounts []common.Address
 
 	// hash of the Transfer event signature

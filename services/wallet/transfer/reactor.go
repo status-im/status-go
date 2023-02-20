@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/chain"
 )
 
 var errAlreadyRunning = errors.New("already running")
@@ -37,7 +37,7 @@ type Reactor struct {
 	group *async.Group
 }
 
-func (r *Reactor) newControlCommand(chainClient *chain.Client, accounts []common.Address) *controlCommand {
+func (r *Reactor) newControlCommand(chainClient *chain.ClientWithFallback, accounts []common.Address) *controlCommand {
 	signer := types.NewLondonSigner(chainClient.ToBigInt())
 	ctl := &controlCommand{
 		db:          r.db,
@@ -59,7 +59,7 @@ func (r *Reactor) newControlCommand(chainClient *chain.Client, accounts []common
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) start(chainClients []*chain.Client, accounts []common.Address) error {
+func (r *Reactor) start(chainClients []*chain.ClientWithFallback, accounts []common.Address) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -86,7 +86,7 @@ func (r *Reactor) stop() {
 	r.group = nil
 }
 
-func (r *Reactor) restart(chainClients []*chain.Client, accounts []common.Address) error {
+func (r *Reactor) restart(chainClients []*chain.ClientWithFallback, accounts []common.Address) error {
 	r.stop()
 	return r.start(chainClients, accounts)
 }

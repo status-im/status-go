@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
-	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -428,12 +427,12 @@ func (r *Router) requireApproval(ctx context.Context, bridge bridge.Bridge, acco
 }
 
 func (r *Router) getBalance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
-	clients, err := chain.NewClients(r.s.rpcClient, []uint64{network.ChainID})
+	client, err := r.s.rpcClient.EthClient(network.ChainID)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.s.tokenManager.GetBalance(ctx, clients[0], account, token.Address)
+	return r.s.tokenManager.GetBalance(ctx, client, account, token.Address)
 }
 
 func (r *Router) suggestedRoutes(

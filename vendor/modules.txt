@@ -12,6 +12,11 @@ github.com/StackExchange/wmi
 # github.com/VictoriaMetrics/fastcache v1.6.0
 ## explicit; go 1.13
 github.com/VictoriaMetrics/fastcache
+# github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
+## explicit
+github.com/afex/hystrix-go/hystrix
+github.com/afex/hystrix-go/hystrix/metric_collector
+github.com/afex/hystrix-go/hystrix/rolling
 # github.com/anacrolix/chansync v0.3.0
 ## explicit; go 1.16
 github.com/anacrolix/chansync

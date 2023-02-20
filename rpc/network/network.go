@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-const baseQuery = "SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks"
+const baseQuery = "SELECT chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks"
 
 func newNetworksQuery() *networksQuery {
 	buf := bytes.NewBuffer(nil)
@@ -56,7 +56,7 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 	for rows.Next() {
 		network := params.Network{}
 		err := rows.Scan(
-			&network.ChainID, &network.ChainName, &network.RPCURL, &network.BlockExplorerURL, &network.IconURL,
+			&network.ChainID, &network.ChainName, &network.RPCURL, &network.FallbackURL, &network.BlockExplorerURL, &network.IconURL,
 			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
 			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
 		)
@@ -121,6 +121,14 @@ func (nm *Manager) Init(networks []params.Network) error {
 						errors += fmt.Sprintf("error updating network rpc_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 					}
 				}
+
+				if currentNetworks[j].FallbackURL != networks[i].FallbackURL {
+					// Update fallback_url if it's different
+					err := nm.UpdateFallbackURL(currentNetworks[j].ChainID, networks[i].FallbackURL)
+					if err != nil {
+						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+					}
+				}
 				break
 			}
 		}
@@ -143,8 +151,8 @@ func (nm *Manager) Init(networks []params.Network) error {
 
 func (nm *Manager) Upsert(network *params.Network) error {
 	_, err := nm.db.Exec(
-		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
+		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		network.ChainID, network.ChainName, network.RPCURL, network.FallbackURL, network.BlockExplorerURL, network.IconURL,
 		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
 		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
 	)
@@ -158,6 +166,11 @@ func (nm *Manager) Delete(chainID uint64) error {
 
 func (nm *Manager) UpdateRPCURL(chainID uint64, rpcURL string) error {
 	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ? WHERE chain_id = ?`, rpcURL, chainID)
+	return err
+}
+
+func (nm *Manager) UpdateFallbackURL(chainID uint64, fallbackURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET fallback_url = ? WHERE chain_id = ?`, fallbackURL, chainID)
 	return err
 }
 
