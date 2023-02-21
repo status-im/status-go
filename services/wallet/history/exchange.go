@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/market"
 )
 
 type tokenType = string
@@ -26,13 +26,13 @@ type Exchange struct {
 	allTimeCache map[tokenType]map[currencyType][]allTimeEntry
 	fetchMutex   sync.Mutex
 
-	cryptoCompare *thirdparty.CryptoCompare
+	marketManager *market.Manager
 }
 
-func NewExchange(cryptoCompare *thirdparty.CryptoCompare) *Exchange {
+func NewExchange(marketManager *market.Manager) *Exchange {
 	return &Exchange{
 		cache:         make(map[tokenType]map[currencyType]map[yearType][]float32),
-		cryptoCompare: cryptoCompare,
+		marketManager: marketManager,
 	}
 }
 
@@ -110,7 +110,7 @@ func (e *Exchange) FetchAndCacheMissingRates(token tokenType, currency currencyT
 		return nil
 	}
 
-	res, err := e.cryptoCompare.FetchDailyMarketValues(token, currency, daysToFetch, false, 1)
+	res, err := e.marketManager.FetchHistoricalDailyPrices(token, currency, daysToFetch, false, 1)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (e *Exchange) FetchAndCacheMissingRates(token tokenType, currency currencyT
 	}
 
 	// Fetch all time
-	allTime, err := e.cryptoCompare.FetchDailyMarketValues(token, currency, 1, true, 30)
+	allTime, err := e.marketManager.FetchHistoricalDailyPrices(token, currency, 1, true, 30)
 	if err != nil {
 		return err
 	}

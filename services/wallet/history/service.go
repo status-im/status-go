@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 
 	"github.com/status-im/status-go/services/wallet/chain"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -55,7 +55,7 @@ type Service struct {
 
 type chainIdentity uint64
 
-func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, cryptoCompare *thirdparty.CryptoCompare) *Service {
+func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager) *Service {
 	return &Service{
 		balance:        NewBalance(NewBalanceDB(db)),
 		db:             db,
@@ -63,7 +63,7 @@ func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, 
 		rpcClient:      rpcClient,
 		networkManager: rpcClient.NetworkManager,
 		tokenManager:   tokenManager,
-		exchange:       NewExchange(cryptoCompare),
+		exchange:       NewExchange(marketManager),
 	}
 }
 

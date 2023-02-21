@@ -16,7 +16,8 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
 	"github.com/status-im/status-go/transactions/fake"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ import (
 func setupDummyServiceNoDependencies(t *testing.T) (service *Service, closeFn func()) {
 	db, err := appdatabase.InitializeDB(":memory:", "wallet-history-service-tests", 1)
 	require.NoError(t, err)
-	cryptoCompare := thirdparty.NewCryptoCompare()
+	cryptoCompare := cryptocompare.NewClient()
 
 	// Creating a dummy status node to simulate what it's done in get_status_node.go
 	upstreamConfig := params.UpstreamRPCConfig{
@@ -40,7 +41,7 @@ func setupDummyServiceNoDependencies(t *testing.T) (service *Service, closeFn fu
 	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
 	require.NoError(t, err)
 
-	return NewService(db, nil, rpcClient, nil, cryptoCompare), func() {
+	return NewService(db, nil, rpcClient, nil, market.NewManager(cryptoCompare)), func() {
 		require.NoError(t, db.Close())
 	}
 }

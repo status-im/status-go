@@ -1,4 +1,4 @@
-package wallet
+package opensea
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestFetchAllCollectionsByOwner(t *testing.T) {
-	expected := []OpenseaCollection{OpenseaCollection{Name: "Rocky", Slug: "rocky", ImageURL: "ImageUrl", OwnedAssetCount: 1}}
+	expected := []Collection{Collection{Name: "Rocky", Slug: "rocky", ImageURL: "ImageUrl", OwnedAssetCount: 1}}
 	response, _ := json.Marshal(expected)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
@@ -23,27 +23,27 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &OpenseaClient{
+	opensea := &Client{
 		client: srv.Client(),
 		url:    srv.URL,
 	}
-	res, err := opensea.fetchAllCollectionsByOwner(common.Address{1})
+	res, err := opensea.FetchAllCollectionsByOwner(common.Address{1})
 	assert.Equal(t, expected, res)
 	assert.Nil(t, err)
 }
 
 func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
-	expected := []OpenseaAsset{OpenseaAsset{
+	expected := []Asset{Asset{
 		ID:                1,
 		Name:              "Rocky",
 		Description:       "Rocky Balboa",
 		Permalink:         "permalink",
 		ImageThumbnailURL: "ImageThumbnailURL",
 		ImageURL:          "ImageUrl",
-		Contract:          OpenseaContract{Address: "1"},
-		Collection:        OpenseaAssetCollection{Name: "Rocky"},
+		Contract:          Contract{Address: "1"},
+		Collection:        AssetCollection{Name: "Rocky"},
 	}}
-	response, _ := json.Marshal(OpenseaAssetContainer{Assets: expected})
+	response, _ := json.Marshal(AssetContainer{Assets: expected})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, err := w.Write(response)
@@ -53,11 +53,11 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &OpenseaClient{
+	opensea := &Client{
 		client: srv.Client(),
 		url:    srv.URL,
 	}
-	res, err := opensea.fetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", 200)
+	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", 200)
 	assert.Equal(t, expected, res)
 	assert.Nil(t, err)
 }

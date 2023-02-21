@@ -13,9 +13,9 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/chain"
-
-	"github.com/status-im/status-go/services/wallet/price"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -28,15 +28,14 @@ func getFixedCurrencies() []string {
 	return []string{"USD"}
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, priceManager *price.Manager, cryptoCompare *thirdparty.CryptoCompare, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
-	return &Reader{rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed, nil}
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
+	return &Reader{rpcClient, tokenManager, marketManager, accountsDB, walletFeed, nil}
 }
 
 type Reader struct {
 	rpcClient     *rpc.Client
 	tokenManager  *token.Manager
-	priceManager  *price.Manager
-	cryptoCompare *thirdparty.CryptoCompare
+	marketManager *market.Manager
 	accountsDB    *accounts.Database
 	walletFeed    *event.Feed
 	cancel        context.CancelFunc
@@ -182,13 +181,13 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	var (
 		group             = async.NewAtomicGroup(ctx)
 		prices            = map[string]map[string]float64{}
-		tokenDetails      = map[string]thirdparty.Coin{}
-		tokenMarketValues = map[string]map[string]thirdparty.MarketCoinValues{}
+		tokenDetails      = map[string]thirdparty.TokenDetails{}
+		tokenMarketValues = map[string]thirdparty.TokenMarketValues{}
 		balances          = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	)
 
 	group.Add(func(parent context.Context) error {
-		prices, err = r.priceManager.FetchPrices(tokenSymbols, currencies)
+		prices, err = r.marketManager.FetchPrices(tokenSymbols, currencies)
 		if err != nil {
 			return err
 		}
@@ -196,7 +195,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenDetails, err = r.cryptoCompare.FetchTokenDetails(tokenSymbols)
+		tokenDetails, err = r.marketManager.FetchTokenDetails(tokenSymbols)
 		if err != nil {
 			return err
 		}
@@ -204,7 +203,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.cryptoCompare.FetchTokenMarketValues(tokenSymbols, currencies)
+		tokenMarketValues, err = r.marketManager.FetchTokenMarketValues(tokenSymbols, currency)
 		if err != nil {
 			return err
 		}
@@ -257,13 +256,13 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			marketValuesPerCurrency := make(map[string]TokenMarketValues)
 			for _, currency := range currencies {
 				marketValuesPerCurrency[currency] = TokenMarketValues{
-					MarketCap:       tokenMarketValues[symbol][currency].MKTCAP,
-					HighDay:         tokenMarketValues[symbol][currency].HIGHDAY,
-					LowDay:          tokenMarketValues[symbol][currency].LOWDAY,
-					ChangePctHour:   tokenMarketValues[symbol][currency].CHANGEPCTHOUR,
-					ChangePctDay:    tokenMarketValues[symbol][currency].CHANGEPCTDAY,
-					ChangePct24hour: tokenMarketValues[symbol][currency].CHANGEPCT24HOUR,
-					Change24hour:    tokenMarketValues[symbol][currency].CHANGE24HOUR,
+					MarketCap:       tokenMarketValues[symbol].MKTCAP,
+					HighDay:         tokenMarketValues[symbol].HIGHDAY,
+					LowDay:          tokenMarketValues[symbol].LOWDAY,
+					ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
+					ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
+					ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
+					Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
 					Price:           prices[symbol][currency],
 				}
 			}

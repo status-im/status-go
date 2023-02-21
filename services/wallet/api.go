@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -295,24 +296,24 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
 
-func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]OpenseaCollection, error) {
+func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]opensea.Collection, error) {
 	log.Debug("call to get opensea collections")
-	client, err := newOpenseaClient(chainID, api.s.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.fetchAllCollectionsByOwner(owner)
+	return client.FetchAllCollectionsByOwner(owner)
 }
 
-func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
+func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
 	log.Debug("call to get opensea assets")
-	client, err := newOpenseaClient(chainID, api.s.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.fetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
+	return client.FetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
 }
 
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
@@ -332,27 +333,27 @@ func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*par
 
 func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	log.Debug("call to FetchPrices")
-	return api.s.priceManager.FetchPrices(symbols, currencies)
+	return api.s.marketManager.FetchPrices(symbols, currencies)
 }
 
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]thirdparty.MarketCoinValues, error) {
+func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	log.Debug("call to FetchMarketValues")
-	return api.s.cryptoCompare.FetchTokenMarketValues(symbols, currencies)
+	return api.s.marketManager.FetchTokenMarketValues(symbols, currency)
 }
 
-func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]thirdparty.TokenHistoricalPairs, error) {
+func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	log.Debug("call to GetHourlyMarketValues")
-	return api.s.cryptoCompare.FetchHourlyMarketValues(symbol, currency, limit, aggregate)
+	return api.s.marketManager.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
 }
 
-func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.TokenHistoricalPairs, error) {
+func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	log.Debug("call to GetDailyMarketValues")
-	return api.s.cryptoCompare.FetchDailyMarketValues(symbol, currency, limit, allData, aggregate)
+	return api.s.marketManager.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
 }
 
-func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.Coin, error) {
+func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.TokenDetails, error) {
 	log.Debug("call to FetchTokenDetails")
-	return api.s.cryptoCompare.FetchTokenDetails(symbols)
+	return api.s.marketManager.FetchTokenDetails(symbols)
 }
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

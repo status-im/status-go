@@ -7,7 +7,7 @@ import (
 
 	iso4217 "github.com/ladydascalie/currency"
 
-	"github.com/status-im/status-go/services/wallet/price"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
@@ -25,12 +25,12 @@ type Format struct {
 type FormatPerSymbol = map[string]Format
 
 type Currency struct {
-	priceManager *price.Manager
+	marketManager *market.Manager
 }
 
-func NewCurrency(priceManager *price.Manager) *Currency {
+func NewCurrency(marketManager *market.Manager) *Currency {
 	return &Currency{
-		priceManager: priceManager,
+		marketManager: marketManager,
 	}
 }
 
@@ -126,7 +126,7 @@ func (cm *Currency) FetchTokenCurrencyFormats(symbols []string) (FormatPerSymbol
 	formats := make(FormatPerSymbol)
 
 	// Get latest cached price, fetch only if not available
-	prices, err := cm.priceManager.GetOrFetchPrices(symbols, []string{decimalsCalculationCurrency}, math.MaxInt64)
+	prices, err := cm.marketManager.GetOrFetchPrices(symbols, []string{decimalsCalculationCurrency}, math.MaxInt64)
 	if err != nil {
 		return nil, err
 	}
