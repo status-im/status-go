@@ -107,7 +107,38 @@ func (rh *RoutedHost) Connect(ctx context.Context, pi peer.AddrInfo) error {
 
 	// if we're here, we got some addrs. let's use our wrapped host to connect.
 	pi.Addrs = addrs
-	return rh.host.Connect(ctx, pi)
+	if cerr := rh.host.Connect(ctx, pi); cerr != nil {
+		// We couldn't connect. Let's check if we have the most
+		// up-to-date addresses for the given peer. If there
+		// are addresses we didn't know about previously, we
+		// try to connect again.
+		newAddrs, err := rh.findPeerAddrs(ctx, pi.ID)
+		if err != nil {
+			return fmt.Errorf("failed to find peers: %w", err)
+		}
+
+		// Build lookup map
+		lookup := make(map[ma.Multiaddr]struct{}, len(addrs))
+		for _, addr := range addrs {
+			lookup[addr] = struct{}{}
+		}
+
+		// if there's any address that's not in the previous set
+		// of addresses, try to connect again. If all addresses
+		// where known previously we return the original error.
+		for _, newAddr := range newAddrs {
+			if _, found := lookup[newAddr]; found {
+				continue
+			}
+
+			pi.Addrs = newAddrs
+			return rh.host.Connect(ctx, pi)
+		}
+		// No appropriate new address found.
+		// Return the original dial error.
+		return cerr
+	}
+	return nil
 }
 
 func (rh *RoutedHost) findPeerAddrs(ctx context.Context, id peer.ID) ([]ma.Multiaddr, error) {
@@ -157,7 +188,7 @@ func (rh *RoutedHost) SetStreamHandler(pid protocol.ID, handler network.StreamHa
 	rh.host.SetStreamHandler(pid, handler)
 }
 
-func (rh *RoutedHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool, handler network.StreamHandler) {
+func (rh *RoutedHost) SetStreamHandlerMatch(pid protocol.ID, m func(protocol.ID) bool, handler network.StreamHandler) {
 	rh.host.SetStreamHandlerMatch(pid, m, handler)
 }
 

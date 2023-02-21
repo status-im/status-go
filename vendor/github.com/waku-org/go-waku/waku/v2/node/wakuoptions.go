@@ -23,6 +23,7 @@ import (
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -42,7 +43,7 @@ const defaultMinRelayPeersToPublish = 0
 type WakuNodeParameters struct {
 	hostAddr       *net.TCPAddr
 	dns4Domain     string
-	advertiseAddr  *net.IP
+	advertiseAddrs []multiaddr.Multiaddr
 	multiAddr      []multiaddr.Multiaddr
 	addressFactory basichost.AddrsFactory
 	privKey        *ecdsa.PrivateKey
@@ -59,12 +60,14 @@ type WakuNodeParameters struct {
 
 	logger *zap.Logger
 
-	noDefaultWakuTopic bool
-	enableRelay        bool
-	enableFilter       bool
-	isFilterFullNode   bool
-	filterOpts         []filter.Option
-	wOpts              []pubsub.Option
+	noDefaultWakuTopic      bool
+	enableRelay             bool
+	enableFilter            bool
+	isFilterFullNode        bool
+	enableFilterV2LightNode bool
+	enableFilterV2FullNode  bool
+	filterOpts              []filter.Option
+	wOpts                   []pubsub.Option
 
 	minRelayPeersToPublish int
 
@@ -199,32 +202,12 @@ func WithHostAddress(hostAddr *net.TCPAddr) WakuNodeOption {
 	}
 }
 
-// WithAdvertiseAddress is a WakuNodeOption that allows overriding the address used in the waku node with custom value
-func WithAdvertiseAddress(address *net.TCPAddr) WakuNodeOption {
+// WithAdvertiseAddresses is a WakuNodeOption that allows overriding the address used in the waku node with custom value
+func WithAdvertiseAddresses(advertiseAddrs ...ma.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.advertiseAddr = &address.IP
-
-		advertiseAddress, err := manet.FromNetAddr(address)
-		if err != nil {
-			return err
-		}
-
+		params.advertiseAddrs = advertiseAddrs
 		params.addressFactory = func([]multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
-			addresses = append(addresses, advertiseAddress)
-			if params.enableWSS {
-				wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/wss", address.IP, params.wssPort))
-				if err != nil {
-					panic(err)
-				}
-				addresses = append(addresses, wsMa)
-			} else if params.enableWS {
-				wsMa, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/ws", address.IP, params.wsPort))
-				if err != nil {
-					panic(err)
-				}
-				addresses = append(addresses, wsMa)
-			}
-			return addresses
+			return advertiseAddrs
 		}
 		return nil
 	}
@@ -329,12 +312,30 @@ func WithPeerExchange() WakuNodeOption {
 	}
 }
 
-// WithWakuFilter enables the Waku V2 Filter protocol. This WakuNodeOption
+// WithWakuFilter enables the Waku Filter protocol. This WakuNodeOption
 // accepts a list of WakuFilter gossipsub options to setup the protocol
 func WithWakuFilter(fullNode bool, filterOpts ...filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilter = true
 		params.isFilterFullNode = fullNode
+		params.filterOpts = filterOpts
+		return nil
+	}
+}
+
+// WithWakuFilterV2 enables the Waku Filter V2 protocol for lightnode functionality
+func WithWakuFilterV2LightNode() WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableFilterV2LightNode = true
+		return nil
+	}
+}
+
+// WithWakuFilterV2FullNode enables the Waku Filter V2 protocol full node functionality.
+// This WakuNodeOption accepts a list of WakuFilter options to setup the protocol
+func WithWakuFilterV2FullNode(filterOpts ...filter.Option) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableFilterV2FullNode = true
 		params.filterOpts = filterOpts
 		return nil
 	}

@@ -13,9 +13,22 @@ import (
 	"strings"
 )
 
-// ErrNotSupported is the error returned when the muxer does not support
-// the protocol specified for the handshake.
-var ErrNotSupported = errors.New("protocol not supported")
+// ErrNotSupported is the error returned when the muxer doesn't support
+// the protocols tried for the handshake.
+type ErrNotSupported[T StringLike] struct {
+
+	// Slice of protocols that were not supported by the muxer
+	Protos []T
+}
+
+func (e ErrNotSupported[T]) Error() string {
+	return fmt.Sprintf("protocols not supported: %v", e.Protos)
+}
+
+func (e ErrNotSupported[T]) Is(target error) bool {
+	_, ok := target.(ErrNotSupported[T])
+	return ok
+}
 
 // ErrNoProtocols is the error returned when the no protocols have been
 // specified.
@@ -31,7 +44,7 @@ const (
 // to inform the muxer of the protocol that will be used to communicate
 // on this ReadWriteCloser. It returns an error if, for example,
 // the muxer does not know how to handle this protocol.
-func SelectProtoOrFail(proto string, rwc io.ReadWriteCloser) (err error) {
+func SelectProtoOrFail[T StringLike](proto T, rwc io.ReadWriteCloser) (err error) {
 	defer func() {
 		if rerr := recover(); rerr != nil {
 			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
@@ -66,7 +79,7 @@ func SelectProtoOrFail(proto string, rwc io.ReadWriteCloser) (err error) {
 
 // SelectOneOf will perform handshakes with the protocols on the given slice
 // until it finds one which is supported by the muxer.
-func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (proto string, err error) {
+func SelectOneOf[T StringLike](protos []T, rwc io.ReadWriteCloser) (proto T, err error) {
 	defer func() {
 		if rerr := recover(); rerr != nil {
 			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
@@ -83,21 +96,25 @@ func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (proto string, err err
 	// can continue negotiating the rest of the protocols normally.
 	//
 	// This saves us a round trip.
-	switch err := SelectProtoOrFail(protos[0], rwc); err {
+	switch err := SelectProtoOrFail(protos[0], rwc); err.(type) {
 	case nil:
 		return protos[0], nil
-	case ErrNotSupported: // try others
+	case ErrNotSupported[T]: // try others
 	default:
 		return "", err
 	}
-	return selectProtosOrFail(protos[1:], rwc)
+	proto, err = selectProtosOrFail(protos[1:], rwc)
+	if _, ok := err.(ErrNotSupported[T]); ok {
+		return "", ErrNotSupported[T]{protos}
+	}
+	return proto, err
 }
 
 const simOpenProtocol = "/libp2p/simultaneous-connect"
 
 // SelectWithSimopenOrFail performs protocol negotiation with the simultaneous open extension.
 // The returned boolean indicator will be true if we should act as a server.
-func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (proto string, isServer bool, err error) {
+func SelectWithSimopenOrFail[T StringLike](protos []T, rwc io.ReadWriteCloser) (proto T, isServer bool, err error) {
 	defer func() {
 		if rerr := recover(); rerr != nil {
 			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
@@ -125,7 +142,7 @@ func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (proto str
 		return "", false, err
 	}
 
-	tok, err := ReadNextToken(rwc)
+	tok, err := ReadNextToken[T](rwc)
 	if err != nil {
 		return "", false, err
 	}
@@ -146,13 +163,13 @@ func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (proto str
 		}
 		return proto, false, nil
 	default:
-		return "", false, errors.New("unexpected response: " + tok)
+		return "", false, fmt.Errorf("unexpected response: %s", tok)
 	}
 }
 
-func clientOpen(protos []string, rwc io.ReadWriteCloser) (string, error) {
+func clientOpen[T StringLike](protos []T, rwc io.ReadWriteCloser) (T, error) {
 	// check to see if we selected the pipelined protocol
-	tok, err := ReadNextToken(rwc)
+	tok, err := ReadNextToken[T](rwc)
 	if err != nil {
 		return "", err
 	}
@@ -161,27 +178,31 @@ func clientOpen(protos []string, rwc io.ReadWriteCloser) (string, error) {
 	case protos[0]:
 		return tok, nil
 	case "na":
-		return selectProtosOrFail(protos[1:], rwc)
+		proto, err := selectProtosOrFail(protos[1:], rwc)
+		if _, ok := err.(ErrNotSupported[T]); ok {
+			return "", ErrNotSupported[T]{protos}
+		}
+		return proto, err
 	default:
-		return "", errors.New("unexpected response: " + tok)
+		return "", fmt.Errorf("unexpected response: %s", tok)
 	}
 }
 
-func selectProtosOrFail(protos []string, rwc io.ReadWriteCloser) (string, error) {
+func selectProtosOrFail[T StringLike](protos []T, rwc io.ReadWriteCloser) (T, error) {
 	for _, p := range protos {
 		err := trySelect(p, rwc)
-		switch err {
+		switch err := err.(type) {
 		case nil:
 			return p, nil
-		case ErrNotSupported:
+		case ErrNotSupported[T]:
 		default:
 			return "", err
 		}
 	}
-	return "", ErrNotSupported
+	return "", ErrNotSupported[T]{protos}
 }
 
-func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
+func simOpen[T StringLike](protos []T, rwc io.ReadWriteCloser) (T, bool, error) {
 	randBytes := make([]byte, 8)
 	_, err := rand.Read(randBytes)
 	if err != nil {
@@ -198,17 +219,17 @@ func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
 
 	// skip exactly one protocol
 	// see https://github.com/multiformats/go-multistream/pull/42#discussion_r558757135
-	_, err = ReadNextToken(rwc)
+	_, err = ReadNextToken[T](rwc)
 	if err != nil {
 		return "", false, err
 	}
 
 	// read the tie breaker nonce
-	tok, err := ReadNextToken(rwc)
+	tok, err := ReadNextToken[T](rwc)
 	if err != nil {
 		return "", false, err
 	}
-	if !strings.HasPrefix(tok, tieBreakerPrefix) {
+	if !strings.HasPrefix(string(tok), tieBreakerPrefix) {
 		return "", false, errors.New("tie breaker nonce not sent with the correct prefix")
 	}
 
@@ -216,7 +237,7 @@ func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
 		return "", false, err
 	}
 
-	peerNonce, err := strconv.ParseUint(tok[len(tieBreakerPrefix):], 10, 64)
+	peerNonce, err := strconv.ParseUint(string(tok[len(tieBreakerPrefix):]), 10, 64)
 	if err != nil {
 		return "", false, err
 	}
@@ -228,7 +249,7 @@ func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
 	}
 	iamserver = peerNonce > myNonce
 
-	var proto string
+	var proto T
 	if iamserver {
 		proto, err = simOpenSelectServer(protos, rwc)
 	} else {
@@ -238,29 +259,28 @@ func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
 	return proto, iamserver, err
 }
 
-func simOpenSelectServer(protos []string, rwc io.ReadWriteCloser) (string, error) {
+func simOpenSelectServer[T StringLike](protos []T, rwc io.ReadWriteCloser) (T, error) {
 	werrCh := make(chan error, 1)
 	go func() {
 		err := delimWriteBuffered(rwc, []byte(responder))
 		werrCh <- err
 	}()
 
-	tok, err := ReadNextToken(rwc)
+	tok, err := ReadNextToken[T](rwc)
 	if err != nil {
 		return "", err
 	}
 	if tok != initiator {
-		return "", errors.New("unexpected response: " + tok)
+		return "", fmt.Errorf("unexpected response: %s", tok)
 	}
 	if err = <-werrCh; err != nil {
 		return "", err
 	}
-
 	for {
-		tok, err = ReadNextToken(rwc)
+		tok, err = ReadNextToken[T](rwc)
 
 		if err == io.EOF {
-			return "", ErrNotSupported
+			return "", ErrNotSupported[T]{protos}
 		}
 
 		if err != nil {
@@ -286,19 +306,19 @@ func simOpenSelectServer(protos []string, rwc io.ReadWriteCloser) (string, error
 
 }
 
-func simOpenSelectClient(protos []string, rwc io.ReadWriteCloser) (string, error) {
+func simOpenSelectClient[T StringLike](protos []T, rwc io.ReadWriteCloser) (T, error) {
 	werrCh := make(chan error, 1)
 	go func() {
 		err := delimWriteBuffered(rwc, []byte(initiator))
 		werrCh <- err
 	}()
 
-	tok, err := ReadNextToken(rwc)
+	tok, err := ReadNextToken[T](rwc)
 	if err != nil {
 		return "", err
 	}
 	if tok != responder {
-		return "", errors.New("unexpected response: " + tok)
+		return "", fmt.Errorf("unexpected response: %s", tok)
 	}
 	if err = <-werrCh; err != nil {
 		return "", err
@@ -308,7 +328,7 @@ func simOpenSelectClient(protos []string, rwc io.ReadWriteCloser) (string, error
 }
 
 func readMultistreamHeader(r io.Reader) error {
-	tok, err := ReadNextToken(r)
+	tok, err := ReadNextToken[string](r)
 	if err != nil {
 		return err
 	}
@@ -319,7 +339,7 @@ func readMultistreamHeader(r io.Reader) error {
 	return nil
 }
 
-func trySelect(proto string, rwc io.ReadWriteCloser) error {
+func trySelect[T StringLike](proto T, rwc io.ReadWriteCloser) error {
 	err := delimWriteBuffered(rwc, []byte(proto))
 	if err != nil {
 		return err
@@ -327,8 +347,8 @@ func trySelect(proto string, rwc io.ReadWriteCloser) error {
 	return readProto(proto, rwc)
 }
 
-func readProto(proto string, r io.Reader) error {
-	tok, err := ReadNextToken(r)
+func readProto[T StringLike](proto T, r io.Reader) error {
+	tok, err := ReadNextToken[T](r)
 	if err != nil {
 		return err
 	}
@@ -337,8 +357,8 @@ func readProto(proto string, r io.Reader) error {
 	case proto:
 		return nil
 	case "na":
-		return ErrNotSupported
+		return ErrNotSupported[T]{[]T{proto}}
 	default:
-		return errors.New("unrecognized response: " + tok)
+		return fmt.Errorf("unrecognized response: %s", tok)
 	}
 }

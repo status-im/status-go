@@ -53,17 +53,28 @@ func (c *Client) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (transport
 	if err != nil {
 		return nil, err
 	}
-	if err := connScope.SetPeer(p); err != nil {
-		connScope.Done()
-		return nil, err
-	}
-	conn, err := c.dial(ctx, a, p)
+	conn, err := c.dialAndUpgrade(ctx, a, p, connScope)
 	if err != nil {
 		connScope.Done()
 		return nil, err
 	}
+	return conn, nil
+}
+
+func (c *Client) dialAndUpgrade(ctx context.Context, a ma.Multiaddr, p peer.ID, connScope network.ConnManagementScope) (transport.CapableConn, error) {
+	if err := connScope.SetPeer(p); err != nil {
+		return nil, err
+	}
+	conn, err := c.dial(ctx, a, p)
+	if err != nil {
+		return nil, err
+	}
 	conn.tagHop()
-	return c.upgrader.Upgrade(ctx, c, conn, network.DirOutbound, p, connScope)
+	cc, err := c.upgrader.Upgrade(ctx, c, conn, network.DirOutbound, p, connScope)
+	if err != nil {
+		return nil, err
+	}
+	return capableConn{cc.(capableConnWithStat)}, nil
 }
 
 func (c *Client) CanDial(addr ma.Multiaddr) bool {

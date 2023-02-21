@@ -9,6 +9,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"go.uber.org/zap"
 )
@@ -20,7 +21,7 @@ var ErrNoPeersAvailable = errors.New("no suitable peers found")
 // SelectPeer is used to return a random peer that supports a given protocol.
 // If a list of specific peers is passed, the peer will be chosen from that list assuming
 // it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
-func SelectPeer(host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
+func SelectPeer(host host.Host, protocolId protocol.ID, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
 	// @TODO We need to be more strategic about which peers we dial. Right now we just set one on the service.
 	// Ideally depending on the query and our set  of peers we take a subset of ideal peers.
 	// This will require us to check for various factors such as:
@@ -61,7 +62,7 @@ type pingResult struct {
 // SelectPeerWithLowestRTT will select a peer that supports a specific protocol with the lowest reply time
 // If a list of specific peers is passed, the peer will be chosen from that list assuming
 // it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
-func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId string, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
+func SelectPeerWithLowestRTT(ctx context.Context, host host.Host, protocolId protocol.ID, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
 	var peers peer.IDSlice
 
 	peerSet := specificPeers

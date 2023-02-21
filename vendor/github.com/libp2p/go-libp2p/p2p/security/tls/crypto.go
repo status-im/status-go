@@ -16,8 +16,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"golang.org/x/sys/cpu"
-
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -75,11 +73,10 @@ func NewIdentity(privKey ic.PrivKey, opts ...IdentityOption) (*Identity, error) 
 	}
 	return &Identity{
 		config: tls.Config{
-			MinVersion:               tls.VersionTLS13,
-			PreferServerCipherSuites: preferServerCipherSuites(),
-			InsecureSkipVerify:       true, // This is not insecure here. We will verify the cert chain ourselves.
-			ClientAuth:               tls.RequireAnyClientCert,
-			Certificates:             []tls.Certificate{*cert},
+			MinVersion:         tls.VersionTLS13,
+			InsecureSkipVerify: true, // This is not insecure here. We will verify the cert chain ourselves.
+			ClientAuth:         tls.RequireAnyClientCert,
+			Certificates:       []tls.Certificate{*cert},
 			VerifyPeerCertificate: func(_ [][]byte, _ [][]*x509.Certificate) error {
 				panic("tls config not specialized for peer")
 			},
@@ -270,26 +267,4 @@ func certTemplate() (*x509.Certificate, error) {
 		// see https://datatracker.ietf.org/doc/html/rfc3280#section-4.1.2.4.
 		Subject: pkix.Name{SerialNumber: subjectSN.String()},
 	}, nil
-}
-
-// We want nodes without AES hardware (e.g. ARM) support to always use ChaCha.
-// Only if both nodes have AES hardware support (e.g. x86), AES should be used.
-// x86->x86: AES, ARM->x86: ChaCha, x86->ARM: ChaCha and ARM->ARM: Chacha
-// This function returns true if we don't have AES hardware support, and false otherwise.
-// Thus, ARM servers will always use their own cipher suite preferences (ChaCha first),
-// and x86 servers will always use the client's cipher suite preferences.
-func preferServerCipherSuites() bool {
-	// Copied from the Go TLS implementation.
-
-	// Check the cpu flags for each platform that has optimized GCM implementations.
-	// Worst case, these variables will just all be false.
-	var (
-		hasGCMAsmAMD64 = cpu.X86.HasAES && cpu.X86.HasPCLMULQDQ
-		hasGCMAsmARM64 = cpu.ARM64.HasAES && cpu.ARM64.HasPMULL
-		// Keep in sync with crypto/aes/cipher_s390x.go.
-		hasGCMAsmS390X = cpu.S390X.HasAES && cpu.S390X.HasAESCBC && cpu.S390X.HasAESCTR && (cpu.S390X.HasGHASH || cpu.S390X.HasAESGCM)
-
-		hasGCMAsm = hasGCMAsmAMD64 || hasGCMAsmARM64 || hasGCMAsmS390X
-	)
-	return !hasGCMAsm
 }

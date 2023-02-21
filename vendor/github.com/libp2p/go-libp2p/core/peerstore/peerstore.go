@@ -11,6 +11,7 @@ import (
 
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/record"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -24,11 +25,6 @@ var (
 
 	// TempAddrTTL is the ttl used for a short lived address.
 	TempAddrTTL = time.Minute * 2
-
-	// ProviderAddrTTL is the TTL of an address we've received from a provider.
-	// This is also a temporary address, but lasts longer. After this expires,
-	// the records we return will require an extra lookup.
-	ProviderAddrTTL = time.Minute * 30
 
 	// RecentlyConnectedAddrTTL is used when we recently connected to a peer.
 	// It means that we are reasonably certain of the peer's address.
@@ -235,19 +231,19 @@ type Metrics interface {
 
 // ProtoBook tracks the protocols supported by peers.
 type ProtoBook interface {
-	GetProtocols(peer.ID) ([]string, error)
-	AddProtocols(peer.ID, ...string) error
-	SetProtocols(peer.ID, ...string) error
-	RemoveProtocols(peer.ID, ...string) error
+	GetProtocols(peer.ID) ([]protocol.ID, error)
+	AddProtocols(peer.ID, ...protocol.ID) error
+	SetProtocols(peer.ID, ...protocol.ID) error
+	RemoveProtocols(peer.ID, ...protocol.ID) error
 
 	// SupportsProtocols returns the set of protocols the peer supports from among the given protocols.
 	// If the returned error is not nil, the result is indeterminate.
-	SupportsProtocols(peer.ID, ...string) ([]string, error)
+	SupportsProtocols(peer.ID, ...protocol.ID) ([]protocol.ID, error)
 
 	// FirstSupportedProtocol returns the first protocol that the peer supports among the given protocols.
-	// If the peer does not support any of the given protocols, this function will return an empty string and a nil error.
+	// If the peer does not support any of the given protocols, this function will return an empty protocol.ID and a nil error.
 	// If the returned error is not nil, the result is indeterminate.
-	FirstSupportedProtocol(peer.ID, ...string) (string, error)
+	FirstSupportedProtocol(peer.ID, ...protocol.ID) (protocol.ID, error)
 
 	// RemovePeer removes all protocols associated with a peer.
 	RemovePeer(peer.ID)

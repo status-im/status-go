@@ -8,13 +8,15 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/internal/catch"
-	pb "github.com/libp2p/go-libp2p/core/record/pb"
+	"github.com/libp2p/go-libp2p/core/record/pb"
 
 	pool "github.com/libp2p/go-buffer-pool"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/multiformats/go-varint"
+	"google.golang.org/protobuf/proto"
 )
+
+//go:generate protoc --proto_path=$PWD:$PWD/../.. --go_out=. --go_opt=Mpb/envelope.proto=./pb pb/envelope.proto
 
 // Envelope contains an arbitrary []byte payload, signed by a libp2p peer.
 //

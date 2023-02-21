@@ -4,6 +4,7 @@ type config struct {
 	protocolVersion         string
 	userAgent               string
 	disableSignedPeerRecord bool
+	metricsTracer           MetricsTracer
 }
 
 // Option is an option function for identify.
@@ -29,5 +30,11 @@ func UserAgent(ua string) Option {
 func DisableSignedPeerRecord() Option {
 	return func(cfg *config) {
 		cfg.disableSignedPeerRecord = true
+	}
+}
+
+func WithMetricsTracer(tr MetricsTracer) Option {
+	return func(cfg *config) {
+		cfg.metricsTracer = tr
 	}
 }

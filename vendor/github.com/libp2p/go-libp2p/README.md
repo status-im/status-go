@@ -10,17 +10,17 @@
   <a href="http://libp2p.io/"><img src="https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square" /></a>
   <a href="https://pkg.go.dev/github.com/libp2p/go-libp2p"><img src="https://pkg.go.dev/badge/github.com/libp2p/go-libp2p.svg" alt="Go Reference"></a>
   <a href="https://discuss.libp2p.io"><img src="https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg"/></a>
+  <a href="https://marcopolo.github.io/FlakyTests/"><img src="https://marcopolo.github.io/FlakyTests/current-score.svg"/></a>
 </p>
 
 # Table of Contents
 
 - [Background](#background)
+- [Roadmap](#roadmap)
 - [Usage](#usage)
   - [Examples](#examples)
 - [Development](#development)
-  - [Using the go-libp2p Workspace](#using-the-go-libp2p-workspace)
   - [Tests](#tests)
-  - [Packages](#packages)
 - [Contribute](#contribute)
 - [Supported Go Versions](#supported-go-versions)
 
@@ -36,6 +36,11 @@ To learn more, check out the following resources:
 - [**The libp2p Specification**](https://github.com/libp2p/specs)
 - [**js-libp2p implementation**](https://github.com/libp2p/js-libp2p)
 - [**rust-libp2p implementation**](https://github.com/libp2p/rust-libp2p)
+
+## Roadmap
+
+Our roadmap for go-libp2p can be found here: https://github.com/libp2p/go-libp2p/blob/master/ROADMAP.md
+This document represents current projects the go-libp2p team is focused on and provides an estimation of completion targets. It is a completementary roadmap to the overarching libp2p project roadmap: https://github.com/libp2p/specs/blob/master/ROADMAP.md
 
 ## Usage
 
@@ -78,3 +83,25 @@ There's a few things you can do right now to help out:
 
 We test against and support the two most recent major releases of Go. This is
 informed by Go's own [security policy](https://go.dev/security).
+
+# Notable Users
+Some notable users of go-libp2p are:
+- [Kubo](https://github.com/ipfs/kubo) - The original Go implementation of IPFS
+- [Lotus](https://github.com/filecoin-project/lotus) - An implementation of the Filecoin protocol
+- [Drand](https://github.com/drand/drand) - A distributed random beacon daemon
+- [Prysm](https://github.com/prysmaticlabs/prysm) - An Ethereum Beacon Chain consensus client built by [Prysmatic Labs](https://prysmaticlabs.com/)
+- [Berty](https://github.com/berty/berty) - An open, secure, offline-first, peer-to-peer and zero trust messaging app.
+- [Wasp](https://github.com/iotaledger/wasp) - A node that runs IOTA Smart Contracts built by the [IOTA Foundation](https://www.iota.org/)
+- [Mina](https://github.com/minaprotocol/mina) - A lightweight, constant-sized blockchain that runs zero-knowledge smart contracts
+- [Polygon Edge](https://github.com/0xPolygon/polygon-edge) - A modular, extensible framework for building Ethereum compatible networks
+- [Celestia Node](https://github.com/celestiaorg/celestia-node) - The Go implementation of Celestia's data availability nodes
+- [Status go](https://github.com/status-im/status-go) - Status bindings for go-ethereum, built by [Status.im](https://status.im/)
+- [Flow](https://github.com/onflow/flow-go) - A blockchain built to support games, apps, and digital assets built by [Dapper Labs](https://www.dapperlabs.com/)
+- [Swarm Bee](https://github.com/ethersphere/bee) - A client for connecting to the [Swarm network](https://www.ethswarm.org/)
+- [Elrond Go](https://github.com/multiversx/mx-chain-go) - The Go implementation of the the Elrond network protocol
+- [Sonr](https://github.com/sonr-io/sonr) - A platform to integrate DID Documents, WebAuthn, and IPFS and manage digital identity and assets.
+- [EdgeVPN](https://github.com/mudler/edgevpn) - A decentralized, immutable, portable VPN and reverse proxy over p2p.
+- [Kairos](https://github.com/kairos-io/kairos) - A Kubernetes-focused, Cloud Native Linux meta-distribution.
+- [Oasis Core](https://github.com/oasisprotocol/oasis-core) - The consensus and runtime layers of the [Oasis protocol](https://oasisprotocol.org/).
+
+Please open a pull request if you want your project to be added here.

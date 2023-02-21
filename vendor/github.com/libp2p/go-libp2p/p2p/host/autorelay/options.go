@@ -3,7 +3,6 @@ package autorelay
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -11,12 +10,24 @@ import (
 	"github.com/benbjohnson/clock"
 )
 
+// AutoRelay will call this function when it needs new candidates because it is
+// not connected to the desired number of relays or we get disconnected from one
+// of the relays. Implementations must send *at most* numPeers, and close the
+// channel when they don't intend to provide any more peers. AutoRelay will not
+// call the callback again until the channel is closed. Implementations should
+// send new peers, but may send peers they sent before. AutoRelay implements a
+// per-peer backoff (see WithBackoff). See WithMinInterval for setting the
+// minimum interval between calls to the callback. The context.Context passed
+// may be canceled when AutoRelay feels satisfied, it will be canceled when the
+// node is shutting down. If the context is canceled you MUST close the output
+// channel at some point.
+type PeerSource func(ctx context.Context, num int) <-chan peer.AddrInfo
+
 type config struct {
 	clock      clock.Clock
-	peerSource func(ctx context.Context, num int) <-chan peer.AddrInfo
+	peerSource PeerSource
 	// minimum interval used to call the peerSource callback
-	minInterval  time.Duration
-	staticRelays []peer.AddrInfo
+	minInterval time.Duration
 	// see WithMinCandidates
 	minCandidates int
 	// see WithMaxCandidates
@@ -42,76 +53,48 @@ var defaultConfig = config{
 	backoff:         time.Hour,
 	desiredRelays:   2,
 	maxCandidateAge: 30 * time.Minute,
+	minInterval:     30 * time.Second,
 }
 
 var (
-	errStaticRelaysMinCandidates = errors.New("cannot use WithMinCandidates and WithStaticRelays")
-	errStaticRelaysPeerSource    = errors.New("cannot use WithPeerSource and WithStaticRelays")
+	errAlreadyHavePeerSource = errors.New("can only use a single WithPeerSource or WithStaticRelays")
 )
-
-// DefaultRelays are the known PL-operated v1 relays; will be decommissioned in 2022.
-var DefaultRelays = []string{
-	"/ip4/147.75.80.110/tcp/4001/p2p/QmbFgm5zan8P6eWWmeyfncR5feYEMPbht5b1FW1C37aQ7y",
-	"/ip4/147.75.80.110/udp/4001/quic/p2p/QmbFgm5zan8P6eWWmeyfncR5feYEMPbht5b1FW1C37aQ7y",
-	"/ip4/147.75.195.153/tcp/4001/p2p/QmW9m57aiBDHAkKj9nmFSEn7ZqrcF1fZS4bipsTCHburei",
-	"/ip4/147.75.195.153/udp/4001/quic/p2p/QmW9m57aiBDHAkKj9nmFSEn7ZqrcF1fZS4bipsTCHburei",
-	"/ip4/147.75.70.221/tcp/4001/p2p/Qme8g49gm3q4Acp7xWBKg3nAa9fxZ1YmyDJdyGgoG6LsXh",
-	"/ip4/147.75.70.221/udp/4001/quic/p2p/Qme8g49gm3q4Acp7xWBKg3nAa9fxZ1YmyDJdyGgoG6LsXh",
-}
-
-var defaultStaticRelays []peer.AddrInfo
-
-func init() {
-	for _, s := range DefaultRelays {
-		pi, err := peer.AddrInfoFromString(s)
-		if err != nil {
-			panic(fmt.Sprintf("failed to initialize default static relays: %s", err))
-		}
-		defaultStaticRelays = append(defaultStaticRelays, *pi)
-	}
-}
 
 type Option func(*config) error
 
 func WithStaticRelays(static []peer.AddrInfo) Option {
 	return func(c *config) error {
-		if c.setMinCandidates {
-			return errStaticRelaysMinCandidates
-		}
 		if c.peerSource != nil {
-			return errStaticRelaysPeerSource
+			return errAlreadyHavePeerSource
 		}
-		if len(c.staticRelays) > 0 {
-			return errors.New("can't set static relays, static relays already configured")
-		}
-		c.minCandidates = len(static)
-		c.staticRelays = static
+
+		WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+			if len(static) < numPeers {
+				numPeers = len(static)
+			}
+			c := make(chan peer.AddrInfo, numPeers)
+			defer close(c)
+
+			for i := 0; i < numPeers; i++ {
+				c <- static[i]
+			}
+			return c
+		})(c)
+		WithMinCandidates(len(static))(c)
+		WithMaxCandidates(len(static))(c)
+		WithNumRelays(len(static))(c)
+
 		return nil
 	}
 }
 
-func WithDefaultStaticRelays() Option {
-	return WithStaticRelays(defaultStaticRelays)
-}
-
 // WithPeerSource defines a callback for AutoRelay to query for more relay candidates.
-// AutoRelay will call this function when it needs new candidates is connected to the desired number of
-// relays, and it has enough candidates (in case we get disconnected from one of the relays).
-// Implementations must send *at most* numPeers, and close the channel when they don't intend to provide
-// any more peers.
-// AutoRelay will not call the callback again until the channel is closed.
-// Implementations should send new peers, but may send peers they sent before. AutoRelay implements
-// a per-peer backoff (see WithBackoff).
-// minInterval is the minimum interval this callback is called with, even if AutoRelay needs new candidates.
-// The context.Context passed MAY be canceled when AutoRelay feels satisfied, it will be canceled when the node is shutting down.
-// If the channel is canceled you MUST close the output channel at some point.
-func WithPeerSource(f func(ctx context.Context, numPeers int) <-chan peer.AddrInfo, minInterval time.Duration) Option {
+func WithPeerSource(f PeerSource) Option {
 	return func(c *config) error {
-		if len(c.staticRelays) > 0 {
-			return errStaticRelaysPeerSource
+		if c.peerSource != nil {
+			return errAlreadyHavePeerSource
 		}
 		c.peerSource = f
-		c.minInterval = minInterval
 		return nil
 	}
 }
@@ -140,9 +123,6 @@ func WithMaxCandidates(n int) Option {
 // This is to make sure that we don't just randomly connect to the first candidate that we discover.
 func WithMinCandidates(n int) Option {
 	return func(c *config) error {
-		if len(c.staticRelays) > 0 {
-			return errStaticRelaysMinCandidates
-		}
 		if n > c.maxCandidates {
 			n = c.maxCandidates
 		}
@@ -194,6 +174,15 @@ func WithMaxCandidateAge(d time.Duration) Option {
 func WithClock(cl clock.Clock) Option {
 	return func(c *config) error {
 		c.clock = cl
+		return nil
+	}
+}
+
+// WithMinInterval sets the minimum interval after which peerSource callback will be called for more
+// candidates even if AutoRelay needs new candidates.
+func WithMinInterval(interval time.Duration) Option {
+	return func(c *config) error {
+		c.minInterval = interval
 		return nil
 	}
 }

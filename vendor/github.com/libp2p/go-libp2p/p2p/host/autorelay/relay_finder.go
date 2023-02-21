@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	basic "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	relayv1 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv1/relay"
 	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	circuitv2_proto "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
@@ -23,8 +24,8 @@ import (
 )
 
 const (
-	protoIDv1 = string(relayv1.ProtoID)
-	protoIDv2 = string(circuitv2_proto.ProtoIDv2Hop)
+	protoIDv1 = relayv1.ProtoID
+	protoIDv2 = circuitv2_proto.ProtoIDv2Hop
 )
 
 // Terminology:
@@ -59,7 +60,7 @@ type relayFinder struct {
 	ctxCancel   context.CancelFunc
 	ctxCancelMx sync.Mutex
 
-	peerSource func(context.Context, int) <-chan peer.AddrInfo
+	peerSource PeerSource
 
 	candidateFound             chan struct{} // receives every time we find a new relay candidate
 	candidateMx                sync.Mutex
@@ -82,7 +83,11 @@ type relayFinder struct {
 	cachedAddrsExpiry time.Time
 }
 
-func newRelayFinder(host *basic.BasicHost, peerSource func(context.Context, int) <-chan peer.AddrInfo, conf *config) *relayFinder {
+func newRelayFinder(host *basic.BasicHost, peerSource PeerSource, conf *config) *relayFinder {
+	if peerSource == nil {
+		panic("Can not create a new relayFinder. Need a Peer Source fn or a list of static relays. Refer to the documentation around `libp2p.EnableAutoRelay`")
+	}
+
 	return &relayFinder{
 		bootTime:                   conf.clock.Now(),
 		host:                       host,
@@ -99,19 +104,11 @@ func newRelayFinder(host *basic.BasicHost, peerSource func(context.Context, int)
 }
 
 func (rf *relayFinder) background(ctx context.Context) {
-	if rf.usesStaticRelay() {
-		rf.refCount.Add(1)
-		go func() {
-			defer rf.refCount.Done()
-			rf.handleStaticRelays(ctx)
-		}()
-	} else {
-		rf.refCount.Add(1)
-		go func() {
-			defer rf.refCount.Done()
-			rf.findNodes(ctx)
-		}()
-	}
+	rf.refCount.Add(1)
+	go func() {
+		defer rf.refCount.Done()
+		rf.findNodes(ctx)
+	}()
 
 	rf.refCount.Add(1)
 	go func() {
@@ -119,7 +116,7 @@ func (rf *relayFinder) background(ctx context.Context) {
 		rf.handleNewCandidates(ctx)
 	}()
 
-	subConnectedness, err := rf.host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
+	subConnectedness, err := rf.host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged), eventbus.Name("autorelay (relay finder)"))
 	if err != nil {
 		log.Error("failed to subscribe to the EvtPeerConnectednessChanged")
 		return
@@ -268,23 +265,6 @@ func (rf *relayFinder) findNodes(ctx context.Context) {
 			return
 		}
 	}
-}
-
-func (rf *relayFinder) handleStaticRelays(ctx context.Context) {
-	sem := make(chan struct{}, 4)
-	var wg sync.WaitGroup
-	wg.Add(len(rf.conf.staticRelays))
-	for _, pi := range rf.conf.staticRelays {
-		sem <- struct{}{}
-		go func(pi peer.AddrInfo) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			rf.handleNewNode(ctx, pi)
-		}(pi)
-	}
-	wg.Wait()
-	log.Debug("processed all static relays")
-	rf.notifyNewCandidate()
 }
 
 func (rf *relayFinder) notifyMaybeConnectToRelay() {
@@ -446,7 +426,7 @@ func (rf *relayFinder) maybeConnectToRelay(ctx context.Context) {
 	}
 
 	rf.candidateMx.Lock()
-	if !rf.usesStaticRelay() && len(rf.relays) == 0 && len(rf.candidates) < rf.conf.minCandidates && rf.conf.clock.Since(rf.bootTime) < rf.conf.bootDelay {
+	if len(rf.relays) == 0 && len(rf.candidates) < rf.conf.minCandidates && rf.conf.clock.Since(rf.bootTime) < rf.conf.bootDelay {
 		// During the startup phase, we don't want to connect to the first candidate that we find.
 		// Instead, we wait until we've found at least minCandidates, and then select the best of those.
 		// However, if that takes too long (longer than bootDelay), we still go ahead.
@@ -637,10 +617,6 @@ func (rf *relayFinder) relayAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	rf.cachedAddrsExpiry = rf.conf.clock.Now().Add(30 * time.Second)
 
 	return raddrs
-}
-
-func (rf *relayFinder) usesStaticRelay() bool {
-	return len(rf.conf.staticRelays) > 0
 }
 
 func (rf *relayFinder) Start() error {

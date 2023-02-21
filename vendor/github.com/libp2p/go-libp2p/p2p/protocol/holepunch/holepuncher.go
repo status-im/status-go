@@ -10,14 +10,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	pb "github.com/libp2p/go-libp2p/p2p/protocol/holepunch/pb"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch/pb"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-
-	"github.com/libp2p/go-msgio/protoio"
-
+	"github.com/libp2p/go-msgio/pbio"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
+
+//go:generate protoc --proto_path=$PWD:$PWD/../../.. --go_out=. --go_opt=Mpb/holepunch.proto=./pb pb/holepunch.proto
 
 // ErrHolePunchActive is returned from DirectConnect when another hole punching attempt is currently running
 var ErrHolePunchActive = errors.New("another hole punching attempt to this peer is active")
@@ -49,14 +49,16 @@ type holePuncher struct {
 	closed  bool
 
 	tracer *tracer
+	filter AddrFilter
 }
 
-func newHolePuncher(h host.Host, ids identify.IDService, tracer *tracer) *holePuncher {
+func newHolePuncher(h host.Host, ids identify.IDService, tracer *tracer, filter AddrFilter) *holePuncher {
 	hp := &holePuncher{
 		host:   h,
 		ids:    ids,
 		active: make(map[peer.ID]struct{}),
 		tracer: tracer,
+		filter: filter,
 	}
 	hp.ctx, hp.ctxCancel = context.WithCancel(context.Background())
 	h.Network().Notify((*netNotifiee)(hp))
@@ -198,16 +200,24 @@ func (hp *holePuncher) initiateHolePunchImpl(str network.Stream) ([]ma.Multiaddr
 	}
 	defer str.Scope().ReleaseMemory(maxMsgSize)
 
-	w := protoio.NewDelimitedWriter(str)
-	rd := protoio.NewDelimitedReader(str, maxMsgSize)
+	w := pbio.NewDelimitedWriter(str)
+	rd := pbio.NewDelimitedReader(str, maxMsgSize)
 
 	str.SetDeadline(time.Now().Add(StreamTimeout))
 
 	// send a CONNECT and start RTT measurement.
+	obsAddrs := removeRelayAddrs(hp.ids.OwnObservedAddrs())
+	if hp.filter != nil {
+		obsAddrs = hp.filter.FilterLocal(str.Conn().RemotePeer(), obsAddrs)
+	}
+	if len(obsAddrs) == 0 {
+		return nil, 0, errors.New("aborting hole punch initiation as we have no public address")
+	}
+
 	start := time.Now()
 	if err := w.WriteMsg(&pb.HolePunch{
 		Type:     pb.HolePunch_CONNECT.Enum(),
-		ObsAddrs: addrsToBytes(removeRelayAddrs(hp.ids.OwnObservedAddrs())),
+		ObsAddrs: addrsToBytes(obsAddrs),
 	}); err != nil {
 		str.Reset()
 		return nil, 0, err
@@ -222,7 +232,12 @@ func (hp *holePuncher) initiateHolePunchImpl(str network.Stream) ([]ma.Multiaddr
 	if t := msg.GetType(); t != pb.HolePunch_CONNECT {
 		return nil, 0, fmt.Errorf("expect CONNECT message, got %s", t)
 	}
+
 	addrs := removeRelayAddrs(addrsFromBytes(msg.ObsAddrs))
+	if hp.filter != nil {
+		addrs = hp.filter.FilterRemote(str.Conn().RemotePeer(), addrs)
+	}
+
 	if len(addrs) == 0 {
 		return nil, 0, errors.New("didn't receive any public addresses in CONNECT")
 	}

@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
 )
 
 type Subscriber struct {
 	peer      peer.ID
 	requestId string
-	filter    pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
+	filter    *pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
 }
 
 func (sub Subscriber) HasContentTopic(topic string) bool {

@@ -40,8 +40,6 @@ func (id *ID) UnmarshalBinary(data []byte) error {
 	return id.Unmarshal(data)
 }
 
-// Size implements Gogo's proto.Sizer, but we omit the compile-time assertion to avoid introducing a hard
-// dependency on gogo.
 func (id ID) Size() int {
 	return len([]byte(id))
 }

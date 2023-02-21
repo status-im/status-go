@@ -39,6 +39,9 @@ type Subscription interface {
 
 	// Out returns the channel from which to consume events.
 	Out() <-chan interface{}
+
+	// Name returns the name for the subscription
+	Name() string
 }
 
 // Bus is an interface for a type-based event delivery system.

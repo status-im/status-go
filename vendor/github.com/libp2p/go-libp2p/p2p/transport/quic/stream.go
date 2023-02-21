@@ -5,7 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/network"
 
-	"github.com/lucas-clemente/quic-go"
+	"github.com/quic-go/quic-go"
 )
 
 const (

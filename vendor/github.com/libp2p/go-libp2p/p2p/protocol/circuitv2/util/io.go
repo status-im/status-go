@@ -5,10 +5,9 @@ import (
 	"io"
 
 	pool "github.com/libp2p/go-buffer-pool"
-	"github.com/libp2p/go-msgio/protoio"
-
-	"github.com/gogo/protobuf/proto"
+	"github.com/libp2p/go-msgio/pbio"
 	"github.com/multiformats/go-varint"
+	"google.golang.org/protobuf/proto"
 )
 
 type DelimitedReader struct {
@@ -62,6 +61,6 @@ func (d *DelimitedReader) ReadMsg(msg proto.Message) error {
 	return proto.Unmarshal(buf, msg)
 }
 
-func NewDelimitedWriter(w io.Writer) protoio.WriteCloser {
-	return protoio.NewDelimitedWriter(w)
+func NewDelimitedWriter(w io.Writer) pbio.WriteCloser {
+	return pbio.NewDelimitedWriter(w)
 }

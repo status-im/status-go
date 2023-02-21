@@ -9,11 +9,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush/pb"
+	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 )
@@ -70,8 +71,8 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 		logger := wakuLP.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
 		requestPushRPC := &pb.PushRPC{}
 
-		writer := protoio.NewDelimitedWriter(s)
-		reader := protoio.NewDelimitedReader(s, math.MaxInt32)
+		writer := pbio.NewDelimitedWriter(s)
+		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 
 		err := reader.ReadMsg(requestPushRPC)
 		if err != nil {
@@ -169,8 +170,8 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 
 	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestId), Query: req}
 
-	writer := protoio.NewDelimitedWriter(connOpt)
-	reader := protoio.NewDelimitedReader(connOpt, math.MaxInt32)
+	writer := pbio.NewDelimitedWriter(connOpt)
+	reader := pbio.NewDelimitedReader(connOpt, math.MaxInt32)
 
 	err = writer.WriteMsg(pushRequestRPC)
 	if err != nil {
@@ -200,7 +201,7 @@ func (wakuLP *WakuLightPush) Stop() {
 }
 
 // PublishToTopic is used to broadcast a WakuMessage to a pubsub topic via lightpush protocol
-func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *pb.WakuMessage, topic string, opts ...LightPushOption) ([]byte, error) {
+func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.WakuMessage, topic string, opts ...LightPushOption) ([]byte, error) {
 	if message == nil {
 		return nil, errors.New("message can't be null")
 	}
@@ -224,6 +225,6 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *pb.Wak
 }
 
 // Publish is used to broadcast a WakuMessage to the default waku pubsub topic via lightpush protocol
-func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *pb.WakuMessage, opts ...LightPushOption) ([]byte, error) {
+func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessage, opts ...LightPushOption) ([]byte, error) {
 	return wakuLP.PublishToTopic(ctx, message, relay.DefaultWakuTopic, opts...)
 }

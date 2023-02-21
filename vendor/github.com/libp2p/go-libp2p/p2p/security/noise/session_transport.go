@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/canonicallog"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
 	"github.com/libp2p/go-libp2p/p2p/security/noise/pb"
 
@@ -50,6 +51,17 @@ func EarlyData(initiator, responder EarlyDataHandler) SessionOption {
 	}
 }
 
+// DisablePeerIDCheck disables checking the remote peer ID for a noise connection.
+// For outbound connections, this is the equivalent of calling `SecureInbound` with an empty
+// peer ID. This is susceptible to MITM attacks since we do not verify the identity of the remote
+// peer.
+func DisablePeerIDCheck() SessionOption {
+	return func(s *SessionTransport) error {
+		s.disablePeerIDCheck = true
+		return nil
+	}
+}
+
 var _ sec.SecureTransport = &SessionTransport{}
 
 // SessionTransport can be used
@@ -57,7 +69,10 @@ var _ sec.SecureTransport = &SessionTransport{}
 type SessionTransport struct {
 	t *Transport
 	// options
-	prologue []byte
+	prologue           []byte
+	disablePeerIDCheck bool
+
+	protocolID protocol.ID
 
 	initiatorEarlyDataHandler, responderEarlyDataHandler EarlyDataHandler
 }
@@ -65,7 +80,8 @@ type SessionTransport struct {
 // SecureInbound runs the Noise handshake as the responder.
 // If p is empty, connections from any peer are accepted.
 func (i *SessionTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	c, err := newSecureSession(i.t, ctx, insecure, p, i.prologue, i.initiatorEarlyDataHandler, i.responderEarlyDataHandler, false)
+	checkPeerID := !i.disablePeerIDCheck && p != ""
+	c, err := newSecureSession(i.t, ctx, insecure, p, i.prologue, i.initiatorEarlyDataHandler, i.responderEarlyDataHandler, false, checkPeerID)
 	if err != nil {
 		addr, maErr := manet.FromNetAddr(insecure.RemoteAddr())
 		if maErr == nil {
@@ -77,5 +93,9 @@ func (i *SessionTransport) SecureInbound(ctx context.Context, insecure net.Conn,
 
 // SecureOutbound runs the Noise handshake as the initiator.
 func (i *SessionTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	return newSecureSession(i.t, ctx, insecure, p, i.prologue, i.initiatorEarlyDataHandler, i.responderEarlyDataHandler, true)
+	return newSecureSession(i.t, ctx, insecure, p, i.prologue, i.initiatorEarlyDataHandler, i.responderEarlyDataHandler, true, !i.disablePeerIDCheck)
+}
+
+func (i *SessionTransport) ID() protocol.ID {
+	return i.protocolID
 }

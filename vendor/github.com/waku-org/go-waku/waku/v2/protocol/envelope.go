@@ -3,14 +3,15 @@ package protocol
 import (
 	"crypto/sha256"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 )
 
 // Envelope contains information about the pubsub topic of a WakuMessage
 // and a hash used to identify a message based on the bytes of a WakuMessage
 // protobuffer
 type Envelope struct {
-	msg   *pb.WakuMessage
+	msg   *wpb.WakuMessage
 	size  int
 	hash  []byte
 	index *pb.Index
@@ -19,7 +20,7 @@ type Envelope struct {
 // NewEnvelope creates a new Envelope that contains a WakuMessage
 // It's used as a way to know to which Pubsub topic belongs a WakuMessage
 // as well as generating a hash based on the bytes that compose the message
-func NewEnvelope(msg *pb.WakuMessage, receiverTime int64, pubSubTopic string) *Envelope {
+func NewEnvelope(msg *wpb.WakuMessage, receiverTime int64, pubSubTopic string) *Envelope {
 	messageHash, dataLen, _ := msg.Hash()
 	hash := sha256.Sum256(append([]byte(msg.ContentTopic), msg.Payload...))
 	return &Envelope{
@@ -36,7 +37,7 @@ func NewEnvelope(msg *pb.WakuMessage, receiverTime int64, pubSubTopic string) *E
 }
 
 // Message returns the WakuMessage associated to an Envelope
-func (e *Envelope) Message() *pb.WakuMessage {
+func (e *Envelope) Message() *wpb.WakuMessage {
 	return e.msg
 }
 

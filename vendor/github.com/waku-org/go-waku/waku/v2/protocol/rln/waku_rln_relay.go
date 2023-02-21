@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	proto "github.com/golang/protobuf/proto"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -21,6 +20,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
+	proto "google.golang.org/protobuf/proto"
 )
 
 // the maximum clock difference between peers in seconds
