@@ -33,24 +33,26 @@ pipeline {
     REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
     GOPATH = "${env.WORKSPACE}"
     PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
-    /* docker image settings */
-    IMAGE_NAME  = "statusteam/status-go"
-    IMAGE_TAG   = "deploy-test"
+    /* Makefile parameters */
+    DOCKER_IMAGE_NAME = 'statusteam/status-go'
+    DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${utils.gitCommit()}"
+    /* Release docker image settings. */
+    RELEASE_IMAGE_TAG = "deploy-test"
   }
 
   stages {
     stage('Prep') { steps { dir(env.REPO) { script {
-      println("Output: ${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+      println("Output: ${env.DOCKER_IMAGE_NAME}:${env.RELEASE_IMAGE_TAG}")
     } } } }
 
     stage('Build') { steps { dir(env.REPO) { script {
       sh 'make docker-image'
-      image = docker.image("${env.IMAGE_NAME}:v${utils.getVersion()}")
+      image = docker.image("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_CUSTOM_TAG}")
     } } } }
 
     stage('Push') { steps { dir(env.REPO) { script {
       withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-        image.push()
+        image.push("v${utils.getVersion()}-${utils.gitCommit()}")
       }
     } } } }
 
@@ -58,7 +60,7 @@ pipeline {
       when { expression { params.RELEASE == true } }
       steps { dir(env.REPO) { script {
         withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-          image.push(env.IMAGE_TAG)
+          image.push(env.RELEASE_IMAGE_TAG)
         }
     } } } }
   } // stages
