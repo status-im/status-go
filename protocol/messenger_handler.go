@@ -262,7 +262,28 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 	return m.persistence.ActiveContactRequestNotification(contactID)
 }
 
-func (m *Messenger) createContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
+func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
+	if contactRequest != nil && contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
+		// Pull one from the db if there
+		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+		if err != nil {
+			return err
+		}
+
+		if notification != nil {
+			notification.Message = contactRequest
+			notification.Read = true
+			notification.Accepted = true
+			notification.Dismissed = false
+			err = m.persistence.SaveActivityCenterNotification(notification)
+			if err != nil {
+				return err
+			}
+			messageState.Response.AddMessage(contactRequest)
+			messageState.Response.AddActivityCenterNotification(notification)
+		}
+		return nil
+	}
 
 	if contactRequest == nil || contactRequest.ContactRequestState == common.ContactRequestStatePending {
 		notification, err := m.PendingNotificationContactRequest(contact.ID)
@@ -321,28 +342,19 @@ func (m *Messenger) createContactRequestNotification(contact *Contact, messageSt
 			}
 		}
 
-		contactRequest = &common.Message{}
-
-		contactRequest.WhisperTimestamp = messageState.CurrentMessageState.WhisperTimestamp
-		contactRequest.Seen = true
-		contactRequest.Text = "Please add me to your contacts"
-		contactRequest.From = contact.ID
-		contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
-		contactRequest.Clock = messageState.CurrentMessageState.Message.Clock
-		contactRequest.ID = defaultID
-
-		if contact.mutual() {
-			contactRequest.ContactRequestState = common.ContactRequestStateAccepted
-		} else {
-			contactRequest.ContactRequestState = common.ContactRequestStatePending
-		}
-		err = contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+		// generate request message
+		contactRequest, err = m.generateContactRequest(
+			messageState.CurrentMessageState.Message.Clock,
+			messageState.CurrentMessageState.WhisperTimestamp,
+			contact,
+			"Please add me to your contacts",
+		)
 		if err != nil {
 			return err
 		}
 
+		// save this message
 		messageState.Response.AddMessage(contactRequest)
-
 		err = m.persistence.SaveMessages([]*common.Message{contactRequest})
 		if err != nil {
 			return err
@@ -762,10 +774,10 @@ func (m *Messenger) handleAcceptContactRequest(
 	response *MessengerResponse,
 	contact *Contact,
 	originalRequest *common.Message,
-	message protobuf.AcceptContactRequest) (ContactRequestProcessingResponse, error) {
+	clock uint64) (ContactRequestProcessingResponse, error) {
 
-	m.logger.Debug("received contact request", zap.Uint64("clock-sent", message.Clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
-	if contact.ContactRequestRemoteClock > message.Clock {
+	m.logger.Debug("received contact request", zap.Uint64("clock-sent", clock), zap.Uint64("current-clock", contact.ContactRequestRemoteClock), zap.Uint64("current-state", uint64(contact.ContactRequestRemoteState)))
+	if contact.ContactRequestRemoteClock > clock {
 		m.logger.Debug("not handling accept since clock lower")
 		return ContactRequestProcessingResponse{}, nil
 	}
@@ -774,14 +786,14 @@ func (m *Messenger) handleAcceptContactRequest(
 	// be that we sent a legacy contact request/contact-update, or another
 	// device has sent it, and we haven't synchronized it
 	if originalRequest == nil {
-		return contact.ContactRequestAccepted(message.Clock), nil
+		return contact.ContactRequestAccepted(clock), nil
 	}
 
 	if originalRequest.LocalChatID != contact.ID {
 		return ContactRequestProcessingResponse{}, errors.New("can't accept contact request not sent to user")
 	}
 
-	contact.ContactRequestAccepted(message.Clock)
+	contact.ContactRequestAccepted(clock)
 
 	originalRequest.ContactRequestState = common.ContactRequestStateAccepted
 
@@ -794,15 +806,15 @@ func (m *Messenger) handleAcceptContactRequest(
 	return ContactRequestProcessingResponse{}, nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest) error {
-	originalRequest, err := m.persistence.MessageByID(message.Id)
+func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageState, clock uint64, contactRequestID string, isOutgoing bool) error {
+	request, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil && err != common.ErrRecordNotFound {
 		return err
 	}
 
 	contact := state.CurrentMessageState.Contact
 
-	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, originalRequest, message)
+	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, request, clock)
 	if err != nil {
 		return err
 	}
@@ -818,14 +830,14 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 			return err
 		}
 
-		if chat.LastClockValue < message.Clock {
-			chat.LastClockValue = message.Clock
+		if chat.LastClockValue < clock {
+			chat.LastClockValue = clock
 		}
 
 		// NOTE(cammellos): This will re-enable the chat if it was deleted, and only
 		// after we became contact, currently seems safe, but that needs
 		// discussing with UX.
-		if chat.DeletedAtClockValue < message.Clock {
+		if chat.DeletedAtClockValue < clock {
 			chat.Active = true
 		}
 
@@ -833,9 +845,16 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 		state.AllChats.Store(chat.ID, chat)
 	}
 
-	if originalRequest != nil {
-		// Update contact requests if existing, or create a new one
-		err = m.createContactRequestNotification(contact, state, originalRequest, processingResponse.newContactRequestReceived)
+	if request != nil {
+		if isOutgoing {
+			notification := m.generateOutgoingContactRequestNotification(contact, request)
+			err = m.addActivityCenterNotification(state.Response, notification)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
+		}
 		if err != nil {
 			m.logger.Warn("could not create contact request notification", zap.Error(err))
 		}
@@ -843,6 +862,22 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 
 	state.ModifiedContacts.Store(contact.ID, true)
 	state.AllContacts.Store(contact.ID, contact)
+	return nil
+}
+
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
+	// outgoing contact requests are created on the side of a sender
+	err := m.handleAcceptContactRequestMessage(state, message.Clock, defaultContactRequestID(senderID), true)
+	if err != nil {
+		m.logger.Warn("could not accept contact request", zap.Error(err))
+	}
+
+	// legacy contact requests: the ones that are send with SendContactRequest
+	err = m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
+	if err != nil {
+		m.logger.Warn("could not accept contact request", zap.Error(err))
+	}
+
 	return nil
 }
 
@@ -922,7 +957,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		}
 		if result.newContactRequestReceived {
-			err = m.createContactRequestNotification(contact, state, nil, true)
+			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				return err
 			}
@@ -946,7 +981,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		r := contact.ContactRequestReceived(message.ContactRequestClock)
 		if r.newContactRequestReceived {
-			err = m.createContactRequestNotification(contact, state, nil, true)
+			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				m.logger.Warn("could not create contact request notification", zap.Error(err))
 			}
@@ -1255,7 +1290,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			return err
 		}
 	} else {
-		// Activity Center notification, updating existing for accespted/declined
+		// Activity Center notification, updating existing for accepted/declined
 		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
 		if err != nil {
 			return err
@@ -1751,7 +1786,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			err = m.createContactRequestNotification(contact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
@@ -1762,7 +1797,6 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
-
 		chatContact := contact
 		if isSyncMessage {
 			chatContact, err = m.BuildContact(chat.ID)
@@ -1780,7 +1814,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		state.AllContacts.Store(chatContact.ID, chatContact)
 
 		if sendNotification {
-			err = m.createContactRequestNotification(chatContact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestNotification(chatContact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
@@ -2668,13 +2702,12 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message protobuf.SyncContactRequestDecision) error {
 	var err error
 	var response *MessengerResponse
+
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
 		response, err = m.updateAcceptedContactRequest(nil, message.RequestId)
-
 	} else {
-		response, err = m.dismissContactRequest(message.RequestId, true)
+		response, err = m.declineContactRequest(message.RequestId, true)
 	}
-
 	if err != nil {
 		return err
 	}

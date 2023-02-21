@@ -270,7 +270,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Dismiss contact request, receiver side
-	resp, err = theirMessenger.DismissContactRequest(context.Background(), &requests.DismissContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
+	resp, err = theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
 	s.Require().NoError(err)
 
 	// Check the contact state is correctly set
@@ -427,7 +427,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	mutualContacts = s.m.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
 
-	resp, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(contactID)})
+	resp, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
@@ -681,7 +681,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
-	// Make sure it's not returned as coming from us
+	// Make sure it's not returned
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
 	s.Require().NoError(err)
 	s.Require().Len(contactRequests, 0)
@@ -1038,7 +1038,7 @@ func (s *MessengerContactRequestSuite) TestReceiveMultipleLegacy() {
 
 	// Remove contact
 
-	_, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(contactID)})
+	_, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -1277,7 +1277,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	resp, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	resp, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
@@ -1603,7 +1603,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// adds bob again to her device
@@ -1689,7 +1689,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
-	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ContactID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// adds bob again to her device
