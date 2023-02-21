@@ -1086,6 +1086,14 @@ func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activity
 	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
+func (api *PublicAPI) ActivityCenterNotificationsByGroupCount(activityGroup protocol.ActivityCenterGroup) (uint64, error) {
+	return api.service.messenger.ActivityCenterNotificationsByGroupCount(activityGroup)
+}
+
+func (api *PublicAPI) UnreadActivityCenterNotificationsByGroupCount(activityGroup protocol.ActivityCenterGroup) (uint64, error) {
+	return api.service.messenger.UnreadActivityCenterNotificationsByGroupCount(activityGroup)
+}
+
 func (api *PublicAPI) HasUnseenActivityCenterNotifications() (bool, error) {
 	return api.service.messenger.HasUnseenActivityCenterNotifications()
 }

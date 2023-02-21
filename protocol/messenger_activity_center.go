@@ -20,6 +20,14 @@ func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount(activityTy
 	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
+func (m *Messenger) ActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup) (uint64, error) {
+	return m.persistence.ActivityCenterNotificationsByGroupCount(activityGroup, ActivityCenterQueryParamsReadAll)
+}
+
+func (m *Messenger) UnreadActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup) (uint64, error) {
+	return m.persistence.ActivityCenterNotificationsByGroupCount(activityGroup, ActivityCenterQueryParamsReadUnread)
+}
+
 func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
 	return m.persistence.HasUnseenActivityCenterNotifications()
 }

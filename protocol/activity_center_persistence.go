@@ -421,6 +421,39 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	return db.unmarshalActivityCenterNotificationRows(rows)
 }
 
+func (db sqlitePersistence) buildActivityCenterNotificationsCountQuery(isAccepted bool, read ActivityCenterQueryParamsRead, activityCenterTypes []ActivityCenterType) *sql.Row {
+	var args []interface{}
+	var conditions []string
+
+	if !isAccepted {
+		conditions = append(conditions, "NOT accepted")
+	}
+
+	switch read {
+	case ActivityCenterQueryParamsReadRead:
+		conditions = append(conditions, "read = 1")
+	case ActivityCenterQueryParamsReadUnread:
+		conditions = append(conditions, "NOT read")
+	}
+
+	if len(activityCenterTypes) > 0 {
+		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
+		conditions = append(conditions, fmt.Sprintf("notification_type IN (%s)", inVector))
+		for _, activityCenterType := range activityCenterTypes {
+			args = append(args, activityCenterType)
+		}
+	}
+
+	var conditionsString string
+	if len(conditions) > 0 {
+		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query := fmt.Sprintf(`SELECT COUNT(1) FROM activity_center_notifications %s`, conditionsString)
+
+	return db.db.QueryRow(query, args...)
+}
+
 func (db sqlitePersistence) runActivityCenterIDQuery(query string) ([][]byte, error) {
 	rows, err := db.db.Query(query)
 	if err != nil {
@@ -814,43 +847,23 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 
 }
 
-func (db sqlitePersistence) buildActivityCenterNotificationsCountQuery(isAccepted bool, activityTypes []ActivityCenterType) *sql.Row {
-	var args []interface{}
-	var acceptedWhere string
-
-	if !isAccepted {
-		acceptedWhere = `AND NOT accepted`
-	}
-
-	var inTypeWhere string
-	if len(activityTypes) != 0 {
-		inVector := strings.Repeat("?, ", len(activityTypes)-1) + "?"
-		inTypeWhere = fmt.Sprintf(" AND notification_type IN (%s)", inVector)
-		for _, activityCenterType := range activityTypes {
-			args = append(args, activityCenterType)
-		}
-	}
-
-	query := fmt.Sprintf(`
-		SELECT COUNT(1) 
-		FROM activity_center_notifications 
-		WHERE NOT read AND NOT dismissed 
-		%s 
-		%s
-	`, acceptedWhere, inTypeWhere)
-
-	return db.db.QueryRow(query, args...)
-}
-
 func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	var count uint64
-	err := db.buildActivityCenterNotificationsCountQuery(false, []ActivityCenterType{}).Scan(&count)
+	err := db.buildActivityCenterNotificationsCountQuery(true, ActivityCenterQueryParamsReadUnread, []ActivityCenterType{}).Scan(&count)
 	return count, err
 }
 
 func (db sqlitePersistence) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []ActivityCenterType) (uint64, error) {
 	var count uint64
-	err := db.buildActivityCenterNotificationsCountQuery(true, activityTypes).Scan(&count)
+	err := db.buildActivityCenterNotificationsCountQuery(false, ActivityCenterQueryParamsReadUnread, activityTypes).Scan(&count)
+	return count, err
+}
+
+func (db sqlitePersistence) ActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup, readType ActivityCenterQueryParamsRead) (uint64, error) {
+	activityTypes := activityGroup.NotificationTypes()
+
+	var count uint64
+	err := db.buildActivityCenterNotificationsCountQuery(true, ActivityCenterQueryParamsReadAll, activityTypes).Scan(&count)
 	return count, err
 }
 

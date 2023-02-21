@@ -1781,6 +1781,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// All
+	cnt, err := p.ActivityCenterNotificationsByGroupCount(ActivityCenterAll, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(9))
+
 	_, notifications, err := p.ActivityCenterNotificationsByGroup(
 		initialCursor,
 		limit,
@@ -1799,6 +1804,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.Equal(t, nID2, notifications[7].ID)
 	require.Equal(t, nID1, notifications[8].ID)
 
+	// Mentions
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterMentions, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(1))
+
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
 		limit,
@@ -1809,6 +1819,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
+	// Replies
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterReplies, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(1))
+
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
 		limit,
@@ -1818,6 +1833,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID3, notifications[0].ID)
+
+	// Membership
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterMembership, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(5))
 
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
@@ -1833,6 +1853,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.Equal(t, nID5, notifications[3].ID)
 	require.Equal(t, nID1, notifications[4].ID)
 
+	// Admin
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterAdmin, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(1))
+
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
 		limit,
@@ -1843,6 +1868,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID7, notifications[0].ID)
 
+	// Contact Requests
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterContactRequests, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(1))
+
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
 		limit,
@@ -1852,6 +1882,11 @@ func TestActivityCenterReadUnreadFilterByGroup(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID4, notifications[0].ID)
+
+	// Identity Verification
+	cnt, err = p.ActivityCenterNotificationsByGroupCount(ActivityCenterIdentityVerification, ActivityCenterQueryParamsReadAll)
+	require.NoError(t, err)
+	require.Equal(t, cnt, uint64(1))
 
 	_, notifications, err = p.ActivityCenterNotificationsByGroup(
 		initialCursor,
