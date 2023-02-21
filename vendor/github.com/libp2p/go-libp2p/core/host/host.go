@@ -8,7 +8,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/event"
-	"github.com/libp2p/go-libp2p/core/introspection"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -53,7 +52,7 @@ type Host interface {
 
 	// SetStreamHandlerMatch sets the protocol handler on the Host's Mux
 	// using a matching function for protocol selection.
-	SetStreamHandlerMatch(protocol.ID, func(string) bool, network.StreamHandler)
+	SetStreamHandlerMatch(protocol.ID, func(protocol.ID) bool, network.StreamHandler)
 
 	// RemoveStreamHandler removes a handler on the mux that was set by
 	// SetStreamHandler
@@ -73,17 +72,4 @@ type Host interface {
 
 	// EventBus returns the hosts eventbus
 	EventBus() event.Bus
-}
-
-// IntrospectableHost is implemented by Host implementations that are
-// introspectable, that is, that may have introspection capability.
-type IntrospectableHost interface {
-	// Introspector returns the introspector, or nil if one hasn't been
-	// registered. With it, the call can register data providers, and can fetch
-	// introspection data.
-	Introspector() introspection.Introspector
-
-	// IntrospectionEndpoint returns the introspection endpoint, or nil if one
-	// hasn't been registered.
-	IntrospectionEndpoint() introspection.Endpoint
 }

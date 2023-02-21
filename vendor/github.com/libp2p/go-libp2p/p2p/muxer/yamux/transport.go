@@ -12,6 +12,8 @@ import (
 
 var DefaultTransport *Transport
 
+const ID = "/yamux/1.0.0"
+
 func init() {
 	config := yamux.DefaultConfig()
 	// We've bumped this to 16MiB as this critically limits throughput.

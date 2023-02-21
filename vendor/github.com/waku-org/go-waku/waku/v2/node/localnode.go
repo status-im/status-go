@@ -53,7 +53,7 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr)
 	return nil
 }
 
-func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags utils.WakuEnrBitfield, advertiseAddr *net.IP, shouldAutoUpdate bool, log *zap.Logger) error {
+func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags utils.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool, log *zap.Logger) error {
 	localnode.SetFallbackUDP(int(udpPort))
 	localnode.Set(enr.WithEntry(utils.WakuENRField, wakuFlags))
 	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
@@ -65,13 +65,22 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 	if advertiseAddr != nil {
 		// An advertised address disables libp2p address updates
 		// and discv5 predictions
-		localnode.SetStaticIP(*advertiseAddr)
+
+		ipAddr, err := selectMostExternalAddress(advertiseAddr)
+		if err != nil {
+			return err
+		}
+
+		localnode.SetStaticIP(ipAddr.IP)
 		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
+
+		return writeMultiaddresses(localnode, multiaddrs)
 	} else if !shouldAutoUpdate {
 		// We received a libp2p address update. Autoupdate is disabled
 		// Using a static ip will disable endpoint prediction.
 		localnode.SetStaticIP(ipAddr.IP)
 		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
+		return writeMultiaddresses(localnode, multiaddrs)
 	} else {
 		// We received a libp2p address update, but we should still
 		// allow discv5 to update the enr record. We set the localnode
@@ -94,8 +103,13 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 			localnode.Delete(enr.IPv6{})
 			localnode.Delete(enr.TCP6(0))
 		}
+
+		return writeMultiaddresses(localnode, multiaddrs)
 	}
 
+}
+
+func writeMultiaddresses(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr) error {
 	// Randomly shuffle multiaddresses
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
@@ -203,7 +217,6 @@ func extractIPAddressForENR(addr ma.Multiaddr) (*net.TCPAddr, error) {
 
 func selectMostExternalAddress(addresses []ma.Multiaddr) (*net.TCPAddr, error) {
 	var ipAddrs []*net.TCPAddr
-
 	for _, addr := range addresses {
 		ipAddr, err := extractIPAddressForENR(addr)
 		if err != nil {
@@ -337,7 +350,7 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 		return err
 	}
 
-	err = w.updateLocalNode(w.localNode, multiaddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddr, w.opts.discV5autoUpdate, w.log)
+	err = w.updateLocalNode(w.localNode, multiaddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddrs, w.opts.discV5autoUpdate, w.log)
 	if err != nil {
 		w.log.Error("updating localnode ENR record", zap.Error(err))
 		return err

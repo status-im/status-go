@@ -15,6 +15,7 @@ const (
 	P_IP6ZONE           = 42
 	P_IPCIDR            = 43
 	P_QUIC              = 460
+	P_QUIC_V1           = 461
 	P_WEBTRANSPORT      = 465
 	P_CERTHASH          = 466
 	P_SCTP              = 132
@@ -182,6 +183,11 @@ var (
 		Code:  P_QUIC,
 		VCode: CodeToVarint(P_QUIC),
 	}
+	protoQUICV1 = Protocol{
+		Name:  "quic-v1",
+		Code:  P_QUIC_V1,
+		VCode: CodeToVarint(P_QUIC_V1),
+	}
 	protoWEBTRANSPORT = Protocol{
 		Name:  "webtransport",
 		Code:  P_WEBTRANSPORT,
@@ -285,6 +291,7 @@ func init() {
 		protoUTP,
 		protoUDT,
 		protoQUIC,
+		protoQUICV1,
 		protoWEBTRANSPORT,
 		protoCERTHASH,
 		protoHTTP,

@@ -11,12 +11,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
 	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
+	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.opencensus.io/stats"
@@ -80,7 +81,7 @@ func NewWakuFilter(host host.Host, broadcaster v2.Broadcaster, isFullNode bool, 
 	wf.h = host
 	wf.isFullNode = isFullNode
 	wf.filters = NewFilterMap(broadcaster, timesource)
-	wf.subscribers = NewSubscribers(params.timeout)
+	wf.subscribers = NewSubscribers(params.Timeout)
 
 	return wf
 }
@@ -116,7 +117,7 @@ func (wf *WakuFilter) onRequest(ctx context.Context) func(s network.Stream) {
 
 		filterRPCRequest := &pb.FilterRPC{}
 
-		reader := protoio.NewDelimitedReader(s, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 
 		err := reader.ReadMsg(filterRPCRequest)
 		if err != nil {
@@ -139,7 +140,7 @@ func (wf *WakuFilter) onRequest(ctx context.Context) func(s network.Stream) {
 			// We're on a full node.
 			// This is a filter request coming from a light node.
 			if filterRPCRequest.Request.Subscribe {
-				subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: *filterRPCRequest.Request}
+				subscriber := Subscriber{peer: s.Conn().RemotePeer(), requestId: filterRPCRequest.RequestId, filter: filterRPCRequest.Request}
 				if subscriber.filter.Topic == "" { // @TODO: review if empty topic is possible
 					subscriber.filter.Topic = relay.DefaultWakuTopic
 				}
@@ -162,8 +163,8 @@ func (wf *WakuFilter) onRequest(ctx context.Context) func(s network.Stream) {
 	}
 }
 
-func (wf *WakuFilter) pushMessage(ctx context.Context, subscriber Subscriber, msg *pb.WakuMessage) error {
-	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*pb.WakuMessage{msg}}}
+func (wf *WakuFilter) pushMessage(ctx context.Context, subscriber Subscriber, msg *wpb.WakuMessage) error {
+	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*wpb.WakuMessage{msg}}}
 	logger := wf.log.With(logging.HostID("peer", subscriber.peer))
 
 	// We connect first so dns4 addresses are resolved (NewStream does not do it)
@@ -184,7 +185,7 @@ func (wf *WakuFilter) pushMessage(ctx context.Context, subscriber Subscriber, ms
 	}
 
 	defer conn.Close()
-	writer := protoio.NewDelimitedWriter(conn)
+	writer := pbio.NewDelimitedWriter(conn)
 	err = writer.WriteMsg(pushRPC)
 	if err != nil {
 		logger.Error("pushing messages to peer", zap.Error(err))
@@ -268,7 +269,7 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 		return
 	}
 
-	request := pb.FilterRequest{
+	request := &pb.FilterRequest{
 		Subscribe:      true,
 		Topic:          filter.Topic,
 		ContentFilters: contentFilters,
@@ -285,9 +286,9 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 	// This is the only successful path to subscription
 	requestID := hex.EncodeToString(protocol.GenerateRequestId())
 
-	writer := protoio.NewDelimitedWriter(conn)
-	filterRPC := &pb.FilterRPC{RequestId: requestID, Request: &request}
-	wf.log.Info("sending filterRPC", zap.Stringer("rpc", filterRPC))
+	writer := pbio.NewDelimitedWriter(conn)
+	filterRPC := &pb.FilterRPC{RequestId: requestID, Request: request}
+	wf.log.Debug("sending filterRPC", zap.Stringer("rpc", filterRPC))
 	err = writer.WriteMsg(filterRPC)
 	if err != nil {
 		wf.log.Error("sending filterRPC", zap.Error(err))
@@ -324,14 +325,14 @@ func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilt
 		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
 	}
 
-	request := pb.FilterRequest{
+	request := &pb.FilterRequest{
 		Subscribe:      false,
 		Topic:          contentFilter.Topic,
 		ContentFilters: contentFilters,
 	}
 
-	writer := protoio.NewDelimitedWriter(conn)
-	filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: &request}
+	writer := pbio.NewDelimitedWriter(conn)
+	filterRPC := &pb.FilterRPC{RequestId: hex.EncodeToString(id), Request: request}
 	err = writer.WriteMsg(filterRPC)
 	if err != nil {
 		return err

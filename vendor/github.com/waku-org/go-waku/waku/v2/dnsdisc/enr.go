@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -25,6 +26,7 @@ func WithNameserver(nameserver string) DnsDiscoveryOption {
 }
 
 type DiscoveredNode struct {
+	PeerID    peer.ID
 	Addresses []ma.Multiaddr
 	ENR       *enode.Node
 }
@@ -48,12 +50,16 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 	}
 
 	for _, node := range tree.Nodes() {
-		m, err := utils.Multiaddress(node)
+		peerID, m, err := utils.Multiaddress(node)
 		if err != nil {
 			return nil, err
 		}
 
-		d := DiscoveredNode{Addresses: m}
+		d := DiscoveredNode{
+			PeerID:    peerID,
+			Addresses: m,
+		}
+
 		if hasUDP(node) {
 			d.ENR = node
 		}

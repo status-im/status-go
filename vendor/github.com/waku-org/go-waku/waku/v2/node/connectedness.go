@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
@@ -18,7 +19,7 @@ import (
 )
 
 // PeerStatis is a map of peer IDs to supported protocols
-type PeerStats map[peer.ID][]string
+type PeerStats map[peer.ID][]protocol.ID
 
 // ConnStatus is used to indicate if the node is online, has access to history
 // and also see the list of peers the node is aware of
@@ -121,16 +122,16 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 		}
 
 		for _, protocol := range protocols {
-			if !hasRelay && protocol == string(relay.WakuRelayID_v200) {
+			if !hasRelay && protocol == relay.WakuRelayID_v200 {
 				hasRelay = true
 			}
-			if !hasLightPush && protocol == string(lightpush.LightPushID_v20beta1) {
+			if !hasLightPush && protocol == lightpush.LightPushID_v20beta1 {
 				hasLightPush = true
 			}
-			if !hasStore && protocol == string(store.StoreID_v20beta4) {
+			if !hasStore && protocol == store.StoreID_v20beta4 {
 				hasStore = true
 			}
-			if !hasFilter && protocol == string(filter.FilterID_v20beta1) {
+			if !hasFilter && protocol == filter.FilterID_v20beta1 {
 				hasFilter = true
 			}
 		}

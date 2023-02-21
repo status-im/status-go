@@ -261,11 +261,16 @@ func (d *frameDec) reset(br byteBuffer) error {
 	}
 	d.history.windowSize = int(d.WindowSize)
 	if !d.o.lowMem || d.history.windowSize < maxBlockSize {
-		// Alloc 2x window size if not low-mem, or very small window size.
+		// Alloc 2x window size if not low-mem, or window size below 2MB.
 		d.history.allocFrameBuffer = d.history.windowSize * 2
 	} else {
-		// Alloc with one additional block
-		d.history.allocFrameBuffer = d.history.windowSize + maxBlockSize
+		if d.o.lowMem {
+			// Alloc with 1MB extra.
+			d.history.allocFrameBuffer = d.history.windowSize + maxBlockSize/2
+		} else {
+			// Alloc with 2MB extra.
+			d.history.allocFrameBuffer = d.history.windowSize + maxBlockSize
+		}
 	}
 
 	if debugDecoder {
@@ -343,7 +348,7 @@ func (d *frameDec) consumeCRC() error {
 	return nil
 }
 
-// runDecoder will create a sync decoder that will decode a block of data.
+// runDecoder will run the decoder for the remainder of the frame.
 func (d *frameDec) runDecoder(dst []byte, dec *blockDec) ([]byte, error) {
 	saved := d.history.b
 
@@ -369,7 +374,7 @@ func (d *frameDec) runDecoder(dst []byte, dec *blockDec) ([]byte, error) {
 		if debugDecoder {
 			println("maxSyncLen:", d.history.decoders.maxSyncLen)
 		}
-		if !d.o.limitToCap && uint64(cap(dst)-len(dst)) < d.history.decoders.maxSyncLen {
+		if !d.o.limitToCap && uint64(cap(dst)) < d.history.decoders.maxSyncLen {
 			// Alloc for output
 			dst2 := make([]byte, len(dst), d.history.decoders.maxSyncLen+compressedBlockOverAlloc)
 			copy(dst2, dst)

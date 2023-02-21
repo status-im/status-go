@@ -70,7 +70,7 @@ type BasicHost struct {
 
 	network      network.Network
 	psManager    *pstoremanager.PeerstoreManager
-	mux          *msmux.MultistreamMuxer
+	mux          *msmux.MultistreamMuxer[protocol.ID]
 	ids          identify.IDService
 	hps          *holepunch.Service
 	pings        *ping.PingService
@@ -108,7 +108,7 @@ var _ host.Host = (*BasicHost)(nil)
 // customize construction of the *BasicHost.
 type HostOpts struct {
 	// MultistreamMuxer is essential for the *BasicHost and will use a sensible default value if omitted.
-	MultistreamMuxer *msmux.MultistreamMuxer
+	MultistreamMuxer *msmux.MultistreamMuxer[protocol.ID]
 
 	// NegotiationTimeout determines the read and write timeouts on streams.
 	// If 0 or omitted, it will use DefaultNegotiationTimeout.
@@ -155,7 +155,7 @@ type HostOpts struct {
 
 // NewHost constructs a new *BasicHost and activates it by attaching its stream and connection handlers to the given inet.Network.
 func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
-	eventBus := eventbus.NewBus()
+	eventBus := eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer()))
 	psManager, err := pstoremanager.NewPeerstoreManager(n.Peerstore(), eventBus)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 	h := &BasicHost{
 		network:                 n,
 		psManager:               psManager,
-		mux:                     msmux.NewMultistreamMuxer(),
+		mux:                     msmux.NewMultistreamMuxer[protocol.ID](),
 		negtimeout:              DefaultNegotiationTimeout,
 		AddrsFactory:            DefaultAddrsFactory,
 		maResolver:              madns.DefaultResolver,
@@ -181,7 +181,7 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 
 	h.updateLocalIpAddr()
 
-	if h.emitters.evtLocalProtocolsUpdated, err = h.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}); err != nil {
+	if h.emitters.evtLocalProtocolsUpdated, err = h.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}, eventbus.Stateful); err != nil {
 		return nil, err
 	}
 	if h.emitters.evtLocalAddrsUpdated, err = h.eventbus.Emitter(&event.EvtLocalAddressesUpdated{}, eventbus.Stateful); err != nil {
@@ -230,12 +230,14 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 			identify.UserAgent(opts.UserAgent),
 			identify.ProtocolVersion(opts.ProtocolVersion),
 			identify.DisableSignedPeerRecord(),
+			identify.WithMetricsTracer(identify.NewMetricsTracer()),
 		)
 	} else {
 		h.ids, err = identify.NewIDService(
 			h,
 			identify.UserAgent(opts.UserAgent),
 			identify.ProtocolVersion(opts.ProtocolVersion),
+			identify.WithMetricsTracer(identify.NewMetricsTracer()),
 		)
 	}
 	if err != nil {
@@ -367,6 +369,7 @@ func (h *BasicHost) updateLocalIpAddr() {
 func (h *BasicHost) Start() {
 	h.psManager.Start()
 	h.refCount.Add(1)
+	h.ids.Start()
 	go h.background()
 }
 
@@ -407,13 +410,13 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 		}
 	}
 
-	if err := s.SetProtocol(protocol.ID(protoID)); err != nil {
+	if err := s.SetProtocol(protoID); err != nil {
 		log.Debugf("error setting stream protocol: %s", err)
 		s.Reset()
 		return
 	}
 
-	log.Debugf("protocol negotiation took %s", took)
+	log.Debugf("negotiated: %s (took %s)", protoID, took)
 
 	go handle(protoID, s)
 }
@@ -571,9 +574,9 @@ func (h *BasicHost) EventBus() event.Bus {
 //
 // (Threadsafe)
 func (h *BasicHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
-	h.Mux().AddHandler(string(pid), func(p string, rwc io.ReadWriteCloser) error {
+	h.Mux().AddHandler(pid, func(p protocol.ID, rwc io.ReadWriteCloser) error {
 		is := rwc.(network.Stream)
-		is.SetProtocol(protocol.ID(p))
+		is.SetProtocol(p)
 		handler(is)
 		return nil
 	})
@@ -584,10 +587,10 @@ func (h *BasicHost) SetStreamHandler(pid protocol.ID, handler network.StreamHand
 
 // SetStreamHandlerMatch sets the protocol handler on the Host's Mux
 // using a matching function to do protocol comparisons
-func (h *BasicHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool, handler network.StreamHandler) {
-	h.Mux().AddHandlerWithFunc(string(pid), m, func(p string, rwc io.ReadWriteCloser) error {
+func (h *BasicHost) SetStreamHandlerMatch(pid protocol.ID, m func(protocol.ID) bool, handler network.StreamHandler) {
+	h.Mux().AddHandlerWithFunc(pid, m, func(p protocol.ID, rwc io.ReadWriteCloser) error {
 		is := rwc.(network.Stream)
-		is.SetProtocol(protocol.ID(p))
+		is.SetProtocol(p)
 		handler(is)
 		return nil
 	})
@@ -598,7 +601,7 @@ func (h *BasicHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool, 
 
 // RemoveStreamHandler returns ..
 func (h *BasicHost) RemoveStreamHandler(pid protocol.ID) {
-	h.Mux().RemoveHandler(string(pid))
+	h.Mux().RemoveHandler(pid)
 	h.emitters.evtLocalProtocolsUpdated.Emit(event.EvtLocalProtocolsUpdated{
 		Removed: []protocol.ID{pid},
 	})
@@ -637,9 +640,7 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 		return nil, ctx.Err()
 	}
 
-	pidStrings := protocol.ConvertToStrings(pids)
-
-	pref, err := h.preferredProtocol(p, pidStrings)
+	pref, err := h.preferredProtocol(p, pids)
 	if err != nil {
 		_ = s.Reset()
 		return nil, err
@@ -647,7 +648,7 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 
 	if pref != "" {
 		s.SetProtocol(pref)
-		lzcon := msmux.NewMSSelect(s, string(pref))
+		lzcon := msmux.NewMSSelect(s, pref)
 		return &streamWrapper{
 			Stream: s,
 			rw:     lzcon,
@@ -655,10 +656,10 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	}
 
 	// Negotiate the protocol in the background, obeying the context.
-	var selected string
+	var selected protocol.ID
 	errCh := make(chan error, 1)
 	go func() {
-		selected, err = msmux.SelectOneOf(pidStrings, s)
+		selected, err = msmux.SelectOneOf(pids, s)
 		errCh <- err
 	}()
 	select {
@@ -674,13 +675,12 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 		return nil, ctx.Err()
 	}
 
-	selpid := protocol.ID(selected)
-	s.SetProtocol(selpid)
+	s.SetProtocol(selected)
 	h.Peerstore().AddProtocols(p, selected)
 	return s, nil
 }
 
-func (h *BasicHost) preferredProtocol(p peer.ID, pids []string) (protocol.ID, error) {
+func (h *BasicHost) preferredProtocol(p peer.ID, pids []protocol.ID) (protocol.ID, error) {
 	supported, err := h.Peerstore().SupportsProtocols(p, pids...)
 	if err != nil {
 		return "", err
@@ -688,7 +688,7 @@ func (h *BasicHost) preferredProtocol(p peer.ID, pids []string) (protocol.ID, er
 
 	var out protocol.ID
 	if len(supported) > 0 {
-		out = protocol.ID(supported[0])
+		out = supported[0]
 	}
 	return out, nil
 }

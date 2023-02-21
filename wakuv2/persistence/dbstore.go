@@ -11,6 +11,7 @@ import (
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
@@ -161,7 +162,7 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 }
 
 // Query retrieves messages from the DB
-func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.StoredMessage, error) {
+func (d *DBStore) Query(query *storepb.HistoryQuery) (*storepb.Index, []gowakuPersistence.StoredMessage, error) {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
@@ -211,7 +212,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 
 		if exists {
 			eqOp := ">"
-			if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+			if query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 				eqOp = "<"
 			}
 			paramCnt++
@@ -224,7 +225,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 
 	if query.StartTime != 0 {
-		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id >= $%d", paramCnt))
 			startTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.StartTime), uint64(query.StartTime), "", []byte{})
@@ -234,7 +235,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 
 	if query.EndTime != 0 {
-		if !usesCursor || query.PagingInfo.Direction == pb.PagingInfo_FORWARD {
+		if !usesCursor || query.PagingInfo.Direction == storepb.PagingInfo_FORWARD {
 			paramCnt++
 			conditions = append(conditions, fmt.Sprintf("id <= $%d", paramCnt))
 			endTimeDBKey := gowakuPersistence.NewDBKey(uint64(query.EndTime), uint64(query.EndTime), "", []byte{})
@@ -248,7 +249,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 
 	orderDirection := "ASC"
-	if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+	if query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 		orderDirection = "DESC"
 	}
 
@@ -280,7 +281,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 	defer rows.Close()
 
-	var cursor *pb.Index
+	var cursor *storepb.Index
 	if len(result) != 0 {
 		if len(result) > int(query.PagingInfo.PageSize) {
 			result = result[0:query.PagingInfo.PageSize]
@@ -290,7 +291,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []gowakuPersistence.
 	}
 
 	// The retrieved messages list should always be in chronological order
-	if query.PagingInfo.Direction == pb.PagingInfo_BACKWARD {
+	if query.PagingInfo.Direction == storepb.PagingInfo_BACKWARD {
 		for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
 			result[i], result[j] = result[j], result[i]
 		}

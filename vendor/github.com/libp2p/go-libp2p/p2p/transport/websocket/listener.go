@@ -1,13 +1,19 @@
 package websocket
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+
+	ws "nhooyr.io/websocket"
 )
 
 type listener struct {
@@ -17,7 +23,7 @@ type listener struct {
 	laddr ma.Multiaddr
 
 	closed   chan struct{}
-	incoming chan *Conn
+	incoming chan net.Conn
 }
 
 func (pwma *parsedWebsocketMultiaddr) toMultiaddr() ma.Multiaddr {
@@ -69,7 +75,7 @@ func newListener(a ma.Multiaddr, tlsConf *tls.Config) (*listener, error) {
 	ln := &listener{
 		nl:       nl,
 		laddr:    parsed.toMultiaddr(),
-		incoming: make(chan *Conn),
+		incoming: make(chan net.Conn),
 		closed:   make(chan struct{}),
 	}
 	ln.server = http.Server{Handler: ln}
@@ -89,16 +95,34 @@ func (l *listener) serve() {
 }
 
 func (l *listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
+	scheme := "ws"
+	if l.server.TLSConfig != nil {
+		scheme = "wss"
+	}
+
+	c, err := ws.Accept(w, r, &ws.AcceptOptions{
+		// Allow requests from *all* origins.
+		InsecureSkipVerify: true,
+	})
 	if err != nil {
 		// The upgrader writes a response for us.
 		return
 	}
 
 	select {
-	case l.incoming <- NewConn(c, false):
+	case l.incoming <- conn{
+		Conn: ws.NetConn(context.Background(), c, ws.MessageBinary),
+		localAddr: addrWrapper{&url.URL{
+			Host:   r.Context().Value(http.LocalAddrContextKey).(net.Addr).String(),
+			Scheme: scheme,
+		}},
+		remoteAddr: addrWrapper{&url.URL{
+			Host:   r.RemoteAddr,
+			Scheme: scheme,
+		}},
+	}:
 	case <-l.closed:
-		c.Close()
+		c.Close(ws.StatusNormalClosure, "closed")
 	}
 	// The connection has been hijacked, it's safe to return.
 }
@@ -135,4 +159,16 @@ func (l *listener) Close() error {
 
 func (l *listener) Multiaddr() ma.Multiaddr {
 	return l.laddr
+}
+
+type transportListener struct {
+	transport.Listener
+}
+
+func (l *transportListener) Accept() (transport.CapableConn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &capableConn{CapableConn: conn}, nil
 }

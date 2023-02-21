@@ -25,7 +25,7 @@ func SetDefaultServiceLimits(config *rcmgr.ScalingLimitConfig) {
 		rcmgr.BaseLimit{StreamsInbound: 16, StreamsOutbound: 16, Streams: 32, Memory: 1 << 20},
 		rcmgr.BaseLimitIncrease{},
 	)
-	for _, id := range [...]protocol.ID{identify.ID, identify.IDDelta, identify.IDPush} {
+	for _, id := range [...]protocol.ID{identify.ID, identify.IDPush} {
 		config.AddProtocolLimit(
 			id,
 			rcmgr.BaseLimit{StreamsInbound: 64, StreamsOutbound: 64, Streams: 128, Memory: 4 << 20},

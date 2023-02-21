@@ -11,6 +11,8 @@ import (
 // DefaultTransport has default settings for Transport
 var DefaultTransport = &Transport{}
 
+const ID = "/mplex/6.7.0"
+
 var _ network.Multiplexer = &Transport{}
 
 // Transport implements mux.Multiplexer that constructs

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -191,7 +191,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 	}
 
 	if r.StoreCursor != nil {
-		options = append(options, store.WithCursor(&pb.Index{
+		options = append(options, store.WithCursor(&storepb.Index{
 			Digest:       r.StoreCursor.Digest,
 			ReceiverTime: r.StoreCursor.ReceiverTime,
 			SenderTime:   r.StoreCursor.SenderTime,

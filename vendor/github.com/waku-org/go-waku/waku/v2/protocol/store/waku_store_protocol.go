@@ -9,21 +9,22 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 )
 
 // MaxTimeVariance is the maximum duration in the future allowed for a message timestamp
 const MaxTimeVariance = time.Duration(20) * time.Second
 
-func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*pb.WakuMessage, *pb.PagingInfo, error) {
+func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*wpb.WakuMessage, *pb.PagingInfo, error) {
 	if query.PagingInfo == nil {
 		query.PagingInfo = &pb.PagingInfo{
 			Direction: pb.PagingInfo_FORWARD,
@@ -47,7 +48,7 @@ func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*pb.Wa
 		return nil, &pb.PagingInfo{Cursor: nil}, nil
 	}
 
-	resultMessages := make([]*pb.WakuMessage, len(queryResult))
+	resultMessages := make([]*wpb.WakuMessage, len(queryResult))
 	for i := range queryResult {
 		resultMessages[i] = queryResult[i].Message
 	}
@@ -86,7 +87,7 @@ type MessageProvider interface {
 type Store interface {
 	Start(ctx context.Context) error
 	Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error)
-	Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*pb.WakuMessage, error)
+	Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error)
 	Next(ctx context.Context, r *Result) (*Result, error)
 	Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error)
 	MessageChannel() chan *protocol.Envelope
@@ -184,8 +185,8 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	logger := store.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
 	historyRPCRequest := &pb.HistoryRPC{}
 
-	writer := protoio.NewDelimitedWriter(s)
-	reader := protoio.NewDelimitedReader(s, math.MaxInt32)
+	writer := pbio.NewDelimitedWriter(s)
+	reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
@@ -246,7 +247,7 @@ func (store *WakuStore) Stop() {
 	store.wg.Wait()
 }
 
-func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) ([]*pb.WakuMessage, error) {
+func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) ([]*wpb.WakuMessage, error) {
 	// loops through the candidateList in order and sends the query to each until one of the query gets resolved successfully
 	// returns the number of retrieved messages, or error if all the requests fail
 
@@ -270,7 +271,7 @@ func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, c
 	queryWg.Wait()
 	close(resultChan)
 
-	var messages []*pb.WakuMessage
+	var messages []*wpb.WakuMessage
 	hasResults := false
 	for result := range resultChan {
 		hasResults = true

@@ -27,7 +27,7 @@ var log = logging.Logger("blankhost")
 // BlankHost is the thinnest implementation of the host.Host interface
 type BlankHost struct {
 	n        network.Network
-	mux      *mstream.MultistreamMuxer
+	mux      *mstream.MultistreamMuxer[protocol.ID]
 	cmgr     connmgr.ConnManager
 	eventbus event.Bus
 	emitters struct {
@@ -65,10 +65,10 @@ func NewBlankHost(n network.Network, options ...Option) *BlankHost {
 	bh := &BlankHost{
 		n:    n,
 		cmgr: cfg.cmgr,
-		mux:  mstream.NewMultistreamMuxer(),
+		mux:  mstream.NewMultistreamMuxer[protocol.ID](),
 	}
 	if bh.eventbus == nil {
-		bh.eventbus = eventbus.NewBus()
+		bh.eventbus = eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer()))
 	}
 
 	// subscribe the connection manager to network notifications (has no effect with NullConnMgr)
@@ -158,35 +158,29 @@ func (bh *BlankHost) NewStream(ctx context.Context, p peer.ID, protos ...protoco
 		return nil, err
 	}
 
-	protoStrs := make([]string, len(protos))
-	for i, pid := range protos {
-		protoStrs[i] = string(pid)
-	}
-
-	selected, err := mstream.SelectOneOf(protoStrs, s)
+	selected, err := mstream.SelectOneOf(protos, s)
 	if err != nil {
 		s.Reset()
 		return nil, err
 	}
 
-	selpid := protocol.ID(selected)
-	s.SetProtocol(selpid)
+	s.SetProtocol(selected)
 	bh.Peerstore().AddProtocols(p, selected)
 
 	return s, nil
 }
 
 func (bh *BlankHost) RemoveStreamHandler(pid protocol.ID) {
-	bh.Mux().RemoveHandler(string(pid))
+	bh.Mux().RemoveHandler(pid)
 	bh.emitters.evtLocalProtocolsUpdated.Emit(event.EvtLocalProtocolsUpdated{
 		Removed: []protocol.ID{pid},
 	})
 }
 
 func (bh *BlankHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
-	bh.Mux().AddHandler(string(pid), func(p string, rwc io.ReadWriteCloser) error {
+	bh.Mux().AddHandler(pid, func(p protocol.ID, rwc io.ReadWriteCloser) error {
 		is := rwc.(network.Stream)
-		is.SetProtocol(protocol.ID(p))
+		is.SetProtocol(p)
 		handler(is)
 		return nil
 	})
@@ -195,10 +189,10 @@ func (bh *BlankHost) SetStreamHandler(pid protocol.ID, handler network.StreamHan
 	})
 }
 
-func (bh *BlankHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool, handler network.StreamHandler) {
-	bh.Mux().AddHandlerWithFunc(string(pid), m, func(p string, rwc io.ReadWriteCloser) error {
+func (bh *BlankHost) SetStreamHandlerMatch(pid protocol.ID, m func(protocol.ID) bool, handler network.StreamHandler) {
+	bh.Mux().AddHandlerWithFunc(pid, m, func(p protocol.ID, rwc io.ReadWriteCloser) error {
 		is := rwc.(network.Stream)
-		is.SetProtocol(protocol.ID(p))
+		is.SetProtocol(p)
 		handler(is)
 		return nil
 	})
@@ -216,7 +210,7 @@ func (bh *BlankHost) newStreamHandler(s network.Stream) {
 		return
 	}
 
-	s.SetProtocol(protocol.ID(protoID))
+	s.SetProtocol(protoID)
 
 	go handle(protoID, s)
 }

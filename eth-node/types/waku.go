@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pborman/uuid"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,8 +20,8 @@ type ConnStatus struct {
 }
 
 type WakuV2Peer struct {
-	Protocols []string `json:"protocols"`
-	Addresses []string `json:"addresses"`
+	Protocols []protocol.ID `json:"protocols"`
+	Addresses []string      `json:"addresses"`
 }
 
 type ConnStatusSubscription struct {

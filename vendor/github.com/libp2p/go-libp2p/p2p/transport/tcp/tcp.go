@@ -136,7 +136,7 @@ var _ transport.Transport = &TcpTransport{}
 // created. It represents an entire TCP stack (though it might not necessarily be).
 func NewTCPTransport(upgrader transport.Upgrader, rcmgr network.ResourceManager, opts ...Option) (*TcpTransport, error) {
 	if rcmgr == nil {
-		rcmgr = network.NullResourceManager
+		rcmgr = &network.NullResourceManager{}
 	}
 	tr := &TcpTransport{
 		upgrader:       upgrader,
@@ -181,14 +181,22 @@ func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) 
 		log.Debugw("resource manager blocked outgoing connection", "peer", p, "addr", raddr, "error", err)
 		return nil, err
 	}
+
+	c, err := t.dialWithScope(ctx, raddr, p, connScope)
+	if err != nil {
+		connScope.Done()
+		return nil, err
+	}
+	return c, nil
+}
+
+func (t *TcpTransport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p peer.ID, connScope network.ConnManagementScope) (transport.CapableConn, error) {
 	if err := connScope.SetPeer(p); err != nil {
 		log.Debugw("resource manager blocked outgoing connection for peer", "peer", p, "addr", raddr, "error", err)
-		connScope.Done()
 		return nil, err
 	}
 	conn, err := t.maDial(ctx, raddr)
 	if err != nil {
-		connScope.Done()
 		return nil, err
 	}
 	// Set linger to 0 so we never get stuck in the TIME-WAIT state. When
@@ -201,7 +209,6 @@ func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) 
 		var err error
 		c, err = newTracingConn(conn, true)
 		if err != nil {
-			connScope.Done()
 			return nil, err
 		}
 	}

@@ -56,51 +56,51 @@ func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
 }
 
 // Multiaddress is used to extract all the multiaddresses that are part of a ENR record
-func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
+func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	var result []multiaddr.Multiaddr
 
 	addr, err := enodeToMultiAddr(node)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	result = append(result, addr)
 
 	var multiaddrRaw []byte
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
 		if !enr.IsNotFound(err) {
-			return nil, err
+			return "", nil, err
 		} else {
 			// No multiaddr entry on enr
-			return result, nil
+			return peerID, result, nil
 		}
 	}
 
 	if len(multiaddrRaw) < 2 {
 		// There was no error loading the multiaddr field, but its length is incorrect
-		return result, nil
+		return peerID, result, nil
 	}
 
 	hostInfo, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	offset := 0
 	for {
 		maSize := binary.BigEndian.Uint16(multiaddrRaw[offset : offset+2])
 		if len(multiaddrRaw) < offset+2+int(maSize) {
-			return nil, errors.New("invalid multiaddress field length")
+			return "", nil, errors.New("invalid multiaddress field length")
 		}
 		maRaw := multiaddrRaw[offset+2 : offset+2+int(maSize)]
 		addr, err := multiaddr.NewMultiaddrBytes(maRaw)
 		if err != nil {
-			return nil, fmt.Errorf("invalid multiaddress field length")
+			return "", nil, fmt.Errorf("invalid multiaddress field length")
 		}
 
 		result = append(result, addr.Encapsulate(hostInfo))
@@ -111,12 +111,12 @@ func Multiaddress(node *enode.Node) ([]multiaddr.Multiaddr, error) {
 		}
 	}
 
-	return result, nil
+	return peerID, result, nil
 }
 
 // EnodeToPeerInfo extracts the peer ID and multiaddresses defined in an ENR
 func EnodeToPeerInfo(node *enode.Node) (*peer.AddrInfo, error) {
-	addresses, err := Multiaddress(node)
+	_, addresses, err := Multiaddress(node)
 	if err != nil {
 		return nil, err
 	}
