@@ -192,6 +192,7 @@ func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.S
 	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
 	if fromNetwork.Layer == 1 {
 		hash, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
+		return hash, err
 	}
 	hash, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
 	return hash, err
