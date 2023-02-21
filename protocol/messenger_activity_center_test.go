@@ -11,6 +11,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -110,4 +112,85 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	alice := s.m
+	bob := s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	// Create an community chat
+	response, err := bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+	s.Require().NotNil(community)
+
+	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
+
+	// bob sends a community message
+	inputMessage := &common.Message{}
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
+
+	err = bob.SaveChat(chat)
+	s.Require().NoError(err)
+	_, err = bob.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.Communities()) == 1 },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+
+	// Alice joins the community
+	response, err = alice.JoinCommunity(context.Background(), community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().Len(response.Chats(), 1)
+
+	defaultCommunityChatID := response.Chats()[0].ID
+
+	// bob sends a community message
+	inputMessage = &common.Message{}
+	inputMessage.ChatId = defaultCommunityChatID
+	inputMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
+	inputMessage.CommunityID = community.IDString()
+
+	response, err = alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages(), 1)
+
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	response, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages(), 1)
+
+	s.Require().True(response.Messages()[0].Mentioned)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeMention, response.ActivityCenterNotifications()[0].Type)
 }

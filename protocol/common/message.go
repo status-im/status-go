@@ -78,7 +78,7 @@ const (
 	ContactVerificationStateCanceled
 )
 
-const everyoneMentionTag = "0x00001"
+const EveryoneMentionTag = "0x00001"
 
 type CommandParameters struct {
 	// ID is the ID of the initial message
@@ -516,7 +516,7 @@ func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkSt
 	switch n := node.(type) {
 	case *ast.Mention:
 		mention := string(n.Literal)
-		if mention == v.identity || mention == everyoneMentionTag {
+		if mention == v.identity || mention == EveryoneMentionTag {
 			v.mentioned = true
 		}
 		v.mentions = append(v.mentions, mention)
