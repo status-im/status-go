@@ -188,6 +188,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to handleSyncSavedAddress when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS:
+			var message protobuf.SyncAllKeycards
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.handleSyncKeycards(state, message)
+			if err != nil {
+				m.logger.Error("failed to handleSyncKeycards when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		}
 	}
 	response, err := m.saveDataAndPrepareResponse(state)

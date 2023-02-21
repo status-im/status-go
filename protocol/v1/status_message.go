@@ -318,6 +318,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData((new(protobuf.SyncContactRequestDecision)))
 	case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
 		return m.unmarshalProtobufData(new(protobuf.SyncSavedAddress))
+	case protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS:
+		return m.unmarshalProtobufData(new(protobuf.SyncAllKeycards))
+	case protobuf.ApplicationMetadataMessage_SYNC_KEYCARD_ACTION:
+		return m.unmarshalProtobufData(new(protobuf.SyncKeycardAction))
 	}
 	return nil
 }

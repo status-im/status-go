@@ -62,34 +62,40 @@ func TestKeypairs(t *testing.T) {
 	}
 
 	// Test adding key pairs
-	result, err := db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair1)
+	addedKc, addedAccs, err := db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair1)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
-	result, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair2)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
+	addedKc, addedAccs, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair2)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
-	result, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair3)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
+	addedKc, addedAccs, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair3)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
 	// this should be added
-	result, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(KeyPair{
+	addedKc, addedAccs, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(KeyPair{
 		KeycardUID:        keyPair3.KeycardUID,
 		AccountsAddresses: []types.Address{{0x03}},
 		LastUpdateClock:   keyPair3.LastUpdateClock + 1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, true, result)
+	require.Equal(t, false, addedKc)
+	require.Equal(t, true, addedAccs)
 	// this should not be added as it has clock value less than last updated clock value
-	result, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(KeyPair{
+	addedKc, addedAccs, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(KeyPair{
 		KeycardUID:        keyPair3.KeycardUID,
 		AccountsAddresses: []types.Address{{0x04}},
 		LastUpdateClock:   keyPair3.LastUpdateClock,
 	})
 	require.NoError(t, err)
-	require.Equal(t, false, result)
-	result, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair4)
+	require.Equal(t, false, addedKc)
+	require.Equal(t, false, addedAccs)
+	addedKc, addedAccs, err = db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair4)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
 
 	// Test reading migrated key pairs
 	rows, err := db.GetAllMigratedKeyPairs()
@@ -156,9 +162,8 @@ func TestKeypairs(t *testing.T) {
 	}
 
 	// Test seting a new keycard name
-	result, err = db.SetKeycardName(keyPair1.KeycardUID, "Card101", 1000)
+	err = db.SetKeycardName(keyPair1.KeycardUID, "Card101", 1000)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
 	newKeycardName := ""
@@ -170,9 +175,8 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, "Card101", newKeycardName)
 
 	// Test seting a new keycard name with an old clock value
-	result, err = db.SetKeycardName(keyPair1.KeycardUID, "Card102", 999) // clock is less than the last one
+	err = db.SetKeycardName(keyPair1.KeycardUID, "Card102", 999) // clock is less than the last one
 	require.NoError(t, err)
-	require.Equal(t, false, result)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
 	newKeycardName = ""
@@ -184,9 +188,8 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, "Card101", newKeycardName)
 
 	// Test locking a keycard
-	result, err = db.KeycardLocked(keyPair1.KeycardUID, 1001)
+	err = db.KeycardLocked(keyPair1.KeycardUID, 1001)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
 	locked := false
@@ -201,9 +204,8 @@ func TestKeypairs(t *testing.T) {
 	const numOfAccountsToRemove = 2
 	require.Greater(t, len(keyPair1.AccountsAddresses), numOfAccountsToRemove)
 	accountsToRemove := keyPair1.AccountsAddresses[:numOfAccountsToRemove]
-	result, err = db.RemoveMigratedAccountsForKeycard(keyPair1.KeycardUID, accountsToRemove, 1002)
+	err = db.RemoveMigratedAccountsForKeycard(keyPair1.KeycardUID, accountsToRemove, 1002)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 	rows, err = db.GetMigratedKeyPairByKeyUID(keyPair1.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rows))
@@ -211,9 +213,8 @@ func TestKeypairs(t *testing.T) {
 
 	// Test deleting accounts one by one, with the last deleted account keycard should be delete as well
 	for i, addr := range keyPair4.AccountsAddresses {
-		result, err = db.RemoveMigratedAccountsForKeycard(keyPair4.KeycardUID, []types.Address{addr}, 1003+uint64(i))
+		err = db.RemoveMigratedAccountsForKeycard(keyPair4.KeycardUID, []types.Address{addr}, 1003+uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, true, result)
 	}
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
@@ -227,14 +228,12 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, true, deletedKeyPair4)
 
 	// Test update keycard uid
-	result, err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID, 1100)
+	err = db.UpdateKeycardUID(keyPair1.KeycardUID, keycardUID, 1100)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 
 	// Test unlocking a locked keycard
-	result, err = db.KeycardUnlocked(keycardUID, 1101)
+	err = db.KeycardUnlocked(keycardUID, 1101)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
 	locked = true
@@ -246,9 +245,8 @@ func TestKeypairs(t *testing.T) {
 	require.Equal(t, false, locked)
 
 	// Test detleting a keycard
-	result, err = db.DeleteKeycard(keycardUID, 1102)
+	err = db.DeleteKeycard(keycardUID, 1102)
 	require.NoError(t, err)
-	require.Equal(t, true, result)
 	rows, err = db.GetAllMigratedKeyPairs()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rows))
