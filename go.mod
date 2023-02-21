@@ -78,7 +78,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.5.2-0.20230221135630-99cb08b42f59
+	github.com/waku-org/go-waku v0.5.2-0.20230221221637-74b734c337e9
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 )

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"net"
@@ -74,13 +75,13 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 		localnode.SetStaticIP(ipAddr.IP)
 		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
 
-		return writeMultiaddresses(localnode, multiaddrs)
+		return writeMultiaddresses(localnode, multiaddrs, w.log)
 	} else if !shouldAutoUpdate {
 		// We received a libp2p address update. Autoupdate is disabled
 		// Using a static ip will disable endpoint prediction.
 		localnode.SetStaticIP(ipAddr.IP)
 		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
-		return writeMultiaddresses(localnode, multiaddrs)
+		return writeMultiaddresses(localnode, multiaddrs, w.log)
 	} else {
 		// We received a libp2p address update, but we should still
 		// allow discv5 to update the enr record. We set the localnode
@@ -104,12 +105,12 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 			localnode.Delete(enr.TCP6(0))
 		}
 
-		return writeMultiaddresses(localnode, multiaddrs)
+		return writeMultiaddresses(localnode, multiaddrs, w.log)
 	}
 
 }
 
-func writeMultiaddresses(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr) error {
+func writeMultiaddresses(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, logger *zap.Logger) error {
 	// Randomly shuffle multiaddresses
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
@@ -127,8 +128,16 @@ func writeMultiaddresses(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr) 
 			break
 		} else {
 			failedOnceWritingENR = true
+			localnode.Delete(enr.WithEntry(utils.MultiaddrENRField, struct{}{}))
 		}
 	}
+
+	fmt.Println("WriteMultiaddresses ================================================================")
+	fmt.Println("Multiaddresses:", multiaddrs)
+	fmt.Println("Failed to write ENR?", failedOnceWritingENR)
+	fmt.Println("SuccessIDX:", successIdx)
+	logger.Info("Updating ENR ---", zap.Any("multiaddr", multiaddrs), zap.Int("successIDX", successIdx), zap.Bool("Failed to write enr", failedOnceWritingENR))
+	fmt.Println("------------------------------------------------------------")
 
 	if failedOnceWritingENR {
 		if !couldWriteENRatLeastOnce {
@@ -344,6 +353,11 @@ func (w *WakuNode) getENRAddresses(addrs []ma.Multiaddr) (extAddr *net.TCPAddr, 
 }
 
 func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
+	fmt.Println("SetupENR ================================================================")
+	fmt.Println("Multiaddresses", addrs)
+	w.log.Info("Setup ENR", zap.Any("multiaddresses", addrs))
+	fmt.Println("------------------------------------------------------------")
+
 	ipAddr, multiaddresses, err := w.getENRAddresses(addrs)
 	if err != nil {
 		w.log.Error("obtaining external address", zap.Error(err))
