@@ -454,7 +454,7 @@ func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Cont
 		kp.AccountsAddresses = append(kp.AccountsAddresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	added, err := api.db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(kp)
+	added, err := (*api.messenger).AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx, &kp)
 	if err != nil {
 		return err
 	}
@@ -472,14 +472,8 @@ func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Cont
 }
 
 func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, accountAddresses []string) error {
-	var addresses []types.Address
-	for _, addr := range accountAddresses {
-		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
-	}
-
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.RemoveMigratedAccountsForKeycard(kcUID, addresses, clock)
-	return err
+	return (*api.messenger).RemoveMigratedAccountsForKeycard(ctx, kcUID, accountAddresses, clock)
 }
 
 func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
@@ -496,26 +490,22 @@ func (api *API) GetMigratedKeyPairByKeyUID(ctx context.Context, keyUID string) (
 
 func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.SetKeycardName(kcUID, kpName, clock)
-	return err
+	return (*api.messenger).SetKeycardName(ctx, kcUID, kpName, clock)
 }
 
 func (api *API) KeycardLocked(ctx context.Context, kcUID string) error {
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.KeycardLocked(kcUID, clock)
-	return err
+	return (*api.messenger).KeycardLocked(ctx, kcUID, clock)
 }
 
 func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.KeycardUnlocked(kcUID, clock)
-	return err
+	return (*api.messenger).KeycardUnlocked(ctx, kcUID, clock)
 }
 
 func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.DeleteKeycard(kcUID, clock)
-	return err
+	return (*api.messenger).DeleteKeycard(ctx, kcUID, clock)
 }
 
 func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
@@ -524,6 +514,5 @@ func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
 
 func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
 	clock := uint64(time.Now().Unix())
-	_, err := api.db.UpdateKeycardUID(oldKcUID, newKcUID, clock)
-	return err
+	return (*api.messenger).UpdateKeycardUID(ctx, oldKcUID, newKcUID, clock)
 }

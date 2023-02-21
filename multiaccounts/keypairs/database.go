@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-const (
-	dbTransactionIsNil = "database transaction is nil"
-)
+var errDbTransactionIsNil = errors.New("keycard: database transaction is nil")
 
 type KeyPair struct {
 	KeycardUID        string          `json:"keycard-uid"`
@@ -20,6 +19,47 @@ type KeyPair struct {
 	AccountsAddresses []types.Address `json:"accounts-addresses"`
 	KeyUID            string          `json:"key-uid"`
 	LastUpdateClock   uint64
+}
+
+type KeycardAction struct {
+	Action        string   `json:"action"`
+	OldKeycardUID string   `json:"old-keycard-uid,omitempty"`
+	Keycard       *KeyPair `json:"keycard"`
+}
+
+func (kp *KeyPair) ToSyncKeycard() *protobuf.SyncKeycard {
+	kc := &protobuf.SyncKeycard{
+		Uid:    kp.KeycardUID,
+		Name:   kp.KeycardName,
+		Locked: kp.KeycardLocked,
+		KeyUid: kp.KeyUID,
+		Clock:  kp.LastUpdateClock,
+	}
+
+	for _, addr := range kp.AccountsAddresses {
+		kc.Addresses = append(kc.Addresses, addr.Bytes())
+	}
+
+	return kc
+}
+
+func (kp *KeyPair) FromSyncKeycard(kc *protobuf.SyncKeycard) {
+	kp.KeycardUID = kc.Uid
+	kp.KeycardName = kc.Name
+	kp.KeycardLocked = kc.Locked
+	kp.KeyUID = kc.KeyUid
+	kp.LastUpdateClock = kc.Clock
+
+	for _, addr := range kc.Addresses {
+		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
+	}
+}
+
+func removeElementAtIndex[T any](s []T, index int) []T {
+	if index < 0 || index >= len(s) {
+		panic("keycard: index out of the range")
+	}
+	return append(s[:index], s[index+1:]...)
 }
 
 type KeyPairs struct {
@@ -150,7 +190,7 @@ func (kp *KeyPairs) startTransactionAndCheckIfNeedToProceed(kcUID string, clock 
 	var dbLastUpdateClock uint64
 	err = tx.QueryRow(`SELECT last_update_clock FROM keycards WHERE keycard_uid = ?`, kcUID).Scan(&dbLastUpdateClock)
 	if err != nil {
-		return tx, false, err
+		return tx, err == sql.ErrNoRows, err
 	}
 
 	return tx, dbLastUpdateClock <= clock, nil
@@ -158,7 +198,7 @@ func (kp *KeyPairs) startTransactionAndCheckIfNeedToProceed(kcUID string, clock 
 
 func (kp *KeyPairs) setLastUpdateClock(tx *sql.Tx, kcUID string, clock uint64) (err error) {
 	if tx == nil {
-		return errors.New(dbTransactionIsNil)
+		return errDbTransactionIsNil
 	}
 
 	_, err = tx.Exec(`
@@ -176,7 +216,7 @@ func (kp *KeyPairs) setLastUpdateClock(tx *sql.Tx, kcUID string, clock uint64) (
 func (kp *KeyPairs) getAccountsForKeycard(tx *sql.Tx, kcUID string) ([]types.Address, error) {
 	var accountAddresses []types.Address
 	if tx == nil {
-		return accountAddresses, errors.New(dbTransactionIsNil)
+		return accountAddresses, errDbTransactionIsNil
 	}
 
 	rows, err := tx.Query(`SELECT account_address FROM keycards_accounts WHERE keycard_uid = ?`, kcUID)
@@ -199,7 +239,7 @@ func (kp *KeyPairs) getAccountsForKeycard(tx *sql.Tx, kcUID string) ([]types.Add
 
 func (kp *KeyPairs) addAccounts(tx *sql.Tx, kcUID string, accountsAddresses []types.Address) (err error) {
 	if tx == nil {
-		return errors.New(dbTransactionIsNil)
+		return errDbTransactionIsNil
 	}
 
 	insertKcAcc, err := tx.Prepare(`
@@ -232,7 +272,7 @@ func (kp *KeyPairs) addAccounts(tx *sql.Tx, kcUID string, accountsAddresses []ty
 
 func (kp *KeyPairs) deleteKeycard(tx *sql.Tx, kcUID string) (err error) {
 	if tx == nil {
-		return errors.New(dbTransactionIsNil)
+		return errDbTransactionIsNil
 	}
 
 	delete, err := tx.Prepare(`
@@ -252,7 +292,7 @@ func (kp *KeyPairs) deleteKeycard(tx *sql.Tx, kcUID string) (err error) {
 	return err
 }
 
-func (kp *KeyPairs) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair KeyPair) (added bool, err error) {
+func (kp *KeyPairs) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair KeyPair) (addedKc bool, addedAccs bool, err error) {
 	tx, proceed, err := kp.startTransactionAndCheckIfNeedToProceed(keyPair.KeycardUID, keyPair.LastUpdateClock)
 	defer func() {
 		if err == nil {
@@ -262,8 +302,9 @@ func (kp *KeyPairs) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair KeyP
 		_ = tx.Rollback()
 	}()
 
-	if err != nil {
-		if err == sql.ErrNoRows {
+	if proceed {
+		// insert only if there is no such keycard, otherwise just add accounts
+		if err != nil && err == sql.ErrNoRows {
 			_, err = tx.Exec(`
 				INSERT INTO
 					keycards
@@ -279,31 +320,117 @@ func (kp *KeyPairs) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(keyPair KeyP
 				keyPair.KeycardUID, keyPair.KeycardName, keyPair.KeycardLocked, keyPair.KeyUID, keyPair.LastUpdateClock)
 
 			if err != nil {
-				return false, err
+				return false, false, err
 			}
 
 			err = kp.addAccounts(tx, keyPair.KeycardUID, keyPair.AccountsAddresses)
-			return err == nil, err
+			return err == nil, false, err
 		}
 
-		return false, err
-	}
-
-	if proceed {
 		err = kp.setLastUpdateClock(tx, keyPair.KeycardUID, keyPair.LastUpdateClock)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
 
 		err = kp.addAccounts(tx, keyPair.KeycardUID, keyPair.AccountsAddresses)
-		return err == nil, err
+		return false, err == nil, err
 	}
 
-	return false, nil
+	return false, false, err
+}
+
+func (kp *KeyPairs) SyncKeycards(syncingClock uint64, keypairsToSync []*KeyPair) (err error) {
+	tx, err := kp.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query(`SELECT * FROM keycards`)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	defer rows.Close()
+
+	var dbKeypairs []*KeyPair
+	for rows.Next() {
+		keyPair := &KeyPair{}
+		err := rows.Scan(&keyPair.KeycardUID, &keyPair.KeycardName, &keyPair.KeycardLocked, &keyPair.KeyUID,
+			&keyPair.LastUpdateClock)
+		if err != nil {
+			return err
+		}
+
+		dbKeypairs = append(dbKeypairs, keyPair)
+	}
+
+	// apply those from `keypairsToSync` which are newer
+	for _, syncKp := range keypairsToSync {
+		foundAtIndex := -1
+		for i := range dbKeypairs {
+			if dbKeypairs[i].KeycardUID == syncKp.KeycardUID {
+				foundAtIndex = i
+				break
+			}
+		}
+
+		doInsertOrReplace := true
+		if foundAtIndex > -1 {
+			if dbKeypairs[foundAtIndex].LastUpdateClock > syncKp.LastUpdateClock {
+				doInsertOrReplace = false
+			}
+			dbKeypairs = removeElementAtIndex(dbKeypairs, foundAtIndex)
+		}
+
+		if doInsertOrReplace {
+			_, err = tx.Exec(`
+				INSERT OR REPLACE INTO
+					keycards
+					(
+						keycard_uid,
+						keycard_name,
+						keycard_locked,
+						key_uid,
+						last_update_clock
+					)
+				VALUES
+					(?, ?, ?, ?, ?);`,
+				syncKp.KeycardUID, syncKp.KeycardName, syncKp.KeycardLocked, syncKp.KeyUID, syncKp.LastUpdateClock)
+
+			if err != nil {
+				return err
+			}
+
+			err = kp.addAccounts(tx, syncKp.KeycardUID, syncKp.AccountsAddresses)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// remove those from the db if they are not in `keypairsToSync` and if they are older than the moment `keypairsToSync` was created at
+	for _, dbKp := range dbKeypairs {
+		if dbKp.LastUpdateClock > syncingClock {
+			continue
+		}
+
+		err = kp.deleteKeycard(tx, dbKp.KeycardUID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddresses []types.Address,
-	clock uint64) (removed bool, err error) {
+	clock uint64) (err error) {
 	tx, proceed, err := kp.startTransactionAndCheckIfNeedToProceed(kcUID, clock)
 	defer func() {
 		if err == nil {
@@ -314,18 +441,18 @@ func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddres
 	}()
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if proceed {
 		err = kp.setLastUpdateClock(tx, kcUID, clock)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		dbAccountAddresses, err := kp.getAccountsForKeycard(tx, kcUID)
 		if err != nil {
-			return false, err
+			return err
 		}
 		deleteKeycard := true
 		for _, dbAddr := range dbAccountAddresses {
@@ -341,8 +468,7 @@ func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddres
 		}
 
 		if deleteKeycard {
-			err = kp.deleteKeycard(tx, kcUID)
-			return err == nil, err
+			return kp.deleteKeycard(tx, kcUID)
 		}
 
 		inVector := strings.Repeat(",?", len(accountAddresses)-1)
@@ -357,7 +483,7 @@ func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddres
 		`
 		delete, err := tx.Prepare(query)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		args := make([]interface{}, len(accountAddresses)+1)
@@ -370,13 +496,13 @@ func (kp *KeyPairs) RemoveMigratedAccountsForKeycard(kcUID string, accountAddres
 
 		_, err = delete.Exec(args...)
 
-		return true, err
+		return err
 	}
 
-	return false, nil
+	return err
 }
 
-func (kp *KeyPairs) execUpdateQuery(kcUID string, clock uint64, field string, value interface{}) (updated bool, err error) {
+func (kp *KeyPairs) execUpdateQuery(kcUID string, clock uint64, field string, value interface{}) (err error) {
 	tx, proceed, err := kp.startTransactionAndCheckIfNeedToProceed(kcUID, clock)
 	defer func() {
 		if err == nil {
@@ -387,35 +513,35 @@ func (kp *KeyPairs) execUpdateQuery(kcUID string, clock uint64, field string, va
 	}()
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if proceed {
 		sql := fmt.Sprintf(`UPDATE keycards SET %s = ?, last_update_clock = ?	WHERE keycard_uid = ?`, field) // nolint: gosec
 		_, err = tx.Exec(sql, value, clock, kcUID)
-		return err == nil, err
+		return err
 	}
 
-	return false, nil
+	return nil
 }
 
-func (kp *KeyPairs) KeycardLocked(kcUID string, clock uint64) (updated bool, err error) {
+func (kp *KeyPairs) KeycardLocked(kcUID string, clock uint64) (err error) {
 	return kp.execUpdateQuery(kcUID, clock, "keycard_locked", true)
 }
 
-func (kp *KeyPairs) KeycardUnlocked(kcUID string, clock uint64) (updated bool, err error) {
+func (kp *KeyPairs) KeycardUnlocked(kcUID string, clock uint64) (err error) {
 	return kp.execUpdateQuery(kcUID, clock, "keycard_locked", false)
 }
 
-func (kp *KeyPairs) UpdateKeycardUID(oldKcUID string, newKcUID string, clock uint64) (updated bool, err error) {
+func (kp *KeyPairs) UpdateKeycardUID(oldKcUID string, newKcUID string, clock uint64) (err error) {
 	return kp.execUpdateQuery(oldKcUID, clock, "keycard_uid", newKcUID)
 }
 
-func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string, clock uint64) (updated bool, err error) {
+func (kp *KeyPairs) SetKeycardName(kcUID string, kpName string, clock uint64) (err error) {
 	return kp.execUpdateQuery(kcUID, clock, "keycard_name", kpName)
 }
 
-func (kp *KeyPairs) DeleteKeycard(kcUID string, clock uint64) (deleted bool, err error) {
+func (kp *KeyPairs) DeleteKeycard(kcUID string, clock uint64) (err error) {
 	tx, proceed, err := kp.startTransactionAndCheckIfNeedToProceed(kcUID, clock)
 	defer func() {
 		if err == nil {
@@ -426,15 +552,14 @@ func (kp *KeyPairs) DeleteKeycard(kcUID string, clock uint64) (deleted bool, err
 	}()
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if proceed {
-		err = kp.deleteKeycard(tx, kcUID)
-		return err == nil, err
+		return kp.deleteKeycard(tx, kcUID)
 	}
 
-	return false, nil
+	return err
 }
 
 func (kp *KeyPairs) DeleteKeypair(keyUID string) (err error) {

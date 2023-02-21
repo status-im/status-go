@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/keypairs"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -69,6 +70,8 @@ type MessengerResponse struct {
 	trustStatus                 map[string]verification.TrustStatus
 	emojiReactions              map[string]*EmojiReaction
 	savedAddresses              map[string]*wallet.SavedAddress
+	keycards                    []*keypairs.KeyPair
+	keycardActions              []*keypairs.KeycardAction
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -107,6 +110,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
+		Keycards                      []*keypairs.KeyPair                  `json:"keycards,omitempty"`
+		KeycardActions                []*keypairs.KeycardAction            `json:"keycardActions,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -138,6 +143,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories:             r.DiscordCategories,
 		DiscordChannels:               r.DiscordChannels,
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
+		Keycards:                      r.AllKnownKeycards(),
+		KeycardActions:                r.KeycardActions(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -262,6 +269,8 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity) == 0 &&
 		len(r.savedAddresses) == 0 &&
+		len(r.keycards) == 0 &&
+		len(r.keycardActions) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil
 }
@@ -293,6 +302,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddEmojiReactions(response.EmojiReactions())
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
+	r.AddAllKnownKeycards(response.AllKnownKeycards())
+	r.AddKeycardActions(response.KeycardActions())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 
 	return nil
@@ -422,6 +433,26 @@ func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
 		ers = append(ers, er)
 	}
 	return ers
+}
+
+func (r *MessengerResponse) AddAllKnownKeycards(keycards []*keypairs.KeyPair) {
+	r.keycards = append(r.keycards, keycards...)
+}
+
+func (r *MessengerResponse) AllKnownKeycards() []*keypairs.KeyPair {
+	return r.keycards
+}
+
+func (r *MessengerResponse) AddKeycardAction(keycardAction *keypairs.KeycardAction) {
+	r.keycardActions = append(r.keycardActions, keycardAction)
+}
+
+func (r *MessengerResponse) AddKeycardActions(keycardActions []*keypairs.KeycardAction) {
+	r.keycardActions = append(r.keycardActions, keycardActions...)
+}
+
+func (r *MessengerResponse) KeycardActions() []*keypairs.KeycardAction {
+	return r.keycardActions
 }
 
 func (r *MessengerResponse) AddNotification(n *localnotifications.Notification) {
