@@ -1,4 +1,4 @@
-library 'status-jenkins-lib@v1.6.4'
+library 'status-jenkins-lib@v1.6.7'
 
 pipeline {
   agent { label 'linux && x86_64 && go-1.18' }
