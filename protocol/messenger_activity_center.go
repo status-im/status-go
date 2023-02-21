@@ -28,6 +28,10 @@ func (m *Messenger) UnreadActivityCenterNotificationsByGroupCount(activityGroup 
 	return m.persistence.ActivityCenterNotificationsByGroupCount(activityGroup, ActivityCenterQueryParamsReadUnread)
 }
 
+func (m *Messenger) ActivityCenterTypesByGroup(activityGroup ActivityCenterGroup) ([]ActivityCenterType, error) {
+	return activityGroup.NotificationTypes(), nil
+}
+
 func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
 	return m.persistence.HasUnseenActivityCenterNotifications()
 }
