@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -64,6 +65,36 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 	return stack, nil
 }
 
+func getUsableTCPPort() (int, error) {
+	conn, err := net.ListenTCP("tcp", &net.TCPAddr{
+		IP:   net.IPv4zero,
+		Port: 0,
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	return conn.Addr().(*net.TCPAddr).Port, nil
+}
+
+func handleListenAddr(listenAddr string) (string, error) {
+	if listenAddr == "" {
+		return "", nil
+	}
+	ip, port, err := net.SplitHostPort(listenAddr)
+	if err != nil {
+		return "", err
+	}
+	if port == "0" {
+		randomPort, err := getUsableTCPPort()
+		if err != nil {
+			return "", err
+		}
+		listenAddr = net.JoinHostPort(ip, fmt.Sprintf("%d", randomPort))
+	}
+	return listenAddr, nil
+}
+
 // newGethNodeConfig returns default stack configuration for mobile client node
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	// NOTE: I haven't changed anything related to this parameters, but
@@ -80,6 +111,11 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		maxPendingPeers = config.MaxPendingPeers
 	}
 
+	listenAddr, err := handleListenAddr(config.ListenAddr)
+	if err != nil {
+		return nil, err
+	}
+
 	nc := &node.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
@@ -89,7 +125,7 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery:     true, // we always use only v5 server
-			ListenAddr:      config.ListenAddr,
+			ListenAddr:      listenAddr,
 			NAT:             nat.Any(),
 			MaxPeers:        maxPeers,
 			MaxPendingPeers: maxPendingPeers,
