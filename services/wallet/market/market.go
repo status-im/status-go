@@ -1,7 +1,10 @@
-package price
+package market
 
 import (
+	"sync"
 	"time"
+
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 type DataPoint struct {
@@ -12,15 +15,36 @@ type DataPoint struct {
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 
 type Manager struct {
-	priceProvider Provider
-	priceCache    DataPerTokenAndCurrency
+	provider        thirdparty.MarketDataProvider
+	priceCache      DataPerTokenAndCurrency
+	IsConnected     bool
+	LastCheckedAt   int64
+	IsConnectedLock sync.RWMutex
 }
 
-func NewManager(priceProvider Provider) *Manager {
+func NewManager(provider thirdparty.MarketDataProvider) *Manager {
 	return &Manager{
-		priceProvider: priceProvider,
+		provider:      provider,
 		priceCache:    make(DataPerTokenAndCurrency),
+		IsConnected:   true,
+		LastCheckedAt: time.Now().Unix(),
 	}
+}
+
+func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+	return pm.provider.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+}
+
+func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+	return pm.provider.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+}
+
+func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	return pm.provider.FetchTokenMarketValues(symbols, currency)
+}
+
+func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
+	return pm.provider.FetchTokenDetails(symbols)
 }
 
 func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
@@ -37,7 +61,7 @@ func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
 }
 
 func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	result, err := pm.priceProvider.FetchPrices(symbols, currencies)
+	result, err := pm.provider.FetchPrices(symbols, currencies)
 	if err != nil {
 		return nil, err
 	}

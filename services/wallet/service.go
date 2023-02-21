@@ -18,8 +18,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/chain"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
-	"github.com/status-im/status-go/services/wallet/price"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -32,9 +33,9 @@ type Connection struct {
 }
 
 type ConnectedResult struct {
-	Infura        map[uint64]Connection `json:"infura"`
-	CryptoCompare Connection            `json:"cryptoCompare"`
-	Opensea       map[uint64]Connection `json:"opensea"`
+	Blockchain   map[uint64]Connection `json:"blockchain"`
+	Market       Connection            `json:"market"`
+	Collectibles map[uint64]Connection `json:"collectibles"`
 }
 
 // NewService initializes service instance.
@@ -61,11 +62,11 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
-	cryptoCompare := thirdparty.NewCryptoCompare()
-	priceManager := price.NewManager(cryptoCompare)
-	reader := NewReader(rpcClient, tokenManager, priceManager, cryptoCompare, accountsDB, walletFeed)
-	history := history.NewService(db, walletFeed, rpcClient, tokenManager, cryptoCompare)
-	currency := currency.NewService(db, walletFeed, tokenManager, priceManager)
+	cryptoCompare := cryptocompare.NewClient()
+	marketManager := market.NewManager(cryptoCompare)
+	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, walletFeed)
+	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
+	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -78,14 +79,13 @@ func NewService(
 		openseaAPIKey:         openseaAPIKey,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
-		priceManager:          priceManager,
+		marketManager:         marketManager,
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
 		feed:                  accountFeed,
 		signals:               signals,
 		reader:                reader,
-		cryptoCompare:         cryptoCompare,
 		history:               history,
 		currency:              currency,
 	}
@@ -102,7 +102,7 @@ type Service struct {
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
-	priceManager          *price.Manager
+	marketManager         *market.Manager
 	started               bool
 	openseaAPIKey         string
 	gethManager           *account.GethManager
@@ -112,7 +112,6 @@ type Service struct {
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
-	cryptoCompare         *thirdparty.CryptoCompare
 	history               *history.Service
 	currency              *currency.Service
 }
@@ -167,27 +166,27 @@ func (s *Service) IsStarted() bool {
 }
 
 func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
-	infura := make(map[uint64]Connection)
+	blockchain := make(map[uint64]Connection)
 	for chainID, client := range chain.ChainClientInstances {
-		infura[chainID] = Connection{
+		blockchain[chainID] = Connection{
 			Up:            client.IsConnected,
 			LastCheckedAt: client.LastCheckedAt,
 		}
 	}
 
-	opensea := make(map[uint64]Connection)
-	for chainID, client := range OpenseaClientInstances {
-		opensea[chainID] = Connection{
+	collectibles := make(map[uint64]Connection)
+	for chainID, client := range opensea.OpenseaClientInstances {
+		collectibles[chainID] = Connection{
 			Up:            client.IsConnected,
 			LastCheckedAt: client.LastCheckedAt,
 		}
 	}
 	return &ConnectedResult{
-		Infura:  infura,
-		Opensea: opensea,
-		CryptoCompare: Connection{
-			Up:            s.cryptoCompare.IsConnected,
-			LastCheckedAt: s.cryptoCompare.LastCheckedAt,
+		Blockchain:   blockchain,
+		Collectibles: collectibles,
+		Market: Connection{
+			Up:            s.marketManager.IsConnected,
+			LastCheckedAt: s.marketManager.LastCheckedAt,
 		},
 	}
 }

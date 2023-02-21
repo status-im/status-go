@@ -458,7 +458,7 @@ func (r *Router) suggestedRoutes(
 		return nil, err
 	}
 
-	pricesMap, err := r.s.priceManager.FetchPrices([]string{"ETH", tokenSymbol}, []string{"USD"})
+	pricesMap, err := r.s.marketManager.FetchPrices([]string{"ETH", tokenSymbol}, []string{"USD"})
 	if err != nil {
 		return nil, err
 	}

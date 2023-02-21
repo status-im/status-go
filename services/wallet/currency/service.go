@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/services/wallet/price"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -26,9 +26,9 @@ type Service struct {
 	cancelFn     context.CancelFunc
 }
 
-func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager, priceManager *price.Manager) *Service {
+func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager, marketManager *market.Manager) *Service {
 	return &Service{
-		currency:     NewCurrency(priceManager),
+		currency:     NewCurrency(marketManager),
 		db:           NewCurrencyDB(db),
 		tokenManager: tokenManager,
 		walletFeed:   walletFeed,

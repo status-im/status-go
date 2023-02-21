@@ -1,4 +1,4 @@
-package wallet
+package opensea
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ import (
 const AssetLimit = 50
 const CollectionLimit = 300
 
-var OpenseaClientInstances = make(map[uint64]*OpenseaClient)
+var OpenseaClientInstances = make(map[uint64]*Client)
 
 var BaseURLs = map[uint64]string{
 	1: "https://api.opensea.io/api/v1",
@@ -46,26 +46,26 @@ func (st *TraitValue) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type OpenseaAssetContainer struct {
-	Assets []OpenseaAsset `json:"assets"`
+type AssetContainer struct {
+	Assets []Asset `json:"assets"`
 }
 
-type OpenseaAssetCollection struct {
+type AssetCollection struct {
 	Name string `json:"name"`
 }
 
-type OpenseaContract struct {
+type Contract struct {
 	Address string `json:"address"`
 }
 
-type OpenseaTrait struct {
+type Trait struct {
 	TraitType   string     `json:"trait_type"`
 	Value       TraitValue `json:"value"`
 	DisplayType string     `json:"display_type"`
 	MaxValue    string     `json:"max_value"`
 }
 
-type OpenseaPaymentToken struct {
+type PaymentToken struct {
 	ID       int    `json:"id"`
 	Symbol   string `json:"symbol"`
 	Address  string `json:"address"`
@@ -76,42 +76,42 @@ type OpenseaPaymentToken struct {
 	UsdPrice string `json:"usd_price"`
 }
 
-type OpenseaLastSale struct {
-	PaymentToken OpenseaPaymentToken `json:"payment_token"`
+type LastSale struct {
+	PaymentToken PaymentToken `json:"payment_token"`
 }
 
-type OpenseaSellOrder struct {
+type SellOrder struct {
 	CurrentPrice string `json:"current_price"`
 }
-type OpenseaAsset struct {
-	ID                int                    `json:"id"`
-	Name              string                 `json:"name"`
-	Description       string                 `json:"description"`
-	Permalink         string                 `json:"permalink"`
-	ImageThumbnailURL string                 `json:"image_thumbnail_url"`
-	ImageURL          string                 `json:"image_url"`
-	Contract          OpenseaContract        `json:"asset_contract"`
-	Collection        OpenseaAssetCollection `json:"collection"`
-	Traits            []OpenseaTrait         `json:"traits"`
-	LastSale          OpenseaLastSale        `json:"last_sale"`
-	SellOrders        []OpenseaSellOrder     `json:"sell_orders"`
-	BackgroundColor   string                 `json:"background_color"`
+type Asset struct {
+	ID                int             `json:"id"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description"`
+	Permalink         string          `json:"permalink"`
+	ImageThumbnailURL string          `json:"image_thumbnail_url"`
+	ImageURL          string          `json:"image_url"`
+	Contract          Contract        `json:"asset_contract"`
+	Collection        AssetCollection `json:"collection"`
+	Traits            []Trait         `json:"traits"`
+	LastSale          LastSale        `json:"last_sale"`
+	SellOrders        []SellOrder     `json:"sell_orders"`
+	BackgroundColor   string          `json:"background_color"`
 }
 
-type OpenseaCollectionTrait struct {
+type CollectionTrait struct {
 	Min float64 `json:"min"`
 	Max float64 `json:"max"`
 }
 
-type OpenseaCollection struct {
-	Name            string                            `json:"name"`
-	Slug            string                            `json:"slug"`
-	ImageURL        string                            `json:"image_url"`
-	OwnedAssetCount int                               `json:"owned_asset_count"`
-	Traits          map[string]OpenseaCollectionTrait `json:"traits"`
+type Collection struct {
+	Name            string                     `json:"name"`
+	Slug            string                     `json:"slug"`
+	ImageURL        string                     `json:"image_url"`
+	OwnedAssetCount int                        `json:"owned_asset_count"`
+	Traits          map[string]CollectionTrait `json:"traits"`
 }
 
-type OpenseaClient struct {
+type Client struct {
 	client          *http.Client
 	url             string
 	apiKey          string
@@ -121,7 +121,7 @@ type OpenseaClient struct {
 }
 
 // new opensea client.
-func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
+func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 	if client, ok := OpenseaClientInstances[chainID]; ok {
 		if client.apiKey == apiKey {
 			return client, nil
@@ -132,7 +132,7 @@ func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
 		Timeout: time.Second * 5,
 	}
 	if url, ok := BaseURLs[chainID]; ok {
-		openseaClient := &OpenseaClient{client: client, url: url, apiKey: apiKey, IsConnected: true, LastCheckedAt: time.Now().Unix()}
+		openseaClient := &Client{client: client, url: url, apiKey: apiKey, IsConnected: true, LastCheckedAt: time.Now().Unix()}
 		OpenseaClientInstances[chainID] = openseaClient
 		return openseaClient, nil
 	}
@@ -140,9 +140,9 @@ func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
 	return nil, errors.New("ChainID not supported")
 }
 
-func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]OpenseaCollection, error) {
+func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]Collection, error) {
 	offset := 0
-	var collections []OpenseaCollection
+	var collections []Collection
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
 	o.LastCheckedAt = time.Now().Unix()
@@ -154,7 +154,7 @@ func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]Open
 			return nil, err
 		}
 
-		var tmp []OpenseaCollection
+		var tmp []Collection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
 			o.IsConnected = false
@@ -171,9 +171,9 @@ func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]Open
 	return collections, nil
 }
 
-func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]OpenseaAsset, error) {
+func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]Asset, error) {
 	offset := 0
-	var assets []OpenseaAsset
+	var assets []Asset
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
 	o.LastCheckedAt = time.Now().Unix()
@@ -185,7 +185,7 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 			return nil, err
 		}
 
-		container := OpenseaAssetContainer{}
+		container := AssetContainer{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
 			o.IsConnected = false
@@ -213,7 +213,7 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 	return assets, nil
 }
 
-func (o *OpenseaClient) doOpenseaRequest(url string) ([]byte, error) {
+func (o *Client) doOpenseaRequest(url string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
