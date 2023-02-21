@@ -23,6 +23,7 @@ pipeline {
 
   environment {
     TARGET   = 'tests'
+    DB_CONT  = 'status-go-test-db'
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     PATH     = "${PATH}:${GOPATH}/bin"
@@ -62,11 +63,16 @@ pipeline {
 
     stage('Unit Tests') {
       steps { script {
-        docker.image('postgres:9.6-alpine').withRun(
-          '-e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432'
-        ) { c ->
+        db = docker.image('postgres:9.6-alpine').withRun([
+          "--name=${DB_CONT}",
+          '--env=POSTGRES_HOST_AUTH_METHOD=trust',
+          '--publish=5432:5432',
+        ].join(' ')) { c ->
           nix.shell('make test-unit V=1', pure: false)
         }
+      } }
+      post { cleanup { /* Leftover DB containers. */
+        sh "docker rm ${DB_CONT} || true"
       } }
     }
   } // stages
