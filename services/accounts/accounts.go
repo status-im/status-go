@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -443,22 +444,23 @@ func (api *API) VerifyPassword(password string) bool {
 
 func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
 	kp := keypairs.KeyPair{
-		KeycardUID:    kcUID,
-		KeycardName:   kpName,
-		KeycardLocked: false,
-		KeyUID:        keyUID,
+		KeycardUID:      kcUID,
+		KeycardName:     kpName,
+		KeycardLocked:   false,
+		KeyUID:          keyUID,
+		LastUpdateClock: uint64(time.Now().Unix()),
 	}
 	for _, addr := range accountAddresses {
 		kp.AccountsAddresses = append(kp.AccountsAddresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	err := api.db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(kp)
+	added, err := api.db.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(kp)
 	if err != nil {
 		return err
 	}
 
 	// Once we migrate a keypair, corresponding keystore files need to be deleted.
-	if len(password) > 0 {
+	if added && len(password) > 0 {
 		for _, addr := range kp.AccountsAddresses {
 			err = api.manager.DeleteAccount(addr, password)
 			if err != nil {
@@ -475,7 +477,9 @@ func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID stri
 		addresses = append(addresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	return api.db.RemoveMigratedAccountsForKeycard(kcUID, addresses)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.RemoveMigratedAccountsForKeycard(kcUID, addresses, clock)
+	return err
 }
 
 func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
@@ -491,19 +495,27 @@ func (api *API) GetMigratedKeyPairByKeyUID(ctx context.Context, keyUID string) (
 }
 
 func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
-	return api.db.SetKeycardName(kcUID, kpName)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.SetKeycardName(kcUID, kpName, clock)
+	return err
 }
 
 func (api *API) KeycardLocked(ctx context.Context, kcUID string) error {
-	return api.db.KeycardLocked(kcUID)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.KeycardLocked(kcUID, clock)
+	return err
 }
 
 func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
-	return api.db.KeycardUnlocked(kcUID)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.KeycardUnlocked(kcUID, clock)
+	return err
 }
 
 func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
-	return api.db.DeleteKeycard(kcUID)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.DeleteKeycard(kcUID, clock)
+	return err
 }
 
 func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
@@ -511,5 +523,7 @@ func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
 }
 
 func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
-	return api.db.UpdateKeycardUID(oldKcUID, newKcUID)
+	clock := uint64(time.Now().Unix())
+	_, err := api.db.UpdateKeycardUID(oldKcUID, newKcUID, clock)
+	return err
 }
