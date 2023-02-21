@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -57,12 +59,12 @@ func (w *gethWakuWrapper) StopDiscV5() error {
 }
 
 // PeerCount function only added for compatibility with waku V2
-func (w *gethWakuWrapper) AddStorePeer(address string) (string, error) {
+func (w *gethWakuWrapper) AddStorePeer(address string) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
 }
 
 // AddRelayPeer function only added for compatibility with waku V2
-func (w *gethWakuWrapper) AddRelayPeer(address string) (string, error) {
+func (w *gethWakuWrapper) AddRelayPeer(address string) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
 }
 

@@ -1151,15 +1151,12 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return hash, nil
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
 	}
 
-	requestID := protocol.GenerateRequestId()
-
-	opts = append(opts, store.WithRequestId(requestID))
 	opts = append(opts, store.WithPeer(peerID))
 
 	query := store.Query{
@@ -1169,7 +1166,13 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 		Topic:         relay.DefaultWakuTopic,
 	}
 
-	result, err := w.node.Store().Query(ctx, query, opts...)
+	return w.node.Store().Query(ctx, query, opts...)
+}
+
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
+	requestID := protocol.GenerateRequestId()
+	opts = append(opts, store.WithRequestId(requestID))
+	result, err := w.query(ctx, peerID, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
 		signal.SendHistoricMessagesRequestFailed(requestID, peerID, err)
@@ -1470,7 +1473,7 @@ func (w *Waku) restartDiscV5() error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address string) (string, error) {
+func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 	addr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return "", err
@@ -1480,7 +1483,7 @@ func (w *Waku) AddStorePeer(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(peerID), nil
+	return peerID, nil
 }
 
 func (w *Waku) timestamp() int64 {
@@ -1533,7 +1536,7 @@ func (w *Waku) autoRelayPeerSource(ctx context.Context, numPeers int) <-chan pee
 	return output
 }
 
-func (w *Waku) AddRelayPeer(address string) (string, error) {
+func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 	addr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return "", err
@@ -1543,7 +1546,7 @@ func (w *Waku) AddRelayPeer(address string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(peerID), nil
+	return peerID, nil
 }
 
 func (w *Waku) DialPeer(address string) error {

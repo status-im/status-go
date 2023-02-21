@@ -234,11 +234,11 @@ func (w *gethWakuV2Wrapper) StopDiscV5() error {
 	return w.waku.StopDiscV5()
 }
 
-func (w *gethWakuV2Wrapper) AddStorePeer(address string) (string, error) {
+func (w *gethWakuV2Wrapper) AddStorePeer(address string) (peer.ID, error) {
 	return w.waku.AddStorePeer(address)
 }
 
-func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (string, error) {
+func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (peer.ID, error) {
 	return w.waku.AddRelayPeer(address)
 }
 
