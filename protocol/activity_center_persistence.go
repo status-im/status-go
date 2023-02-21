@@ -322,7 +322,7 @@ type activityCenterQueryParams struct {
 	activityCenterTypes []ActivityCenterType
 }
 
-func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
+func (db sqlitePersistence) prepareQueryConditionsAndArgs(params activityCenterQueryParams) ([]interface{}, string) {
 	var args []interface{}
 	var conditions []string
 
@@ -330,7 +330,6 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	ids := params.ids
 	author := params.author
 	activityCenterTypes := params.activityCenterTypes
-	limit := params.limit
 	chatID := params.chatID
 	read := params.read
 	accepted := params.accepted
@@ -382,6 +381,12 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
+	return args, conditionsString
+}
+
+func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
+	args, conditionsString := db.prepareQueryConditionsAndArgs(params)
+
 	query := fmt.Sprintf( // nolint: gosec
 		`
 	SELECT
@@ -408,8 +413,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	%s
 	ORDER BY cursor DESC`, conditionsString)
 
-	if limit != 0 {
-		args = append(args, limit)
+	if params.limit != 0 {
+		args = append(args, params.limit)
 		query += ` LIMIT ?`
 	}
 
@@ -422,34 +427,14 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 }
 
 func (db sqlitePersistence) buildActivityCenterNotificationsCountQuery(isAccepted bool, read ActivityCenterQueryParamsRead, activityCenterTypes []ActivityCenterType) *sql.Row {
-	var args []interface{}
-	var conditions []string
-
-	if !isAccepted {
-		conditions = append(conditions, "NOT accepted")
+	params := activityCenterQueryParams{
+		accepted:            isAccepted,
+		read:                read,
+		activityCenterTypes: activityCenterTypes,
 	}
 
-	switch read {
-	case ActivityCenterQueryParamsReadRead:
-		conditions = append(conditions, "read = 1")
-	case ActivityCenterQueryParamsReadUnread:
-		conditions = append(conditions, "NOT read")
-	}
-
-	if len(activityCenterTypes) > 0 {
-		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
-		conditions = append(conditions, fmt.Sprintf("notification_type IN (%s)", inVector))
-		for _, activityCenterType := range activityCenterTypes {
-			args = append(args, activityCenterType)
-		}
-	}
-
-	var conditionsString string
-	if len(conditions) > 0 {
-		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	query := fmt.Sprintf(`SELECT COUNT(1) FROM activity_center_notifications %s`, conditionsString)
+	args, conditionsString := db.prepareQueryConditionsAndArgs(params)
+	query := fmt.Sprintf(`SELECT COUNT(1) FROM activity_center_notifications a %s`, conditionsString)
 
 	return db.db.QueryRow(query, args...)
 }
