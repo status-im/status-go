@@ -272,7 +272,8 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.HTTPPort = 8545
 	// FIXME: This should be taken from CLI flags.
 	nodeConfig.HTTPHost = "0.0.0.0"
-	nodeConfig.HTTPVirtualHosts = []string{"localhost"}
+	// FIXME: This should be taken from CLI flags.
+	nodeConfig.HTTPVirtualHosts = []string{"localhost", "wakunode"}
 	nodeConfig.APIModules = "wakuext,ext,waku"
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
