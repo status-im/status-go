@@ -1186,11 +1186,13 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 }
 
 func (api *PublicAPI) AddStorePeer(address string) (string, error) {
-	return api.service.messenger.AddStorePeer(address)
+	peerID, err := api.service.messenger.AddStorePeer(address)
+	return string(peerID), err
 }
 
 func (api *PublicAPI) AddRelayPeer(address string) (string, error) {
-	return api.service.messenger.AddRelayPeer(address)
+	peerID, err := api.service.messenger.AddRelayPeer(address)
+	return string(peerID), err
 }
 
 func (api *PublicAPI) DialPeer(address string) error {

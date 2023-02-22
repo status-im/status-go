@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pborman/uuid"
 
@@ -87,9 +88,9 @@ type Waku interface {
 
 	StopDiscV5() error
 
-	AddStorePeer(address string) (string, error)
+	AddStorePeer(address string) (peer.ID, error)
 
-	AddRelayPeer(address string) (string, error)
+	AddRelayPeer(address string) (peer.ID, error)
 
 	DialPeer(address string) error
 
