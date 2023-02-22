@@ -16,18 +16,24 @@ type Balance struct {
 	db *BalanceDB
 }
 
-type blocksStride = int
-
 const (
-	blockTime = time.Duration(12) * time.Second
-	aDay      = time.Duration(24) * time.Hour
+	defaultChains = uint64(0)
+	aDay          = time.Duration(24) * time.Hour
 )
+
+var averageBlockDurationForChain = map[uint64]time.Duration{
+	defaultChains: time.Duration(12000) * time.Millisecond,
+	10:            time.Duration(400) * time.Millisecond,  // Optimism
+	420:           time.Duration(2000) * time.Millisecond, // Optimism Testnet
+	42161:         time.Duration(300) * time.Millisecond,  // Arbitrum
+	421611:        time.Duration(1500) * time.Millisecond, // Arbitrum Testnet
+}
 
 // Must have a common divisor to share common blocks and increase the cache hit
 const (
-	twiceADayStride  blocksStride = blocksStride((time.Duration(12) * time.Hour) / blockTime)
-	weekStride                    = 14 * twiceADayStride
-	fourMonthsStride              = 4 /*months*/ * 4 * weekStride
+	twiceADayStride  time.Duration = time.Duration(12) * time.Hour
+	weekStride                     = 14 * twiceADayStride
+	fourMonthsStride               = 4 /*months*/ * 4 * weekStride
 )
 
 // bitsetFilters used to fetch relevant data points in one batch and to increase cache hit
@@ -63,12 +69,21 @@ var timeIntervalToBitsetFilter = map[TimeInterval]bitsetFilter{
 	BalanceHistoryAllTime: filterAllTime,
 }
 
-var timeIntervalToStride = map[TimeInterval]blocksStride{
+var timeIntervalToStrideDuration = map[TimeInterval]time.Duration{
 	BalanceHistory7Days:   twiceADayStride,
 	BalanceHistory1Month:  twiceADayStride,
 	BalanceHistory6Months: weekStride,
 	BalanceHistory1Year:   weekStride,
 	BalanceHistoryAllTime: fourMonthsStride,
+}
+
+func strideBlockCount(timeInterval TimeInterval, chainID uint64) int {
+	blockDuration, found := averageBlockDurationForChain[chainID]
+	if !found {
+		blockDuration = averageBlockDurationForChain[defaultChains]
+	}
+
+	return int(timeIntervalToStrideDuration[timeInterval] / blockDuration)
 }
 
 func NewBalance(db *BalanceDB) *Balance {
@@ -90,10 +105,6 @@ type DataPoint struct {
 	Balance     *hexutil.Big
 	Timestamp   uint64
 	BlockNumber *hexutil.Big
-}
-
-func strideDuration(timeInterval TimeInterval) time.Duration {
-	return time.Duration(timeIntervalToStride[timeInterval]) * blockTime
 }
 
 // fetchAndCache will process the last available block if blocNo is nil
@@ -170,7 +181,7 @@ func (b *Balance) update(ctx context.Context, source DataSource, address common.
 	if timeInterval != BalanceHistoryAllTime {
 		// Ensure we always get the complete range by fetching the next block also
 		startTimestamp = endTime - int64(timeIntervalDuration[timeInterval].Seconds())
-		fetchTimestamp = startTimestamp - int64(strideDuration(timeInterval).Seconds())
+		fetchTimestamp = startTimestamp - int64(timeIntervalToStrideDuration[timeInterval].Seconds())
 	}
 	identity := &assetIdentity{source.ChainID(), address, source.Currency()}
 	firstCached, err := b.firstCachedStartingAt(identity, fetchTimestamp, timeInterval)
@@ -231,7 +242,7 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 	if timeInterval != BalanceHistoryAllTime {
 		// Ensure we always get the complete range by fetching the next block also
 		startTimestamp = endTimestamp - int64(timeIntervalDuration[timeInterval].Seconds())
-		fetchTimestamp = startTimestamp - int64(strideDuration(timeInterval).Seconds())
+		fetchTimestamp = startTimestamp - int64(timeIntervalToStrideDuration[timeInterval].Seconds())
 	}
 	cached, _, err := b.db.filter(&assetIdentity{chainID, address, currency}, nil, &balanceFilter{fetchTimestamp, endTimestamp, expandFlag(timeIntervalToBitsetFilter[timeInterval])}, 200, asc)
 	if err != nil {
@@ -265,9 +276,9 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 
 // fetchBackwardAndCache fetches and adds to DB balance entries starting one stride before the endBlock and stops
 // when reaching a block timestamp older than startTimestamp or genesis block
-// relies on the approximation of a block length to be blockTime for sampling the data
+// relies on the approximation of a block length to match averageBlockDurationForChain for sampling the data
 func (b *Balance) fetchBackwardAndCache(ctx context.Context, source DataSource, address common.Address, endBlock *big.Int, startTimestamp int64, timeInterval TimeInterval) error {
-	stride := timeIntervalToStride[timeInterval]
+	stride := strideBlockCount(timeInterval, source.ChainID())
 	nextBlock := new(big.Int).Set(endBlock)
 	for nextBlock.Cmp(big.NewInt(1)) > 0 {
 		if shouldCancel(ctx) {
@@ -296,9 +307,9 @@ func (b *Balance) fetchBackwardAndCache(ctx context.Context, source DataSource, 
 
 // fetchForwardAndCache fetches and adds to DB balance entries starting one stride before the startBlock and stops
 // when block not found
-// relies on the approximation of a block length to be blockTime
+// relies on the approximation of a block length to match averageBlockDurationForChain
 func (b *Balance) fetchForwardAndCache(ctx context.Context, source DataSource, address common.Address, startBlock *big.Int, timeInterval TimeInterval) error {
-	stride := timeIntervalToStride[timeInterval]
+	stride := strideBlockCount(timeInterval, source.ChainID())
 	nextBlock := new(big.Int).Set(startBlock)
 	for {
 		if shouldCancel(ctx) {
