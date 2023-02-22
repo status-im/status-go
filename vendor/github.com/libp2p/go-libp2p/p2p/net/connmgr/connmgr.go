@@ -62,14 +62,21 @@ type segment struct {
 	peers map[peer.ID]*peerInfo
 }
 
-type segments [256]*segment
+type segments struct {
+	// bucketsMu is used to prevent deadlocks when concurrent processes try to
+	// grab multiple segment locks at once. If you need multiple segment locks
+	// at once, you should grab this lock first. You may release this lock once
+	// you have the segment locks.
+	bucketsMu sync.Mutex
+	buckets   [256]*segment
+}
 
 func (ss *segments) get(p peer.ID) *segment {
-	return ss[byte(p[len(p)-1])]
+	return ss.buckets[byte(p[len(p)-1])]
 }
 
 func (ss *segments) countPeers() (count int) {
-	for _, seg := range ss {
+	for _, seg := range ss.buckets {
 		seg.Lock()
 		count += len(seg.peers)
 		seg.Unlock()
@@ -122,15 +129,15 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 		cfg:       cfg,
 		clock:     cfg.clock,
 		protected: make(map[peer.ID]map[string]struct{}, 16),
-		segments: func() (ret segments) {
-			for i := range ret {
-				ret[i] = &segment{
-					peers: make(map[peer.ID]*peerInfo),
-				}
-			}
-			return ret
-		}(),
+		segments:  segments{},
 	}
+
+	for i := range cm.segments.buckets {
+		cm.segments.buckets[i] = &segment{
+			peers: make(map[peer.ID]*peerInfo),
+		}
+	}
+
 	cm.ctx, cm.cancel = context.WithCancel(context.Background())
 
 	if cfg.emergencyTrim {
@@ -246,15 +253,32 @@ type peerInfo struct {
 	firstSeen time.Time // timestamp when we began tracking this peer.
 }
 
-type peerInfos []peerInfo
+type peerInfos []*peerInfo
 
 // SortByValueAndStreams sorts peerInfos by their value and stream count. It
 // will sort peers with no streams before those with streams (all else being
 // equal). If `sortByMoreStreams` is true it will sort peers with more streams
 // before those with fewer streams. This is useful to prioritize freeing memory.
-func (p peerInfos) SortByValueAndStreams(sortByMoreStreams bool) {
+func (p peerInfos) SortByValueAndStreams(segments *segments, sortByMoreStreams bool) {
 	sort.Slice(p, func(i, j int) bool {
 		left, right := p[i], p[j]
+
+		// Grab this lock so that we can grab both segment locks below without deadlocking.
+		segments.bucketsMu.Lock()
+
+		// lock this to protect from concurrent modifications from connect/disconnect events
+		leftSegment := segments.get(left.id)
+		leftSegment.Lock()
+		defer leftSegment.Unlock()
+
+		rightSegment := segments.get(right.id)
+		if leftSegment != rightSegment {
+			// These two peers are not in the same segment, lets get the lock
+			rightSegment.Lock()
+			defer rightSegment.Unlock()
+		}
+		segments.bucketsMu.Unlock()
+
 		// temporary peers are preferred for pruning.
 		if left.temp != right.temp {
 			return left.temp
@@ -360,31 +384,34 @@ func (cm *BasicConnMgr) getConnsToCloseEmergency(target int) []network.Conn {
 	candidates := make(peerInfos, 0, cm.segments.countPeers())
 
 	cm.plk.RLock()
-	for _, s := range cm.segments {
+	for _, s := range cm.segments.buckets {
 		s.Lock()
 		for id, inf := range s.peers {
 			if _, ok := cm.protected[id]; ok {
 				// skip over protected peer.
 				continue
 			}
-			candidates = append(candidates, *inf)
+			candidates = append(candidates, inf)
 		}
 		s.Unlock()
 	}
 	cm.plk.RUnlock()
 
 	// Sort peers according to their value.
-	candidates.SortByValueAndStreams(true)
+	candidates.SortByValueAndStreams(&cm.segments, true)
 
 	selected := make([]network.Conn, 0, target+10)
 	for _, inf := range candidates {
 		if target <= 0 {
 			break
 		}
+		s := cm.segments.get(inf.id)
+		s.Lock()
 		for c := range inf.conns {
 			selected = append(selected, c)
 		}
 		target -= len(inf.conns)
+		s.Unlock()
 	}
 	if len(selected) >= target {
 		// We found enough connections that were not protected.
@@ -395,24 +422,28 @@ func (cm *BasicConnMgr) getConnsToCloseEmergency(target int) []network.Conn {
 	// We have no choice but to kill some protected connections.
 	candidates = candidates[:0]
 	cm.plk.RLock()
-	for _, s := range cm.segments {
+	for _, s := range cm.segments.buckets {
 		s.Lock()
 		for _, inf := range s.peers {
-			candidates = append(candidates, *inf)
+			candidates = append(candidates, inf)
 		}
 		s.Unlock()
 	}
 	cm.plk.RUnlock()
 
-	candidates.SortByValueAndStreams(true)
+	candidates.SortByValueAndStreams(&cm.segments, true)
 	for _, inf := range candidates {
 		if target <= 0 {
 			break
 		}
+		// lock this to protect from concurrent modifications from connect/disconnect events
+		s := cm.segments.get(inf.id)
+		s.Lock()
 		for c := range inf.conns {
 			selected = append(selected, c)
 		}
 		target -= len(inf.conns)
+		s.Unlock()
 	}
 	return selected
 }
@@ -435,7 +466,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 	gracePeriodStart := cm.clock.Now().Add(-cm.cfg.gracePeriod)
 
 	cm.plk.RLock()
-	for _, s := range cm.segments {
+	for _, s := range cm.segments.buckets {
 		s.Lock()
 		for id, inf := range s.peers {
 			if _, ok := cm.protected[id]; ok {
@@ -448,7 +479,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 			}
 			// note that we're copying the entry here,
 			// but since inf.conns is a map, it will still point to the original object
-			candidates = append(candidates, *inf)
+			candidates = append(candidates, inf)
 			ncandidates += len(inf.conns)
 		}
 		s.Unlock()
@@ -465,7 +496,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 	}
 
 	// Sort peers according to their value.
-	candidates.SortByValueAndStreams(false)
+	candidates.SortByValueAndStreams(&cm.segments, false)
 
 	target := ncandidates - cm.cfg.lowWater
 

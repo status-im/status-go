@@ -1,12 +1,16 @@
 package protocol
 
-import "github.com/status-im/status-go/eth-node/types"
+import (
+	"github.com/libp2p/go-libp2p/core/peer"
 
-func (m *Messenger) AddStorePeer(address string) (string, error) {
+	"github.com/status-im/status-go/eth-node/types"
+)
+
+func (m *Messenger) AddStorePeer(address string) (peer.ID, error) {
 	return m.transport.AddStorePeer(address)
 }
 
-func (m *Messenger) AddRelayPeer(address string) (string, error) {
+func (m *Messenger) AddRelayPeer(address string) (peer.ID, error) {
 	return m.transport.AddStorePeer(address)
 }
 

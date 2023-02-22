@@ -11,6 +11,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-discover/discover"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -21,7 +22,6 @@ import (
 )
 
 var ErrNoDiscV5Listener = errors.New("no discv5 listener")
-
 
 type DiscoveryV5 struct {
 	sync.RWMutex
@@ -46,7 +46,7 @@ type discV5Parameters struct {
 	autoUpdate    bool
 	bootnodes     []*enode.Node
 	udpPort       uint
-	advertiseAddr *net.IP
+	advertiseAddr []multiaddr.Multiaddr
 }
 
 type DiscoveryV5Option func(*discV5Parameters)
@@ -65,9 +65,9 @@ func WithBootnodes(bootnodes []*enode.Node) DiscoveryV5Option {
 	}
 }
 
-func WithAdvertiseAddr(addr net.IP) DiscoveryV5Option {
+func WithAdvertiseAddr(addr []multiaddr.Multiaddr) DiscoveryV5Option {
 	return func(params *discV5Parameters) {
-		params.advertiseAddr = &addr
+		params.advertiseAddr = addr
 	}
 }
 
@@ -288,7 +288,7 @@ func (d *DiscoveryV5) iterate(ctx context.Context) error {
 			break
 		}
 
-		addresses, err := utils.Multiaddress(iterator.Node())
+		_, addresses, err := utils.Multiaddress(iterator.Node())
 		if err != nil {
 			d.log.Error("extracting multiaddrs from enr", zap.Error(err))
 			continue

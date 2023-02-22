@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/pborman/uuid"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,8 +21,8 @@ type ConnStatus struct {
 }
 
 type WakuV2Peer struct {
-	Protocols []string `json:"protocols"`
-	Addresses []string `json:"addresses"`
+	Protocols []protocol.ID `json:"protocols"`
+	Addresses []string      `json:"addresses"`
 }
 
 type ConnStatusSubscription struct {
@@ -86,9 +88,9 @@ type Waku interface {
 
 	StopDiscV5() error
 
-	AddStorePeer(address string) (string, error)
+	AddStorePeer(address string) (peer.ID, error)
 
-	AddRelayPeer(address string) (string, error)
+	AddRelayPeer(address string) (peer.ID, error)
 
 	DialPeer(address string) error
 

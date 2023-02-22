@@ -15,10 +15,12 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise/pb"
 
 	"github.com/flynn/noise"
-	"github.com/gogo/protobuf/proto"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/minio/sha256-simd"
+	"google.golang.org/protobuf/proto"
 )
+
+//go:generate protoc --go_out=. --go_opt=Mpb/payload.proto=./pb pb/payload.proto
 
 // payloadSigPrefix is prepended to our Noise static key before signing with
 // our libp2p identity key.
@@ -272,11 +274,8 @@ func (s *secureSession) handleRemoteHandshakePayload(payload []byte, remoteStati
 		return nil, err
 	}
 
-	// check the peer ID for:
-	// * all outbound connection
-	// * inbound connections, if we know which peer we want to connect to (SecureInbound called with a peer ID)
-	if (s.initiator && s.remoteID != id) || (!s.initiator && s.remoteID != "" && s.remoteID != id) {
-		// use Pretty() as it produces the full b58-encoded string, rather than abbreviated forms.
+	// check the peer ID if enabled
+	if s.checkPeerID && s.remoteID != id {
 		return nil, fmt.Errorf("peer id mismatch: expected %s, but remote key matches %s", s.remoteID.Pretty(), id.Pretty())
 	}
 

@@ -10,40 +10,16 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-// Addr is an implementation of net.Addr for WebSocket.
-type Addr struct {
+// addrWrapper is an implementation of net.Addr for WebSocket.
+type addrWrapper struct {
 	*url.URL
 }
 
-var _ net.Addr = (*Addr)(nil)
+var _ net.Addr = addrWrapper{}
 
 // Network returns the network type for a WebSocket, "websocket".
-func (addr *Addr) Network() string {
+func (a addrWrapper) Network() string {
 	return "websocket"
-}
-
-// NewAddr creates an Addr with `ws` scheme (insecure).
-//
-// Deprecated. Use NewAddrWithScheme.
-func NewAddr(host string) *Addr {
-	// Older versions of the transport only supported insecure connections (i.e.
-	// WS instead of WSS). Assume that is the case here.
-	return NewAddrWithScheme(host, false)
-}
-
-// NewAddrWithScheme creates a new Addr using the given host string. isSecure
-// should be true for WSS connections and false for WS.
-func NewAddrWithScheme(host string, isSecure bool) *Addr {
-	scheme := "ws"
-	if isSecure {
-		scheme = "wss"
-	}
-	return &Addr{
-		URL: &url.URL{
-			Scheme: scheme,
-			Host:   host,
-		},
-	}
 }
 
 func ConvertWebsocketMultiaddrToNetAddr(maddr ma.Multiaddr) (net.Addr, error) {
@@ -51,11 +27,11 @@ func ConvertWebsocketMultiaddrToNetAddr(maddr ma.Multiaddr) (net.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Addr{URL: url}, nil
+	return addrWrapper{URL: url}, nil
 }
 
 func ParseWebsocketNetAddr(a net.Addr) (ma.Multiaddr, error) {
-	wsa, ok := a.(*Addr)
+	wsa, ok := a.(addrWrapper)
 	if !ok {
 		return nil, fmt.Errorf("not a websocket address")
 	}

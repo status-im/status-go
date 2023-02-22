@@ -10,11 +10,14 @@ import (
 	"github.com/flynn/noise"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 type secureSession struct {
-	initiator bool
+	initiator   bool
+	checkPeerID bool
 
 	localID   peer.ID
 	localKey  crypto.PrivKey
@@ -39,11 +42,14 @@ type secureSession struct {
 	prologue []byte
 
 	initiatorEarlyDataHandler, responderEarlyDataHandler EarlyDataHandler
+
+	// ConnectionState holds state information releated to the secureSession entity.
+	connectionState network.ConnectionState
 }
 
 // newSecureSession creates a Noise session over the given insecureConn Conn, using
 // the libp2p identity keypair from the given Transport.
-func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, remote peer.ID, prologue []byte, initiatorEDH, responderEDH EarlyDataHandler, initiator bool) (*secureSession, error) {
+func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, remote peer.ID, prologue []byte, initiatorEDH, responderEDH EarlyDataHandler, initiator, checkPeerID bool) (*secureSession, error) {
 	s := &secureSession{
 		insecureConn:              insecure,
 		insecureReader:            bufio.NewReader(insecure),
@@ -54,6 +60,7 @@ func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, re
 		prologue:                  prologue,
 		initiatorEarlyDataHandler: initiatorEDH,
 		responderEarlyDataHandler: responderEDH,
+		checkPeerID:               checkPeerID,
 	}
 
 	// the go-routine we create to run the handshake will
@@ -108,6 +115,10 @@ func (s *secureSession) RemotePublicKey() crypto.PubKey {
 	return s.remoteKey
 }
 
+func (s *secureSession) ConnState() network.ConnectionState {
+	return s.connectionState
+}
+
 func (s *secureSession) SetDeadline(t time.Time) error {
 	return s.insecureConn.SetDeadline(t)
 }
@@ -122,4 +133,11 @@ func (s *secureSession) SetWriteDeadline(t time.Time) error {
 
 func (s *secureSession) Close() error {
 	return s.insecureConn.Close()
+}
+
+func SessionWithConnState(s *secureSession, muxer protocol.ID) *secureSession {
+	if s != nil {
+		s.connectionState.StreamMultiplexer = muxer
+	}
+	return s
 }

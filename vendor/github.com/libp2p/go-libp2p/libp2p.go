@@ -37,8 +37,7 @@ func ChainOptions(opts ...Option) Option {
 // transport protocols;
 //
 // - If no multiplexer configuration is provided, the node is configured by
-// default to use the "yamux/1.0.0" and "mplux/6.7.0" stream connection
-// multiplexers;
+// default to use yamux;
 //
 // - If no security transport is provided, the host uses the go-libp2p's noise
 // and/or tls encrypted transport to encrypt all traffic;

@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 
-	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
-
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 )
 
 type RelayManager struct {
@@ -44,7 +44,7 @@ func (m *RelayManager) background(ctx context.Context) {
 		m.mutex.Unlock()
 	}()
 
-	subReachability, _ := m.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
+	subReachability, _ := m.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged), eventbus.Name("relaysvc"))
 	defer subReachability.Close()
 
 	for {

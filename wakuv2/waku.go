@@ -73,6 +73,7 @@ import (
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 )
 
 const messageQueueLimit = 1024
@@ -252,8 +253,9 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
 	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
 	libp2pOpts = append(libp2pOpts, libp2p.EnableHolePunching())
-	libp2pOpts = append(libp2pOpts, libp2p.EnableAutoRelay(
-		autorelay.WithPeerSource(waku.autoRelayPeerSource, autoRelayMinInterval),
+	libp2pOpts = append(libp2pOpts, libp2p.EnableAutoRelayWithPeerSource(
+		waku.autoRelayPeerSource,
+		autorelay.WithMinInterval(autoRelayMinInterval),
 	))
 
 	opts := []node.WakuNodeOption{
@@ -539,7 +541,7 @@ func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, ma mu
 		return
 	}
 
-	supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, string(relay.WakuRelayID_v200))
+	supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, relay.WakuRelayID_v200)
 	if err != nil {
 		w.logger.Error("could not obtain protocols", zap.Any("peer", peerInfo.ID), zap.Error(err))
 		return
@@ -614,7 +616,7 @@ func (w *Waku) runPeerExchangeLoop() {
 			connectedPeers := w.node.Host().Network().Peers()
 			peersWithRelay := 0
 			for _, p := range connectedPeers {
-				supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(p, string(relay.WakuRelayID_v200))
+				supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(p, relay.WakuRelayID_v200)
 				if err != nil {
 					continue
 				}
@@ -650,7 +652,7 @@ func (w *Waku) runPeerExchangeLoop() {
 						continue // Couldnt decode the peerID for some reason?
 					}
 
-					supportsProtocol, _ := w.node.Host().Peerstore().SupportsProtocols(peerID, string(peer_exchange.PeerExchangeID_v20alpha1))
+					supportsProtocol, _ := w.node.Host().Peerstore().SupportsProtocols(peerID, peer_exchange.PeerExchangeID_v20alpha1)
 					if len(supportsProtocol) != 0 {
 						withThesePeers = append(withThesePeers, peerID)
 					}
@@ -1149,15 +1151,12 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return hash, nil
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *pb.Index, err error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
 	}
 
-	requestID := protocol.GenerateRequestId()
-
-	opts = append(opts, store.WithRequestId(requestID))
 	opts = append(opts, store.WithPeer(peerID))
 
 	query := store.Query{
@@ -1167,7 +1166,13 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 		Topic:         relay.DefaultWakuTopic,
 	}
 
-	result, err := w.node.Store().Query(ctx, query, opts...)
+	return w.node.Store().Query(ctx, query, opts...)
+}
+
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
+	requestID := protocol.GenerateRequestId()
+	opts = append(opts, store.WithRequestId(requestID))
+	result, err := w.query(ctx, peerID, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
 		signal.SendHistoricMessagesRequestFailed(requestID, peerID, err)
@@ -1468,17 +1473,17 @@ func (w *Waku) restartDiscV5() error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address string) (string, error) {
+func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 	addr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, string(store.StoreID_v20beta4))
+	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
-	return string(peerID), nil
+	return peerID, nil
 }
 
 func (w *Waku) timestamp() int64 {
@@ -1531,17 +1536,17 @@ func (w *Waku) autoRelayPeerSource(ctx context.Context, numPeers int) <-chan pee
 	return output
 }
 
-func (w *Waku) AddRelayPeer(address string) (string, error) {
+func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 	addr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, string(relay.WakuRelayID_v200))
+	peerID, err := w.node.AddPeer(addr, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
-	return string(peerID), nil
+	return peerID, nil
 }
 
 func (w *Waku) DialPeer(address string) error {

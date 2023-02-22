@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
@@ -52,7 +53,7 @@ type StoredMessage struct {
 	ID           []byte
 	PubsubTopic  string
 	ReceiverTime int64
-	Message      *pb.WakuMessage
+	Message      *wpb.WakuMessage
 }
 
 // DBOption is an optional setting that can be used to configure the DBStore
@@ -451,7 +452,7 @@ func (d *DBStore) GetStoredMessage(row *sql.Rows) (StoredMessage, error) {
 		return StoredMessage{}, err
 	}
 
-	msg := new(pb.WakuMessage)
+	msg := new(wpb.WakuMessage)
 	msg.ContentTopic = contentTopic
 	msg.Payload = payload
 	msg.Timestamp = senderTimestamp

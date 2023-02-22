@@ -1,8 +1,3 @@
 package pb
 
-//go:generate protoc -I. --gofast_out=. ./waku_filter.proto
-//go:generate protoc -I. --gofast_out=. ./waku_lightpush.proto
-//go:generate protoc -I. --gofast_out=. ./waku_message.proto
-//go:generate protoc -I. --gofast_out=. ./waku_store.proto
-//go:generate protoc -I. --gofast_out=. ./waku_swap.proto
-//go:generate protoc -I. --gofast_out=. ./waku_peer_exchange.proto
+//go:generate protoc -I. --go_opt=paths=source_relative --go_opt=Mwaku_message.proto=github.com/waku-org/go-waku/waku/v2/protocol/pb --go_out=. ./waku_message.proto

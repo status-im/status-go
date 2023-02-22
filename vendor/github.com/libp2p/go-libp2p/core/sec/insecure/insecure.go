@@ -10,12 +10,18 @@ import (
 	"net"
 
 	ci "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
-	pb "github.com/libp2p/go-libp2p/core/sec/insecure/pb"
+	"github.com/libp2p/go-libp2p/core/sec/insecure/pb"
 
 	"github.com/libp2p/go-msgio"
+
+	"google.golang.org/protobuf/proto"
 )
+
+//go:generate protoc --proto_path=$PWD:$PWD/../../.. --go_out=. --go_opt=Mpb/plaintext.proto=./pb pb/plaintext.proto
 
 // ID is the multistream-select protocol ID that should be used when identifying
 // this security transport.
@@ -27,18 +33,22 @@ const ID = "/plaintext/2.0.0"
 // peer presents as their ID and public key.
 // No authentication of the remote identity is performed.
 type Transport struct {
-	id  peer.ID
-	key ci.PrivKey
+	id         peer.ID
+	key        ci.PrivKey
+	protocolID protocol.ID
 }
+
+var _ sec.SecureTransport = &Transport{}
 
 // NewWithIdentity constructs a new insecure transport. The provided private key
 // is stored and returned from LocalPrivateKey to satisfy the
 // SecureTransport interface, and the public key is sent to
 // remote peers. No security is provided.
-func NewWithIdentity(id peer.ID, key ci.PrivKey) *Transport {
+func NewWithIdentity(protocolID protocol.ID, id peer.ID, key ci.PrivKey) *Transport {
 	return &Transport{
-		id:  id,
-		key: key,
+		protocolID: protocolID,
+		id:         id,
+		key:        key,
 	}
 }
 
@@ -105,6 +115,10 @@ func (t *Transport) SecureOutbound(ctx context.Context, insecure net.Conn, p pee
 	}
 
 	return conn, nil
+}
+
+func (t *Transport) ID() protocol.ID {
+	return t.protocolID
 }
 
 // Conn is the connection type returned by the insecure transport.
@@ -180,7 +194,7 @@ func (ic *Conn) runHandshakeSync() error {
 func readWriteMsg(rw io.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
 	const maxMessageSize = 1 << 16
 
-	outBytes, err := out.Marshal()
+	outBytes, err := proto.Marshal(out)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +205,7 @@ func readWriteMsg(rw io.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
 	}()
 
 	r := msgio.NewVarintReaderSize(rw, maxMessageSize)
-	msg, err1 := r.ReadMsg()
+	b, err1 := r.ReadMsg()
 
 	// Always wait for the read to finish.
 	err2 := <-wresult
@@ -200,11 +214,11 @@ func readWriteMsg(rw io.ReadWriter, out *pb.Exchange) (*pb.Exchange, error) {
 		return nil, err1
 	}
 	if err2 != nil {
-		r.ReleaseMsg(msg)
+		r.ReleaseMsg(b)
 		return nil, err2
 	}
 	inMsg := new(pb.Exchange)
-	err = inMsg.Unmarshal(msg)
+	err = proto.Unmarshal(b, inMsg)
 	return inMsg, err
 }
 
@@ -228,6 +242,11 @@ func (ic *Conn) RemotePublicKey() ci.PubKey {
 // LocalPrivateKey returns the private key for the local peer.
 func (ic *Conn) LocalPrivateKey() ci.PrivKey {
 	return ic.localPrivKey
+}
+
+// ConnState returns the security connection's state information.
+func (ic *Conn) ConnState() network.ConnectionState {
+	return network.ConnectionState{}
 }
 
 var _ sec.SecureTransport = (*Transport)(nil)

@@ -517,38 +517,18 @@ func peerScopeName(p peer.ID) string {
 	return fmt.Sprintf("peer:%s", p)
 }
 
-// ParsePeerScopeName returns "" if name is not a peerScopeName
-func ParsePeerScopeName(name string) peer.ID {
+// PeerStrInScopeName returns "" if name is not a peerScopeName. Returns a string to avoid allocating a peer ID object
+func PeerStrInScopeName(name string) string {
 	if !strings.HasPrefix(name, "peer:") || IsSpan(name) {
 		return ""
 	}
-	parts := strings.SplitN(name, "peer:", 2)
-	if len(parts) != 2 {
+	// Index to avoid allocating a new string
+	peerSplitIdx := strings.Index(name, "peer:")
+	if peerSplitIdx == -1 {
 		return ""
 	}
-	p, err := peer.Decode(parts[1])
-	if err != nil {
-		return ""
-	}
+	p := (name[peerSplitIdx+len("peer:"):])
 	return p
-}
-
-// ParseServiceScopeName returns the service name if name is a serviceScopeName.
-// Otherwise returns ""
-func ParseServiceScopeName(name string) string {
-	if strings.HasPrefix(name, "service:") && !IsSpan(name) {
-		if strings.Contains(name, "peer:") {
-			// This is a service peer scope
-			return ""
-		}
-		parts := strings.SplitN(name, ":", 2)
-		if len(parts) != 2 {
-			return ""
-		}
-
-		return parts[1]
-	}
-	return ""
 }
 
 // ParseProtocolScopeName returns the service name if name is a serviceScopeName.
@@ -559,12 +539,13 @@ func ParseProtocolScopeName(name string) string {
 			// This is a protocol peer scope
 			return ""
 		}
-		parts := strings.SplitN(name, ":", 2)
-		if len(parts) != 2 {
-			return ("")
-		}
 
-		return parts[1]
+		// Index to avoid allocating a new string
+		separatorIdx := strings.Index(name, ":")
+		if separatorIdx == -1 {
+			return ""
+		}
+		return name[separatorIdx+1:]
 	}
 	return ""
 }

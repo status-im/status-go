@@ -141,7 +141,7 @@ func NewObservedAddrManager(host host.Host) (*ObservedAddrManager, error) {
 	}
 	oas.ctx, oas.ctxCancel = context.WithCancel(context.Background())
 
-	reachabilitySub, err := host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
+	reachabilitySub, err := host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged), eventbus.Name("identify (obsaddr)"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to reachability event: %s", err)
 	}

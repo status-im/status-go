@@ -10,9 +10,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	pb "github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
+	"github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
 
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -69,8 +70,8 @@ func (as *autoNATService) handleStream(s network.Stream) {
 	pid := s.Conn().RemotePeer()
 	log.Debugf("New stream from %s", pid.Pretty())
 
-	r := protoio.NewDelimitedReader(s, maxMsgSize)
-	w := protoio.NewDelimitedWriter(s)
+	r := pbio.NewDelimitedReader(s, maxMsgSize)
+	w := pbio.NewDelimitedWriter(s)
 
 	var req pb.Message
 	var res pb.Message

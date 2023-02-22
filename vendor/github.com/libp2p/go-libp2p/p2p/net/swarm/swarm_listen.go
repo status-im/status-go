@@ -37,9 +37,13 @@ func (s *Swarm) Listen(addrs ...ma.Multiaddr) error {
 	return nil
 }
 
-// ListenClose stop and delete listeners for all of the given addresses.
+// ListenClose stop and delete listeners for all of the given addresses. If an
+// any address belongs to one of the addreses a Listener provides, then the
+// Listener will close for *all* addresses it provides. For example if you close
+// and address with `/quic`, then the QUIC listener will close and also close
+// any `/quic-v1` address.
 func (s *Swarm) ListenClose(addrs ...ma.Multiaddr) {
-	var listenersToClose []transport.Listener
+	listenersToClose := make(map[transport.Listener]struct{}, len(addrs))
 
 	s.listeners.Lock()
 	for l := range s.listeners.m {
@@ -48,12 +52,12 @@ func (s *Swarm) ListenClose(addrs ...ma.Multiaddr) {
 		}
 
 		delete(s.listeners.m, l)
-		listenersToClose = append(listenersToClose, l)
+		listenersToClose[l] = struct{}{}
 	}
 	s.listeners.cacheEOL = time.Time{}
 	s.listeners.Unlock()
 
-	for _, l := range listenersToClose {
+	for l := range listenersToClose {
 		l.Close()
 	}
 }
@@ -126,6 +130,9 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 				return
 			}
 			canonicallog.LogPeerStatus(100, c.RemotePeer(), c.RemoteMultiaddr(), "connection_status", "established", "dir", "inbound")
+			if s.metricsTracer != nil {
+				s.metricsTracer.OpenedConnection(network.DirInbound, c.RemotePublicKey(), c.ConnState())
+			}
 
 			log.Debugf("swarm listener accepted connection: %s <-> %s", c.LocalMultiaddr(), c.RemoteMultiaddr())
 			s.refs.Add(1)

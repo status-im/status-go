@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,8 +14,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/pnet"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/sec"
+	"github.com/libp2p/go-libp2p/core/sec/insecure"
 	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
@@ -27,13 +30,13 @@ import (
 	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
+	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
 
-	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
-
-var log = logging.Logger("p2p-config")
 
 // AddrsFactory is a function that takes a set of multiaddrs we're listening on and
 // returns the set of multiaddrs we should advertise to the network.
@@ -51,6 +54,11 @@ type AutoNATConfig struct {
 	ThrottleGlobalLimit int
 	ThrottlePeerLimit   int
 	ThrottleInterval    time.Duration
+}
+
+type Security struct {
+	ID          protocol.ID
+	Constructor interface{}
 }
 
 // Config describes a set of settings for a libp2p node
@@ -71,9 +79,10 @@ type Config struct {
 
 	PeerKey crypto.PrivKey
 
-	Transports         []TptC
-	Muxers             []MsMuxC
-	SecurityTransports []MsSecC
+	QUICReuse          []fx.Option
+	Transports         []fx.Option
+	Muxers             []tptu.StreamMuxer
+	SecurityTransports []Security
 	Insecure           bool
 	PSK                pnet.PSK
 
@@ -110,7 +119,7 @@ type Config struct {
 	HolePunchingOptions []holepunch.Option
 }
 
-func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
+func (cfg *Config) makeSwarm(enableMetrics bool) (*swarm.Swarm, error) {
 	if cfg.Peerstore == nil {
 		return nil, fmt.Errorf("no peerstore specified")
 	}
@@ -142,7 +151,7 @@ func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
 		return nil, err
 	}
 
-	opts := make([]swarm.Option, 0, 3)
+	opts := make([]swarm.Option, 0, 6)
 	if cfg.Reporter != nil {
 		opts = append(opts, swarm.WithMetrics(cfg.Reporter))
 	}
@@ -158,6 +167,9 @@ func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
 	if cfg.MultiaddrResolver != nil {
 		opts = append(opts, swarm.WithMultiaddrResolver(cfg.MultiaddrResolver))
 	}
+	if enableMetrics {
+		opts = append(opts, swarm.WithMetricsTracer(swarm.NewMetricsTracer()))
+	}
 	// TODO: Make the swarm implementation configurable.
 	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
 }
@@ -168,51 +180,98 @@ func (cfg *Config) addTransports(h host.Host) error {
 		// Should probably skip this if no transports.
 		return fmt.Errorf("swarm does not support transports")
 	}
-	var secure sec.SecureMuxer
+
+	fxopts := []fx.Option{
+		fx.WithLogger(func() fxevent.Logger { return getFXLogger() }),
+		fx.Provide(fx.Annotate(tptu.New, fx.ParamTags(`name:"security"`))),
+		fx.Supply(cfg.Muxers),
+		fx.Supply(h.ID()),
+		fx.Provide(func() host.Host { return h }),
+		fx.Provide(func() crypto.PrivKey { return h.Peerstore().PrivKey(h.ID()) }),
+		fx.Provide(func() connmgr.ConnectionGater { return cfg.ConnectionGater }),
+		fx.Provide(func() pnet.PSK { return cfg.PSK }),
+		fx.Provide(func() network.ResourceManager { return cfg.ResourceManager }),
+		fx.Provide(func() *madns.Resolver { return cfg.MultiaddrResolver }),
+	}
+	fxopts = append(fxopts, cfg.Transports...)
 	if cfg.Insecure {
-		secure = makeInsecureTransport(h.ID(), cfg.PeerKey)
+		fxopts = append(fxopts,
+			fx.Provide(
+				fx.Annotate(
+					func(id peer.ID, priv crypto.PrivKey) []sec.SecureTransport {
+						return []sec.SecureTransport{insecure.NewWithIdentity(insecure.ID, id, priv)}
+					},
+					fx.ResultTags(`name:"security"`),
+				),
+			),
+		)
 	} else {
-		var err error
-		secure, err = makeSecurityMuxer(h, cfg.SecurityTransports)
-		if err != nil {
-			return err
+		// fx groups are unordered, but we need to preserve the order of the security transports
+		// First of all, we construct the security transports that are needed,
+		// and save them to a group call security_unordered.
+		for _, s := range cfg.SecurityTransports {
+			fxName := fmt.Sprintf(`name:"security_%s"`, s.ID)
+			fxopts = append(fxopts, fx.Supply(fx.Annotate(s.ID, fx.ResultTags(fxName))))
+			fxopts = append(fxopts,
+				fx.Provide(fx.Annotate(
+					s.Constructor,
+					fx.ParamTags(fxName),
+					fx.As(new(sec.SecureTransport)),
+					fx.ResultTags(`group:"security_unordered"`),
+				)),
+			)
 		}
-	}
-	muxer, err := makeMuxer(h, cfg.Muxers)
-	if err != nil {
-		return err
-	}
-	var opts []tptu.Option
-	if len(cfg.PSK) > 0 {
-		opts = append(opts, tptu.WithPSK(cfg.PSK))
-	}
-	if cfg.ConnectionGater != nil {
-		opts = append(opts, tptu.WithConnectionGater(cfg.ConnectionGater))
-	}
-	if cfg.ResourceManager != nil {
-		opts = append(opts, tptu.WithResourceManager(cfg.ResourceManager))
-	}
-	upgrader, err := tptu.New(secure, muxer, opts...)
-	if err != nil {
-		return err
-	}
-	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.MultiaddrResolver, cfg.Transports)
-	if err != nil {
-		return err
-	}
-	for _, t := range tpts {
-		if err := swrm.AddTransport(t); err != nil {
-			return err
-		}
+		// Then we consume the group security_unordered, and order them by the user's preference.
+		fxopts = append(fxopts, fx.Provide(
+			fx.Annotate(
+				func(secs []sec.SecureTransport) ([]sec.SecureTransport, error) {
+					if len(secs) != len(cfg.SecurityTransports) {
+						return nil, errors.New("inconsistent length for security transports")
+					}
+					t := make([]sec.SecureTransport, 0, len(secs))
+					for _, s := range cfg.SecurityTransports {
+						for _, st := range secs {
+							if s.ID != st.ID() {
+								continue
+							}
+							t = append(t, st)
+						}
+					}
+					return t, nil
+				},
+				fx.ParamTags(`group:"security_unordered"`),
+				fx.ResultTags(`name:"security"`),
+			)))
 	}
 
+	fxopts = append(fxopts, fx.Provide(PrivKeyToStatelessResetKey))
+	if cfg.QUICReuse != nil {
+		fxopts = append(fxopts, cfg.QUICReuse...)
+	} else {
+		fxopts = append(fxopts, fx.Provide(quicreuse.NewConnManager)) // TODO: close the ConnManager when shutting down the node
+	}
+
+	fxopts = append(fxopts, fx.Invoke(
+		fx.Annotate(
+			func(tpts []transport.Transport) error {
+				for _, t := range tpts {
+					if err := swrm.AddTransport(t); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+			fx.ParamTags(`group:"transport"`),
+		)),
+	)
 	if cfg.Relay {
-		if err := circuitv2.AddTransport(h, upgrader); err != nil {
-			h.Close()
-			return err
-		}
+		fxopts = append(fxopts, fx.Invoke(circuitv2.AddTransport))
 	}
-
+	app := fx.New(fxopts...)
+	if err := app.Err(); err != nil {
+		h.Close()
+		return err
+	}
 	return nil
 }
 
@@ -220,7 +279,7 @@ func (cfg *Config) addTransports(h host.Host) error {
 //
 // This function consumes the config. Do not reuse it (really!).
 func (cfg *Config) NewNode() (host.Host, error) {
-	swrm, err := cfg.makeSwarm()
+	swrm, err := cfg.makeSwarm(true)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +385,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			Peerstore:          ps,
 		}
 
-		dialer, err := autoNatCfg.makeSwarm()
+		dialer, err := autoNatCfg.makeSwarm(false)
 		if err != nil {
 			h.Close()
 			return nil, err

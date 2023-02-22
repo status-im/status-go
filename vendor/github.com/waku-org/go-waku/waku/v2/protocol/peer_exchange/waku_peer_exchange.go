@@ -19,12 +19,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
@@ -146,7 +146,7 @@ func (wakuPX *WakuPeerExchange) onRequest(ctx context.Context) func(s network.St
 		defer s.Close()
 		logger := wakuPX.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
 		requestRPC := &pb.PeerExchangeRPC{}
-		reader := protoio.NewDelimitedReader(s, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 		err := reader.ReadMsg(requestRPC)
 		if err != nil {
 			logger.Error("reading request", zap.Error(err))
@@ -229,7 +229,7 @@ func (wakuPX *WakuPeerExchange) sendPeerExchangeRPCToPeer(ctx context.Context, r
 	}
 	defer connOpt.Close()
 
-	writer := protoio.NewDelimitedWriter(connOpt)
+	writer := pbio.NewDelimitedWriter(connOpt)
 	err = writer.WriteMsg(rpc)
 	if err != nil {
 		logger.Error("writing response", zap.Error(err))
@@ -343,7 +343,7 @@ func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) error {
 			break
 		}
 
-		addresses, err := utils.Multiaddress(iterator.Node())
+		_, addresses, err := utils.Multiaddress(iterator.Node())
 		if err != nil {
 			wakuPX.log.Error("extracting multiaddrs from enr", zap.Error(err))
 			continue

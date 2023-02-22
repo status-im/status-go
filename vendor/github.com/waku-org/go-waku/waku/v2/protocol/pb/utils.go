@@ -3,7 +3,7 @@ package pb
 import (
 	"crypto/sha256"
 
-	proto "github.com/golang/protobuf/proto"
+	proto "google.golang.org/protobuf/proto"
 )
 
 // Hash calculates the hash of a waku message

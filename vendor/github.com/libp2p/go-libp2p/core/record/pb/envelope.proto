@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package record.pb;
 
-import "crypto/pb/crypto.proto";
+import "core/crypto/pb/crypto.proto";
 
 // Envelope encloses a signed payload produced by a peer, along with the public
 // key of the keypair it was signed with so that it can be statelessly validated

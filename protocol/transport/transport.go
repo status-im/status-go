@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -653,11 +654,11 @@ func (t *Transport) ListenAddresses() ([]string, error) {
 	return t.waku.ListenAddresses()
 }
 
-func (t *Transport) AddStorePeer(address string) (string, error) {
+func (t *Transport) AddStorePeer(address string) (peer.ID, error) {
 	return t.waku.AddStorePeer(address)
 }
 
-func (t *Transport) AddRelayPeer(address string) (string, error) {
+func (t *Transport) AddRelayPeer(address string) (peer.ID, error) {
 	return t.waku.AddRelayPeer(address)
 }
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p-pubsub/timecache"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/discovery"
@@ -20,7 +21,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	logging "github.com/ipfs/go-log"
-	"github.com/whyrusleeping/timecache"
 )
 
 // DefaultMaximumMessageSize is 1mb.
@@ -31,6 +31,10 @@ var (
 	// Use WithSeenMessagesTTL to configure this per pubsub instance, instead of overriding the global default.
 	TimeCacheDuration = 120 * time.Second
 
+	// TimeCacheStrategy specifies which type of lookup/cleanup strategy is used by the seen messages cache.
+	// Use WithSeenMessagesStrategy to configure this per pubsub instance, instead of overriding the global default.
+	TimeCacheStrategy = timecache.Strategy_FirstSeen
+
 	// ErrSubscriptionCancelled may be returned when a subscription Next() is called after the
 	// subscription has been cancelled.
 	ErrSubscriptionCancelled = errors.New("subscription cancelled")
@@ -38,7 +42,7 @@ var (
 
 var log = logging.Logger("pubsub")
 
-type ProtocolMatchFn = func(string) func(string) bool
+type ProtocolMatchFn = func(protocol.ID) func(protocol.ID) bool
 
 // PubSub is the implementation of the pubsub system.
 type PubSub struct {
@@ -148,9 +152,10 @@ type PubSub struct {
 	inboundStreamsMx sync.Mutex
 	inboundStreams   map[peer.ID]network.Stream
 
-	seenMessagesMx sync.Mutex
-	seenMessages   *timecache.TimeCache
-	seenMsgTTL     time.Duration
+	seenMessagesMx  sync.Mutex
+	seenMessages    timecache.TimeCache
+	seenMsgTTL      time.Duration
+	seenMsgStrategy timecache.Strategy
 
 	// generator used to compute the ID for a message
 	idGen *msgIDGenerator
@@ -170,6 +175,12 @@ type PubSub struct {
 	protoMatchFunc ProtocolMatchFn
 
 	ctx context.Context
+
+	// appSpecificRpcInspector is an auxiliary that may be set by the application to inspect incoming RPCs prior to
+	// processing them. The inspector is invoked on an accepted RPC right prior to handling it.
+	// The return value of the inspector function is an error indicating whether the RPC should be processed or not.
+	// If the error is nil, the RPC is processed as usual. If the error is non-nil, the RPC is dropped.
+	appSpecificRpcInspector func(peer.ID, *RPC) error
 }
 
 // PubSubRouter is the message router component of PubSub.
@@ -280,6 +291,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		blacklist:             NewMapBlacklist(),
 		blacklistPeer:         make(chan peer.ID),
 		seenMsgTTL:            TimeCacheDuration,
+		seenMsgStrategy:       TimeCacheStrategy,
 		idGen:                 newMsgIdGenerator(),
 		counter:               uint64(time.Now().UnixNano()),
 	}
@@ -301,7 +313,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		}
 	}
 
-	ps.seenMessages = timecache.NewTimeCache(ps.seenMsgTTL)
+	ps.seenMessages = timecache.NewTimeCacheWithStrategy(ps.seenMsgStrategy, ps.seenMsgTTL)
 
 	if err := ps.disc.Start(ps); err != nil {
 		return nil, err
@@ -311,7 +323,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 
 	for _, id := range rt.Protocols() {
 		if ps.protoMatchFunc != nil {
-			h.SetStreamHandlerMatch(id, ps.protoMatchFunc(string(id)), ps.handleNewStream)
+			h.SetStreamHandlerMatch(id, ps.protoMatchFunc(id), ps.handleNewStream)
 		} else {
 			h.SetStreamHandler(id, ps.handleNewStream)
 		}
@@ -523,6 +535,25 @@ func WithProtocolMatchFn(m ProtocolMatchFn) Option {
 func WithSeenMessagesTTL(ttl time.Duration) Option {
 	return func(ps *PubSub) error {
 		ps.seenMsgTTL = ttl
+		return nil
+	}
+}
+
+// WithSeenMessagesStrategy configures which type of lookup/cleanup strategy is used by the seen messages cache
+func WithSeenMessagesStrategy(strategy timecache.Strategy) Option {
+	return func(ps *PubSub) error {
+		ps.seenMsgStrategy = strategy
+		return nil
+	}
+}
+
+// WithAppSpecificRpcInspector sets a hook that inspect incomings RPCs prior to
+// processing them.  The inspector is invoked on an accepted RPC just before it
+// is handled.  If inspector's error is nil, the RPC is handled. Otherwise, it
+// is dropped.
+func WithAppSpecificRpcInspector(inspector func(peer.ID, *RPC) error) Option {
+	return func(ps *PubSub) error {
+		ps.appSpecificRpcInspector = inspector
 		return nil
 	}
 }
@@ -1005,6 +1036,15 @@ func (p *PubSub) notifyLeave(topic string, pid peer.ID) {
 }
 
 func (p *PubSub) handleIncomingRPC(rpc *RPC) {
+	// pass the rpc through app specific validation (if any available).
+	if p.appSpecificRpcInspector != nil {
+		// check if the RPC is allowed by the external inspector
+		if err := p.appSpecificRpcInspector(rpc.from, rpc); err != nil {
+			log.Debugf("application-specific inspection failed, rejecting incoming rpc: %s", err)
+			return // reject the RPC
+		}
+	}
+
 	p.tracer.RecvRPC(rpc)
 
 	subs := rpc.GetSubscriptions()

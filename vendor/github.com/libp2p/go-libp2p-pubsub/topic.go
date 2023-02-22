@@ -239,7 +239,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
-	if pub.customKey != nil {
+	if pub.customKey != nil && !pub.local {
 		key, pid = pub.customKey()
 		if key == nil {
 			return ErrNilSignKey

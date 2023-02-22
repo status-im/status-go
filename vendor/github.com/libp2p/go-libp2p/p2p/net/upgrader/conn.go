@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/transport"
 )
 
@@ -14,6 +15,9 @@ type transportConn struct {
 	transport transport.Transport
 	scope     network.ConnManagementScope
 	stat      network.ConnStats
+
+	muxer    protocol.ID
+	security protocol.ID
 }
 
 var _ transport.CapableConn = &transportConn{}
@@ -48,4 +52,12 @@ func (t *transportConn) Scope() network.ConnScope {
 func (t *transportConn) Close() error {
 	defer t.scope.Done()
 	return t.MuxedConn.Close()
+}
+
+func (t *transportConn) ConnState() network.ConnectionState {
+	return network.ConnectionState{
+		StreamMultiplexer: t.muxer,
+		Security:          t.security,
+		Transport:         "tcp",
+	}
 }

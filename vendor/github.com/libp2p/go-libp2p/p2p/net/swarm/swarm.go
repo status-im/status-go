@@ -71,6 +71,13 @@ func WithMetrics(reporter metrics.Reporter) Option {
 	}
 }
 
+func WithMetricsTracer(t MetricsTracer) Option {
+	return func(s *Swarm) error {
+		s.metricsTracer = t
+		return nil
+	}
+}
+
 func WithDialTimeout(t time.Duration) Option {
 	return func(s *Swarm) error {
 		s.dialTimeout = t
@@ -151,7 +158,8 @@ type Swarm struct {
 	ctx       context.Context // is canceled when Close is called
 	ctxCancel context.CancelFunc
 
-	bwc metrics.Reporter
+	bwc           metrics.Reporter
+	metricsTracer MetricsTracer
 }
 
 // NewSwarm constructs a Swarm.
@@ -178,7 +186,7 @@ func NewSwarm(local peer.ID, peers peerstore.Peerstore, opts ...Option) (*Swarm,
 		}
 	}
 	if s.rcmgr == nil {
-		s.rcmgr = network.NullResourceManager
+		s.rcmgr = &network.NullResourceManager{}
 	}
 
 	s.dsync = newDialSync(s.dialWorkerLoop)
@@ -237,8 +245,14 @@ func (s *Swarm) close() {
 	s.transports.m = nil
 	s.transports.Unlock()
 
-	var wg sync.WaitGroup
+	// Dedup transports that may be listening on multiple protocols
+	transportsToClose := make(map[transport.Transport]struct{}, len(transports))
 	for _, t := range transports {
+		transportsToClose[t] = struct{}{}
+	}
+
+	var wg sync.WaitGroup
+	for t := range transportsToClose {
 		if closer, ok := t.(io.Closer); ok {
 			wg.Add(1)
 			go func(c io.Closer) {

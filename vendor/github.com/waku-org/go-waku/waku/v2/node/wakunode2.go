@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
@@ -32,6 +33,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
@@ -45,7 +47,7 @@ import (
 
 type Peer struct {
 	ID        peer.ID        `json:"peerID"`
-	Protocols []string       `json:"protocols"`
+	Protocols []protocol.ID  `json:"protocols"`
 	Addrs     []ma.Multiaddr `json:"addrs"`
 	Connected bool           `json:"connected"`
 }
@@ -78,6 +80,8 @@ type WakuNode struct {
 	discoveryV5   Service
 	peerExchange  Service
 	filter        ReceptorService
+	filterV2Full  ReceptorService
+	filterV2Light Service
 	store         ReceptorService
 	rlnRelay      RLNRelay
 
@@ -208,6 +212,8 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	w.relay = relay.NewWakuRelay(w.host, w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.filter = filter.NewWakuFilter(w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
+	w.filterV2Full = filterv2.NewWakuFilterFullnode(w.host, w.bcaster, w.timesource, w.log, w.opts.filterOpts...)
+	w.filterV2Light = filterv2.NewWakuFilterLightnode(w.host, w.bcaster, w.timesource, w.log)
 	w.lightPush = lightpush.NewWakuLightPush(w.host, w.Relay(), w.log)
 
 	if w.opts.enableSwap {
@@ -234,8 +240,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	if w.addressChangesSub, err = host.EventBus().Subscribe(new(event.EvtLocalAddressesUpdated)); err != nil {
 		return nil, err
 	}
-
-	w.enrChangeCh = make(chan struct{}, 10)
 
 	if params.connStatusC != nil {
 		w.connStatusChan = params.connStatusC
@@ -287,6 +291,8 @@ func (w *WakuNode) Start(ctx context.Context) error {
 
 	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.log)
 	w.host.Network().Notify(w.connectionNotif)
+
+	w.enrChangeCh = make(chan struct{}, 10)
 
 	w.wg.Add(3)
 	go w.connectednessListener(ctx)
@@ -353,6 +359,23 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		w.bcaster.Register(nil, w.filter.MessageChannel())
 	}
 
+	if w.opts.enableFilterV2FullNode {
+		err := w.filterV2Full.Start(ctx)
+		if err != nil {
+			return err
+		}
+
+		w.log.Info("Subscribing filterV2 to broadcaster")
+		w.bcaster.Register(nil, w.filterV2Full.MessageChannel())
+	}
+
+	if w.opts.enableFilterV2LightNode {
+		err := w.filterV2Light.Start(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = w.setupENR(ctx, w.ListenAddresses())
 	if err != nil {
 		return err
@@ -394,6 +417,7 @@ func (w *WakuNode) Stop() {
 	w.lightPush.Stop()
 	w.store.Stop()
 	w.filter.Stop()
+	w.filterV2Full.Stop()
 	w.peerExchange.Stop()
 
 	if w.opts.enableDiscV5 {
@@ -489,6 +513,14 @@ func (w *WakuNode) Filter() *filter.WakuFilter {
 	return nil
 }
 
+// FilterV2 is used to access any operation related to Waku Filter protocol
+func (w *WakuNode) FilterV2() *filterv2.WakuFilterLightnode {
+	if result, ok := w.filterV2Light.(*filterv2.WakuFilterLightnode); ok {
+		return result
+	}
+	return nil
+}
+
 // Lightpush is used to access any operation related to Waku Lightpush protocol
 func (w *WakuNode) Lightpush() *lightpush.WakuLightPush {
 	if result, ok := w.lightPush.(*lightpush.WakuLightPush); ok {
@@ -554,8 +586,8 @@ func (w *WakuNode) mountDiscV5() error {
 		discv5.WithAutoUpdate(w.opts.discV5autoUpdate),
 	}
 
-	if w.opts.advertiseAddr != nil {
-		discV5Options = append(discV5Options, discv5.WithAdvertiseAddr(*w.opts.advertiseAddr))
+	if w.opts.advertiseAddrs != nil {
+		discV5Options = append(discV5Options, discv5.WithAdvertiseAddr(w.opts.advertiseAddrs))
 	}
 
 	var err error
@@ -577,7 +609,7 @@ func (w *WakuNode) startStore(ctx context.Context) error {
 
 		var peerIDs []peer.ID
 		for _, n := range w.opts.resumeNodes {
-			pID, err := w.AddPeer(n, string(store.StoreID_v20beta4))
+			pID, err := w.AddPeer(n, store.StoreID_v20beta4)
 			if err != nil {
 				w.log.Warn("adding peer to peerstore", logging.MultiAddrs("peer", n), zap.Error(err))
 			}
@@ -601,7 +633,7 @@ func (w *WakuNode) startStore(ctx context.Context) error {
 	return nil
 }
 
-func (w *WakuNode) addPeer(info *peer.AddrInfo, protocols ...string) error {
+func (w *WakuNode) addPeer(info *peer.AddrInfo, protocols ...protocol.ID) error {
 	w.log.Info("adding peer to peerstore", logging.HostID("peer", info.ID))
 	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
 	err := w.host.Peerstore().AddProtocols(info.ID, protocols...)
@@ -613,7 +645,7 @@ func (w *WakuNode) addPeer(info *peer.AddrInfo, protocols ...string) error {
 }
 
 // AddPeer is used to add a peer and the protocols it support to the node peerstore
-func (w *WakuNode) AddPeer(address ma.Multiaddr, protocols ...string) (peer.ID, error) {
+func (w *WakuNode) AddPeer(address ma.Multiaddr, protocols ...protocol.ID) (peer.ID, error) {
 	info, err := peer.AddrInfoFromP2pAddr(address)
 	if err != nil {
 		return "", err

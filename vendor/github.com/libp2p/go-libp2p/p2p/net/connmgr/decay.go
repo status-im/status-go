@@ -177,7 +177,7 @@ func (d *decayer) process() {
 			d.tagsMu.Unlock()
 
 			// Visit each peer, and decay tags that need to be decayed.
-			for _, s := range d.mgr.segments {
+			for _, s := range d.mgr.segments.buckets {
 				s.Lock()
 
 				// Entered a segment that contains peers. Process each peer.
@@ -261,7 +261,7 @@ func (d *decayer) process() {
 			d.tagsMu.Unlock()
 
 			// Remove the tag from all peers that had it in the connmgr.
-			for _, s := range d.mgr.segments {
+			for _, s := range d.mgr.segments.buckets {
 				// visit all segments, and attempt to remove the tag from all the peers it stores.
 				s.Lock()
 				for _, p := range s.peers {

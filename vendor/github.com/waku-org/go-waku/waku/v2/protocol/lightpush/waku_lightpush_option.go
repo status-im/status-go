@@ -32,7 +32,7 @@ func WithPeer(p peer.ID) LightPushOption {
 // from the node peerstore
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeer(params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
+		p, err := utils.SelectPeer(params.host, LightPushID_v20beta1, fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = p
 		} else {
@@ -47,7 +47,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) LightPushOption {
 // from the node peerstore
 func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) LightPushOption {
 	return func(params *LightPushParameters) {
-		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, string(LightPushID_v20beta1), fromThesePeers, params.log)
+		p, err := utils.SelectPeerWithLowestRTT(ctx, params.host, LightPushID_v20beta1, fromThesePeers, params.log)
 		if err == nil {
 			params.selectedPeer = p
 		} else {

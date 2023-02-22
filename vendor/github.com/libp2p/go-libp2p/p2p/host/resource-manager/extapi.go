@@ -87,7 +87,7 @@ func (r *resourceManager) ListProtocols() []protocol.ID {
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return strings.Compare(string(result[i]), string(result[j])) < 0
+		return result[i] < result[j]
 	})
 
 	return result
