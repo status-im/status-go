@@ -1461,6 +1461,15 @@ func (m *Messenger) Init() error {
 		}
 	}
 
+	spectatedCommunities, err := m.communitiesManager.Spectated()
+	if err != nil {
+		return err
+	}
+
+	for _, org := range spectatedCommunities {
+		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
+	}
+
 	// Init filters for the communities we are an admin of
 	var adminCommunitiesPks []*ecdsa.PrivateKey
 	adminCommunities, err := m.communitiesManager.Created()
