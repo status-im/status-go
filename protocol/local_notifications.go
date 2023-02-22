@@ -89,7 +89,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap,
 	if n.Chat.PrivateGroupChat() || n.Chat.Public() || n.Chat.CommunityChat() {
 		title = n.Chat.Name
 	} else if n.Chat.OneToOne() {
-		title = n.Contact.CanonicalName()
+		title = n.Contact.PrimaryName()
 
 	}
 
@@ -103,7 +103,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap,
 				return nil, err
 			}
 		}
-		canonicalNames[mentionID] = contact.CanonicalName()
+		canonicalNames[mentionID] = contact.PrimaryName()
 	}
 
 	// We don't pass idenity as only interested in the simplified text
@@ -123,7 +123,7 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap,
 		IsConversation:      true,
 		IsGroupConversation: true,
 		Author: localnotifications.NotificationAuthor{
-			Name: n.Contact.CanonicalName(),
+			Name: n.Contact.PrimaryName(),
 			Icon: n.Contact.CanonicalImage(settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
@@ -137,13 +137,13 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 	return &localnotifications.Notification{
 		ID:       gethcommon.HexToHash(id),
 		Body:     n,
-		Title:    n.Contact.CanonicalName() + " invited you to " + n.Chat.Name,
-		Message:  n.Contact.CanonicalName() + " wants you to join group " + n.Chat.Name,
+		Title:    n.Contact.PrimaryName() + " invited you to " + n.Chat.Name,
+		Message:  n.Contact.PrimaryName() + " wants you to join group " + n.Chat.Name,
 		BodyType: localnotifications.TypeMessage,
 		Category: localnotifications.CategoryGroupInvite,
 		Deeplink: n.Chat.DeepLink(),
 		Author: localnotifications.NotificationAuthor{
-			Name: n.Contact.CanonicalName(),
+			Name: n.Contact.PrimaryName(),
 			Icon: n.Contact.CanonicalImage(settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
 			ID:   n.Contact.ID,
 		},
@@ -155,8 +155,8 @@ func (n NotificationBody) toCommunityRequestToJoinNotification(id string) *local
 	return &localnotifications.Notification{
 		ID:       gethcommon.HexToHash(id),
 		Body:     n,
-		Title:    n.Contact.CanonicalName() + " wants to join " + n.Community.Name(),
-		Message:  n.Contact.CanonicalName() + " wants to join  message " + n.Community.Name(),
+		Title:    n.Contact.PrimaryName() + " wants to join " + n.Community.Name(),
+		Message:  n.Contact.PrimaryName() + " wants to join  message " + n.Community.Name(),
 		BodyType: localnotifications.TypeMessage,
 		Category: localnotifications.CategoryCommunityRequestToJoin,
 		Deeplink: "status-im://cr/" + n.Community.IDString(),

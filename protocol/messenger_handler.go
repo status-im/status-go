@@ -367,7 +367,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 
 	notification := &ActivityCenterNotification{
 		ID:        types.FromHex(contactRequest.ID),
-		Name:      contact.CanonicalName(),
+		Name:      contact.PrimaryName(),
 		Message:   contactRequest,
 		Type:      ActivityCenterNotificationTypeContactRequest,
 		Author:    messageState.CurrentMessageState.Contact.ID,
