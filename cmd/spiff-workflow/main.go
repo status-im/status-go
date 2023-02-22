@@ -139,7 +139,7 @@ func main() {
 		return
 	}
 
-        retrieveMessagesLoop(wakuext.Messenger(), 300*time.Millisecond)
+	retrieveMessagesLoop(wakuext.Messenger(), 300*time.Millisecond)
 
 }
 
@@ -268,11 +268,12 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "DEBUG"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
-        nodeConfig.HTTPEnabled = true
-        nodeConfig.HTTPPort = 8545
-        nodeConfig.HTTPHost = "localhost"
-        nodeConfig.HTTPVirtualHosts = []string{"localhost"}
-        nodeConfig.APIModules = "wakuext,ext,waku"
+	nodeConfig.HTTPEnabled = true
+	nodeConfig.HTTPPort = 8545
+	// FIXME: This should be taken from CLI flags.
+	nodeConfig.HTTPHost = "0.0.0.0"
+	nodeConfig.HTTPVirtualHosts = []string{"localhost"}
+	nodeConfig.APIModules = "wakuext,ext,waku"
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
@@ -292,17 +293,17 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-        nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
+	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
 	nodeConfig.ClusterConfig.WakuNodes = nodes
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
 
 	nodeConfig.EnableNTPSync = true
-        nodeConfig.WakuV2Config = params.WakuV2Config{
-          Enabled: true,
-          EnableDiscV5: true,
-          DiscoveryLimit: 20,
-          UDPPort: 9002,
-        }
+	nodeConfig.WakuV2Config = params.WakuV2Config{
+		Enabled:        true,
+		EnableDiscV5:   true,
+		DiscoveryLimit: 20,
+		UDPPort:        9002,
+	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		BackupDisabledDataDir:      "",
@@ -340,18 +341,17 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		return err
 	}
 
-
 	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
 	if err != nil {
 		logger.Error("failed derive", err)
 		return err
 	}
 
-        var exist bool
+	var exist bool
 	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
-        if err != nil && err.Error() == "account already exists" {
-          exist = true
-        } else if err != nil {
+	if err != nil && err.Error() == "account already exists" {
+		exist = true
+	} else if err != nil {
 		logger.Error("failed store derive", err)
 		return err
 	}
@@ -393,9 +393,9 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	fmt.Println(nodeConfig)
 	accounts := []*accounts.Account{walletAccount, chatAccount}
-        if !exist {
-	  return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
-        }
+	if !exist {
+		return backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
+	}
 	return backend.StartNodeWithAccount(account, "", nodeConfig)
 }
 
@@ -454,6 +454,6 @@ func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration) {
 				logger.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
+		}
 	}
-      }
 }
