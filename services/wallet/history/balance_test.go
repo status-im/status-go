@@ -213,7 +213,7 @@ func extractTestData(dataSource *chainClientTestSource) (reqBlkNos []int64, info
 }
 
 func minimumExpectedDataPoints(interval TimeInterval) int {
-	return int(math.Ceil(float64(timeIntervalDuration[interval]) / float64(strideDuration(interval))))
+	return int(math.Ceil(float64(timeIntervalDuration[interval]) / float64(timeIntervalToStrideDuration[interval])))
 }
 
 func getTimeError(dataSource *chainClientTestSource, data []*DataPoint, interval TimeInterval) int64 {
@@ -377,7 +377,7 @@ func TestBalanceHistoryFetchFirstTime(t *testing.T) {
 			}
 
 			errorFromIdeal := getTimeError(dataSource, balanceData, testInput.interval)
-			require.Less(t, math.Abs(float64(errorFromIdeal)), strideDuration(testInput.interval).Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, strideDuration(testInput.interval).Seconds(), testInput.interval)
+			require.Less(t, math.Abs(float64(errorFromIdeal)), timeIntervalToStrideDuration[testInput.interval].Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, timeIntervalToStrideDuration[testInput.interval].Seconds(), testInput.interval)
 		})
 	}
 }
@@ -445,7 +445,7 @@ func TestBalanceHistoryFetchError(t *testing.T) {
 	}
 
 	errorFromIdeal := getTimeError(dataSource, balanceData, BalanceHistory1Year)
-	require.Less(t, math.Abs(float64(errorFromIdeal)), strideDuration(BalanceHistory1Year).Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, strideDuration(BalanceHistory1Year).Seconds(), BalanceHistory1Year)
+	require.Less(t, math.Abs(float64(errorFromIdeal)), timeIntervalToStrideDuration[BalanceHistory1Year].Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, timeIntervalToStrideDuration[BalanceHistory1Year].Seconds(), BalanceHistory1Year)
 }
 
 func TestBalanceHistoryValidateBalanceValuesAndCacheHit(t *testing.T) {
@@ -569,7 +569,7 @@ func TestGetBalanceHistoryUpdateLater(t *testing.T) {
 	}
 
 	errorFromIdeal := getTimeError(dataSource, updatedBalanceData, BalanceHistory1Month)
-	require.Less(t, math.Abs(float64(errorFromIdeal)), strideDuration(BalanceHistory1Month).Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, strideDuration(BalanceHistory1Month).Seconds(), BalanceHistory1Month)
+	require.Less(t, math.Abs(float64(errorFromIdeal)), timeIntervalToStrideDuration[BalanceHistory1Month].Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, timeIntervalToStrideDuration[BalanceHistory1Month].Seconds(), BalanceHistory1Month)
 
 	// Advance little bit more than a month
 	dataSource.setCurrentTime(currentTime.Unix())
@@ -601,7 +601,7 @@ func TestGetBalanceHistoryUpdateLater(t *testing.T) {
 	}
 
 	errorFromIdeal = getTimeError(dataSource, newBalanceData, BalanceHistory1Month)
-	require.Less(t, math.Abs(float64(errorFromIdeal)), strideDuration(BalanceHistory1Month).Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, strideDuration(BalanceHistory1Month).Seconds(), BalanceHistory1Month)
+	require.Less(t, math.Abs(float64(errorFromIdeal)), timeIntervalToStrideDuration[BalanceHistory1Month].Seconds(), "Duration error [%d s] is within 1 stride [%.f s] for interval [%#v]", errorFromIdeal, timeIntervalToStrideDuration[BalanceHistory1Month].Seconds(), BalanceHistory1Month)
 }
 
 func TestGetBalanceHistoryFetchMultipleAccounts(t *testing.T) {
@@ -674,27 +674,27 @@ func TestGetBalanceHistoryUpdateCancellation(t *testing.T) {
 }
 
 func TestBlockStrideHaveCommonDivisor(t *testing.T) {
-	values := make([]blocksStride, 0, len(timeIntervalToStride))
-	for _, blockCount := range timeIntervalToStride {
-		values = append(values, blockCount)
+	values := make([]time.Duration, 0, len(timeIntervalToStrideDuration))
+	for _, blockDuration := range timeIntervalToStrideDuration {
+		values = append(values, blockDuration)
 	}
 	sort.Slice(values, func(i, j int) bool {
 		return values[i] < values[j]
 	})
 	for i := 1; i < len(values); i++ {
-		require.Equal(t, blocksStride(0), values[i]%values[i-1], " %d value from index %d is divisible with previous %d", values[i], i, values[i-1])
+		require.Equal(t, time.Duration(0), values[i]%values[i-1], " %d value from index %d is divisible with previous %d", values[i], i, values[i-1])
 	}
 }
 
 func TestBlockStrideMatchesBitsetFilter(t *testing.T) {
-	filterToStrideEquivalence := map[bitsetFilter]blocksStride{
+	filterToStrideEquivalence := map[bitsetFilter]time.Duration{
 		filterAllTime:   fourMonthsStride,
 		filterWeekly:    weekStride,
 		filterTwiceADay: twiceADayStride,
 	}
 
 	for interval, bitsetFiler := range timeIntervalToBitsetFilter {
-		stride, found := timeIntervalToStride[interval]
+		stride, found := timeIntervalToStrideDuration[interval]
 		require.True(t, found)
 		require.Equal(t, stride, filterToStrideEquivalence[bitsetFiler])
 	}

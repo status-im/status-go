@@ -225,7 +225,7 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 		}
 	}
 
-	data, err := mergeDataPoints(allData, strideDuration(timeInterval))
+	data, err := mergeDataPoints(allData, timeIntervalToStrideDuration[timeInterval])
 	if err != nil {
 		return nil, err
 	} else if len(data) == 0 {
