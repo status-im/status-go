@@ -513,7 +513,7 @@ func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact,
 	return &ActivityCenterNotification{
 		ID:        types.FromHex(contactRequest.ID),
 		Type:      ActivityCenterNotificationTypeContactRequest,
-		Name:      contact.CanonicalName(),
+		Name:      contact.PrimaryName(),
 		Author:    m.myHexIdentity(),
 		Message:   contactRequest,
 		Timestamp: m.getTimesource().GetCurrentTime(),

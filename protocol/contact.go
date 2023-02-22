@@ -40,18 +40,6 @@ type ContactDeviceInfo struct {
 	FCMToken string `json:"fcmToken"`
 }
 
-func (c *Contact) CanonicalName() string {
-	if c.LocalNickname != "" {
-		return c.LocalNickname
-	}
-
-	if c.ENSVerified {
-		return c.EnsName
-	}
-
-	return c.Alias
-}
-
 func (c *Contact) CanonicalImage(profilePicturesVisibility settings.ProfilePicturesVisibilityType) string {
 	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.added()) {
 		return c.Identicon
@@ -191,8 +179,47 @@ func (c *Contact) mutual() bool {
 	return c.added() && c.hasAddedUs()
 }
 
+func (c *Contact) active() bool {
+	return c.mutual() && !c.Blocked
+}
+
 func (c *Contact) dismissed() bool {
 	return c.ContactRequestLocalState == ContactRequestStateDismissed
+}
+
+func (c *Contact) names() []string {
+	var names []string
+
+	if c.LocalNickname != "" {
+		names = append(names, c.LocalNickname)
+	}
+
+	if c.ENSVerified && len(c.EnsName) != 0 {
+		names = append(names, c.EnsName)
+	}
+
+	if c.DisplayName != "" {
+		names = append(names, c.DisplayName)
+	}
+
+	return append(names, c.Alias)
+
+}
+
+func (c *Contact) PrimaryName() string {
+	return c.names()[0]
+}
+
+func (c *Contact) SecondaryName() string {
+	// Only shown if the user has a nickname
+	if c.LocalNickname == "" {
+		return ""
+	}
+	names := c.names()
+	if len(names) > 1 {
+		return names[1]
+	}
+	return ""
 }
 
 type ContactRequestProcessingResponse struct {
@@ -380,6 +407,11 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 		Added               bool                `json:"added"`
 		ContactRequestState ContactRequestState `json:"contactRequestState"`
 		HasAddedUs          bool                `json:"hasAddedUs"`
+		Mutual              bool                `json:"mutual"`
+
+		Active        bool   `json:"active"`
+		PrimaryName   string `json:"primaryName"`
+		SecondaryName string `json:"secondaryName,omitempty"`
 	}{
 		Alias: (*Alias)(c),
 	}
@@ -392,6 +424,11 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 
 	item.Added = c.added()
 	item.HasAddedUs = c.hasAddedUs()
+	item.Mutual = c.mutual()
+	item.Active = c.active()
+	item.PrimaryName = c.PrimaryName()
+	item.SecondaryName = c.SecondaryName()
+	item.Active = c.active()
 
 	if c.mutual() {
 		item.ContactRequestState = ContactRequestStateMutual

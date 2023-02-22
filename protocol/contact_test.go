@@ -549,7 +549,12 @@ func TestContactContactRequestAccepted(t *testing.T) {
 }
 
 func TestMarshalContactJSON(t *testing.T) {
-	contact := &Contact{}
+	contact := &Contact{
+		LocalNickname:             "primary-name",
+		Alias:                     "secondary-name",
+		ContactRequestLocalState:  ContactRequestStateSent,
+		ContactRequestRemoteState: ContactRequestStateReceived,
+	}
 	id, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	contact.ID = common.PubkeyToHex(&id.PublicKey)
@@ -557,8 +562,14 @@ func TestMarshalContactJSON(t *testing.T) {
 	encodedContact, err := json.Marshal(contact)
 
 	require.NoError(t, err)
-	require.True(t, strings.Contains(string(encodedContact), "compressedKey\":\"zQ"))
 
+	require.True(t, strings.Contains(string(encodedContact), "compressedKey\":\"zQ"))
+	require.True(t, strings.Contains(string(encodedContact), "mutual\":true"))
+	require.True(t, strings.Contains(string(encodedContact), "added\":true"))
+	require.True(t, strings.Contains(string(encodedContact), "hasAddedUs\":true"))
+	require.True(t, strings.Contains(string(encodedContact), "active\":true"))
+	require.True(t, strings.Contains(string(encodedContact), "primaryName\":\"primary-name"))
+	require.True(t, strings.Contains(string(encodedContact), "secondaryName\":\"secondary-name"))
 }
 
 func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirSide(t *testing.T) {
@@ -710,4 +721,47 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateRemoteState(t *tes
 	require.False(t, c.added())
 	require.False(t, c.hasAddedUs())
 	require.False(t, c.mutual())
+}
+
+func TestPrimaryName(t *testing.T) {
+	// Has only Alias
+
+	contact := &Contact{
+		Alias: "alias",
+	}
+
+	require.Equal(t, "alias", contact.PrimaryName())
+
+	// Has display name
+
+	contact.DisplayName = "display-name"
+
+	require.Equal(t, "display-name", contact.PrimaryName())
+	require.Equal(t, "", contact.SecondaryName())
+
+	// Has non verified ens name
+
+	contact.EnsName = "ens-name"
+	require.Equal(t, "display-name", contact.PrimaryName())
+	require.Equal(t, "", contact.SecondaryName())
+
+	// Has verified ens name
+	contact.ENSVerified = true
+	require.Equal(t, "ens-name", contact.PrimaryName())
+	require.Equal(t, "", contact.SecondaryName())
+
+	contact.LocalNickname = "nickname"
+	// Has nickname and ENS name
+	require.Equal(t, "nickname", contact.PrimaryName())
+	require.Equal(t, "ens-name", contact.SecondaryName())
+
+	// Has nickname and display name
+	contact.EnsName = ""
+	require.Equal(t, "nickname", contact.PrimaryName())
+	require.Equal(t, "display-name", contact.SecondaryName())
+
+	// Has nickname and alias
+	contact.DisplayName = ""
+	require.Equal(t, "nickname", contact.PrimaryName())
+	require.Equal(t, "alias", contact.SecondaryName())
 }

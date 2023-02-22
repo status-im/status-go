@@ -1032,7 +1032,7 @@ func (m *Messenger) GetLatestVerificationRequestFrom(contactID string) (*verific
 func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contact *Contact, response *MessengerResponse, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
-		Name:                      contact.CanonicalName(),
+		Name:                      contact.PrimaryName(),
 		Type:                      ActivityCenterNotificationTypeContactVerification,
 		Author:                    chatMessage.From,
 		Message:                   chatMessage,
@@ -1051,7 +1051,7 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
-		Name:                      contact.CanonicalName(),
+		Name:                      contact.PrimaryName(),
 		Type:                      ActivityCenterNotificationTypeContactVerification,
 		Author:                    messageState.CurrentMessageState.Contact.ID,
 		Message:                   chatMessage,
