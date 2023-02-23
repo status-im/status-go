@@ -26,10 +26,15 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+type Connection struct {
+	Up            bool  `json:"up"`
+	LastCheckedAt int64 `json:"lastCheckedAt"`
+}
+
 type ConnectedResult struct {
-	Infura        map[uint64]bool `json:"infura"`
-	CryptoCompare bool            `json:"cryptoCompare"`
-	Opensea       map[uint64]bool `json:"opensea"`
+	Infura        map[uint64]Connection `json:"infura"`
+	CryptoCompare Connection            `json:"cryptoCompare"`
+	Opensea       map[uint64]Connection `json:"opensea"`
 }
 
 // NewService initializes service instance.
@@ -162,18 +167,27 @@ func (s *Service) IsStarted() bool {
 }
 
 func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
-	infura := make(map[uint64]bool)
+	infura := make(map[uint64]Connection)
 	for chainID, client := range chain.ChainClientInstances {
-		infura[chainID] = client.IsConnected
+		infura[chainID] = Connection{
+			Up:            client.IsConnected,
+			LastCheckedAt: client.LastCheckedAt,
+		}
 	}
 
-	opensea := make(map[uint64]bool)
+	opensea := make(map[uint64]Connection)
 	for chainID, client := range OpenseaClientInstances {
-		opensea[chainID] = client.IsConnected
+		opensea[chainID] = Connection{
+			Up:            client.IsConnected,
+			LastCheckedAt: client.LastCheckedAt,
+		}
 	}
 	return &ConnectedResult{
-		Infura:        infura,
-		Opensea:       opensea,
-		CryptoCompare: s.cryptoCompare.IsConnected,
+		Infura:  infura,
+		Opensea: opensea,
+		CryptoCompare: Connection{
+			Up:            s.cryptoCompare.IsConnected,
+			LastCheckedAt: s.cryptoCompare.LastCheckedAt,
+		},
 	}
 }
