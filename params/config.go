@@ -859,7 +859,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		},
 		WakuV2Config: WakuV2Config{
 			Host:           "0.0.0.0",
-			Port:           60000,
+			Port:           0,
 			DataDir:        wakuV2Dir,
 			MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
 		},
