@@ -1086,18 +1086,6 @@ func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activity
 	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
-func (api *PublicAPI) ActivityCenterNotificationsByGroupCount(activityGroup protocol.ActivityCenterGroup) (uint64, error) {
-	return api.service.messenger.ActivityCenterNotificationsByGroupCount(activityGroup)
-}
-
-func (api *PublicAPI) UnreadActivityCenterNotificationsByGroupCount(activityGroup protocol.ActivityCenterGroup) (uint64, error) {
-	return api.service.messenger.UnreadActivityCenterNotificationsByGroupCount(activityGroup)
-}
-
-func (api *PublicAPI) ActivityCenterTypesByGroup(activityGroup protocol.ActivityCenterGroup) ([]protocol.ActivityCenterType, error) {
-	return api.service.messenger.ActivityCenterTypesByGroup(activityGroup)
-}
-
 func (api *PublicAPI) HasUnseenActivityCenterNotifications() (bool, error) {
 	return api.service.messenger.HasUnseenActivityCenterNotifications()
 }
@@ -1145,10 +1133,6 @@ func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uin
 
 func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {
 	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
-}
-
-func (api *PublicAPI) ActivityCenterNotificationsByGroup(cursor string, limit uint64, activityGroup protocol.ActivityCenterGroup, readType protocol.ActivityCenterQueryParamsRead) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsByGroup(cursor, limit, activityGroup, readType)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

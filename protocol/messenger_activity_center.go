@@ -20,18 +20,6 @@ func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount(activityTy
 	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
 }
 
-func (m *Messenger) ActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup) (uint64, error) {
-	return m.persistence.ActivityCenterNotificationsByGroupCount(activityGroup, ActivityCenterQueryParamsReadAll)
-}
-
-func (m *Messenger) UnreadActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup) (uint64, error) {
-	return m.persistence.ActivityCenterNotificationsByGroupCount(activityGroup, ActivityCenterQueryParamsReadUnread)
-}
-
-func (m *Messenger) ActivityCenterTypesByGroup(activityGroup ActivityCenterGroup) ([]ActivityCenterType, error) {
-	return activityGroup.NotificationTypes(), nil
-}
-
 func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
 	return m.persistence.HasUnseenActivityCenterNotifications()
 }
@@ -324,18 +312,6 @@ func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint6
 
 func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (*ActivityCenterPaginationResponse, error) {
 	cursor, notifications, err := m.persistence.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ActivityCenterPaginationResponse{
-		Cursor:        cursor,
-		Notifications: notifications,
-	}, nil
-}
-
-func (m *Messenger) ActivityCenterNotificationsByGroup(cursor string, limit uint64, activityGroup ActivityCenterGroup, readType ActivityCenterQueryParamsRead) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ActivityCenterNotificationsByGroup(cursor, limit, activityGroup, readType)
 	if err != nil {
 		return nil, err
 	}

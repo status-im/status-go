@@ -580,20 +580,6 @@ func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit u
 	return db.activityCenterNotifications(params)
 }
 
-func (db sqlitePersistence) ActivityCenterNotificationsByGroup(cursor string, limit uint64, activityGroup ActivityCenterGroup, readType ActivityCenterQueryParamsRead) (string, []*ActivityCenterNotification, error) {
-	activityTypes := activityGroup.NotificationTypes()
-
-	params := activityCenterQueryParams{
-		activityCenterTypes: activityTypes,
-		cursor:              cursor,
-		limit:               limit,
-		read:                readType,
-		accepted:            true,
-	}
-
-	return db.activityCenterNotifications(params)
-}
-
 func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
@@ -841,14 +827,6 @@ func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, er
 func (db sqlitePersistence) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []ActivityCenterType) (uint64, error) {
 	var count uint64
 	err := db.buildActivityCenterNotificationsCountQuery(false, ActivityCenterQueryParamsReadUnread, activityTypes).Scan(&count)
-	return count, err
-}
-
-func (db sqlitePersistence) ActivityCenterNotificationsByGroupCount(activityGroup ActivityCenterGroup, readType ActivityCenterQueryParamsRead) (uint64, error) {
-	activityTypes := activityGroup.NotificationTypes()
-
-	var count uint64
-	err := db.buildActivityCenterNotificationsCountQuery(true, ActivityCenterQueryParamsReadAll, activityTypes).Scan(&count)
 	return count, err
 }
 
