@@ -107,9 +107,12 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 
 	if config.WakuV2Config.Enabled {
-		telemetryServerURL, err := accDB.GetTelemetryServerURL()
-		if err != nil {
-			return err
+		telemetryServerURL := ""
+		if accDB.DB() != nil {
+			telemetryServerURL, err = accDB.GetTelemetryServerURL()
+			if err != nil {
+				return err
+			}
 		}
 
 		waku2Service, err := b.wakuV2Service(config, telemetryServerURL)
