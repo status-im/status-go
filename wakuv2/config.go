@@ -48,7 +48,7 @@ type Config struct {
 var DefaultConfig = Config{
 	MaxMessageSize:    common.DefaultMaxMessageSize,
 	Host:              "0.0.0.0",
-	Port:              60000,
+	Port:              0,
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
@@ -66,10 +66,6 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.Host == "" {
 		cfg.Host = DefaultConfig.Host
-	}
-
-	if cfg.Port == 0 {
-		cfg.Port = DefaultConfig.Port
 	}
 
 	if cfg.KeepAliveInterval == 0 {
