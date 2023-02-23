@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,7 @@ type Client struct {
 	ChainID         uint64
 	rpcClient       *rpc.Client
 	IsConnected     bool
+	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
 }
 
@@ -37,7 +39,7 @@ func NewClient(rpc *rpc.Client, chainID uint64) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{eth: ethClient, ChainID: chainID, rpcClient: rpc, IsConnected: true}
+	client := &Client{eth: ethClient, ChainID: chainID, rpcClient: rpc, IsConnected: true, LastCheckedAt: time.Now().Unix()}
 	ChainClientInstances[chainID] = client
 	return client, nil
 }
@@ -60,6 +62,7 @@ func NewClients(rpc *rpc.Client, chainIDs []uint64) (res []*Client, err error) {
 func (cc *Client) toggleIsConnected(err error) {
 	cc.IsConnectedLock.Lock()
 	defer cc.IsConnectedLock.Unlock()
+	cc.LastCheckedAt = time.Now().Unix()
 	if err != nil {
 		cc.IsConnected = false
 	} else {

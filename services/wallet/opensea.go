@@ -116,6 +116,7 @@ type OpenseaClient struct {
 	url             string
 	apiKey          string
 	IsConnected     bool
+	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
 }
 
@@ -131,7 +132,7 @@ func newOpenseaClient(chainID uint64, apiKey string) (*OpenseaClient, error) {
 		Timeout: time.Second * 5,
 	}
 	if url, ok := BaseURLs[chainID]; ok {
-		openseaClient := &OpenseaClient{client: client, url: url, apiKey: apiKey, IsConnected: true}
+		openseaClient := &OpenseaClient{client: client, url: url, apiKey: apiKey, IsConnected: true, LastCheckedAt: time.Now().Unix()}
 		OpenseaClientInstances[chainID] = openseaClient
 		return openseaClient, nil
 	}
@@ -144,6 +145,7 @@ func (o *OpenseaClient) fetchAllCollectionsByOwner(owner common.Address) ([]Open
 	var collections []OpenseaCollection
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
+	o.LastCheckedAt = time.Now().Unix()
 	for {
 		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", o.url, owner, offset, CollectionLimit)
 		body, err := o.doOpenseaRequest(url)
@@ -174,6 +176,7 @@ func (o *OpenseaClient) fetchAllAssetsByOwnerAndCollection(owner common.Address,
 	var assets []OpenseaAsset
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
+	o.LastCheckedAt = time.Now().Unix()
 	for {
 		url := fmt.Sprintf("%s/assets?owner=%s&collection=%s&offset=%d&limit=%d", o.url, owner, collectionSlug, offset, AssetLimit)
 		body, err := o.doOpenseaRequest(url)

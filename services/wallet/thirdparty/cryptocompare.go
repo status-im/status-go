@@ -68,11 +68,12 @@ type MarketValuesContainer struct {
 type CryptoCompare struct {
 	client          *http.Client
 	IsConnected     bool
+	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
 }
 
 func NewCryptoCompare() *CryptoCompare {
-	return &CryptoCompare{client: &http.Client{Timeout: time.Minute}, IsConnected: true}
+	return &CryptoCompare{client: &http.Client{Timeout: time.Minute}, IsConnected: true, LastCheckedAt: time.Now().Unix()}
 }
 
 func renameSymbols(symbols []string) (renames []string) {
@@ -111,6 +112,7 @@ func (c *CryptoCompare) DoQuery(url string) (*http.Response, error) {
 	c.IsConnectedLock.Lock()
 	defer c.IsConnectedLock.Unlock()
 
+	c.LastCheckedAt = time.Now().Unix()
 	if err != nil {
 		c.IsConnected = false
 		return nil, err
