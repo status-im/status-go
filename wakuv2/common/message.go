@@ -154,7 +154,8 @@ type MemoryMessageStore struct {
 func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
-		log.Error("failed to extract content topic from message", "topic", env.Message().ContentTopic, "err", err)
+		log.Debug("failed to extract content topic from message", "topic", env.Message().ContentTopic, "err", err)
+		return nil
 	}
 
 	return &ReceivedMessage{

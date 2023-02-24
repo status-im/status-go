@@ -1235,6 +1235,10 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
+	if recvMessage == nil {
+		return nil, nil
+	}
+
 	envelopeErrors := make([]common.EnvelopeError, 0)
 
 	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
