@@ -270,6 +270,10 @@ func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids 
 	return nil, err
 }
 
+func (m *Messenger) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) error {
+	return m.persistence.DeleteActivityCenterNotifications(ids)
+}
+
 func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCenterNotification, error) {
 	return m.persistence.GetActivityCenterNotificationByID(id)
 }

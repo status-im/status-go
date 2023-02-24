@@ -54,6 +54,7 @@ type ActivityCenterNotification struct {
 	Timestamp                 uint64                         `json:"timestamp"`
 	Read                      bool                           `json:"read"`
 	Dismissed                 bool                           `json:"dismissed"`
+	Deleted                   bool                           `json:"deleted"`
 	Accepted                  bool                           `json:"accepted"`
 	ContactVerificationStatus verification.RequestStatus     `json:"contactVerificationStatus"`
 }
