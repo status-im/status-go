@@ -187,14 +187,6 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/emirpasic/gods v1.18.1
-## explicit; go 1.2
-github.com/emirpasic/gods/containers
-github.com/emirpasic/gods/lists
-github.com/emirpasic/gods/lists/doublylinkedlist
-github.com/emirpasic/gods/maps
-github.com/emirpasic/gods/maps/linkedhashmap
-github.com/emirpasic/gods/utils
 # github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.4
 ## explicit; go 1.17
 github.com/ethereum/go-ethereum
@@ -411,12 +403,6 @@ github.com/imdario/mergo
 # github.com/ipfs/go-cid v0.3.2
 ## explicit; go 1.18
 github.com/ipfs/go-cid
-# github.com/ipfs/go-log v1.0.5
-## explicit; go 1.12
-github.com/ipfs/go-log
-github.com/ipfs/go-log/tracer
-github.com/ipfs/go-log/tracer/wire
-github.com/ipfs/go-log/writer
 # github.com/ipfs/go-log/v2 v2.5.1
 ## explicit; go 1.16
 github.com/ipfs/go-log/v2
@@ -544,7 +530,7 @@ github.com/libp2p/go-libp2p/p2p/transport/webtransport
 # github.com/libp2p/go-libp2p-asn-util v0.2.0
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-pubsub v0.9.0
+# github.com/libp2p/go-libp2p-pubsub v0.9.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
@@ -693,11 +679,6 @@ github.com/onsi/ginkgo/v2/types
 # github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opentracing/opentracing-go v1.2.0
-## explicit; go 1.14
-github.com/opentracing/opentracing-go
-github.com/opentracing/opentracing-go/ext
-github.com/opentracing/opentracing-go/log
 # github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 ## explicit; go 1.16
 github.com/pbnjay/memory
@@ -985,7 +966,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.5.2-0.20230223234511-57f6110074d0
+# github.com/waku-org/go-waku v0.5.2-0.20230224151428-d6c87f346b72
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
