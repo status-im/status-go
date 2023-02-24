@@ -1,71 +1,56 @@
 package timecache
 
 import (
-	"container/list"
+	"context"
 	"sync"
 	"time"
 )
 
-// FirstSeenCache is a thread-safe copy of https://github.com/whyrusleeping/timecache.
+// FirstSeenCache is a time cache that only marks the expiry of a message when first added.
 type FirstSeenCache struct {
-	q     *list.List
-	m     map[string]time.Time
-	span  time.Duration
-	guard *sync.RWMutex
+	lk  sync.RWMutex
+	m   map[string]time.Time
+	ttl time.Duration
+
+	done func()
 }
 
-func newFirstSeenCache(span time.Duration) TimeCache {
-	return &FirstSeenCache{
-		q:     list.New(),
-		m:     make(map[string]time.Time),
-		span:  span,
-		guard: new(sync.RWMutex),
+var _ TimeCache = (*FirstSeenCache)(nil)
+
+func newFirstSeenCache(ttl time.Duration) *FirstSeenCache {
+	tc := &FirstSeenCache{
+		m:   make(map[string]time.Time),
+		ttl: ttl,
 	}
+
+	ctx, done := context.WithCancel(context.Background())
+	tc.done = done
+	go background(ctx, &tc.lk, tc.m)
+
+	return tc
 }
 
-func (tc FirstSeenCache) Add(s string) {
-	tc.guard.Lock()
-	defer tc.guard.Unlock()
+func (tc *FirstSeenCache) Done() {
+	tc.done()
+}
+
+func (tc *FirstSeenCache) Has(s string) bool {
+	tc.lk.RLock()
+	defer tc.lk.RUnlock()
+
+	_, ok := tc.m[s]
+	return ok
+}
+
+func (tc *FirstSeenCache) Add(s string) bool {
+	tc.lk.Lock()
+	defer tc.lk.Unlock()
 
 	_, ok := tc.m[s]
 	if ok {
-		panic("putting the same entry twice not supported")
+		return false
 	}
 
-	// TODO(#515): Do GC in the background
-	tc.sweep()
-
-	tc.m[s] = time.Now()
-	tc.q.PushFront(s)
-}
-
-func (tc FirstSeenCache) sweep() {
-	for {
-		back := tc.q.Back()
-		if back == nil {
-			return
-		}
-
-		v := back.Value.(string)
-		t, ok := tc.m[v]
-		if !ok {
-			panic("inconsistent cache state")
-		}
-
-		if time.Since(t) > tc.span {
-			tc.q.Remove(back)
-			delete(tc.m, v)
-		} else {
-			return
-		}
-	}
-}
-
-func (tc FirstSeenCache) Has(s string) bool {
-	tc.guard.RLock()
-	defer tc.guard.RUnlock()
-
-	ts, ok := tc.m[s]
-	// Only consider the entry found if it was present in the cache AND hadn't already expired.
-	return ok && time.Since(ts) <= tc.span
+	tc.m[s] = time.Now().Add(tc.ttl)
+	return true
 }

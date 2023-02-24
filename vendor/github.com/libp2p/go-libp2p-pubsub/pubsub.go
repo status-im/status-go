@@ -20,7 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 // DefaultMaximumMessageSize is 1mb.
@@ -152,7 +152,6 @@ type PubSub struct {
 	inboundStreamsMx sync.Mutex
 	inboundStreams   map[peer.ID]network.Stream
 
-	seenMessagesMx  sync.Mutex
 	seenMessages    timecache.TimeCache
 	seenMsgTTL      time.Duration
 	seenMsgStrategy timecache.Strategy
@@ -567,6 +566,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 		}
 		p.peers = nil
 		p.topics = nil
+		p.seenMessages.Done()
 	}()
 
 	for {
@@ -985,22 +985,13 @@ func (p *PubSub) notifySubs(msg *Message) {
 
 // seenMessage returns whether we already saw this message before
 func (p *PubSub) seenMessage(id string) bool {
-	p.seenMessagesMx.Lock()
-	defer p.seenMessagesMx.Unlock()
 	return p.seenMessages.Has(id)
 }
 
 // markSeen marks a message as seen such that seenMessage returns `true' for the given id
 // returns true if the message was freshly marked
 func (p *PubSub) markSeen(id string) bool {
-	p.seenMessagesMx.Lock()
-	defer p.seenMessagesMx.Unlock()
-	if p.seenMessages.Has(id) {
-		return false
-	}
-
-	p.seenMessages.Add(id)
-	return true
+	return p.seenMessages.Add(id)
 }
 
 // subscribedToMessage returns whether we are subscribed to one of the topics
