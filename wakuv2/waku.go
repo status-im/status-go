@@ -90,6 +90,7 @@ type settings struct {
 	PeerExchange        bool   // Enable peer exchange
 	DiscoveryLimit      int    // Indicates the number of nodes to discover
 	Nameserver          string // Optional nameserver to use for dns discovery
+	EnableDiscV5        bool   // Indicates whether discv5 is enabled or not
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -218,6 +219,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		PeerExchange:     cfg.PeerExchange,
 		DiscoveryLimit:   cfg.DiscoveryLimit,
 		Nameserver:       cfg.Nameserver,
+		EnableDiscV5:     cfg.EnableDiscV5,
 	}
 
 	waku.filters = common.NewFilters()
@@ -351,18 +353,20 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 				waku.connStatusMu.Unlock()
 				signal.SendPeerStats(latestConnStatus)
 
-				// Restarting DiscV5
-				if !latestConnStatus.IsOnline && isConnected {
-					waku.logger.Debug("Restarting DiscV5: offline and is connected")
-					isConnected = false
-					waku.node.DiscV5().Stop()
-				} else if latestConnStatus.IsOnline && !isConnected {
-					waku.logger.Debug("Restarting DiscV5: online and is not connected")
-					isConnected = true
-					if !waku.node.DiscV5().IsStarted() {
-						err := waku.node.DiscV5().Start(ctx)
-						if err != nil {
-							waku.logger.Error("Could not start DiscV5", zap.Error(err))
+				if cfg.EnableDiscV5 {
+					// Restarting DiscV5
+					if !latestConnStatus.IsOnline && isConnected {
+						waku.logger.Debug("Restarting DiscV5: offline and is connected")
+						isConnected = false
+						waku.node.DiscV5().Stop()
+					} else if latestConnStatus.IsOnline && !isConnected {
+						waku.logger.Debug("Restarting DiscV5: online and is not connected")
+						isConnected = true
+						if !waku.node.DiscV5().IsStarted() {
+							err := waku.node.DiscV5().Start(ctx)
+							if err != nil {
+								waku.logger.Error("Could not start DiscV5", zap.Error(err))
+							}
 						}
 					}
 				}
@@ -1406,6 +1410,10 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
+	if !w.settings.EnableDiscV5 || w.node.DiscV5() == nil {
+		return
+	}
+
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	var lastTry = time.Now().UnixNano() / int64(time.Millisecond)
