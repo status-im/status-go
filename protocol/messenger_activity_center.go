@@ -322,6 +322,10 @@ func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, a
 	}, nil
 }
 
+func (m *Messenger) ActivityCenterNotificationsCountBy(activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
+	return m.persistence.ActivityCenterNotificationsCountBy(activityTypes, readType, accepted)
+}
+
 func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
 
