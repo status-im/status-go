@@ -1135,6 +1135,10 @@ func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64,
 	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
 }
 
+func (api *PublicAPI) ActivityCenterNotificationsCountBy(activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
+	return api.service.messenger.ActivityCenterNotificationsCountBy(activityTypes, readType, accepted)
+}
+
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages()
 }

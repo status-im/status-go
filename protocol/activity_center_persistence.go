@@ -830,6 +830,12 @@ func (db sqlitePersistence) UnreadAndAcceptedActivityCenterNotificationsCount(ac
 	return count, err
 }
 
+func (db sqlitePersistence) ActivityCenterNotificationsCountBy(activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
+	var count uint64
+	err := db.buildActivityCenterNotificationsCountQuery(accepted, readType, activityTypes).Scan(&count)
+	return count, err
+}
+
 func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (*ActivityCenterNotification, error) {
 	row := db.db.QueryRow(`
 		SELECT
