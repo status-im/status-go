@@ -16,6 +16,7 @@ const (
 	SyncWakuSectionKeyContacts    = "contacts"
 	SyncWakuSectionKeyCommunities = "communities"
 	SyncWakuSectionKeySettings    = "settings"
+	SyncWakuSectionKeyKeycards    = "keycards"
 )
 
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
@@ -44,6 +45,12 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		errors = append(errors, err)
 	}
 
+	err = m.handleBackedUpKeycards(message.Keycards)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	// Send signal about applied backup progress
 	if m.config.messengerSignalsHandler != nil {
 		response := wakusync.WakuBackedUpDataResponse{}
 
@@ -51,9 +58,12 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyContacts, message.ContactsDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyCommunities, message.CommunitiesDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeySettings, message.SettingsDetails)
+		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeycards, message.KeycardsDetails)
 
 		m.config.messengerSignalsHandler.SendWakuFetchingBackupProgress(&response)
 	}
+
+	state.Response.BackupHandled = true
 
 	return errors
 }
@@ -151,14 +161,33 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 		return nil
 	}
 
-	if settingField != nil {
+	if settingField != nil && m.config.messengerSignalsHandler != nil {
 		response := wakusync.WakuBackedUpDataResponse{
 			Setting: settingField,
 		}
 
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+	}
+
+	return nil
+}
+
+func (m *Messenger) handleBackedUpKeycards(message *protobuf.SyncAllKeycards) error {
+	if message == nil {
+		return nil
+	}
+
+	allKeycards, err := m.syncReceivedKeycards(*message)
+	if err != nil {
+		return err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		response := wakusync.WakuBackedUpDataResponse{
+			Keycards: allKeycards,
 		}
+
+		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
 	}
 
 	return nil

@@ -115,16 +115,9 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
-
+			return r.BackupHandled
 		},
-		"contacts not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(bob2.AddedContacts(), 2)
@@ -194,15 +187,9 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"profile data not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 
@@ -293,15 +280,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"profile data not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 
@@ -360,15 +341,9 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				s.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"contacts not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 
@@ -433,15 +408,9 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"contacts not backed up",
+		"no messages",
 	)
 	// Bob 2 should remove the contact
 	s.Require().NoError(err)
@@ -486,15 +455,9 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"contacts not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 
@@ -539,15 +502,9 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"contacts not backed up",
+		"no messages",
 	)
 	s.Require().NoError(err)
 
@@ -563,14 +520,12 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	_, err = bob1.BackupData(context.Background())
 	s.Require().NoError(err)
 
-	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			return len(bob2.BlockedContacts()) == 1
-
+			return r.BackupHandled
 		},
-		"blocked contact not received",
+		"no messages",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(bob2.BlockedContacts(), 1)
@@ -612,15 +567,9 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			_, err := bob2.RetrieveAll()
-			if err != nil {
-				bob2.logger.Info("Failed")
-				return false
-			}
-
-			return true
+			return r.BackupHandled
 		},
-		"communities not backed up",
+		"no messages",
 	)
 
 	s.Require().NoError(err)
@@ -633,4 +582,41 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)
 	s.Require().Equal(clock, lastBackup)
+}
+
+func (s *MessengerBackupSuite) TestBackupKeycards() {
+	// Create bob1
+	bob1 := s.m
+	allKeycardsToSync := getKeycardsForTest()
+	for _, kp := range allKeycardsToSync {
+		addedKc, addedAccs, err := bob1.settings.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		s.Require().NoError(err)
+		s.Require().Equal(true, addedKc)
+		s.Require().Equal(false, addedAccs)
+	}
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	syncedKeycards, err := bob2.settings.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(len(allKeycardsToSync), len(syncedKeycards))
+	s.Require().True(haveSameElements(syncedKeycards, allKeycardsToSync, sameKeycards))
 }

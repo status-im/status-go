@@ -95,6 +95,11 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, errors[0]
 	}
 
+	keycardsToBackup, err := m.prepareSyncAllKeycardsMessage(clock)
+	if err != nil {
+		return 0, err
+	}
+
 	backupDetailsOnly := func() *protobuf.Backup {
 		return &protobuf.Backup{
 			Clock: clock,
@@ -113,6 +118,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 			SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
 				TotalNumber: uint32(len(settings)),
+			},
+			KeycardsDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(1),
 			},
 		}
 	}
@@ -159,6 +168,15 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
+	}
+
+	// Update keycards message encode and dispatch
+	pb := backupDetailsOnly()
+	pb.KeycardsDetails.DataNumber = 1
+	pb.Keycards = &keycardsToBackup
+	err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+	if err != nil {
+		return 0, err
 	}
 
 	chat.LastClockValue = clock

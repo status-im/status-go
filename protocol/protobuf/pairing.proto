@@ -26,6 +26,8 @@ message Backup {
   FetchingBackedUpDataDetails profileDetails = 8;
   SyncSetting setting = 9;
   FetchingBackedUpDataDetails settingsDetails = 10;
+  SyncAllKeycards keycards = 11;
+  FetchingBackedUpDataDetails keycardsDetails = 12;
 }
 
 message MultiAccount {

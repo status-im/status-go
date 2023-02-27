@@ -3,14 +3,17 @@ package signal
 import "encoding/json"
 
 const (
-	// EventWakuFetchingBackupProgress is triggered during the syncing from waku
+	// EventWakuFetchingBackupProgress is emitted while applying fetched data is ongoing
 	EventWakuFetchingBackupProgress = "waku.fetching.backup.progress"
 
-	// EventSyncFromWakuProfile is triggered during the syncing user profile from waku
+	// EventSyncFromWakuProfile is emitted while applying fetched profile data from waku
 	EventWakuBackedUpProfile = "waku.backedup.profile"
 
-	// EventWakuBackedUpSettings is triggered during the syncing user settings from waku
+	// EventWakuBackedUpSettings is emitted while applying fetched settings from waku
 	EventWakuBackedUpSettings = "waku.backedup.settings"
+
+	// EventWakuBackedUpKeycards is emitted while applying fetched keycard data from waku
+	EventWakuBackedUpKeycards = "waku.backedup.keycards"
 )
 
 func SendWakuFetchingBackupProgress(obj json.Marshaler) {
@@ -23,4 +26,8 @@ func SendWakuBackedUpProfile(obj json.Marshaler) {
 
 func SendWakuBackedUpSettings(obj json.Marshaler) {
 	send(EventWakuBackedUpSettings, obj)
+}
+
+func SendWakuBackedUpKeycards(obj json.Marshaler) {
+	send(EventWakuBackedUpKeycards, obj)
 }

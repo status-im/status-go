@@ -156,3 +156,7 @@ func (m *MessengerSignalsHandler) SendWakuBackedUpProfile(response *wakusync.Wak
 func (m *MessengerSignalsHandler) SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse) {
 	signal.SendWakuBackedUpSettings(response)
 }
+
+func (m *MessengerSignalsHandler) SendWakuBackedUpKeycards(response *wakusync.WakuBackedUpDataResponse) {
+	signal.SendWakuBackedUpKeycards(response)
+}
