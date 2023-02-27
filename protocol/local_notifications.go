@@ -138,7 +138,7 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 		ID:       gethcommon.HexToHash(id),
 		Body:     n,
 		Title:    n.Contact.CanonicalName() + " invited you to " + n.Chat.Name,
-		Message:  n.Contact.CanonicalName() + " wants you to join group " + n.Chat.Name,
+		Message:  n.Contact.CanonicalName() + " added you to group " + n.Chat.Name,
 		BodyType: localnotifications.TypeMessage,
 		Category: localnotifications.CategoryGroupInvite,
 		Deeplink: n.Chat.DeepLink(),
