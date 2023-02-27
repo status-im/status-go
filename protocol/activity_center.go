@@ -38,6 +38,14 @@ const (
 	ActivityCenterMembershipStatusDeclined
 )
 
+type ActivityCenterQueryParamsRead uint
+
+const (
+	ActivityCenterQueryParamsReadRead = iota + 1
+	ActivityCenterQueryParamsReadUnread
+	ActivityCenterQueryParamsReadAll
+)
+
 var ErrInvalidActivityCenterNotification = errors.New("invalid activity center notification")
 
 type ActivityCenterNotification struct {
@@ -59,10 +67,26 @@ type ActivityCenterNotification struct {
 	ContactVerificationStatus verification.RequestStatus     `json:"contactVerificationStatus"`
 }
 
+type ActivityCenterNotificationsArgs struct {
+	Cursor        string                        `json:"cursor"`
+	Limit         uint64                        `json:"limit"`
+	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
+	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
+	Accepted      bool                          `json:"accepted"`
+}
+
+type ActivityCenterCountArgs struct {
+	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
+	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
+	Accepted      bool                          `json:"accepted"`
+}
+
 type ActivityCenterPaginationResponse struct {
 	Cursor        string                        `json:"cursor"`
 	Notifications []*ActivityCenterNotification `json:"notifications"`
 }
+
+type ActivityCenterCountResponse = map[ActivityCenterType]uint64
 
 type ActivityCenterState struct {
 	HasSeen bool `json:"hasSeen"`
