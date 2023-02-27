@@ -33,15 +33,12 @@ func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, sync
 	return err
 }
 
-func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) prepareSyncAllKeycardsMessage(clock uint64) (message protobuf.SyncAllKeycards, err error) {
 	allKeycards, err := m.settings.GetAllKnownKeycards()
 	if err != nil {
-		return err
+		return message, err
 	}
 
-	clock, chat := m.getLastClockWithRelatedChat()
-
-	message := protobuf.SyncAllKeycards{}
 	message.Clock = clock
 
 	for _, kc := range allKeycards {
@@ -50,6 +47,17 @@ func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMe
 			syncKeycard.Clock = clock
 		}
 		message.Keycards = append(message.Keycards, syncKeycard)
+	}
+
+	return
+}
+
+func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMessageHandler) (err error) {
+	clock, chat := m.getLastClockWithRelatedChat()
+
+	message, err := m.prepareSyncAllKeycardsMessage(clock)
+	if err != nil {
+		return err
 	}
 
 	err = m.dispatchSyncKeycard(ctx, chat.ID, message, rawMessageHandler)
@@ -61,7 +69,7 @@ func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMe
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage protobuf.SyncAllKeycards) (err error) {
+func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) ([]*keypairs.KeyPair, error) {
 	var keypairsToSync []*keypairs.KeyPair
 	for _, syncKc := range syncMessage.Keycards {
 		var kp = &keypairs.KeyPair{}
@@ -69,12 +77,21 @@ func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage 
 		keypairsToSync = append(keypairsToSync, kp)
 	}
 
-	err = m.settings.SyncKeycards(syncMessage.Clock, keypairsToSync)
+	err := m.settings.SyncKeycards(syncMessage.Clock, keypairsToSync)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	allKeycards, err := m.settings.GetAllKnownKeycards()
+	if err != nil {
+		return nil, err
+	}
+
+	return allKeycards, nil
+}
+
+func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage protobuf.SyncAllKeycards) (err error) {
+	allKeycards, err := m.syncReceivedKeycards(syncMessage)
 	if err != nil {
 		return err
 	}

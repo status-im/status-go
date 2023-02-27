@@ -47,6 +47,7 @@ type MessengerResponse struct {
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
+	BackupHandled                 bool
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -305,6 +306,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddAllKnownKeycards(response.AllKnownKeycards())
 	r.AddKeycardActions(response.KeycardActions())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
+	r.BackupHandled = response.BackupHandled
 
 	return nil
 }
