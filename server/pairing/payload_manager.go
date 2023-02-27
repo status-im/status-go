@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/signal"
 )
 
 var (
@@ -252,6 +253,8 @@ func (apm *AccountPayloadManager) Receive(data []byte) error {
 		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apm.accountPayloadMarshaller.password),
 		zap.Binary("accountPayloadMarshaller.Received()", apm.Received()),
 	)
+
+	signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: apm.accountPayload.multiaccount})
 
 	return apm.payloadRepository.StoreToSource()
 }
