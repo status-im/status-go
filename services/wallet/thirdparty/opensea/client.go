@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,10 +14,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const AssetLimit = 50
 const CollectionLimit = 300
+
+const RequestRetryMaxCount = 1
+const RequestWaitTime = 300 * time.Millisecond
 
 var OpenseaClientInstances = make(map[uint64]*Client)
 
@@ -27,6 +33,11 @@ var BaseURLs = map[uint64]string{
 }
 
 type TraitValue string
+
+type NFTUniqueID struct {
+	ContractAddress common.Address `json:"contractAddress"`
+	TokenID         bigint.BigInt  `json:"tokenID"`
+}
 
 func (st *TraitValue) UnmarshalJSON(b []byte) error {
 	var item interface{}
@@ -47,11 +58,9 @@ func (st *TraitValue) UnmarshalJSON(b []byte) error {
 }
 
 type AssetContainer struct {
-	Assets []Asset `json:"assets"`
-}
-
-type AssetCollection struct {
-	Name string `json:"name"`
+	Assets         []Asset `json:"assets"`
+	NextCursor     string  `json:"next"`
+	PreviousCursor string  `json:"previous"`
 }
 
 type Contract struct {
@@ -83,19 +92,21 @@ type LastSale struct {
 type SellOrder struct {
 	CurrentPrice string `json:"current_price"`
 }
+
 type Asset struct {
-	ID                int             `json:"id"`
-	Name              string          `json:"name"`
-	Description       string          `json:"description"`
-	Permalink         string          `json:"permalink"`
-	ImageThumbnailURL string          `json:"image_thumbnail_url"`
-	ImageURL          string          `json:"image_url"`
-	Contract          Contract        `json:"asset_contract"`
-	Collection        AssetCollection `json:"collection"`
-	Traits            []Trait         `json:"traits"`
-	LastSale          LastSale        `json:"last_sale"`
-	SellOrders        []SellOrder     `json:"sell_orders"`
-	BackgroundColor   string          `json:"background_color"`
+	ID                int            `json:"id"`
+	TokenID           *bigint.BigInt `json:"token_id"`
+	Name              string         `json:"name"`
+	Description       string         `json:"description"`
+	Permalink         string         `json:"permalink"`
+	ImageThumbnailURL string         `json:"image_thumbnail_url"`
+	ImageURL          string         `json:"image_url"`
+	Contract          Contract       `json:"asset_contract"`
+	Collection        Collection     `json:"collection"`
+	Traits            []Trait        `json:"traits"`
+	LastSale          LastSale       `json:"last_sale"`
+	SellOrders        []SellOrder    `json:"sell_orders"`
+	BackgroundColor   string         `json:"background_color"`
 }
 
 type CollectionTrait struct {
@@ -104,11 +115,15 @@ type CollectionTrait struct {
 }
 
 type Collection struct {
-	Name            string                     `json:"name"`
-	Slug            string                     `json:"slug"`
-	ImageURL        string                     `json:"image_url"`
-	OwnedAssetCount int                        `json:"owned_asset_count"`
-	Traits          map[string]CollectionTrait `json:"traits"`
+	Name     string                     `json:"name"`
+	Slug     string                     `json:"slug"`
+	ImageURL string                     `json:"image_url"`
+	Traits   map[string]CollectionTrait `json:"traits"`
+}
+
+type OwnedCollection struct {
+	Collection
+	OwnedAssetCount *bigint.BigInt `json:"owned_asset_count"`
 }
 
 type Client struct {
@@ -118,6 +133,7 @@ type Client struct {
 	IsConnected     bool
 	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
+	requestLock     sync.RWMutex
 }
 
 // new opensea client.
@@ -132,7 +148,13 @@ func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 		Timeout: time.Second * 5,
 	}
 	if url, ok := BaseURLs[chainID]; ok {
-		openseaClient := &Client{client: client, url: url, apiKey: apiKey, IsConnected: true, LastCheckedAt: time.Now().Unix()}
+		openseaClient := &Client{
+			client:        client,
+			url:           url,
+			apiKey:        apiKey,
+			IsConnected:   true,
+			LastCheckedAt: time.Now().Unix(),
+		}
 		OpenseaClientInstances[chainID] = openseaClient
 		return openseaClient, nil
 	}
@@ -140,24 +162,28 @@ func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 	return nil, errors.New("ChainID not supported")
 }
 
-func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]Collection, error) {
-	offset := 0
-	var collections []Collection
+func (o *Client) setConnected(value bool) {
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
+	o.IsConnected = value
 	o.LastCheckedAt = time.Now().Unix()
+}
+
+func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollection, error) {
+	offset := 0
+	var collections []OwnedCollection
 	for {
 		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", o.url, owner, offset, CollectionLimit)
 		body, err := o.doOpenseaRequest(url)
 		if err != nil {
-			o.IsConnected = false
+			o.setConnected(false)
 			return nil, err
 		}
 
-		var tmp []Collection
+		var tmp []OwnedCollection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
-			o.IsConnected = false
+			o.setConnected(false)
 			return nil, err
 		}
 
@@ -167,28 +193,47 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]Collection,
 			break
 		}
 	}
-	o.IsConnected = true
+	o.setConnected(true)
 	return collections, nil
 }
 
 func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]Asset, error) {
-	offset := 0
+	queryParams := url.Values{
+		"owner":      {owner.String()},
+		"collection": {collectionSlug},
+	}
+
+	return o.fetchAssets(queryParams, limit)
+}
+
+func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []NFTUniqueID, limit int) ([]Asset, error) {
+	queryParams := url.Values{}
+
+	for _, uniqueID := range uniqueIDs {
+		queryParams.Add("token_ids", uniqueID.TokenID.String())
+		queryParams.Add("asset_contract_addresses", uniqueID.ContractAddress.String())
+	}
+
+	return o.fetchAssets(queryParams, limit)
+}
+
+func (o *Client) fetchAssets(queryParams url.Values, limit int) ([]Asset, error) {
 	var assets []Asset
-	o.IsConnectedLock.Lock()
-	defer o.IsConnectedLock.Unlock()
-	o.LastCheckedAt = time.Now().Unix()
+
+	queryParams["limit"] = []string{strconv.Itoa(AssetLimit)}
 	for {
-		url := fmt.Sprintf("%s/assets?owner=%s&collection=%s&offset=%d&limit=%d", o.url, owner, collectionSlug, offset, AssetLimit)
+		url := o.url + "/assets?" + queryParams.Encode()
+
 		body, err := o.doOpenseaRequest(url)
 		if err != nil {
-			o.IsConnected = false
+			o.setConnected(false)
 			return nil, err
 		}
 
 		container := AssetContainer{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
-			o.IsConnected = false
+			o.setConnected(false)
 			return nil, err
 		}
 
@@ -204,35 +249,68 @@ func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collec
 			break
 		}
 
+		nextCursor := container.NextCursor
+
+		if len(nextCursor) == 0 {
+			break
+		}
+
+		queryParams["cursor"] = []string{nextCursor}
+
 		if len(assets) >= limit {
 			break
 		}
 	}
 
-	o.IsConnected = true
+	o.setConnected(true)
 	return assets, nil
 }
 
 func (o *Client) doOpenseaRequest(url string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
+	// Ensure only one thread makes a request at a time
+	o.requestLock.Lock()
+	defer o.requestLock.Unlock()
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-	req.Header.Set("X-API-KEY", o.apiKey)
+	retryCount := 0
+	statusCode := http.StatusOK
 
-	resp, err := o.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Error("failed to close opensea request body", "err", err)
+	for {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
 		}
-	}()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	return body, err
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
+		req.Header.Set("X-API-KEY", o.apiKey)
+
+		resp, err := o.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Error("failed to close opensea request body", "err", err)
+			}
+		}()
+
+		statusCode = resp.StatusCode
+		switch resp.StatusCode {
+		case http.StatusOK:
+			body, err := ioutil.ReadAll(resp.Body)
+			return body, err
+		case http.StatusTooManyRequests:
+			if retryCount < RequestRetryMaxCount {
+				// sleep and retry
+				time.Sleep(RequestWaitTime)
+				retryCount++
+				continue
+			}
+			// break and error
+		default:
+			// break and error
+		}
+		break
+	}
+	return nil, fmt.Errorf("unsuccessful request: %d %s", statusCode, http.StatusText(statusCode))
 }
