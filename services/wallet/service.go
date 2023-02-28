@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -63,7 +64,8 @@ func NewService(
 	transactionManager := &TransactionManager{db: db, transactor: transactor, gethManager: gethManager, config: config, accountsDB: accountsDB}
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed)
 	cryptoCompare := cryptocompare.NewClient()
-	marketManager := market.NewManager(cryptoCompare)
+	coingecko := coingecko.NewClient()
+	marketManager := market.NewManager(cryptoCompare, coingecko)
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
