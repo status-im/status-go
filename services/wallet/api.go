@@ -296,7 +296,7 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
 
-func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]opensea.Collection, error) {
+func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {
 	log.Debug("call to get opensea collections")
 	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
@@ -314,6 +314,17 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 	}
 
 	return client.FetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
+}
+
+func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []opensea.NFTUniqueID, limit int) ([]opensea.Asset, error) {
+	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
+
+	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.FetchAssetsByNFTUniqueID(uniqueIDs, limit)
 }
 
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {

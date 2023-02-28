@@ -2,9 +2,12 @@ package opensea
 
 import (
 	"encoding/json"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/status-im/status-go/services/wallet/bigint"
 
 	"github.com/stretchr/testify/assert"
 
@@ -12,7 +15,14 @@ import (
 )
 
 func TestFetchAllCollectionsByOwner(t *testing.T) {
-	expected := []Collection{Collection{Name: "Rocky", Slug: "rocky", ImageURL: "ImageUrl", OwnedAssetCount: 1}}
+	expected := []OwnedCollection{{
+		Collection: Collection{
+			Name:     "Rocky",
+			Slug:     "rocky",
+			ImageURL: "ImageUrl",
+		},
+		OwnedAssetCount: &bigint.BigInt{Int: big.NewInt(1)},
+	}}
 	response, _ := json.Marshal(expected)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
@@ -33,7 +43,7 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 }
 
 func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
-	expected := []Asset{Asset{
+	expected := []Asset{{
 		ID:                1,
 		Name:              "Rocky",
 		Description:       "Rocky Balboa",
@@ -41,7 +51,7 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 		ImageThumbnailURL: "ImageThumbnailURL",
 		ImageURL:          "ImageUrl",
 		Contract:          Contract{Address: "1"},
-		Collection:        AssetCollection{Name: "Rocky"},
+		Collection:        Collection{Name: "Rocky"},
 	}}
 	response, _ := json.Marshal(AssetContainer{Assets: expected})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

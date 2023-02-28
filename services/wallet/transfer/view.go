@@ -77,7 +77,7 @@ func CastToTransferView(t Transfer) View {
 	view.NetworkID = t.NetworkID
 
 	value := new(hexutil.Big)
-	tokenId := new(hexutil.Big)
+	tokenID := new(hexutil.Big)
 
 	switch view.Type {
 	case ethTransfer:
@@ -93,13 +93,13 @@ func CastToTransferView(t Transfer) View {
 		view.From, view.To, value = from, to, (*hexutil.Big)(valueInt)
 	case erc721Transfer:
 		view.Contract = t.Log.Address
-		from, to, tokenIdInt := parseErc721Log(t.Log)
-		view.From, view.To, tokenId = from, to, (*hexutil.Big)(tokenIdInt)
+		from, to, tokenIDInt := parseErc721Log(t.Log)
+		view.From, view.To, tokenID = from, to, (*hexutil.Big)(tokenIDInt)
 	}
 
 	view.MultiTransactionID = int64(t.MultiTransactionID)
 	view.Value = value
-	view.TokenID = tokenId
+	view.TokenID = tokenID
 
 	return view
 }
@@ -146,8 +146,8 @@ func parseErc20Log(ethlog *types.Log) (from, to common.Address, amount *big.Int)
 	return
 }
 
-func parseErc721Log(ethlog *types.Log) (from, to common.Address, tokenId *big.Int) {
-	tokenId = new(big.Int)
+func parseErc721Log(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
+	tokenID = new(big.Int)
 	if len(ethlog.Topics) < 4 {
 		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
 		return
@@ -166,7 +166,7 @@ func parseErc721Log(ethlog *types.Log) (from, to common.Address, tokenId *big.In
 	}
 	copy(from[:], ethlog.Topics[1][12:])
 	copy(to[:], ethlog.Topics[2][12:])
-	tokenId.SetBytes(ethlog.Topics[3][:])
+	tokenID.SetBytes(ethlog.Topics[3][:])
 
 	return
 }
