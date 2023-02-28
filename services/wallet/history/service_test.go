@@ -41,7 +41,7 @@ func setupDummyServiceNoDependencies(t *testing.T) (service *Service, closeFn fu
 	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
 	require.NoError(t, err)
 
-	return NewService(db, nil, rpcClient, nil, market.NewManager(cryptoCompare)), func() {
+	return NewService(db, nil, rpcClient, nil, market.NewManager(cryptoCompare, cryptoCompare)), func() {
 		require.NoError(t, db.Close())
 	}
 }

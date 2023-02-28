@@ -46,7 +46,7 @@ func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string)
 }
 
 func setupTestPrice(t *testing.T, provider thirdparty.MarketDataProvider) *Manager {
-	return NewManager(provider)
+	return NewManager(provider, provider)
 }
 
 func TestPrice(t *testing.T) {
