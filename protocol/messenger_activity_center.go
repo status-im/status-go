@@ -33,7 +33,7 @@ func fromHexBytes(hb []types.HexBytes) [][]byte {
 }
 
 func (m *Messenger) ActivityCenterNotifications(args ActivityCenterNotificationsArgs) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ActivityCenterNotifications(args.Cursor, args.Limit, args.ActivityTypes, args.ReadType, args.Accepted)
+	cursor, notifications, err := m.persistence.ActivityCenterNotifications(args.Cursor, args.Limit, args.ActivityTypes, args.ReadType, true)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (m *Messenger) ActivityCenterNotificationsCount(args ActivityCenterCountArg
 	response := make(ActivityCenterCountResponse)
 
 	for _, activityType := range args.ActivityTypes {
-		count, err := m.persistence.ActivityCenterNotificationsCount([]ActivityCenterType{activityType}, args.ReadType, args.Accepted)
+		count, err := m.persistence.ActivityCenterNotificationsCount([]ActivityCenterType{activityType}, args.ReadType, true)
 		if err != nil {
 			return nil, err
 		}

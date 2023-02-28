@@ -121,7 +121,6 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 		Limit:         10,
 		ActivityTypes: []ActivityCenterType{},
 		ReadType:      ActivityCenterQueryParamsReadUnread,
-		Accepted:      false,
 	},
 	)
 	s.Require().NoError(err)

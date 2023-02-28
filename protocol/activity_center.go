@@ -72,13 +72,11 @@ type ActivityCenterNotificationsArgs struct {
 	Limit         uint64                        `json:"limit"`
 	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
 	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
-	Accepted      bool                          `json:"accepted"`
 }
 
 type ActivityCenterCountArgs struct {
 	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
 	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
-	Accepted      bool                          `json:"accepted"`
 }
 
 type ActivityCenterPaginationResponse struct {

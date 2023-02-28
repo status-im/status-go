@@ -697,7 +697,6 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 			Limit:         4,
 			ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
 			ReadType:      ActivityCenterQueryParamsReadUnread,
-			Accepted:      false,
 		},
 	)
 	s.Require().NoError(err)
