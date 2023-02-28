@@ -691,10 +691,14 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Equal(common.ContactVerificationStatePending, resp.Messages()[0].ContactVerificationState)
 
 	// Make sure it's stored and retrieved correctly
-	notifications, err := theirMessenger.UnreadActivityCenterNotifications(
-		"",
-		4,
-		[]ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
+	notifications, err := theirMessenger.ActivityCenterNotifications(
+		ActivityCenterNotificationsArgs{
+			Cursor:        "",
+			Limit:         4,
+			ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeContactVerification},
+			ReadType:      ActivityCenterQueryParamsReadUnread,
+			Accepted:      false,
+		},
 	)
 	s.Require().NoError(err)
 	s.Require().Greater(len(notifications.Notifications), 0)
