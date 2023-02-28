@@ -21,10 +21,15 @@ type Type string
 type MultiTransactionIDType int64
 
 const (
-	ethTransfer   Type = "eth"
-	erc20Transfer Type = "erc20"
+	ethTransfer          Type = "eth"
+	erc20Transfer        Type = "erc20"
+	erc721Transfer       Type = "erc721"
+	unknownTokenTransfer Type = "unknown"
 
-	erc20TransferEventSignature = "Transfer(address,address,uint256)"
+	erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
+
+	erc20TransferEventIndexedParameters  = 3 // signature, from, to
+	erc721TransferEventIndexedParameters = 4 // signature, from, to, tokenId
 
 	NoMultiTransactionID = MultiTransactionIDType(0)
 )
@@ -208,7 +213,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 // NewERC20TransfersDownloader returns new instance.
 func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
-	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
+	signature := crypto.Keccak256Hash([]byte(erc20_721TransferEventSignature))
 	return &ERC20TransfersDownloader{
 		client:    client,
 		accounts:  accounts,
@@ -217,7 +222,11 @@ func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []co
 	}
 }
 
-// ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
+// ERC20TransfersDownloader is a downloader for erc20 and erc721 tokens transfers.
+// Since both transaction types share the same signature, both will be assigned
+// type erc20Transfer. Until the downloader gets refactored and a migration of the
+// database gets implemented, differentiation between erc20 and erc721 will handled
+// in the controller.
 type ERC20TransfersDownloader struct {
 	client   *chain.ClientWithFallback
 	accounts []common.Address
@@ -478,7 +487,7 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 }
 
 func IsTokenTransfer(logs []*types.Log) bool {
-	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
+	signature := crypto.Keccak256Hash([]byte(erc20_721TransferEventSignature))
 	for _, l := range logs {
 		if len(l.Topics) > 0 && l.Topics[0] == signature {
 			return true
@@ -488,7 +497,7 @@ func IsTokenTransfer(logs []*types.Log) bool {
 }
 
 func getTokenLog(logs []*types.Log) *types.Log {
-	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
+	signature := crypto.Keccak256Hash([]byte(erc20_721TransferEventSignature))
 	for _, l := range logs {
 		if len(l.Topics) > 0 && l.Topics[0] == signature {
 			return l

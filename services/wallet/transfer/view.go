@@ -29,7 +29,8 @@ type View struct {
 	TxStatus             hexutil.Uint64 `json:"txStatus"`
 	Input                hexutil.Bytes  `json:"input"`
 	TxHash               common.Hash    `json:"txHash"`
-	Value                *hexutil.Big   `json:"value"`
+	Value                *hexutil.Big   `json:"value"`   // Only used for Type ethTransfer and erc20Transfer
+	TokenID              *hexutil.Big   `json:"tokenId"` // Only used for Type erc721Transfer
 	From                 common.Address `json:"from"`
 	To                   common.Address `json:"to"`
 	Contract             common.Address `json:"contract"`
@@ -49,7 +50,7 @@ func castToTransferViews(transfers []Transfer) []View {
 func CastToTransferView(t Transfer) View {
 	view := View{}
 	view.ID = t.ID
-	view.Type = t.Type
+	view.Type = getFixedTransferType(t)
 	view.Address = t.Address
 	view.BlockNumber = (*hexutil.Big)(t.BlockNumber)
 	view.BlockHash = t.BlockHash
@@ -74,25 +75,54 @@ func CastToTransferView(t Transfer) View {
 	view.Input = hexutil.Bytes(t.Transaction.Data())
 	view.TxHash = t.Transaction.Hash()
 	view.NetworkID = t.NetworkID
-	switch t.Type {
+
+	value := new(hexutil.Big)
+	tokenId := new(hexutil.Big)
+
+	switch view.Type {
 	case ethTransfer:
 		view.From = t.From
 		if t.Transaction.To() != nil {
 			view.To = *t.Transaction.To()
 		}
-		view.Value = (*hexutil.Big)(t.Transaction.Value())
+		value = (*hexutil.Big)(t.Transaction.Value())
 		view.Contract = t.Receipt.ContractAddress
 	case erc20Transfer:
 		view.Contract = t.Log.Address
-		from, to, amount := parseLog(t.Log)
-		view.From, view.To, view.Value = from, to, (*hexutil.Big)(amount)
+		from, to, valueInt := parseErc20Log(t.Log)
+		view.From, view.To, value = from, to, (*hexutil.Big)(valueInt)
+	case erc721Transfer:
+		view.Contract = t.Log.Address
+		from, to, tokenIdInt := parseErc721Log(t.Log)
+		view.From, view.To, tokenId = from, to, (*hexutil.Big)(tokenIdInt)
 	}
 
 	view.MultiTransactionID = int64(t.MultiTransactionID)
+	view.Value = value
+	view.TokenID = tokenId
+
 	return view
 }
 
-func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
+func getFixedTransferType(tx Transfer) Type {
+	// erc721 transfers share signature with erc20 ones, so they are both (cached and new)
+	// categorized as erc20 by the Downloader. We fix this on the fly for the moment, until
+	// the Downloader gets refactored.
+	if tx.Type == erc20Transfer {
+		switch len(tx.Log.Topics) {
+		case erc20TransferEventIndexedParameters:
+			// do nothing
+		case erc721TransferEventIndexedParameters:
+			return erc721Transfer
+		default:
+			return unknownTokenTransfer
+		}
+	}
+	return tx.Type
+}
+
+func parseErc20Log(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
+	amount = new(big.Int)
 	if len(ethlog.Topics) < 3 {
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
 		return
@@ -111,6 +141,32 @@ func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 		log.Warn("data is not padded to 32 byts big int", "data", ethlog.Data)
 		return
 	}
-	amount = new(big.Int).SetBytes(ethlog.Data)
+	amount.SetBytes(ethlog.Data)
+
+	return
+}
+
+func parseErc721Log(ethlog *types.Log) (from, to common.Address, tokenId *big.Int) {
+	tokenId = new(big.Int)
+	if len(ethlog.Topics) < 4 {
+		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
+		return
+	}
+	if len(ethlog.Topics[1]) != 32 {
+		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+		return
+	}
+	if len(ethlog.Topics[2]) != 32 {
+		log.Warn("third topic is not padded to 32 byte address", "topic", ethlog.Topics[2])
+		return
+	}
+	if len(ethlog.Topics[3]) != 32 {
+		log.Warn("fourth topic is not 32 byte tokenId", "topic", ethlog.Topics[3])
+		return
+	}
+	copy(from[:], ethlog.Topics[1][12:])
+	copy(to[:], ethlog.Topics[2][12:])
+	tokenId.SetBytes(ethlog.Topics[3][:])
+
 	return
 }
