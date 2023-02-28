@@ -182,7 +182,7 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 
 func pairTwoDevices(s *suite.Suite, device1, device2 *Messenger) {
 	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background())
+	response, err := device1.SendPairInstallation(context.Background(), nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Len(response.Chats(), 1)

@@ -335,7 +335,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().Exactly(expected.Timestamp, acc.Timestamp)
 	pms.Require().Len(acc.Images, 2)
 
-	err = ppr2.StoreToSource()
+	err = ppr2.storeKeys(ppr2.keystorePath)
 	pms.Require().ErrorIs(err, ErrKeyFileAlreadyExists)
 }
 

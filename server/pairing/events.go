@@ -32,4 +32,5 @@ const (
 	ActionConnect = iota + 1
 	ActionPairingAccount
 	ActionSyncDevice
+	ActionPairingInstallation
 )

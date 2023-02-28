@@ -153,17 +153,9 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 }
 
 func (m *Messenger) setInstallationHostname() error {
-	ourInstallation, ok := m.allInstallations.Load(m.installationID)
-	if !ok {
-		m.logger.Error("Messenger's installationID is not set or not loadable")
-		return nil
-	}
-
-	var imd *multidevice.InstallationMetadata
-	if ourInstallation.InstallationMetadata == nil {
-		imd = new(multidevice.InstallationMetadata)
-	} else {
-		imd = ourInstallation.InstallationMetadata
+	imd, err := m.getOurInstallationMetadata()
+	if err != nil {
+		return err
 	}
 
 	// If the name is already set, don't do anything
@@ -176,5 +168,37 @@ func (m *Messenger) setInstallationHostname() error {
 		return err
 	}
 	imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+	return m.setInstallationMetadata(m.installationID, imd)
+}
+
+func (m *Messenger) getOurInstallationMetadata() (*multidevice.InstallationMetadata, error) {
+	ourInstallation, ok := m.allInstallations.Load(m.installationID)
+	if !ok {
+		return nil, fmt.Errorf("messenger's installationID is not set or not loadable")
+	}
+
+	if ourInstallation.InstallationMetadata == nil {
+		return new(multidevice.InstallationMetadata), nil
+	}
+
+	return ourInstallation.InstallationMetadata, nil
+}
+
+func (m *Messenger) SetInstallationDeviceType(deviceType string) error {
+	if strings.TrimSpace(deviceType) == "" {
+		return errors.New("device type is empty")
+	}
+
+	imd, err := m.getOurInstallationMetadata()
+	if err != nil {
+		return err
+	}
+
+	// If the name is already set, don't do anything
+	if len(imd.DeviceType) != 0 {
+		return nil
+	}
+
+	imd.DeviceType = deviceType
 	return m.setInstallationMetadata(m.installationID, imd)
 }

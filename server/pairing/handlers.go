@@ -15,26 +15,28 @@ import (
 
 const (
 	// Handler routes for pairing
-	pairingBase              = "/pairing"
-	pairingSendAccount       = pairingBase + "/sendAccount"
-	pairingReceiveAccount    = pairingBase + "/receiveAccount"
-	pairingChallenge         = pairingBase + "/challenge"
-	pairingSyncDeviceSend    = pairingBase + "/sendSyncDevice"
-	pairingSyncDeviceReceive = pairingBase + "/receiveSyncDevice"
+	pairingBase                = "/pairing"
+	pairingSendAccount         = pairingBase + "/sendAccount"
+	pairingReceiveAccount      = pairingBase + "/receiveAccount"
+	pairingChallenge           = pairingBase + "/challenge"
+	pairingSyncDeviceSend      = pairingBase + "/sendSyncDevice"
+	pairingSyncDeviceReceive   = pairingBase + "/receiveSyncDevice"
+	pairingSendInstallation    = pairingBase + "/sendInstallation"
+	pairingReceiveInstallation = pairingBase + "/receiveInstallation"
 
 	// Session names
 	sessionChallenge = "challenge"
 	sessionBlocked   = "blocked"
 )
 
-func handlePairingReceive(ps *Server) http.HandlerFunc {
+func handleReceiveAccount(ps *Server) http.HandlerFunc {
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 	logger := ps.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
-			logger.Error("ioutil.ReadAll(r.Body)", zap.Error(err))
+			logger.Error("handleReceiveAccount io.ReadAll(r.Body)", zap.Error(err))
 			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
@@ -49,6 +51,28 @@ func handlePairingReceive(ps *Server) http.HandlerFunc {
 	}
 }
 
+func handleReceiveInstallation(ps *Server) http.HandlerFunc {
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
+	logger := ps.GetLogger()
+	return func(w http.ResponseWriter, r *http.Request) {
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+			logger.Error("handleReceiveInstallation io.ReadAll(r.Body)", zap.Error(err))
+			return
+		}
+		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+
+		err = ps.installationPayloadManager.Receive(payload)
+		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingInstallation})
+			logger.Error("ps.installationPayloadManager.Receive(payload)", zap.Error(err))
+			return
+		}
+		signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionPairingInstallation})
+	}
+}
+
 func handleParingSyncDeviceReceive(ps *Server) http.HandlerFunc {
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 	logger := ps.GetLogger()
@@ -56,7 +80,7 @@ func handleParingSyncDeviceReceive(ps *Server) http.HandlerFunc {
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-			logger.Error("io.ReadAll(r.Body)", zap.Error(err))
+			logger.Error("handleParingSyncDeviceReceive io.ReadAll(r.Body)", zap.Error(err))
 			return
 		}
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionSyncDevice})
@@ -71,7 +95,7 @@ func handleParingSyncDeviceReceive(ps *Server) http.HandlerFunc {
 	}
 }
 
-func handlePairingSend(ps *Server) http.HandlerFunc {
+func handleSendAccount(ps *Server) http.HandlerFunc {
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 	logger := ps.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +109,30 @@ func handlePairingSend(ps *Server) http.HandlerFunc {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
 
 		ps.PayloadManager.LockPayload()
+	}
+}
+
+func handleSendInstallation(ps *Server) http.HandlerFunc {
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
+	logger := ps.GetLogger()
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		err := ps.installationPayloadManager.Mount()
+		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+			logger.Error("ps.installationPayloadManager.Mount()", zap.Error(err))
+			return
+		}
+
+		_, err = w.Write(ps.installationPayloadManager.ToSend())
+		if err != nil {
+			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+			logger.Error("w.Write(ps.installationPayloadManager.ToSend())", zap.Error(err))
+			return
+		}
+		signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+
+		ps.installationPayloadManager.LockPayload()
 	}
 }
 

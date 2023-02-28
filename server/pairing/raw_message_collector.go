@@ -3,6 +3,8 @@ package pairing
 import (
 	"context"
 
+	"github.com/status-im/status-go/protocol/protobuf"
+
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -17,4 +19,15 @@ func (r *RawMessageCollector) dispatchMessage(_ context.Context, rawMessage comm
 
 func (r *RawMessageCollector) getRawMessages() []*common.RawMessage {
 	return r.rawMessages
+}
+
+func (r *RawMessageCollector) convertToSyncRawMessage() *protobuf.SyncRawMessage {
+	syncRawMessage := new(protobuf.SyncRawMessage)
+	for _, m := range r.getRawMessages() {
+		rawMessage := new(protobuf.RawMessage)
+		rawMessage.Payload = m.Payload
+		rawMessage.MessageType = m.MessageType
+		syncRawMessage.RawMessages = append(syncRawMessage.RawMessages, rawMessage)
+	}
+	return syncRawMessage
 }

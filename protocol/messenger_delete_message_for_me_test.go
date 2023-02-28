@@ -84,7 +84,7 @@ func (s *MessengerDeleteMessageForMeSuite) Pair() {
 		DeviceType: "alice2",
 	})
 	s.Require().NoError(err)
-	response, err := s.alice2.SendPairInstallation(context.Background())
+	response, err := s.alice2.SendPairInstallation(context.Background(), nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)

@@ -60,7 +60,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	}
 	err = s.other.SetInstallationMetadata(s.other.installationID, imOther)
 	s.Require().NoError(err)
-	response, err := s.other.SendPairInstallation(context.Background())
+	response, err := s.other.SendPairInstallation(context.Background(), nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 

@@ -215,6 +215,11 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		}
 	}
 
+	if b.account != nil && b.account.KeyUID == keyUID {
+		// reset active account
+		b.account = nil
+	}
+
 	return os.RemoveAll(keyStoreDir)
 }
 
@@ -1362,6 +1367,7 @@ func (b *GethStatusBackend) Logout() error {
 
 	b.AccountManager().Logout()
 	b.appDB = nil
+	b.account = nil
 
 	if b.statusNode != nil {
 		if err := b.statusNode.Stop(); err != nil {

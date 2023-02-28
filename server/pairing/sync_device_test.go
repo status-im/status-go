@@ -113,6 +113,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 	accounts := []*accounts.Account{walletAccount, chatAccount}
 	err = backend.StartNodeWithAccountAndInitialConfig(account, s.password, *settings, nodeConfig, accounts)
 	require.NoError(s.T(), err)
+
 	return backend
 }
 
@@ -125,11 +126,11 @@ func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethS
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
 	clientBackend := s.prepareBackendWithAccount(clientTmpDir)
-
 	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
 	serverBackend := s.prepareBackendWithoutAccount(serverTmpDir)
 	defer func() {
 		require.NoError(s.T(), serverBackend.Logout())
+		require.NoError(s.T(), clientBackend.Logout())
 	}()
 
 	err := serverBackend.AccountManager().InitKeystore(filepath.Join(serverTmpDir, keystoreDir))
@@ -142,6 +143,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := PayloadSourceConfig{
 		KeystorePath: serverKeystoreDir,
+		DeviceType:   "desktop",
 		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
 			KDFIterations:         expectedKDFIterations,
 			NodeConfig:            serverNodeConfig,
@@ -167,6 +169,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
 	clientPayloadSourceConfig := PayloadSourceConfig{
 		KeystorePath: clientKeystorePath,
+		DeviceType:   "android",
 		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 			KeyUID:   clientActiveAccount.KeyUID,
 			Password: s.password,
@@ -176,7 +179,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
-	require.NoError(s.T(), clientBackend.Logout())
 
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
 	bookmarks, err := serverBrowserAPI.GetBookmarks(context.TODO())
@@ -188,6 +190,35 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
 	require.Equal(s.T(), serverActiveAccount.KDFIterations, expectedKDFIterations)
+
+	serverMessenger := serverBackend.Messenger()
+	clientMessenger := clientBackend.Messenger()
+	require.True(s.T(), serverMessenger.HasPairedDevices())
+	require.True(s.T(), clientMessenger.HasPairedDevices())
+
+	err = clientMessenger.DisableInstallation(serverNodeConfig.ShhextConfig.InstallationID)
+	require.NoError(s.T(), err)
+	require.False(s.T(), clientMessenger.HasPairedDevices())
+	clientNodeConfig, err := clientBackend.GetNodeConfig()
+	require.NoError(s.T(), err)
+	err = serverMessenger.DisableInstallation(clientNodeConfig.ShhextConfig.InstallationID)
+	require.NoError(s.T(), err)
+	require.False(s.T(), serverMessenger.HasPairedDevices())
+
+	// repeat local pairing, we should expect no error after receiver logged in
+	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
+	require.NoError(s.T(), err)
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
+	require.True(s.T(), clientMessenger.HasPairedDevices())
+	require.True(s.T(), serverMessenger.HasPairedDevices())
+
+	// test if it's okay when account already exist but not logged in
+	require.NoError(s.T(), serverBackend.Logout())
+	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
+	require.NoError(s.T(), err)
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
@@ -198,6 +229,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	serverBackend := s.prepareBackendWithAccount(serverTmpDir)
 	defer func() {
 		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
 	}()
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
@@ -205,6 +237,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
 	var config = PayloadSourceConfig{
 		KeystorePath: serverKeystorePath,
+		DeviceType:   "desktop",
 		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
 			KeyUID:   serverActiveAccount.KeyUID,
 			Password: s.password,
@@ -233,6 +266,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := PayloadSourceConfig{
 		KeystorePath: clientKeystoreDir,
+		DeviceType:   "iphone",
 		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
 			KDFIterations:         expectedKDFIterations,
 			NodeConfig:            clientNodeConfig,
@@ -245,8 +279,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
-	require.NoError(s.T(), serverBackend.Logout())
-
 	clientBrowserAPI := clientBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
 	bookmarks, err := clientBrowserAPI.GetBookmarks(context.TODO())
 	require.NoError(s.T(), err)
@@ -257,6 +289,35 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
 	require.Equal(s.T(), clientActiveAccount.KDFIterations, expectedKDFIterations)
+
+	serverMessenger := serverBackend.Messenger()
+	clientMessenger := clientBackend.Messenger()
+	require.True(s.T(), serverMessenger.HasPairedDevices())
+	require.True(s.T(), clientMessenger.HasPairedDevices())
+
+	err = serverMessenger.DisableInstallation(clientNodeConfig.ShhextConfig.InstallationID)
+	require.NoError(s.T(), err)
+	require.False(s.T(), serverMessenger.HasPairedDevices())
+	serverNodeConfig, err := serverBackend.GetNodeConfig()
+	require.NoError(s.T(), err)
+	err = clientMessenger.DisableInstallation(serverNodeConfig.ShhextConfig.InstallationID)
+	require.NoError(s.T(), err)
+	require.False(s.T(), clientMessenger.HasPairedDevices())
+
+	// repeat local pairing, we should expect no error after receiver logged in
+	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
+	require.NoError(s.T(), err)
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
+	require.True(s.T(), serverMessenger.HasPairedDevices())
+	require.True(s.T(), clientMessenger.HasPairedDevices())
+
+	// test if it's okay when account already exist but not logged in
+	require.NoError(s.T(), clientBackend.Logout())
+	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
+	require.NoError(s.T(), err)
+	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
