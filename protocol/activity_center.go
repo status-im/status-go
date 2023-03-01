@@ -67,14 +67,14 @@ type ActivityCenterNotification struct {
 	ContactVerificationStatus verification.RequestStatus     `json:"contactVerificationStatus"`
 }
 
-type ActivityCenterNotificationsArgs struct {
+type ActivityCenterNotificationsRequest struct {
 	Cursor        string                        `json:"cursor"`
 	Limit         uint64                        `json:"limit"`
 	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
 	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
 }
 
-type ActivityCenterCountArgs struct {
+type ActivityCenterCountRequest struct {
 	ActivityTypes []ActivityCenterType          `json:"activityTypes"`
 	ReadType      ActivityCenterQueryParamsRead `json:"readType"`
 }

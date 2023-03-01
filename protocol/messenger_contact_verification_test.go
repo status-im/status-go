@@ -692,7 +692,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	// Make sure it's stored and retrieved correctly
 	notifications, err := theirMessenger.ActivityCenterNotifications(
-		ActivityCenterNotificationsArgs{
+		ActivityCenterNotificationsRequest{
 			Cursor:        "",
 			Limit:         4,
 			ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeContactVerification},

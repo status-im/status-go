@@ -116,7 +116,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
-	notifications, err := theirMessenger.ActivityCenterNotifications(ActivityCenterNotificationsArgs{
+	notifications, err := theirMessenger.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
 		Cursor:        "",
 		Limit:         10,
 		ActivityTypes: []ActivityCenterType{},

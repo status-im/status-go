@@ -1090,12 +1090,12 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID)
 }
 
-func (api *PublicAPI) ActivityCenterNotifications(args protocol.ActivityCenterNotificationsArgs) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotifications(args)
+func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotifications(request)
 }
 
-func (api *PublicAPI) ActivityCenterNotificationsCount(args protocol.ActivityCenterCountArgs) (*protocol.ActivityCenterCountResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsCount(args)
+func (api *PublicAPI) ActivityCenterNotificationsCount(request protocol.ActivityCenterCountRequest) (*protocol.ActivityCenterCountResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsCount(request)
 }
 
 func (api *PublicAPI) HasUnseenActivityCenterNotifications() (bool, error) {
