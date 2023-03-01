@@ -152,3 +152,16 @@ func isWebp(buf []byte) bool {
 		buf[8] == 0x57 && buf[9] == 0x45 &&
 		buf[10] == 0x42 && buf[11] == 0x50
 }
+
+func GetImageDimensions(imgBytes []byte) (int, int, error) {
+	// Decode image bytes
+	img, _, err := image.Decode(bytes.NewReader(imgBytes))
+	if err != nil {
+		return 0, 0, err
+	}
+	// Get the image dimensions
+	bounds := img.Bounds()
+	width := bounds.Max.X - bounds.Min.X
+	height := bounds.Max.Y - bounds.Min.Y
+	return width, height, nil
+}
