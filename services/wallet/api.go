@@ -558,6 +558,11 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *tr
 	return api.s.transactionManager.CreateMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
 }
 
+func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
+	log.Debug("[WalletAPI:: GetMultiTransactions] for IDs", transactionIDs)
+	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
+}
+
 func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
 	log.Debug("call to GetCachedCurrencyFormats")
 	return api.s.currency.GetCachedCurrencyFormats()

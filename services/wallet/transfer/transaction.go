@@ -250,18 +250,13 @@ func (tm *TransactionManager) Watch(ctx context.Context, transactionHash common.
 	return watchTxCommand.Command()(commandContext)
 }
 
-func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
-	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
-	if err != nil {
-		return nil, err
-	}
+const multiTransactionColumns = "from_address, from_asset, from_amount, to_address, to_asset, type, timestamp"
 
-	insert, err := tm.db.Prepare(`INSERT OR REPLACE INTO multi_transactions
-                                      (from_address, from_asset, from_amount, to_address, to_asset, type, timestamp)
-                                      VALUES
-                                      (?, ?, ?, ?, ?, ?, ?)`)
+func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
+	insert, err := db.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO multi_transactions (%s)
+											VALUES(?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	result, err := insert.Exec(
 		multiTransaction.FromAddress,
@@ -273,10 +268,20 @@ func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiT
 		time.Now().Unix(),
 	)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	defer insert.Close()
 	multiTransactionID, err := result.LastInsertId()
+	return MultiTransactionIDType(multiTransactionID), err
+}
+
+func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
+	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
+	if err != nil {
+		return nil, err
+	}
+
+	multiTransactionID, err := insertMultiTransaction(tm.db, multiTransaction)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +301,7 @@ func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiT
 			Data:               tx.Data().String(),
 			Type:               WalletTransfer,
 			ChainID:            tx.ChainID,
-			MultiTransactionID: MultiTransactionIDType(multiTransactionID),
+			MultiTransactionID: multiTransactionID,
 			Symbol:             multiTransaction.FromAsset,
 		}
 		err = tm.AddPending(pendingTransaction)
@@ -307,9 +312,63 @@ func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiT
 	}
 
 	return &MultiTransactionResult{
-		ID:     multiTransactionID,
+		ID:     int64(multiTransactionID),
 		Hashes: hashes,
 	}, nil
+}
+
+func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []MultiTransactionIDType) ([]*MultiTransaction, error) {
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, v := range ids {
+		placeholders[i] = "?"
+		args[i] = v
+	}
+
+	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT rowid, %s
+											FROM multi_transactions
+											WHERE rowid in (%s)`,
+		multiTransactionColumns,
+		strings.Join(placeholders, ",")))
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var multiTransactions []*MultiTransaction
+	for rows.Next() {
+		multiTransaction := &MultiTransaction{}
+		var fromAmount string
+		err := rows.Scan(
+			&multiTransaction.ID,
+			&multiTransaction.FromAddress,
+			&multiTransaction.FromAsset,
+			&fromAmount,
+			&multiTransaction.ToAddress,
+			&multiTransaction.ToAsset,
+			&multiTransaction.Type,
+			&multiTransaction.Timestamp,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		multiTransaction.FromAmount = new(hexutil.Big)
+		_, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmount, 0)
+		if !ok {
+			return nil, errors.New("failed to convert fromAmount to big.Int: " + fromAmount)
+		}
+
+		multiTransactions = append(multiTransactions, multiTransaction)
+	}
+
+	return multiTransactions, nil
 }
 
 func (tm *TransactionManager) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
