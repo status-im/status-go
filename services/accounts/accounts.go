@@ -405,11 +405,24 @@ func (api *API) generateAccountPasswordVerified(
 		return err
 	}
 
+	allAccounts, err := api.GetAccounts(ctx)
+	if err != nil {
+		return err
+	}
+
+	accountType := accounts.AccountTypeGenerated
+	for _, acc := range allAccounts {
+		if (acc.Type == accounts.AccountTypeSeed || acc.Type == accounts.AccountTypeKey) && acc.DerivedFrom == address {
+			accountType = acc.Type
+			break
+		}
+	}
+
 	acc := &accounts.Account{
 		Address:     types.Address(common.HexToAddress(infos[path].Address)),
 		KeyUID:      info.KeyUID,
 		PublicKey:   types.HexBytes(infos[path].PublicKey),
-		Type:        accounts.AccountTypeGenerated,
+		Type:        accountType,
 		Name:        name,
 		Emoji:       emoji,
 		Color:       color,

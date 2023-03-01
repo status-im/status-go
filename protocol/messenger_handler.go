@@ -2633,6 +2633,23 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 
 	var accs []*accounts.Account
 	for _, message := range message.Accounts {
+
+		// We need to ignore accounts in the desktop app with empty `DerivedFrom`, otherwise that will break keypairs.
+		// nodeConfig, err := m.settings.GetNodeConfig()
+		// if err != nil {
+		// 	return err
+		// }
+		// The only way we can differ if `status-go` is used by desktop app or not is `Name` field from node config (at least
+		// I don't know for other flag).
+		// if nodeConfig.Name == "StatusDesktop" { // "StatusDesktop" is set for `Name` if the desktop app is using `status-go` lib
+		// `DerivedFrom` is not synced yet, it's not a part of `protobuf.SyncWalletAccount` message.
+		// Because of that the following code is just commented here and will deal with this in a new PR.
+
+		// if message.DerivedFrom == "" {
+		// 	continue
+		// }
+		// }
+
 		dbAcc := dbAccountMap[types.BytesToAddress(message.Address)]
 		if dbAcc != nil && message.Clock <= dbAcc.Clock {
 			continue
