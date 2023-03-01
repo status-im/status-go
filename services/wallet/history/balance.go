@@ -31,9 +31,9 @@ var averageBlockDurationForChain = map[uint64]time.Duration{
 
 // Must have a common divisor to share common blocks and increase the cache hit
 const (
-	twiceADayStride  time.Duration = time.Duration(12) * time.Hour
-	weekStride                     = 14 * twiceADayStride
-	fourMonthsStride               = 4 /*months*/ * 4 * weekStride
+	twiceADayStride time.Duration = time.Duration(12) * time.Hour
+	weekStride                    = 14 * twiceADayStride
+	monthsStride                  = 1 /*months*/ * 4 * weekStride
 )
 
 // bitsetFilters used to fetch relevant data points in one batch and to increase cache hit
@@ -74,7 +74,7 @@ var timeIntervalToStrideDuration = map[TimeInterval]time.Duration{
 	BalanceHistory1Month:  twiceADayStride,
 	BalanceHistory6Months: weekStride,
 	BalanceHistory1Year:   weekStride,
-	BalanceHistoryAllTime: fourMonthsStride,
+	BalanceHistoryAllTime: monthsStride,
 }
 
 func strideBlockCount(timeInterval TimeInterval, chainID uint64) int {
@@ -244,7 +244,7 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 		startTimestamp = endTimestamp - int64(timeIntervalDuration[timeInterval].Seconds())
 		fetchTimestamp = startTimestamp - int64(timeIntervalToStrideDuration[timeInterval].Seconds())
 	}
-	cached, _, err := b.db.filter(&assetIdentity{chainID, address, currency}, nil, &balanceFilter{fetchTimestamp, endTimestamp, expandFlag(timeIntervalToBitsetFilter[timeInterval])}, 200, asc)
+	cached, _, err := b.db.filter(&assetIdentity{chainID, address, currency}, nil, &balanceFilter{fetchTimestamp, endTimestamp, expandFlag(timeIntervalToBitsetFilter[timeInterval])}, 800, asc)
 	if err != nil {
 		return nil, err
 	}

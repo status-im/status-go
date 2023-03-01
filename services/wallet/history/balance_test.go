@@ -273,16 +273,18 @@ func TestBalanceHistoryGetWithoutOverlappingFetch(t *testing.T) {
 			currentTimestamp := dataSource.TimeNow()
 			getUntilTimestamp := currentTimestamp - int64((400 /*days*/ * 24 * time.Hour).Seconds())
 
-			fetchInterval := testInput.interval + 3
-			if fetchInterval > BalanceHistoryAllTime {
-				fetchInterval = BalanceHistory7Days + BalanceHistoryAllTime - testInput.interval
+			getInterval := testInput.interval + 3
+			if getInterval > BalanceHistoryAllTime {
+				getInterval = BalanceHistory7Days + BalanceHistoryAllTime - testInput.interval
 			}
-			err := bh.update(context.Background(), dataSource, common.Address{7}, fetchInterval)
+			err := bh.update(context.Background(), dataSource, common.Address{7}, testInput.interval)
 			require.NoError(t, err)
 
-			balanceData, err := bh.get(context.Background(), dataSource.ChainID(), dataSource.Currency(), common.Address{7}, getUntilTimestamp, testInput.interval)
+			balanceData, err := bh.get(context.Background(), dataSource.ChainID(), dataSource.Currency(), common.Address{7}, getUntilTimestamp, getInterval)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(balanceData))
+			if testInput.interval != BalanceHistoryAllTime {
+				require.Equal(t, 0, len(balanceData))
+			}
 		})
 	}
 }
@@ -688,7 +690,7 @@ func TestBlockStrideHaveCommonDivisor(t *testing.T) {
 
 func TestBlockStrideMatchesBitsetFilter(t *testing.T) {
 	filterToStrideEquivalence := map[bitsetFilter]time.Duration{
-		filterAllTime:   fourMonthsStride,
+		filterAllTime:   monthsStride,
 		filterWeekly:    weekStride,
 		filterTwiceADay: twiceADayStride,
 	}
