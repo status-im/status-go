@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strings"
@@ -220,17 +221,69 @@ func (m *Manager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.torrentConfig = config
 }
 
+// getTCPandUDPport will return the same port number given if != 0,
+// otherwise, it will attempt to find a free random tcp and udp port using
+// the same number for both protocols
+func (m *Manager) getTCPandUDPport(portNumber int) (int, error) {
+	if portNumber != 0 {
+		return portNumber, nil
+	}
+
+	// Find free port
+	for i := 0; i < 10; i++ {
+		tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
+		if err != nil {
+			m.logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
+			continue
+		}
+
+		tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+		if err != nil {
+			tcpListener.Close()
+			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
+			continue
+		}
+
+		port := tcpListener.Addr().(*net.TCPAddr).Port
+		tcpListener.Close()
+
+		udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
+		if err != nil {
+			m.logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
+			continue
+		}
+
+		udpListener, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			udpListener.Close()
+			m.logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
+			continue
+		}
+
+		udpListener.Close()
+
+		return port, nil
+	}
+
+	return 0, fmt.Errorf("no free port found")
+}
+
 func (m *Manager) StartTorrentClient() error {
 	if m.torrentConfig == nil {
-		return fmt.Errorf("Can't start torrent client: missing torrentConfig")
+		return fmt.Errorf("can't start torrent client: missing torrentConfig")
 	}
 
 	if m.TorrentClientStarted() {
 		return nil
 	}
 
+	port, err := m.getTCPandUDPport(m.torrentConfig.Port)
+	if err != nil {
+		return err
+	}
+
 	config := torrent.NewDefaultClientConfig()
-	config.SetListenAddr(":" + fmt.Sprint(m.torrentConfig.Port))
+	config.SetListenAddr(":" + fmt.Sprint(port))
 	config.Seed = true
 
 	config.DataDir = m.torrentConfig.DataDir
@@ -242,7 +295,7 @@ func (m *Manager) StartTorrentClient() error {
 		}
 	}
 
-	m.logger.Info("Starting torrent client", zap.Any("port", m.torrentConfig.Port))
+	m.logger.Info("Starting torrent client", zap.Any("port", port))
 	// Instantiating the client will make it bootstrap and listen eagerly,
 	// so no go routine is needed here
 	client, err := torrent.NewClient(config)
