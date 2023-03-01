@@ -1,0 +1,1 @@
+UPDATE accounts SET type = "seed" WHERE derived_from IN (SELECT derived_from FROM accounts WHERE type = "seed" AND derived_from != "");
