@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
@@ -27,18 +26,6 @@ type Server struct {
 	mode Mode
 
 	cookieStore *sessions.CookieStore
-}
-
-type Config struct {
-	// Connection fields
-	PK       *ecdsa.PublicKey
-	EK       []byte
-	Cert     *tls.Certificate
-	Hostname string
-	Mode     Mode
-
-	// AccountPayload management fields
-	*AccountPayloadManagerConfig
 }
 
 func makeCookieStore() (*sessions.CookieStore, error) {
