@@ -37,6 +37,31 @@ message CommunityPermissions {
   Access access = 3;
 }
 
+message TokenCriteria {
+  map<uint64, string> contract_addresses = 1;
+  CommunityTokenType type = 2;
+  string symbol = 3;
+  string name = 4;
+  string amount = 5;
+  repeated uint64 token_ids = 6;
+  string ens_pattern = 7;
+}
+
+message CommunityTokenPermission {
+
+  enum Type {
+    UNKNOWN_TOKEN_PERMISSION = 0;
+    BECOME_ADMIN = 1;
+    BECOME_MEMBER = 2;
+  }
+
+  string id = 1;
+  Type type = 2;
+  repeated TokenCriteria token_criteria = 3;
+  repeated string chat_ids = 4;
+  bool is_private = 5;
+}
+
 message CommunityDescription {
   uint64 clock = 1;
   map<string,CommunityMember> members = 2;
@@ -51,6 +76,7 @@ message CommunityDescription {
   string outro_message = 12;
   bool encrypted = 13;
   repeated string tags = 14;
+  map<string, CommunityTokenPermission> token_permissions = 15;
 }
 
 message CommunityAdminSettings {

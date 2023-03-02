@@ -439,6 +439,83 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	return community, nil
 }
 
+func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	tokenPermission := request.ToCommunityTokenPermission()
+	tokenPermission.Id = uuid.New().String()
+
+	changes, err := community.AddTokenPermission(&tokenPermission)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
+func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	tokenPermission := request.ToCommunityTokenPermission()
+
+	changes, err := community.UpdateTokenPermission(tokenPermission.Id, &tokenPermission)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
+func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	changes, err := community.DeleteTokenPermission(request.PermissionID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, changes, nil
+}
+
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	err := m.persistence.DeleteCommunity(id)
 	if err != nil {

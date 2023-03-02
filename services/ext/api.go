@@ -484,6 +484,18 @@ func (api *PublicAPI) RemoveRoleFromMember(request *requests.RemoveRoleFromMembe
 	return api.service.messenger.RemoveRoleFromMember(request)
 }
 
+func (api *PublicAPI) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityTokenPermission(request)
+}
+
+func (api *PublicAPI) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeleteCommunityTokenPermission(request)
+}
+
+func (api *PublicAPI) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditCommunityTokenPermission(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()
