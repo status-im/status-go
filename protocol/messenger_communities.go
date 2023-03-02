@@ -1070,6 +1070,56 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	return response, nil
 }
 
+func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, changes, err := m.communitiesManager.CreateCommunityTokenPermission(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return response, nil
+}
+
+func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, changes, err := m.communitiesManager.EditCommunityTokenPermission(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return response, nil
+}
+
+func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, changes, err := m.communitiesManager.DeleteCommunityTokenPermission(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+	return response, nil
+}
+
 func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err

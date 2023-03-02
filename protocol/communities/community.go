@@ -95,23 +95,24 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                     types.HexBytes                  `json:"id"`
-		Verified               bool                            `json:"verified"`
-		Chats                  map[string]CommunityChat        `json:"chats"`
-		Categories             map[string]CommunityCategory    `json:"categories"`
-		Name                   string                          `json:"name"`
-		Description            string                          `json:"description"`
-		IntroMessage           string                          `json:"introMessage"`
-		OutroMessage           string                          `json:"outroMessage"`
-		Tags                   []CommunityTag                  `json:"tags"`
-		Images                 map[string]images.IdentityImage `json:"images"`
-		Color                  string                          `json:"color"`
-		MembersCount           int                             `json:"membersCount"`
-		EnsName                string                          `json:"ensName"`
-		Link                   string                          `json:"link"`
-		CommunityAdminSettings CommunityAdminSettings          `json:"adminSettings"`
-		Encrypted              bool                            `json:"encrypted"`
-		BanList                []string                        `json:"banList"`
+		ID                     types.HexBytes                                `json:"id"`
+		Verified               bool                                          `json:"verified"`
+		Chats                  map[string]CommunityChat                      `json:"chats"`
+		Categories             map[string]CommunityCategory                  `json:"categories"`
+		Name                   string                                        `json:"name"`
+		Description            string                                        `json:"description"`
+		IntroMessage           string                                        `json:"introMessage"`
+		OutroMessage           string                                        `json:"outroMessage"`
+		Tags                   []CommunityTag                                `json:"tags"`
+		Images                 map[string]images.IdentityImage               `json:"images"`
+		Color                  string                                        `json:"color"`
+		MembersCount           int                                           `json:"membersCount"`
+		EnsName                string                                        `json:"ensName"`
+		Link                   string                                        `json:"link"`
+		CommunityAdminSettings CommunityAdminSettings                        `json:"adminSettings"`
+		Encrypted              bool                                          `json:"encrypted"`
+		BanList                []string                                      `json:"banList"`
+		TokenPermissions       map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -148,6 +149,8 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			}
 			communityItem.Chats[id] = chat
 		}
+
+		communityItem.TokenPermissions = o.config.CommunityDescription.TokenPermissions
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
@@ -183,33 +186,34 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                          types.HexBytes                       `json:"id"`
-		Admin                       bool                                 `json:"admin"`
-		Verified                    bool                                 `json:"verified"`
-		Joined                      bool                                 `json:"joined"`
-		Spectated                   bool                                 `json:"spectated"`
-		RequestedAccessAt           int                                  `json:"requestedAccessAt"`
-		Name                        string                               `json:"name"`
-		Description                 string                               `json:"description"`
-		IntroMessage                string                               `json:"introMessage"`
-		OutroMessage                string                               `json:"outroMessage"`
-		Tags                        []CommunityTag                       `json:"tags"`
-		Chats                       map[string]CommunityChat             `json:"chats"`
-		Categories                  map[string]CommunityCategory         `json:"categories"`
-		Images                      map[string]images.IdentityImage      `json:"images"`
-		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
-		Members                     map[string]*protobuf.CommunityMember `json:"members"`
-		CanRequestAccess            bool                                 `json:"canRequestAccess"`
-		CanManageUsers              bool                                 `json:"canManageUsers"`
-		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"`
-		CanJoin                     bool                                 `json:"canJoin"`
-		Color                       string                               `json:"color"`
-		RequestedToJoinAt           uint64                               `json:"requestedToJoinAt,omitempty"`
-		IsMember                    bool                                 `json:"isMember"`
-		Muted                       bool                                 `json:"muted"`
-		CommunityAdminSettings      CommunityAdminSettings               `json:"adminSettings"`
-		Encrypted                   bool                                 `json:"encrypted"`
-		BanList                     []string                             `json:"banList"`
+		ID                          types.HexBytes                                `json:"id"`
+		Admin                       bool                                          `json:"admin"`
+		Verified                    bool                                          `json:"verified"`
+		Joined                      bool                                          `json:"joined"`
+		Spectated                   bool                                          `json:"spectated"`
+		RequestedAccessAt           int                                           `json:"requestedAccessAt"`
+		Name                        string                                        `json:"name"`
+		Description                 string                                        `json:"description"`
+		IntroMessage                string                                        `json:"introMessage"`
+		OutroMessage                string                                        `json:"outroMessage"`
+		Tags                        []CommunityTag                                `json:"tags"`
+		Chats                       map[string]CommunityChat                      `json:"chats"`
+		Categories                  map[string]CommunityCategory                  `json:"categories"`
+		Images                      map[string]images.IdentityImage               `json:"images"`
+		Permissions                 *protobuf.CommunityPermissions                `json:"permissions"`
+		Members                     map[string]*protobuf.CommunityMember          `json:"members"`
+		CanRequestAccess            bool                                          `json:"canRequestAccess"`
+		CanManageUsers              bool                                          `json:"canManageUsers"`
+		CanDeleteMessageForEveryone bool                                          `json:"canDeleteMessageForEveryone"`
+		CanJoin                     bool                                          `json:"canJoin"`
+		Color                       string                                        `json:"color"`
+		RequestedToJoinAt           uint64                                        `json:"requestedToJoinAt,omitempty"`
+		IsMember                    bool                                          `json:"isMember"`
+		Muted                       bool                                          `json:"muted"`
+		CommunityAdminSettings      CommunityAdminSettings                        `json:"adminSettings"`
+		Encrypted                   bool                                          `json:"encrypted"`
+		BanList                     []string                                      `json:"banList"`
+		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 	}{
 		ID:                          o.ID(),
 		Admin:                       o.IsAdmin(),
@@ -257,6 +261,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			}
 			communityItem.Chats[id] = chat
 		}
+		communityItem.TokenPermissions = o.config.CommunityDescription.TokenPermissions
 		communityItem.Members = o.config.CommunityDescription.Members
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
@@ -431,6 +436,10 @@ type CommunityChanges struct {
 	Community      *Community                           `json:"community"`
 	MembersAdded   map[string]*protobuf.CommunityMember `json:"membersAdded"`
 	MembersRemoved map[string]*protobuf.CommunityMember `json:"membersRemoved"`
+
+	TokenPermissionsAdded    map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsAdded"`
+	TokenPermissionsModified map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsModified"`
+	TokenPermissionsRemoved  []string                                      `json:"tokenPermissionsRemoved"`
 
 	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
 	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
@@ -1388,6 +1397,80 @@ func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	}
 
 	return response
+}
+
+func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+
+	if _, exists := o.config.CommunityDescription.TokenPermissions[permission.Id]; exists {
+		return nil, ErrTokenPermissionAlreadyExists
+	}
+
+	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
+	o.increaseClock()
+	changes := o.emptyCommunityChanges()
+
+	if changes.TokenPermissionsAdded == nil {
+		changes.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	changes.TokenPermissionsAdded[permission.Id] = permission
+
+	return changes, nil
+}
+
+func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	if _, ok := o.config.CommunityDescription.TokenPermissions[permissionID]; !ok {
+		return nil, ErrTokenPermissionNotFound
+	}
+
+	changes := o.emptyCommunityChanges()
+	o.config.CommunityDescription.TokenPermissions[permissionID] = tokenPermission
+	o.increaseClock()
+
+	if changes.TokenPermissionsModified == nil {
+		changes.TokenPermissionsModified = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	changes.TokenPermissionsModified[permissionID] = o.config.CommunityDescription.TokenPermissions[tokenPermission.Id]
+
+	return changes, nil
+}
+
+func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if _, exists := o.config.CommunityDescription.TokenPermissions[permissionID]; !exists {
+		return nil, ErrTokenPermissionNotFound
+	}
+
+	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
+	changes := o.emptyCommunityChanges()
+	changes.TokenPermissionsRemoved = append(changes.TokenPermissionsRemoved, permissionID)
+	o.increaseClock()
+	return changes, nil
 }
 
 func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
