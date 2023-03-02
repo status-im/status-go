@@ -371,7 +371,7 @@ func (s *PersistenceSuite) TestUpdateCommunitySettings() {
 }
 
 func (s *PersistenceSuite) TestGetCommunityTokens() {
-	tokens, err := s.db.GetCommunityTokens("123", 1)
+	tokens, err := s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 0)
 
@@ -412,14 +412,14 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	err = s.db.AddCommunityToken(&token2)
 	s.Require().NoError(err)
 
-	tokens, err = s.db.GetCommunityTokens("123", 1)
+	tokens, err = s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(token, *tokens[0])
 
 	err = s.db.UpdateCommunityTokenState("0x123", Deployed)
 	s.Require().NoError(err)
-	tokens, err = s.db.GetCommunityTokens("123", 1)
+	tokens, err = s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(Deployed, tokens[0].DeployState)

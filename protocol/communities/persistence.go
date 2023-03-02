@@ -828,10 +828,10 @@ func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string,
 	return ids, nil
 }
 
-func (p *Persistence) GetCommunityTokens(communityID string, chainID int) ([]*CommunityToken, error) {
+func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken, error) {
 	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply,
 	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64
-	FROM community_tokens WHERE community_id = ? AND chain_id = ?`, communityID, chainID)
+	FROM community_tokens WHERE community_id = ?`, communityID)
 	if err != nil {
 		return nil, err
 	}
