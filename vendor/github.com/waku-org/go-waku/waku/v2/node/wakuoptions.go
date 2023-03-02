@@ -58,7 +58,8 @@ type WakuNodeParameters struct {
 	wssPort   int
 	tlsConfig *tls.Config
 
-	logger *zap.Logger
+	logger   *zap.Logger
+	logLevel logging.LogLevel
 
 	noDefaultWakuTopic      bool
 	enableRelay             bool
@@ -150,7 +151,8 @@ func WithLogger(l *zap.Logger) WakuNodeOption {
 // WithLogLevel is a WakuNodeOption that sets the log level for go-waku
 func WithLogLevel(lvl zapcore.Level) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		logging.SetAllLoggers(logging.LogLevel(lvl))
+		params.logLevel = logging.LogLevel(lvl)
+		logging.SetAllLoggers(params.logLevel)
 		return nil
 	}
 }
