@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	golog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"go.uber.org/zap"
 
@@ -129,6 +130,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	if params.logger == nil {
 		params.logger = utils.Logger()
+		golog.SetAllLoggers(params.logLevel)
 	}
 
 	if params.privKey == nil {

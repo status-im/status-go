@@ -1,10 +1,9 @@
 package protocol
 
 import (
-	"crypto/sha256"
-
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // Envelope contains information about the pubsub topic of a WakuMessage
@@ -22,7 +21,7 @@ type Envelope struct {
 // as well as generating a hash based on the bytes that compose the message
 func NewEnvelope(msg *wpb.WakuMessage, receiverTime int64, pubSubTopic string) *Envelope {
 	messageHash, dataLen, _ := msg.Hash()
-	hash := sha256.Sum256(append([]byte(msg.ContentTopic), msg.Payload...))
+	hash := utils.SHA256(append([]byte(msg.ContentTopic), msg.Payload...))
 	return &Envelope{
 		msg:  msg,
 		size: dataLen,
