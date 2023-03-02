@@ -24,3 +24,10 @@ enum ImageType {
   WEBP = 3;
   GIF = 4;
 }
+
+enum CommunityTokenType {
+  UNKNOWN_TOKEN_TYPE = 0;
+  ERC20 = 1;
+  ERC721 = 2;
+  ENS = 3;
+}
