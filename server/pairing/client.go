@@ -404,10 +404,15 @@ func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (
 // VVV All new stuff below this line VVV
 //
 
+const (
+	accountPayloadMounter    = "accountPayloadMounter"
+	rawMessagePayloadMounter = "rawMessagePayloadMounter"
+)
+
 type SenderClient struct {
 	*http.Client
 	payloadEncryptor *PayloadEncryptor
-	payloadSender    PayloadMounter
+	mounters         map[string]PayloadMounter
 
 	baseAddress     *url.URL
 	certPEM         []byte
@@ -463,11 +468,19 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 	if err != nil {
 		return nil, err
 	}
+	rmm, err := NewRawMessagePayloadMounter(logger, pe, backend, &config.Sender)
+	if err != nil {
+		return nil, err
+	}
+
+	mm := make(map[string]PayloadMounter)
+	mm[accountPayloadMounter] = pg
+	mm[rawMessagePayloadMounter] = rmm
 
 	return &SenderClient{
 		Client:           &http.Client{Transport: tr, Jar: cj},
 		payloadEncryptor: pe,
-		payloadSender:    pg,
+		mounters:         mm,
 
 		baseAddress: u,
 		certPEM:     certPem,
@@ -478,13 +491,13 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 }
 
 func (c *SenderClient) sendAccountData() error {
-	err := c.payloadSender.Mount()
+	err := c.mounters[accountPayloadMounter].Mount()
 	if err != nil {
 		return err
 	}
 
 	c.baseAddress.Path = pairingReceiveAccount
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.payloadSender.ToSend()))
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[accountPayloadMounter].ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
 		return err
@@ -498,16 +511,31 @@ func (c *SenderClient) sendAccountData() error {
 
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
 
-	c.payloadSender.LockPayload()
+	c.mounters[accountPayloadMounter].LockPayload()
 	return nil
 }
 
-func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupSendingClient(backend, cs, configJSON)
+func (c *SenderClient) sendSyncDeviceData() error {
+	err := c.mounters[rawMessagePayloadMounter].Mount()
 	if err != nil {
 		return err
 	}
-	return c.sendAccountData()
+
+	c.baseAddress.Path = pairingSyncDeviceReceive
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[rawMessagePayloadMounter].ToSend()))
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not okay when sending sync device data, status: %s", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
+	}
+
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionSyncDevice})
+	return nil
 }
 
 func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON string) (*SenderClient, error) {
@@ -526,4 +554,16 @@ func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON st
 	conf.Sender.DB = backend.GetMultiaccountDB()
 
 	return NewSenderClient(backend, ccp, conf)
+}
+
+func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+	c, err := setupSendingClient(backend, cs, configJSON)
+	if err != nil {
+		return err
+	}
+	err = c.sendAccountData()
+	if err != nil {
+		return err
+	}
+	return c.sendSyncDeviceData()
 }

@@ -3,13 +3,16 @@ package pairing
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/multiaccounts"
-	"go.uber.org/zap"
+	"github.com/status-im/status-go/api"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/keystore"
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type PayloadMounter interface {
@@ -26,6 +29,15 @@ type PayloadLoader interface {
 	LoadFromSource() error
 }
 
+/*
+|--------------------------------------------------------------------------
+| AccountPayload
+|--------------------------------------------------------------------------
+|
+| AccountPayloadMounter, AccountPayloadLoader and AccountPayloadMarshaller
+|
+*/
+
 // AccountPayloadMounter is responsible for the whole lifecycle of an AccountPayload
 type AccountPayloadMounter struct {
 	logger                   *zap.Logger
@@ -37,12 +49,12 @@ type AccountPayloadMounter struct {
 
 // NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
 func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
-	l := logger.Named("AccountPayloadGetter")
+	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
-	apg, err := NewAccountPayloadGetter(p, config)
+	apl, err := NewAccountPayloadLoader(p, config)
 	if err != nil {
 		return nil, err
 	}
@@ -52,11 +64,11 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 		accountPayload:           p,
 		encryptor:                pe,
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
-		payloadLoader:            apg,
+		payloadLoader:            apl,
 	}, nil
 }
 
-// Mount loads and prepares the payload to be stored in the AccountPayloadGetter's state ready for later access
+// Mount loads and prepares the payload to be stored in the AccountPayloadLoader's state ready for later access
 func (apm *AccountPayloadMounter) Mount() error {
 	l := apm.logger.Named("Mount()")
 	l.Debug("fired")
@@ -90,8 +102,8 @@ func (apm *AccountPayloadMounter) LockPayload() {
 	apm.encryptor.lockPayload()
 }
 
-// AccountPayloadGetter is responsible for loading, parsing and validating AccountPayload data
-type AccountPayloadGetter struct {
+// AccountPayloadLoader is responsible for loading, parsing and validating AccountPayload data
+type AccountPayloadLoader struct {
 	*AccountPayload
 
 	multiaccountsDB *multiaccounts.Database
@@ -99,8 +111,8 @@ type AccountPayloadGetter struct {
 	keyUID          string
 }
 
-func NewAccountPayloadGetter(p *AccountPayload, config *SenderConfig) (*AccountPayloadGetter, error) {
-	ppr := &AccountPayloadGetter{
+func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountPayloadLoader, error) {
+	ppr := &AccountPayloadLoader{
 		AccountPayload: p,
 	}
 
@@ -115,7 +127,7 @@ func NewAccountPayloadGetter(p *AccountPayload, config *SenderConfig) (*AccountP
 	return ppr, nil
 }
 
-func (apr *AccountPayloadGetter) LoadFromSource() error {
+func (apr *AccountPayloadLoader) LoadFromSource() error {
 	err := apr.loadKeys(apr.keystorePath)
 	if err != nil {
 		return err
@@ -134,7 +146,7 @@ func (apr *AccountPayloadGetter) LoadFromSource() error {
 	return nil
 }
 
-func (apr *AccountPayloadGetter) loadKeys(keyStorePath string) error {
+func (apr *AccountPayloadLoader) loadKeys(keyStorePath string) error {
 	apr.keys = make(map[string][]byte)
 
 	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
@@ -173,7 +185,7 @@ func (apr *AccountPayloadGetter) loadKeys(keyStorePath string) error {
 	return nil
 }
 
-func (apr *AccountPayloadGetter) validateKeys(password string) error {
+func (apr *AccountPayloadLoader) validateKeys(password string) error {
 	for _, key := range apr.keys {
 		k, err := keystore.DecryptKey(key, password)
 		if err != nil {
@@ -190,84 +202,68 @@ func (apr *AccountPayloadGetter) validateKeys(password string) error {
 }
 
 /*
-func (apr *AccountPayloadRepository) StoreToSource() error {
-	keyUID := apr.multiaccount.KeyUID
-	if apr.loggedInKeyUID != "" && apr.loggedInKeyUID != keyUID {
-		return ErrLoggedInKeyUIDConflict
-	}
-	if apr.loggedInKeyUID == keyUID {
-		// skip storing keys if user is logged in with the same key
-		return nil
-	}
+|--------------------------------------------------------------------------
+| RawMessagePayload
+|--------------------------------------------------------------------------
+|
+| RawMessagePayloadMounter and RawMessageLoader
+|
+*/
 
-	err := apr.validateKeys(apr.password)
+type RawMessagePayloadMounter struct {
+	logger *zap.Logger
+
+	encryptor         *PayloadEncryptor
+	payloadRepository *RawMessageLoader
+}
+
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*RawMessagePayloadMounter, error) {
+	l := logger.Named("RawMessagePayloadManager")
+	return &RawMessagePayloadMounter{
+		logger:            l,
+		encryptor:         pe,
+		payloadRepository: NewRawMessageLoader(backend, config),
+	}, nil
+}
+
+func (r *RawMessagePayloadMounter) Mount() error {
+	err := r.payloadRepository.LoadFromSource()
 	if err != nil {
 		return err
 	}
-
-	if err = apr.storeKeys(apr.keystorePath); err != nil && err != ErrKeyFileAlreadyExists {
-		return err
-	}
-
-	// skip storing multiaccount if key already exists
-	if err == ErrKeyFileAlreadyExists {
-		apr.exist = true
-		apr.multiaccount, err = apr.multiaccountsDB.GetAccount(keyUID)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return apr.storeMultiAccount()
+	return r.encryptor.encrypt(r.payloadRepository.payload)
 }
 
-func (apr *AccountPayloadRepository) storeKeys(keyStorePath string) error {
-	if keyStorePath == "" {
-		return fmt.Errorf("keyStorePath can not be empty")
-	}
-
-	_, lastDir := filepath.Split(keyStorePath)
-
-	// If lastDir == "keystore" we presume we need to create the rest of the keystore path
-	// else we presume the provided keystore is valid
-	if lastDir == "keystore" {
-		if apr.multiaccount == nil || apr.multiaccount.KeyUID == "" {
-			return fmt.Errorf("no known Key UID")
-		}
-		keyStorePath = filepath.Join(keyStorePath, apr.multiaccount.KeyUID)
-		_, err := os.Stat(keyStorePath)
-		if os.IsNotExist(err) {
-			err := os.MkdirAll(keyStorePath, 0777)
-			if err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		} else {
-			return ErrKeyFileAlreadyExists
-		}
-	}
-
-	for name, data := range apr.keys {
-		accountKey := new(keystore.EncryptedKeyJSONV3)
-		if err := json.Unmarshal(data, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
-		}
-
-		if len(accountKey.Address) != 40 {
-			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
-		}
-
-		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (r *RawMessagePayloadMounter) ToSend() []byte {
+	return r.encryptor.getEncrypted()
 }
 
-func (apr *AccountPayloadRepository) storeMultiAccount() error {
-	apr.multiaccount.KDFIterations = apr.kdfIterations
-	return apr.multiaccountsDB.SaveAccount(*apr.multiaccount)
+func (r *RawMessagePayloadMounter) LockPayload() {
+	r.encryptor.lockPayload()
 }
-*/
+
+func (r *RawMessagePayloadMounter) ResetPayload() {
+	r.payloadRepository.payload = make([]byte, 0)
+	r.encryptor.resetPayload()
+}
+
+type RawMessageLoader struct {
+	payload               []byte
+	syncRawMessageHandler *SyncRawMessageHandler
+	keyUID                string
+	deviceType            string
+}
+
+func NewRawMessageLoader(backend *api.GethStatusBackend, config *SenderConfig) *RawMessageLoader {
+	return &RawMessageLoader{
+		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
+		payload:               make([]byte, 0),
+		keyUID:                config.KeyUID,
+		deviceType:            config.DeviceType,
+	}
+}
+
+func (r *RawMessageLoader) LoadFromSource() (err error) {
+	r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
+	return err
+}
