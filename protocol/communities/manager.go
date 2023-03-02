@@ -2696,8 +2696,8 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 	return 0, false
 }
 
-func (m *Manager) GetCommunityTokens(communityID string, chainID int) ([]*CommunityToken, error) {
-	return m.persistence.GetCommunityTokens(communityID, chainID)
+func (m *Manager) GetCommunityTokens(communityID string) ([]*CommunityToken, error) {
+	return m.persistence.GetCommunityTokens(communityID)
 }
 
 func (m *Manager) AddCommunityToken(token *CommunityToken) error {

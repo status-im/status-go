@@ -1260,8 +1260,8 @@ func (api *PublicAPI) BuildContact(publicKey string) (*protocol.Contact, error) 
 	return api.service.messenger.BuildContact(publicKey)
 }
 
-func (api *PublicAPI) GetCommunityTokens(communityID string, chainID int) ([]*communities.CommunityToken, error) {
-	return api.service.messenger.GetCommunityTokens(communityID, chainID)
+func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*communities.CommunityToken, error) {
+	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
 func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) error {
