@@ -10,6 +10,8 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 
 replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
 
+replace github.com/libp2p/go-libp2p => github.com/status-im/go-libp2p v0.25.1-debug-closing-conn
+
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0
