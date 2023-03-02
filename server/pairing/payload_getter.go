@@ -3,6 +3,7 @@ package pairing
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/api"
 	"io/ioutil"
 	"os"
@@ -265,5 +266,72 @@ func NewRawMessageLoader(backend *api.GethStatusBackend, config *SenderConfig) *
 
 func (r *RawMessageLoader) LoadFromSource() (err error) {
 	r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
+	return err
+}
+
+/*
+|--------------------------------------------------------------------------
+| InstallationPayload
+|--------------------------------------------------------------------------
+|
+| InstallationPayloadMounter and InstallationPayloadLoader
+|
+*/
+
+type InstallationPayloadMounter struct {
+	logger                    *zap.Logger
+	encryptor                 *PayloadEncryptor
+	installationPayloadLoader *InstallationPayloadLoader
+}
+
+func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadMounter, error) {
+	return &InstallationPayloadMounter{
+		logger:                    logger.Named("InstallationPayloadManager"),
+		encryptor:                 pe,
+		installationPayloadLoader: NewInstallationPayloadLoader(backend, deviceType),
+	}, nil
+}
+
+func (i *InstallationPayloadMounter) Mount() error {
+	err := i.installationPayloadLoader.LoadFromSource()
+	if err != nil {
+		return err
+	}
+	return i.encryptor.encrypt(i.installationPayloadLoader.payload)
+}
+
+func (i *InstallationPayloadMounter) ToSend() []byte {
+	return i.encryptor.getEncrypted()
+}
+
+func (i *InstallationPayloadMounter) LockPayload() {
+	i.encryptor.lockPayload()
+}
+
+func (i *InstallationPayloadMounter) ResetPayload() {
+	i.installationPayloadLoader.payload = make([]byte, 0)
+	i.encryptor.resetPayload()
+}
+
+type InstallationPayloadLoader struct {
+	payload               []byte
+	syncRawMessageHandler *SyncRawMessageHandler
+	deviceType            string
+}
+
+func NewInstallationPayloadLoader(backend *api.GethStatusBackend, deviceType string) *InstallationPayloadLoader {
+	return &InstallationPayloadLoader{
+		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
+		deviceType:            deviceType,
+	}
+}
+
+func (r *InstallationPayloadLoader) LoadFromSource() error {
+	rawMessageCollector := new(RawMessageCollector)
+	err := r.syncRawMessageHandler.CollectInstallationData(rawMessageCollector, r.deviceType)
+	if err != nil {
+		return err
+	}
+	r.payload, err = proto.Marshal(rawMessageCollector.convertToSyncRawMessage())
 	return err
 }

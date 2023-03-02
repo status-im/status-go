@@ -404,9 +404,11 @@ func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (
 // VVV All new stuff below this line VVV
 //
 
+// TODO we may or may not need these longer term.
 const (
-	accountPayloadMounter    = "accountPayloadMounter"
-	rawMessagePayloadMounter = "rawMessagePayloadMounter"
+	accountPayloadMounter      = "accountPayloadMounter"
+	rawMessagePayloadMounter   = "rawMessagePayloadMounter"
+	installationPayloadMounter = "installationPayloadMounter"
 )
 
 type SenderClient struct {
@@ -464,7 +466,7 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 
 	pe := NewPayloadEncryptor(c.aesKey, logger)
-	pg, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
+	pm, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -472,10 +474,12 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 	if err != nil {
 		return nil, err
 	}
+	im, err := NewInstallationPayloadMounter(logger, pe, backend, config.Sender.DeviceType)
 
 	mm := make(map[string]PayloadMounter)
-	mm[accountPayloadMounter] = pg
+	mm[accountPayloadMounter] = pm
 	mm[rawMessagePayloadMounter] = rmm
+	mm[installationPayloadMounter] = im
 
 	return &SenderClient{
 		Client:           &http.Client{Transport: tr, Jar: cj},
@@ -538,6 +542,32 @@ func (c *SenderClient) sendSyncDeviceData() error {
 	return nil
 }
 
+func (c *SenderClient) sendInstallationData() error {
+	err := c.mounters[installationPayloadMounter].Mount()
+	if err != nil {
+		return err
+	}
+
+	c.baseAddress.Path = pairingReceiveInstallation
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[installationPayloadMounter].ToSend()))
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not okay when sending installation data, status: %s", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+	return nil
+}
+
 func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON string) (*SenderClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
@@ -565,5 +595,9 @@ func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	if err != nil {
 		return err
 	}
-	return c.sendSyncDeviceData()
+	err = c.sendSyncDeviceData()
+	if err != nil {
+		return err
+	}
+	return c.sendInstallationData()
 }
