@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -397,4 +398,132 @@ func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (
 		return nil, err
 	}
 	return c, nil
+}
+
+//
+// VVV All new stuff below this line VVV
+//
+
+type SenderClient struct {
+	*http.Client
+	payloadEncryptor *PayloadEncryptor
+	payloadSender    PayloadMounter
+
+	baseAddress     *url.URL
+	certPEM         []byte
+	serverPK        *ecdsa.PublicKey
+	serverMode      Mode
+	serverCert      *x509.Certificate
+	serverChallenge []byte
+}
+
+func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
+	u, err := c.URL()
+	if err != nil {
+		return nil, err
+	}
+
+	serverCert, err := getServerCert(u)
+	if err != nil {
+		return nil, err
+	}
+
+	err = verifyCert(serverCert, c.publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCert.Raw})
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	if ok := rootCAs.AppendCertsFromPEM(certPem); !ok {
+		return nil, fmt.Errorf("failed to append certPem to rootCAs")
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: false, // MUST BE FALSE
+			RootCAs:            rootCAs,
+		},
+	}
+
+	cj, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	logger := logutils.ZapLogger().Named("ReceiverClient")
+
+	pe := NewPayloadEncryptor(c.aesKey, logger)
+	pg, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SenderClient{
+		Client:           &http.Client{Transport: tr, Jar: cj},
+		payloadEncryptor: pe,
+		payloadSender:    pg,
+
+		baseAddress: u,
+		certPEM:     certPem,
+		serverCert:  serverCert,
+		serverPK:    c.publicKey,
+		serverMode:  c.serverMode,
+	}, nil
+}
+
+func (c *SenderClient) sendAccountData() error {
+	err := c.payloadSender.Mount()
+	if err != nil {
+		return err
+	}
+
+	c.baseAddress.Path = pairingReceiveAccount
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.payloadSender.ToSend()))
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not ok when sending account data, received '%s'", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
+	}
+
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
+
+	c.payloadSender.LockPayload()
+	return nil
+}
+
+func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+	c, err := setupSendingClient(backend, cs, configJSON)
+	if err != nil {
+		return err
+	}
+	return c.sendAccountData()
+}
+
+func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON string) (*SenderClient, error) {
+	ccp := new(ConnectionParams)
+	err := ccp.FromString(cs)
+	if err != nil {
+		return nil, err
+	}
+
+	conf := new(SenderClientConfig)
+	err = json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return nil, err
+	}
+
+	conf.Sender.DB = backend.GetMultiaccountDB()
+
+	return NewSenderClient(backend, ccp, conf)
 }

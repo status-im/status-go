@@ -1,7 +1,6 @@
 package pairing
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +16,6 @@ import (
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 )
@@ -37,6 +35,8 @@ type PayloadManager interface {
 
 	// Receive stores data from an inbound source into the PayloadManager's state
 	Receive(data []byte) error
+
+	// Functions of a PayloadEncryptionManager
 
 	// ToSend returns an outbound safe (encrypted) payload
 	ToSend() []byte
@@ -149,108 +149,6 @@ func (apm *AccountPayloadManager) ResetPayload() {
 	apm.PayloadEncryptionManager.ResetPayload()
 }
 
-// EncryptionPayload represents the plain text and encrypted text of payload data
-type EncryptionPayload struct {
-	plain     []byte
-	encrypted []byte
-	locked    bool
-}
-
-func (ep *EncryptionPayload) lock() {
-	ep.locked = true
-}
-
-// PayloadEncryptionManager is responsible for encrypting and decrypting payload data
-type PayloadEncryptionManager struct {
-	logger   *zap.Logger
-	aesKey   []byte
-	toSend   *EncryptionPayload
-	received *EncryptionPayload
-}
-
-func NewPayloadEncryptionManager(aesKey []byte, logger *zap.Logger) (*PayloadEncryptionManager, error) {
-	return &PayloadEncryptionManager{logger.Named("PayloadEncryptionManager"), aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
-}
-
-// EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
-// This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
-func (pem *PayloadEncryptionManager) EncryptPlain(plaintext []byte) ([]byte, error) {
-	l := pem.logger.Named("EncryptPlain()")
-	l.Debug("fired")
-
-	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
-}
-
-func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
-	l := pem.logger.Named("Encrypt()")
-	l.Debug("fired")
-
-	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
-	if err != nil {
-		return err
-	}
-
-	pem.toSend.plain = data
-	pem.toSend.encrypted = ep
-
-	l.Debug(
-		"after common.Encrypt",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("ep", ep),
-	)
-
-	return nil
-}
-
-func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
-	l := pem.logger.Named("Decrypt()")
-	l.Debug("fired")
-
-	pd, err := common.Decrypt(data, pem.aesKey)
-	l.Debug(
-		"after common.Decrypt(data, pem.aesKey)",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("pd", pd),
-		zap.Error(err),
-	)
-	if err != nil {
-		return err
-	}
-
-	pem.received.encrypted = data
-	pem.received.plain = pd
-	return nil
-}
-
-func (pem *PayloadEncryptionManager) ToSend() []byte {
-	if pem.toSend.locked {
-		return nil
-	}
-	return pem.toSend.encrypted
-}
-
-func (pem *PayloadEncryptionManager) Received() []byte {
-	if pem.toSend.locked {
-		return nil
-	}
-	return pem.received.plain
-}
-
-func (pem *PayloadEncryptionManager) ResetPayload() {
-	pem.toSend = new(EncryptionPayload)
-	pem.received = new(EncryptionPayload)
-}
-
-func (pem *PayloadEncryptionManager) LockPayload() {
-	l := pem.logger.Named("LockPayload")
-	l.Debug("fired")
-
-	pem.toSend.lock()
-	pem.received.lock()
-}
-
 // AccountPayload represents the payload structure a Server handles
 type AccountPayload struct {
 	keys         map[string][]byte
@@ -333,11 +231,6 @@ func (ppm *AccountPayloadMarshaller) accountKeysFromProtobuf(pbKeys []*protobuf.
 func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *protobuf.MultiAccount) {
 	ppm.multiaccount = new(multiaccounts.Account)
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
-}
-
-type PayloadRepository interface {
-	LoadFromSource() error
-	StoreToSource() error
 }
 
 // AccountPayloadRepository is responsible for loading, parsing, validating and storing Server payload data
@@ -464,13 +357,7 @@ func (apr *AccountPayloadRepository) StoreToSource() error {
 		}
 		return nil
 	}
-	err = apr.storeMultiAccount()
-	if err != nil {
-		return err
-	}
-
-	// TODO install PublicKey into settings, probably do this outside of StoreToSource
-	return nil
+	return apr.storeMultiAccount()
 }
 
 func (apr *AccountPayloadRepository) validateKeys(password string) error {

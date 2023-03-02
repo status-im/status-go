@@ -61,6 +61,7 @@ func (t *timeoutManager) run(terminate func(), exit chan struct{}) {
 		return
 	case <-time.After(time.Duration(t.timeout) * time.Millisecond):
 		terminate()
+		// TODO fire signal to let UI know
 		return
 	}
 }

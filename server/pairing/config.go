@@ -52,23 +52,23 @@ type ServerConfig struct {
 type ClientConfig struct{}
 
 type SenderServerConfig struct {
-	SenderConfig
-	ServerConfig
+	Sender SenderConfig
+	Server ServerConfig
 }
 
 type SenderClientConfig struct {
-	SenderConfig
-	ClientConfig
+	Sender SenderConfig
+	Client ClientConfig
 }
 
 type ReceiverClientConfig struct {
-	ReceiverConfig
-	ClientConfig
+	Receiver ReceiverConfig
+	Client   ClientConfig
 }
 
 type ReceiverServerConfig struct {
-	ReceiverConfig
-	ServerConfig
+	Receiver ReceiverConfig
+	Server   ServerConfig
 }
 
 // VVV Old code below this line VVV

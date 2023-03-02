@@ -1041,25 +1041,36 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	return cs
 }
 
-// InputConnectionStringForBootstrapping starts a pairing.Client
+// InputConnectionStringForBootstrapping starts a pairing.ReceiverClient
 // The given server.ConnectionParams string will determine the server.Mode
 //
 // server.Mode = server.Sending
-// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
-//
-// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
-//
-// server.Mode = server.Receiving
 // Used when the device is Logged out or has no Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
 	err := pairing.StartUpPairingClient(statusBackend, cs, configJSON)
+	return makeJSONResponse(err)
+}
+
+// InputConnectionStringForBootstrappingAnotherDevice starts a pairing.SendingClient
+// The given server.ConnectionParams string will determine the server.Mode
+//
+// server.Mode = server.Receiving
+// Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
+//
+// Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
+func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, SenderClientConfig is expected"))
+	}
+
+	err := pairing.StartUpSendingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
 }
 

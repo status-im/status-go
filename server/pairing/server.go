@@ -53,11 +53,6 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 		return nil, err
 	}
 
-	cs, err := makeCookieStore()
-	if err != nil {
-		return nil, err
-	}
-
 	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, config.EK, backend, accountPayloadManagerConfig.GetNodeConfig(), accountPayloadManagerConfig.GetSettingCurrentNetwork(), accountPayloadManagerConfig.GetDeviceType())
 	if err != nil {
 		return nil, err
@@ -67,6 +62,12 @@ func NewPairingServer(backend *api.GethStatusBackend, config *Config) (*Server, 
 	if err != nil {
 		return nil, err
 	}
+
+	cs, err := makeCookieStore()
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Server{Server: server.NewServer(
 		config.Cert,
 		config.Hostname,
