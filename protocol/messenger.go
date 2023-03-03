@@ -3016,7 +3016,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			Type:         notificationType,
 			Timestamp:    message.WhisperTimestamp,
 			ChatID:       chat.ID,
-			CommunityID:  message.CommunityID,
+			CommunityID:  chat.CommunityID,
 			Author:       message.From,
 		}
 
