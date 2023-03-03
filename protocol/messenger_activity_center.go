@@ -12,22 +12,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *Messenger) UnreadActivityCenterNotificationsCount() (uint64, error) {
-	return m.persistence.UnreadActivityCenterNotificationsCount()
-}
-
-func (m *Messenger) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []ActivityCenterType) (uint64, error) {
-	return m.persistence.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
-}
-
-func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
-	return m.persistence.HasUnseenActivityCenterNotifications()
-}
-
-func (m *Messenger) GetActivityCenterState() (*ActivityCenterState, error) {
-	return m.persistence.GetActivityCenterState()
-}
-
 func toHexBytes(b [][]byte) []types.HexBytes {
 	hb := make([]types.HexBytes, len(b))
 
@@ -46,6 +30,41 @@ func fromHexBytes(hb []types.HexBytes) [][]byte {
 	}
 
 	return b
+}
+
+func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificationsRequest) (*ActivityCenterPaginationResponse, error) {
+	cursor, notifications, err := m.persistence.ActivityCenterNotifications(request.Cursor, request.Limit, request.ActivityTypes, request.ReadType, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ActivityCenterPaginationResponse{
+		Cursor:        cursor,
+		Notifications: notifications,
+	}, nil
+}
+
+func (m *Messenger) ActivityCenterNotificationsCount(request ActivityCenterCountRequest) (*ActivityCenterCountResponse, error) {
+	response := make(ActivityCenterCountResponse)
+
+	for _, activityType := range request.ActivityTypes {
+		count, err := m.persistence.ActivityCenterNotificationsCount([]ActivityCenterType{activityType}, request.ReadType, true)
+		if err != nil {
+			return nil, err
+		}
+
+		response[activityType] = count
+	}
+
+	return &response, nil
+}
+
+func (m *Messenger) HasUnseenActivityCenterNotifications() (bool, error) {
+	return m.persistence.HasUnseenActivityCenterNotifications()
+}
+
+func (m *Messenger) GetActivityCenterState() (*ActivityCenterState, error) {
+	return m.persistence.GetActivityCenterState()
 }
 
 func (m *Messenger) MarkAsSeenActivityCenterNotifications() (*MessengerResponse, error) {
@@ -276,58 +295,6 @@ func (m *Messenger) DeleteActivityCenterNotifications(ctx context.Context, ids [
 
 func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCenterNotification, error) {
 	return m.persistence.GetActivityCenterNotificationByID(id)
-}
-
-func (m *Messenger) ActivityCenterNotifications(cursor string, limit uint64) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ActivityCenterNotifications(cursor, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ActivityCenterPaginationResponse{
-		Cursor:        cursor,
-		Notifications: notifications,
-	}, nil
-}
-
-func (m *Messenger) ReadActivityCenterNotifications(cursor string, limit uint64, activityTypes []ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ReadActivityCenterNotifications(cursor, limit, activityTypes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ActivityCenterPaginationResponse{
-		Cursor:        cursor,
-		Notifications: notifications,
-	}, nil
-}
-
-func (m *Messenger) UnreadActivityCenterNotifications(cursor string, limit uint64, activityTypes []ActivityCenterType) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.UnreadActivityCenterNotifications(cursor, limit, activityTypes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ActivityCenterPaginationResponse{
-		Cursor:        cursor,
-		Notifications: notifications,
-	}, nil
-}
-
-func (m *Messenger) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (*ActivityCenterPaginationResponse, error) {
-	cursor, notifications, err := m.persistence.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ActivityCenterPaginationResponse{
-		Cursor:        cursor,
-		Notifications: notifications,
-	}, nil
-}
-
-func (m *Messenger) ActivityCenterNotificationsCountBy(activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
-	return m.persistence.ActivityCenterNotificationsCountBy(activityTypes, readType, accepted)
 }
 
 func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {

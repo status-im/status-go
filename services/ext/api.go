@@ -1090,14 +1090,12 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID)
 }
 
-func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
-	return api.service.messenger.UnreadActivityCenterNotificationsCount()
+func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotifications(request)
 }
 
-// UnreadAndAcceptedActivityCenterNotificationsCount is a temporary endpoint to
-// support the mobile client needs.
-func (api *PublicAPI) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []protocol.ActivityCenterType) (uint64, error) {
-	return api.service.messenger.UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes)
+func (api *PublicAPI) ActivityCenterNotificationsCount(request protocol.ActivityCenterCountRequest) (*protocol.ActivityCenterCountResponse, error) {
+	return api.service.messenger.ActivityCenterNotificationsCount(request)
 }
 
 func (api *PublicAPI) HasUnseenActivityCenterNotifications() (bool, error) {
@@ -1135,26 +1133,6 @@ func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, id
 
 func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
 	return api.service.messenger.DeleteActivityCenterNotifications(ctx, ids, false)
-}
-
-func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
-}
-
-func (api *PublicAPI) ReadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ReadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
-}
-
-func (api *PublicAPI) UnreadActivityCenterNotifications(cursor string, limit uint64, activityType protocol.ActivityCenterType) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.UnreadActivityCenterNotifications(cursor, limit, []protocol.ActivityCenterType{activityType})
-}
-
-func (api *PublicAPI) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (*protocol.ActivityCenterPaginationResponse, error) {
-	return api.service.messenger.ActivityCenterNotificationsBy(cursor, limit, activityTypes, readType, accepted)
-}
-
-func (api *PublicAPI) ActivityCenterNotificationsCountBy(activityTypes []protocol.ActivityCenterType, readType protocol.ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
-	return api.service.messenger.ActivityCenterNotificationsCountBy(activityTypes, readType, accepted)
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

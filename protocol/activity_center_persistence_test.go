@@ -52,13 +52,13 @@ func TestDeleteActivityCenterNotificationsWhenEmpty(t *testing.T) {
 	})
 
 	var count uint64
-	count, _ = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(1), count)
 
 	err = p.DeleteActivityCenterNotifications([]types.HexBytes{})
 	require.NoError(t, err)
 
-	count, _ = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(1), count)
 }
 
@@ -81,13 +81,13 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 	})
 
 	var count uint64
-	count, _ = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(3), count)
 
 	err = p.DeleteActivityCenterNotifications([]types.HexBytes{notifications[1].ID, notifications[2].ID})
 	require.NoError(t, err)
 
-	count, _ = p.UnreadActivityCenterNotificationsCount()
+	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(1), count)
 }
 
@@ -651,7 +651,7 @@ func TestUnreadActivityCenterNotificationsCount(t *testing.T) {
 	})
 
 	// Test: Ignore soft deleted and accepted.
-	count, err := p.UnreadActivityCenterNotificationsCount()
+	count, err := p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, true)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), count)
 }
@@ -670,16 +670,14 @@ func TestUnreadAndAcceptedActivityCenterNotificationsCount(t *testing.T) {
 	})
 
 	// Test: counts everything, except soft deleted notifications.
-	count, err := p.UnreadAndAcceptedActivityCenterNotificationsCount([]ActivityCenterType{})
+	count, err := p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, true)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), count)
 
 	// Test: counts everything, except soft deleted ones and limit by type.
-	count, err = p.UnreadAndAcceptedActivityCenterNotificationsCount(
-		[]ActivityCenterType{
-			ActivityCenterNotificationTypeContactRequest,
-		},
-	)
+	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{
+		ActivityCenterNotificationTypeContactRequest,
+	}, ActivityCenterQueryParamsReadUnread, true)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), count)
 }
@@ -710,7 +708,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	err = p.SaveActivityCenterNotification(notification)
 	require.NoError(t, err)
 
-	cursor, notifications, err := p.ActivityCenterNotifications("", 2)
+	cursor, notifications, err := p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
@@ -727,7 +725,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	err = p.SaveActivityCenterNotification(notification)
 	require.NoError(t, err)
 
-	cursor, notifications, err = p.ActivityCenterNotifications("", 1)
+	cursor, notifications, err = p.ActivityCenterNotifications("", 1, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.NotEmpty(t, cursor)
@@ -735,7 +733,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// fetch next pagination
 
-	cursor, notifications, err = p.ActivityCenterNotifications(cursor, 1)
+	cursor, notifications, err = p.ActivityCenterNotifications(cursor, 1, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Empty(t, cursor)
@@ -743,25 +741,25 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.Equal(t, nID1, notifications[0].ID)
 
 	// Check count
-	count, err := p.UnreadActivityCenterNotificationsCount()
+	count, err := p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), count)
 
 	// Mark first one as read
 	require.NoError(t, p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID1}))
-	count, err = p.UnreadActivityCenterNotificationsCount()
+	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), count)
 
 	// Mark first one as unread
 	require.NoError(t, p.MarkActivityCenterNotificationsUnread([]types.HexBytes{nID1}))
-	count, err = p.UnreadActivityCenterNotificationsCount()
+	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), count)
 
 	// Mark all read
 	require.NoError(t, p.MarkAllActivityCenterNotificationsRead())
-	_, notifications, err = p.ActivityCenterNotifications(cursor, 2)
+	_, notifications, err = p.ActivityCenterNotifications(cursor, 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Empty(t, cursor)
@@ -769,7 +767,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.True(t, notifications[1].Read)
 
 	// Check count
-	count, err = p.UnreadActivityCenterNotificationsCount()
+	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), count)
 
@@ -778,14 +776,14 @@ func TestActivityCenterPersistence(t *testing.T) {
 	notifications, err = p.AcceptActivityCenterNotifications([]types.HexBytes{nID1})
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
-	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	// It should not be returned anymore
 	require.Len(t, notifications, 1)
 
 	// Mark last one as dismissed
 	require.NoError(t, p.DismissActivityCenterNotifications([]types.HexBytes{nID2}))
-	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 
 	require.Len(t, notifications, 1)
@@ -805,7 +803,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 
-	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 
 	require.Len(t, notifications, 1)
@@ -821,7 +819,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// Mark all as dismissed
 	require.NoError(t, p.DismissAllActivityCenterNotifications())
-	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 
 	require.Len(t, notifications, 2)
@@ -894,10 +892,12 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch UNREAD notifications, first page.
-	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+	cursor, notifications, err := p.ActivityCenterNotifications(
 		initialOrFinalCursor,
 		1,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
@@ -905,20 +905,24 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.NotEmpty(t, cursor)
 
 	// Fetch next pages.
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+	cursor, notifications, err = p.ActivityCenterNotifications(
 		cursor,
 		1,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.NotEmpty(t, cursor)
 
-	cursor, notifications, err = p.UnreadActivityCenterNotifications(
+	cursor, notifications, err = p.ActivityCenterNotifications(
 		cursor,
 		1,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
@@ -926,10 +930,12 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.Empty(t, cursor)
 
 	// Fetch READ notifications, first page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(
+	cursor, notifications, err = p.ActivityCenterNotifications(
 		initialOrFinalCursor,
 		1,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadRead,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
@@ -937,10 +943,12 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	require.NotEmpty(t, cursor)
 
 	// Fetch next page.
-	cursor, notifications, err = p.ReadActivityCenterNotifications(
+	cursor, notifications, err = p.ActivityCenterNotifications(
 		cursor,
 		1,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadRead,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
@@ -994,10 +1002,12 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	}
 
 	// Don't filter by type if the array of types is empty.
-	_, notifications, err := p.UnreadActivityCenterNotifications(
+	_, notifications, err := p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 3)
@@ -1005,29 +1015,35 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	require.Equal(t, nID2, notifications[1].ID)
 	require.Equal(t, nID1, notifications[2].ID)
 
-	_, notifications, err = p.UnreadActivityCenterNotifications(
+	_, notifications, err = p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.UnreadActivityCenterNotifications(
+	_, notifications, err = p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 	require.Equal(t, nID3, notifications[0].ID)
 	require.Equal(t, nID1, notifications[1].ID)
 
-	_, notifications, err = p.UnreadActivityCenterNotifications(
+	_, notifications, err = p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 3)
@@ -1041,19 +1057,23 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, notifications, err = p.ReadActivityCenterNotifications(
+	_, notifications, err = p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadRead,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
 
-	_, notifications, err = p.ReadActivityCenterNotifications(
+	_, notifications, err = p.ActivityCenterNotifications(
 		initialCursor,
 		limit,
 		[]ActivityCenterType{ActivityCenterNotificationTypeMention},
+		ActivityCenterQueryParamsReadRead,
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
@@ -1100,20 +1120,24 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
 	require.NoError(t, err)
 
-	cursor, notifications, err := p.UnreadActivityCenterNotifications(
+	cursor, notifications, err := p.ActivityCenterNotifications(
 		"",
 		2,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadUnread,
+		false,
 	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID1, notifications[0].ID)
 
-	cursor, notifications, err = p.ReadActivityCenterNotifications(
+	cursor, notifications, err = p.ActivityCenterNotifications(
 		"",
 		2,
 		[]ActivityCenterType{ActivityCenterNotificationTypeNewOneToOne},
+		ActivityCenterQueryParamsReadRead,
+		false,
 	)
 	require.NoError(t, err)
 	require.Empty(t, cursor)

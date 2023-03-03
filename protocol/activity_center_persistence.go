@@ -323,14 +323,6 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 }
 
-type ActivityCenterQueryParamsRead uint
-
-const (
-	ActivityCenterQueryParamsReadRead = iota + 1
-	ActivityCenterQueryParamsReadUnread
-	ActivityCenterQueryParamsReadAll
-)
-
 type activityCenterQueryParams struct {
 	cursor              string
 	limit               uint64
@@ -580,40 +572,6 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 	return notification, err
 }
 
-func (db sqlitePersistence) UnreadActivityCenterNotifications(cursor string, limit uint64, activityTypes []ActivityCenterType) (string, []*ActivityCenterNotification, error) {
-	params := activityCenterQueryParams{
-		activityCenterTypes: activityTypes,
-		cursor:              cursor,
-		limit:               limit,
-		read:                ActivityCenterQueryParamsReadUnread,
-	}
-
-	return db.activityCenterNotifications(params)
-}
-
-func (db sqlitePersistence) ReadActivityCenterNotifications(cursor string, limit uint64, activityTypes []ActivityCenterType) (string, []*ActivityCenterNotification, error) {
-	params := activityCenterQueryParams{
-		activityCenterTypes: activityTypes,
-		cursor:              cursor,
-		limit:               limit,
-		read:                ActivityCenterQueryParamsReadRead,
-	}
-
-	return db.activityCenterNotifications(params)
-}
-
-func (db sqlitePersistence) ActivityCenterNotificationsBy(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (string, []*ActivityCenterNotification, error) {
-	params := activityCenterQueryParams{
-		activityCenterTypes: activityTypes,
-		cursor:              cursor,
-		limit:               limit,
-		read:                readType,
-		accepted:            accepted,
-	}
-
-	return db.activityCenterNotifications(params)
-}
-
 func (db sqlitePersistence) activityCenterNotifications(params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
@@ -646,14 +604,6 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	}
 
 	return latestCursor, notifications, nil
-}
-
-func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
-	params := activityCenterQueryParams{
-		cursor: currCursor,
-		limit:  limit,
-	}
-	return db.activityCenterNotifications(params)
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotifications() error {
@@ -887,22 +837,21 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 	query := "UPDATE activity_center_notifications SET read = 0 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err := db.db.Exec(query, idsArgs...)
 	return err
-
 }
 
-func (db sqlitePersistence) UnreadActivityCenterNotificationsCount() (uint64, error) {
-	var count uint64
-	err := db.buildActivityCenterNotificationsCountQuery(true, ActivityCenterQueryParamsReadUnread, []ActivityCenterType{}).Scan(&count)
-	return count, err
+func (db sqlitePersistence) ActivityCenterNotifications(cursor string, limit uint64, activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (string, []*ActivityCenterNotification, error) {
+	params := activityCenterQueryParams{
+		activityCenterTypes: activityTypes,
+		cursor:              cursor,
+		limit:               limit,
+		read:                readType,
+		accepted:            accepted,
+	}
+
+	return db.activityCenterNotifications(params)
 }
 
-func (db sqlitePersistence) UnreadAndAcceptedActivityCenterNotificationsCount(activityTypes []ActivityCenterType) (uint64, error) {
-	var count uint64
-	err := db.buildActivityCenterNotificationsCountQuery(true, ActivityCenterQueryParamsReadUnread, activityTypes).Scan(&count)
-	return count, err
-}
-
-func (db sqlitePersistence) ActivityCenterNotificationsCountBy(activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
+func (db sqlitePersistence) ActivityCenterNotificationsCount(activityTypes []ActivityCenterType, readType ActivityCenterQueryParamsRead, accepted bool) (uint64, error) {
 	var count uint64
 	err := db.buildActivityCenterNotificationsCountQuery(accepted, readType, activityTypes).Scan(&count)
 	return count, err
