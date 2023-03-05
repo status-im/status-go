@@ -3,15 +3,15 @@ package pairing
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/status-im/status-go/api"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
 )
@@ -49,7 +49,7 @@ type AccountPayloadMounter struct {
 }
 
 // NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
-func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
+func NewAccountPayloadMounter(pe PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
 	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -63,7 +63,7 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 	return &AccountPayloadMounter{
 		logger:                   l,
 		accountPayload:           p,
-		encryptor:                pe,
+		encryptor:                &pe,
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
 		payloadLoader:            apl,
 	}, nil
@@ -218,11 +218,11 @@ type RawMessagePayloadMounter struct {
 	payloadRepository *RawMessageLoader
 }
 
-func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*RawMessagePayloadMounter, error) {
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*RawMessagePayloadMounter, error) {
 	l := logger.Named("RawMessagePayloadManager")
 	return &RawMessagePayloadMounter{
 		logger:            l,
-		encryptor:         pe,
+		encryptor:         &pe,
 		payloadRepository: NewRawMessageLoader(backend, config),
 	}, nil
 }
@@ -284,10 +284,10 @@ type InstallationPayloadMounter struct {
 	installationPayloadLoader *InstallationPayloadLoader
 }
 
-func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadMounter, error) {
+func NewInstallationPayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadMounter, error) {
 	return &InstallationPayloadMounter{
 		logger:                    logger.Named("InstallationPayloadManager"),
-		encryptor:                 pe,
+		encryptor:                 &pe,
 		installationPayloadLoader: NewInstallationPayloadLoader(backend, deviceType),
 	}, nil
 }

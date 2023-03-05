@@ -16,11 +16,11 @@ import (
 const (
 	// Handler routes for pairing
 	pairingBase                = "/pairing"
+	pairingChallenge           = pairingBase + "/challenge"
 	pairingSendAccount         = pairingBase + "/sendAccount"
 	pairingReceiveAccount      = pairingBase + "/receiveAccount"
-	pairingChallenge           = pairingBase + "/challenge"
-	pairingSyncDeviceSend      = pairingBase + "/sendSyncDevice"
-	pairingSyncDeviceReceive   = pairingBase + "/receiveSyncDevice"
+	pairingSendSyncDevice      = pairingBase + "/sendSyncDevice"
+	pairingReceiveSyncDevice   = pairingBase + "/receiveSyncDevice"
 	pairingSendInstallation    = pairingBase + "/sendInstallation"
 	pairingReceiveInstallation = pairingBase + "/receiveInstallation"
 

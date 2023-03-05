@@ -181,7 +181,7 @@ func (c *Client) sendSyncDeviceData() error {
 		return err
 	}
 
-	c.baseAddress.Path = pairingSyncDeviceReceive
+	c.baseAddress.Path = pairingReceiveSyncDevice
 	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.rawMessagePayloadManager.ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
@@ -234,7 +234,7 @@ func (c *Client) receiveInstallationData() error {
 }
 
 func (c *Client) receiveSyncDeviceData() error {
-	c.baseAddress.Path = pairingSyncDeviceSend
+	c.baseAddress.Path = pairingSendSyncDevice
 	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
 		return err
@@ -415,12 +415,8 @@ type SenderClient struct {
 	*http.Client
 	payloadEncryptor *PayloadEncryptor
 	mounters         map[string]PayloadMounter
+	baseAddress      *url.URL
 
-	baseAddress     *url.URL
-	certPEM         []byte
-	serverPK        *ecdsa.PublicKey
-	serverMode      Mode
-	serverCert      *x509.Certificate
 	serverChallenge []byte
 }
 
@@ -463,7 +459,7 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 		return nil, err
 	}
 
-	logger := logutils.ZapLogger().Named("ReceiverClient")
+	logger := logutils.ZapLogger().Named("SenderClient")
 
 	pe := NewPayloadEncryptor(c.aesKey, logger)
 	pm, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
@@ -483,14 +479,10 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 
 	return &SenderClient{
 		Client:           &http.Client{Transport: tr, Jar: cj},
-		payloadEncryptor: pe,
+		payloadEncryptor: &pe,
 		mounters:         mm,
 
 		baseAddress: u,
-		certPEM:     certPem,
-		serverCert:  serverCert,
-		serverPK:    c.publicKey,
-		serverMode:  c.serverMode,
 	}, nil
 }
 
@@ -525,7 +517,7 @@ func (c *SenderClient) sendSyncDeviceData() error {
 		return err
 	}
 
-	c.baseAddress.Path = pairingSyncDeviceReceive
+	c.baseAddress.Path = pairingReceiveSyncDevice
 	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[rawMessagePayloadMounter].ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})

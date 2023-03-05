@@ -116,9 +116,11 @@ func (s *Server) StartPairing() error {
 
 func (s *Server) startReceivingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingReceiveAccount:    handleReceiveAccount(s),
 		pairingChallenge:         handlePairingChallenge(s),
-		pairingSyncDeviceReceive: handleParingSyncDeviceReceive(s),
+		pairingReceiveAccount:    handleReceiveAccount(s),
+		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s),
+		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
+		//  the other handlers.
 		// send installation data back to sender
 		pairingSendInstallation: handleSendInstallation(s),
 	})
@@ -132,9 +134,11 @@ func (s *Server) startSendingData() error {
 	}
 
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingSendAccount:    challengeMiddleware(s, handleSendAccount(s)),
 		pairingChallenge:      handlePairingChallenge(s),
-		pairingSyncDeviceSend: challengeMiddleware(s, handlePairingSyncDeviceSend(s)),
+		pairingSendAccount:    challengeMiddleware(s, handleSendAccount(s)),
+		pairingSendSyncDevice: challengeMiddleware(s, handlePairingSyncDeviceSend(s)),
+		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
+		//  the other handlers.
 		// receive installation data from receiver
 		pairingReceiveInstallation: challengeMiddleware(s, handleReceiveInstallation(s)),
 	})

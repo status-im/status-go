@@ -116,8 +116,12 @@ type PayloadEncryptor struct {
 	payload *EncryptionPayload
 }
 
-func NewPayloadEncryptor(aesKey []byte, logger *zap.Logger) *PayloadEncryptor {
-	return &PayloadEncryptor{logger.Named("PayloadEncryptionManager"), aesKey, new(EncryptionPayload)}
+func NewPayloadEncryptor(aesKey []byte, logger *zap.Logger) PayloadEncryptor {
+	return PayloadEncryptor{
+		logger.Named("PayloadEncryptionManager"),
+		aesKey,
+		new(EncryptionPayload),
+	}
 }
 
 // EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value

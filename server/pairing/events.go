@@ -29,7 +29,7 @@ type Event struct {
 type Action int
 
 const (
-	ActionConnect = iota + 1
+	ActionConnect Action = iota + 1
 	ActionPairingAccount
 	ActionSyncDevice
 	ActionPairingInstallation
