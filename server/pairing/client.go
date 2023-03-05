@@ -413,10 +413,12 @@ const (
 
 type SenderClient struct {
 	*http.Client
-	payloadEncryptor *PayloadEncryptor
-	mounters         map[string]PayloadMounter
-	baseAddress      *url.URL
+	payloadEncryptor    *PayloadEncryptor
+	accountMounter      *AccountPayloadMounter
+	rawMessageMounter   *RawMessagePayloadMounter
+	installationMounter *InstallationPayloadMounter
 
+	baseAddress     *url.URL
 	serverChallenge []byte
 }
 
@@ -471,29 +473,29 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 		return nil, err
 	}
 	im, err := NewInstallationPayloadMounter(logger, pe, backend, config.Sender.DeviceType)
-
-	mm := make(map[string]PayloadMounter)
-	mm[accountPayloadMounter] = pm
-	mm[rawMessagePayloadMounter] = rmm
-	mm[installationPayloadMounter] = im
+	if err != nil {
+		return nil, err
+	}
 
 	return &SenderClient{
-		Client:           &http.Client{Transport: tr, Jar: cj},
-		payloadEncryptor: &pe,
-		mounters:         mm,
+		Client:              &http.Client{Transport: tr, Jar: cj},
+		payloadEncryptor:    &pe,
+		accountMounter:      pm,
+		rawMessageMounter:   rmm,
+		installationMounter: im,
 
 		baseAddress: u,
 	}, nil
 }
 
 func (c *SenderClient) sendAccountData() error {
-	err := c.mounters[accountPayloadMounter].Mount()
+	err := c.accountMounter.Mount()
 	if err != nil {
 		return err
 	}
 
 	c.baseAddress.Path = pairingReceiveAccount
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[accountPayloadMounter].ToSend()))
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.accountMounter.ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
 		return err
@@ -507,18 +509,18 @@ func (c *SenderClient) sendAccountData() error {
 
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
 
-	c.mounters[accountPayloadMounter].LockPayload()
+	c.accountMounter.LockPayload()
 	return nil
 }
 
 func (c *SenderClient) sendSyncDeviceData() error {
-	err := c.mounters[rawMessagePayloadMounter].Mount()
+	err := c.rawMessageMounter.Mount()
 	if err != nil {
 		return err
 	}
 
 	c.baseAddress.Path = pairingReceiveSyncDevice
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[rawMessagePayloadMounter].ToSend()))
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.rawMessageMounter.ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
 		return err
@@ -534,29 +536,39 @@ func (c *SenderClient) sendSyncDeviceData() error {
 	return nil
 }
 
-func (c *SenderClient) sendInstallationData() error {
-	err := c.mounters[installationPayloadMounter].Mount()
+func (c *SenderClient) receiveInstallationData() error {
+	c.baseAddress.Path = pairingSendInstallation
+	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	c.baseAddress.Path = pairingReceiveInstallation
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.mounters[installationPayloadMounter].ToSend()))
-	if err != nil {
-		return err
-	}
+	resp, err := c.Do(req)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[client] status not okay when sending installation data, status: %s", resp.Status)
+		err = fmt.Errorf("[client] status not ok when receiving installation data, received '%s'", resp.Status)
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
 	}
 
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+
+	// TODO resolve this with a MounterReceiver
+	err = c.rawMessageMounter.Receive(payload)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionPairingInstallation})
 	return nil
 }
 
@@ -591,5 +603,5 @@ func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	if err != nil {
 		return err
 	}
-	return c.sendInstallationData()
+	return c.receiveInstallationData()
 }

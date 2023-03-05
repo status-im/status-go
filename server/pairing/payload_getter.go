@@ -214,25 +214,25 @@ func (apr *AccountPayloadLoader) validateKeys(password string) error {
 type RawMessagePayloadMounter struct {
 	logger *zap.Logger
 
-	encryptor         *PayloadEncryptor
-	payloadRepository *RawMessageLoader
+	encryptor *PayloadEncryptor
+	loader    *RawMessageLoader
 }
 
 func NewRawMessagePayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*RawMessagePayloadMounter, error) {
 	l := logger.Named("RawMessagePayloadManager")
 	return &RawMessagePayloadMounter{
-		logger:            l,
-		encryptor:         &pe,
-		payloadRepository: NewRawMessageLoader(backend, config),
+		logger:    l,
+		encryptor: &pe,
+		loader:    NewRawMessageLoader(backend, config),
 	}, nil
 }
 
 func (r *RawMessagePayloadMounter) Mount() error {
-	err := r.payloadRepository.LoadFromSource()
+	err := r.loader.LoadFromSource()
 	if err != nil {
 		return err
 	}
-	return r.encryptor.encrypt(r.payloadRepository.payload)
+	return r.encryptor.encrypt(r.loader.payload)
 }
 
 func (r *RawMessagePayloadMounter) ToSend() []byte {
@@ -244,7 +244,7 @@ func (r *RawMessagePayloadMounter) LockPayload() {
 }
 
 func (r *RawMessagePayloadMounter) ResetPayload() {
-	r.payloadRepository.payload = make([]byte, 0)
+	r.loader.payload = make([]byte, 0)
 	r.encryptor.resetPayload()
 }
 
@@ -279,25 +279,25 @@ func (r *RawMessageLoader) LoadFromSource() (err error) {
 */
 
 type InstallationPayloadMounter struct {
-	logger                    *zap.Logger
-	encryptor                 *PayloadEncryptor
-	installationPayloadLoader *InstallationPayloadLoader
+	logger    *zap.Logger
+	encryptor *PayloadEncryptor
+	loader    *InstallationPayloadLoader
 }
 
 func NewInstallationPayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadMounter, error) {
 	return &InstallationPayloadMounter{
-		logger:                    logger.Named("InstallationPayloadManager"),
-		encryptor:                 &pe,
-		installationPayloadLoader: NewInstallationPayloadLoader(backend, deviceType),
+		logger:    logger.Named("InstallationPayloadManager"),
+		encryptor: &pe,
+		loader:    NewInstallationPayloadLoader(backend, deviceType),
 	}, nil
 }
 
 func (i *InstallationPayloadMounter) Mount() error {
-	err := i.installationPayloadLoader.LoadFromSource()
+	err := i.loader.LoadFromSource()
 	if err != nil {
 		return err
 	}
-	return i.encryptor.encrypt(i.installationPayloadLoader.payload)
+	return i.encryptor.encrypt(i.loader.payload)
 }
 
 func (i *InstallationPayloadMounter) ToSend() []byte {
@@ -309,7 +309,7 @@ func (i *InstallationPayloadMounter) LockPayload() {
 }
 
 func (i *InstallationPayloadMounter) ResetPayload() {
-	i.installationPayloadLoader.payload = make([]byte, 0)
+	i.loader.payload = make([]byte, 0)
 	i.encryptor.resetPayload()
 }
 
