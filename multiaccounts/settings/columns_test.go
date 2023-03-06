@@ -52,7 +52,8 @@ func TestJSONEncoding(t *testing.T) {
 	encoded, err := json.Marshal(settings)
 	require.NoError(t, err)
 
-	require.True(t, strings.Contains(string(encoded), "\"compressed-key\":\"zQ3shudJrBctPznsRLvbsCtvZFTdi3b34uzYDuqE9Wq9m9T1C\""))
+	require.True(t, strings.Contains(string(encoded), "\"compressedKey\":\"zQ3shudJrBctPznsRLvbsCtvZFTdi3b34uzYDuqE9Wq9m9T1C\""))
+	require.True(t, strings.Contains(string(encoded), "\"emojiHash\""))
 }
 
 // TestGetFieldFromProtobufType checks if all the protobuf.SyncSetting_Type_value are assigned to a SettingField

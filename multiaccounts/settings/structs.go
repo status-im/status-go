@@ -3,7 +3,7 @@ package settings
 import (
 	"encoding/json"
 
-	"github.com/status-im/status-go/api/multiformat"
+	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -190,19 +190,13 @@ type Settings struct {
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
+	// We need this typedef in order to overcome stack overflow
+	// when marshaling JSON
 	type Alias Settings
-	item := struct {
-		Alias
-		CompressedKey string `json:"compressed-key"`
-	}{
-		Alias: (Alias)(s),
-	}
 
-	compressedKey, err := multiformat.SerializeLegacyKey(item.PublicKey)
+	ext, err := accountJson.ExtendStructWithPubKeyData(s.PublicKey, Alias(s))
 	if err != nil {
 		return nil, err
 	}
-	item.CompressedKey = compressedKey
-
-	return json.Marshal(item)
+	return json.Marshal(ext)
 }

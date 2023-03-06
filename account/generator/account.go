@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/api/multiformat"
+	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
@@ -69,20 +69,11 @@ type AccountInfo struct {
 
 func (a AccountInfo) MarshalJSON() ([]byte, error) {
 	type Alias AccountInfo
-	item := struct {
-		Alias
-		CompressedKey string `json:"compressedKey"`
-	}{
-		Alias: (Alias)(a),
-	}
-
-	compressedKey, err := multiformat.SerializeLegacyKey(item.PublicKey)
+	ext, err := accountJson.ExtendStructWithPubKeyData(a.PublicKey, Alias(a))
 	if err != nil {
 		return nil, err
 	}
-	item.CompressedKey = compressedKey
-
-	return json.Marshal(item)
+	return json.Marshal(ext)
 }
 
 // IdentifiedAccountInfo contains AccountInfo and the ID of an account.

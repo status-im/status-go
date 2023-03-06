@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
-	"github.com/status-im/status-go/api/multiformat"
+	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/audio"
@@ -222,11 +222,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Pack int32  `json:"pack"`
 		URL  string `json:"url"`
 	}
-	item := struct {
+
+	type MessageStructType struct {
 		ID                       string                           `json:"id"`
 		WhisperTimestamp         uint64                           `json:"whisperTimestamp"`
 		From                     string                           `json:"from"`
-		CompressedKey            string                           `json:"compressedKey"`
 		Alias                    string                           `json:"alias"`
 		Identicon                string                           `json:"identicon"`
 		Seen                     bool                             `json:"seen"`
@@ -268,7 +268,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactRequestState      ContactRequestState              `json:"contactRequestState,omitempty"`
 		ContactVerificationState ContactVerificationState         `json:"contactVerificationState,omitempty"`
 		DiscordMessage           *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
-	}{
+	}
+	item := MessageStructType{
 		ID:                       m.ID,
 		WhisperTimestamp:         m.WhisperTimestamp,
 		From:                     m.From,
@@ -308,13 +309,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactRequestState:      m.ContactRequestState,
 		ContactVerificationState: m.ContactVerificationState,
 	}
-	if item.From != "" {
-		compressedKey, err := multiformat.SerializeLegacyKey(item.From)
-		if err != nil {
-			return nil, err
-		}
-		item.CompressedKey = compressedKey
-	}
 
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
@@ -336,6 +330,14 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
 		item.DiscordMessage = discordMessage
+	}
+	if item.From != "" {
+		ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
+		if err != nil {
+			return nil, err
+		}
+
+		return json.Marshal(ext)
 	}
 
 	return json.Marshal(item)

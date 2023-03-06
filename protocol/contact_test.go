@@ -570,6 +570,7 @@ func TestMarshalContactJSON(t *testing.T) {
 	require.True(t, strings.Contains(string(encodedContact), "active\":true"))
 	require.True(t, strings.Contains(string(encodedContact), "primaryName\":\"primary-name"))
 	require.True(t, strings.Contains(string(encodedContact), "secondaryName\":\"secondary-name"))
+	require.True(t, strings.Contains(string(encodedContact), "emojiHash"))
 }
 
 func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirSide(t *testing.T) {

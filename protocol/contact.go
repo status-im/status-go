@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 
-	"github.com/status-im/status-go/api/multiformat"
+	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -401,26 +401,20 @@ func (c *Contact) ProcessSyncContactRequestState(remoteState ContactRequestState
 
 func (c *Contact) MarshalJSON() ([]byte, error) {
 	type Alias Contact
-	item := struct {
+	type ContactType struct {
 		*Alias
-		CompressedKey       string              `json:"compressedKey"`
 		Added               bool                `json:"added"`
 		ContactRequestState ContactRequestState `json:"contactRequestState"`
 		HasAddedUs          bool                `json:"hasAddedUs"`
 		Mutual              bool                `json:"mutual"`
+		Active              bool                `json:"active"`
+		PrimaryName         string              `json:"primaryName"`
+		SecondaryName       string              `json:"secondaryName,omitempty"`
+	}
 
-		Active        bool   `json:"active"`
-		PrimaryName   string `json:"primaryName"`
-		SecondaryName string `json:"secondaryName,omitempty"`
-	}{
+	item := ContactType{
 		Alias: (*Alias)(c),
 	}
-
-	compressedKey, err := multiformat.SerializeLegacyKey(item.ID)
-	if err != nil {
-		return nil, err
-	}
-	item.CompressedKey = compressedKey
 
 	item.Added = c.added()
 	item.HasAddedUs = c.hasAddedUs()
@@ -428,7 +422,6 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 	item.Active = c.active()
 	item.PrimaryName = c.PrimaryName()
 	item.SecondaryName = c.SecondaryName()
-	item.Active = c.active()
 
 	if c.mutual() {
 		item.ContactRequestState = ContactRequestStateMutual
@@ -437,8 +430,12 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 	} else if c.hasAddedUs() {
 		item.ContactRequestState = ContactRequestStateReceived
 	}
+	ext, err := accountJson.ExtendStructWithPubKeyData(item.ID, item)
+	if err != nil {
+		return nil, err
+	}
 
-	return json.Marshal(item)
+	return json.Marshal(ext)
 }
 
 // ContactRequestPropagatedStateReceived handles the propagation of state from
