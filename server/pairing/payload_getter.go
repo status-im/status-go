@@ -10,7 +10,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
@@ -128,18 +127,18 @@ func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountP
 	return ppr, nil
 }
 
-func (apr *AccountPayloadLoader) LoadFromSource() error {
-	err := apr.loadKeys(apr.keystorePath)
+func (apl *AccountPayloadLoader) LoadFromSource() error {
+	err := apl.loadKeys(apl.keystorePath)
 	if err != nil {
 		return err
 	}
 
-	err = apr.validateKeys(apr.password)
+	err = validateKeys(apl.keys, apl.password)
 	if err != nil {
 		return err
 	}
 
-	apr.multiaccount, err = apr.multiaccountsDB.GetAccount(apr.keyUID)
+	apl.multiaccount, err = apl.multiaccountsDB.GetAccount(apl.keyUID)
 	if err != nil {
 		return err
 	}
@@ -147,8 +146,8 @@ func (apr *AccountPayloadLoader) LoadFromSource() error {
 	return nil
 }
 
-func (apr *AccountPayloadLoader) loadKeys(keyStorePath string) error {
-	apr.keys = make(map[string][]byte)
+func (apl *AccountPayloadLoader) loadKeys(keyStorePath string) error {
+	apl.keys = make(map[string][]byte)
 
 	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
@@ -173,7 +172,7 @@ func (apr *AccountPayloadLoader) loadKeys(keyStorePath string) error {
 			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
 		}
 
-		apr.keys[fileInfo.Name()] = rawKeyFile
+		apl.keys[fileInfo.Name()] = rawKeyFile
 
 		return nil
 	}
@@ -181,22 +180,6 @@ func (apr *AccountPayloadLoader) loadKeys(keyStorePath string) error {
 	err := filepath.Walk(keyStorePath, fileWalker)
 	if err != nil {
 		return fmt.Errorf("cannot traverse key store folder: %v", err)
-	}
-
-	return nil
-}
-
-func (apr *AccountPayloadLoader) validateKeys(password string) error {
-	for _, key := range apr.keys {
-		k, err := keystore.DecryptKey(key, password)
-		if err != nil {
-			return err
-		}
-
-		err = generator.ValidateKeystoreExtendedKey(k)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -218,13 +201,13 @@ type RawMessagePayloadMounter struct {
 	loader    *RawMessageLoader
 }
 
-func NewRawMessagePayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*RawMessagePayloadMounter, error) {
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
 	l := logger.Named("RawMessagePayloadManager")
 	return &RawMessagePayloadMounter{
 		logger:    l,
 		encryptor: &pe,
 		loader:    NewRawMessageLoader(backend, config),
-	}, nil
+	}
 }
 
 func (r *RawMessagePayloadMounter) Mount() error {
@@ -284,12 +267,12 @@ type InstallationPayloadMounter struct {
 	loader    *InstallationPayloadLoader
 }
 
-func NewInstallationPayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) (*InstallationPayloadMounter, error) {
+func NewInstallationPayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
 	return &InstallationPayloadMounter{
 		logger:    logger.Named("InstallationPayloadManager"),
 		encryptor: &pe,
 		loader:    NewInstallationPayloadLoader(backend, deviceType),
-	}, nil
+	}
 }
 
 func (i *InstallationPayloadMounter) Mount() error {

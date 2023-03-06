@@ -1054,7 +1054,7 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
-	err := pairing.StartUpPairingClient(statusBackend, cs, configJSON)
+	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
 }
 

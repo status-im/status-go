@@ -592,3 +592,16 @@ func (r *InstallationPayloadRepository) StoreToSource() error {
 	}
 	return messenger.HandleSyncRawMessages(rawMessages)
 }
+
+type InstallationPayloadMounterReceiver struct {
+	*InstallationPayloadMounter
+	*InstallationPayloadReceiver
+}
+
+func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
+	l := logger.Named("InstallationPayloadMounterReceiver")
+	return &InstallationPayloadMounterReceiver{
+		NewInstallationPayloadMounter(l, encryptor, backend, deviceType),
+		NewInstallationPayloadReceiver(l, encryptor, backend, deviceType),
+	}
+}

@@ -10,7 +10,7 @@ type PayloadManagerer interface {
 
 type PayloadRepository interface {
 	PayloadLoader
-	StoreToSource() error
+	PayloadStorer
 }
 
 type PayloadLocker interface {
