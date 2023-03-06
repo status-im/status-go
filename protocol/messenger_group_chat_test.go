@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -352,6 +353,92 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(member.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
+	admin := s.startNewMessenger()
+	member := s.startNewMessenger()
+	s.makeMutualContacts(admin, member)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	s.verifyGroupChatCreated(member, true)
+
+	ctx := context.Background()
+	inputMessage := buildTestMessage(*groupChat)
+	_, err := member.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(
+		admin,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"messages not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+
+	message := response.Messages()[0]
+	deleteMessageResponse, err := admin.DeleteMessageAndSend(ctx, message.ID)
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(member, func(response *MessengerResponse) bool {
+		return len(response.RemovedMessages()) > 0
+	}, "removed messages not received")
+	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(admin.IdentityPublicKey()))
+	s.Require().NoError(err)
+	message, err = member.MessageByID(message.ID)
+	s.Require().NoError(err)
+	s.Require().True(message.Deleted)
+
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(member.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
+	admin := s.startNewMessenger()
+	member := s.startNewMessenger()
+	s.makeMutualContacts(admin, member)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	s.verifyGroupChatCreated(member, true)
+
+	ctx := context.Background()
+	inputMessage := buildTestMessage(*groupChat)
+	_, err := member.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(
+		admin,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"messages not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
+
+	deleteMessage := DeleteMessage{
+		DeleteMessage: protobuf.DeleteMessage{
+			Clock:       2,
+			MessageType: protobuf.MessageType_PRIVATE_GROUP,
+			MessageId:   inputMessage.ID,
+			ChatId:      groupChat.ID,
+		},
+		From: common.PubkeyToHex(&admin.identity.PublicKey),
+	}
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	err = member.HandleDeleteMessage(state, deleteMessage)
+	s.Require().NoError(err)
+
+	removedMessages := state.Response.RemovedMessages()
+	s.Require().Len(removedMessages, 1)
+	s.Require().Equal(removedMessages[0].MessageID, inputMessage.ID)
 
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(member.Shutdown())
