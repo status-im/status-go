@@ -603,14 +603,6 @@ func (db *Database) GetMasterAddress() (rst types.Address, err error) {
 	return
 }
 
-func (db *Database) TestNetworksEnabled() (rst bool, err error) {
-	err = db.makeSelectRow(TestNetworksEnabled).Scan(&rst)
-	if err == sql.ErrNoRows {
-		return rst, nil
-	}
-	return
-}
-
 func (db *Database) GetTestNetworksEnabled() (result bool, err error) {
 	err = db.makeSelectRow(TestNetworksEnabled).Scan(&result)
 	if err == sql.ErrNoRows {

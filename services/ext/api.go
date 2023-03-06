@@ -930,19 +930,11 @@ func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID st
 
 // Saved Addresses APIs
 func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
-	if sa.ChainID == 0 {
-		sa.ChainID = api.service.rpcClient.UpstreamChainID
-	}
-
 	return api.service.messenger.UpsertSavedAddress(ctx, sa)
 }
 
-func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, chainID uint64, address ethcommon.Address) error {
-	if chainID == 0 {
-		chainID = api.service.rpcClient.UpstreamChainID
-	}
-
-	return api.service.messenger.DeleteSavedAddress(ctx, chainID, address)
+func (api *PublicAPI) DeleteSavedAddress(ctx context.Context, address ethcommon.Address, ens string, isTest bool) error {
+	return api.service.messenger.DeleteSavedAddress(ctx, address, ens, isTest)
 }
 
 // PushNotifications server endpoints
