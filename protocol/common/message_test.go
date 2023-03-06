@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -140,5 +141,8 @@ func TestMarshalMessageJSON(t *testing.T) {
 	encodedMessage, err := json.Marshal(message)
 
 	require.NoError(t, err)
+
+	log.Println("### encodedMessage", string(encodedMessage))
 	require.True(t, strings.Contains(string(encodedMessage), "compressedKey\":\"zQ"))
+	require.True(t, strings.Contains(string(encodedMessage), "emojiHash"))
 }
