@@ -303,17 +303,36 @@ func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64
 	return client.FetchAllCollectionsByOwner(owner)
 }
 
+// Kept for compatibility with mobile app
 func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
+	container, err := api.GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx, chainID, owner, collectionSlug, "", limit)
+	if err != nil {
+		return nil, err
+	}
+	return container.Assets, nil
+}
+
+func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to get opensea assets")
 	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.FetchAllAssetsByOwnerAndCollection(owner, collectionSlug, limit)
+	return client.FetchAllAssetsByOwnerAndCollection(owner, collectionSlug, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []opensea.NFTUniqueID, limit int) ([]opensea.Asset, error) {
+func (api *API) GetOpenseaAssetsByOwnerWithCursor(ctx context.Context, chainID uint64, owner common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
+	log.Debug("call to FetchAllAssetsByOwner")
+	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.FetchAllAssetsByOwner(owner, cursor, limit)
+}
+
+func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []opensea.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
 
 	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)

@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const AssetLimit = 50
+const AssetLimit = 200
 const CollectionLimit = 300
 
 const RequestRetryMaxCount = 1
@@ -197,16 +197,32 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 	return collections, nil
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, limit int) ([]Asset, error) {
+func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, cursor string, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{
 		"owner":      {owner.String()},
 		"collection": {collectionSlug},
 	}
 
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
 	return o.fetchAssets(queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []NFTUniqueID, limit int) ([]Asset, error) {
+func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limit int) (*AssetContainer, error) {
+	queryParams := url.Values{
+		"owner": {owner.String()},
+	}
+
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
+	return o.fetchAssets(queryParams, limit)
+}
+
+func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []NFTUniqueID, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{}
 
 	for _, uniqueID := range uniqueIDs {
@@ -217,10 +233,19 @@ func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []NFTUniqueID, limit int) ([
 	return o.fetchAssets(queryParams, limit)
 }
 
-func (o *Client) fetchAssets(queryParams url.Values, limit int) ([]Asset, error) {
-	var assets []Asset
+func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer, error) {
+	assets := new(AssetContainer)
 
-	queryParams["limit"] = []string{strconv.Itoa(AssetLimit)}
+	if len(queryParams["cursor"]) > 0 {
+		assets.PreviousCursor = queryParams["cursor"][0]
+	}
+
+	tmpLimit := limit
+	if AssetLimit < limit {
+		tmpLimit = AssetLimit
+	}
+
+	queryParams["limit"] = []string{strconv.Itoa(tmpLimit)}
 	for {
 		url := o.url + "/assets?" + queryParams.Encode()
 
@@ -242,22 +267,17 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) ([]Asset, error)
 				asset.Traits[i].TraitType = strings.Replace(asset.Traits[i].TraitType, "_", " ", 1)
 				asset.Traits[i].Value = TraitValue(strings.Title(string(asset.Traits[i].Value)))
 			}
-			assets = append(assets, asset)
+			assets.Assets = append(assets.Assets, asset)
 		}
+		assets.NextCursor = container.NextCursor
 
-		if len(container.Assets) < AssetLimit {
+		if len(assets.NextCursor) == 0 {
 			break
 		}
 
-		nextCursor := container.NextCursor
+		queryParams["cursor"] = []string{assets.NextCursor}
 
-		if len(nextCursor) == 0 {
-			break
-		}
-
-		queryParams["cursor"] = []string{nextCursor}
-
-		if len(assets) >= limit {
+		if len(assets.Assets) >= limit {
 			break
 		}
 	}
