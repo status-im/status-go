@@ -43,17 +43,21 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 }
 
 func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
-	expected := []Asset{{
-		ID:                1,
-		Name:              "Rocky",
-		Description:       "Rocky Balboa",
-		Permalink:         "permalink",
-		ImageThumbnailURL: "ImageThumbnailURL",
-		ImageURL:          "ImageUrl",
-		Contract:          Contract{Address: "1"},
-		Collection:        Collection{Name: "Rocky"},
-	}}
-	response, _ := json.Marshal(AssetContainer{Assets: expected})
+	expected := AssetContainer{
+		Assets: []Asset{{
+			ID:                1,
+			Name:              "Rocky",
+			Description:       "Rocky Balboa",
+			Permalink:         "permalink",
+			ImageThumbnailURL: "ImageThumbnailURL",
+			ImageURL:          "ImageUrl",
+			Contract:          Contract{Address: "1"},
+			Collection:        Collection{Name: "Rocky"},
+		}},
+		NextCursor:     "",
+		PreviousCursor: "",
+	}
+	response, _ := json.Marshal(expected)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, err := w.Write(response)
@@ -67,7 +71,7 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 		client: srv.Client(),
 		url:    srv.URL,
 	}
-	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", 200)
-	assert.Equal(t, expected, res)
+	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", "", 200)
 	assert.Nil(t, err)
+	assert.Equal(t, expected, *res)
 }
