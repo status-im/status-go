@@ -111,32 +111,24 @@ func (pem *PayloadEncryptionManager) LockPayload() {
 
 // PayloadEncryptor is responsible for encrypting and decrypting payload data
 type PayloadEncryptor struct {
-	logger  *zap.Logger
 	aesKey  []byte
 	payload *EncryptionPayload
 }
 
-func NewPayloadEncryptor(aesKey []byte, logger *zap.Logger) PayloadEncryptor {
-	return PayloadEncryptor{
-		logger.Named("PayloadEncryptionManager"),
+func NewPayloadEncryptor(aesKey []byte) *PayloadEncryptor {
+	return &PayloadEncryptor{
 		aesKey,
 		new(EncryptionPayload),
 	}
 }
 
-// EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
+// encryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
 // This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
-func (pem *PayloadEncryptor) EncryptPlain(plaintext []byte) ([]byte, error) {
-	l := pem.logger.Named("EncryptPlain()")
-	l.Debug("fired")
-
+func (pem *PayloadEncryptor) encryptPlain(plaintext []byte) ([]byte, error) {
 	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
 }
 
 func (pem *PayloadEncryptor) encrypt(data []byte) error {
-	l := pem.logger.Named("encrypt()")
-	l.Debug("fired")
-
 	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
 	if err != nil {
 		return err
@@ -144,29 +136,11 @@ func (pem *PayloadEncryptor) encrypt(data []byte) error {
 
 	pem.payload.plain = data
 	pem.payload.encrypted = ep
-
-	l.Debug(
-		"after common.Encrypt",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("ep", ep),
-	)
-
 	return nil
 }
 
 func (pem *PayloadEncryptor) decrypt(data []byte) error {
-	l := pem.logger.Named("decrypt()")
-	l.Debug("fired")
-
 	pd, err := common.Decrypt(data, pem.aesKey)
-	l.Debug(
-		"after common.Decrypt(data, pem.aesKey)",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("pd", pd),
-		zap.Error(err),
-	)
 	if err != nil {
 		return err
 	}
@@ -195,8 +169,5 @@ func (pem *PayloadEncryptor) resetPayload() {
 }
 
 func (pem *PayloadEncryptor) lockPayload() {
-	l := pem.logger.Named("lockPayload")
-	l.Debug("fired")
-
 	pem.payload.lock()
 }

@@ -404,16 +404,20 @@ func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (
 // VVV All new stuff below this line VVV
 //
 
-// TODO we may or may not need these longer term.
-const (
-	accountPayloadMounter      = "accountPayloadMounter"
-	rawMessagePayloadMounter   = "rawMessagePayloadMounter"
-	installationPayloadMounter = "installationPayloadMounter"
-)
+/*
+|--------------------------------------------------------------------------
+| BaseClient
+|--------------------------------------------------------------------------
+|
+|
+|
+*/
 
 type BaseClient struct {
 	*http.Client
-	baseAddress *url.URL
+	encryptor       *PayloadEncryptor
+	baseAddress     *url.URL
+	serverChallenge []byte
 }
 
 func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
@@ -457,8 +461,36 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 
 	return &BaseClient{
 		Client:      &http.Client{Transport: tr, Jar: cj},
+		encryptor:   NewPayloadEncryptor(c.aesKey),
 		baseAddress: u,
 	}, nil
+}
+
+func (c *BaseClient) getChallenge() error {
+	c.baseAddress.Path = pairingChallenge
+	resp, err := c.Get(c.baseAddress.String())
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("[client] status not ok when getting challenge, received '%s'", resp.Status)
+	}
+
+	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
+	return err
+}
+
+func (c *BaseClient) doChallenge(req *http.Request) error {
+	if c.serverChallenge != nil {
+		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	}
+	return nil
 }
 
 /*
@@ -475,24 +507,23 @@ type SenderClient struct {
 	accountMounter      *AccountPayloadMounter
 	rawMessageMounter   *RawMessagePayloadMounter
 	installationMounter *InstallationPayloadMounterReceiver
-
-	serverChallenge []byte
 }
 
 func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
+	logger := logutils.ZapLogger().Named("SenderClient")
+	pe := NewPayloadEncryptor(c.aesKey)
+
 	bc, err := NewBaseClient(c)
 	if err != nil {
 		return nil, err
 	}
 
-	logger := logutils.ZapLogger().Named("SenderClient")
-	pe := NewPayloadEncryptor(c.aesKey, logger)
-	pm, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
+	pm, err := NewAccountPayloadMounter(*pe, &config.Sender, logger)
 	if err != nil {
 		return nil, err
 	}
-	rmm := NewRawMessagePayloadMounter(logger, pe, backend, &config.Sender)
-	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Sender.DeviceType)
+	rmm := NewRawMessagePayloadMounter(logger, *pe, backend, &config.Sender)
+	imr := NewInstallationPayloadMounterReceiver(logger, *pe, backend, config.Sender.DeviceType)
 
 	return &SenderClient{
 		BaseClient:          bc,
@@ -634,9 +665,6 @@ type ReceiverClient struct {
 	accountReceiver      *AccountPayloadReceiver
 	rawMessageReceiver   *RawMessagePayloadReceiver
 	installationReceiver *InstallationPayloadMounterReceiver
-
-	encryptor       *PayloadEncryptor
-	serverChallenge []byte
 }
 
 func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
@@ -646,21 +674,20 @@ func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, conf
 	}
 
 	logger := logutils.ZapLogger().Named("ReceiverClient")
-	pe := NewPayloadEncryptor(c.aesKey, logger)
+	pe := NewPayloadEncryptor(c.aesKey)
 
-	pr, err := NewAccountPayloadReceiver(pe, &config.Receiver, logger)
+	pr, err := NewAccountPayloadReceiver(*pe, &config.Receiver, logger)
 	if err != nil {
 		return nil, err
 	}
-	rmr := NewRawMessagePayloadReceiver(logger, pr.accountPayload, pe, backend, &config.Receiver)
-	ipmr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Receiver.DeviceType)
+	rmr := NewRawMessagePayloadReceiver(logger, pr.accountPayload, *pe, backend, &config.Receiver)
+	ipmr := NewInstallationPayloadMounterReceiver(logger, *pe, backend, config.Receiver.DeviceType)
 
 	return &ReceiverClient{
 		BaseClient:           bc,
 		accountReceiver:      pr,
 		rawMessageReceiver:   rmr,
 		installationReceiver: ipmr,
-		encryptor:            &pe,
 	}, nil
 }
 
@@ -672,7 +699,7 @@ func (c *ReceiverClient) receiveAccountData() error {
 	}
 
 	if c.serverChallenge != nil {
-		ec, err := c.encryptor.EncryptPlain(c.serverChallenge)
+		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
 		if err != nil {
 			return err
 		}
@@ -716,7 +743,7 @@ func (c *ReceiverClient) receiveSyncDeviceData() error {
 	}
 
 	if c.serverChallenge != nil {
-		ec, err := c.encryptor.EncryptPlain(c.serverChallenge)
+		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
 		if err != nil {
 			return err
 		}
@@ -765,7 +792,7 @@ func (c *ReceiverClient) sendInstallationData() error {
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	if c.serverChallenge != nil {
-		ec, err := c.encryptor.EncryptPlain(c.serverChallenge)
+		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
 		if err != nil {
 			return err
 		}
@@ -808,6 +835,10 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs string, configJSON 
 
 func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
 	c, err := setupReceivingClient(backend, cs, configJSON)
+	if err != nil {
+		return err
+	}
+	err = c.getChallenge()
 	if err != nil {
 		return err
 	}
