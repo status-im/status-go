@@ -2748,4 +2748,5 @@ func (s *MessengerCommunitiesSuite) TestCommunityTokensMetadata() {
 	s.Require().Equal(tokensMetadata[0].Image, newToken.Image)
 	s.Require().Equal(tokensMetadata[0].TokenType, newToken.TokenType)
 	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
+	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
 }
