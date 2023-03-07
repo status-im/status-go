@@ -205,7 +205,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 	}
 
 	transfersCount := int64(len(rst))
-	chainClient, err := c.rpcClient.EthClient(c.rpcClient.UpstreamChainID)
+	chainClient, err := c.rpcClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
