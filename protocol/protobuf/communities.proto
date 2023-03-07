@@ -29,6 +29,7 @@ message CommunityTokenMetadata {
   string image = 3;
   CommunityTokenType tokenType = 4;
   string symbol = 5;
+  string name = 6;
 }
 
 message CommunityPermissions {

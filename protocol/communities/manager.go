@@ -2716,6 +2716,7 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) error {
 		Image:             token.Base64Image,
 		Symbol:            token.Symbol,
 		TokenType:         token.TokenType,
+		Name:              token.Name,
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {
