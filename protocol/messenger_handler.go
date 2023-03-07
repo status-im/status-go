@@ -1531,16 +1531,22 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 
 	var canDeleteMessageForEveryone = false
 	if originalMessage.From != deleteMessage.From {
+		fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
+		if err != nil {
+			return err
+		}
 		if chat.ChatType == ChatTypeCommunityChat {
-			fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
-			if err != nil {
-				return err
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryoneInCommunity(chat.CommunityID, fromPublicKey)
+			if !canDeleteMessageForEveryone {
+				return ErrInvalidDeletePermission
 			}
-			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(chat.CommunityID, fromPublicKey)
+		} else if chat.ChatType == ChatTypePrivateGroupChat {
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryoneInPrivateGroupChat(chat, fromPublicKey)
 			if !canDeleteMessageForEveryone {
 				return ErrInvalidDeletePermission
 			}
 		}
+
 		// Check edit is valid
 		if !canDeleteMessageForEveryone {
 			return errors.New("invalid delete, not the right author")

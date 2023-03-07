@@ -90,7 +90,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	return response, nil
 }
 
-func (m *Messenger) CanDeleteMessageForEveryone(communityID string, publicKey *ecdsa.PublicKey) bool {
+func (m *Messenger) CanDeleteMessageForEveryoneInCommunity(communityID string, publicKey *ecdsa.PublicKey) bool {
 	if communityID != "" {
 		community, err := m.communitiesManager.GetByIDString(communityID)
 		if err != nil {
@@ -100,6 +100,16 @@ func (m *Messenger) CanDeleteMessageForEveryone(communityID string, publicKey *e
 		return community.CanDeleteMessageForEveryone(publicKey)
 	}
 	return false
+}
+
+func (m *Messenger) CanDeleteMessageForEveryoneInPrivateGroupChat(chat *Chat, publicKey *ecdsa.PublicKey) bool {
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		m.logger.Error("failed to find group", zap.String("chatID", chat.ID), zap.Error(err))
+		return false
+	}
+	admins := group.Admins()
+	return stringSliceContains(admins, common.PubkeyToHex(publicKey))
 }
 
 func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) (*MessengerResponse, error) {
@@ -119,7 +129,12 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
 		if message.MessageType == protobuf.MessageType_COMMUNITY_CHAT {
 			communityID := chat.CommunityID
-			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryone(communityID, &m.identity.PublicKey)
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryoneInCommunity(communityID, &m.identity.PublicKey)
+			if !canDeleteMessageForEveryone {
+				return nil, ErrInvalidDeletePermission
+			}
+		} else if message.MessageType == protobuf.MessageType_PRIVATE_GROUP {
+			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryoneInPrivateGroupChat(chat, &m.identity.PublicKey)
 			if !canDeleteMessageForEveryone {
 				return nil, ErrInvalidDeletePermission
 			}
