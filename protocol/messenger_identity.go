@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -158,17 +159,25 @@ func (m *Messenger) setInstallationHostname() error {
 		return err
 	}
 
-	// If the name is already set, don't do anything
-	if len(imd.Name) != 0 {
+	// If the name and device are already set, don't do anything
+	if len(imd.Name) != 0 && len(imd.DeviceType) != 0 {
 		return nil
 	}
 
-	hn, err := server.GetDeviceName()
-	if err != nil {
-		return err
+	if len(imd.Name) == 0 {
+		hn, err := server.GetDeviceName()
+		if err != nil {
+			return err
+		}
+		imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
 	}
-	imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+
+	if len(imd.DeviceType) == 0 {
+		imd.DeviceType = runtime.GOOS
+	}
+
 	return m.setInstallationMetadata(m.installationID, imd)
+
 }
 
 func (m *Messenger) getOurInstallationMetadata() (*multidevice.InstallationMetadata, error) {
