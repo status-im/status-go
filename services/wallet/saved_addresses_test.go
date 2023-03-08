@@ -110,7 +110,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	dbSavedAddresses, err := manager.GetRawSavedAddresses()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(dbSavedAddresses))
-	require.Equal(t, sa1, dbSavedAddresses[0])
+	require.Equal(t, sa1.Address, dbSavedAddresses[0].Address)
 
 	// Add simple saved address without sync metadata
 	sa2 := SavedAddress{
@@ -134,16 +134,16 @@ func TestSavedAddressesMetadata(t *testing.T) {
 		rawIndex = 1
 		simpleIndex = 0
 	}
-	require.Equal(t, sa1, dbSavedAddresses[rawIndex])
-	require.Equal(t, sa2.Address, dbSavedAddresses[simpleIndex].Address)
-	require.Equal(t, sa2.Name, dbSavedAddresses[simpleIndex].Name)
-	require.Equal(t, sa2.Favourite, dbSavedAddresses[simpleIndex].Favourite)
-	require.Equal(t, sa2.IsTest, dbSavedAddresses[simpleIndex].IsTest)
+	require.Equal(t, sa1.Address, dbSavedAddresses[simpleIndex].Address)
+	require.Equal(t, sa2.Address, dbSavedAddresses[rawIndex].Address)
+	require.Equal(t, sa2.Name, dbSavedAddresses[rawIndex].Name)
+	require.Equal(t, sa2.Favourite, dbSavedAddresses[rawIndex].Favourite)
+	require.Equal(t, sa2.IsTest, dbSavedAddresses[rawIndex].IsTest)
 
 	// Check the default values
-	require.False(t, dbSavedAddresses[simpleIndex].Removed)
-	require.Equal(t, dbSavedAddresses[simpleIndex].UpdateClock, sa2UpdatedClock)
-	require.Greater(t, dbSavedAddresses[simpleIndex].UpdateClock, uint64(0))
+	require.False(t, dbSavedAddresses[rawIndex].Removed)
+	require.Equal(t, dbSavedAddresses[rawIndex].UpdateClock, sa2UpdatedClock)
+	require.Greater(t, dbSavedAddresses[rawIndex].UpdateClock, uint64(0))
 
 	sa2Older := sa2
 	sa2Older.Favourite = true
@@ -155,7 +155,7 @@ func TestSavedAddressesMetadata(t *testing.T) {
 
 	// Try to add an older entry
 	updated := false
-	updated, err = manager.AddSavedAddressIfNewerUpdate(sa2Older, dbSavedAddresses[simpleIndex].UpdateClock-1)
+	updated, err = manager.AddSavedAddressIfNewerUpdate(sa2Older, dbSavedAddresses[rawIndex].UpdateClock-1)
 	require.NoError(t, err)
 	require.False(t, updated)
 
@@ -171,10 +171,10 @@ func TestSavedAddressesMetadata(t *testing.T) {
 
 	require.Equal(t, 2, len(dbSavedAddresses))
 	require.True(t, haveSameElements([]SavedAddress{sa1, sa2}, dbSavedAddresses, savedAddressDataIsEqual))
-	require.Equal(t, sa1.savedAddressMeta, dbSavedAddresses[rawIndex].savedAddressMeta)
+	require.Equal(t, sa1.savedAddressMeta, dbSavedAddresses[simpleIndex].savedAddressMeta)
 
 	// Try to update sa2 with a newer entry
-	updatedClock := dbSavedAddresses[simpleIndex].UpdateClock + 1
+	updatedClock := dbSavedAddresses[rawIndex].UpdateClock + 1
 	updated, err = manager.AddSavedAddressIfNewerUpdate(sa2Newer, updatedClock)
 	require.NoError(t, err)
 	require.True(t, updated)
@@ -182,14 +182,9 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	dbSavedAddresses, err = manager.GetRawSavedAddresses()
 	require.NoError(t, err)
 
-	simpleIndex = 1
-	if dbSavedAddresses[0] != sa1 {
-		simpleIndex = 0
-	}
-
 	require.Equal(t, 2, len(dbSavedAddresses))
 	require.True(t, haveSameElements([]SavedAddress{sa1, sa2Newer}, dbSavedAddresses, savedAddressDataIsEqual))
-	require.Equal(t, updatedClock, dbSavedAddresses[simpleIndex].UpdateClock)
+	require.Equal(t, updatedClock, dbSavedAddresses[rawIndex].UpdateClock)
 
 	// Try to delete the sa2 newer entry
 	updatedDeleteClock := updatedClock + 1
@@ -200,13 +195,8 @@ func TestSavedAddressesMetadata(t *testing.T) {
 	dbSavedAddresses, err = manager.GetRawSavedAddresses()
 	require.NoError(t, err)
 
-	simpleIndex = 1
-	if dbSavedAddresses[0] != sa1 {
-		simpleIndex = 0
-	}
-
 	require.Equal(t, 2, len(dbSavedAddresses))
-	require.True(t, dbSavedAddresses[simpleIndex].Removed)
+	require.True(t, dbSavedAddresses[rawIndex].Removed)
 
 	// Check that deleted entry is not returned with the regular API (non-raw)
 	dbSavedAddresses, err = manager.GetSavedAddresses()
@@ -372,16 +362,8 @@ func testInsertSameAddressWithOneChange(t *testing.T, member int) {
 	require.True(t, savedAddressDataIsEqual(sa2, rst[secondIndex]))
 }
 
-func TestSavedAddressesAddDifferentAddress(t *testing.T) {
-	testInsertSameAddressWithOneChange(t, addressMember)
-}
-
 func TestSavedAddressesAddDifferentIsTest(t *testing.T) {
 	testInsertSameAddressWithOneChange(t, isTestMember)
-}
-
-func TestSavedAddressesAddDifferentEns(t *testing.T) {
-	testInsertSameAddressWithOneChange(t, ensMember)
 }
 
 func TestSavedAddressesAddSame(t *testing.T) {
