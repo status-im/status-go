@@ -971,7 +971,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.5.2-0.20230302181640-4c385249f567
+# github.com/waku-org/go-waku v0.5.2-0.20230308135126-4b52983fc483
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -979,6 +979,7 @@ github.com/waku-org/go-waku/waku/try
 github.com/waku-org/go-waku/waku/v2
 github.com/waku-org/go-waku/waku/v2/discv5
 github.com/waku-org/go-waku/waku/v2/dnsdisc
+github.com/waku-org/go-waku/waku/v2/hash
 github.com/waku-org/go-waku/waku/v2/metrics
 github.com/waku-org/go-waku/waku/v2/node
 github.com/waku-org/go-waku/waku/v2/payload

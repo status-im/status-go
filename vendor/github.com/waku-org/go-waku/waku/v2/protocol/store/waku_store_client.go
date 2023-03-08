@@ -314,13 +314,6 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 		return nil, errors.New("invalid cursor")
 	}
 
-	var messageIDs [][]byte
-	for _, m := range response.Messages {
-		messageID, _, _ := m.Hash()
-		messageIDs = append(messageIDs, messageID)
-	}
-	store.log.Info("waku.store retrieved", logging.HexArray("hashes", messageIDs))
-
 	result := &Result{
 		store:    store,
 		Messages: response.Messages,

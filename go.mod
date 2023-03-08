@@ -80,7 +80,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.5.2-0.20230302181640-4c385249f567
+	github.com/waku-org/go-waku v0.5.2-0.20230308135126-4b52983fc483
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 )

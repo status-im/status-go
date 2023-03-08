@@ -216,7 +216,7 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.Wa
 	}
 
 	if response.IsSuccess {
-		hash, _, _ := message.Hash()
+		hash := message.Hash(topic)
 		wakuLP.log.Info("waku.lightpush published", logging.HexString("hash", hash))
 		return hash, nil
 	} else {
