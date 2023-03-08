@@ -122,6 +122,14 @@ func NewPayloadEncryptor(aesKey []byte) *PayloadEncryptor {
 	}
 }
 
+// Renew regenerates the whole PayloadEncryptor and returns the new instance, only the aesKey is preserved
+func (pem *PayloadEncryptor) Renew() *PayloadEncryptor {
+	return &PayloadEncryptor{
+		aesKey:  pem.aesKey,
+		payload: new(EncryptionPayload),
+	}
+}
+
 // encryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
 // This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
 func (pem *PayloadEncryptor) encryptPlain(plaintext []byte) ([]byte, error) {

@@ -130,6 +130,8 @@ func (tlc *TestLoggerComponents) SetupLoggerComponents() {
 	tlc.Logger = logutils.ZapLogger()
 }
 
+// TODO remove this once all instances of it have been replaced
+
 type MockEncryptOnlyPayloadManager struct {
 	*PayloadEncryptionManager
 }
@@ -159,3 +161,46 @@ func (m *MockEncryptOnlyPayloadManager) Mount() error {
 func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
 	return m.Decrypt(data)
 }
+
+type MockPayloadReceiver struct {
+	encryptor *PayloadEncryptor
+}
+
+func NewMockPayloadReceiver(aesKey []byte) *MockPayloadReceiver {
+	return &MockPayloadReceiver{NewPayloadEncryptor(aesKey)}
+}
+
+func (m *MockPayloadReceiver) Receive(data []byte) error {
+	return m.encryptor.decrypt(data)
+}
+
+func (m *MockPayloadReceiver) Received() []byte {
+	return m.encryptor.getDecrypted()
+}
+
+func (m *MockPayloadReceiver) LockPayload() {}
+
+type MockPayloadMounter struct {
+	encryptor *PayloadEncryptor
+}
+
+func NewMockPayloadMounter(aesKey []byte) *MockPayloadMounter {
+	return &MockPayloadMounter{NewPayloadEncryptor(aesKey)}
+}
+
+func (m *MockPayloadMounter) Mount() error {
+	// Make a random payload
+	data := make([]byte, 32)
+	_, err := rand.Read(data)
+	if err != nil {
+		return err
+	}
+
+	return m.encryptor.encrypt(data)
+}
+
+func (m *MockPayloadMounter) ToSend() []byte {
+	return m.encryptor.getEncrypted()
+}
+
+func (m *MockPayloadMounter) LockPayload() {}

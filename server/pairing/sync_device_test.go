@@ -23,16 +23,16 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-const pathWalletRoot = "m/44'/60'/0'/0"
-const pathEIP1581 = "m/43'/60'/1581'"
-const pathDefaultChat = pathEIP1581 + "/0'/0"
-const pathDefaultWallet = pathWalletRoot + "/0"
+const (
+	pathWalletRoot    = "m/44'/60'/0'/0"
+	pathEIP1581       = "m/43'/60'/1581'"
+	pathDefaultChat   = pathEIP1581 + "/0'/0"
+	pathDefaultWallet = pathWalletRoot + "/0"
+	keystoreDir       = "keystore"
+	currentNetwork    = "mainnet_rpc"
+)
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
-
-const keystoreDir = "keystore"
-
-const currentNetwork = "mainnet_rpc"
 
 func TestSyncDeviceSuite(t *testing.T) {
 	suite.Run(t, new(SyncDeviceSuite))
@@ -167,17 +167,17 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
-	clientPayloadSourceConfig := PayloadSourceConfig{
-		KeystorePath: clientKeystorePath,
-		DeviceType:   "android",
-		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
-			KeyUID:   clientActiveAccount.KeyUID,
-			Password: s.password,
+	clientPayloadSourceConfig := SenderClientConfig{
+		Sender: SenderConfig{
+			KeystorePath: clientKeystorePath,
+			DeviceType:   "android",
+			KeyUID:       clientActiveAccount.KeyUID,
+			Password:     s.password,
 		},
 	}
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
@@ -208,7 +208,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	// repeat local pairing, we should expect no error after receiver logged in
 	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 	require.True(s.T(), clientMessenger.HasPairedDevices())
 	require.True(s.T(), serverMessenger.HasPairedDevices())
@@ -217,7 +217,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), serverBackend.Logout())
 	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 }
 
@@ -264,19 +264,19 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
-	clientPayloadSourceConfig := PayloadSourceConfig{
-		KeystorePath: clientKeystoreDir,
-		DeviceType:   "iphone",
-		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
+	clientPayloadSourceConfig := ReceiverClientConfig{
+		Receiver: ReceiverConfig{
+			KeystorePath:          clientKeystoreDir,
+			DeviceType:            "iphone",
 			KDFIterations:         expectedKDFIterations,
 			NodeConfig:            clientNodeConfig,
-			RootDataDir:           clientTmpDir,
 			SettingCurrentNetwork: currentNetwork,
 		},
 	}
+	clientNodeConfig.RootDataDir = clientTmpDir
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
 	clientBrowserAPI := clientBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
@@ -307,7 +307,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	// repeat local pairing, we should expect no error after receiver logged in
 	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 	require.True(s.T(), serverMessenger.HasPairedDevices())
 	require.True(s.T(), clientMessenger.HasPairedDevices())
@@ -316,7 +316,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), clientBackend.Logout())
 	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
 	require.NoError(s.T(), err)
-	err = StartUpPairingClient(clientBackend, cs, string(clientConfigBytes))
+	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 }
 

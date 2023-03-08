@@ -1,13 +1,5 @@
 package pairing
 
-type PayloadManagerer interface {
-	// Mount Loads the payload into the PayloadManager's state
-	Mount() error
-
-	// Receive stores data from an inbound source into the PayloadManager's state
-	Receive(data []byte) error
-}
-
 type PayloadRepository interface {
 	PayloadLoader
 	PayloadStorer

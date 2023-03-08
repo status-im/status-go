@@ -48,7 +48,7 @@ type AccountPayloadMounter struct {
 }
 
 // NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
-func NewAccountPayloadMounter(pe PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
+func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
 	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -62,7 +62,7 @@ func NewAccountPayloadMounter(pe PayloadEncryptor, config *SenderConfig, logger 
 	return &AccountPayloadMounter{
 		logger:                   l,
 		accountPayload:           p,
-		encryptor:                &pe,
+		encryptor:                pe.Renew(),
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
 		payloadLoader:            apl,
 	}, nil
@@ -201,11 +201,11 @@ type RawMessagePayloadMounter struct {
 	loader    *RawMessageLoader
 }
 
-func NewRawMessagePayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
 	l := logger.Named("RawMessagePayloadManager")
 	return &RawMessagePayloadMounter{
 		logger:    l,
-		encryptor: &pe,
+		encryptor: pe.Renew(),
 		loader:    NewRawMessageLoader(backend, config),
 	}
 }
@@ -267,10 +267,10 @@ type InstallationPayloadMounter struct {
 	loader    *InstallationPayloadLoader
 }
 
-func NewInstallationPayloadMounter(logger *zap.Logger, pe PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
+func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
 	return &InstallationPayloadMounter{
 		logger:    logger.Named("InstallationPayloadManager"),
-		encryptor: &pe,
+		encryptor: pe.Renew(),
 		loader:    NewInstallationPayloadLoader(backend, deviceType),
 	}
 }

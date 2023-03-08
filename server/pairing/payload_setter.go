@@ -49,7 +49,7 @@ type AccountPayloadReceiver struct {
 }
 
 // NewAccountPayloadReceiver generates a new and initialised AccountPayloadManager
-func NewAccountPayloadReceiver(encryptor PayloadEncryptor, config *ReceiverConfig, logger *zap.Logger) (*AccountPayloadReceiver, error) {
+func NewAccountPayloadReceiver(encryptor *PayloadEncryptor, config *ReceiverConfig, logger *zap.Logger) (*AccountPayloadReceiver, error) {
 	l := logger.Named("AccountPayloadManager")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -63,7 +63,7 @@ func NewAccountPayloadReceiver(encryptor PayloadEncryptor, config *ReceiverConfi
 	return &AccountPayloadReceiver{
 		logger:                   l,
 		accountPayload:           p,
-		encryptor:                &encryptor,
+		encryptor:                encryptor.Renew(),
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
 		accountStorer:            accountPayloadRepository,
 	}, nil
@@ -231,11 +231,11 @@ type RawMessagePayloadReceiver struct {
 	storer    *RawMessageStorer
 }
 
-func NewRawMessagePayloadReceiver(logger *zap.Logger, accountPayload *AccountPayload, encryptor PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *RawMessagePayloadReceiver {
+func NewRawMessagePayloadReceiver(logger *zap.Logger, accountPayload *AccountPayload, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *RawMessagePayloadReceiver {
 	l := logger.Named("RawMessagePayloadManager")
 	return &RawMessagePayloadReceiver{
 		logger:    l,
-		encryptor: &encryptor,
+		encryptor: encryptor.Renew(),
 		storer:    NewRawMessageStorer(backend, accountPayload, config),
 	}
 }
@@ -308,11 +308,11 @@ type InstallationPayloadReceiver struct {
 	storer    *InstallationPayloadStorer
 }
 
-func NewInstallationPayloadReceiver(logger *zap.Logger, encryptor PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadReceiver {
+func NewInstallationPayloadReceiver(logger *zap.Logger, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadReceiver {
 	l := logger.Named("InstallationPayloadManager")
 	return &InstallationPayloadReceiver{
 		logger:    l,
-		encryptor: &encryptor,
+		encryptor: encryptor.Renew(),
 		storer:    NewInstallationPayloadStorer(backend, deviceType),
 	}
 }

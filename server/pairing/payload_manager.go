@@ -598,7 +598,7 @@ type InstallationPayloadMounterReceiver struct {
 	*InstallationPayloadReceiver
 }
 
-func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
+func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
 	l := logger.Named("InstallationPayloadMounterReceiver")
 	return &InstallationPayloadMounterReceiver{
 		NewInstallationPayloadMounter(l, encryptor, backend, deviceType),
