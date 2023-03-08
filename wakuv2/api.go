@@ -28,6 +28,7 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -179,6 +180,83 @@ type NewMessage struct {
 	Padding    []byte           `json:"padding"`
 	TargetPeer string           `json:"targetPeer"`
 	Ephemeral  bool             `json:"ephemeral"`
+}
+
+func (api *PublicWakuAPI) Encode(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+	fmt.Println("Encoding v2")
+	var (
+		symKeyGiven = len(req.SymKeyID) > 0
+		pubKeyGiven = len(req.PublicKey) > 0
+		err         error
+	)
+
+	// user must specify either a symmetric or an asymmetric key
+	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
+		return nil, ErrSymAsym
+	}
+
+	params := &common.MessageParams{
+		Payload: req.Payload,
+		Padding: req.Padding,
+		Topic:   req.Topic,
+	}
+
+	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
+
+	// Set key that is used to sign the message
+	if len(req.Sig) > 0 {
+		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
+			return nil, err
+		}
+		keyInfo.PrivKey = params.Src
+	}
+
+	// Set symmetric key that is used to encrypt the message
+	if symKeyGiven {
+		keyInfo.Kind = payload.Symmetric
+
+		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
+			return nil, ErrNoTopics
+		}
+		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
+			return nil, err
+		}
+		if !common.ValidateDataIntegrity(keyInfo.SymKey, common.AESKeyLength) {
+			return nil, ErrInvalidSymmetricKey
+		}
+	}
+
+	// Set asymmetric key that is used to encrypt the message
+	if pubKeyGiven {
+		keyInfo.Kind = payload.Asymmetric
+
+		var pubK *ecdsa.PublicKey
+		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
+			return nil, ErrInvalidPublicKey
+		}
+		keyInfo.PubKey = *pubK
+	}
+
+	var version uint32 = 1 // Use wakuv1 encryption
+
+	p := new(payload.Payload)
+	p.Data = req.Payload
+	p.Key = keyInfo
+
+	payload, err := p.Encode(version)
+	if err != nil {
+		return nil, err
+	}
+
+	wakuMsg := &pb.WakuMessage{
+		Payload:      payload,
+		Version:      version,
+		ContentTopic: req.Topic.ContentTopic(),
+		Timestamp:    api.w.timestamp(),
+		Ephemeral:    req.Ephemeral,
+	}
+
+	return proto.Marshal(wakuMsg)
 }
 
 // Post posts a message on the Waku network.

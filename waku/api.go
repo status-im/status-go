@@ -225,6 +225,11 @@ type NewMessage struct {
 	Ephemeral  bool             `json:"ephemeral"`
 }
 
+func (api *PublicWakuAPI) Encode(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+	fmt.Println("encoding v1")
+	return nil, ErrSymAsym
+}
+
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {

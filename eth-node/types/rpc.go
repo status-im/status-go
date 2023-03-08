@@ -6,17 +6,18 @@ import (
 
 // NewMessage represents a new whisper message that is posted through the RPC.
 type NewMessage struct {
-	SymKeyID   string    `json:"symKeyID"`
-	PublicKey  []byte    `json:"pubKey"`
-	SigID      string    `json:"sig"`
-	TTL        uint32    `json:"ttl"`
-	Topic      TopicType `json:"topic"`
-	Payload    []byte    `json:"payload"`
-	Padding    []byte    `json:"padding"`
-	PowTime    uint32    `json:"powTime"`
-	PowTarget  float64   `json:"powTarget"`
-	TargetPeer string    `json:"targetPeer"`
-	Ephemeral  bool      `json:"ephemeral"`
+	SymKeyID    string    `json:"symKeyID"`
+	PublicKey   []byte    `json:"pubKey"`
+	SigID       string    `json:"sig"`
+	TTL         uint32    `json:"ttl"`
+	Topic       TopicType `json:"topic"`
+	Payload     []byte    `json:"payload"`
+	Padding     []byte    `json:"padding"`
+	PowTime     uint32    `json:"powTime"`
+	PowTarget   float64   `json:"powTarget"`
+	TargetPeer  string    `json:"targetPeer"`
+	Ephemeral   bool      `json:"ephemeral"`
+	WakuPayload []byte    `json:"wakupayload"`
 }
 
 // Message is the RPC representation of a whisper message.
@@ -54,6 +55,8 @@ type PublicWhisperAPI interface {
 	// DeleteKeyPair removes the key with the given key if it exists.
 	DeleteKeyPair(ctx context.Context, key string) (bool, error)
 
+	Encode(ctx context.Context, req NewMessage) ([]byte, error)
+
 	// Post posts a message on the Whisper network.
 	// returns the hash of the message in case of success.
 	Post(ctx context.Context, req NewMessage) ([]byte, error)
@@ -77,6 +80,10 @@ type PublicWakuAPI interface {
 	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
 	// DeleteKeyPair removes the key with the given key if it exists.
 	DeleteKeyPair(ctx context.Context, key string) (bool, error)
+
+	// Post posts a message on the Whisper network.
+	// returns the hash of the message in case of success.
+	Encode(ctx context.Context, req NewMessage) ([]byte, error)
 
 	// Post posts a message on the Whisper network.
 	// returns the hash of the message in case of success.

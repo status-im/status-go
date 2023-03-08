@@ -1930,6 +1930,125 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 	return rawMessage, nil
 }
 
+func (m *Messenger) encodeMessage(ctx context.Context, rawMessage common.RawMessage) (*types.NewMessage, error) {
+	var err error
+	var newMessage *types.NewMessage
+	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", rawMessage.LocalChatID))
+	chat, ok := m.allChats.Load(rawMessage.LocalChatID)
+	if !ok {
+		return nil, errors.New("no chat found")
+	}
+
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
+		publicKey, err := chat.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+
+		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
+		//message for sending to paired devices later
+		specCopyForPairedDevices := rawMessage
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryption {
+			newMessage, err = m.sender.EncodePrivate(ctx, publicKey, &rawMessage)
+
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		err = m.sendToPairedDevices(ctx, specCopyForPairedDevices)
+
+		if err != nil {
+			return nil, err
+		}
+
+	case ChatTypePublic, ChatTypeProfile:
+		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		newMessage, err = m.sender.EncodePublic(ctx, chat.ID, rawMessage)
+		if err != nil {
+			return nil, err
+		}
+	case ChatTypeCommunityChat:
+		// TODO: add grant
+		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// We allow emoji reactions by anyone
+		if rawMessage.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION && !canPost {
+			m.logger.Error("can't post on chat", zap.String("chat-id", chat.ID), zap.String("chat-name", chat.Name))
+
+			return nil, errors.New("can't post on chat")
+		}
+
+		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
+		isEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+		if !isEncrypted {
+			newMessage, err = m.sender.EncodePublic(ctx, chat.ID, rawMessage)
+		} else {
+			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
+
+			if err == nil {
+				newMessage, err = m.sender.EncodeCommunityMessage(ctx, rawMessage)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	case ChatTypePrivateGroupChat:
+		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		if rawMessage.Recipients == nil {
+			rawMessage.Recipients, err = chat.MembersAsPublicKeys()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		hasPairedDevices := m.hasPairedDevices()
+
+		if !hasPairedDevices {
+
+			// Filter out my key from the recipients
+			n := 0
+			for _, recipient := range rawMessage.Recipients {
+				if !common.IsPubKeyEqual(recipient, &m.identity.PublicKey) {
+					rawMessage.Recipients[n] = recipient
+					n++
+				}
+			}
+			rawMessage.Recipients = rawMessage.Recipients[:n]
+		}
+
+		// We won't really send the message out if there's no recipients
+		if len(rawMessage.Recipients) == 0 {
+			rawMessage.Sent = true
+		}
+
+		// We skip wrapping in some cases (emoji reactions for example)
+		if !rawMessage.SkipGroupMessageWrap {
+			rawMessage.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
+		}
+
+		newMessage, err = m.sender.EncodeGroup(ctx, rawMessage.Recipients, rawMessage)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, errors.New("chat type not supported")
+	}
+	return newMessage, nil
+}
+
+func (m *Messenger) EncodeChatMessage(ctx context.Context, message *common.Message) (*types.NewMessage, error) {
+	return m.encodeChatMessage(ctx, message)
+}
+
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	return m.sendChatMessage(ctx, message)
@@ -1954,10 +2073,11 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 }
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
-func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+func (m *Messenger) makeChatMessage(ctx context.Context, message *common.Message) (common.RawMessage, error) {
+	var rawMessage common.RawMessage
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
-		return nil, err
+		return rawMessage, err
 	}
 
 	message.DisplayName = displayName
@@ -1965,21 +2085,21 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 		err := message.LoadImage()
 		if err != nil {
-			return nil, err
+			return rawMessage, err
 		}
 	} else if len(message.CommunityID) != 0 {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
 		if err != nil {
-			return nil, err
+			return rawMessage, err
 		}
 
 		if community == nil {
-			return nil, errors.New("community not found")
+			return rawMessage, errors.New("community not found")
 		}
 
 		wrappedCommunity, err := community.ToBytes()
 		if err != nil {
-			return nil, err
+			return rawMessage, err
 		}
 		message.Payload = &protobuf.ChatMessage_Community{Community: wrappedCommunity}
 
@@ -1987,44 +2107,60 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	} else if len(message.AudioPath) != 0 {
 		err := message.LoadAudio()
 		if err != nil {
-			return nil, err
+			return rawMessage, err
 		}
 	}
-
-	var response MessengerResponse
 
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return rawMessage, errors.New("Chat not found")
 	}
 
 	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
-		return nil, err
+		return rawMessage, err
 	}
 
 	err = extendMessageFromChat(message, chat, &m.identity.PublicKey, m.getTimesource())
 	if err != nil {
-		return nil, err
+		return rawMessage, err
 	}
 
 	err = m.addContactRequestPropagatedState(message)
 	if err != nil {
-		return nil, err
+		return rawMessage, err
 	}
 
 	encodedMessage, err := m.encodeChatEntity(chat, message)
 	if err != nil {
-		return nil, err
+		return rawMessage, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage = common.RawMessage{
 		LocalChatID:          chat.ID,
 		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		ResendAutomatically:  true,
+	}
+
+	return rawMessage, nil
+}
+
+func (m *Messenger) encodeChatMessage(ctx context.Context, message *common.Message) (*types.NewMessage, error) {
+	rawMessage, err := m.makeChatMessage(ctx, message)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.encodeMessage(ctx, rawMessage)
+}
+
+func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+	rawMessage, err := m.makeChatMessage(ctx, message)
+	if err != nil {
+		return nil, err
 	}
 
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
@@ -2041,6 +2177,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
+	chat, ok := m.allChats.Load(message.ChatId)
+	if !ok {
+		return nil, errors.New("Chat not found")
+	}
+
 	err = chat.UpdateFromMessage(message, m.getTimesource())
 	if err != nil {
 		return nil, err
@@ -2055,6 +2196,8 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
+
+	var response MessengerResponse
 
 	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(message.WhisperTimestamp), &response); err != nil {
 		return nil, err

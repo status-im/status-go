@@ -759,6 +759,9 @@ func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) 
 	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
 
+func (api *PublicAPI) EncodeChatMessage(ctx context.Context, message *common.Message) (*types.NewMessage, error) {
+	return api.service.messenger.EncodeChatMessage(ctx, message)
+}
 func (api *PublicAPI) SendChatMessage(ctx context.Context, message *common.Message) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendChatMessage(ctx, message)
 }

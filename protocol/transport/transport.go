@@ -274,24 +274,58 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 // SendPublic sends a new message using the Whisper service.
 // For public filters, chat name is used as an ID as well as
 // a topic.
-func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
+func (t *Transport) EncodePublic(ctx context.Context, newMessage *types.NewMessage, chatName string) error {
 	if err := t.addSig(newMessage); err != nil {
-		return nil, err
+		return err
 	}
 
 	filter, err := t.filters.LoadPublic(chatName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	newMessage.SymKeyID = filter.SymKeyID
 	newMessage.Topic = filter.Topic
 
+	newMessage.WakuPayload, err = t.api.Encode(ctx, *newMessage)
+
+	fmt.Println("here", newMessage.WakuPayload)
+
+	return err
+}
+
+func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
+	if err := t.EncodePublic(ctx, newMessage, chatName); err != nil {
+		return nil, err
+	}
+
 	return t.api.Post(ctx, *newMessage)
 }
 
-func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
+func (t *Transport) EncodePrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) error {
 	if err := t.addSig(newMessage); err != nil {
+		return err
+	}
+
+	filter, err := t.filters.LoadNegotiated(types.NegotiatedSecret{
+		PublicKey: publicKey,
+		Key:       secret,
+	})
+	if err != nil {
+		return err
+	}
+
+	newMessage.SymKeyID = filter.SymKeyID
+	newMessage.Topic = filter.Topic
+	newMessage.PublicKey = nil
+
+	newMessage.WakuPayload, err = t.api.Encode(ctx, *newMessage)
+
+	return err
+}
+
+func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
+	if err := t.EncodePrivateWithSharedSecret(ctx, newMessage, publicKey, secret); err != nil {
 		return nil, err
 	}
 
@@ -310,6 +344,23 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 	return t.api.Post(ctx, *newMessage)
 }
 
+func (t *Transport) EncodePrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) error {
+	if err := t.addSig(newMessage); err != nil {
+		return err
+	}
+
+	filter, err := t.filters.LoadPartitioned(publicKey, t.keysManager.privateKey, false)
+	if err != nil {
+		return err
+	}
+
+	newMessage.Topic = filter.Topic
+	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	newMessage.WakuPayload, err = t.api.Encode(ctx, *newMessage)
+
+	return err
+}
+
 func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err := t.addSig(newMessage); err != nil {
 		return nil, err
@@ -324,6 +375,24 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return t.api.Post(ctx, *newMessage)
+}
+
+func (t *Transport) EncodePrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) error {
+	if err := t.addSig(newMessage); err != nil {
+		return err
+	}
+
+	filter, err := t.filters.LoadPersonal(publicKey, t.keysManager.privateKey, false)
+	if err != nil {
+		return err
+	}
+
+	newMessage.Topic = filter.Topic
+	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+
+	newMessage.WakuPayload, err = t.api.Encode(ctx, *newMessage)
+
+	return err
 }
 
 func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
@@ -350,22 +419,30 @@ func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 	return t.filters.LoadEphemeral(&key.PublicKey, key, true)
 }
 
-func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (t *Transport) MakeCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) error {
 	if err := t.addSig(newMessage); err != nil {
-		return nil, err
+		return err
 	}
 
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:])
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	newMessage.Topic = filter.Topic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	t.logger.Debug("SENDING message", zap.Binary("topic", filter.Topic[:]))
+	newMessage.WakuPayload, err = t.api.Encode(ctx, *newMessage)
 
+	t.logger.Debug("SENDING message", zap.Binary("topic", filter.Topic[:]))
+	return err
+}
+
+func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if err := t.MakeCommunityMessage(ctx, newMessage, publicKey); err != nil {
+		return nil, err
+	}
 	return t.api.Post(ctx, *newMessage)
 }
 

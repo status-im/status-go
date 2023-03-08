@@ -89,6 +89,23 @@ func (w *gethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Messag
 	return wrappedMsgs, nil
 }
 
+func (w *gethPublicWakuAPIWrapper) Encode(ctx context.Context, req types.NewMessage) ([]byte, error) {
+	msg := waku.NewMessage{
+		SymKeyID:   req.SymKeyID,
+		PublicKey:  req.PublicKey,
+		Sig:        req.SigID, // Sig is really a SigID
+		TTL:        req.TTL,
+		Topic:      wakucommon.TopicType(req.Topic),
+		Payload:    req.Payload,
+		Padding:    req.Padding,
+		PowTime:    req.PowTime,
+		PowTarget:  req.PowTarget,
+		TargetPeer: req.TargetPeer,
+		Ephemeral:  req.Ephemeral,
+	}
+	return w.api.Encode(ctx, msg)
+}
+
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
 func (w *gethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
