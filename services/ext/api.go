@@ -1264,6 +1264,14 @@ func (api *PublicAPI) UpdateCommunityTokenState(contractAddress string, deploySt
 	return api.service.messenger.UpdateCommunityTokenState(contractAddress, deployState)
 }
 
+func (api *PublicAPI) ToggleCollapsedCommunityCategory(request *requests.ToggleCollapsedCommunityCategory) error {
+	return api.service.messenger.ToggleCollapsedCommunityCategory(request)
+}
+
+func (api *PublicAPI) CollapsedCommunityCategories() ([]protocol.CollapsedCommunityCategory, error) {
+	return api.service.messenger.CollapsedCommunityCategories()
+}
+
 // -----
 // HELPER
 // -----

@@ -2,37 +2,27 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/waku"
 )
 
 const (
@@ -48,20 +38,8 @@ func TestMessengerSuite(t *testing.T) {
 	suite.Run(t, new(MessengerSuite))
 }
 
-func TestMessengerWithDataSyncEnabledSuite(t *testing.T) {
-	suite.Run(t, &MessengerSuite{enableDataSync: true})
-}
-
 type MessengerSuite struct {
-	suite.Suite
-	enableDataSync bool
-
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Whisper service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 type testNode struct {
@@ -94,88 +72,6 @@ func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
 
 func (n *testNode) PeersCount() int {
 	return 1
-}
-
-func (s *MessengerSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	if err != nil {
-		return nil, err
-	}
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	options := []Option{
-		WithCustomLogger(logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-		WithToplevelDatabaseMigrations(),
-		WithAppSettings(settings.Settings{
-			ProfilePicturesShowTo:     1,
-			ProfilePicturesVisibility: 1,
-		}, params.NodeConfig{}),
-		WithBrowserDatabase(nil),
-	}
-
-	options = append(options, extraOptions...)
-
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		options...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Init()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func (s *MessengerSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
-}
-
-func (s *MessengerSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-	_ = s.logger.Sync()
 }
 
 func (s *MessengerSuite) TestInit() {
@@ -595,7 +491,7 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 
 // Retrieve their public message
 func (s *MessengerSuite) TestRetrieveTheirPublic() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
@@ -639,7 +535,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 
 // Drop audio message in public group
 func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
@@ -666,7 +562,7 @@ func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 }
 
 func (s *MessengerSuite) TestDeletedAtClockValue() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
@@ -698,7 +594,7 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 }
 
 func (s *MessengerSuite) TestRetrieveBlockedContact() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
@@ -767,7 +663,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 
 // Resend their public message, receive only once
 func (s *MessengerSuite) TestResendPublicMessage() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
@@ -822,7 +718,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 
 // Test receiving a message on an existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
@@ -865,7 +761,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 
 // Test receiving a message on an non-existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
@@ -903,7 +799,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 
 // Test receiving a message on an non-existing public chat
 func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	chat := CreatePublicChat("test-chat", s.m.transport)
@@ -929,7 +825,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 // Test receiving a message on an existing private group chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	var response *MessengerResponse
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
@@ -997,7 +893,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 // Test receiving a message on an existing private group chat
 func (s *MessengerSuite) TestChangeNameGroupChat() {
 	var response *MessengerResponse
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
@@ -1054,7 +950,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 // Test being re-invited to a group chat
 func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	var response *MessengerResponse
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
@@ -1584,7 +1480,7 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	value := testValue
 	contract := testContract
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1679,7 +1575,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	value := testValue
 	contract := testContract
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1783,7 +1679,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	value := testValue
 	contract := testContract
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1886,7 +1782,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	value := testValue
 	contract := testContract
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1984,7 +1880,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -2074,7 +1970,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
