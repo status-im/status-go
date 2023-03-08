@@ -116,7 +116,7 @@ type Waku struct {
 
 	bandwidthCounter *metrics.BandwidthCounter
 
-	sendQueue chan *pb.WakuMessage
+	sendQueue chan *protocol.Envelope
 	msgQueue  chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 	quit      chan struct{}                // Channel used for graceful exit
 	wg        sync.WaitGroup
@@ -193,7 +193,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		envelopes:               make(map[gethcommon.Hash]*common.ReceivedMessage),
 		expirations:             make(map[uint32]mapset.Set),
 		msgQueue:                make(chan *common.ReceivedMessage, messageQueueLimit),
-		sendQueue:               make(chan *pb.WakuMessage, 1000),
+		sendQueue:               make(chan *protocol.Envelope, 1000),
 		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
 		quit:                    make(chan struct{}),
 		connectionChanged:       make(chan struct{}),
@@ -1093,26 +1093,20 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 func (w *Waku) broadcast() {
 	for {
 		select {
-		case msg := <-w.sendQueue:
-
-			hash, _, err := msg.Hash()
-			if err != nil {
-				w.logger.Error("invalid message", zap.Error(err))
-				continue
-			}
-
+		case envelope := <-w.sendQueue:
+			var err error
 			if w.settings.LightClient {
-				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(hash)))
-				_, err = w.node.Lightpush().Publish(context.Background(), msg)
+				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())))
+				_, err = w.node.Lightpush().Publish(context.Background(), envelope.Message())
 			} else {
-				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(hash)))
-				_, err = w.node.Relay().Publish(context.Background(), msg)
+				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())))
+				_, err = w.node.Relay().Publish(context.Background(), envelope.Message())
 			}
 
 			if err != nil {
-				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(hash)), zap.Error(err))
+				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.Error(err))
 				w.envelopeFeed.Send(common.EnvelopeEvent{
-					Hash:  gethcommon.BytesToHash(hash),
+					Hash:  gethcommon.BytesToHash(envelope.Hash()),
 					Event: common.EventEnvelopeExpired,
 				})
 
@@ -1121,7 +1115,7 @@ func (w *Waku) broadcast() {
 
 			event := common.EnvelopeEvent{
 				Event: common.EventEnvelopeSent,
-				Hash:  gethcommon.BytesToHash(hash),
+				Hash:  gethcommon.BytesToHash(envelope.Hash()),
 			}
 
 			w.SendEnvelopeEvent(event)
@@ -1135,24 +1129,20 @@ func (w *Waku) broadcast() {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
-	hash, _, err := msg.Hash()
-	if err != nil {
-		return nil, err
-	}
+	envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic) // TODO: once sharding is defined, use the correct pubsub topic
 
-	w.sendQueue <- msg
+	w.sendQueue <- envelope
 
 	w.poolMu.Lock()
-	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(hash)]
+	_, alreadyCached := w.envelopes[gethcommon.BytesToHash(envelope.Hash())]
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
 		recvMessage := common.NewReceivedMessage(envelope, common.RelayedMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
 	}
 
-	return hash, nil
+	return envelope.Hash(), nil
 }
 
 func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
@@ -1289,7 +1279,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	} else {
 		w.logger.Debug("cached w envelope", zap.String("envelopeHash", recvMessage.Hash().Hex()))
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
-		common.EnvelopesSizeMeter.Observe(float64(recvMessage.Envelope.Size()))
+		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 		w.postEvent(recvMessage) // notify the local node about the new message
 	}
 	return true, nil

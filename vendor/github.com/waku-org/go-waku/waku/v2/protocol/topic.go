@@ -3,11 +3,22 @@ package protocol
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 )
 
+const Waku2PubsubTopicPrefix = "/waku/2"
+const StaticShardingPubsubTopicPrefix = Waku2PubsubTopicPrefix + "/rs"
+
 var ErrInvalidFormat = errors.New("invalid format")
+var ErrInvalidStructure = errors.New("invalid topic structure")
+var ErrInvalidTopicPrefix = errors.New("must start with " + Waku2PubsubTopicPrefix)
+var ErrMissingTopicName = errors.New("missing topic-name")
+var ErrInvalidShardedTopicPrefix = errors.New("must start with " + StaticShardingPubsubTopicPrefix)
+var ErrMissingClusterIndex = errors.New("missing shard_cluster_index")
+var ErrMissingShardNumber = errors.New("missing shard_number")
+var ErrInvalidNumberFormat = errors.New("only 2^16 numbers are allowed")
 
 type ContentTopic struct {
 	ApplicationName    string
@@ -54,38 +65,156 @@ func StringToContentTopic(s string) (ContentTopic, error) {
 	}, nil
 }
 
-type PubsubTopic struct {
-	Name     string
-	Encoding string
+type NamespacedPubsubTopicKind int
+
+const (
+	StaticSharding NamespacedPubsubTopicKind = iota
+	NamedSharding
+)
+
+type ShardedPubsubTopic interface {
+	String() string
+	Kind() NamespacedPubsubTopicKind
+	Equal(ShardedPubsubTopic) bool
 }
 
-func (t PubsubTopic) String() string {
-	return fmt.Sprintf("/waku/2/%s/%s", t.Name, t.Encoding)
+type NamedShardingPubsubTopic struct {
+	ShardedPubsubTopic
+	kind NamespacedPubsubTopicKind
+	name string
 }
 
-func DefaultPubsubTopic() PubsubTopic {
-	return NewPubsubTopic("default-waku", "proto")
-}
-
-func NewPubsubTopic(name string, encoding string) PubsubTopic {
-	return PubsubTopic{
-		Name:     name,
-		Encoding: encoding,
+func NewNamedShardingPubsubTopic(name string) ShardedPubsubTopic {
+	return NamedShardingPubsubTopic{
+		kind: NamedSharding,
+		name: name,
 	}
 }
 
-func (t PubsubTopic) Equal(t2 PubsubTopic) bool {
-	return t.Name == t2.Name && t.Encoding == t2.Encoding
+func (n NamedShardingPubsubTopic) Kind() NamespacedPubsubTopicKind {
+	return n.kind
 }
 
-func StringToPubsubTopic(s string) (PubsubTopic, error) {
-	p := strings.Split(s, "/")
-	if len(p) != 5 || p[0] != "" || p[1] != "waku" || p[2] != "2" || p[3] == "" || p[4] == "" {
-		return PubsubTopic{}, ErrInvalidFormat
+func (n NamedShardingPubsubTopic) Name() string {
+	return n.name
+}
+
+func (s NamedShardingPubsubTopic) Equal(t2 ShardedPubsubTopic) bool {
+	return s.String() == t2.String()
+}
+
+func (n NamedShardingPubsubTopic) String() string {
+	return fmt.Sprintf("%s/%s", Waku2PubsubTopicPrefix, n.name)
+}
+
+func (s *NamedShardingPubsubTopic) Parse(topic string) error {
+	if !strings.HasPrefix(topic, Waku2PubsubTopicPrefix) {
+		return ErrInvalidTopicPrefix
 	}
 
-	return PubsubTopic{
-		Name:     p[3],
-		Encoding: p[4],
-	}, nil
+	topicName := topic[8:]
+	if len(topicName) == 0 {
+		return ErrMissingTopicName
+	}
+
+	s.kind = NamedSharding
+	s.name = topicName
+
+	return nil
+}
+
+type StaticShardingPubsubTopic struct {
+	ShardedPubsubTopic
+	kind    NamespacedPubsubTopicKind
+	cluster uint16
+	shard   uint16
+}
+
+func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) ShardedPubsubTopic {
+	return StaticShardingPubsubTopic{
+		kind:    StaticSharding,
+		cluster: cluster,
+		shard:   shard,
+	}
+}
+
+func (n StaticShardingPubsubTopic) Cluster() uint16 {
+	return n.cluster
+}
+
+func (n StaticShardingPubsubTopic) Shard() uint16 {
+	return n.shard
+}
+
+func (n StaticShardingPubsubTopic) Kind() NamespacedPubsubTopicKind {
+	return n.kind
+}
+
+func (s StaticShardingPubsubTopic) Equal(t2 ShardedPubsubTopic) bool {
+	return s.String() == t2.String()
+}
+
+func (n StaticShardingPubsubTopic) String() string {
+	return fmt.Sprintf("%s/%d/%d", StaticShardingPubsubTopicPrefix, n.cluster, n.shard)
+}
+
+func (s *StaticShardingPubsubTopic) Parse(topic string) error {
+	if !strings.HasPrefix(topic, StaticShardingPubsubTopicPrefix) {
+		fmt.Println(topic, StaticShardingPubsubTopicPrefix)
+		return ErrInvalidShardedTopicPrefix
+	}
+
+	parts := strings.Split(topic[11:], "/")
+	if len(parts) != 2 {
+		return ErrInvalidStructure
+	}
+
+	clusterPart := parts[0]
+	if len(clusterPart) == 0 {
+		return ErrMissingClusterIndex
+	}
+
+	clusterInt, err := strconv.ParseUint(clusterPart, 10, 16)
+	if err != nil {
+		return ErrInvalidNumberFormat
+	}
+
+	shardPart := parts[1]
+	if len(shardPart) == 0 {
+		return ErrMissingShardNumber
+	}
+
+	shardInt, err := strconv.ParseUint(shardPart, 10, 16)
+	if err != nil {
+		return ErrInvalidNumberFormat
+	}
+
+	s.shard = uint16(shardInt)
+	s.cluster = uint16(clusterInt)
+	s.kind = StaticSharding
+
+	return nil
+}
+
+func ToShardedPubsubTopic(topic string) (ShardedPubsubTopic, error) {
+	if strings.HasPrefix(topic, StaticShardingPubsubTopicPrefix) {
+		s := StaticShardingPubsubTopic{}
+		err := s.Parse(topic)
+		if err != nil {
+			return nil, err
+		}
+		return s, nil
+	} else {
+		debug.PrintStack()
+		s := NamedShardingPubsubTopic{}
+		err := s.Parse(topic)
+		if err != nil {
+			return nil, err
+		}
+		return s, nil
+	}
+}
+
+func DefaultPubsubTopic() ShardedPubsubTopic {
+	return NewNamedShardingPubsubTopic("default-waku/proto")
 }

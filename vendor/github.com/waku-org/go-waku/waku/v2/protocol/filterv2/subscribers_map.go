@@ -161,6 +161,13 @@ func (sub *SubscribersMap) RemoveAll() {
 	sub.items = make(map[peer.ID]PubsubTopics)
 }
 
+func (sub *SubscribersMap) Count() int {
+	sub.RLock()
+	defer sub.RUnlock()
+
+	return len(sub.items)
+}
+
 func (sub *SubscribersMap) Items(pubsubTopic string, contentTopic string) <-chan peer.ID {
 	c := make(chan peer.ID)
 

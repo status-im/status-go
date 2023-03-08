@@ -17,6 +17,7 @@ message WakuMessage {
     string contentTopic = 2;
     uint32 version = 3;
     sint64 timestamp = 10;
+    bytes meta = 11;
     RateLimitProof rate_limit_proof = 21;
     bool ephemeral = 31;
 }

@@ -2,6 +2,7 @@ package filterv2
 
 import (
 	"context"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -25,9 +26,22 @@ type (
 		log            *zap.Logger
 	}
 
+	FilterParameters struct {
+		Timeout        time.Duration
+		MaxSubscribers int
+	}
+
+	Option func(*FilterParameters)
+
 	FilterSubscribeOption   func(*FilterSubscribeParameters)
 	FilterUnsubscribeOption func(*FilterUnsubscribeParameters)
 )
+
+func WithTimeout(timeout time.Duration) Option {
+	return func(params *FilterParameters) {
+		params.Timeout = timeout
+	}
+}
 
 func WithPeer(p peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
@@ -110,5 +124,18 @@ func AutomaticRequestId() FilterUnsubscribeOption {
 func DefaultUnsubscribeOptions() []FilterUnsubscribeOption {
 	return []FilterUnsubscribeOption{
 		AutomaticRequestId(),
+	}
+}
+
+func WithMaxSubscribers(maxSubscribers int) Option {
+	return func(params *FilterParameters) {
+		params.MaxSubscribers = maxSubscribers
+	}
+}
+
+func DefaultOptions() []Option {
+	return []Option{
+		WithTimeout(24 * time.Hour),
+		WithMaxSubscribers(DefaultMaxSubscriptions),
 	}
 }

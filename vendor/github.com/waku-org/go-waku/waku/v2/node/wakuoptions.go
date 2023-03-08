@@ -26,6 +26,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
@@ -68,6 +69,7 @@ type WakuNodeParameters struct {
 	enableFilterV2LightNode bool
 	enableFilterV2FullNode  bool
 	filterOpts              []filter.Option
+	filterV2Opts            []filterv2.Option
 	wOpts                   []pubsub.Option
 
 	minRelayPeersToPublish int
@@ -335,10 +337,10 @@ func WithWakuFilterV2LightNode() WakuNodeOption {
 
 // WithWakuFilterV2FullNode enables the Waku Filter V2 protocol full node functionality.
 // This WakuNodeOption accepts a list of WakuFilter options to setup the protocol
-func WithWakuFilterV2FullNode(filterOpts ...filter.Option) WakuNodeOption {
+func WithWakuFilterV2FullNode(filterOpts ...filterv2.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilterV2FullNode = true
-		params.filterOpts = filterOpts
+		params.filterV2Opts = filterOpts
 		return nil
 	}
 }

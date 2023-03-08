@@ -16,7 +16,6 @@ import (
 	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.opencensus.io/tag"
@@ -27,6 +26,8 @@ import (
 // allow filter clients to subscribe, modify, refresh and unsubscribe a desired set of filter criteria
 const FilterSubscribeID_v20beta1 = libp2pProtocol.ID("/vac/waku/filter-subscribe/2.0.0-beta1")
 
+const peerHasNoSubscription = "peer has no subscriptions"
+
 type (
 	WakuFilterFull struct {
 		cancel context.CancelFunc
@@ -36,16 +37,18 @@ type (
 		log    *zap.Logger
 
 		subscriptions *SubscribersMap
+
+		maxSubscriptions int
 	}
 )
 
 // NewWakuFilterFullnode returns a new instance of Waku Filter struct setup according to the chosen parameter and options
-func NewWakuFilterFullnode(host host.Host, broadcaster v2.Broadcaster, timesource timesource.Timesource, log *zap.Logger, opts ...filter.Option) *WakuFilterFull {
+func NewWakuFilterFullnode(host host.Host, broadcaster v2.Broadcaster, timesource timesource.Timesource, log *zap.Logger, opts ...Option) *WakuFilterFull {
 	wf := new(WakuFilterFull)
 	wf.log = log.Named("filterv2-fullnode")
 
-	params := new(filter.FilterParameters)
-	optList := filter.DefaultOptions()
+	params := new(FilterParameters)
+	optList := DefaultOptions()
 	optList = append(optList, opts...)
 	for _, opt := range optList {
 		opt(params)
@@ -54,6 +57,7 @@ func NewWakuFilterFullnode(host host.Host, broadcaster v2.Broadcaster, timesourc
 	wf.wg = &sync.WaitGroup{}
 	wf.h = host
 	wf.subscriptions = NewSubscribersMap(params.Timeout)
+	wf.maxSubscriptions = params.MaxSubscribers
 
 	return wf
 }
@@ -138,7 +142,7 @@ func (wf *WakuFilterFull) ping(s network.Stream, logger *zap.Logger, request *pb
 	if exists {
 		reply(s, logger, request, http.StatusOK)
 	} else {
-		reply(s, logger, request, http.StatusNotFound)
+		reply(s, logger, request, http.StatusNotFound, peerHasNoSubscription)
 	}
 }
 
@@ -153,7 +157,24 @@ func (wf *WakuFilterFull) subscribe(s network.Stream, logger *zap.Logger, reques
 		return
 	}
 
+	if wf.subscriptions.Count() >= wf.maxSubscriptions {
+		reply(s, logger, request, http.StatusServiceUnavailable, "node has reached maximum number of subscriptions")
+		return
+	}
+
 	peerID := s.Conn().RemotePeer()
+
+	if totalSubs, exists := wf.subscriptions.Get(peerID); exists {
+		ctTotal := 0
+		for _, contentTopicSet := range totalSubs {
+			ctTotal += len(contentTopicSet)
+		}
+
+		if ctTotal+len(request.ContentTopics) > MaxCriteriaPerSubscription {
+			reply(s, logger, request, http.StatusServiceUnavailable, "peer has reached maximum number of filter criteria")
+			return
+		}
+	}
 
 	wf.subscriptions.Set(peerID, request.PubsubTopic, request.ContentTopics)
 
@@ -173,7 +194,7 @@ func (wf *WakuFilterFull) unsubscribe(s network.Stream, logger *zap.Logger, requ
 
 	err := wf.subscriptions.Delete(s.Conn().RemotePeer(), request.PubsubTopic, request.ContentTopics)
 	if err != nil {
-		reply(s, logger, request, http.StatusNotFound)
+		reply(s, logger, request, http.StatusNotFound, peerHasNoSubscription)
 	} else {
 		reply(s, logger, request, http.StatusOK)
 	}
@@ -182,7 +203,7 @@ func (wf *WakuFilterFull) unsubscribe(s network.Stream, logger *zap.Logger, requ
 func (wf *WakuFilterFull) unsubscribeAll(s network.Stream, logger *zap.Logger, request *pb.FilterSubscribeRequest) {
 	err := wf.subscriptions.DeleteAll(s.Conn().RemotePeer())
 	if err != nil {
-		reply(s, logger, request, http.StatusNotFound)
+		reply(s, logger, request, http.StatusNotFound, peerHasNoSubscription)
 	} else {
 		reply(s, logger, request, http.StatusOK)
 	}
