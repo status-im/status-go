@@ -22,6 +22,7 @@ type SavedAddress struct {
 	ChainShortNames string `json:"chainShortNames"` // used with address only, not with ENSName
 	ENSName         string `json:"ens"`
 	IsTest          bool   `json:"isTest"`
+	CreatedAt       int64  `json:"createdAt"`
 	savedAddressMeta
 }
 
@@ -37,7 +38,7 @@ func NewSavedAddressesManager(db *sql.DB) *SavedAddressesManager {
 	return &SavedAddressesManager{db: db}
 }
 
-const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test"
+const rawQueryColumnsOrder = "address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at"
 
 // getSavedAddressesFromDBRows retrieves all data based on SELECT Query using rawQueryColumnsOrder
 func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
@@ -45,7 +46,7 @@ func getSavedAddressesFromDBRows(rows *sql.Rows) ([]SavedAddress, error) {
 	for rows.Next() {
 		sa := SavedAddress{}
 		// based on rawQueryColumnsOrder
-		err := rows.Scan(&sa.Address, &sa.Name, &sa.Favourite, &sa.Removed, &sa.UpdateClock, &sa.ChainShortNames, &sa.ENSName, &sa.IsTest)
+		err := rows.Scan(&sa.Address, &sa.Name, &sa.Favourite, &sa.Removed, &sa.UpdateClock, &sa.ChainShortNames, &sa.ENSName, &sa.IsTest, &sa.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -81,20 +82,46 @@ func (sam *SavedAddressesManager) GetRawSavedAddresses() ([]SavedAddress, error)
 	return sam.getSavedAddresses("")
 }
 
-func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx) error {
-	sqlStatement := "INSERT OR REPLACE INTO saved_addresses (address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-	var err error
-	var insert *sql.Stmt
-	if tx != nil {
-		insert, err = tx.Prepare(sqlStatement)
-	} else {
-		insert, err = sam.db.Prepare(sqlStatement)
+func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx) (err error) {
+	if tx == nil {
+		tx, err = sam.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			_ = tx.Rollback()
+		}()
 	}
+	rows, err := tx.Query(
+		fmt.Sprintf("SELECT %s FROM saved_addresses WHERE address = ? AND is_test = ? AND ens_name = ?", rawQueryColumnsOrder),
+		sa.Address, sa.IsTest, sa.ENSName,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	savedAddresses, err := getSavedAddressesFromDBRows(rows)
+	if err != nil {
+		return err
+	}
+	sa.CreatedAt = time.Now().Unix()
+	for _, savedAddress := range savedAddresses {
+		if savedAddress.Address == sa.Address && savedAddress.IsTest == sa.IsTest && savedAddress.ENSName == sa.ENSName {
+			sa.CreatedAt = savedAddress.CreatedAt
+			break
+		}
+	}
+	sqlStatement := "INSERT OR REPLACE INTO saved_addresses (address, name, favourite, removed, update_clock, chain_short_names, ens_name, is_test, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	insert, err := tx.Prepare(sqlStatement)
 	if err != nil {
 		return err
 	}
 	defer insert.Close()
-	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName, sa.IsTest)
+	_, err = insert.Exec(sa.Address, sa.Name, sa.Favourite, sa.Removed, sa.UpdateClock, sa.ChainShortNames, sa.ENSName, sa.IsTest, sa.CreatedAt)
 	return err
 }
 
