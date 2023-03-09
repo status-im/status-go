@@ -32,6 +32,8 @@ var BaseURLs = map[uint64]string{
 	5: "https://testnets-api.opensea.io/api/v1",
 }
 
+const ChainIDRequiringAPIKey = 1
+
 type TraitValue string
 
 type NFTUniqueID struct {
@@ -138,8 +140,12 @@ type Client struct {
 
 // new opensea client.
 func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
+	var tmpAPIKey string = ""
+	if chainID == ChainIDRequiringAPIKey {
+		tmpAPIKey = apiKey
+	}
 	if client, ok := OpenseaClientInstances[chainID]; ok {
-		if client.apiKey == apiKey {
+		if client.apiKey == tmpAPIKey {
 			return client, nil
 		}
 	}
@@ -151,7 +157,7 @@ func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 		openseaClient := &Client{
 			client:        client,
 			url:           url,
-			apiKey:        apiKey,
+			apiKey:        tmpAPIKey,
 			IsConnected:   true,
 			LastCheckedAt: time.Now().Unix(),
 		}
@@ -282,7 +288,9 @@ func (o *Client) doOpenseaRequest(url string) ([]byte, error) {
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-		req.Header.Set("X-API-KEY", o.apiKey)
+		if len(o.apiKey) > 0 {
+			req.Header.Set("X-API-KEY", o.apiKey)
+		}
 
 		resp, err := o.client.Do(req)
 		if err != nil {
