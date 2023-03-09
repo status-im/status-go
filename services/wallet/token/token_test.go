@@ -1,6 +1,7 @@
 package token
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ import (
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	db, err := appdatabase.InitializeDB(":memory:", "wallet-token-tests", 1)
 	require.NoError(t, err)
-	return &Manager{db, nil, nil}, func() {
+	return &Manager{db, nil, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
 	}
 }
@@ -74,35 +75,103 @@ func TestTokenOverride(t *testing.T) {
 			},
 		},
 	}
-	testTokenStore := map[uint64]map[common.Address]*Token{
-		1: {
-			common.Address{1}: {
-				Address: common.Address{1},
-				Symbol:  "SNT",
-			},
-			common.Address{2}: {
-				Address: common.Address{2},
-				Symbol:  "TNT",
-			},
+
+	tokenList := []*Token{
+		&Token{
+			Address: common.Address{1},
+			Symbol:  "SNT",
+			ChainID: 1,
 		},
-		2: {
-			common.Address{3}: {
-				Address: common.Address{3},
-				Symbol:  "STT",
-			},
-			common.Address{4}: {
-				Address: common.Address{4},
-				Symbol:  "TTT",
-			},
+		&Token{
+			Address: common.Address{2},
+			Symbol:  "TNT",
+			ChainID: 1,
+		},
+		&Token{
+			Address: common.Address{3},
+			Symbol:  "STT",
+			ChainID: 2,
+		},
+		&Token{
+			Address: common.Address{4},
+			Symbol:  "TTT",
+			ChainID: 2,
 		},
 	}
-	overrideTokensInPlace(networks, testTokenStore)
-	_, found := testTokenStore[1][common.Address{1}]
+	testStore := &DefaultStore{
+		tokenList,
+		false,
+	}
+
+	overrideTokensInPlace(networks, testStore.tokenList)
+	tokens, err := testStore.GetTokens()
+	require.NoError(t, err)
+	tokenMap := toTokenMap(tokens)
+	_, found := tokenMap[1][common.Address{1}]
 	require.False(t, found)
-	require.Equal(t, common.Address{11}, testTokenStore[1][common.Address{11}].Address)
-	require.Equal(t, common.Address{2}, testTokenStore[1][common.Address{2}].Address)
-	_, found = testTokenStore[2][common.Address{3}]
+	require.Equal(t, common.Address{11}, tokenMap[1][common.Address{11}].Address)
+	require.Equal(t, common.Address{2}, tokenMap[1][common.Address{2}].Address)
+	_, found = tokenMap[2][common.Address{3}]
 	require.False(t, found)
-	require.Equal(t, common.Address{33}, testTokenStore[2][common.Address{33}].Address)
-	require.Equal(t, common.Address{4}, testTokenStore[2][common.Address{4}].Address)
+	require.Equal(t, common.Address{33}, tokenMap[2][common.Address{33}].Address)
+	require.Equal(t, common.Address{4}, tokenMap[2][common.Address{4}].Address)
+}
+
+func TestMergeTokenLists(t *testing.T) {
+	tokenList1 := []*Token{
+		&Token{
+			Address: common.Address{1},
+			Symbol:  "SNT",
+			ChainID: 1,
+		},
+	}
+	tokenList1Copy := []*Token{
+		&Token{
+			Address: common.Address{1},
+			Symbol:  "SNT",
+			ChainID: 1,
+		},
+	}
+	tokenList2 := []*Token{
+		&Token{
+			Address: common.Address{3},
+			Symbol:  "STT",
+			ChainID: 2,
+		},
+		&Token{
+			Address: common.Address{4},
+			Symbol:  "TTT",
+			ChainID: 2,
+		},
+	}
+	tokenList1Plus2 := []*Token{
+		&Token{
+			Address: common.Address{1},
+			Symbol:  "SNT",
+			ChainID: 1,
+		},
+		&Token{
+			Address: common.Address{3},
+			Symbol:  "STT",
+			ChainID: 2,
+		},
+		&Token{
+			Address: common.Address{4},
+			Symbol:  "TTT",
+			ChainID: 2,
+		},
+	}
+	tokenListEmpty := []*Token{}
+
+	mergedList := mergeTokenLists([][]*Token{tokenListEmpty, tokenListEmpty})
+	require.Equal(t, 0, len(mergedList))
+
+	mergedList = mergeTokenLists([][]*Token{tokenListEmpty, tokenList1})
+	require.True(t, reflect.DeepEqual(mergedList, tokenList1))
+
+	mergedList = mergeTokenLists([][]*Token{tokenList1, tokenList1Copy})
+	require.True(t, reflect.DeepEqual(mergedList, tokenList1))
+
+	mergedList = mergeTokenLists([][]*Token{tokenList1, tokenList2})
+	require.True(t, reflect.DeepEqual(mergedList, tokenList1Plus2))
 }

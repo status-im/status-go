@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -49,6 +50,9 @@ type Manager struct {
 	db             *sql.DB
 	RPCClient      *rpc.Client
 	networkManager *network.Manager
+	stores         []store
+	tokenList      []*Token
+	tokenMap       storeMap
 }
 
 func NewTokenManager(
@@ -56,55 +60,83 @@ func NewTokenManager(
 	RPCClient *rpc.Client,
 	networkManager *network.Manager,
 ) *Manager {
-	tokenManager := &Manager{db, RPCClient, networkManager}
-
-	overrideTokensInPlace(networkManager.GetConfiguredNetworks(), tokenStore)
+	defaultStore := newDefaultStore()
+	// Order of stores is important when merging token lists. The former prevale
+	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), defaultStore}, nil, nil}
 
 	return tokenManager
 }
 
 // overrideTokensInPlace overrides tokens in the store with the ones from the networks
 // BEWARE: overridden tokens will have their original address removed and replaced by the one in networks
-func overrideTokensInPlace(networks []params.Network, store map[uint64]map[common.Address]*Token) {
+func overrideTokensInPlace(networks []params.Network, tokens []*Token) {
 	for _, network := range networks {
 		if len(network.TokenOverrides) == 0 {
 			continue
 		}
 
-		// Map from original address to overridden address
-		overriddenMap := make(map[common.Address]common.Address, len(network.TokenOverrides))
-		tokensMap, ok := store[network.ChainID]
-		if !ok {
-			continue
-		}
 		for _, overrideToken := range network.TokenOverrides {
-			for _, token := range tokensMap {
+			for _, token := range tokens {
 				if token.Symbol == overrideToken.Symbol {
-					overriddenMap[token.Address] = overrideToken.Address
+					token.Address = overrideToken.Address
 				}
 			}
 		}
-		for originalAddress, newAddress := range overriddenMap {
-			newToken := *tokensMap[originalAddress]
-			tokensMap[newAddress] = &newToken
-			newToken.Address = newAddress
+	}
+}
 
-			delete(tokensMap, originalAddress)
+func mergeTokenLists(sliceLists [][]*Token) []*Token {
+	allKeys := make(map[string]bool)
+	res := []*Token{}
+	for _, list := range sliceLists {
+		for _, token := range list {
+			key := strconv.FormatUint(token.ChainID, 10) + token.Address.String()
+			if _, value := allKeys[key]; !value {
+				allKeys[key] = true
+				res = append(res, token)
+			}
 		}
 	}
+	return res
 }
 
 func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
 	if address == nativeChainAddress {
 		return true
 	}
-	tokensMap, ok := tokenStore[chainID]
+
+	tokensMap, ok := tm.tokenMap[chainID]
 	if !ok {
 		return false
 	}
 	_, ok = tokensMap[address]
 
 	return ok
+}
+
+func (tm *Manager) areTokensFetched() bool {
+	for _, store := range tm.stores {
+		if !store.areTokensFetched() {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (tm *Manager) fetchTokens() []*Token {
+	result := make([]*Token, 0)
+	for _, store := range tm.stores {
+		tokens, err := store.GetTokens()
+		if err != nil {
+			log.Error("can't fetch tokens from store: %s", err)
+			continue
+		}
+
+		result = mergeTokenLists([][]*Token{result, tokens})
+	}
+
+	return result
 }
 
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
@@ -130,12 +162,12 @@ func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token
 }
 
 func (tm *Manager) FindSNT(chainID uint64) *Token {
-	tokensMap, ok := tokenStore[chainID]
-	if !ok {
+	tokens, err := tm.GetTokens(chainID)
+	if err != nil {
 		return nil
 	}
 
-	for _, token := range tokensMap {
+	for _, token := range tokens {
 		if token.Symbol == "SNT" || token.Symbol == "STT" {
 			return token
 		}
@@ -163,25 +195,27 @@ func (tm *Manager) GetAllTokensAndNativeCurrencies() ([]*Token, error) {
 }
 
 func (tm *Manager) GetAllTokens() ([]*Token, error) {
-	result := make([]*Token, 0)
-	for _, tokens := range tokenStore {
-		for _, token := range tokens {
-			result = append(result, token)
-		}
+	if tm.areTokensFetched() {
+		return tm.tokenList, nil
 	}
+
+	tm.tokenList = tm.fetchTokens()
 
 	tokens, err := tm.GetCustoms()
 	if err != nil {
-		return nil, err
+		log.Error("can't fetch custom tokens: %s", err)
 	}
 
-	result = append(result, tokens...)
+	tm.tokenList = append(tm.tokenList, tokens...)
+	tm.tokenMap = toTokenMap(tm.tokenList)
 
-	return result, nil
+	overrideTokensInPlace(tm.networkManager.GetConfiguredNetworks(), tm.tokenList)
+
+	return tm.tokenList, nil
 }
 
 func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
-	tokensMap, ok := tokenStore[chainID]
+	tokensMap, ok := tm.tokenMap[chainID]
 	if !ok {
 		return nil, errors.New("no tokens for this network")
 	}
@@ -348,7 +382,12 @@ func (tm *Manager) GetVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
 		}
 
 		found := false
-		for _, token := range tokenStore[chainID] {
+		tokens, err := tm.GetTokens(chainID)
+		if err != nil {
+			continue
+		}
+
+		for _, token := range tokens {
 			if token.Address == address {
 				rst[chainID] = append(rst[chainID], token)
 				found = true
