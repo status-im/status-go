@@ -1289,6 +1289,38 @@ func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }
 
+func (api *PublicAPI) ChatMentionCheckMentions(chatID, text string) (string, error) {
+	return api.service.messenger.GetMentionsManager().CheckMentions(chatID, text)
+}
+
+func (api *PublicAPI) ChatMentionOnTextInput(chatID string, state *protocol.MentionState) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().OnTextInput(chatID, state)
+}
+
+func (api *PublicAPI) ChatMentionRecheckAtIdxs(chatID string, text string, publicKey string) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().RecheckAtIdxs(chatID, text, publicKey)
+}
+
+func (api *PublicAPI) ChatMentionCalculateSuggestions(chatID, text string) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().CalculateSuggestions(chatID, text)
+}
+
+func (api *PublicAPI) ChatMentionNewInputTextWithMention(chatID, text, primaryName string) *protocol.ChatMentionContext {
+	return api.service.messenger.GetMentionsManager().NewInputTextWithMention(chatID, text, primaryName)
+}
+
+func (api *PublicAPI) ChatMentionClearMentions(chatID string) {
+	api.service.messenger.GetMentionsManager().ClearMentions(chatID)
+}
+
+func (api *PublicAPI) ChatMentionHandleSelectionChange(chatID, text string, start int, end int) *protocol.ChatMentionContext {
+	return api.service.messenger.GetMentionsManager().HandleSelectionChange(chatID, text, start, end)
+}
+
+func (api *PublicAPI) ChatMentionToInputField(chatID, text string) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().ToInputField(chatID, text)
+}
+
 // -----
 // HELPER
 // -----

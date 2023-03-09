@@ -110,6 +110,7 @@ type Messenger struct {
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
 	accountsManager        *account.GethManager
+	mentionsManager        *MentionManager
 	logger                 *zap.Logger
 
 	outputCSV bool
@@ -505,6 +506,7 @@ func NewMessenger(
 		logger:                logger,
 		savedAddressesManager: savedAddressesManager,
 	}
+	messenger.mentionsManager = NewMentionManager(messenger)
 
 	if c.outputMessagesCSV {
 		messenger.outputCSV = c.outputMessagesCSV
@@ -6158,4 +6160,8 @@ func (m *Messenger) ImageServerURL() string {
 
 func (m *Messenger) myHexIdentity() string {
 	return common.PubkeyToHex(&m.identity.PublicKey)
+}
+
+func (m *Messenger) GetMentionsManager() *MentionManager {
+	return m.mentionsManager
 }
