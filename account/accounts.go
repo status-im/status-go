@@ -1,6 +1,7 @@
 package account
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -10,17 +11,22 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 )
 
 // errors
@@ -32,6 +38,7 @@ var (
 	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
+	ErrInvalidPersonalSignAccount     = errors.New("invalid account as only the selected one can generate a signature")
 )
 
 type ErrCannotLocateKeyFile struct {
@@ -44,11 +51,24 @@ func (e ErrCannotLocateKeyFile) Error() string {
 
 var zeroAddress = types.Address{}
 
+type SignParams struct {
+	Data     interface{} `json:"data"`
+	Address  string      `json:"account"`
+	Password string      `json:"password"`
+}
+
+type RecoverParams struct {
+	Message   string `json:"message"`
+	Signature string `json:"signature"`
+}
+
 // Manager represents account manager interface.
 type Manager struct {
-	mu       sync.RWMutex
-	Keydir   string
-	keystore types.KeyStore
+	mu         sync.RWMutex
+	rpcClient  *rpc.Client
+	rpcTimeout time.Duration
+	Keydir     string
+	keystore   types.KeyStore
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
@@ -611,4 +631,97 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 
 func (m *Manager) DeleteAccount(address types.Address, password string) error {
 	return m.keystore.Delete(types.Account{Address: address}, password)
+}
+
+func (m *Manager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error) {
+	exists, err := db.AddressExists(types.HexToAddress(address))
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return nil, errors.New("account doesn't exist")
+	}
+
+	key, err := m.VerifyAccountPassword(m.Keydir, address, password)
+	if _, ok := err.(*ErrCannotLocateKeyFile); ok {
+		key, err = m.generatePartialAccountKey(db, address, password)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &SelectedExtKey{
+		Address:    key.Address,
+		AccountKey: key,
+	}, nil
+}
+
+func (m *Manager) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
+	dbPath, err := db.GetPath(types.HexToAddress(address))
+	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
+	if err != nil {
+		return nil, err
+	}
+
+	rootAddress, err := db.GetWalletRootAddress()
+	if err != nil {
+		return nil, err
+	}
+	info, err := m.AccountsGenerator().LoadAccount(rootAddress.Hex(), password)
+	if err != nil {
+		return nil, err
+	}
+	masterID := info.ID
+
+	accInfosMap, err := m.AccountsGenerator().StoreDerivedAccounts(masterID, password, []string{path})
+	if err != nil {
+		return nil, err
+	}
+
+	_, key, err := m.AddressToDecryptedAccount(accInfosMap[path].Address, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+func (m *Manager) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
+	defer cancel()
+	var gethAddr gethcommon.Address
+	err = m.rpcClient.CallContextIgnoringLocalHandlers(
+		ctx,
+		&gethAddr,
+		m.rpcClient.UpstreamChainID,
+		params.PersonalRecoverMethodName,
+		rpcParams.Message, rpcParams.Signature)
+	addr = types.Address(gethAddr)
+
+	return
+}
+
+func (m *Manager) Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error) {
+	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
+		err = ErrInvalidPersonalSignAccount
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
+	defer cancel()
+	var gethResult hexutil.Bytes
+	err = m.rpcClient.CallContextIgnoringLocalHandlers(
+		ctx,
+		&gethResult,
+		m.rpcClient.UpstreamChainID,
+		params.PersonalSignMethodName,
+		rpcParams.Data, rpcParams.Address, rpcParams.Password)
+	result = types.HexBytes(gethResult)
+
+	return
 }

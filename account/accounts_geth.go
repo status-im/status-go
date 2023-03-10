@@ -1,9 +1,12 @@
 package account
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/rpc"
 )
 
 // GethManager represents account manager interface.
@@ -18,6 +21,11 @@ func NewGethManager() *GethManager {
 	m := &GethManager{}
 	m.Manager = &Manager{accountsGenerator: generator.New(m)}
 	return m
+}
+
+func (m *GethManager) SetRPCClient(rpcClient *rpc.Client, rpcTimeout time.Duration) {
+	m.Manager.rpcClient = rpcClient
+	m.Manager.rpcTimeout = rpcTimeout
 }
 
 // InitKeystore sets key manager and key store.

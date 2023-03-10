@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
@@ -107,7 +108,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -157,6 +158,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 		s.n,
 		s.config.ShhextConfig.InstallationID,
 		s.peerStore,
+		accountManager,
 		options...,
 	)
 	if err != nil {

@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
@@ -106,6 +107,7 @@ type Messenger struct {
 	pushNotificationClient *pushnotificationclient.Client
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
+	accountsManager        *account.GethManager
 	logger                 *zap.Logger
 
 	outputCSV bool
@@ -238,6 +240,7 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
+	accountsManager *account.GethManager,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -434,6 +437,7 @@ func NewMessenger(
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
 		communitiesManager:         communitiesManager,
+		accountsManager:            accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,

@@ -86,6 +86,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 		&testNode{shh: shh},
 		uuid.New().String(),
 		nil,
+		nil,
 		options...,
 	)
 	s.Require().NoError(err)

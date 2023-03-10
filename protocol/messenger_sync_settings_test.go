@@ -113,6 +113,7 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		&testNode{shh: shh},
 		uuid.New().String(),
 		nil,
+		nil,
 		options...,
 	)
 	s.Require().NoError(err)
