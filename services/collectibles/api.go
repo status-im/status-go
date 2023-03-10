@@ -2,10 +2,13 @@ package collectibles
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/collectibles"
@@ -15,11 +18,12 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, appDb *sql.DB) *API {
 	return &API{
 		RPCClient:       rpcClient,
 		accountsManager: accountsManager,
 		config:          config,
+		db:              NewCollectiblesDatabase(appDb),
 	}
 }
 
@@ -27,6 +31,7 @@ type API struct {
 	RPCClient       *rpc.Client
 	accountsManager *account.GethManager
 	config          *params.NodeConfig
+	db              *Database
 }
 
 type DeploymentDetails struct {
@@ -98,4 +103,65 @@ func (api *API) Deploy(ctx context.Context, chainID uint64, deploymentParameters
 	}
 
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
+}
+
+func (api *API) newCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
+	backend, err := api.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return collectibles.NewCollectibles(common.HexToAddress(contractAddress), backend)
+}
+
+func (api *API) multiplyWalletAddresses(amount int, contractAddresses []string) []string {
+	var totalAddresses []string
+	for i := 1; i <= amount; i++ {
+		totalAddresses = append(totalAddresses, contractAddresses...)
+	}
+	return totalAddresses
+}
+
+func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, users []string, amount int) (string, error) {
+	if len(users) == 0 {
+		return "", errors.New("users list is empty")
+	}
+
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+
+	// if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
+	// twice to every address - we need to send to smart contract table ["a", "a", "b", "b"]
+	totalAddresses := api.multiplyWalletAddresses(amount, users)
+
+	var usersAddresses = []common.Address{}
+	for _, k := range totalAddresses {
+		usersAddresses = append(usersAddresses, common.HexToAddress(k))
+	}
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+
+	tx, err := contractInst.MintTo(transactOpts, usersAddresses)
+	if err != nil {
+		return "", err
+	}
+
+	//save to db
+	_ = api.db.AddTokenOwners(chainID, contractAddress, totalAddresses)
+
+	return tx.Hash().Hex(), nil
+}
+
+func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	owner, err := contractInst.Owner(callOpts)
+	if err != nil {
+		return "", err
+	}
+	return owner.String(), nil
 }

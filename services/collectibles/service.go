@@ -1,6 +1,8 @@
 package collectibles
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
@@ -14,9 +16,9 @@ type Service struct {
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, appDb *sql.DB) *Service {
 	return &Service{
-		NewAPI(rpcClient, accountsManager, config),
+		NewAPI(rpcClient, accountsManager, config, appDb),
 	}
 }
 
