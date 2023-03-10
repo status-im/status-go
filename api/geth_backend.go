@@ -960,7 +960,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}); err != nil {
 		return
 	}
-
+	b.accountManager.SetRPCClient(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 	signal.SendNodeStarted()
 
 	b.transactor.SetNetworkID(config.NetworkID)
@@ -1456,7 +1456,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 	}
 
 	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, logutils.ZapLogger()); err != nil {
 			return err
 		}
 		// Set initial connection state

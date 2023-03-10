@@ -226,6 +226,7 @@ func main() {
 			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
 			installationID.String(),
 			nil,
+			backend.AccountManager(),
 			options...,
 		)
 		if err != nil {
