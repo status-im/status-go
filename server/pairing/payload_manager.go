@@ -605,3 +605,8 @@ func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor *Payloa
 		NewInstallationPayloadReceiver(l, encryptor, backend, deviceType),
 	}
 }
+
+func (i *InstallationPayloadMounterReceiver) LockPayload() {
+	i.InstallationPayloadMounter.LockPayload()
+	i.InstallationPayloadReceiver.LockPayload()
+}

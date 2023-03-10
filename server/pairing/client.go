@@ -136,11 +136,11 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 		return nil, err
 	}
 
-	pm, err := NewAccountPayloadMounter(pe, &config.Sender, logger)
+	pm, err := NewAccountPayloadMounter(pe, config.Sender, logger)
 	if err != nil {
 		return nil, err
 	}
-	rmm := NewRawMessagePayloadMounter(logger, pe, backend, &config.Sender)
+	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config.Sender)
 	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Sender.DeviceType)
 
 	return &SenderClient{
@@ -294,11 +294,11 @@ func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, conf
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
-	pr, err := NewAccountPayloadReceiver(pe, &config.Receiver, logger)
+	pr, err := NewAccountPayloadReceiver(pe, config.Receiver, logger)
 	if err != nil {
 		return nil, err
 	}
-	rmr := NewRawMessagePayloadReceiver(logger, pr.accountPayload, pe, backend, &config.Receiver)
+	rmr := NewRawMessagePayloadReceiver(logger, pr.accountPayload, pe, backend, config.Receiver)
 	ipmr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Receiver.DeviceType)
 
 	return &ReceiverClient{

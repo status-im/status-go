@@ -1008,7 +1008,7 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 	return string(data)
 }
 
-// GetConnectionStringForBeingBootstrapped starts a pairing.Receiving pairing.PairingServer
+// GetConnectionStringForBeingBootstrapped starts a pairing.ReceiverServer
 // then generates a pairing.ConnectionParams. Used when the device is Logged out or has no Account keys
 // and the device has no camera to read a QR code with
 //
@@ -1017,14 +1017,14 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Receiving, configJSON)
+	cs, err := pairing.StartUpReceiverServer(statusBackend, pairing.Receiving, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 	return cs
 }
 
-// GetConnectionStringForBootstrappingAnotherDevice starts a pairing.Sending pairing.Server
+// GetConnectionStringForBootstrappingAnotherDevice starts a pairing.SenderServer
 // then generates a pairing.ConnectionParams. Used when the device is Logged in and therefore has Account keys
 // and the device might not have a camera
 //
@@ -1032,9 +1032,9 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // sending account data to a mobile (device with camera)
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
 	if configJSON == "" {
-		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
+		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
 	}
-	cs, err := pairing.StartUpPairingServer(statusBackend, pairing.Sending, configJSON)
+	cs, err := pairing.StartUpSenderServer(statusBackend, pairing.Sending, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
