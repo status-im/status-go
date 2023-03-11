@@ -79,12 +79,12 @@ func (apm *AccountPayloadMounter) Mount() error {
 	}
 	l.Debug("after LoadFromSource")
 
-	pb, err := apm.accountPayloadMarshaller.MarshalToProtobuf()
+	pb, err := apm.accountPayloadMarshaller.MarshalProtobuf()
 	if err != nil {
 		return err
 	}
 	l.Debug(
-		"after MarshalToProtobuf",
+		"after MarshalProtobuf",
 		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.keys", apm.accountPayloadMarshaller.keys),
 		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.multiaccount", apm.accountPayloadMarshaller.multiaccount),
 		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apm.accountPayloadMarshaller.password),
@@ -317,4 +317,23 @@ func (r *InstallationPayloadLoader) LoadFromSource() error {
 	}
 	r.payload, err = proto.Marshal(rawMessageCollector.convertToSyncRawMessage())
 	return err
+}
+
+/*
+|--------------------------------------------------------------------------
+| PayloadMounters
+|--------------------------------------------------------------------------
+|
+| Funcs for all PayloadMounters AccountPayloadMounter, RawMessagePayloadMounter and InstallationPayloadMounter
+|
+*/
+
+func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*AccountPayloadMounter, *RawMessagePayloadMounter, *InstallationPayloadMounterReceiver, error) {
+	am, err := NewAccountPayloadMounter(pe, config, logger)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config)
+	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.DeviceType)
+	return am, rmm, imr, nil
 }

@@ -196,8 +196,8 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 	// Make and Load PairingPayloadMarshaller 1
 	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
-	// TEST PairingPayloadMarshaller 1 MarshalToProtobuf()
-	pb, err := ppm.MarshalToProtobuf()
+	// TEST PairingPayloadMarshaller 1 MarshalProtobuf()
+	pb, err := ppm.MarshalProtobuf()
 	pms.Require().NoError(err)
 	pms.Require().Len(pb, 1384)
 
@@ -226,7 +226,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	// Make and Load PairingPayloadMarshaller 1
 	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
-	pb, err := ppm.MarshalToProtobuf()
+	pb, err := ppm.MarshalProtobuf()
 	pms.Require().NoError(err)
 
 	// Make a Payload
@@ -280,7 +280,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	// Make and Load PairingPayloadMarshaller 1
 	ppm := NewPairingPayloadMarshaller(pp, pms.Logger)
 
-	pb, err := ppm.MarshalToProtobuf()
+	pb, err := ppm.MarshalProtobuf()
 	pms.Require().NoError(err)
 
 	// Make a Payload
@@ -334,8 +334,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {
 	_, err := rand.Read(AESKey)
 	pms.Require().NoError(err)
 
-	pm, err := NewMockEncryptOnlyPayloadManager(AESKey)
-	pms.Require().NoError(err)
+	pm := NewMockPayloadMounter(AESKey)
 
 	err = pm.Mount()
 	pms.Require().NoError(err)

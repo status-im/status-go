@@ -98,9 +98,6 @@ func (apr *AccountPayloadReceiver) Receive(data []byte) error {
 }
 
 func (apr *AccountPayloadReceiver) Received() []byte {
-	if apr.encryptor.payload.locked {
-		return nil
-	}
 	return apr.encryptor.getDecrypted()
 }
 
@@ -250,9 +247,6 @@ func (r *RawMessagePayloadReceiver) Receive(data []byte) error {
 }
 
 func (r *RawMessagePayloadReceiver) Received() []byte {
-	if r.encryptor.payload.locked {
-		return nil
-	}
 	return r.encryptor.getDecrypted()
 }
 
@@ -327,9 +321,6 @@ func (i *InstallationPayloadReceiver) Receive(data []byte) error {
 }
 
 func (i *InstallationPayloadReceiver) Received() []byte {
-	if i.encryptor.payload.locked {
-		return nil
-	}
 	return i.encryptor.getDecrypted()
 }
 
@@ -371,4 +362,23 @@ func (r *InstallationPayloadStorer) StoreToSource() error {
 		return err
 	}
 	return messenger.HandleSyncRawMessages(rawMessages)
+}
+
+/*
+|--------------------------------------------------------------------------
+| PayloadReceivers
+|--------------------------------------------------------------------------
+|
+| Funcs for all PayloadReceivers AccountPayloadReceiver, RawMessagePayloadReceiver and InstallationPayloadMounter
+|
+*/
+
+func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) (*AccountPayloadReceiver, *RawMessagePayloadReceiver, *InstallationPayloadMounterReceiver, error) {
+	ar, err := NewAccountPayloadReceiver(pe, config, logger)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	rmr := NewRawMessagePayloadReceiver(logger, ar.accountPayload, pe, backend, config)
+	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.DeviceType)
+	return ar, rmr, imr, nil
 }

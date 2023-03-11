@@ -29,6 +29,7 @@ import (
 |
 */
 
+// BaseClient is responsible for lower level pairing.Client functionality common to dependent Client types
 type BaseClient struct {
 	*http.Client
 	serverCert      *x509.Certificate
@@ -37,6 +38,7 @@ type BaseClient struct {
 	serverChallenge []byte
 }
 
+// NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
 func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	u, err := c.URL()
 	if err != nil {
@@ -84,6 +86,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	}, nil
 }
 
+// getChallenge makes a call to the identified Server and receives a [32]byte challenge
 func (c *BaseClient) getChallenge() error {
 	c.baseAddress.Path = pairingChallenge
 	resp, err := c.Get(c.baseAddress.String())
@@ -99,6 +102,7 @@ func (c *BaseClient) getChallenge() error {
 	return err
 }
 
+// doChallenge checks if there is a serverChallenge and encrypts the challenge using the shared AES key
 func (c *BaseClient) doChallenge(req *http.Request) error {
 	if c.serverChallenge != nil {
 		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
@@ -120,6 +124,7 @@ func (c *BaseClient) doChallenge(req *http.Request) error {
 |
 */
 
+// SenderClient is responsible for sending pairing data to a ReceiverServer
 type SenderClient struct {
 	*BaseClient
 	accountMounter      PayloadMounter
@@ -127,6 +132,7 @@ type SenderClient struct {
 	installationMounter *InstallationPayloadMounterReceiver
 }
 
+// NewSenderClient returns a fully qualified SenderClient created with the incoming parameters
 func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
 	logger := logutils.ZapLogger().Named("SenderClient")
 	pe := NewPayloadEncryptor(c.aesKey)
@@ -136,16 +142,14 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 		return nil, err
 	}
 
-	pm, err := NewAccountPayloadMounter(pe, config.Sender, logger)
+	am, rmm, imr, err := NewPayloadMounters(logger, pe, backend, config.Sender)
 	if err != nil {
 		return nil, err
 	}
-	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config.Sender)
-	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Sender.DeviceType)
 
 	return &SenderClient{
 		BaseClient:          bc,
-		accountMounter:      pm,
+		accountMounter:      am,
 		rawMessageMounter:   rmm,
 		installationMounter: imr,
 	}, nil
@@ -234,7 +238,8 @@ func (c *SenderClient) receiveInstallationData() error {
 	return nil
 }
 
-func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON string) (*SenderClient, error) {
+// setupSendingClient creates a new SenderClient after parsing string inputs
+func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (*SenderClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
@@ -252,6 +257,7 @@ func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON st
 	return NewSenderClient(backend, ccp, conf)
 }
 
+// StartUpSendingClient creates a SenderClient and triggers all `send` calls in sequence to the ReceiverServer
 func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
 	c, err := setupSendingClient(backend, cs, configJSON)
 	if err != nil {
@@ -277,6 +283,7 @@ func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string)
 |
 */
 
+// ReceiverClient is responsible for accepting pairing data to a SenderServer
 type ReceiverClient struct {
 	*BaseClient
 
@@ -285,6 +292,7 @@ type ReceiverClient struct {
 	installationReceiver *InstallationPayloadMounterReceiver
 }
 
+// NewReceiverClient returns a fully qualified ReceiverClient created with the incoming parameters
 func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
 	bc, err := NewBaseClient(c)
 	if err != nil {
@@ -294,18 +302,16 @@ func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, conf
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
-	pr, err := NewAccountPayloadReceiver(pe, config.Receiver, logger)
+	ar, rmr, imr, err := NewPayloadReceivers(logger, pe, backend, config.Receiver)
 	if err != nil {
 		return nil, err
 	}
-	rmr := NewRawMessagePayloadReceiver(logger, pr.accountPayload, pe, backend, config.Receiver)
-	ipmr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.Receiver.DeviceType)
 
 	return &ReceiverClient{
 		BaseClient:           bc,
-		accountReceiver:      pr,
+		accountReceiver:      ar,
 		rawMessageReceiver:   rmr,
-		installationReceiver: ipmr,
+		installationReceiver: imr,
 	}, nil
 }
 
@@ -316,13 +322,10 @@ func (c *ReceiverClient) receiveAccountData() error {
 		return err
 	}
 
-	if c.serverChallenge != nil {
-		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	err = c.doChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
 	}
 
 	resp, err := c.Do(req)
@@ -360,13 +363,10 @@ func (c *ReceiverClient) receiveSyncDeviceData() error {
 		return err
 	}
 
-	if c.serverChallenge != nil {
-		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	err = c.doChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
 	}
 
 	resp, err := c.Do(req)
@@ -409,12 +409,11 @@ func (c *ReceiverClient) sendInstallationData() error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	if c.serverChallenge != nil {
-		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
+
+	err = c.doChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
 	}
 
 	resp, err := c.Do(req)
@@ -433,7 +432,8 @@ func (c *ReceiverClient) sendInstallationData() error {
 	return nil
 }
 
-func setupReceivingClient(backend *api.GethStatusBackend, cs string, configJSON string) (*ReceiverClient, error) {
+// setupReceivingClient creates a new ReceiverClient after parsing string inputs
+func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*ReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
@@ -451,6 +451,7 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs string, configJSON 
 	return NewReceiverClient(backend, ccp, conf)
 }
 
+// StartUpReceivingClient creates a ReceiverClient and triggers all `receive` calls in sequence to the SenderServer
 func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
 	c, err := setupReceivingClient(backend, cs, configJSON)
 	if err != nil {

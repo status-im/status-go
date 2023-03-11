@@ -43,7 +43,7 @@ func NewPairingPayloadMarshaller(ap *AccountPayload, logger *zap.Logger) *Accoun
 	return &AccountPayloadMarshaller{logger: logger, AccountPayload: ap}
 }
 
-func (ppm *AccountPayloadMarshaller) MarshalToProtobuf() ([]byte, error) {
+func (ppm *AccountPayloadMarshaller) MarshalProtobuf() ([]byte, error) {
 	return proto.Marshal(&protobuf.LocalPairingPayload{
 		Keys:         ppm.accountKeysToProtobuf(),
 		Multiaccount: ppm.multiaccount.ToProtobuf(),
@@ -104,6 +104,7 @@ func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
 
+// InstallationPayloadMounterReceiver represents an InstallationPayload Repository
 type InstallationPayloadMounterReceiver struct {
 	*InstallationPayloadMounter
 	*InstallationPayloadReceiver

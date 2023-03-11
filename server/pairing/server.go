@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
 )
 
@@ -31,6 +30,7 @@ type BaseServer struct {
 	server.Server
 
 	cookieStore *sessions.CookieStore
+	encryptor   *PayloadEncryptor
 
 	pk *ecdsa.PublicKey
 	ek []byte
@@ -39,7 +39,7 @@ type BaseServer struct {
 }
 
 // NewBaseServer returns a *BaseServer init from the given *SenderServerConfig
-func NewBaseServer(logger *zap.Logger, config *ServerConfig) (*BaseServer, error) {
+func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig) (*BaseServer, error) {
 	cs, err := makeCookieStore()
 	if err != nil {
 		return nil, err
@@ -52,6 +52,7 @@ func NewBaseServer(logger *zap.Logger, config *ServerConfig) (*BaseServer, error
 			nil,
 			logger,
 		),
+		encryptor:   e,
 		cookieStore: cs,
 		pk:          config.PK,
 		ek:          config.EK,
@@ -98,7 +99,7 @@ func (s *BaseServer) GetCookieStore() *sessions.CookieStore {
 }
 
 func (s *BaseServer) DecryptPlain(data []byte) ([]byte, error) {
-	return common.Decrypt(data, s.ek)
+	return s.encryptor.decryptPlain(data)
 }
 
 func MakeServerConfig(config *ServerConfig) error {
@@ -151,35 +152,33 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 	logger := logutils.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.Server.EK)
 
-	bs, err := NewBaseServer(logger, config.Server)
+	bs, err := NewBaseServer(logger, e, config.Server)
 	if err != nil {
 		return nil, err
 	}
 
-	pm, err := NewAccountPayloadMounter(e, config.Sender, logger)
+	am, rmm, imr, err := NewPayloadMounters(logger, e, backend, config.Sender)
 	if err != nil {
 		return nil, err
 	}
-	rmpm := NewRawMessagePayloadMounter(logger, e, backend, config.Sender)
-	ipm := NewInstallationPayloadMounterReceiver(logger, e, backend, config.Sender.DeviceType)
 
 	return &SenderServer{
 		BaseServer:          bs,
-		accountMounter:      pm,
-		rawMessageMounter:   rmpm,
-		installationMounter: ipm,
+		accountMounter:      am,
+		rawMessageMounter:   rmm,
+		installationMounter: imr,
 	}, nil
 }
 
 func (s *SenderServer) startSendingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:      handlePairingChallenge(s),
-		pairingSendAccount:    challengeMiddleware(s, handleSendAccount(s, s.accountMounter)),
-		pairingSendSyncDevice: challengeMiddleware(s, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
+		pairingSendAccount:    middlewareChallenge(s, handleSendAccount(s, s.accountMounter)),
+		pairingSendSyncDevice: middlewareChallenge(s, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		// receive installation data from receiver
-		pairingReceiveInstallation: challengeMiddleware(s, handleReceiveInstallation(s, s.installationMounter)),
+		pairingReceiveInstallation: middlewareChallenge(s, handleReceiveInstallation(s, s.installationMounter)),
 	})
 	return s.Start()
 }
@@ -243,17 +242,15 @@ func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerCon
 	logger := logutils.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.Server.EK)
 
-	bs, err := NewBaseServer(logger, config.Server)
+	bs, err := NewBaseServer(logger, e, config.Server)
 	if err != nil {
 		return nil, err
 	}
 
-	ar, err := NewAccountPayloadReceiver(e, config.Receiver, logger)
+	ar, rmr, imr, err := NewPayloadReceivers(logger, e, backend, config.Receiver)
 	if err != nil {
 		return nil, err
 	}
-	rmr := NewRawMessagePayloadReceiver(logger, ar.accountPayload, e, backend, config.Receiver)
-	imr := NewInstallationPayloadMounterReceiver(logger, e, backend, config.Receiver.DeviceType)
 
 	return &ReceiverServer{
 		BaseServer:           bs,

@@ -3,6 +3,7 @@ package pairing
 import (
 	"crypto/ecdsa"
 	"crypto/tls"
+
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 )
@@ -79,15 +80,15 @@ func NewSenderServerConfig() *SenderServerConfig {
 
 func NewSenderClientConfig() *SenderClientConfig {
 	return &SenderClientConfig{
-		Sender: &SenderConfig{},
-		Client: &ClientConfig{},
+		Sender: new(SenderConfig),
+		Client: new(ClientConfig),
 	}
 }
 
 func NewReceiverClientConfig() *ReceiverClientConfig {
 	return &ReceiverClientConfig{
-		Receiver: &ReceiverConfig{},
-		Client:   &ClientConfig{},
+		Receiver: new(ReceiverConfig),
+		Client:   new(ClientConfig),
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/asn1"
-
 	"math/big"
 	"net"
 	"testing"

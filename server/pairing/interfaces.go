@@ -5,11 +5,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// PayloadMounterReceiver represents a struct that can:
+//  - mount payload data from a PayloadRepository or a PayloadLoader into memory (PayloadMounter.Mount)
+//  - prepare data to be sent encrypted (PayloadMounter.ToSend) via some transport
+//  - receive and prepare encrypted transport data (PayloadReceiver.Receive) to be stored
+//  - prepare the received (PayloadReceiver.Received) data to be stored to a PayloadRepository or a PayloadStorer
 type PayloadMounterReceiver interface {
 	PayloadMounter
 	PayloadReceiver
 }
 
+// PayloadRepository represents a struct that can both load and store data to an internally managed data store
 type PayloadRepository interface {
 	PayloadLoader
 	PayloadStorer
@@ -25,13 +31,16 @@ type PayloadResetter interface {
 	ResetPayload()
 }
 
-type Encryptor interface {
-	// EncryptPlain encrypts the given plaintext using internal key(s)
-	EncryptPlain(plaintext []byte) ([]byte, error)
-}
-
 type HandlerServer interface {
 	GetLogger() *zap.Logger
 	GetCookieStore() *sessions.CookieStore
 	DecryptPlain([]byte) ([]byte, error)
+}
+
+type ProtobufMarshaler interface {
+	MarshalProtobuf() ([]byte, error)
+}
+
+type ProtobufUnmarshaler interface {
+	UnmarshalProtobuf([]byte) error
 }

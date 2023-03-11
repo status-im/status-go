@@ -2,8 +2,6 @@ package pairing
 
 import (
 	"crypto/rand"
-	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -18,96 +16,7 @@ func (ep *EncryptionPayload) lock() {
 	ep.locked = true
 }
 
-// PayloadEncryptionManager is responsible for encrypting and decrypting payload data
-type PayloadEncryptionManager struct {
-	logger   *zap.Logger
-	aesKey   []byte
-	toSend   *EncryptionPayload
-	received *EncryptionPayload
-}
-
-func NewPayloadEncryptionManager(aesKey []byte, logger *zap.Logger) (*PayloadEncryptionManager, error) {
-	return &PayloadEncryptionManager{logger.Named("PayloadEncryptionManager"), aesKey, new(EncryptionPayload), new(EncryptionPayload)}, nil
-}
-
-// EncryptPlain encrypts any given plain text using the internal AES key and returns the encrypted value
-// This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
-func (pem *PayloadEncryptionManager) EncryptPlain(plaintext []byte) ([]byte, error) {
-	l := pem.logger.Named("EncryptPlain()")
-	l.Debug("fired")
-
-	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
-}
-
-func (pem *PayloadEncryptionManager) Encrypt(data []byte) error {
-	l := pem.logger.Named("Encrypt()")
-	l.Debug("fired")
-
-	ep, err := common.Encrypt(data, pem.aesKey, rand.Reader)
-	if err != nil {
-		return err
-	}
-
-	pem.toSend.plain = data
-	pem.toSend.encrypted = ep
-
-	l.Debug(
-		"after common.Encrypt",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("ep", ep),
-	)
-
-	return nil
-}
-
-func (pem *PayloadEncryptionManager) Decrypt(data []byte) error {
-	l := pem.logger.Named("Decrypt()")
-	l.Debug("fired")
-
-	pd, err := common.Decrypt(data, pem.aesKey)
-	l.Debug(
-		"after common.Decrypt(data, pem.aesKey)",
-		zap.Binary("data", data),
-		zap.Binary("pem.aesKey", pem.aesKey),
-		zap.Binary("pd", pd),
-		zap.Error(err),
-	)
-	if err != nil {
-		return err
-	}
-
-	pem.received.encrypted = data
-	pem.received.plain = pd
-	return nil
-}
-
-func (pem *PayloadEncryptionManager) ToSend() []byte {
-	if pem.toSend.locked {
-		return nil
-	}
-	return pem.toSend.encrypted
-}
-
-func (pem *PayloadEncryptionManager) Received() []byte {
-	if pem.toSend.locked {
-		return nil
-	}
-	return pem.received.plain
-}
-
-func (pem *PayloadEncryptionManager) ResetPayload() {
-	pem.toSend = new(EncryptionPayload)
-	pem.received = new(EncryptionPayload)
-}
-
-func (pem *PayloadEncryptionManager) LockPayload() {
-	l := pem.logger.Named("LockPayload")
-	l.Debug("fired")
-
-	pem.toSend.lock()
-	pem.received.lock()
-}
+// TODO resolve the many cases of other structs simply wrapping their encryptor rather than embedding the functionality
 
 // PayloadEncryptor is responsible for encrypting and decrypting payload data
 type PayloadEncryptor struct {
@@ -134,6 +43,12 @@ func (pem *PayloadEncryptor) Renew() *PayloadEncryptor {
 // This function is different to Encrypt as the internal EncryptionPayload.encrypted value is not set
 func (pem *PayloadEncryptor) encryptPlain(plaintext []byte) ([]byte, error) {
 	return common.Encrypt(plaintext, pem.aesKey, rand.Reader)
+}
+
+// decryptPlain decrypts any given plain text using the internal AES key and returns the encrypted value
+// This function is different to Decrypt as the internal EncryptionPayload.plain value is not set
+func (pem *PayloadEncryptor) decryptPlain(plaintext []byte) ([]byte, error) {
+	return common.Decrypt(plaintext, pem.aesKey)
 }
 
 func (pem *PayloadEncryptor) encrypt(data []byte) error {

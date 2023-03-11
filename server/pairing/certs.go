@@ -18,6 +18,8 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
+// TODO Reconcile duplicate function here and in server/certs.go
+
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()
 	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
