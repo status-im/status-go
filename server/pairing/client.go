@@ -241,7 +241,7 @@ func setupSendingClient(backend *api.GethStatusBackend, cs string, configJSON st
 		return nil, err
 	}
 
-	conf := new(SenderClientConfig)
+	conf := NewSenderClientConfig()
 	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return nil, err
@@ -440,7 +440,7 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs string, configJSON 
 		return nil, err
 	}
 
-	conf := new(ReceiverClientConfig)
+	conf := NewReceiverClientConfig()
 	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return nil, err

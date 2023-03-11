@@ -30,62 +30,61 @@ func (s *PairingServerSuite) SetupTest() {
 }
 
 func (s *PairingServerSuite) TestMultiBackgroundForeground() {
-	err := s.PS.Start()
+	err := s.SS.Start()
 	s.Require().NoError(err)
-	s.PS.ToBackground()
-	s.PS.ToForeground()
-	s.PS.ToBackground()
-	s.PS.ToBackground()
-	s.PS.ToForeground()
-	s.PS.ToForeground()
-	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.PS.MakeBaseURL().String()) // nolint: gosimple
+	s.SS.ToBackground()
+	s.SS.ToForeground()
+	s.SS.ToBackground()
+	s.SS.ToBackground()
+	s.SS.ToForeground()
+	s.SS.ToForeground()
+	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.SS.MakeBaseURL().String()) // nolint: gosimple
 }
 
 func (s *PairingServerSuite) TestMultiTimeout() {
-	s.PS.SetTimeout(20)
+	s.SS.SetTimeout(20)
 
-	err := s.PS.Start()
+	err := s.SS.Start()
 	s.Require().NoError(err)
 
-	s.PS.ToBackground()
-	s.PS.ToForeground()
-	s.PS.ToBackground()
-	s.PS.ToBackground()
-	s.PS.ToForeground()
-	s.PS.ToForeground()
+	s.SS.ToBackground()
+	s.SS.ToForeground()
+	s.SS.ToBackground()
+	s.SS.ToBackground()
+	s.SS.ToForeground()
+	s.SS.ToForeground()
 
-	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.PS.MakeBaseURL().String()) // nolint: gosimple
+	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.SS.MakeBaseURL().String()) // nolint: gosimple
 
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToBackground()
+	s.SS.ToBackground()
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToForeground()
+	s.SS.ToForeground()
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToBackground()
+	s.SS.ToBackground()
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToBackground()
+	s.SS.ToBackground()
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToForeground()
+	s.SS.ToForeground()
 	time.Sleep(7 * time.Millisecond)
-	s.PS.ToForeground()
+	s.SS.ToForeground()
 
 	// Wait for timeout to expire
 	time.Sleep(40 * time.Millisecond)
-	s.Require().False(s.PS.IsRunning())
+	s.Require().False(s.SS.IsRunning())
 }
 
 // TestPairingServer_StartPairingSend tests that a Server can send data to a ReceiverClient
 func (s *PairingServerSuite) TestPairingServer_StartPairingSend() {
-	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
-	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
-	s.Require().NoError(err)
-	s.PS.PayloadManager = pm
-	s.PS.mode = Sending
+	// Replace PairingServer.accountMounter with a MockPayloadMounter
+	pm := NewMockPayloadMounter(s.EphemeralAES)
+	s.SS.accountMounter = pm
+	s.SS.mode = Sending
 
-	err = s.PS.StartPairing()
+	err := s.SS.startSendingData()
 	s.Require().NoError(err)
 
-	cp, err := s.PS.MakeConnectionParams()
+	cp, err := s.SS.MakeConnectionParams()
 	s.Require().NoError(err)
 
 	qr := cp.ToString()
@@ -95,12 +94,12 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingSend() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{})
+	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{Receiver: &ReceiverConfig{}, Client: &ClientConfig{}})
 	s.Require().NoError(err)
 
 	// Compare cert values
 	cert := c.serverCert
-	cl := s.PS.GetCert().Leaf
+	cl := s.SS.GetCert().Leaf
 	s.Require().Equal(cl.Signature, cert.Signature)
 	s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).X.Cmp(cert.PublicKey.(*ecdsa.PublicKey).X))
 	s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).Y.Cmp(cert.PublicKey.(*ecdsa.PublicKey).Y))
@@ -118,24 +117,22 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingSend() {
 	err = c.receiveAccountData()
 	s.Require().NoError(err)
 
-	s.Require().Equal(c.accountReceiver.Received(), s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).toSend.plain)
-	s.Require().Equal(c.accountReceiver.(*MockPayloadReceiver).encryptor.getEncrypted(), s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).toSend.encrypted)
-	s.Require().Nil(s.PS.Received())
+	s.Require().Equal(c.accountReceiver.Received(), s.SS.accountMounter.(*MockPayloadMounter).encryptor.getDecrypted())
+	s.Require().Equal(c.accountReceiver.(*MockPayloadReceiver).encryptor.getEncrypted(), s.SS.accountMounter.(*MockPayloadMounter).ToSend())
 }
 
 // TestPairingServer_StartPairingReceive tests that a Server can receive data to a SenderClient
 func (s *PairingServerSuite) TestPairingServer_StartPairingReceive() {
 	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
-	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
+	pm := NewMockPayloadReceiver(s.EphemeralAES)
+	s.RS.accountReceiver = pm
+
+	s.RS.mode = Receiving
+
+	err := s.RS.startReceivingData()
 	s.Require().NoError(err)
-	s.PS.PayloadManager = pm
 
-	s.PS.mode = Receiving
-
-	err = s.PS.StartPairing()
-	s.Require().NoError(err)
-
-	cp, err := s.PS.MakeConnectionParams()
+	cp, err := s.RS.MakeConnectionParams()
 	s.Require().NoError(err)
 
 	qr := cp.ToString()
@@ -145,12 +142,12 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingReceive() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewSenderClient(nil, ccp, &SenderClientConfig{})
+	c, err := NewSenderClient(nil, ccp, &SenderClientConfig{Sender: &SenderConfig{}, Client: &ClientConfig{}})
 	s.Require().NoError(err)
 
 	// Compare cert values
 	cert := c.serverCert
-	cl := s.PS.GetCert().Leaf
+	cl := s.RS.GetCert().Leaf
 	s.Require().Equal(cl.Signature, cert.Signature)
 	s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).X.Cmp(cert.PublicKey.(*ecdsa.PublicKey).X))
 	s.Require().Zero(cl.PublicKey.(*ecdsa.PublicKey).Y.Cmp(cert.PublicKey.(*ecdsa.PublicKey).Y))
@@ -167,22 +164,20 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingReceive() {
 	err = c.sendAccountData()
 	s.Require().NoError(err)
 
-	s.Require().Equal(c.accountMounter.(*MockPayloadMounter).encryptor.getDecrypted(), s.PS.Received())
-	s.Require().Equal(s.PS.PayloadManager.(*MockEncryptOnlyPayloadManager).received.encrypted, c.accountMounter.(*MockPayloadMounter).encryptor.getEncrypted())
-	s.Require().Nil(s.PS.ToSend())
+	s.Require().Equal(c.accountMounter.(*MockPayloadMounter).encryptor.getDecrypted(), s.RS.accountReceiver.Received())
+	s.Require().Equal(s.RS.accountReceiver.(*MockPayloadReceiver).encryptor.getEncrypted(), c.accountMounter.(*MockPayloadMounter).encryptor.getEncrypted())
 }
 
 func (s *PairingServerSuite) sendingSetup() *ReceiverClient {
-	// Replace PairingServer.PayloadManager with a MockEncryptOnlyPayloadManager
-	pm, err := NewMockEncryptOnlyPayloadManager(s.EphemeralAES)
-	s.Require().NoError(err)
-	s.PS.PayloadManager = pm
-	s.PS.mode = Sending
+	// Replace PairingServer.PayloadManager with a MockPayloadReceiver
+	pm := NewMockPayloadMounter(s.EphemeralAES)
+	s.SS.accountMounter = pm
+	s.SS.mode = Sending
 
-	err = s.PS.StartPairing()
+	err := s.SS.startSendingData()
 	s.Require().NoError(err)
 
-	cp, err := s.PS.MakeConnectionParams()
+	cp, err := s.SS.MakeConnectionParams()
 	s.Require().NoError(err)
 
 	qr := cp.ToString()
@@ -192,7 +187,7 @@ func (s *PairingServerSuite) sendingSetup() *ReceiverClient {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{})
+	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{Receiver: &ReceiverConfig{}, Client: &ClientConfig{}})
 	s.Require().NoError(err)
 
 	// Replace PairingClient.PayloadManager with a MockEncryptOnlyPayloadManager
@@ -283,17 +278,17 @@ func makeThingToSay() (string, error) {
 }
 
 func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
-	s.PS.mode = Sending
-	s.PS.SetHandlers(server.HandlerPatternMap{"/hello": testHandler(s.T())})
+	s.SS.mode = Sending
+	s.SS.SetHandlers(server.HandlerPatternMap{"/hello": testHandler(s.T())})
 
-	err := s.PS.Start()
+	err := s.SS.Start()
 	s.Require().NoError(err)
 
 	// Give time for the sever to be ready, hacky I know, I'll iron this out
 	time.Sleep(100 * time.Millisecond)
 
 	// Server generates a QR code connection string
-	cp, err := s.PS.MakeConnectionParams()
+	cp, err := s.SS.MakeConnectionParams()
 	s.Require().NoError(err)
 
 	qr := cp.ToString()
@@ -303,7 +298,7 @@ func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{})
+	c, err := NewReceiverClient(nil, ccp, &ReceiverClientConfig{Receiver: &ReceiverConfig{}, Client: &ClientConfig{}})
 	s.Require().NoError(err)
 
 	thing, err := makeThingToSay()

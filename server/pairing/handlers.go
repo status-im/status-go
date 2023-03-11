@@ -127,6 +127,7 @@ func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.H
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 			logger.Error("pmr.Mount()", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
 

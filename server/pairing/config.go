@@ -3,7 +3,6 @@ package pairing
 import (
 	"crypto/ecdsa"
 	"crypto/tls"
-	"encoding/json"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 )
@@ -71,147 +70,30 @@ type ReceiverServerConfig struct {
 	Server   *ServerConfig
 }
 
-// VVV Old code below this line VVV
-
-type PayloadSourceSenderConfig struct {
-	KeyUID   string `json:"keyUID"`
-	Password string `json:"password"`
-}
-
-type PayloadSourceReceiverConfig struct {
-	KDFIterations int `json:"kdfIterations"`
-	NodeConfig    *params.NodeConfig
-	// this field already exists within params.NodeConfig, but it doesn't support json marshalling, so we need to duplicate it here
-	RootDataDir string
-	// corresponding to field current_network from table settings, so that we can override current network from sender
-	SettingCurrentNetwork string
-}
-
-// PayloadSourceConfig represents location and access data of the pairing payload
-// ONLY available from the application client
-type PayloadSourceConfig struct {
-	// required for sender and receiver, there are some different cases:
-	// 1. for sender, KeystorePath must end with keyUID
-	// 2. for receiver, KeystorePath must not end with keyUID (because keyUID is not known yet)
-	KeystorePath string `json:"keystorePath"`
-	// required for sender and receiver, SendPairInstallation need this information
-	DeviceType string `json:"deviceType"`
-	*PayloadSourceSenderConfig
-	*PayloadSourceReceiverConfig
-	// Timeout the number of milliseconds after which the pairing server will automatically terminate
-	Timeout uint `json:"timeout"`
-}
-
-type Config struct {
-	// Connection fields
-	PK       *ecdsa.PublicKey
-	EK       []byte
-	Cert     *tls.Certificate
-	Hostname string
-	Mode     Mode
-
-	// AccountPayload management fields
-	*AccountPayloadManagerConfig
-}
-
-// AccountPayloadManagerConfig represents the initialisation parameters required for a AccountPayloadManager
-type AccountPayloadManagerConfig struct {
-	DB *multiaccounts.Database
-	*PayloadSourceConfig
-	// only used for the receiver side
-	LoggedInKeyUID string
-}
-
-// Superfluous below this comment, specific config types makes this redundant.
-// VVV I like the idea here though VVV
-
-func (a *AccountPayloadManagerConfig) GetNodeConfig() *params.NodeConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
-		return a.NodeConfig
+func NewSenderServerConfig() *SenderServerConfig {
+	return &SenderServerConfig{
+		Sender: new(SenderConfig),
+		Server: new(ServerConfig),
 	}
-	return nil
 }
 
-func (a *AccountPayloadManagerConfig) GetSettingCurrentNetwork() string {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
-		return a.SettingCurrentNetwork
+func NewSenderClientConfig() *SenderClientConfig {
+	return &SenderClientConfig{
+		Sender: &SenderConfig{},
+		Client: &ClientConfig{},
 	}
-	return ""
 }
 
-func (a *AccountPayloadManagerConfig) GetDeviceType() string {
-	if a.PayloadSourceConfig != nil {
-		return a.DeviceType
+func NewReceiverClientConfig() *ReceiverClientConfig {
+	return &ReceiverClientConfig{
+		Receiver: &ReceiverConfig{},
+		Client:   &ClientConfig{},
 	}
-	return ""
 }
 
-func (a *AccountPayloadManagerConfig) GetPayloadSourceSenderConfig() *PayloadSourceSenderConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceSenderConfig != nil {
-		return a.PayloadSourceSenderConfig
+func NewReceiverServerConfig() *ReceiverServerConfig {
+	return &ReceiverServerConfig{
+		Receiver: new(ReceiverConfig),
+		Server:   new(ServerConfig),
 	}
-	return nil
-}
-
-func (a *AccountPayloadManagerConfig) GetPayloadSourceReceiverConfig() *PayloadSourceReceiverConfig {
-	if a.PayloadSourceConfig != nil && a.PayloadSourceConfig.PayloadSourceReceiverConfig != nil {
-		return a.PayloadSourceReceiverConfig
-	}
-	return nil
-}
-
-func (a *AccountPayloadManagerConfig) GetKeystorePath() string {
-	if a.PayloadSourceConfig != nil {
-		return a.KeystorePath
-	}
-	return ""
-}
-
-func (a *AccountPayloadManagerConfig) GetTimeout() uint {
-	if a.PayloadSourceConfig != nil {
-		return a.Timeout
-	}
-	return 0
-}
-
-type payloadSourceUnmarshalCallback func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error)
-
-func NewPayloadSourceForClient(configJSON string, mode Mode) (*PayloadSourceConfig, error) {
-	return unmarshalPayloadSourceConfig(configJSON, func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
-		if mode == Sending && conf.NodeConfig == nil {
-			return nil, ErrNodeConfigNilAsReceiver
-		}
-		if mode == Receiving && conf.KeyUID == "" {
-			return nil, ErrKeyUIDEmptyAsSender
-		}
-		return updateRootDataDirToNodeConfig(conf)
-	})
-}
-
-func NewPayloadSourceForServer(configJSON string, mode Mode) (*PayloadSourceConfig, error) {
-	return unmarshalPayloadSourceConfig(configJSON, func(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
-		if mode == Sending && conf.KeyUID == "" {
-			return nil, ErrKeyUIDEmptyAsSender
-		}
-		if mode == Receiving && conf.NodeConfig == nil {
-			return nil, ErrNodeConfigNilAsReceiver
-		}
-		return updateRootDataDirToNodeConfig(conf)
-	})
-}
-
-func updateRootDataDirToNodeConfig(conf *PayloadSourceConfig) (*PayloadSourceConfig, error) {
-	if conf.PayloadSourceReceiverConfig != nil && conf.PayloadSourceReceiverConfig.NodeConfig != nil {
-		conf.NodeConfig.RootDataDir = conf.RootDataDir
-	}
-	return conf, nil
-}
-
-func unmarshalPayloadSourceConfig(configJSON string, successCallback payloadSourceUnmarshalCallback) (*PayloadSourceConfig, error) {
-	var conf = PayloadSourceConfig{}
-	err := json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return nil, err
-	}
-	return successCallback(&conf)
 }

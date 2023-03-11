@@ -90,7 +90,8 @@ type TestPairingServerComponents struct {
 	EphemeralAES []byte
 	OutboundIP   net.IP
 	Cert         tls.Certificate
-	PS           *Server
+	SS           *SenderServer
+	RS           *ReceiverServer
 }
 
 func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing.T) {
@@ -113,12 +114,16 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, time.Now(), tpsc.OutboundIP.String())
 	require.NoError(t, err)
 
-	tpsc.PS, err = NewPairingServer(nil, &Config{
-		PK:                          &tpsc.EphemeralPK.PublicKey,
-		EK:                          tpsc.EphemeralAES,
-		Cert:                        &tpsc.Cert,
-		Hostname:                    tpsc.OutboundIP.String(),
-		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{}})
+	sc := &ServerConfig{
+		PK:       &tpsc.EphemeralPK.PublicKey,
+		EK:       tpsc.EphemeralAES,
+		Cert:     &tpsc.Cert,
+		Hostname: tpsc.OutboundIP.String(),
+	}
+
+	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{Server: sc, Sender: &SenderConfig{}})
+	require.NoError(t, err)
+	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{Server: sc, Receiver: &ReceiverConfig{}})
 	require.NoError(t, err)
 }
 
@@ -128,38 +133,6 @@ type TestLoggerComponents struct {
 
 func (tlc *TestLoggerComponents) SetupLoggerComponents() {
 	tlc.Logger = logutils.ZapLogger()
-}
-
-// TODO remove this once all instances of it have been replaced
-
-type MockEncryptOnlyPayloadManager struct {
-	*PayloadEncryptionManager
-}
-
-func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadManager, error) {
-	pem, err := NewPayloadEncryptionManager(aesKey, logutils.ZapLogger())
-	if err != nil {
-		return nil, err
-	}
-
-	return &MockEncryptOnlyPayloadManager{
-		pem,
-	}, nil
-}
-
-func (m *MockEncryptOnlyPayloadManager) Mount() error {
-	// Make a random payload
-	data := make([]byte, 32)
-	_, err := rand.Read(data)
-	if err != nil {
-		return err
-	}
-
-	return m.Encrypt(data)
-}
-
-func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
-	return m.Decrypt(data)
 }
 
 type MockPayloadReceiver struct {

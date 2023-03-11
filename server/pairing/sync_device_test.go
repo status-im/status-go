@@ -141,19 +141,20 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
-	serverPayloadSourceConfig := PayloadSourceConfig{
-		KeystorePath: serverKeystoreDir,
-		DeviceType:   "desktop",
-		PayloadSourceReceiverConfig: &PayloadSourceReceiverConfig{
-			KDFIterations:         expectedKDFIterations,
+	serverPayloadSourceConfig := &ReceiverServerConfig{
+		Receiver: &ReceiverConfig{
 			NodeConfig:            serverNodeConfig,
-			RootDataDir:           serverTmpDir,
+			KeystorePath:          serverKeystoreDir,
+			DeviceType:            "desktop",
+			KDFIterations:         expectedKDFIterations,
 			SettingCurrentNetwork: currentNetwork,
 		},
+		Server: new(ServerConfig),
 	}
+	serverNodeConfig.RootDataDir = serverTmpDir
 	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
 	require.NoError(s.T(), err)
-	cs, err := StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err := StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 
 	// generate some data for the client
@@ -168,12 +169,13 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
 	clientPayloadSourceConfig := SenderClientConfig{
-		Sender: SenderConfig{
+		Sender: &SenderConfig{
 			KeystorePath: clientKeystorePath,
 			DeviceType:   "android",
 			KeyUID:       clientActiveAccount.KeyUID,
 			Password:     s.password,
 		},
+		Client: new(ClientConfig),
 	}
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
@@ -206,7 +208,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.False(s.T(), serverMessenger.HasPairedDevices())
 
 	// repeat local pairing, we should expect no error after receiver logged in
-	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err = StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -215,7 +217,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 
 	// test if it's okay when account already exist but not logged in
 	require.NoError(s.T(), serverBackend.Logout())
-	cs, err = StartUpPairingServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err = StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -235,17 +237,18 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
-	var config = PayloadSourceConfig{
-		KeystorePath: serverKeystorePath,
-		DeviceType:   "desktop",
-		PayloadSourceSenderConfig: &PayloadSourceSenderConfig{
-			KeyUID:   serverActiveAccount.KeyUID,
-			Password: s.password,
+	var config = &SenderServerConfig{
+		Sender: &SenderConfig{
+			KeystorePath: serverKeystorePath,
+			DeviceType:   "desktop",
+			KeyUID:       serverActiveAccount.KeyUID,
+			Password:     s.password,
 		},
+		Server: new(ServerConfig),
 	}
 	configBytes, err := json.Marshal(config)
 	require.NoError(s.T(), err)
-	cs, err := StartUpPairingServer(serverBackend, Sending, string(configBytes))
+	cs, err := StartUpSenderServer(serverBackend, Sending, string(configBytes))
 	require.NoError(s.T(), err)
 
 	// generate some data for the server
@@ -265,13 +268,14 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
-		Receiver: ReceiverConfig{
+		Receiver: &ReceiverConfig{
 			KeystorePath:          clientKeystoreDir,
 			DeviceType:            "iphone",
 			KDFIterations:         expectedKDFIterations,
 			NodeConfig:            clientNodeConfig,
 			SettingCurrentNetwork: currentNetwork,
 		},
+		Client: new(ClientConfig),
 	}
 	clientNodeConfig.RootDataDir = clientTmpDir
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
@@ -305,7 +309,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.False(s.T(), clientMessenger.HasPairedDevices())
 
 	// repeat local pairing, we should expect no error after receiver logged in
-	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
+	cs, err = StartUpSenderServer(serverBackend, Sending, string(configBytes))
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -314,7 +318,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 
 	// test if it's okay when account already exist but not logged in
 	require.NoError(s.T(), clientBackend.Logout())
-	cs, err = StartUpPairingServer(serverBackend, Sending, string(configBytes))
+	cs, err = StartUpSenderServer(serverBackend, Sending, string(configBytes))
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
