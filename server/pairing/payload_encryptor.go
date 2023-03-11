@@ -2,6 +2,7 @@ package pairing
 
 import (
 	"crypto/rand"
+
 	"github.com/status-im/status-go/protocol/common"
 )
 
