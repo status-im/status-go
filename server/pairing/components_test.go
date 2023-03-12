@@ -175,4 +175,6 @@ func (m *MockPayloadMounter) ToSend() []byte {
 	return m.encryptor.getEncrypted()
 }
 
-func (m *MockPayloadMounter) LockPayload() {}
+func (m *MockPayloadMounter) LockPayload() {
+	m.encryptor.lockPayload()
+}
