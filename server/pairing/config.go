@@ -21,7 +21,7 @@ type SenderConfig struct {
 }
 
 type ReceiverConfig struct {
-	NodeConfig *params.NodeConfig
+	NodeConfig *params.NodeConfig `json:"nodeConfig"`
 
 	// ReceiverConfig.KeystorePath must not end with keyUID (because keyUID is not known yet)
 	KeystorePath string `json:"keystorePath"`
@@ -29,7 +29,7 @@ type ReceiverConfig struct {
 	DeviceType    string `json:"deviceType"`
 	KDFIterations int    `json:"kdfIterations"`
 	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
-	SettingCurrentNetwork string
+	SettingCurrentNetwork string `json:"settingCurrentNetwork"`
 
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
@@ -52,23 +52,23 @@ type ServerConfig struct {
 type ClientConfig struct{}
 
 type SenderServerConfig struct {
-	Sender *SenderConfig
-	Server *ServerConfig
+	Sender *SenderConfig `json:"sender"`
+	Server *ServerConfig `json:"server"`
 }
 
 type SenderClientConfig struct {
-	Sender *SenderConfig
-	Client *ClientConfig
+	Sender *SenderConfig `json:"sender"`
+	Client *ClientConfig `json:"client"`
 }
 
 type ReceiverClientConfig struct {
-	Receiver *ReceiverConfig
-	Client   *ClientConfig
+	Receiver *ReceiverConfig `json:"receiver"`
+	Client   *ClientConfig   `json:"client"`
 }
 
 type ReceiverServerConfig struct {
-	Receiver *ReceiverConfig
-	Server   *ServerConfig
+	Receiver *ReceiverConfig `json:"receiver"`
+	Server   *ServerConfig   `json:"server"`
 }
 
 func NewSenderServerConfig() *SenderServerConfig {

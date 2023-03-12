@@ -111,7 +111,6 @@ type AccountPayloadStorer struct {
 	multiaccountsDB *multiaccounts.Database
 
 	keystorePath   string
-	keyUID         string
 	kdfIterations  int
 	loggedInKeyUID string
 }
