@@ -47,7 +47,7 @@ func (s *SocialLinksSettings) GetSocialLinks() (identity.SocialLinks, error) {
 	return links, nil
 }
 
-// Be careful, it removes every row except static links (__twitter, etc.) before insertion
+// Be careful, it removes every row before insertion
 func (s *SocialLinksSettings) SetSocialLinks(links *identity.SocialLinks) (err error) {
 	if links == nil {
 		return errors.New("can't set social links, nil object provided")
@@ -66,9 +66,8 @@ func (s *SocialLinksSettings) SetSocialLinks(links *identity.SocialLinks) (err e
 		_ = tx.Rollback()
 	}()
 
-	// remove everything except static links
-	_, err = tx.Exec(`DELETE from social_links_settings WHERE link_text != ? AND link_text != ? AND link_text != ? AND link_text != ? AND link_text != ? AND link_text != ?`,
-		identity.TwitterID, identity.PersonalSiteID, identity.GithubID, identity.YoutubeID, identity.DiscordID, identity.TelegramID)
+	// remove everything
+	_, err = tx.Exec(`DELETE from social_links_settings`)
 
 	stmt, err := tx.Prepare("INSERT INTO social_links_settings (link_text, link_url) VALUES (?, ?)")
 	if err != nil {

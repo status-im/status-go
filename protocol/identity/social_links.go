@@ -2,7 +2,7 @@ package identity
 
 import (
 	"encoding/json"
-	"sort"
+	"reflect"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -41,18 +41,7 @@ func (s *SocialLinks) ToProtobuf() []*protobuf.SocialLink {
 }
 
 func (s SocialLinks) Equals(rhs SocialLinks) bool {
-	if len(s) != len(rhs) {
-		return false
-	}
-	sort.Slice(s, func(i, j int) bool { return s[i].Text < s[j].Text })
-	sort.Slice(rhs, func(i, j int) bool { return rhs[i].Text < rhs[j].Text })
-	for i := range s {
-		if s[i] != rhs[i] {
-			return false
-		}
-	}
-
-	return true
+	return reflect.DeepEqual(s, rhs)
 }
 
 func (s *SocialLinks) Serialize() ([]byte, error) {
