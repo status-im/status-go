@@ -3,7 +3,12 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"github.com/cenkalti/backoff/v3"
+	"github.com/status-im/status-go/mailserver"
+	"github.com/status-im/status-go/params"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -31,20 +36,43 @@ type MessengerContactRequestSuite struct {
 	// a single waku service should be shared.
 	shh    types.Waku
 	logger *zap.Logger
+
+	server *mailserver.WakuMailServer
 }
 
 func (s *MessengerContactRequestSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	const password = "password_for_this_test"
 
 	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
+
+	s.logger = tt.MustCreateTestLogger()
+	s.server = &mailserver.WakuMailServer{}
 	shh := waku.New(&config, s.logger)
+	shh.RegisterMailServer(s.server)
+
+	tmpDir, err := os.MkdirTemp("", "mailserver-test")
+	s.Require().NoError(err)
+
+	err = s.server.Init(shh, &params.WakuConfig{
+		DataDir:            tmpDir,
+		MailServerPassword: password,
+		MinimumPoW:         0.00001,
+	})
+	if err != nil {
+		s.T().Fatal(err)
+	}
+
+	_, err = shh.AddSymKeyFromPassword(password)
+	if err != nil {
+		s.T().Fatalf("failed to create symmetric key for mail request: %s", err)
+	}
+
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	_, err := s.m.Start()
+	_, err = s.m.Start()
 	s.Require().NoError(err)
 }
 
@@ -56,7 +84,7 @@ func (s *MessengerContactRequestSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, nil)
 	s.Require().NoError(err)
 	return messenger
 }
@@ -1721,4 +1749,40 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	result := aliceFromBob.ContactRequestPropagatedStateReceived(bobFromAlice.ContactRequestPropagatedState())
 	s.Require().True(result.newContactRequestReceived)
 
+}
+
+func (s *MessengerContactRequestSuite) TestBuildContact() {
+	theirName := "SomeName"
+
+	//contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+
+	// Create a new messenger
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	// Set ENS name
+	err = theirMessenger.settings.SaveSettingField(settings.Name, theirName)
+	s.Require().NoError(err)
+
+	// Build contact
+	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	response, err := s.m.BuildContact(theirContactID)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Wait for the message to reach its destination
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 2 * time.Second
+	}
+	err = tt.RetryWithBackOff(func() error {
+		r, err := s.m.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		s.logger.Debug("Test data", zap.Any("contacts", r.Contacts))
+		s.logger.Debug("Test data", zap.Any("messages", r.Messages()))
+
+		return nil
+	}, options)
 }
