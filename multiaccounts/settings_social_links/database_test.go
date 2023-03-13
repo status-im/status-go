@@ -71,7 +71,7 @@ func TestDatabase(t *testing.T) {
 	require.NoError(t, err)
 	links, err = socialLinkSettings.GetSocialLinks()
 	require.NoError(t, err)
-	require.True(t, links.Equals(socialLinksWithDefaults("", "", "", "", "", "")))
+	require.True(t, links.Equals(identity.SocialLinks{}))
 
 	// custom links
 	links = identity.SocialLinks{
@@ -80,18 +80,27 @@ func TestDatabase(t *testing.T) {
 			URL:  "Status_ico",
 		},
 		{
+			Text: identity.TelegramID,
+			URL:  "dummy.telegram",
+		},
+		{
 			Text: "customLink",
 			URL:  "customLink.com",
+		},
+	}
+	err = socialLinkSettings.SetSocialLinks(&links)
+	require.NoError(t, err)
+
+	expected := identity.SocialLinks{
+		{
+			Text: identity.TwitterID,
+			URL:  "Status_ico",
 		},
 		{
 			Text: identity.TelegramID,
 			URL:  "dummy.telegram",
 		},
 	}
-	err = socialLinkSettings.SetSocialLinks(&links)
-	require.NoError(t, err)
-
-	expected := socialLinksWithDefaults("Status_ico", "", "", "", "", "dummy.telegram")
 	expected = append(expected, identity.SocialLink{Text: "customLink", URL: "customLink.com"})
 
 	links, err = socialLinkSettings.GetSocialLinks()
