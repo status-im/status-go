@@ -1265,7 +1265,7 @@ func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*communities.Com
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
-func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) error {
+func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) (*communities.CommunityToken, error) {
 	return api.service.messenger.AddCommunityToken(token)
 }
 
