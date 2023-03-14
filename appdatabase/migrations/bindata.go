@@ -895,7 +895,7 @@ func _1670249678_display_name_to_settings_sync_clock_tableUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1670249678_display_name_to_settings_sync_clock_table.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1670249678_display_name_to_settings_sync_clock_table.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x39, 0x18, 0xdc, 0xc4, 0x1f, 0x79, 0x22, 0x16, 0x4d, 0xdf, 0x6c, 0x66, 0xd5, 0xa4, 0x88, 0x5d, 0x5, 0x37, 0xa7, 0x41, 0x5, 0x50, 0xae, 0x12, 0xfa, 0x7e, 0x89, 0x24, 0x5c, 0xae, 0x30, 0xfc}}
 	return a, nil
 }
@@ -935,7 +935,7 @@ func _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql() (*asset, 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xda, 0x8b, 0x4b, 0xd6, 0xd8, 0xe2, 0x3d, 0xf7, 0x6b, 0xcd, 0x1e, 0x70, 0x9, 0x2e, 0x35, 0x4, 0x61, 0xc3, 0xb5, 0x9d, 0xc5, 0x27, 0x21, 0xa, 0x5a, 0xd6, 0x3e, 0xa6, 0x24, 0xa2, 0x12, 0xdf}}
 	return a, nil
 }
@@ -955,7 +955,7 @@ func _1672933930_switcher_cardUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1672933930_switcher_card.up.sql", size: 162, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1672933930_switcher_card.up.sql", size: 162, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x39, 0xba, 0xdc, 0xbb, 0x40, 0x4, 0xf2, 0x10, 0xdf, 0xb4, 0xd2, 0x80, 0x8a, 0x74, 0x4d, 0xf6, 0xbc, 0x50, 0x7, 0xd, 0x22, 0x7f, 0xc4, 0xaf, 0xaa, 0xde, 0xdc, 0x71, 0xe9, 0x42, 0x98, 0x36}}
 	return a, nil
 }
@@ -975,7 +975,7 @@ func _1674056187_add_price_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674056187_add_price_cache.up.sql", size: 255, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1674056187_add_price_cache.up.sql", size: 255, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb7, 0x79, 0x6a, 0x9b, 0x28, 0xd1, 0x22, 0xf0, 0x84, 0x76, 0x40, 0x39, 0x49, 0x15, 0x5d, 0xaa, 0xfd, 0x11, 0xff, 0x13, 0x27, 0x42, 0x12, 0xfa, 0x82, 0xe6, 0x7a, 0xf0, 0x5e, 0x1f, 0xe3, 0xba}}
 	return a, nil
 }
@@ -995,7 +995,7 @@ func _1674136690_ens_usernamesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674136690_ens_usernames.up.sql", size: 98, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1674136690_ens_usernames.up.sql", size: 98, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x7a, 0xf3, 0xa8, 0x88, 0x99, 0xd6, 0x9c, 0x69, 0x48, 0x3c, 0x10, 0xda, 0x72, 0xdc, 0x14, 0xd, 0x6e, 0x8c, 0x82, 0x92, 0x2d, 0x2c, 0xee, 0x4c, 0x70, 0xa4, 0xdc, 0x5c, 0x5, 0x2, 0xc3}}
 	return a, nil
 }
@@ -1015,7 +1015,7 @@ func _1674232431_add_balance_historyUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674232431_add_balance_history.up.sql", size: 698, mode: os.FileMode(0644), modTime: time.Unix(1676035352, 0)}
+	info := bindataFileInfo{name: "1674232431_add_balance_history.up.sql", size: 698, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf7, 0xb5, 0x18, 0xca, 0x4a, 0x93, 0xbb, 0x6f, 0xa4, 0xee, 0xe4, 0x3e, 0xff, 0x6a, 0x4b, 0xe2, 0xe1, 0x61, 0x28, 0xee, 0xc5, 0x26, 0x57, 0x61, 0x5e, 0x6d, 0x44, 0x1e, 0x85, 0x43, 0x70, 0xa2}}
 	return a, nil
 }
@@ -1035,7 +1035,7 @@ func _1676368933_keypairs_to_keycardsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676368933_keypairs_to_keycards.up.sql", size: 639, mode: os.FileMode(0644), modTime: time.Unix(1677233463, 0)}
+	info := bindataFileInfo{name: "1676368933_keypairs_to_keycards.up.sql", size: 639, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x93, 0x27, 0x2, 0xf0, 0x37, 0x81, 0x65, 0xa4, 0xb3, 0x5b, 0x60, 0x36, 0x95, 0xfc, 0x81, 0xf0, 0x3b, 0x7c, 0xc3, 0x2c, 0x85, 0xbd, 0x38, 0x46, 0xa4, 0x95, 0x4a, 0x6, 0x3e, 0x74, 0xd5}}
 	return a, nil
 }
@@ -1055,7 +1055,7 @@ func _1676951398_add_currency_format_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676951398_add_currency_format_cache.up.sql", size: 291, mode: os.FileMode(0644), modTime: time.Unix(1677233463, 0)}
+	info := bindataFileInfo{name: "1676951398_add_currency_format_cache.up.sql", size: 291, mode: os.FileMode(0644), modTime: time.Unix(1678711803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf9, 0xa3, 0x76, 0x35, 0xca, 0xf, 0xe8, 0xdf, 0xd9, 0x61, 0xf9, 0xed, 0xfc, 0x6d, 0xf5, 0xe, 0x11, 0x88, 0xbd, 0x14, 0x92, 0xc6, 0x57, 0x53, 0xe, 0xcd, 0x52, 0xf4, 0xa9, 0xb1, 0xdd, 0xfd}}
 	return a, nil
 }
@@ -1075,7 +1075,7 @@ func _1676968196_keycards_add_clock_columnUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676968196_keycards_add_clock_column.up.sql", size: 73, mode: os.FileMode(0644), modTime: time.Unix(1678196210, 0)}
+	info := bindataFileInfo{name: "1676968196_keycards_add_clock_column.up.sql", size: 73, mode: os.FileMode(0644), modTime: time.Unix(1678798710, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4c, 0xf, 0x1c, 0x28, 0x41, 0x57, 0x57, 0x6c, 0xe, 0x75, 0x6b, 0x75, 0x12, 0x0, 0x18, 0x1e, 0x88, 0x1e, 0x45, 0xe0, 0x32, 0xb9, 0xd4, 0xd9, 0x2e, 0xc8, 0xb, 0x80, 0x6, 0x51, 0x3d, 0x28}}
 	return a, nil
 }
@@ -1095,7 +1095,7 @@ func _1676968197_add_fallback_rpc_to_networksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676968197_add_fallback_rpc_to_networks.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1678196210, 0)}
+	info := bindataFileInfo{name: "1676968197_add_fallback_rpc_to_networks.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1678798710, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0x6a, 0xc6, 0x45, 0xfa, 0x62, 0x84, 0x74, 0x6d, 0x7c, 0xd7, 0x1d, 0x79, 0xb6, 0x38, 0x43, 0xa8, 0x8, 0x6b, 0x75, 0x3d, 0x9, 0x2, 0xc5, 0x9f, 0xbb, 0x45, 0x56, 0x4c, 0x4e, 0x17, 0x89}}
 	return a, nil
 }
@@ -1115,7 +1115,7 @@ func _1677674090_add_chains_ens_istest_to_saved_addressesUpSql() (*asset, error)
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677674090_add_chains_ens_istest_to_saved_addresses.up.sql", size: 638, mode: os.FileMode(0644), modTime: time.Unix(1678292274, 0)}
+	info := bindataFileInfo{name: "1677674090_add_chains_ens_istest_to_saved_addresses.up.sql", size: 638, mode: os.FileMode(0644), modTime: time.Unix(1678798710, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa8, 0x2d, 0xa4, 0x1b, 0xf6, 0x6a, 0x13, 0x7b, 0xe, 0x59, 0xcd, 0xe2, 0x4e, 0x81, 0x99, 0xc4, 0x33, 0x84, 0xde, 0x66, 0xca, 0xac, 0x2f, 0x5, 0x90, 0xac, 0xfd, 0x4e, 0xfc, 0x55, 0x44, 0xe5}}
 	return a, nil
 }
@@ -1135,7 +1135,7 @@ func _1677681143_accounts_table_type_column_updateUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677681143_accounts_table_type_column_update.up.sql", size: 135, mode: os.FileMode(0644), modTime: time.Unix(1678292274, 0)}
+	info := bindataFileInfo{name: "1677681143_accounts_table_type_column_update.up.sql", size: 135, mode: os.FileMode(0644), modTime: time.Unix(1678798710, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0xc4, 0x6, 0x42, 0x50, 0x1d, 0xf4, 0x48, 0x55, 0xbc, 0xa2, 0x19, 0xdd, 0xad, 0xc8, 0xc, 0xa7, 0x30, 0xb6, 0xaf, 0xe, 0x2b, 0xaa, 0x2a, 0xa4, 0xe1, 0xb9, 0x41, 0x23, 0x66, 0xd3, 0x3}}
 	return a, nil
 }
