@@ -884,7 +884,7 @@ github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 ## explicit
 github.com/status-im/keycard-go/derivationpath
-# github.com/status-im/markdown v0.0.0-20221220095528-8f1babe09d1e
+# github.com/status-im/markdown v0.0.0-20230314100416-26c6f74522d5
 ## explicit; go 1.12
 github.com/status-im/markdown
 github.com/status-im/markdown/ast
