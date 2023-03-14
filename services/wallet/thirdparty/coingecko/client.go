@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -79,12 +80,14 @@ type GeckoToken struct {
 }
 
 type Client struct {
-	client *http.Client
-	tokens map[string]GeckoToken
+	client           *http.Client
+	tokens           map[string]GeckoToken
+	tokensURL        string
+	fetchTokensMutex sync.Mutex
 }
 
 func NewClient() *Client {
-	return &Client{client: &http.Client{Timeout: time.Minute}, tokens: make(map[string]GeckoToken)}
+	return &Client{client: &http.Client{Timeout: time.Minute}, tokens: make(map[string]GeckoToken), tokensURL: fmt.Sprintf("%scoins/list", baseURL)}
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {
@@ -96,13 +99,27 @@ func (c *Client) DoQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
+func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string]GeckoToken) {
+	for _, token := range tokens {
+		if id, ok := coinGeckoMapping[strings.ToUpper(token.Symbol)]; ok {
+			if id != token.ID {
+				continue
+			}
+		}
+		tokenMap[strings.ToUpper(token.Symbol)] = token
+	}
+}
+
 func (c *Client) getTokens() (map[string]GeckoToken, error) {
+
+	c.fetchTokensMutex.Lock()
+	defer c.fetchTokensMutex.Unlock()
+
 	if len(c.tokens) > 0 {
 		return c.tokens, nil
 	}
 
-	url := fmt.Sprintf("%scoins/list", baseURL)
-	resp, err := c.DoQuery(url)
+	resp, err := c.DoQuery(c.tokensURL)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +136,7 @@ func (c *Client) getTokens() (map[string]GeckoToken, error) {
 		return nil, err
 	}
 
-	for _, token := range tokens {
-		if id, ok := coinGeckoMapping[strings.ToUpper(token.Symbol)]; ok {
-			if id != token.ID {
-				continue
-			}
-		}
-		c.tokens[strings.ToUpper(token.Symbol)] = token
-	}
+	mapTokensToSymbols(tokens, c.tokens)
 
 	return c.tokens, nil
 }
