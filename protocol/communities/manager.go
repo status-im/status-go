@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"sort"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -2701,15 +2703,38 @@ func (m *Manager) GetCommunityTokens(communityID string) ([]*CommunityToken, err
 	return m.persistence.GetCommunityTokens(communityID)
 }
 
-func (m *Manager) AddCommunityToken(token *CommunityToken) error {
+func (m *Manager) ImageToBase64(uri string) string {
+	file, err := os.Open(uri)
+	if err != nil {
+		m.logger.Error(err.Error())
+		return ""
+	}
+	defer file.Close()
+
+	payload, err := ioutil.ReadAll(file)
+	if err != nil {
+		m.logger.Error(err.Error())
+		return ""
+	}
+	base64img, err := images.GetPayloadDataURI(payload)
+	if err != nil {
+		m.logger.Error(err.Error())
+		return ""
+	}
+	return base64img
+}
+
+func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, error) {
 
 	community, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if community == nil {
-		return ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
+
+	token.Base64Image = m.ImageToBase64(token.Base64Image)
 
 	tokenMetadata := &protobuf.CommunityTokenMetadata{
 		ContractAddresses: map[uint64]string{uint64(token.ChainID): token.Address},
@@ -2721,17 +2746,17 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) error {
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.publish(&Subscription{Community: community})
 
-	return m.persistence.AddCommunityToken(token)
+	return token, m.persistence.AddCommunityToken(token)
 }
 
 func (m *Manager) UpdateCommunityTokenState(contractAddress string, deployState DeployState) error {
