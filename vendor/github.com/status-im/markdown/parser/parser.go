@@ -692,7 +692,7 @@ func isNum(c byte) bool {
 }
 
 func isValidStatusTagChar(c byte) bool {
-	return isNum(c) || isLowerCaseLetter(c) || c == '-'
+	return isNum(c) || isLowerCaseLetter(c) || c == '-' || c == '_'
 }
 
 func isValidTerminatingMentionChar(c byte) bool {
