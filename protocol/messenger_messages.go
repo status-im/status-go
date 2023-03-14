@@ -351,7 +351,7 @@ func (m *Messenger) addContactRequestPropagatedState(message *common.Message) er
 		return nil
 	}
 
-	contact, err := m.BuildContact(chat.ID)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: chat.ID})
 	if err != nil {
 		return err
 	}

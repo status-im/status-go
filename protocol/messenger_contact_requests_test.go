@@ -1722,3 +1722,18 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	s.Require().True(result.newContactRequestReceived)
 
 }
+
+func (s *MessengerContactRequestSuite) TestBuildContact() {
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	contact, err := s.m.BuildContact(&requests.BuildContact{PublicKey: contactID})
+	s.Require().NoError(err)
+
+	s.Require().Equal(contact.EnsName, "")
+	s.Require().False(contact.ENSVerified)
+
+	contact, err = s.m.BuildContact(&requests.BuildContact{PublicKey: contactID, ENSName: "foobar"})
+	s.Require().NoError(err)
+
+	s.Require().Equal(contact.EnsName, "foobar")
+	s.Require().True(contact.ENSVerified)
+}

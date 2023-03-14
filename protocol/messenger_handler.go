@@ -1805,7 +1805,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
 		chatContact := contact
 		if isSyncMessage {
-			chatContact, err = m.BuildContact(chat.ID)
+			chatContact, err = m.BuildContact(&requests.BuildContact{PublicKey: chat.ID})
 			if err != nil {
 				return err
 			}

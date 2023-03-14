@@ -54,7 +54,7 @@ func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*Mess
 		return nil, err
 	}
 
-	contact, err := m.BuildContact(contactRequest.From)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactRequest.From})
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 }
 
 func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
-	contact, err := m.BuildContact(pubKey)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: pubKey})
 	if err != nil {
 		return nil, err
 	}
@@ -672,7 +672,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	pubKey := request.ID.String()
 	nickname := request.Nickname
 
-	contact, err := m.BuildContact(pubKey)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: pubKey})
 	if err != nil {
 		return nil, err
 	}
@@ -704,7 +704,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 }
 
 func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat, error) {
-	contact, err := m.BuildContact(contactID)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
 		return nil, err
 	}
@@ -1024,13 +1024,18 @@ func defaultContactRequestID(contactID string) string {
 	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
 }
 
-func (m *Messenger) BuildContact(contactID string) (*Contact, error) {
-	contact, ok := m.allContacts.Load(contactID)
+func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, error) {
+	contact, ok := m.allContacts.Load(request.PublicKey)
 	if !ok {
 		var err error
-		contact, err = buildContactFromPkString(contactID)
+		contact, err = buildContactFromPkString(request.PublicKey)
 		if err != nil {
 			return nil, err
+		}
+
+		if request.ENSName != "" {
+			contact.ENSVerified = true
+			contact.EnsName = request.ENSName
 		}
 	}
 

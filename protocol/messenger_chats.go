@@ -290,7 +290,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		if err != nil {
 			return nil, err
 		}
-		contact, err := m.BuildContact(chatID)
+		contact, err := m.BuildContact(&requests.BuildContact{PublicKey: chatID})
 		if err != nil {
 			return nil, err
 		}

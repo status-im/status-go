@@ -1248,8 +1248,8 @@ func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
 	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
 }
 
-func (api *PublicAPI) BuildContact(publicKey string) (*protocol.Contact, error) {
-	return api.service.messenger.BuildContact(publicKey)
+func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Contact, error) {
+	return api.service.messenger.BuildContact(request)
 }
 
 func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*communities.CommunityToken, error) {
