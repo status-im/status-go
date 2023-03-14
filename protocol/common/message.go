@@ -698,3 +698,14 @@ func (m *Message) LoadImage() error {
 
 	return nil
 }
+
+func (m *Message) SetAlbumID(albumID string) error {
+	imageMessage := m.GetImage()
+	if imageMessage == nil {
+		return errors.New("Image is empty")
+	}
+	imageMessage.AlbumId = albumID
+	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
+
+	return nil
+}
