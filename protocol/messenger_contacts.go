@@ -1033,5 +1033,20 @@ func (m *Messenger) BuildContact(contactID string) (*Contact, error) {
 			return nil, err
 		}
 	}
+
+	// Schedule sync filter to fetch information about the contact
+	publicKey, err := contact.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	filter, err := m.transport.JoinPrivate(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
+	if err != nil {
+		return nil, err
+	}
+
 	return contact, nil
 }
