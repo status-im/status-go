@@ -1583,6 +1583,10 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
+	state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
+		ID:      types.FromHex(messageID),
+		Deleted: true,
+	})
 
 	return nil
 }
