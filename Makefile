@@ -18,12 +18,6 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
- # Qt14.x doesn't provides arm64 binaries on apple silicon
- # See https://github.com/status-im/status-go/pull/3131#issuecomment-1406303234
- ifeq ("$(shell sysctl -nq hw.optional.arm64)","1")
-   FORCE_ARCH ?= amd64
-   GOBIN_SHARED_LIB_CFLAGS=CGO_ENABLED=1 GOOS=darwin GOARCH=$(FORCE_ARCH)
- endif
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
