@@ -63,22 +63,6 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 	return bs, nil
 }
 
-func makeCookieStore() (*sessions.CookieStore, error) {
-	auth := make([]byte, 64)
-	_, err := rand.Read(auth)
-	if err != nil {
-		return nil, err
-	}
-
-	enc := make([]byte, 32)
-	_, err = rand.Read(enc)
-	if err != nil {
-		return nil, err
-	}
-
-	return sessions.NewCookieStore(auth, enc), nil
-}
-
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
 	hostname := s.GetHostname()
@@ -93,14 +77,6 @@ func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
 	}
 
 	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek, s.mode), nil
-}
-
-func (s *BaseServer) GetCookieStore() *sessions.CookieStore {
-	return s.cookieStore
-}
-
-func (s *BaseServer) DecryptPlain(data []byte) ([]byte, error) {
-	return s.encryptor.decryptPlain(data)
 }
 
 func MakeServerConfig(config *ServerConfig) error {
