@@ -60,9 +60,8 @@ func NewTokenManager(
 	RPCClient *rpc.Client,
 	networkManager *network.Manager,
 ) *Manager {
-	defaultStore := newDefaultStore()
 	// Order of stores is important when merging token lists. The former prevale
-	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), defaultStore}, nil, nil}
+	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), newDefaultStore()}, nil, nil}
 
 	return tokenManager
 }
@@ -105,6 +104,10 @@ func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
 		return true
 	}
 
+	if !tm.areTokensFetched() {
+		tm.fetchTokens()
+	}
+
 	tokensMap, ok := tm.tokenMap[chainID]
 	if !ok {
 		return false
@@ -124,8 +127,10 @@ func (tm *Manager) areTokensFetched() bool {
 	return true
 }
 
-func (tm *Manager) fetchTokens() []*Token {
-	result := make([]*Token, 0)
+func (tm *Manager) fetchTokens() {
+	tm.tokenList = nil
+	tm.tokenMap = nil
+
 	for _, store := range tm.stores {
 		tokens, err := store.GetTokens()
 		if err != nil {
@@ -133,10 +138,10 @@ func (tm *Manager) fetchTokens() []*Token {
 			continue
 		}
 
-		result = mergeTokenLists([][]*Token{result, tokens})
+		tm.tokenList = mergeTokenLists([][]*Token{tm.tokenList, tokens})
 	}
 
-	return result
+	tm.tokenMap = toTokenMap(tm.tokenList)
 }
 
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
@@ -195,26 +200,27 @@ func (tm *Manager) GetAllTokensAndNativeCurrencies() ([]*Token, error) {
 }
 
 func (tm *Manager) GetAllTokens() ([]*Token, error) {
-	if tm.areTokensFetched() {
-		return tm.tokenList, nil
+	if !tm.areTokensFetched() {
+		tm.fetchTokens()
 	}
-
-	tm.tokenList = tm.fetchTokens()
 
 	tokens, err := tm.GetCustoms()
 	if err != nil {
 		log.Error("can't fetch custom tokens: %s", err)
 	}
 
-	tm.tokenList = append(tm.tokenList, tokens...)
-	tm.tokenMap = toTokenMap(tm.tokenList)
+	tokens = append(tm.tokenList, tokens...)
 
-	overrideTokensInPlace(tm.networkManager.GetConfiguredNetworks(), tm.tokenList)
+	overrideTokensInPlace(tm.networkManager.GetConfiguredNetworks(), tokens)
 
-	return tm.tokenList, nil
+	return tokens, nil
 }
 
 func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
+	if !tm.areTokensFetched() {
+		tm.fetchTokens()
+	}
+
 	tokensMap, ok := tm.tokenMap[chainID]
 	if !ok {
 		return nil, errors.New("no tokens for this network")
