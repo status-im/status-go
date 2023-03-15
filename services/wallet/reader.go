@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -188,7 +189,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	group.Add(func(parent context.Context) error {
 		prices, err = r.marketManager.FetchPrices(tokenSymbols, currencies)
 		if err != nil {
-			return err
+			log.Info("marketManager.FetchPrices err", err)
 		}
 		return nil
 	})
@@ -196,7 +197,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	group.Add(func(parent context.Context) error {
 		tokenDetails, err = r.marketManager.FetchTokenDetails(tokenSymbols)
 		if err != nil {
-			return err
+			log.Info("marketManager.FetchTokenDetails err", err)
 		}
 		return nil
 	})
@@ -204,7 +205,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	group.Add(func(parent context.Context) error {
 		tokenMarketValues, err = r.marketManager.FetchTokenMarketValues(tokenSymbols, currency)
 		if err != nil {
-			return err
+			log.Info("marketManager.FetchTokenMarketValues err", err)
 		}
 		return nil
 	})
