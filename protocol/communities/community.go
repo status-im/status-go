@@ -455,6 +455,9 @@ type CommunityChanges struct {
 	CategoriesAdded    map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
 	CategoriesModified map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
 
+	MemberWalletsRemoved []string            `json:"memberWalletsRemoved"`
+	MemberWalletsAdded   map[string][]string `json:"memberWalletsAdded"`
+
 	// ShouldMemberJoin indicates whether the user should join this community
 	// automatically
 	ShouldMemberJoin bool `json:"memberAdded"`
@@ -1808,6 +1811,26 @@ func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
+func (o *Community) AddMemberWallet(memberID string, addresses []string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if _, ok := o.config.CommunityDescription.Members[memberID]; !ok {
+		return nil, ErrMemberNotFound
+	}
+
+	o.config.CommunityDescription.Members[memberID].WalletAccounts = addresses
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].WalletAccounts
+	return changes, nil
+}
+
 func emptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:   make(map[string]*protobuf.CommunityMember),
@@ -1820,6 +1843,9 @@ func emptyCommunityChanges() *CommunityChanges {
 		CategoriesRemoved:  []string{},
 		CategoriesAdded:    make(map[string]*protobuf.CommunityCategory),
 		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
+
+		MemberWalletsRemoved: []string{},
+		MemberWalletsAdded:   make(map[string][]string),
 	}
 }
 

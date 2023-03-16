@@ -58,6 +58,7 @@ import (
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/telemetry"
 )
 
@@ -409,6 +410,10 @@ func NewMessenger(
 
 	managerOptions := []communities.ManagerOption{
 		communities.WithAccountManager(accountsManager),
+	}
+	if c.rpcClient != nil {
+		tokenManager := token.NewTokenManager(database, c.rpcClient, c.rpcClient.NetworkManager)
+		managerOptions = append(managerOptions, communities.WithTokenManager(tokenManager))
 	}
 
 	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, c.torrentConfig, managerOptions...)

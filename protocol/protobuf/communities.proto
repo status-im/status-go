@@ -21,6 +21,7 @@ message CommunityMember {
     ROLE_MODERATE_CONTENT = 3;
   }
   repeated Roles roles = 1;
+  repeated string wallet_accounts = 2;
 }
 
 message CommunityTokenMetadata {
