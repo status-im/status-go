@@ -1664,6 +1664,16 @@ func (m *Messenger) SetInstallationMetadata(id string, data *multidevice.Install
 	return m.setInstallationMetadata(id, data)
 }
 
+func (m *Messenger) SetInstallationName(id string, name string) error {
+	installation, ok := m.allInstallations.Load(id)
+	if !ok {
+		return errors.New("no installation found")
+	}
+
+	installation.InstallationMetadata.Name = name
+	return m.encryptor.SetInstallationName(&m.identity.PublicKey, id, name)
+}
+
 // NOT IMPLEMENTED
 func (m *Messenger) SelectMailserver(id string) error {
 	return ErrNotImplemented

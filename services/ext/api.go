@@ -358,6 +358,11 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
+// SetInstallationName sets the only the name in metadata for a given installation
+func (api *PublicAPI) SetInstallationName(installationID string, name string) error {
+	return api.service.messenger.SetInstallationName(installationID, name)
+}
+
 // Communities returns a list of communities that are stored
 func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
 	return api.service.messenger.Communities()

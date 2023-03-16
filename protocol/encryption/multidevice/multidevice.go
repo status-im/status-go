@@ -109,6 +109,11 @@ func (s *Multidevice) SetInstallationMetadata(identity *ecdsa.PublicKey, install
 	return s.persistence.SetInstallationMetadata(identityC, installationID, metadata)
 }
 
+func (s *Multidevice) SetInstallationName(identity *ecdsa.PublicKey, installationID string, name string) error {
+	identityC := crypto.CompressPubkey(identity)
+	return s.persistence.SetInstallationName(identityC, installationID, name)
+}
+
 func (s *Multidevice) EnableInstallation(identity *ecdsa.PublicKey, installationID string) error {
 	identityC := crypto.CompressPubkey(identity)
 	return s.persistence.EnableInstallation(identityC, installationID)
