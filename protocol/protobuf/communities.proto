@@ -54,6 +54,7 @@ message TokenCriteria {
   string amount = 5;
   repeated uint64 token_ids = 6;
   string ens_pattern = 7;
+  uint64 decimals = 8;
 }
 
 message CommunityTokenPermission {
