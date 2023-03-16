@@ -3,7 +3,7 @@ package protocol
 func (p *sqlitePersistence) UpsertCollapsedCommunityCategory(category CollapsedCommunityCategory) error {
 	var err error
 	if category.Collapsed {
-		_, err = p.db.Exec("INSERT INTO collapsed_community_categories(community_id, category_id, collapsed) VALUES(?,?,?)", category.CommunityID, category.CategoryID, category.Collapsed)
+		_, err = p.db.Exec("INSERT INTO collapsed_community_categories(community_id, category_id) VALUES(?,?)", category.CommunityID, category.CategoryID)
 	} else {
 		_, err = p.db.Exec("DELETE FROM collapsed_community_categories WHERE community_id = ? AND category_id = ?", category.CommunityID, category.CategoryID)
 	}
@@ -16,8 +16,7 @@ func (p *sqlitePersistence) CollapsedCommunityCategories() ([]CollapsedCommunity
 	rows, err := p.db.Query(`
   SELECT
     community_id,
-    category_id,
-    collapsed
+    category_id
   FROM
     collapsed_community_categories
   `)
@@ -31,7 +30,6 @@ func (p *sqlitePersistence) CollapsedCommunityCategories() ([]CollapsedCommunity
 		err = rows.Scan(
 			&c.CommunityID,
 			&c.CategoryID,
-			&c.Collapsed,
 		)
 		if err != nil {
 			return nil, err
