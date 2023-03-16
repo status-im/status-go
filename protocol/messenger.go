@@ -53,8 +53,10 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/verification"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -108,6 +110,7 @@ type Messenger struct {
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
 	accountsManager        *account.GethManager
+	tokenManager *token.Manager
 	logger                 *zap.Logger
 
 	outputCSV bool
@@ -241,6 +244,7 @@ func NewMessenger(
 	installationID string,
 	peerStore *mailservers.PeerStore,
 	accountsManager *account.GethManager,
+	rpcClient *rpc.Client,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -407,7 +411,9 @@ func NewMessenger(
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
-	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, accountsManager, transp, c.torrentConfig)
+	tokenManager := token.NewTokenManager(database, rpcClient, rpcClient.NetworkManager)
+
+	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, accountsManager, tokenManager, transp, c.torrentConfig)
 	if err != nil {
 		return nil, err
 	}

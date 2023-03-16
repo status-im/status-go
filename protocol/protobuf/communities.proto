@@ -72,6 +72,11 @@ message CommunityTokenPermission {
   bool is_private = 5;
 }
 
+message MemberWallet {
+  string chat_key = 1;
+  repeated string addresses = 2;
+}
+
 message CommunityDescription {
   uint64 clock = 1;
   map<string,CommunityMember> members = 2;
@@ -88,6 +93,7 @@ message CommunityDescription {
   repeated string tags = 14;
   map<string, CommunityTokenPermission> token_permissions = 15;
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
+  map<string, MemberWallet> member_wallets = 17;
 }
 
 message CommunityAdminSettings {

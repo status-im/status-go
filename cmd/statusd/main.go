@@ -227,6 +227,7 @@ func main() {
 			installationID.String(),
 			nil,
 			backend.AccountManager(),
+			backend.StatusNode().RPCClient(),
 			options...,
 		)
 		if err != nil {

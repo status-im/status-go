@@ -114,12 +114,14 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		BanList                 []string                                      `json:"banList"`
 		TokenPermissions        map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
+		MemberWallets           map[string]*protobuf.MemberWallet             `json:"memberWallets"`
 	}{
-		ID:         o.ID(),
-		Verified:   o.config.Verified,
-		Chats:      make(map[string]CommunityChat),
-		Categories: make(map[string]CommunityCategory),
-		Tags:       o.Tags(),
+		ID:            o.ID(),
+		Verified:      o.config.Verified,
+		Chats:         make(map[string]CommunityChat),
+		Categories:    make(map[string]CommunityCategory),
+		MemberWallets: make(map[string]*protobuf.MemberWallet),
+		Tags:          o.Tags(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -130,6 +132,9 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			}
 			communityItem.Categories[id] = category
 			communityItem.Encrypted = o.config.CommunityDescription.Encrypted
+		}
+		for id, mw := range o.config.CommunityDescription.MemberWallets {
+			communityItem.MemberWallets[id] = mw
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
@@ -217,12 +222,14 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		BanList                     []string                                      `json:"banList"`
 		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
+		MemberWallets               map[string]*protobuf.MemberWallet             `json:"memberWallets"`
 	}{
 		ID:                          o.ID(),
 		Admin:                       o.IsAdmin(),
 		Verified:                    o.config.Verified,
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
+		MemberWallets:               make(map[string]*protobuf.MemberWallet),
 		Joined:                      o.config.Joined,
 		Spectated:                   o.config.Spectated,
 		CanRequestAccess:            o.CanRequestAccess(o.config.MemberIdentity),
@@ -244,6 +251,9 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			}
 			communityItem.Encrypted = o.config.CommunityDescription.Encrypted
 			communityItem.Categories[id] = category
+		}
+		for id, mw := range o.config.CommunityDescription.MemberWallets {
+			communityItem.MemberWallets[id] = mw
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
@@ -454,6 +464,9 @@ type CommunityChanges struct {
 	CategoriesRemoved  []string                               `json:"categoriesRemoved"`
 	CategoriesAdded    map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
 	CategoriesModified map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
+
+	MemberWalletsRemoved []string                          `json:"memberWalletsRemoved"`
+	MemberWalletsAdded   map[string]*protobuf.MemberWallet `json:"memberWalletsAdded"`
 
 	// ShouldMemberJoin indicates whether the user should join this community
 	// automatically
@@ -771,6 +784,10 @@ func (o *Community) removeMemberFromOrg(pk *ecdsa.PublicKey) {
 	// Remove from chats
 	for _, chat := range o.config.CommunityDescription.Chats {
 		delete(chat.Members, key)
+	}
+
+	if _, exists := o.config.CommunityDescription.MemberWallets[key]; exists {
+		delete(o.config.CommunityDescription.MemberWallets, key)
 	}
 
 	o.increaseClock()
@@ -1398,6 +1415,25 @@ func (o *Community) Images() map[string]*protobuf.IdentityImage {
 	return response
 }
 
+func (o *Community) MemberWallets() map[string]*protobuf.MemberWallet {
+	response := make(map[string]*protobuf.MemberWallet)
+
+	if o == nil {
+		return response
+	}
+
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config != nil && o.config.CommunityDescription != nil {
+		for k, v := range o.config.CommunityDescription.MemberWallets {
+			response[k] = v
+		}
+	}
+
+	return response
+}
+
 func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	response := make(map[string]*protobuf.CommunityCategory)
 
@@ -1808,6 +1844,52 @@ func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
+func (o *Community) AddMemberWallet(memberID string, addresses []string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if o.config.CommunityDescription.MemberWallets == nil {
+		o.config.CommunityDescription.MemberWallets = make(map[string]*protobuf.MemberWallet)
+	}
+
+	if _, ok := o.config.CommunityDescription.MemberWallets[memberID]; ok {
+		return nil, ErrMemberWalletAlreadyExists
+	}
+
+	o.config.CommunityDescription.MemberWallets[memberID] = &protobuf.MemberWallet{
+		ChatKey:   memberID,
+		Addresses: addresses,
+	}
+	o.increaseClock()
+
+	changes := o.emptyCommunityChanges()
+	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.MemberWallets[memberID]
+	return changes, nil
+}
+
+func (o *Community) RemoveMemberWallet(memberID string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+
+	if _, exists := o.config.CommunityDescription.MemberWallets[memberID]; !exists {
+		return nil, ErrMemberWalletNotFound
+	}
+
+	delete(o.config.CommunityDescription.MemberWallets, memberID)
+	changes := o.emptyCommunityChanges()
+	changes.MemberWalletsRemoved = append(changes.MemberWalletsRemoved, memberID)
+	o.increaseClock()
+	return changes, nil
+}
+
 func emptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:   make(map[string]*protobuf.CommunityMember),
@@ -1820,6 +1902,9 @@ func emptyCommunityChanges() *CommunityChanges {
 		CategoriesRemoved:  []string{},
 		CategoriesAdded:    make(map[string]*protobuf.CommunityCategory),
 		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
+
+		MemberWalletsRemoved: []string{},
+		MemberWalletsAdded:   make(map[string]*protobuf.MemberWallet),
 	}
 }
 
