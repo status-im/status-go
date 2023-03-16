@@ -26,11 +26,6 @@ type PayloadLocker interface {
 	LockPayload()
 }
 
-type PayloadResetter interface {
-	// ResetPayload resets all payloads the PayloadManager has in its state
-	ResetPayload()
-}
-
 type HandlerServer interface {
 	GetLogger() *zap.Logger
 	GetCookieStore() *sessions.CookieStore

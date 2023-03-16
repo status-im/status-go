@@ -46,7 +46,7 @@ func handleReceiveAccount(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc
 		err = pr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingAccount})
-			logger.Error("pr.Receive(payload)", zap.Error(err))
+			logger.Error("handleReceiveAccount pr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -62,7 +62,7 @@ func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
 		err := pm.Mount()
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
-			logger.Error("pm.Mount()", zap.Error(err))
+			logger.Error("handleSendAccount pm.Mount()", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -70,7 +70,7 @@ func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
 		_, err = w.Write(pm.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
-			logger.Error("w.Write(pm.ToSend())", zap.Error(err))
+			logger.Error("handleSendAccount w.Write(pm.ToSend())", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -98,7 +98,7 @@ func handleParingSyncDeviceReceive(hs HandlerServer, pr PayloadReceiver) http.Ha
 		err = pr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionSyncDevice})
-			logger.Error("pr.Receive(payload)", zap.Error(err))
+			logger.Error("handleParingSyncDeviceReceive pr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -116,7 +116,7 @@ func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.Handl
 		if err != nil {
 			// maybe better to use a new event type here instead of EventTransferError?
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-			logger.Error("pm.Mount()", zap.Error(err))
+			logger.Error("handlePairingSyncDeviceSend pm.Mount()", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -124,7 +124,7 @@ func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.Handl
 		_, err = w.Write(pm.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-			logger.Error("w.Write(pm.ToSend())", zap.Error(err))
+			logger.Error("handlePairingSyncDeviceSend w.Write(pm.ToSend())", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -152,7 +152,7 @@ func handleReceiveInstallation(hs HandlerServer, pmr PayloadMounterReceiver) htt
 		err = pmr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingInstallation})
-			logger.Error("pmr.Receive(payload)", zap.Error(err))
+			logger.Error("handleReceiveInstallation pmr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -168,7 +168,7 @@ func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.H
 		err := pmr.Mount()
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
-			logger.Error("pmr.Mount()", zap.Error(err))
+			logger.Error("handleSendInstallation pmr.Mount()", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -176,7 +176,7 @@ func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.H
 		_, err = w.Write(pmr.ToSend())
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
-			logger.Error("w.Write(pmr.ToSend())", zap.Error(err))
+			logger.Error("handleSendInstallation w.Write(pmr.ToSend())", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -193,7 +193,7 @@ func middlewareChallenge(hs HandlerServer, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := hs.GetCookieStore().Get(r, sessionChallenge)
 		if err != nil {
-			logger.Error("hs.GetCookieStore().Get(r, pairingStoreChallenge)", zap.Error(err))
+			logger.Error("middlewareChallenge: hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -213,7 +213,7 @@ func middlewareChallenge(hs HandlerServer, next http.Handler) http.HandlerFunc {
 
 		c, err := hs.DecryptPlain(base58.Decode(pc))
 		if err != nil {
-			logger.Error("c, err := hs.DecryptPlain(rc, hs.ek)", zap.Error(err))
+			logger.Error("middlewareChallenge: c, err := hs.DecryptPlain(base58.Decode(pc))", zap.Error(err), zap.String("pc", pc))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -231,7 +231,7 @@ func middlewareChallenge(hs HandlerServer, next http.Handler) http.HandlerFunc {
 			s.Values[sessionBlocked] = true
 			err = s.Save(r, w)
 			if err != nil {
-				logger.Error("err = s.Save(r, w)", zap.Error(err))
+				logger.Error("middlewareChallenge: err = s.Save(r, w)", zap.Error(err))
 			}
 
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -247,7 +247,7 @@ func handlePairingChallenge(hs HandlerServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := hs.GetCookieStore().Get(r, sessionChallenge)
 		if err != nil {
-			logger.Error("hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err))
+			logger.Error("handlePairingChallenge: hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -258,7 +258,7 @@ func handlePairingChallenge(hs HandlerServer) http.HandlerFunc {
 			challenge = make([]byte, 64)
 			_, err = rand.Read(challenge)
 			if err != nil {
-				logger.Error("_, err = rand.Read(challenge)", zap.Error(err))
+				logger.Error("handlePairingChallenge: _, err = rand.Read(challenge)", zap.Error(err))
 				http.Error(w, "error", http.StatusInternalServerError)
 				return
 			}
@@ -266,7 +266,7 @@ func handlePairingChallenge(hs HandlerServer) http.HandlerFunc {
 			s.Values[sessionChallenge] = challenge
 			err = s.Save(r, w)
 			if err != nil {
-				logger.Error("err = s.Save(r, w)", zap.Error(err))
+				logger.Error("handlePairingChallenge: err = s.Save(r, w)", zap.Error(err))
 				http.Error(w, "error", http.StatusInternalServerError)
 				return
 			}
@@ -275,7 +275,7 @@ func handlePairingChallenge(hs HandlerServer) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, err = w.Write(challenge)
 		if err != nil {
-			logger.Error("_, err = w.Write(challenge)", zap.Error(err))
+			logger.Error("handlePairingChallenge: _, err = w.Write(challenge)", zap.Error(err))
 			return
 		}
 	}

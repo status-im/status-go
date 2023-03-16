@@ -28,7 +28,6 @@ const (
 	pathEIP1581       = "m/43'/60'/1581'"
 	pathDefaultChat   = pathEIP1581 + "/0'/0"
 	pathDefaultWallet = pathWalletRoot + "/0"
-	keystoreDir       = "keystore"
 	currentNetwork    = "mainnet_rpc"
 )
 

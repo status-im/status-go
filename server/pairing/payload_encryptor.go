@@ -88,10 +88,6 @@ func (pem *PayloadEncryptor) getDecrypted() []byte {
 	return pem.payload.plain
 }
 
-func (pem *PayloadEncryptor) resetPayload() {
-	pem.payload = new(EncryptionPayload)
-}
-
 func (pem *PayloadEncryptor) lockPayload() {
 	pem.payload.lock()
 }

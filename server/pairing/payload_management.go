@@ -11,6 +11,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+const keystoreDir = "keystore"
+
 var (
 	// TODO add validation on config to ensure required fields have valid values
 
@@ -27,10 +29,6 @@ type AccountPayload struct {
 	password     string
 	//flag if account already exist before sync account
 	exist bool
-}
-
-func (ap *AccountPayload) ResetPayload() {
-	*ap = AccountPayload{}
 }
 
 // AccountPayloadMarshaller is responsible for marshalling and unmarshalling Server payload data

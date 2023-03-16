@@ -1,16 +1,15 @@
 package pairing
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
@@ -27,7 +26,7 @@ type PayloadReceiver interface {
 }
 
 type PayloadStorer interface {
-	StoreToSource() error
+	Store() error
 }
 
 /*
@@ -94,7 +93,7 @@ func (apr *AccountPayloadReceiver) Receive(data []byte) error {
 
 	signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: apr.accountPayload.multiaccount})
 
-	return apr.accountStorer.StoreToSource()
+	return apr.accountStorer.Store()
 }
 
 func (apr *AccountPayloadReceiver) Received() []byte {
@@ -131,7 +130,7 @@ func NewAccountPayloadStorer(p *AccountPayload, config *ReceiverConfig) (*Accoun
 	return ppr, nil
 }
 
-func (aps *AccountPayloadStorer) StoreToSource() error {
+func (aps *AccountPayloadStorer) Store() error {
 	keyUID := aps.multiaccount.KeyUID
 	if aps.loggedInKeyUID != "" && aps.loggedInKeyUID != keyUID {
 		return ErrLoggedInKeyUIDConflict
@@ -169,16 +168,16 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 
 	_, lastDir := filepath.Split(keyStorePath)
 
-	// If lastDir == "keystore" we presume we need to create the rest of the keystore path
+	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == "keystore" {
+	if lastDir == keystoreDir {
 		if aps.multiaccount == nil || aps.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
 		keyStorePath = filepath.Join(keyStorePath, aps.multiaccount.KeyUID)
 		_, err := os.Stat(keyStorePath)
 		if os.IsNotExist(err) {
-			err := os.MkdirAll(keyStorePath, 0777)
+			err := os.MkdirAll(keyStorePath, 0700)
 			if err != nil {
 				return err
 			}
@@ -190,18 +189,17 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 	}
 
 	for name, data := range aps.keys {
-		accountKey := new(keystore.EncryptedKeyJSONV3)
-		if err := json.Unmarshal(data, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
-		}
-
-		if len(accountKey.Address) != 40 {
-			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
-		}
-
 		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
 		if err != nil {
-			return err
+			writeErr := fmt.Errorf("failed to write key to path '%s' : %w", filepath.Join(keyStorePath, name), err)
+			// If we get an error on any of the key files attempt to revert
+			err := emptyDir(keyStorePath)
+			if err != nil {
+				// If we get an error when trying to empty the dir combine the write error and empty error
+				emptyDirErr := fmt.Errorf("failed to revert and cleanup storeKeys : %w", err)
+				return multierr.Combine(writeErr, emptyDirErr)
+			}
+			return writeErr
 		}
 	}
 	return nil
@@ -242,7 +240,7 @@ func (r *RawMessagePayloadReceiver) Receive(data []byte) error {
 		return err
 	}
 	r.storer.payload = r.Received()
-	return r.storer.StoreToSource()
+	return r.storer.Store()
 }
 
 func (r *RawMessagePayloadReceiver) Received() []byte {
@@ -251,11 +249,6 @@ func (r *RawMessagePayloadReceiver) Received() []byte {
 
 func (r *RawMessagePayloadReceiver) LockPayload() {
 	r.encryptor.lockPayload()
-}
-
-func (r *RawMessagePayloadReceiver) ResetPayload() {
-	r.storer.payload = make([]byte, 0)
-	r.encryptor.resetPayload()
 }
 
 type RawMessageStorer struct {
@@ -278,7 +271,7 @@ func NewRawMessageStorer(backend *api.GethStatusBackend, accountPayload *Account
 	}
 }
 
-func (r *RawMessageStorer) StoreToSource() error {
+func (r *RawMessageStorer) Store() error {
 	accountPayload := r.accountPayload
 	if accountPayload == nil || accountPayload.multiaccount == nil {
 		return fmt.Errorf("no known multiaccount when storing raw messages")
@@ -316,7 +309,7 @@ func (i *InstallationPayloadReceiver) Receive(data []byte) error {
 		return err
 	}
 	i.storer.payload = i.encryptor.getDecrypted()
-	return i.storer.StoreToSource()
+	return i.storer.Store()
 }
 
 func (i *InstallationPayloadReceiver) Received() []byte {
@@ -325,11 +318,6 @@ func (i *InstallationPayloadReceiver) Received() []byte {
 
 func (i *InstallationPayloadReceiver) LockPayload() {
 	i.encryptor.lockPayload()
-}
-
-func (i *InstallationPayloadReceiver) ResetPayload() {
-	i.storer.payload = make([]byte, 0)
-	i.encryptor.resetPayload()
 }
 
 type InstallationPayloadStorer struct {
@@ -347,10 +335,10 @@ func NewInstallationPayloadStorer(backend *api.GethStatusBackend, deviceType str
 	}
 }
 
-func (r *InstallationPayloadStorer) StoreToSource() error {
+func (r *InstallationPayloadStorer) Store() error {
 	messenger := r.backend.Messenger()
 	if messenger == nil {
-		return fmt.Errorf("messenger is nil when invoke InstallationPayloadRepository#StoreToSource")
+		return fmt.Errorf("messenger is nil when invoke InstallationPayloadRepository#Store()")
 	}
 	rawMessages, _, _, err := r.syncRawMessageHandler.unmarshalSyncRawMessage(r.payload)
 	if err != nil {

@@ -1,17 +1,15 @@
 package pairing
 
 import (
-	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
@@ -26,7 +24,7 @@ type PayloadMounter interface {
 }
 
 type PayloadLoader interface {
-	LoadFromSource() error
+	Load() error
 }
 
 /*
@@ -73,11 +71,11 @@ func (apm *AccountPayloadMounter) Mount() error {
 	l := apm.logger.Named("Mount()")
 	l.Debug("fired")
 
-	err := apm.payloadLoader.LoadFromSource()
+	err := apm.payloadLoader.Load()
 	if err != nil {
 		return err
 	}
-	l.Debug("after LoadFromSource")
+	l.Debug("after Load()")
 
 	pb, err := apm.accountPayloadMarshaller.MarshalProtobuf()
 	if err != nil {
@@ -127,7 +125,7 @@ func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountP
 	return ppr, nil
 }
 
-func (apl *AccountPayloadLoader) LoadFromSource() error {
+func (apl *AccountPayloadLoader) Load() error {
 	err := apl.loadKeys(apl.keystorePath)
 	if err != nil {
 		return err
@@ -149,12 +147,12 @@ func (apl *AccountPayloadLoader) LoadFromSource() error {
 func (apl *AccountPayloadLoader) loadKeys(keyStorePath string) error {
 	apl.keys = make(map[string][]byte)
 
-	fileWalker := func(path string, fileInfo os.FileInfo, err error) error {
+	fileWalker := func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if fileInfo.IsDir() || filepath.Dir(path) != keyStorePath {
+		if dirEntry.IsDir() || filepath.Dir(path) != keyStorePath {
 			return nil
 		}
 
@@ -163,21 +161,12 @@ func (apl *AccountPayloadLoader) loadKeys(keyStorePath string) error {
 			return fmt.Errorf("invalid account key file: %v", err)
 		}
 
-		accountKey := new(keystore.EncryptedKeyJSONV3)
-		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
-		}
-
-		if len(accountKey.Address) != 40 {
-			return fmt.Errorf("account key address has invalid length '%s'", accountKey.Address)
-		}
-
-		apl.keys[fileInfo.Name()] = rawKeyFile
+		apl.keys[dirEntry.Name()] = rawKeyFile
 
 		return nil
 	}
 
-	err := filepath.Walk(keyStorePath, fileWalker)
+	err := filepath.WalkDir(keyStorePath, fileWalker)
 	if err != nil {
 		return fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
@@ -211,7 +200,7 @@ func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backe
 }
 
 func (r *RawMessagePayloadMounter) Mount() error {
-	err := r.loader.LoadFromSource()
+	err := r.loader.Load()
 	if err != nil {
 		return err
 	}
@@ -224,11 +213,6 @@ func (r *RawMessagePayloadMounter) ToSend() []byte {
 
 func (r *RawMessagePayloadMounter) LockPayload() {
 	r.encryptor.lockPayload()
-}
-
-func (r *RawMessagePayloadMounter) ResetPayload() {
-	r.loader.payload = make([]byte, 0)
-	r.encryptor.resetPayload()
 }
 
 type RawMessageLoader struct {
@@ -247,7 +231,7 @@ func NewRawMessageLoader(backend *api.GethStatusBackend, config *SenderConfig) *
 	}
 }
 
-func (r *RawMessageLoader) LoadFromSource() (err error) {
+func (r *RawMessageLoader) Load() (err error) {
 	r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
 	return err
 }
@@ -276,7 +260,7 @@ func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, bac
 }
 
 func (i *InstallationPayloadMounter) Mount() error {
-	err := i.loader.LoadFromSource()
+	err := i.loader.Load()
 	if err != nil {
 		return err
 	}
@@ -289,11 +273,6 @@ func (i *InstallationPayloadMounter) ToSend() []byte {
 
 func (i *InstallationPayloadMounter) LockPayload() {
 	i.encryptor.lockPayload()
-}
-
-func (i *InstallationPayloadMounter) ResetPayload() {
-	i.loader.payload = make([]byte, 0)
-	i.encryptor.resetPayload()
 }
 
 type InstallationPayloadLoader struct {
@@ -309,7 +288,7 @@ func NewInstallationPayloadLoader(backend *api.GethStatusBackend, deviceType str
 	}
 }
 
-func (r *InstallationPayloadLoader) LoadFromSource() error {
+func (r *InstallationPayloadLoader) Load() error {
 	rawMessageCollector := new(RawMessageCollector)
 	err := r.syncRawMessageHandler.CollectInstallationData(rawMessageCollector, r.deviceType)
 	if err != nil {
