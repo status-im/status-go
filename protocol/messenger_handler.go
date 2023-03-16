@@ -1250,7 +1250,17 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		if err != nil {
 			return err
 		}
+	}
 
+	if requestToJoin.State == communities.RequestToJoinStateDeclined {
+		cancel := &requests.DeclineRequestToJoinCommunity{
+			ID: requestToJoin.ID,
+		}
+		_, err = m.DeclineRequestToJoinCommunity(cancel)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	community, err := m.communitiesManager.GetByID(requestToJoinProto.CommunityId)

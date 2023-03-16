@@ -21,6 +21,7 @@ import (
 
 	"github.com/meirf/gopart"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -501,10 +502,40 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
-		Clock:       requestToJoin.Clock,
-		EnsName:     requestToJoin.ENSName,
-		DisplayName: displayName,
-		CommunityId: community.ID(),
+		Clock:             requestToJoin.Clock,
+		EnsName:           requestToJoin.ENSName,
+		DisplayName:       displayName,
+		CommunityId:       community.ID(),
+		RevealedAddresses: make(map[string][]byte),
+	}
+
+	// find wallet accounts and attach wallet addresses and
+	// signatures to request
+	if request.Password != "" {
+		walletAccounts, err := m.settings.GetAccounts()
+		if err != nil {
+			return nil, err
+		}
+		for _, walletAccount := range walletAccounts {
+			if !walletAccount.Chat && walletAccount.Type != accounts.AccountTypeWatch {
+				verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), request.Password)
+				if err != nil {
+					return nil, err
+				}
+
+				messageToSign := types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), request.CommunityID, requestToJoin.ID))
+				signParams := account.SignParams{
+					Data:     messageToSign,
+					Address:  verifiedAccount.Address.Hex(),
+					Password: request.Password,
+				}
+				signatureBytes, err := m.accountsManager.Sign(signParams, verifiedAccount)
+				if err != nil {
+					return nil, err
+				}
+				requestToJoinProto.RevealedAddresses[verifiedAccount.Address.Hex()] = signatureBytes
+			}
+		}
 	}
 
 	payload, err := proto.Marshal(requestToJoinProto)

@@ -322,6 +322,59 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	return err
 }
 
+func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin) (err error) {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, signature) VALUES (?, ?, ?)`
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	for address, signature := range request.RevealedAddresses {
+		_, err = stmt.Exec(
+			request.ID,
+			address,
+			signature,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) (map[string][]byte, error) {
+	revealedAddresses := make(map[string][]byte)
+	rows, err := p.db.Query(`SELECT address, signature FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		address := ""
+		signature := make([]byte, 0)
+		err := rows.Scan(&address, &signature)
+		if err != nil {
+			return nil, err
+		}
+		revealedAddresses[address] = signature
+	}
+	return revealedAddresses, nil
+}
+
 func (p *Persistence) SaveRequestToLeave(request *RequestToLeave) error {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
