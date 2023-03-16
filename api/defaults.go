@@ -21,6 +21,7 @@ const pathDefaultChat = pathEIP1581 + "/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const walletAccountDefaultName = "Ethereum account"
+const keystoreRelativePath = "keystore"
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 

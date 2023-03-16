@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -151,6 +152,16 @@ func (b *GethStatusBackend) UpdateRootDataDir(datadir string) {
 
 func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
 	return b.multiaccountsDB
+}
+
+func (b *GethStatusBackend) InitializeAccounts(rootDirectory string) error {
+	b.UpdateRootDataDir(rootDirectory)
+	manager := b.AccountManager()
+	keystoreDir := filepath.Join(rootDirectory, keystoreRelativePath)
+	if err := manager.InitKeystore(keystoreDir); err != nil {
+		return err
+	}
+	return b.OpenAccounts()
 }
 
 func (b *GethStatusBackend) OpenAccounts() error {
@@ -481,6 +492,10 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 	return nil
 }
 
+func (b *GethStatusBackend) Login(keyUID, password string) error {
+	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil)
+}
+
 func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig) error {
 	err := b.startNodeWithAccount(acc, password, nodecfg)
 	if err != nil {
@@ -702,7 +717,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return err
 	}
 
-	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, "keystore")); err != nil {
+	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)); err != nil {
 		return err
 	}
 
@@ -729,13 +744,14 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return err
 	}
 
-	_, err = generator.StoreDerivedAccounts(info.ID, "", paths)
+	_, err = generator.StoreDerivedAccounts(info.ID, request.Password, paths)
 	if err != nil {
 		return err
 	}
 
 	account := multiaccounts.Account{
 		KeyUID:        info.KeyUID,
+		Name:          request.DisplayName,
 		KDFIterations: sqlite.ReducedKDFIterationsNumber,
 	}
 
@@ -743,6 +759,8 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	if err != nil {
 		return err
 	}
+	settings.DisplayName = request.DisplayName
+	settings.Mnemonic = &info.Mnemonic
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
 	if err != nil {
@@ -765,7 +783,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    info.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
-		Name:      settings.Name,
+		Name:      request.DisplayName,
 		Chat:      true,
 		Path:      pathDefaultChat,
 	}
@@ -776,6 +794,17 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		b.log.Error("start node", err)
 		return err
 	}
+
+	iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+	if err != nil {
+		return err
+	}
+
+	err = b.multiaccountsDB.StoreIdentityImages(info.KeyUID, iis, false)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
