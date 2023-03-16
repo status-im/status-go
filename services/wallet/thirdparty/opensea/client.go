@@ -186,6 +186,11 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 			return nil, err
 		}
 
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
 		var tmp []OwnedCollection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
@@ -259,6 +264,11 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		if err != nil {
 			o.setConnected(false)
 			return nil, err
+		}
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
 		}
 
 		container := AssetContainer{}
