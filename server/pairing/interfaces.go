@@ -1,7 +1,6 @@
 package pairing
 
 import (
-	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
 )
 
@@ -28,8 +27,6 @@ type PayloadLocker interface {
 
 type HandlerServer interface {
 	GetLogger() *zap.Logger
-	GetCookieStore() *sessions.CookieStore
-	DecryptPlain([]byte) ([]byte, error)
 }
 
 type ProtobufMarshaler interface {

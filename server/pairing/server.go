@@ -122,6 +122,8 @@ type SenderServer struct {
 	accountMounter      PayloadMounter
 	rawMessageMounter   *RawMessagePayloadMounter
 	installationMounter *InstallationPayloadMounterReceiver
+
+	challengeGiver *ChallengeGiver
 }
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
@@ -139,24 +141,30 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 		return nil, err
 	}
 
+	cg, err := NewChallengeGiver(e, logger)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SenderServer{
 		BaseServer:          bs,
 		accountMounter:      am,
 		rawMessageMounter:   rmm,
 		installationMounter: imr,
+		challengeGiver:      cg,
 	}, nil
 }
 
 func (s *SenderServer) startSendingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingChallenge:      handlePairingChallenge(s),
-		pairingSendAccount:    middlewareChallenge(s, handleSendAccount(s, s.accountMounter)),
-		pairingSendSyncDevice: middlewareChallenge(s, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
+		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
+		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(s, s.accountMounter)),
+		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// receive installation data from receiver
-		pairingReceiveInstallation: middlewareChallenge(s, handleReceiveInstallation(s, s.installationMounter)),
+		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s, s.installationMounter)),
 	})
 	return s.Start()
 }
@@ -240,7 +248,6 @@ func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerCon
 
 func (s *ReceiverServer) startReceivingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
-		pairingChallenge:         handlePairingChallenge(s),
 		pairingReceiveAccount:    handleReceiveAccount(s, s.accountReceiver),
 		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s, s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of

@@ -1,12 +1,9 @@
 package pairing
 
 import (
-	"bytes"
-	"crypto/rand"
 	"io"
 	"net/http"
 
-	"github.com/btcsuite/btcutil/base58"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/signal"
@@ -188,53 +185,11 @@ func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.H
 
 // Challenge middleware and handling
 
-func middlewareChallenge(hs HandlerServer, next http.Handler) http.HandlerFunc {
-	logger := hs.GetLogger()
+func middlewareChallenge(cg *ChallengeGiver, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, err := hs.GetCookieStore().Get(r, sessionChallenge)
-		if err != nil {
-			logger.Error("middlewareChallenge: hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
-			http.Error(w, "error", http.StatusInternalServerError)
-			return
-		}
-
-		blocked, ok := s.Values[sessionBlocked].(bool)
-		if ok && blocked {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		// If the request header doesn't include a challenge don't punish the client, just throw a 403
-		pc := r.Header.Get(sessionChallenge)
-		if pc == "" {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		c, err := hs.DecryptPlain(base58.Decode(pc))
-		if err != nil {
-			logger.Error("middlewareChallenge: c, err := hs.DecryptPlain(base58.Decode(pc))", zap.Error(err), zap.String("pc", pc))
-			http.Error(w, "error", http.StatusInternalServerError)
-			return
-		}
-
-		// If the challenge is not in the session store don't punish the client, just throw a 403
-		challenge, ok := s.Values[sessionChallenge].([]byte)
-		if !ok {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		// Only if we have both a challenge in the session store and in the request header
-		// do we entertain blocking the client. Because then we know someone is trying to be sneaky.
-		if !bytes.Equal(c, challenge) {
-			s.Values[sessionBlocked] = true
-			err = s.Save(r, w)
-			if err != nil {
-				logger.Error("middlewareChallenge: err = s.Save(r, w)", zap.Error(err))
-			}
-
-			http.Error(w, "forbidden", http.StatusForbidden)
+		ce := cg.handleChallengeResponse(w, r)
+		if ce != nil {
+			http.Error(w, ce.Text, ce.HttpCode)
 			return
 		}
 
@@ -242,40 +197,18 @@ func middlewareChallenge(hs HandlerServer, next http.Handler) http.HandlerFunc {
 	}
 }
 
-func handlePairingChallenge(hs HandlerServer) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handlePairingChallenge(cg *ChallengeGiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, err := hs.GetCookieStore().Get(r, sessionChallenge)
-		if err != nil {
-			logger.Error("handlePairingChallenge: hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err))
-			http.Error(w, "error", http.StatusInternalServerError)
+		challenge, ce := cg.getChallenge(w, r)
+		if ce != nil {
+			http.Error(w, ce.Text, ce.HttpCode)
 			return
 		}
 
-		var challenge []byte
-		challenge, ok := s.Values[sessionChallenge].([]byte)
-		if !ok {
-			challenge = make([]byte, 64)
-			_, err = rand.Read(challenge)
-			if err != nil {
-				logger.Error("handlePairingChallenge: _, err = rand.Read(challenge)", zap.Error(err))
-				http.Error(w, "error", http.StatusInternalServerError)
-				return
-			}
-
-			s.Values[sessionChallenge] = challenge
-			err = s.Save(r, w)
-			if err != nil {
-				logger.Error("handlePairingChallenge: err = s.Save(r, w)", zap.Error(err))
-				http.Error(w, "error", http.StatusInternalServerError)
-				return
-			}
-		}
-
 		w.Header().Set("Content-Type", "application/octet-stream")
-		_, err = w.Write(challenge)
+		_, err := w.Write(challenge)
 		if err != nil {
-			logger.Error("handlePairingChallenge: _, err = w.Write(challenge)", zap.Error(err))
+			cg.logger.Error("handlePairingChallenge: _, err = w.Write(challenge)", zap.Error(err))
 			return
 		}
 	}
