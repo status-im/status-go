@@ -19,6 +19,8 @@ const pathWalletRoot = "m/44'/60'/0'/0"
 const pathEIP1581 = "m/43'/60'/1581'"
 const pathDefaultChat = pathEIP1581 + "/0'/0"
 const pathDefaultWallet = pathWalletRoot + "/0"
+const defaultMnemonicLength = 12
+const walletAccountDefaultName = "Ethereum account"
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
@@ -26,6 +28,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	settings := &settings.Settings{}
+	settings.Mnemonic = &generatedAccountInfo.Mnemonic
 	settings.KeyUID = generatedAccountInfo.KeyUID
 	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
 	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
