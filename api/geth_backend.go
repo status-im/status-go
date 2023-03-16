@@ -715,7 +715,8 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 
 	generator := b.accountManager.AccountsGenerator()
 
-	generatedAccountInfos, err := generator.Generate(12, 1, "")
+	// generate 1(n) account with default mnemonic length and no passphrase
+	generatedAccountInfos, err := generator.Generate(defaultMnemonicLength, 1, "")
 
 	if err != nil {
 		return err
@@ -756,7 +757,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		Color:     "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
-		Name:      "Ethereum account",
+		Name:      walletAccountDefaultName,
 	}
 
 	chatDerivedAccount := derivedAddresses[pathDefaultChat]
@@ -770,7 +771,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	}
 
 	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = b.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
+	err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, accounts)
 	if err != nil {
 		b.log.Error("start node", err)
 		return err
