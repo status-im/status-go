@@ -121,66 +121,6 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
 	return response, nil
 }
 
-func (m *Messenger) cancelOutgoingContactRequest(ctx context.Context, ID string) (*MessengerResponse, error) {
-	response := &MessengerResponse{}
-
-	// remove contact
-	err := m.removeContact(ctx, response, ID, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// remove notification
-	notificationID := types.FromHex(defaultContactRequestID(ID))
-	notification, err := m.persistence.GetActivityCenterNotificationByID(notificationID)
-	if err != nil {
-		return nil, err
-	}
-
-	if notification != nil {
-		err := m.persistence.DeleteActivityCenterNotification(notificationID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// retract contact
-	clock, _ := m.getLastClockWithRelatedChat()
-	retractContactRequest := &protobuf.RetractContactRequest{
-		Clock: clock,
-	}
-	encodedMessage, err := proto.Marshal(retractContactRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
-		LocalChatID:         ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
-		ResendAutomatically: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func (m *Messenger) CancelOutgoingContactRequest(ctx context.Context, request *requests.CancelOutgoingContactRequest) (*MessengerResponse, error) {
-	err := request.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := m.cancelOutgoingContactRequest(ctx, request.ID.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*MessengerResponse, error) {
 	err := request.Validate()
 	if err != nil {
