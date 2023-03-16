@@ -58,7 +58,7 @@ func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver
 func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
 	s, err := cg.cookieStore.Get(r, sessionChallenge)
 	if err != nil {
-		cg.logger.Error("hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err))
+		cg.logger.Error("handleChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
 		return &ChallengeError{"error", http.StatusInternalServerError}
 	}
 
@@ -75,7 +75,7 @@ func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http
 
 	c, err := cg.encryptor.decryptPlain(base58.Decode(pc))
 	if err != nil {
-		cg.logger.Error("c, err := hs.DecryptPlain(rc, hs.ek)", zap.Error(err))
+		cg.logger.Error("handleChallengeResponse: cg.encryptor.decryptPlain(base58.Decode(pc))", zap.Error(err), zap.String("pc", pc))
 		return &ChallengeError{"error", http.StatusInternalServerError}
 	}
 
@@ -91,7 +91,8 @@ func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http
 		s.Values[sessionBlocked] = true
 		err = s.Save(r, w)
 		if err != nil {
-			cg.logger.Error("err = s.Save(r, w)", zap.Error(err))
+			cg.logger.Error("handleChallengeResponse: err = s.Save(r, w)", zap.Error(err))
+			return &ChallengeError{"error", http.StatusInternalServerError}
 		}
 
 		return &ChallengeError{"forbidden", http.StatusForbidden}
@@ -99,11 +100,11 @@ func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http
 	return nil
 }
 
-func (cg *ChallengeGiver) challenge(w http.ResponseWriter, r *http.Request) *ChallengeError {
+func (cg *ChallengeGiver) getChallenge(w http.ResponseWriter, r *http.Request) ([]byte, *ChallengeError) {
 	s, err := cg.cookieStore.Get(r, sessionChallenge)
 	if err != nil {
-		cg.logger.Error("hs.GetCookieStore().Get(r, sessionChallenge)", zap.Error(err))
-		return &ChallengeError{"error", http.StatusInternalServerError}
+		cg.logger.Error("getChallenge: hs.cookieStore.Get(r, sessionChallenge)", zap.Error(err))
+		return nil, &ChallengeError{"error", http.StatusInternalServerError}
 	}
 
 	challenge, ok := s.Values[sessionChallenge].([]byte)
@@ -111,32 +112,18 @@ func (cg *ChallengeGiver) challenge(w http.ResponseWriter, r *http.Request) *Cha
 		challenge = make([]byte, 64)
 		_, err = rand.Read(challenge)
 		if err != nil {
-			cg.logger.Error("_, err = rand.Read(challenge)", zap.Error(err))
-			return &ChallengeError{"error", http.StatusInternalServerError}
+			cg.logger.Error("getChallenge: _, err = rand.Read(challenge)", zap.Error(err))
+			return nil, &ChallengeError{"error", http.StatusInternalServerError}
 		}
 
 		s.Values[sessionChallenge] = challenge
 		err = s.Save(r, w)
 		if err != nil {
-			cg.logger.Error("err = s.Save(r, w)", zap.Error(err))
-			return &ChallengeError{"error", http.StatusInternalServerError}
+			cg.logger.Error("getChallenge: err = s.Save(r, w)", zap.Error(err))
+			return nil, &ChallengeError{"error", http.StatusInternalServerError}
 		}
 	}
-
-	w.Header().Set("Content-Type", "application/octet-stream")
-	_, err = w.Write(challenge)
-	if err != nil {
-		cg.logger.Error("_, err = w.Write(challenge)", zap.Error(err))
-	}
-	return nil
-}
-
-func (s *BaseServer) GetCookieStore() *sessions.CookieStore {
-	return s.cookieStore
-}
-
-func (s *BaseServer) DecryptPlain(data []byte) ([]byte, error) {
-	return s.encryptor.decryptPlain(data)
+	return challenge, nil
 }
 
 type ChallengeTaker struct {
