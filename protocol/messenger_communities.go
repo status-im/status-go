@@ -726,14 +726,26 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.AcceptRequestToJoin(request)
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
-	if err != nil {
+	community, err := m.communitiesManager.AcceptRequestToJoin(request)
+	if err != nil && err != communities.ErrNoPermissionToJoin {
 		return nil, err
+	}
+
+	if err == communities.ErrNoPermissionToJoin {
+		cancel := &requests.DeclineRequestToJoinCommunity{
+			ID: requestToJoin.ID,
+		}
+		response, err := m.DeclineRequestToJoinCommunity(cancel)
+		if err != nil {
+			return nil, err
+		}
+		response.AddCommunity(community)
+		return response, nil
 	}
 
 	pk, err := common.HexToPubkey(requestToJoin.PublicKey)

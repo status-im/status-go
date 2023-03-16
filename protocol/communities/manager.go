@@ -1,13 +1,17 @@
 package communities
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -32,6 +37,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -53,6 +59,7 @@ type Manager struct {
 	ensVerifier                  *ens.Verifier
 	identity                     *ecdsa.PrivateKey
 	accountsManager              *account.GethManager
+	tokenManager                 *token.Manager
 	logger                       *zap.Logger
 	stdoutLogger                 *zap.Logger
 	transport                    *transport.Transport
@@ -87,6 +94,7 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 
 type managerOptions struct {
 	accountsManager *account.GethManager
+	tokenManager    *token.Manager
 }
 
 type ManagerOption func(*managerOptions)
@@ -94,6 +102,12 @@ type ManagerOption func(*managerOptions)
 func WithAccountManager(accountsManager *account.GethManager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.accountsManager = accountsManager
+	}
+}
+
+func WithTokenManager(tokenManager *token.Manager) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.tokenManager = tokenManager
 	}
 }
 
@@ -138,6 +152,10 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 
 	if managerConfig.accountsManager != nil {
 		manager.accountsManager = managerConfig.accountsManager
+	}
+
+	if managerConfig.tokenManager != nil {
+		manager.tokenManager = managerConfig.tokenManager
 	}
 
 	if verifier != nil {
@@ -1091,12 +1109,51 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	addressesToAdd := make([]string, 0)
+
+	if len(becomeMemberPermissions) > 0 {
+		revealedAddresses, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		walletAddresses := make([]gethcommon.Address, 0)
+		for _, walletAddress := range revealedAddresses {
+			walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
+		}
+
+		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+		if err != nil {
+			return nil, err
+		}
+
+		if !hasPermission {
+			pk, err := common.HexToPubkey(dbRequest.PublicKey)
+			if err != nil {
+				return nil, err
+			}
+			err = m.markRequestToJoinAsCanceled(pk, community)
+			if err != nil {
+				return nil, err
+			}
+			return community, ErrNoPermissionToJoin
+		}
+
+		addressesToAdd = append(addressesToAdd, revealedAddresses...)
+	}
+
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = community.AddMemberWallet(dbRequest.PublicKey, addressesToAdd)
 	if err != nil {
 		return nil, err
 	}
@@ -1228,6 +1285,27 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			}
 		}
 
+		// provided wallet addresses seem to be legit, so let's check
+		// if the necessary token permission funds exist
+		verifiedAddresses := make([]gethcommon.Address, 0)
+		for walletAddress := range request.RevealedAddresses {
+			verifiedAddresses = append(verifiedAddresses, gethcommon.HexToAddress(walletAddress))
+		}
+
+		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses)
+		if err != nil {
+			return nil, err
+		}
+
+		if !hasPermission {
+			err = m.markRequestToJoinAsCanceled(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			requestToJoin.State = RequestToJoinStateDeclined
+			return requestToJoin, nil
+		}
+
 		// Save revealed addresses + signatures so they can later be added
 		// to the community member list when the request is accepted
 		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
@@ -1235,7 +1313,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			return nil, err
 		}
 
-		if acceptAutomatically {
+		if hasPermission && acceptAutomatically {
 			err = m.markRequestToJoin(signer, community)
 			if err != nil {
 				return nil, err
@@ -1245,6 +1323,110 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 
 	return requestToJoin, nil
+}
+
+func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, walletAddresses []gethcommon.Address) (bool, error) {
+	tokenAddresses, addressToSymbolMap := getTokenAddressesFromPermissions(permissions)
+	balances, err := m.getAccumulatedTokenBalances(walletAddresses, tokenAddresses, addressToSymbolMap)
+	if err != nil {
+		return false, err
+	}
+
+	hasPermission := false
+	for _, tokenPermission := range permissions {
+		if checkTokenCriteria(tokenPermission.TokenCriteria, balances) {
+			hasPermission = true
+			break
+		}
+	}
+
+	return hasPermission, nil
+}
+
+func checkTokenCriteria(tokenCriteria []*protobuf.TokenCriteria, balances map[string]*big.Float) bool {
+	result := true
+	hasERC20 := false
+	for _, tokenRequirement := range tokenCriteria {
+		// we gotta check for whether there are ERC20 token criteria
+		// in the first place, if we don't we'll return a false positive
+		if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
+			hasERC20 = true
+			amount, _ := strconv.ParseFloat(tokenRequirement.Amount, 32)
+			if balances[tokenRequirement.Symbol].Cmp(big.NewFloat(amount)) == -1 {
+				result = false
+				break
+			}
+		}
+	}
+	return hasERC20 && result
+}
+
+func (m *Manager) getAccumulatedTokenBalances(accounts []gethcommon.Address, tokenAddresses []gethcommon.Address, addressToToken map[gethcommon.Address]tokenData) (map[string]*big.Float, error) {
+	networks, err := m.tokenManager.RPCClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, network := range networks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	clients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	balancesByChain, err := m.tokenManager.GetBalancesByChain(context.Background(), clients, accounts, tokenAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	accumulatedBalances := make(map[string]*big.Float)
+	for _, accounts := range balancesByChain {
+		for _, contracts := range accounts {
+			for contract, value := range contracts {
+				if _, exists := accumulatedBalances[addressToToken[contract].Symbol]; !exists {
+					accumulatedBalances[addressToToken[contract].Symbol] = new(big.Float)
+				}
+				balance := new(big.Float).Quo(
+					new(big.Float).SetInt(value.ToInt()),
+					big.NewFloat(math.Pow(10, float64(addressToToken[contract].Decimals))),
+				)
+				prevBalance := accumulatedBalances[addressToToken[contract].Symbol]
+				accumulatedBalances[addressToToken[contract].Symbol].Add(prevBalance, balance)
+			}
+		}
+	}
+	return accumulatedBalances, nil
+}
+
+type tokenData struct {
+	Symbol   string
+	Decimals int
+}
+
+func getTokenAddressesFromPermissions(tokenPermissions []*protobuf.CommunityTokenPermission) ([]gethcommon.Address, map[gethcommon.Address]tokenData) {
+	set := make(map[gethcommon.Address]bool)
+	addressToToken := make(map[gethcommon.Address]tokenData)
+	for _, tokenPermission := range tokenPermissions {
+		for _, token := range tokenPermission.TokenCriteria {
+			if token.Type == protobuf.CommunityTokenType_ERC20 {
+				for _, contractAddress := range token.ContractAddresses {
+					set[gethcommon.HexToAddress(contractAddress)] = true
+					addressToToken[gethcommon.HexToAddress(contractAddress)] = tokenData{
+						Symbol:   token.Symbol,
+						Decimals: int(token.Decimals),
+					}
+				}
+			}
+		}
+	}
+	tokenAddresses := make([]gethcommon.Address, 0)
+	for tokenAddress := range set {
+		tokenAddresses = append(tokenAddresses, tokenAddress)
+	}
+	return tokenAddresses, addressToToken
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {

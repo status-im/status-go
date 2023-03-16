@@ -218,6 +218,7 @@ func main() {
 			protocol.WithPushNotificationServerConfig(&config.PushNotificationServerConfig),
 			protocol.WithDatabase(db),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
+			protocol.WithRPCClient(backend.StatusNode().RPCClient()),
 		}
 
 		messenger, err := protocol.NewMessenger(
