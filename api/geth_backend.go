@@ -32,11 +32,13 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -432,6 +434,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 
 	err = b.StartNode(b.config)
 	if err != nil {
+		b.log.Info("failed to start node")
 		return err
 	}
 
@@ -441,6 +444,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	}
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
+		b.log.Info("failed to update account")
 		return err
 	}
 
@@ -689,6 +693,88 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
+	return nil
+}
+
+func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) error {
+
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, "keystore")); err != nil {
+		return err
+	}
+
+	b.UpdateRootDataDir(request.BackupDisabledDataDir)
+	err := b.OpenAccounts()
+	if err != nil {
+		b.log.Error("failed open accounts", err)
+		return err
+	}
+
+	generator := b.accountManager.AccountsGenerator()
+
+	generatedAccountInfos, err := generator.Generate(12, 1, "")
+
+	if err != nil {
+		return err
+	}
+
+	info := generatedAccountInfos[0]
+
+	derivedAddresses, err := generator.DeriveAddresses(info.ID, paths)
+	if err != nil {
+		return err
+	}
+
+	_, err = generator.StoreDerivedAccounts(info.ID, "", paths)
+	if err != nil {
+		return err
+	}
+
+	account := multiaccounts.Account{
+		KeyUID:        info.KeyUID,
+		KDFIterations: sqlite.ReducedKDFIterationsNumber,
+	}
+
+	settings, err := defaultSettings(info, derivedAddresses, nil)
+	if err != nil {
+		return err
+	}
+
+	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
+	if err != nil {
+		return err
+	}
+
+	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
+	walletAccount := &accounts.Account{
+		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
+		KeyUID:    info.KeyUID,
+		Address:   types.HexToAddress(walletDerivedAccount.Address),
+		Color:     "",
+		Wallet:    true,
+		Path:      pathDefaultWallet,
+		Name:      "Ethereum account",
+	}
+
+	chatDerivedAccount := derivedAddresses[pathDefaultChat]
+	chatAccount := &accounts.Account{
+		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
+		KeyUID:    info.KeyUID,
+		Address:   types.HexToAddress(chatDerivedAccount.Address),
+		Name:      settings.Name,
+		Chat:      true,
+		Path:      pathDefaultChat,
+	}
+
+	accounts := []*accounts.Account{walletAccount, chatAccount}
+	err = b.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts)
+	if err != nil {
+		b.log.Error("start node", err)
+		return err
+	}
 	return nil
 }
 
