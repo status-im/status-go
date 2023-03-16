@@ -131,10 +131,9 @@ type StatusNode struct {
 // New makes new instance of StatusNode.
 func New(transactor *transactions.Transactor) *StatusNode {
 	return &StatusNode{
-		gethAccountManager: account.NewGethManager(),
-		transactor:         transactor,
-		log:                log.New("package", "status-go/node.StatusNode"),
-		publicMethods:      make(map[string]bool),
+		transactor:    transactor,
+		log:           log.New("package", "status-go/node.StatusNode"),
+		publicMethods: make(map[string]bool),
 	}
 }
 
@@ -237,6 +236,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	if err := n.setupRPCClient(); err != nil {
 		return err
 	}
+
+	n.gethAccountManager = account.NewGethManager()
 
 	n.downloader = ipfs.NewDownloader(config.RootDataDir)
 

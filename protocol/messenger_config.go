@@ -180,6 +180,7 @@ func WithMultiAccounts(ma *multiaccounts.Database) Option {
 		c.multiAccount = ma
 		return nil
 	}
+
 }
 
 func WithMailserversDatabase(ma *mailservers.Database) Option {

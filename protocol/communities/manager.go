@@ -1029,6 +1029,10 @@ func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) e
 	return nil
 }
 
+func (m *Manager) MarkRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
+	return m.markRequestToJoinAsCanceled(pk, community)
+}
+
 func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
 }
@@ -1309,6 +1313,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 		}
 	}
 
+	fmt.Println("HAS PERMISSION TO JOIN: ", hasPermission)
 	return hasPermission, nil
 }
 

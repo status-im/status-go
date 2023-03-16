@@ -760,6 +760,18 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
+	// rtj, err := m.communitiesManager.PendingRequestsToJoinForUser(m.IdentityPublicKey())
+	// for _, r := range rtj {
+	// 	request := &requests.CancelRequestToJoinCommunity{
+	// 		ID: r.ID,
+	// 	}
+	// 	_, _, err := m.communitiesManager.CancelRequestToJoin(request)
+	// 	if err != nil {
+	// 		fmt.Println("COULDN'T REMOVE REQUEST TO JOIN", err)
+	// 		return nil, err
+	// 	}
+	// }
+
 	return response, nil
 }
 

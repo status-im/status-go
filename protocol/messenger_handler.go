@@ -1280,6 +1280,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	}
 
 	if requestToJoin.State == communities.RequestToJoinStatePending {
+		fmt.Println(">>> NOW A PENDING REQUEST")
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))

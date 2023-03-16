@@ -121,6 +121,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback,
 
 	client := chain.NewClient(rpcClient, rpcFallbackClient, chainID)
 	c.rpcClients[chainID] = client
+	fmt.Println(">>>> ALL THE WAY HERE")
 	return client, nil
 }
 
