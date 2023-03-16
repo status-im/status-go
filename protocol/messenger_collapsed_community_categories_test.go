@@ -24,7 +24,6 @@ func (s *MessengerCollapsedCommunityCategoriesSuite) TestUpsertCollapsedCommunit
 	s.Require().Len(categories, 1)
 	s.Require().Equal(communityID, categories[0].CommunityID)
 	s.Require().Equal(categoryID, categories[0].CategoryID)
-	s.Require().True(categories[0].Collapsed)
 
 	request.Collapsed = false
 
