@@ -29,12 +29,13 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
-	protocol "github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing"
 	"github.com/status-im/status-go/services/personal"
@@ -258,6 +259,31 @@ func LoginWithConfig(accountData, password, configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	return makeJSONResponse(nil)
+}
+
+func CreateAccountAndLogin(requestJSON string) string {
+	var request requests.CreateAccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	api.RunAsync(func() error {
+		log.Debug("starting a node and creating config")
+		err := statusBackend.CreateAccountAndLogin(&request)
+		if err != nil {
+			log.Error("failed to create account", "error", err)
+			return err
+		}
+		log.Debug("started a node, and created account")
+		return nil
+	})
 	return makeJSONResponse(nil)
 }
 
