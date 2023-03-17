@@ -216,6 +216,22 @@ func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collec
 	return o.fetchAssets(queryParams, limit)
 }
 
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*AssetContainer, error) {
+	queryParams := url.Values{
+		"owner": {owner.String()},
+	}
+
+	for _, contractAddress := range contractAddresses {
+		queryParams.Add("asset_contract_addresses", contractAddress.String())
+	}
+
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
+	return o.fetchAssets(queryParams, limit)
+}
+
 func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
@@ -246,8 +262,8 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		assets.PreviousCursor = queryParams["cursor"][0]
 	}
 
-	tmpLimit := limit
-	if AssetLimit < limit {
+	tmpLimit := AssetLimit
+	if limit > 0 && limit < tmpLimit {
 		tmpLimit = AssetLimit
 	}
 
@@ -283,7 +299,7 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 
 		queryParams["cursor"] = []string{assets.NextCursor}
 
-		if len(assets.Assets) >= limit {
+		if limit > 0 && len(assets.Assets) >= limit {
 			break
 		}
 	}
