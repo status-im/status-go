@@ -332,6 +332,16 @@ func (api *API) GetOpenseaAssetsByOwnerWithCursor(ctx context.Context, chainID u
 	return client.FetchAllAssetsByOwner(owner, cursor, limit)
 }
 
+func (api *API) GetOpenseaAssetsByOwnerAndContractAddressWithCursor(ctx context.Context, chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
+	log.Debug("call to GetOpenseaAssetsByOwnerAndContractAddressWithCursor")
+	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.FetchAllAssetsByOwnerAndContractAddress(owner, contractAddresses, cursor, limit)
+}
+
 func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []opensea.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
 
