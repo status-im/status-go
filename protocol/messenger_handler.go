@@ -1583,10 +1583,6 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
 	state.Response.AddChat(chat)
 	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
-	state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
-		ID:      types.FromHex(messageID),
-		Deleted: true,
-	})
 
 	return nil
 }
@@ -2594,8 +2590,17 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 		return false, err
 	}
 
-	if !onlyFromContacts {
+	contact, ok := m.allContacts.Load(publicKey)
+
+	if !onlyFromContacts && !ok {
 		return true, nil
+	}
+
+	// If we have an existing chat with a contact which is not added
+	// that means the contact was removed and we don't want to receive
+	// new messages from them.
+	if chat != nil && chat.OneToOne() && ok && !contact.added() {
+		return false, nil
 	}
 
 	// if it's from us, it's allowed
@@ -2613,7 +2618,6 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 		return true, nil
 	}
 
-	contact, ok := m.allContacts.Load(publicKey)
 	if !ok {
 		// If it's not in contacts, we don't allow it
 		return false, nil
