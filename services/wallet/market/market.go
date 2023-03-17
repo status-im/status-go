@@ -17,12 +17,12 @@ type DataPoint struct {
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 
 type Manager struct {
-	main            thirdparty.MarketDataProvider
-	fallback        thirdparty.MarketDataProvider
-	priceCache      DataPerTokenAndCurrency
-	IsConnected     bool
-	LastCheckedAt   int64
-	IsConnectedLock sync.RWMutex
+	main           thirdparty.MarketDataProvider
+	fallback       thirdparty.MarketDataProvider
+	priceCache     DataPerTokenAndCurrency
+	IsConnected    bool
+	LastCheckedAt  int64
+	priceCacheLock sync.RWMutex
 }
 
 func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDataProvider) *Manager {
@@ -186,6 +186,9 @@ func (pm *Manager) getCachedPricesFor(symbols []string, currencies []string) Dat
 }
 
 func (pm *Manager) updatePriceCache(prices map[string]map[string]float64) {
+	pm.priceCacheLock.Lock()
+	defer pm.priceCacheLock.Unlock()
+
 	for token, pricesPerCurrency := range prices {
 		_, present := pm.priceCache[token]
 		if !present {
@@ -201,6 +204,9 @@ func (pm *Manager) updatePriceCache(prices map[string]map[string]float64) {
 }
 
 func (pm *Manager) GetCachedPrices() DataPerTokenAndCurrency {
+	pm.priceCacheLock.RLock()
+	defer pm.priceCacheLock.RUnlock()
+
 	return pm.priceCache
 }
 
@@ -212,7 +218,7 @@ func (pm *Manager) GetOrFetchPrices(symbols []string, currencies []string, maxAg
 	now := time.Now().Unix()
 
 	for _, symbol := range symbols {
-		tokenPriceCache, ok := pm.priceCache[symbol]
+		tokenPriceCache, ok := pm.GetCachedPrices()[symbol]
 		if !ok {
 			if !symbolsToFetchMap[symbol] {
 				symbolsToFetchMap[symbol] = true
