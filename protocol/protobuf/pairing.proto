@@ -142,6 +142,7 @@ message SyncCommunityRequestsToJoin {
   string chat_id = 5;
   bytes community_id = 6;
   uint64 state = 7;
+  map<string, bytes> revealed_addresses = 8;
 }
 
 message SyncInstallation {

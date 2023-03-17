@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -51,6 +52,7 @@ type Manager struct {
 	subscriptions                []chan *Subscription
 	ensVerifier                  *ens.Verifier
 	identity                     *ecdsa.PrivateKey
+	accountsManager              *account.GethManager
 	logger                       *zap.Logger
 	stdoutLogger                 *zap.Logger
 	transport                    *transport.Transport
@@ -83,7 +85,19 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 	close(t.CancelChan)
 }
 
-func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig) (*Manager, error) {
+type managerOptions struct {
+	accountsManager *account.GethManager
+}
+
+type ManagerOption func(*managerOptions)
+
+func WithAccountManager(accountsManager *account.GethManager) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.accountsManager = accountsManager
+	}
+}
+
+func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -98,6 +112,11 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 	stdoutLogger, err := zap.NewDevelopment()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create archive logger")
+	}
+
+	managerConfig := managerOptions{}
+	for _, opt := range opts {
+		opt(&managerConfig)
 	}
 
 	manager := &Manager{
@@ -115,6 +134,10 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 			logger: logger,
 			db:     db,
 		},
+	}
+
+	if managerConfig.accountsManager != nil {
+		manager.accountsManager = managerConfig.accountsManager
 	}
 
 	if verifier != nil {
@@ -1141,11 +1164,12 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 
 	requestToJoin := &RequestToJoin{
-		PublicKey:   common.PubkeyToHex(signer),
-		Clock:       request.Clock,
-		ENSName:     request.EnsName,
-		CommunityID: request.CommunityId,
-		State:       RequestToJoinStatePending,
+		PublicKey:         common.PubkeyToHex(signer),
+		Clock:             request.Clock,
+		ENSName:           request.EnsName,
+		CommunityID:       request.CommunityId,
+		State:             RequestToJoinStatePending,
+		RevealedAddresses: request.RevealedAddresses,
 	}
 
 	requestToJoin.CalculateID()
@@ -1154,16 +1178,70 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
 	// If user is already a member, then accept request automatically
 	// It may happen when member removes itself from community and then tries to rejoin
 	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
-	if acceptAutomatically {
+	if len(becomeMemberPermissions) == 0 && acceptAutomatically {
 		err = m.markRequestToJoin(signer, community)
 		if err != nil {
 			return nil, err
 		}
 		requestToJoin.State = RequestToJoinStateAccepted
+		return requestToJoin, nil
+	}
+
+	if len(becomeMemberPermissions) > 0 {
+		// we have token permissions but requester hasn't revealed
+		// any addresses
+		if len(request.RevealedAddresses) == 0 {
+			err = m.markRequestToJoinAsCanceled(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			requestToJoin.State = RequestToJoinStateDeclined
+			return requestToJoin, nil
+		}
+
+		// verify if revealed addresses indeed belong to requester
+		for address, signature := range request.RevealedAddresses {
+			recoverParams := account.RecoverParams{
+				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+				Signature: types.EncodeHex(signature),
+			}
+
+			recovered, err := m.accountsManager.Recover(recoverParams)
+			if err != nil {
+				return nil, err
+			}
+			if recovered.Hex() != address {
+				// if ownership of only one wallet address cannot be verified,
+				// we mark the request as cancelled and stop
+				err = m.markRequestToJoinAsCanceled(signer, community)
+				if err != nil {
+					return nil, err
+				}
+				requestToJoin.State = RequestToJoinStateDeclined
+				return requestToJoin, nil
+			}
+		}
+
+		// Save revealed addresses + signatures so they can later be added
+		// to the community member list when the request is accepted
+		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+		if err != nil {
+			return nil, err
+		}
+
+		if acceptAutomatically {
+			err = m.markRequestToJoin(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			requestToJoin.State = RequestToJoinStateAccepted
+		}
 	}
 
 	return requestToJoin, nil
@@ -1587,12 +1665,13 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{
-		PublicKey:   common.PubkeyToHex(requester),
-		Clock:       clock,
-		ENSName:     request.ENSName,
-		CommunityID: request.CommunityID,
-		State:       RequestToJoinStatePending,
-		Our:         true,
+		PublicKey:         common.PubkeyToHex(requester),
+		Clock:             clock,
+		ENSName:           request.ENSName,
+		CommunityID:       request.CommunityID,
+		State:             RequestToJoinStatePending,
+		Our:               true,
+		RevealedAddresses: make(map[string][]byte),
 	}
 
 	requestToJoin.CalculateID()

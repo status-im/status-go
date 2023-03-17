@@ -1417,6 +1417,20 @@ func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	return response
 }
 
+func (o *Community) TokenPermissions() map[string]*protobuf.CommunityTokenPermission {
+	return o.config.CommunityDescription.TokenPermissions
+}
+
+func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
+	permissions := make([]*protobuf.CommunityTokenPermission, 0)
+	for _, tokenPermission := range o.TokenPermissions() {
+		if tokenPermission.Type == permissionType {
+			permissions = append(permissions, tokenPermission)
+		}
+	}
+	return permissions
+}
+
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
