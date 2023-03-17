@@ -141,14 +141,14 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
-		Receiver: &ReceiverConfig{
+		ReceiverConfig: &ReceiverConfig{
 			NodeConfig:            serverNodeConfig,
 			KeystorePath:          serverKeystoreDir,
 			DeviceType:            "desktop",
 			KDFIterations:         expectedKDFIterations,
 			SettingCurrentNetwork: currentNetwork,
 		},
-		Server: new(ServerConfig),
+		ServerConfig: new(ServerConfig),
 	}
 	serverNodeConfig.RootDataDir = serverTmpDir
 	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
@@ -168,13 +168,13 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
 	clientPayloadSourceConfig := SenderClientConfig{
-		Sender: &SenderConfig{
+		SenderConfig: &SenderConfig{
 			KeystorePath: clientKeystorePath,
 			DeviceType:   "android",
 			KeyUID:       clientActiveAccount.KeyUID,
 			Password:     s.password,
 		},
-		Client: new(ClientConfig),
+		ClientConfig: new(ClientConfig),
 	}
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
@@ -237,13 +237,13 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
 	var config = &SenderServerConfig{
-		Sender: &SenderConfig{
+		SenderConfig: &SenderConfig{
 			KeystorePath: serverKeystorePath,
 			DeviceType:   "desktop",
 			KeyUID:       serverActiveAccount.KeyUID,
 			Password:     s.password,
 		},
-		Server: new(ServerConfig),
+		ServerConfig: new(ServerConfig),
 	}
 	configBytes, err := json.Marshal(config)
 	require.NoError(s.T(), err)
@@ -267,14 +267,14 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
-		Receiver: &ReceiverConfig{
+		ReceiverConfig: &ReceiverConfig{
 			KeystorePath:          clientKeystoreDir,
 			DeviceType:            "iphone",
 			KDFIterations:         expectedKDFIterations,
 			NodeConfig:            clientNodeConfig,
 			SettingCurrentNetwork: currentNetwork,
 		},
-		Client: new(ClientConfig),
+		ClientConfig: new(ClientConfig),
 	}
 	clientNodeConfig.RootDataDir = clientTmpDir
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)

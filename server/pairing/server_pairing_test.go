@@ -142,7 +142,7 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingReceive() {
 	err = ccp.FromString(qr)
 	s.Require().NoError(err)
 
-	c, err := NewSenderClient(nil, ccp, &SenderClientConfig{Sender: &SenderConfig{}, Client: &ClientConfig{}})
+	c, err := NewSenderClient(nil, ccp, &SenderClientConfig{SenderConfig: &SenderConfig{}, ClientConfig: &ClientConfig{}})
 	s.Require().NoError(err)
 
 	// Compare cert values

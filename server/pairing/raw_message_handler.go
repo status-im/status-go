@@ -25,6 +25,7 @@ func NewSyncRawMessageHandler(backend *api.GethStatusBackend) *SyncRawMessageHan
 
 func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *RawMessageCollector, deviceType string) error {
 	// TODO Could this function be part of the installation data exchange flow?
+	//  https://github.com/status-im/status-go/issues/3304
 	messenger := s.backend.Messenger()
 	if messenger == nil {
 		return fmt.Errorf("messenger is nil when CollectInstallationData")

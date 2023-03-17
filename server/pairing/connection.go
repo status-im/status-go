@@ -70,6 +70,7 @@ func (cp *ConnectionParams) ToString() string {
 	m := base58.Encode(new(big.Int).SetInt64(int64(cp.serverMode)).Bytes())
 
 	// TODO remove server mode from the connection string, rely on specific function calls rather than algorithmic orchestration
+	//  https://github.com/status-im/status-go/issues/3301
 
 	return fmt.Sprintf("%s%s:%s:%s:%s:%s:%s", connectionStringID, v, ip, p, k, ek, m)
 }

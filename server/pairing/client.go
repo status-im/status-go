@@ -142,7 +142,7 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 		return nil, err
 	}
 
-	am, rmm, imr, err := NewPayloadMounters(logger, pe, backend, config.Sender)
+	am, rmm, imr, err := NewPayloadMounters(logger, pe, backend, config.SenderConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (
 		return nil, err
 	}
 
-	conf.Sender.DB = backend.GetMultiaccountDB()
+	conf.SenderConfig.DB = backend.GetMultiaccountDB()
 
 	return NewSenderClient(backend, ccp, conf)
 }
@@ -302,7 +302,7 @@ func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, conf
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
-	ar, rmr, imr, err := NewPayloadReceivers(logger, pe, backend, config.Receiver)
+	ar, rmr, imr, err := NewPayloadReceivers(logger, pe, backend, config.ReceiverConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +446,7 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 		return nil, err
 	}
 
-	conf.Receiver.DB = backend.GetMultiaccountDB()
+	conf.ReceiverConfig.DB = backend.GetMultiaccountDB()
 
 	return NewReceiverClient(backend, ccp, conf)
 }

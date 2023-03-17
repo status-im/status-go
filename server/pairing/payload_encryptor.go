@@ -18,6 +18,7 @@ func (ep *EncryptionPayload) lock() {
 }
 
 // TODO resolve the many cases of other structs simply wrapping their encryptor rather than embedding the functionality
+//  https://github.com/status-im/status-go/issues/3302
 
 // PayloadEncryptor is responsible for encrypting and decrypting payload data
 type PayloadEncryptor struct {

@@ -120,9 +120,9 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 		Hostname: tpsc.OutboundIP.String(),
 	}
 
-	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{Server: sc, Sender: &SenderConfig{}})
+	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{ServerConfig: sc, SenderConfig: &SenderConfig{}})
 	require.NoError(t, err)
-	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{Server: sc, Receiver: &ReceiverConfig{}})
+	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{ServerConfig: sc, ReceiverConfig: &ReceiverConfig{}})
 	require.NoError(t, err)
 }
 

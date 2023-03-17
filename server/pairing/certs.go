@@ -19,6 +19,7 @@ import (
 )
 
 // TODO Reconcile duplicate function here and in server/certs.go
+//  https://github.com/status-im/status-go/issues/3300
 
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()

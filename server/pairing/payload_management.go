@@ -15,6 +15,7 @@ const keystoreDir = "keystore"
 
 var (
 	// TODO add validation on config to ensure required fields have valid values
+	//  https://github.com/status-im/status-go/issues/3303
 
 	ErrKeyFileAlreadyExists    = errors.New("key file already exists")
 	ErrKeyUIDEmptyAsSender     = errors.New("keyUID must be provided as sender")

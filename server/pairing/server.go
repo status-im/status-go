@@ -35,6 +35,7 @@ type BaseServer struct {
 	pk *ecdsa.PublicKey
 	ek []byte
 	// TODO remove mode from pairing process
+	//  https://github.com/status-im/status-go/issues/3301
 	mode Mode
 }
 
@@ -150,14 +151,14 @@ type SenderServer struct {
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
 func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig) (*SenderServer, error) {
 	logger := logutils.ZapLogger().Named("SenderServer")
-	e := NewPayloadEncryptor(config.Server.EK)
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
-	bs, err := NewBaseServer(logger, e, config.Server)
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	am, rmm, imr, err := NewPayloadMounters(logger, e, backend, config.Sender)
+	am, rmm, imr, err := NewPayloadMounters(logger, e, backend, config.SenderConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +178,7 @@ func (s *SenderServer) startSendingData() error {
 		pairingSendSyncDevice: middlewareChallenge(s, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
+		//  https://github.com/status-im/status-go/issues/3304
 		// receive installation data from receiver
 		pairingReceiveInstallation: middlewareChallenge(s, handleReceiveInstallation(s, s.installationMounter)),
 	})
@@ -185,12 +187,12 @@ func (s *SenderServer) startSendingData() error {
 
 // MakeFullSenderServer generates a fully configured and randomly seeded SenderServer
 func MakeFullSenderServer(backend *api.GethStatusBackend, mode Mode, config *SenderServerConfig) (*SenderServer, error) {
-	err := MakeServerConfig(config.Server)
+	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	config.Sender.DB = backend.GetMultiaccountDB()
+	config.SenderConfig.DB = backend.GetMultiaccountDB()
 	return NewSenderServer(backend, config)
 }
 
@@ -240,14 +242,14 @@ type ReceiverServer struct {
 // NewReceiverServer returns a *SenderServer init from the given *ReceiverServerConfig
 func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
 	logger := logutils.ZapLogger().Named("SenderServer")
-	e := NewPayloadEncryptor(config.Server.EK)
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
-	bs, err := NewBaseServer(logger, e, config.Server)
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	ar, rmr, imr, err := NewPayloadReceivers(logger, e, backend, config.Receiver)
+	ar, rmr, imr, err := NewPayloadReceivers(logger, e, backend, config.ReceiverConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -267,6 +269,7 @@ func (s *ReceiverServer) startReceivingData() error {
 		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s, s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
+		//  https://github.com/status-im/status-go/issues/3304
 		// send installation data back to sender
 		pairingSendInstallation: handleSendInstallation(s, s.installationReceiver),
 	})
@@ -275,16 +278,16 @@ func (s *ReceiverServer) startReceivingData() error {
 
 // MakeFullReceiverServer generates a fully configured and randomly seeded ReceiverServer
 func MakeFullReceiverServer(backend *api.GethStatusBackend, mode Mode, config *ReceiverServerConfig) (*ReceiverServer, error) {
-	err := MakeServerConfig(config.Server)
+	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	activeAccount, _ := backend.GetActiveAccount()
 	if activeAccount != nil {
-		config.Receiver.LoggedInKeyUID = activeAccount.KeyUID
+		config.ReceiverConfig.LoggedInKeyUID = activeAccount.KeyUID
 	}
-	config.Receiver.DB = backend.GetMultiaccountDB()
+	config.ReceiverConfig.DB = backend.GetMultiaccountDB()
 
 	return NewReceiverServer(backend, config)
 }

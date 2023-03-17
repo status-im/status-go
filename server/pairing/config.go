@@ -52,49 +52,49 @@ type ServerConfig struct {
 type ClientConfig struct{}
 
 type SenderServerConfig struct {
-	Sender *SenderConfig `json:"sender"`
-	Server *ServerConfig `json:"server"`
+	SenderConfig *SenderConfig `json:"senderConfig"`
+	ServerConfig *ServerConfig `json:"serverConfig"`
 }
 
 type SenderClientConfig struct {
-	Sender *SenderConfig `json:"sender"`
-	Client *ClientConfig `json:"client"`
+	SenderConfig *SenderConfig `json:"senderConfig"`
+	ClientConfig *ClientConfig `json:"clientConfig"`
 }
 
 type ReceiverClientConfig struct {
-	Receiver *ReceiverConfig `json:"receiver"`
-	Client   *ClientConfig   `json:"client"`
+	ReceiverConfig *ReceiverConfig `json:"receiverConfig"`
+	ClientConfig   *ClientConfig   `json:"clientConfig"`
 }
 
 type ReceiverServerConfig struct {
-	Receiver *ReceiverConfig `json:"receiver"`
-	Server   *ServerConfig   `json:"server"`
+	ReceiverConfig *ReceiverConfig `json:"receiverConfig"`
+	ServerConfig   *ServerConfig   `json:"serverConfig"`
 }
 
 func NewSenderServerConfig() *SenderServerConfig {
 	return &SenderServerConfig{
-		Sender: new(SenderConfig),
-		Server: new(ServerConfig),
+		SenderConfig: new(SenderConfig),
+		ServerConfig: new(ServerConfig),
 	}
 }
 
 func NewSenderClientConfig() *SenderClientConfig {
 	return &SenderClientConfig{
-		Sender: new(SenderConfig),
-		Client: new(ClientConfig),
+		SenderConfig: new(SenderConfig),
+		ClientConfig: new(ClientConfig),
 	}
 }
 
 func NewReceiverClientConfig() *ReceiverClientConfig {
 	return &ReceiverClientConfig{
-		Receiver: new(ReceiverConfig),
-		Client:   new(ClientConfig),
+		ReceiverConfig: new(ReceiverConfig),
+		ClientConfig:   new(ClientConfig),
 	}
 }
 
 func NewReceiverServerConfig() *ReceiverServerConfig {
 	return &ReceiverServerConfig{
-		Receiver: new(ReceiverConfig),
-		Server:   new(ServerConfig),
+		ReceiverConfig: new(ReceiverConfig),
+		ServerConfig:   new(ServerConfig),
 	}
 }
