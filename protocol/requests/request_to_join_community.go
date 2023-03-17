@@ -11,6 +11,7 @@ var ErrRequestToJoinCommunityInvalidCommunityID = errors.New("request-to-join-co
 type RequestToJoinCommunity struct {
 	CommunityID types.HexBytes `json:"communityId"`
 	ENSName     string         `json:"ensName"`
+	Password    string         `json:"password"`
 }
 
 func (j *RequestToJoinCommunity) Validate() error {

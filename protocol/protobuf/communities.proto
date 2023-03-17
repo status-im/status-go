@@ -120,6 +120,7 @@ message CommunityRequestToJoin {
   string chat_id = 3;
   bytes community_id = 4;
   string display_name = 5;
+  map<string, bytes> revealed_addresses = 6;
 }
 
 message CommunityCancelRequestToJoin {
