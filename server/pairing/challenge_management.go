@@ -36,6 +36,7 @@ func makeCookieStore() (*sessions.CookieStore, error) {
 	return sessions.NewCookieStore(auth, enc), nil
 }
 
+// ChallengeGiver is responsible for generating challenges and checking challenge responses
 type ChallengeGiver struct {
 	cookieStore *sessions.CookieStore
 	encryptor   *PayloadEncryptor
@@ -50,15 +51,15 @@ func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver
 
 	return &ChallengeGiver{
 		cookieStore: cs,
-		encryptor:   e,
+		encryptor:   e.Renew(),
 		logger:      logger,
 	}, nil
 }
 
-func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
+func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
 	s, err := cg.cookieStore.Get(r, sessionChallenge)
 	if err != nil {
-		cg.logger.Error("handleChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
+		cg.logger.Error("checkChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
 		return &ChallengeError{"error", http.StatusInternalServerError}
 	}
 
@@ -75,7 +76,7 @@ func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http
 
 	c, err := cg.encryptor.decryptPlain(base58.Decode(pc))
 	if err != nil {
-		cg.logger.Error("handleChallengeResponse: cg.encryptor.decryptPlain(base58.Decode(pc))", zap.Error(err), zap.String("pc", pc))
+		cg.logger.Error("checkChallengeResponse: cg.encryptor.decryptPlain(base58.Decode(pc))", zap.Error(err), zap.String("pc", pc))
 		return &ChallengeError{"error", http.StatusInternalServerError}
 	}
 
@@ -91,7 +92,7 @@ func (cg *ChallengeGiver) handleChallengeResponse(w http.ResponseWriter, r *http
 		s.Values[sessionBlocked] = true
 		err = s.Save(r, w)
 		if err != nil {
-			cg.logger.Error("handleChallengeResponse: err = s.Save(r, w)", zap.Error(err))
+			cg.logger.Error("checkChallengeResponse: err = s.Save(r, w)", zap.Error(err))
 			return &ChallengeError{"error", http.StatusInternalServerError}
 		}
 
@@ -126,6 +127,30 @@ func (cg *ChallengeGiver) getChallenge(w http.ResponseWriter, r *http.Request) (
 	return challenge, nil
 }
 
+// ChallengeTaker is responsible for storing and performing server challenges
 type ChallengeTaker struct {
-	encryptor *PayloadEncryptor
+	encryptor       *PayloadEncryptor
+	serverChallenge []byte
+}
+
+func NewChallengeTaker(e *PayloadEncryptor) *ChallengeTaker {
+	return &ChallengeTaker{
+		encryptor: e.Renew(),
+	}
+}
+
+func (ct *ChallengeTaker) SetChallenge(challenge []byte) {
+	ct.serverChallenge = challenge
+}
+
+func (ct *ChallengeTaker) DoChallenge(req *http.Request) error {
+	if ct.serverChallenge != nil {
+		ec, err := ct.encryptor.encryptPlain(ct.serverChallenge)
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	}
+	return nil
 }

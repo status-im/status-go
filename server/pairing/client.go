@@ -13,8 +13,6 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 
-	"github.com/btcsuite/btcutil/base58"
-
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/signal"
@@ -32,10 +30,9 @@ import (
 // BaseClient is responsible for lower level pairing.Client functionality common to dependent Client types
 type BaseClient struct {
 	*http.Client
-	serverCert      *x509.Certificate
-	encryptor       *PayloadEncryptor
-	baseAddress     *url.URL
-	serverChallenge []byte
+	serverCert     *x509.Certificate
+	baseAddress    *url.URL
+	challengeTaker *ChallengeTaker
 }
 
 // NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
@@ -79,10 +76,10 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	}
 
 	return &BaseClient{
-		Client:      &http.Client{Transport: tr, Jar: cj},
-		serverCert:  serverCert,
-		encryptor:   NewPayloadEncryptor(c.aesKey),
-		baseAddress: u,
+		Client:         &http.Client{Transport: tr, Jar: cj},
+		serverCert:     serverCert,
+		challengeTaker: NewChallengeTaker(NewPayloadEncryptor(c.aesKey)),
+		baseAddress:    u,
 	}, nil
 }
 
@@ -98,20 +95,11 @@ func (c *BaseClient) getChallenge() error {
 		return fmt.Errorf("[client] status not ok when getting challenge, received '%s'", resp.Status)
 	}
 
-	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
-	return err
-}
-
-// doChallenge checks if there is a serverChallenge and encrypts the challenge using the shared AES key
-func (c *BaseClient) doChallenge(req *http.Request) error {
-	if c.serverChallenge != nil {
-		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	challenge, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
 	}
+	c.challengeTaker.SetChallenge(challenge)
 	return nil
 }
 
@@ -322,7 +310,7 @@ func (c *ReceiverClient) receiveAccountData() error {
 		return err
 	}
 
-	err = c.doChallenge(req)
+	err = c.challengeTaker.DoChallenge(req)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
 		return err
@@ -363,7 +351,7 @@ func (c *ReceiverClient) receiveSyncDeviceData() error {
 		return err
 	}
 
-	err = c.doChallenge(req)
+	err = c.challengeTaker.DoChallenge(req)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
 		return err
@@ -410,7 +398,7 @@ func (c *ReceiverClient) sendInstallationData() error {
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 
-	err = c.doChallenge(req)
+	err = c.challengeTaker.DoChallenge(req)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
