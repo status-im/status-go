@@ -19,10 +19,6 @@ const (
 	pairingReceiveSyncDevice   = pairingBase + "/receiveSyncDevice"
 	pairingSendInstallation    = pairingBase + "/sendInstallation"
 	pairingReceiveInstallation = pairingBase + "/receiveInstallation"
-
-	// Session names
-	sessionChallenge = "challenge"
-	sessionBlocked   = "blocked"
 )
 
 // Account handling
