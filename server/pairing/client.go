@@ -253,6 +253,10 @@ func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	if err != nil {
 		return err
 	}
+	err = c.getChallenge()
+	if err != nil {
+		return err
+	}
 	return c.receiveInstallationData()
 }
 

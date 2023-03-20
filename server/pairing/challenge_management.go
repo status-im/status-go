@@ -20,11 +20,11 @@ const (
 
 type ChallengeError struct {
 	Text     string
-	HttpCode int
+	HTTPCode int
 }
 
 func (ce *ChallengeError) Error() string {
-	return fmt.Sprintf("%s : %d", ce.Text, ce.HttpCode)
+	return fmt.Sprintf("%s : %d", ce.Text, ce.HTTPCode)
 }
 
 func makeCookieStore() (*sessions.CookieStore, error) {
@@ -142,14 +142,17 @@ func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.
 }
 
 func (cg *ChallengeGiver) getChallenge(w http.ResponseWriter, r *http.Request) ([]byte, *ChallengeError) {
-	s, ce := cg.getSession(r)
-	if ce != nil {
-		return nil, ce
+	s, err := cg.getSession(r)
+	if err != nil {
+		return nil, err
 	}
 
 	challenge, ok := s.Values[sessionChallenge].([]byte)
 	if !ok {
-		challenge, ce = cg.generateNewChallenge(s, w, r)
+		challenge, err = cg.generateNewChallenge(s, w, r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return challenge, nil
 }

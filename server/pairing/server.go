@@ -9,7 +9,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
@@ -28,9 +27,7 @@ import (
 
 type BaseServer struct {
 	server.Server
-
-	cookieStore *sessions.CookieStore
-	encryptor   *PayloadEncryptor
+	challengeGiver *ChallengeGiver
 
 	pk *ecdsa.PublicKey
 	ek []byte
@@ -41,7 +38,7 @@ type BaseServer struct {
 
 // NewBaseServer returns a *BaseServer init from the given *SenderServerConfig
 func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig) (*BaseServer, error) {
-	cs, err := makeCookieStore()
+	cg, err := NewChallengeGiver(e, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +50,10 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 			nil,
 			logger,
 		),
-		encryptor:   e,
-		cookieStore: cs,
-		pk:          config.PK,
-		ek:          config.EK,
-		mode:        config.Mode,
+		challengeGiver: cg,
+		pk:             config.PK,
+		ek:             config.EK,
+		mode:           config.Mode,
 	}
 	bs.SetTimeout(config.Timeout)
 	return bs, nil
@@ -122,8 +118,6 @@ type SenderServer struct {
 	accountMounter      PayloadMounter
 	rawMessageMounter   *RawMessagePayloadMounter
 	installationMounter *InstallationPayloadMounterReceiver
-
-	challengeGiver *ChallengeGiver
 }
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
@@ -141,17 +135,11 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 		return nil, err
 	}
 
-	cg, err := NewChallengeGiver(e, logger)
-	if err != nil {
-		return nil, err
-	}
-
 	return &SenderServer{
 		BaseServer:          bs,
 		accountMounter:      am,
 		rawMessageMounter:   rmm,
 		installationMounter: imr,
-		challengeGiver:      cg,
 	}, nil
 }
 
@@ -248,13 +236,14 @@ func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerCon
 
 func (s *ReceiverServer) startReceivingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
+		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
 		pairingReceiveAccount:    handleReceiveAccount(s, s.accountReceiver),
 		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s, s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// send installation data back to sender
-		pairingSendInstallation: handleSendInstallation(s, s.installationReceiver),
+		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(s, s.installationReceiver)),
 	})
 	return s.Start()
 }

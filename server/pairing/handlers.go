@@ -185,7 +185,7 @@ func middlewareChallenge(cg *ChallengeGiver, next http.Handler) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		ce := cg.checkChallengeResponse(w, r)
 		if ce != nil {
-			http.Error(w, ce.Text, ce.HttpCode)
+			http.Error(w, ce.Text, ce.HTTPCode)
 			return
 		}
 
@@ -197,7 +197,7 @@ func handlePairingChallenge(cg *ChallengeGiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		challenge, ce := cg.getChallenge(w, r)
 		if ce != nil {
-			http.Error(w, ce.Text, ce.HttpCode)
+			http.Error(w, ce.Text, ce.HTTPCode)
 			return
 		}
 

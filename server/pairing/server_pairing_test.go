@@ -223,6 +223,13 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware(
 	err = c.getChallenge()
 	s.Require().NoError(err)
 	s.Require().NotEqual(challenge, c.challengeTaker.serverChallenge)
+
+	// Unlock the MockPayloadMounter to allow the test. Don't do this ordinarily
+	s.SS.accountMounter.(*MockPayloadMounter).encryptor.payload.locked = false
+
+	// receiving account data again using the new challenge
+	err = c.receiveAccountData()
+	s.Require().NoError(err)
 }
 
 func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_block() {
