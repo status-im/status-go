@@ -190,3 +190,75 @@ func TestAddressDoesntExist(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
+
+func TestKeypairNameAndIndexWhenAddingNewAccount(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accountsRegular := []*Account{
+		// chat account
+		{Address: types.Address{0x01}, Chat: true, Wallet: false, KeyUID: "0x0001"},
+		// Status Profile keypair
+		{Address: types.Address{0x02}, Chat: false, Wallet: true, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/0", LastUsedDerivationIndex: 0, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+		{Address: types.Address{0x03}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/1", LastUsedDerivationIndex: 1, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+		{Address: types.Address{0x04}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/2", LastUsedDerivationIndex: 2, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+	}
+	accountsCustom := []*Account{
+		// Keypair1
+		{Address: types.Address{0x11}, Chat: false, Wallet: false, KeyUID: "0x0002", Path: "m/44'/60'/0'/0/10", LastUsedDerivationIndex: 0, DerivedFrom: "0x2222", KeypairName: "Keypair11"},
+		{Address: types.Address{0x12}, Chat: false, Wallet: false, KeyUID: "0x0002", Path: "m/44'/60'/0'/0/11", LastUsedDerivationIndex: 0, DerivedFrom: "0x2222", KeypairName: "Keypair12"},
+		// Keypair2 out of the default Status' derivation tree
+		{Address: types.Address{0x22}, Chat: false, Wallet: false, KeyUID: "0x0003", Path: "m/44'/60'/0'/0/0/100", LastUsedDerivationIndex: 0, DerivedFrom: "0x3333", KeypairName: "Keypair21"},
+		{Address: types.Address{0x23}, Chat: false, Wallet: false, KeyUID: "0x0003", Path: "m/44'/60'/0'/0/1/100", LastUsedDerivationIndex: 0, DerivedFrom: "0x3333", KeypairName: "Keypair22"},
+	}
+
+	err := db.SaveAccounts(accountsRegular)
+	require.NoError(t, err)
+	err = db.SaveAccounts(accountsCustom)
+	require.NoError(t, err)
+	accs, err := db.GetAccounts()
+	require.NoError(t, err)
+
+	for _, acc := range accs {
+		if acc.Chat {
+			continue
+		}
+		if acc.KeyUID == accountsRegular[0].KeyUID {
+			require.Equal(t, uint64(2), acc.LastUsedDerivationIndex)
+			require.Equal(t, "Status Profile", acc.KeypairName)
+		} else if acc.KeyUID == accountsCustom[1].KeyUID {
+			require.Equal(t, uint64(0), acc.LastUsedDerivationIndex)
+			require.Equal(t, "Keypair12", acc.KeypairName)
+		} else if acc.KeyUID == accountsCustom[3].KeyUID {
+			require.Equal(t, uint64(0), acc.LastUsedDerivationIndex)
+			require.Equal(t, "Keypair22", acc.KeypairName)
+		}
+	}
+
+	accountsCustom = []*Account{
+		// Status Profile keypair
+		{Address: types.Address{0x05}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/100/1", LastUsedDerivationIndex: 2, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+	}
+
+	err = db.SaveAccounts(accountsCustom)
+	require.NoError(t, err)
+
+	result, err := db.GetAccountsByKeyUID(accountsCustom[0].KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 5, len(result))
+	require.Equal(t, uint64(2), accountsCustom[0].LastUsedDerivationIndex)
+	require.Equal(t, "Status Profile", accountsCustom[0].KeypairName)
+
+	accountsRegular = []*Account{
+		// Status Profile keypair
+		{Address: types.Address{0x06}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/3", LastUsedDerivationIndex: 3, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+	}
+
+	err = db.SaveAccounts(accountsRegular)
+	require.NoError(t, err)
+
+	result, err = db.GetAccountsByKeyUID(accountsCustom[0].KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 6, len(result))
+	require.Equal(t, uint64(3), accountsRegular[0].LastUsedDerivationIndex)
+	require.Equal(t, "Status Profile", accountsRegular[0].KeypairName)
+}

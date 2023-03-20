@@ -15,4 +15,5 @@ var (
 	ErrNewClockOlderThanCurrent = errors.New("the new clock value is older than the current clock value")
 	// ErrUnrecognisedSyncSettingProtobufType returned if there is no handler or record of a given protobuf.SyncSetting_Type
 	ErrUnrecognisedSyncSettingProtobufType = errors.New("unrecognised protobuf.SyncSetting_Type")
+	ErrDbTransactionIsNil                  = errors.New("database transaction is nil")
 )
