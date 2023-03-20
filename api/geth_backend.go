@@ -795,14 +795,16 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return err
 	}
 
-	iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
-	if err != nil {
-		return err
-	}
+	if request.ImagePath != "" {
+		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+		if err != nil {
+			return err
+		}
 
-	err = b.multiaccountsDB.StoreIdentityImages(info.KeyUID, iis, false)
-	if err != nil {
-		return err
+		err = b.multiaccountsDB.StoreIdentityImages(info.KeyUID, iis, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
