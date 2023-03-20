@@ -615,11 +615,13 @@ func (n *StatusNode) PeerCount() int {
 }
 
 func (n *StatusNode) ConnectionChanged(state connection.State) {
-	if n.wakuExtSrvc == nil {
-		return
+	if n.wakuExtSrvc != nil {
+		n.wakuExtSrvc.ConnectionChanged(state)
 	}
 
-	n.wakuExtSrvc.ConnectionChanged(state)
+	if n.wakuV2ExtSrvc != nil {
+		n.wakuV2ExtSrvc.ConnectionChanged(state)
+	}
 }
 
 // AccountManager exposes reference to node's accounts manager
