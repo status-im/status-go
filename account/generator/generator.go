@@ -69,6 +69,20 @@ func (g *Generator) Generate(mnemonicPhraseLength int, n int, bip39Passphrase st
 	return infos, err
 }
 
+func (g *Generator) CreateAccountFromPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
+	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
+	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		return IdentifiedAccountInfo{}, err
+	}
+
+	acc := &Account{
+		privateKey: privateKey,
+	}
+
+	return acc.ToIdentifiedAccountInfo(""), nil
+}
+
 func (g *Generator) ImportPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
 	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
@@ -124,8 +138,7 @@ func (g *Generator) CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicP
 		}
 	}
 
-	id := uuid.NewRandom().String()
-	accInfo := acc.ToGeneratedAccountInfo(id, mnemonicPhrase)
+	accInfo := acc.ToGeneratedAccountInfo("", mnemonicPhrase)
 
 	return accInfo.toGeneratedAndDerived(derivedAccountsInfo), nil
 }

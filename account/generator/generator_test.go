@@ -44,6 +44,11 @@ const testAccountJSONFile = `{
 	"version":3
 }`
 
+const (
+	path0 = "m/44'/60'/0'/0/0"
+	path1 = "m/44'/60'/0'/0/1"
+)
+
 func TestGenerator_Generate(t *testing.T) {
 	g := New(nil)
 	assert.Equal(t, 0, len(g.accounts))
@@ -56,6 +61,17 @@ func TestGenerator_Generate(t *testing.T) {
 		words := strings.Split(info.Mnemonic, " ")
 		assert.Equal(t, 12, len(words))
 	}
+}
+
+func TestGenerator_CreateAccountFromPrivateKey(t *testing.T) {
+	g := New(nil)
+	assert.Equal(t, 0, len(g.accounts))
+
+	info, err := g.CreateAccountFromPrivateKey(testAccount.bip44Key0)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(g.accounts))
+	assert.Equal(t, 66, len(info.KeyUID))
 }
 
 func TestGenerator_ImportPrivateKey(t *testing.T) {
@@ -74,12 +90,14 @@ func TestGenerator_CreateAccountFromMnemonicAndDeriveAccountsForPaths(t *testing
 	g := New(nil)
 	assert.Equal(t, 0, len(g.accounts))
 
-	info, err := g.CreateAccountFromMnemonicAndDeriveAccountsForPaths(testAccount.mnemonic, testAccount.bip39Passphrase, []string{})
+	info, err := g.CreateAccountFromMnemonicAndDeriveAccountsForPaths(testAccount.mnemonic, testAccount.bip39Passphrase, []string{path0, path1})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(g.accounts))
-	assert.Equal(t, 36, len(info.ID))
 	assert.Equal(t, 66, len(info.KeyUID))
+
+	assert.Equal(t, testAccount.bip44Address0, info.Derived[path0].Address)
+	assert.Equal(t, testAccount.bip44Address1, info.Derived[path1].Address)
 }
 
 func TestGenerator_ImportMnemonic(t *testing.T) {
@@ -120,9 +138,6 @@ func TestGenerator_DeriveAddresses(t *testing.T) {
 	info, err := g.ImportMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(g.accounts))
-
-	path0 := "m/44'/60'/0'/0/0"
-	path1 := "m/44'/60'/0'/0/1"
 
 	addresses, err := g.DeriveAddresses(info.ID, []string{path0, path1})
 	assert.NoError(t, err)
