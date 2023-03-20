@@ -138,6 +138,27 @@ func MultiAccountStoreDerivedAccounts(paramsJSON string) string {
 	return string(out)
 }
 
+// CreateAccountFromPrivateKey returns an account derived from the private key without storing it
+func CreateAccountFromPrivateKey(paramsJSON string) string {
+	var p MultiAccountImportPrivateKeyParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromPrivateKey(p.PrivateKey)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
 // MultiAccountImportPrivateKey imports a raw private key without storing it.
 func MultiAccountImportPrivateKey(paramsJSON string) string {
 	var p MultiAccountImportPrivateKeyParams
