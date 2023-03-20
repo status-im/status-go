@@ -49,27 +49,30 @@ var pieceLength = 100 * 1024
 
 const maxArchiveSizeInBytes = 30000000
 
+var memberPermissionsCheckInterval = 1 * time.Hour
+
 var ErrTorrentTimedout = errors.New("torrent has timed out")
 
 type Manager struct {
-	persistence                  *Persistence
-	encryptor                    *encryption.Protocol
-	ensSubscription              chan []*ens.VerificationRecord
-	subscriptions                []chan *Subscription
-	ensVerifier                  *ens.Verifier
-	identity                     *ecdsa.PrivateKey
-	accountsManager              *account.GethManager
-	tokenManager                 *token.Manager
-	logger                       *zap.Logger
-	stdoutLogger                 *zap.Logger
-	transport                    *transport.Transport
-	quit                         chan struct{}
-	torrentConfig                *params.TorrentConfig
-	torrentClient                *torrent.Client
-	historyArchiveTasksWaitGroup sync.WaitGroup
-	historyArchiveTasks          map[string]chan struct{}
-	torrentTasks                 map[string]metainfo.Hash
-	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
+	persistence                    *Persistence
+	encryptor                      *encryption.Protocol
+	ensSubscription                chan []*ens.VerificationRecord
+	subscriptions                  []chan *Subscription
+	ensVerifier                    *ens.Verifier
+	identity                       *ecdsa.PrivateKey
+	accountsManager                *account.GethManager
+	tokenManager                   *token.Manager
+	logger                         *zap.Logger
+	stdoutLogger                   *zap.Logger
+	transport                      *transport.Transport
+	quit                           chan struct{}
+	torrentConfig                  *params.TorrentConfig
+	torrentClient                  *torrent.Client
+	historyArchiveTasksWaitGroup   sync.WaitGroup
+	historyArchiveTasks            map[string]chan struct{}
+	periodicMemberPermissionsTasks map[string]chan struct{}
+	torrentTasks                   map[string]metainfo.Hash
+	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -134,16 +137,17 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 	}
 
 	manager := &Manager{
-		logger:                      logger,
-		stdoutLogger:                stdoutLogger,
-		encryptor:                   encryptor,
-		identity:                    identity,
-		quit:                        make(chan struct{}),
-		transport:                   transport,
-		torrentConfig:               torrentConfig,
-		historyArchiveTasks:         make(map[string]chan struct{}),
-		torrentTasks:                make(map[string]metainfo.Hash),
-		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
+		logger:                         logger,
+		stdoutLogger:                   stdoutLogger,
+		encryptor:                      encryptor,
+		identity:                       identity,
+		quit:                           make(chan struct{}),
+		transport:                      transport,
+		torrentConfig:                  torrentConfig,
+		historyArchiveTasks:            make(map[string]chan struct{}),
+		periodicMemberPermissionsTasks: make(map[string]chan struct{}),
+		torrentTasks:                   make(map[string]metainfo.Hash),
+		historyArchiveDownloadTasks:    make(map[string]*HistoryArchiveDownloadTask),
 		persistence: &Persistence{
 			logger: logger,
 			db:     db,
@@ -506,6 +510,13 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 
 	m.publish(&Subscription{Community: community})
 
+	// check existing member permission once, then check periodically
+	err = m.checkMemberPermissions(community.ID())
+	if err != nil {
+		return nil, nil, err
+	}
+	go m.CheckMemberPermissionsPeriodically(community.ID())
+
 	return community, changes, nil
 }
 
@@ -537,43 +548,81 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	//
 	// We do this in a separate routine to not block
 	// this function
-	go func() {
-		if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
-			becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-
-			for memberKey, member := range community.Members() {
-				if memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
-					continue
-				}
-
-				walletAddresses := make([]gethcommon.Address, 0)
-				for _, walletAddress := range member.WalletAccounts {
-					walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
-				}
-
-				hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
-				if err != nil {
-					m.logger.Debug("failed to check permission to join", zap.Error(err))
-					continue
-				}
-
-				if !hasPermission {
-					pk, err := common.HexToPubkey(memberKey)
-					if err != nil {
-						m.logger.Debug("failed to convert hex key to pubkey", zap.Error(err))
-						continue
-					}
-					_, err = community.RemoveUserFromOrg(pk)
-					if err != nil {
-						m.logger.Debug("failed to remove member from community", zap.Error(err))
-					}
-				}
+	if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+		go func() {
+			err := m.checkMemberPermissions(community.ID())
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
-			m.publish(&Subscription{Community: community})
-		}
-	}()
+		}()
+	}
 
 	return community, changes, nil
+}
+
+func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	if len(becomeMemberPermissions) > 0 {
+		for memberKey, member := range community.Members() {
+			if memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
+				continue
+			}
+
+			walletAddresses := make([]gethcommon.Address, 0)
+			for _, walletAddress := range member.WalletAccounts {
+				walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
+			}
+
+			hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+			if err != nil {
+				return err
+			}
+
+			if !hasPermission {
+				pk, err := common.HexToPubkey(memberKey)
+				if err != nil {
+					return err
+				}
+				_, err = community.RemoveUserFromOrg(pk)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	m.publish(&Subscription{Community: community})
+	return nil
+}
+
+func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes) {
+
+	if _, exists := m.periodicMemberPermissionsTasks[communityID.String()]; exists {
+		return
+	}
+
+	cancel := make(chan struct{})
+	m.periodicMemberPermissionsTasks[communityID.String()] = cancel
+
+	ticker := time.NewTicker(memberPermissionsCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := m.checkMemberPermissions(communityID)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+		case <-cancel:
+			delete(m.periodicMemberPermissionsTasks, communityID.String())
+			return
+		}
+	}
 }
 
 func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {
@@ -593,6 +642,14 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Check if there's stil BECOME_MEMBER permissions,
+	// if not we can stop checking token criteria on-chain
+	// for members
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	if cancel, exists := m.periodicMemberPermissionsTasks[community.IDString()]; exists && len(becomeMemberPermissions) == 0 {
+		close(cancel)
 	}
 
 	m.publish(&Subscription{Community: community})
