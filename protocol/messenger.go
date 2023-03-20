@@ -1657,11 +1657,21 @@ func (m *Messenger) setInstallationMetadata(id string, data *multidevice.Install
 	}
 
 	installation.InstallationMetadata = data
-	return m.encryptor.SetInstallationMetadata(&m.identity.PublicKey, id, data)
+	return m.encryptor.SetInstallationMetadata(m.IdentityPublicKey(), id, data)
 }
 
 func (m *Messenger) SetInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
 	return m.setInstallationMetadata(id, data)
+}
+
+func (m *Messenger) SetInstallationName(id string, name string) error {
+	installation, ok := m.allInstallations.Load(id)
+	if !ok {
+		return errors.New("no installation found")
+	}
+
+	installation.InstallationMetadata.Name = name
+	return m.encryptor.SetInstallationName(m.IdentityPublicKey(), id, name)
 }
 
 // NOT IMPLEMENTED

@@ -471,6 +471,11 @@ func (p *Protocol) SetInstallationMetadata(myIdentityKey *ecdsa.PublicKey, insta
 	return p.multidevice.SetInstallationMetadata(myIdentityKey, installationID, data)
 }
 
+// SetInstallationName sets the metadata for our own installation
+func (p *Protocol) SetInstallationName(myIdentityKey *ecdsa.PublicKey, installationID string, name string) error {
+	return p.multidevice.SetInstallationName(myIdentityKey, installationID, name)
+}
+
 // GetPublicBundle retrieves a public bundle given an identity
 func (p *Protocol) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
 	installations, err := p.multidevice.GetActiveInstallations(theirIdentityKey)

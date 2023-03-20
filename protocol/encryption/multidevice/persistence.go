@@ -263,3 +263,16 @@ func (s *sqlitePersistence) SetInstallationMetadata(identity []byte, installatio
 	_, err = stmt.Exec(metadata.Name, metadata.DeviceType, metadata.FCMToken, identity, installationID)
 	return err
 }
+
+// SetInstallationName sets the only the name in metadata for a given installation
+func (s *sqlitePersistence) SetInstallationName(identity []byte, installationID string, name string) error {
+	stmt, err := s.db.Prepare(`UPDATE installation_metadata 
+							   SET name = ? 
+							   WHERE identity = ? AND installation_id = ?`)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(name, identity, installationID)
+	return err
+}
