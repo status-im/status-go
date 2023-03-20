@@ -5,8 +5,15 @@ import (
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+const (
+	EventMarketStatusChanged walletevent.EventType = "wallet-market-status-changed"
 )
 
 type DataPoint struct {
@@ -17,15 +24,17 @@ type DataPoint struct {
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 
 type Manager struct {
-	main           thirdparty.MarketDataProvider
-	fallback       thirdparty.MarketDataProvider
-	priceCache     DataPerTokenAndCurrency
-	IsConnected    bool
-	LastCheckedAt  int64
-	priceCacheLock sync.RWMutex
+	main            thirdparty.MarketDataProvider
+	fallback        thirdparty.MarketDataProvider
+	feed            *event.Feed
+	priceCache      DataPerTokenAndCurrency
+	priceCacheLock  sync.RWMutex
+	IsConnected     bool
+	LastCheckedAt   int64
+	IsConnectedLock sync.RWMutex
 }
 
-func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDataProvider) *Manager {
+func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand("marketClient", hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -36,21 +45,40 @@ func NewManager(main thirdparty.MarketDataProvider, fallback thirdparty.MarketDa
 	return &Manager{
 		main:          main,
 		fallback:      fallback,
+		feed:          feed,
 		priceCache:    make(DataPerTokenAndCurrency),
 		IsConnected:   true,
 		LastCheckedAt: time.Now().Unix(),
 	}
 }
 
+func (pm *Manager) setIsConnected(value bool) {
+	pm.IsConnectedLock.Lock()
+	defer pm.IsConnectedLock.Unlock()
+	pm.LastCheckedAt = time.Now().Unix()
+	if value != pm.IsConnected {
+		message := "down"
+		if value {
+			message = "up"
+		}
+		pm.feed.Send(walletevent.Event{
+			Type:     EventMarketStatusChanged,
+			Accounts: []common.Address{},
+			Message:  message,
+			At:       time.Now().Unix(),
+		})
+	}
+	pm.IsConnected = value
+}
+
 func (pm *Manager) makeCall(main func() (any, error), fallback func() (any, error)) (any, error) {
 	resultChan := make(chan any, 1)
-	pm.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go("marketClient", func() error {
 		res, err := main()
 		if err != nil {
 			return err
 		}
-		pm.IsConnected = true
+		pm.setIsConnected(true)
 		resultChan <- res
 		return nil
 	}, func(err error) error {
@@ -60,10 +88,10 @@ func (pm *Manager) makeCall(main func() (any, error), fallback func() (any, erro
 
 		res, err := fallback()
 		if err != nil {
-			pm.IsConnected = false
+			pm.setIsConnected(false)
 			return err
 		}
-		pm.IsConnected = true
+		pm.setIsConnected(true)
 		resultChan <- res
 		return nil
 	})

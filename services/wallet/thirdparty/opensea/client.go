@@ -12,10 +12,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+const (
+	EventCollectibleStatusChanged walletevent.EventType = "wallet-collectible-status-changed"
 )
 
 const AssetLimit = 200
@@ -216,10 +222,11 @@ type Client struct {
 	IsConnected     bool
 	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
+	feed            *event.Feed
 }
 
 // new opensea client.
-func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
+func NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (*Client, error) {
 	if OpenseaHTTPClient == nil {
 		OpenseaHTTPClient = newHTTPClient()
 	}
@@ -228,15 +235,15 @@ func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 	if chainID == ChainIDRequiringAPIKey {
 		tmpAPIKey = apiKey
 	}
-	if client, ok := OpenseaClientInstances[chainID]; ok {
-		if client.apiKey == tmpAPIKey {
-			return client, nil
-		}
-	}
 
 	baseURL, err := getbaseURL(chainID)
 	if err != nil {
 		return nil, err
+	}
+	if client, ok := OpenseaClientInstances[chainID]; ok {
+		if client.apiKey == tmpAPIKey {
+			return client, nil
+		}
 	}
 
 	openseaClient := &Client{
@@ -245,18 +252,30 @@ func NewOpenseaClient(chainID uint64, apiKey string) (*Client, error) {
 		apiKey:        tmpAPIKey,
 		IsConnected:   true,
 		LastCheckedAt: time.Now().Unix(),
+		feed:          feed,
 	}
 	OpenseaClientInstances[chainID] = openseaClient
 	return openseaClient, nil
 }
 
-func (o *Client) setConnected(value bool) {
+func (o *Client) setIsConnected(value bool) {
 	o.IsConnectedLock.Lock()
 	defer o.IsConnectedLock.Unlock()
-	o.IsConnected = value
 	o.LastCheckedAt = time.Now().Unix()
+	if value != o.IsConnected {
+		message := "down"
+		if value {
+			message = "up"
+		}
+		o.feed.Send(walletevent.Event{
+			Type:     EventCollectibleStatusChanged,
+			Accounts: []common.Address{},
+			Message:  message,
+			At:       time.Now().Unix(),
+		})
+	}
+	o.IsConnected = value
 }
-
 func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollection, error) {
 	offset := 0
 	var collections []OwnedCollection
@@ -264,7 +283,7 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", o.url, owner, offset, CollectionLimit)
 		body, err := o.client.doGetRequest(url, o.apiKey)
 		if err != nil {
-			o.setConnected(false)
+			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -276,7 +295,7 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 		var tmp []OwnedCollection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
-			o.setConnected(false)
+			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -286,7 +305,7 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 			break
 		}
 	}
-	o.setConnected(true)
+	o.setIsConnected(true)
 	return collections, nil
 }
 
@@ -360,7 +379,7 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 
 		body, err := o.client.doGetRequest(url, o.apiKey)
 		if err != nil {
-			o.setConnected(false)
+			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -372,7 +391,7 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		container := AssetContainer{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
-			o.setConnected(false)
+			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -396,6 +415,6 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		}
 	}
 
-	o.setConnected(true)
+	o.setIsConnected(true)
 	return assets, nil
 }

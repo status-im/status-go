@@ -37,10 +37,6 @@ func (api *API) StartWallet(ctx context.Context) error {
 	return api.reader.Start()
 }
 
-func (api *API) CheckConnected(ctx context.Context) *ConnectedResult {
-	return api.s.CheckConnected(ctx)
-}
-
 func (api *API) StopWallet(ctx context.Context) error {
 	return api.s.Stop()
 }

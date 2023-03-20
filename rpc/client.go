@@ -52,6 +52,8 @@ type Client struct {
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
 	log        log.Logger
+
+	walletNotifier func(chainID uint64, message string)
 }
 
 // NewClient initializes Client and tries to connect to both,
@@ -93,8 +95,15 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 	return &c, nil
 }
 
+func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
+	c.walletNotifier = notifier
+}
+
 func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback, error) {
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
+		if rpcClient.WalletNotifier == nil {
+			rpcClient.WalletNotifier = c.walletNotifier
+		}
 		return rpcClient, nil
 	}
 
@@ -120,6 +129,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback,
 	}
 
 	client := chain.NewClient(rpcClient, rpcFallbackClient, chainID)
+	client.WalletNotifier = c.walletNotifier
 	c.rpcClients[chainID] = client
 	return client, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -22,19 +23,21 @@ type Manager struct {
 	openseaAPIKey    string
 	nftCache         map[uint64]map[string]opensea.Asset
 	nftCacheLock     sync.RWMutex
+	walletFeed       *event.Feed
 }
 
-func NewManager(rpcClient *rpc.Client, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string) *Manager {
+func NewManager(rpcClient *rpc.Client, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
 	return &Manager{
 		rpcClient:        rpcClient,
 		metadataProvider: metadataProvider,
 		openseaAPIKey:    openseaAPIKey,
 		nftCache:         make(map[uint64]map[string]opensea.Asset),
+		walletFeed:       walletFeed,
 	}
 }
 
 func (o *Manager) FetchAllCollectionsByOwner(chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {
-	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey, o.walletFeed)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +45,7 @@ func (o *Manager) FetchAllCollectionsByOwner(chainID uint64, owner common.Addres
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
-	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey, o.walletFeed)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +64,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner commo
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
-	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey, o.walletFeed)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner 
 }
 
 func (o *Manager) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
-	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey, o.walletFeed)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +106,7 @@ func (o *Manager) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdpart
 
 	idsToFetch := o.getIDsNotInCache(chainID, uniqueIDs)
 	if len(idsToFetch) > 0 {
-		client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+		client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey, o.walletFeed)
 		if err != nil {
 			return nil, err
 		}

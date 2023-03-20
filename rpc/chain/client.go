@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
@@ -31,8 +32,11 @@ type ClientWithFallback struct {
 	mainRPC     *rpc.Client
 	fallbackRPC *rpc.Client
 
-	IsConnected   bool
-	LastCheckedAt int64
+	WalletNotifier func(chainId uint64, message string)
+
+	IsConnected     bool
+	IsConnectedLock sync.RWMutex
+	LastCheckedAt   int64
 }
 
 var vmErrors = []error{
@@ -118,6 +122,22 @@ func isVMError(err error) bool {
 	return false
 }
 
+func (c *ClientWithFallback) setIsConnected(value bool) {
+	c.IsConnectedLock.Lock()
+	defer c.IsConnectedLock.Unlock()
+	c.LastCheckedAt = time.Now().Unix()
+	if value != c.IsConnected {
+		message := "down"
+		if value {
+			message = "up"
+		}
+		if c.WalletNotifier != nil {
+			c.WalletNotifier(c.ChainID, message)
+		}
+	}
+	c.IsConnected = value
+}
+
 func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func() error) error {
 	resultChan := make(chan CommandResult, 1)
 	c.LastCheckedAt = time.Now().Unix()
@@ -130,7 +150,7 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 			}
 			return err
 		}
-		c.IsConnected = true
+		c.setIsConnected(true)
 		resultChan <- CommandResult{}
 		return nil
 	}, func(err error) error {
@@ -144,10 +164,9 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.IsConnected = false
+			c.setIsConnected(false)
 			return err
 		}
-		c.IsConnected = true
 		resultChan <- CommandResult{}
 		return nil
 	})
@@ -175,7 +194,7 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 			}
 			return err
 		}
-		c.IsConnected = true
+		c.setIsConnected(true)
 		resultChan <- CommandResult{res1: res}
 		return nil
 	}, func(err error) error {
@@ -189,10 +208,10 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.IsConnected = false
+			c.setIsConnected(false)
 			return err
 		}
-		c.IsConnected = true
+		c.setIsConnected(true)
 		resultChan <- CommandResult{res1: res}
 		return nil
 	})
@@ -220,7 +239,7 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 			}
 			return err
 		}
-		c.IsConnected = true
+		c.setIsConnected(true)
 		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	}, func(err error) error {
@@ -234,10 +253,10 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.IsConnected = false
+			c.setIsConnected(false)
 			return err
 		}
-		c.IsConnected = true
+		c.setIsConnected(true)
 		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	})
