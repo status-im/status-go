@@ -4,11 +4,18 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
+)
+
+const (
+	// Session names
+	sessionChallenge = "challenge"
+	sessionBlocked   = "blocked"
 )
 
 type ChallengeError struct {
@@ -56,11 +63,48 @@ func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver
 	}, nil
 }
 
-func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
+func (cg *ChallengeGiver) getSession(r *http.Request) (*sessions.Session, *ChallengeError) {
 	s, err := cg.cookieStore.Get(r, sessionChallenge)
 	if err != nil {
 		cg.logger.Error("checkChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
+		return nil, &ChallengeError{"error", http.StatusInternalServerError}
+	}
+	return s, nil
+}
+
+func (cg *ChallengeGiver) generateNewChallenge(s *sessions.Session, w http.ResponseWriter, r *http.Request) ([]byte, *ChallengeError) {
+	challenge := make([]byte, 64)
+	_, err := rand.Read(challenge)
+	if err != nil {
+		cg.logger.Error("regenerateNewChallenge: _, err = rand.Read(challenge)", zap.Error(err))
+		return nil, &ChallengeError{"error", http.StatusInternalServerError}
+	}
+
+	s.Values[sessionChallenge] = challenge
+	err = s.Save(r, w)
+	if err != nil {
+		cg.logger.Error("regenerateNewChallenge: err = s.Save(r, w)", zap.Error(err))
+		return nil, &ChallengeError{"error", http.StatusInternalServerError}
+	}
+
+	return challenge, nil
+}
+
+func (cg *ChallengeGiver) block(s *sessions.Session, w http.ResponseWriter, r *http.Request) *ChallengeError {
+	s.Values[sessionBlocked] = true
+	err := s.Save(r, w)
+	if err != nil {
+		cg.logger.Error("block: err = s.Save(r, w)", zap.Error(err))
 		return &ChallengeError{"error", http.StatusInternalServerError}
+	}
+
+	return &ChallengeError{"forbidden", http.StatusForbidden}
+}
+
+func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
+	s, ce := cg.getSession(r)
+	if ce != nil {
+		return ce
 	}
 
 	blocked, ok := s.Values[sessionBlocked].(bool)
@@ -89,40 +133,23 @@ func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.
 	// Only if we have both a challenge in the session store and in the request header
 	// do we entertain blocking the client. Because then we know someone is trying to be sneaky.
 	if !bytes.Equal(c, challenge) {
-		s.Values[sessionBlocked] = true
-		err = s.Save(r, w)
-		if err != nil {
-			cg.logger.Error("checkChallengeResponse: err = s.Save(r, w)", zap.Error(err))
-			return &ChallengeError{"error", http.StatusInternalServerError}
-		}
-
-		return &ChallengeError{"forbidden", http.StatusForbidden}
+		return cg.block(s, w, r)
 	}
-	return nil
+
+	// If every is ok, regenerate the challenge
+	_, ce = cg.generateNewChallenge(s, w, r)
+	return ce
 }
 
 func (cg *ChallengeGiver) getChallenge(w http.ResponseWriter, r *http.Request) ([]byte, *ChallengeError) {
-	s, err := cg.cookieStore.Get(r, sessionChallenge)
-	if err != nil {
-		cg.logger.Error("getChallenge: hs.cookieStore.Get(r, sessionChallenge)", zap.Error(err))
-		return nil, &ChallengeError{"error", http.StatusInternalServerError}
+	s, ce := cg.getSession(r)
+	if ce != nil {
+		return nil, ce
 	}
 
 	challenge, ok := s.Values[sessionChallenge].([]byte)
 	if !ok {
-		challenge = make([]byte, 64)
-		_, err = rand.Read(challenge)
-		if err != nil {
-			cg.logger.Error("getChallenge: _, err = rand.Read(challenge)", zap.Error(err))
-			return nil, &ChallengeError{"error", http.StatusInternalServerError}
-		}
-
-		s.Values[sessionChallenge] = challenge
-		err = s.Save(r, w)
-		if err != nil {
-			cg.logger.Error("getChallenge: err = s.Save(r, w)", zap.Error(err))
-			return nil, &ChallengeError{"error", http.StatusInternalServerError}
-		}
+		challenge, ce = cg.generateNewChallenge(s, w, r)
 	}
 	return challenge, nil
 }
@@ -139,8 +166,13 @@ func NewChallengeTaker(e *PayloadEncryptor) *ChallengeTaker {
 	}
 }
 
-func (ct *ChallengeTaker) SetChallenge(challenge []byte) {
+func (ct *ChallengeTaker) SetChallenge(resp *http.Response) error {
+	challenge, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 	ct.serverChallenge = challenge
+	return nil
 }
 
 func (ct *ChallengeTaker) DoChallenge(req *http.Request) error {

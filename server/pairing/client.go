@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -95,12 +94,7 @@ func (c *BaseClient) getChallenge() error {
 		return fmt.Errorf("[client] status not ok when getting challenge, received '%s'", resp.Status)
 	}
 
-	challenge, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	c.challengeTaker.SetChallenge(challenge)
-	return nil
+	return c.challengeTaker.SetChallenge(resp)
 }
 
 /*
@@ -445,6 +439,7 @@ func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON strin
 	if err != nil {
 		return err
 	}
+
 	err = c.getChallenge()
 	if err != nil {
 		return err
@@ -453,7 +448,17 @@ func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON strin
 	if err != nil {
 		return err
 	}
+
+	err = c.getChallenge()
+	if err != nil {
+		return err
+	}
 	err = c.receiveSyncDeviceData()
+	if err != nil {
+		return err
+	}
+
+	err = c.getChallenge()
 	if err != nil {
 		return err
 	}

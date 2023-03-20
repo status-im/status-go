@@ -207,17 +207,22 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware(
 
 	err = c.getChallenge()
 	s.Require().NoError(err)
-	challenge := c.serverChallenge
+	challenge := c.challengeTaker.serverChallenge
 
 	// This is NOT a mistake! Call c.getChallenge() twice to check that the client gets the same challenge
-	// the server will only generate 1 challenge per session per connection
+	// the server will only generate 1 challenge until the challenge is successfully completed
 	err = c.getChallenge()
 	s.Require().NoError(err)
-	s.Require().Equal(challenge, c.serverChallenge)
+	s.Require().Equal(challenge, c.challengeTaker.serverChallenge)
 
 	// receiving account data should now work.
 	err = c.receiveAccountData()
 	s.Require().NoError(err)
+
+	// After a successful challenge the challenge should change
+	err = c.getChallenge()
+	s.Require().NoError(err)
+	s.Require().NotEqual(challenge, c.challengeTaker.serverChallenge)
 }
 
 func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_block() {
@@ -233,8 +238,8 @@ func (s *PairingServerSuite) TestPairingServer_handlePairingChallengeMiddleware_
 	s.Require().NoError(err)
 
 	// Simulate encrypting with a dodgy key, write some nonsense to the challenge field
-	c.serverChallenge = make([]byte, 64)
-	_, err = rand.Read(c.serverChallenge)
+	c.challengeTaker.serverChallenge = make([]byte, 64)
+	_, err = rand.Read(c.challengeTaker.serverChallenge)
 	s.Require().NoError(err)
 
 	// Attempt again to get the account data, should fail
