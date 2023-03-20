@@ -192,6 +192,12 @@ func (c *SenderClient) receiveInstallationData() error {
 		return err
 	}
 
+	err = c.challengeTaker.DoChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+
 	resp, err := c.Do(req)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 
 	"github.com/btcsuite/btcutil/base58"
@@ -48,6 +49,7 @@ type ChallengeGiver struct {
 	cookieStore *sessions.CookieStore
 	encryptor   *PayloadEncryptor
 	logger      *zap.Logger
+	authedIP    net.IP
 }
 
 func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver, error) {
@@ -61,6 +63,50 @@ func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver
 		encryptor:   e.Renew(),
 		logger:      logger,
 	}, nil
+}
+
+func (cg *ChallengeGiver) getIP(r *http.Request) (net.IP, *ChallengeError) {
+	h, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		cg.logger.Error("getIP: h, _, err := net.SplitHostPort(r.RemoteAddr)", zap.Error(err), zap.String("r.RemoteAddr", r.RemoteAddr))
+		return nil, &ChallengeError{"error", http.StatusInternalServerError}
+	}
+	return net.ParseIP(h), nil
+}
+
+func (cg *ChallengeGiver) registerClientIP(r *http.Request) *ChallengeError {
+	hIP, err := cg.getIP(r)
+	if err != nil {
+		return err
+	}
+	cg.authedIP = hIP
+	return nil
+}
+
+func (cg *ChallengeGiver) validateClientIP(r *http.Request) *ChallengeError {
+	// If we haven't registered yet register the IP
+	if cg.authedIP == nil || len(cg.authedIP) == 0 {
+		err := cg.registerClientIP(r)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Then compare the current req RemoteIP with the authed IP
+	hIP, err := cg.getIP(r)
+	if err != nil {
+		return err
+	}
+
+	if !cg.authedIP.Equal(hIP) {
+		cg.logger.Error(
+			"request RemoteAddr does not match authedIP: expected '%s', received '%s'",
+			zap.String("expected", cg.authedIP.String()),
+			zap.String("received", hIP.String()),
+		)
+		return &ChallengeError{"forbidden", http.StatusForbidden}
+	}
+	return nil
 }
 
 func (cg *ChallengeGiver) getSession(r *http.Request) (*sessions.Session, *ChallengeError) {
@@ -102,6 +148,11 @@ func (cg *ChallengeGiver) block(s *sessions.Session, w http.ResponseWriter, r *h
 }
 
 func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.Request) *ChallengeError {
+	ce := cg.validateClientIP(r)
+	if ce != nil {
+		return ce
+	}
+
 	s, ce := cg.getSession(r)
 	if ce != nil {
 		return ce
@@ -136,12 +187,17 @@ func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.
 		return cg.block(s, w, r)
 	}
 
-	// If every is ok, regenerate the challenge
+	// If every is ok, generate a new challenge for the next req
 	_, ce = cg.generateNewChallenge(s, w, r)
 	return ce
 }
 
 func (cg *ChallengeGiver) getChallenge(w http.ResponseWriter, r *http.Request) ([]byte, *ChallengeError) {
+	err := cg.validateClientIP(r)
+	if err != nil {
+		return nil, err
+	}
+
 	s, err := cg.getSession(r)
 	if err != nil {
 		return nil, err
