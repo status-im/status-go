@@ -729,6 +729,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 				<-available
 				m.InitHistoryArchiveTasks(adminCommunities)
 			}()
+
+			for _, c := range adminCommunities {
+				if c.Joined() {
+					go m.communitiesManager.CheckMemberPermissionsPeriodically(c.ID())
+				}
+			}
 		}
 	}
 
