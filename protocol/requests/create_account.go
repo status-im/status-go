@@ -6,7 +6,6 @@ import (
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
 var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid password")
-var ErrCreateAccountInvalidImagePath = errors.New("create-account: invalid image path")
 var ErrCreateAccountInvalidColor = errors.New("create-account: invalid color")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
@@ -40,10 +39,6 @@ func (c *CreateAccount) Validate() error {
 
 	if len(c.Password) == 0 {
 		return ErrCreateAccountInvalidPassword
-	}
-
-	if len(c.ImagePath) == 0 {
-		return ErrCreateAccountInvalidImagePath
 	}
 
 	if len(c.Color) == 0 {
