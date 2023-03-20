@@ -3,7 +3,6 @@ package accounts
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -15,13 +14,9 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/keypairs"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 )
-
-const pathWalletRoot = "m/44'/60'/0'/0"
-const pathDefaultWallet = pathWalletRoot + "/0"
 
 func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
 	return &API{manager, config, db, feed, messenger}
@@ -105,232 +100,100 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address, passwo
 	return (*api.messenger).DeleteAccount(address)
 }
 
-func (api *API) AddAccountWatch(ctx context.Context, address string, name string, color string, emoji string) error {
-	account := &accounts.Account{
-		Address: types.Address(common.HexToAddress(address)),
-		Type:    accounts.AccountTypeWatch,
-		Name:    name,
-		Emoji:   emoji,
-		Color:   color,
+func (api *API) AddAccount(ctx context.Context, password string, account *accounts.Account) error {
+	if len(account.Address) == 0 {
+		return errors.New("`Address` field must be set")
 	}
+
+	if account.Wallet || account.Chat {
+		return errors.New("default wallet and chat account cannot be added this way")
+	}
+
+	if len(account.Name) == 0 {
+		return errors.New("`Name` field must be set")
+	}
+
+	if len(account.Emoji) == 0 {
+		return errors.New("`Emoji` field must be set")
+	}
+
+	if len(account.Color) == 0 {
+		return errors.New("`Color` field must be set")
+	}
+
+	if account.Type != accounts.AccountTypeWatch {
+
+		if len(account.KeyUID) == 0 {
+			return errors.New("`KeyUID` field must be set")
+		}
+
+		if len(account.PublicKey) == 0 {
+			return errors.New("`PublicKey` field must be set")
+		}
+
+		if len(account.KeypairName) == 0 {
+			return errors.New("`KeypairName` field must be set")
+		}
+
+		if account.Type != accounts.AccountTypeKey {
+			if len(account.DerivedFrom) == 0 {
+				return errors.New("`DerivedFrom` field must be set")
+			}
+
+			if len(account.Path) == 0 {
+				return errors.New("`Path` field must be set")
+			}
+		}
+	}
+
+	addressExists, err := api.db.AddressExists(account.Address)
+	if err != nil {
+		return err
+	}
+
+	if addressExists {
+		return errors.New("account already exists")
+	}
+
+	// we need to create local keystore file only if password is provided and the account is being added is of
+	// "generated" or "seed" type.
+	if (account.Type == accounts.AccountTypeGenerated || account.Type == accounts.AccountTypeSeed) && len(password) > 0 {
+		info, err := api.manager.AccountsGenerator().LoadAccount(account.DerivedFrom, password)
+		if err != nil {
+			return err
+		}
+
+		_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(info.ID, password, []string{account.Path})
+		if err != nil {
+			return err
+		}
+	}
+
 	return api.SaveAccounts(ctx, []*accounts.Account{account})
 }
 
-func (api *API) AddAccountWithMnemonic(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, pathWalletRoot)
-}
-
-func (api *API) AddAccountWithMnemonicPasswordVerified(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, pathWalletRoot)
-}
-
-func (api *API) AddAccountWithMnemonicAndPath(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-) error {
-	return api.addAccountWithMnemonic(ctx, mnemonic, password, name, color, emoji, path)
-}
-
-func (api *API) AddAccountWithMnemonicAndPathPasswordVerified(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-) error {
-	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, path)
-}
-
-// AddAccountWithPrivateKeyPasswordVerified adds an accounts.Account created from the given private key
-// assuming that client has already authenticated logged in use, this function doesn't verify a password.
-func (api *API) AddAccountWithPrivateKeyPasswordVerified(
-	ctx context.Context,
-	privateKey string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-
+// Imports a new private key and creates local keystore file.
+func (api *API) ImportPrivateKey(ctx context.Context, privateKey string, password string) error {
 	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
 	if err != nil {
 		return err
 	}
 
-	addressExists, err := api.db.AddressExists(types.Address(common.HexToAddress(info.Address)))
+	accs, err := api.db.GetAccountsByKeyUID(info.KeyUID)
 	if err != nil {
 		return err
 	}
-	if addressExists {
-		return errors.New("account already exists")
+
+	if len(accs) > 0 {
+		return errors.New("provided private key was already imported")
 	}
 
 	_, err = api.manager.AccountsGenerator().StoreAccount(info.ID, password)
-	if err != nil {
-		return err
-	}
-
-	account := &accounts.Account{
-		Address:   types.Address(common.HexToAddress(info.Address)),
-		KeyUID:    info.KeyUID,
-		PublicKey: types.HexBytes(info.PublicKey),
-		Type:      accounts.AccountTypeKey,
-		Name:      name,
-		Emoji:     emoji,
-		Color:     color,
-		Path:      pathDefaultWallet,
-	}
-
-	return api.SaveAccounts(ctx, []*accounts.Account{account})
-}
-
-func (api *API) AddAccountWithPrivateKey(
-	ctx context.Context,
-	privateKey string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
-
-	return api.AddAccountWithPrivateKeyPasswordVerified(ctx, privateKey, password, name, color, emoji)
-}
-
-func (api *API) GenerateAccount(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-	address, err := api.db.GetWalletRootAddress()
-	if err != nil {
-		return err
-	}
-
-	latestDerivedPath, err := api.db.GetLatestDerivedPath()
-	if err != nil {
-		return err
-	}
-
-	newDerivedPath := latestDerivedPath + 1
-	path := fmt.Sprint(pathWalletRoot, "/", newDerivedPath)
-
-	err = api.generateAccount(ctx, password, name, color, emoji, path, address.Hex())
-	if err != nil {
-		return err
-	}
-
-	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 
-func (api *API) GenerateAccountPasswordVerified(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-) error {
-	address, err := api.db.GetWalletRootAddress()
-	if err != nil {
-		return err
-	}
-
-	latestDerivedPath, err := api.db.GetLatestDerivedPath()
-	if err != nil {
-		return err
-	}
-
-	newDerivedPath := latestDerivedPath + 1
-	path := fmt.Sprint(pathWalletRoot, "/", newDerivedPath)
-
-	err = api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, address.Hex())
-	if err != nil {
-		return err
-	}
-
-	err = api.db.SaveSettingField(settings.LatestDerivedPath, newDerivedPath)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (api *API) GenerateAccountWithDerivedPath(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-	derivedFrom string,
-) error {
-	return api.generateAccount(ctx, password, name, color, emoji, path, derivedFrom)
-}
-
-func (api *API) GenerateAccountWithDerivedPathPasswordVerified(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-	derivedFrom string,
-) error {
-	return api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, derivedFrom)
-}
-
-func (api *API) verifyPassword(password string) error {
-	address, err := api.db.GetChatAddress()
-	if err != nil {
-		return err
-	}
-	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
-	return err
-}
-
-// addAccountWithMnemonicPasswordVerified adds an accounts.Account derived from the given Mnemonic
-// assuming that client has already authenticated logged in use, this function doesn't verify a password.
-func (api *API) addAccountWithMnemonicPasswordVerified(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-) error {
+// Imports a new mnemonic and creates local keystore file.
+func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
 	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
@@ -338,120 +201,25 @@ func (api *API) addAccountWithMnemonicPasswordVerified(
 		return err
 	}
 
+	accs, err := api.db.GetAccountsByKeyUID(generatedAccountInfo.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	if len(accs) > 0 {
+		return errors.New("provided mnemonic was already imported, to add new account use `AddAccount` endpoint")
+	}
+
 	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
-	if err != nil {
-		return err
-	}
-
-	accountinfos, err := api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, []string{path})
-	if err != nil {
-		return err
-	}
-
-	account := &accounts.Account{
-		Address:     types.Address(common.HexToAddress(accountinfos[path].Address)),
-		KeyUID:      generatedAccountInfo.KeyUID,
-		PublicKey:   types.HexBytes(accountinfos[path].PublicKey),
-		Type:        accounts.AccountTypeSeed,
-		Name:        name,
-		Emoji:       emoji,
-		Color:       color,
-		Path:        path,
-		DerivedFrom: generatedAccountInfo.Address,
-	}
-	return api.SaveAccounts(ctx, []*accounts.Account{account})
-}
-
-func (api *API) addAccountWithMnemonic(
-	ctx context.Context,
-	mnemonic string,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
-
-	return api.addAccountWithMnemonicPasswordVerified(ctx, mnemonic, password, name, color, emoji, path)
-}
-
-// generateAccountPasswordVerified adds an accounts.Account generated from the given path
-// assuming that client has already authenticated logged in use, this function doesn't verify a password.
-func (api *API) generateAccountPasswordVerified(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-	address string,
-) error {
-	info, err := api.manager.AccountsGenerator().LoadAccount(address, password)
-	if err != nil {
-		return err
-	}
-
-	infos, err := api.manager.AccountsGenerator().DeriveAddresses(info.ID, []string{path})
-	if err != nil {
-		return err
-	}
-
-	_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(info.ID, password, []string{path})
-	if err != nil {
-		return err
-	}
-
-	allAccounts, err := api.GetAccounts(ctx)
-	if err != nil {
-		return err
-	}
-
-	accountType := accounts.AccountTypeGenerated
-	for _, acc := range allAccounts {
-		if (acc.Type == accounts.AccountTypeSeed || acc.Type == accounts.AccountTypeKey) && acc.DerivedFrom == address {
-			accountType = acc.Type
-			break
-		}
-	}
-
-	acc := &accounts.Account{
-		Address:     types.Address(common.HexToAddress(infos[path].Address)),
-		KeyUID:      info.KeyUID,
-		PublicKey:   types.HexBytes(infos[path].PublicKey),
-		Type:        accountType,
-		Name:        name,
-		Emoji:       emoji,
-		Color:       color,
-		Path:        path,
-		DerivedFrom: address,
-	}
-
-	return api.SaveAccounts(ctx, []*accounts.Account{acc})
-}
-
-func (api *API) generateAccount(
-	ctx context.Context,
-	password string,
-	name string,
-	color string,
-	emoji string,
-	path string,
-	address string,
-) error {
-	err := api.verifyPassword(password)
-	if err != nil {
-		return err
-	}
-
-	return api.generateAccountPasswordVerified(ctx, password, name, color, emoji, path, address)
+	return err
 }
 
 func (api *API) VerifyPassword(password string) bool {
-	err := api.verifyPassword(password)
+	address, err := api.db.GetChatAddress()
+	if err != nil {
+		return false
+	}
+	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
 	return err == nil
 }
 
