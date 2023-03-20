@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -111,7 +110,6 @@ func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string]GeckoToken) {
 }
 
 func (c *Client) getTokens() (map[string]GeckoToken, error) {
-
 	c.fetchTokensMutex.Lock()
 	defer c.fetchTokensMutex.Unlock()
 
@@ -226,16 +224,8 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	if err != nil {
 		return nil, err
 	}
-	queryParams := url.Values{
-		"ids":                     {strings.Join(ids, ",")},
-		"vs_currency":             {currency},
-		"order":                   {"market_cap_desc"},
-		"per_page":                {"250"},
-		"page":                    {"1"},
-		"sparkline":               {"false"},
-		"price_change_percentage": {"1h,24h"},
-	}
-	url := baseURL + "coins/markets" + queryParams.Encode()
+	url := fmt.Sprintf("%scoins/markets?ids=%s&vs_currency=%s&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=1h%2C24h", baseURL, strings.Join(ids, ","), currency)
+
 	resp, err := c.DoQuery(url)
 	if err != nil {
 		return nil, err

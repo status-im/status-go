@@ -111,21 +111,6 @@ func (r *Reader) Start() error {
 	r.cancel = cancel
 
 	go func() {
-		ticker := time.NewTicker(time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				r.walletFeed.Send(walletevent.Event{
-					Type: EventWalletTickCheckConnected,
-				})
-			}
-		}
-	}()
-
-	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
 		for {

@@ -15,4 +15,6 @@ type Event struct {
 	BlockNumber *big.Int         `json:"blockNumber"`
 	Accounts    []common.Address `json:"accounts"`
 	Message     string           `json:"message"`
+	At          int64            `json:"at"`
+	ChainID     uint64           `json:"chainId"`
 }

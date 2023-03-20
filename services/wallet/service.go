@@ -1,10 +1,10 @@
 package wallet
 
 import (
-	"context"
 	"database/sql"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -23,23 +23,15 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
-	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
-type Connection struct {
-	Up            bool  `json:"up"`
-	LastCheckedAt int64 `json:"lastCheckedAt"`
-}
-
-type ConnectedResult struct {
-	Blockchains  map[uint64]Connection `json:"blockchains"`
-	Market       Connection            `json:"market"`
-	Collectibles map[uint64]Connection `json:"collectibles"`
-}
+const (
+	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
+)
 
 // NewService initializes service instance.
 func NewService(
@@ -62,17 +54,26 @@ func NewService(
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: walletFeed,
 	}
+	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
+		walletFeed.Send(walletevent.Event{
+			Type:     EventBlockchainStatusChanged,
+			Accounts: []common.Address{},
+			Message:  message,
+			At:       time.Now().Unix(),
+			ChainID:  chainID,
+		})
+	})
 	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB)
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed, transactionManager)
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
-	marketManager := market.NewManager(cryptoCompare, coingecko)
+	marketManager := market.NewManager(cryptoCompare, coingecko, walletFeed)
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
-	collectiblesManager := collectibles.NewManager(rpcClient, nftMetadataProvider, openseaAPIKey)
+	collectiblesManager := collectibles.NewManager(rpcClient, nftMetadataProvider, openseaAPIKey, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -169,40 +170,4 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
-}
-
-func (s *Service) CheckConnected(ctx context.Context) *ConnectedResult {
-	networks, err := s.rpcClient.NetworkManager.Get(false)
-	blockchains := make(map[uint64]Connection)
-	if err == nil {
-		for _, network := range networks {
-			ethClient, err := s.rpcClient.EthClient(network.ChainID)
-			if err != nil {
-				blockchains[network.ChainID] = Connection{
-					Up:            true,
-					LastCheckedAt: time.Now().Unix(),
-				}
-			}
-			blockchains[network.ChainID] = Connection{
-				Up:            ethClient.IsConnected,
-				LastCheckedAt: ethClient.LastCheckedAt,
-			}
-		}
-	}
-
-	collectibles := make(map[uint64]Connection)
-	for chainID, client := range opensea.OpenseaClientInstances {
-		collectibles[chainID] = Connection{
-			Up:            client.IsConnected,
-			LastCheckedAt: client.LastCheckedAt,
-		}
-	}
-	return &ConnectedResult{
-		Blockchains:  blockchains,
-		Collectibles: collectibles,
-		Market: Connection{
-			Up:            s.marketManager.IsConnected,
-			LastCheckedAt: s.marketManager.LastCheckedAt,
-		},
-	}
 }
