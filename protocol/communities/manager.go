@@ -532,6 +532,47 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 
 	m.publish(&Subscription{Community: community})
 
+	// check if members still fulfill the token criteria of all
+	// BECOME_MEMBER permissions and kick them if necessary
+	//
+	// We do this in a separate routine to not block
+	// this function
+	go func() {
+		if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+			becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+			for memberKey, member := range community.Members() {
+				if memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
+					continue
+				}
+
+				walletAddresses := make([]gethcommon.Address, 0)
+				for _, walletAddress := range member.WalletAccounts {
+					walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
+				}
+
+				hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+				if err != nil {
+					m.logger.Debug("failed to check permission to join", zap.Error(err))
+					continue
+				}
+
+				if !hasPermission {
+					pk, err := common.HexToPubkey(memberKey)
+					if err != nil {
+						m.logger.Debug("failed to convert hex key to pubkey", zap.Error(err))
+						continue
+					}
+					_, err = community.RemoveUserFromOrg(pk)
+					if err != nil {
+						m.logger.Debug("failed to remove member from community", zap.Error(err))
+					}
+				}
+			}
+			m.publish(&Subscription{Community: community})
+		}
+	}()
+
 	return community, changes, nil
 }
 

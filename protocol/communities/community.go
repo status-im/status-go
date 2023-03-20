@@ -369,6 +369,15 @@ func (o *Community) Color() string {
 	return ""
 }
 
+func (o *Community) Members() map[string]*protobuf.CommunityMember {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		return o.config.CommunityDescription.Members
+	}
+	return nil
+}
+
 func (o *Community) MembersCount() int {
 	if o != nil &&
 		o.config != nil &&
