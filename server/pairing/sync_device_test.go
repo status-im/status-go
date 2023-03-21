@@ -153,7 +153,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	serverNodeConfig.RootDataDir = serverTmpDir
 	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
 	require.NoError(s.T(), err)
-	cs, err := StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err := StartUpReceiverServer(serverBackend, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 
 	// generate some data for the client
@@ -207,7 +207,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.False(s.T(), serverMessenger.HasPairedDevices())
 
 	// repeat local pairing, we should expect no error after receiver logged in
-	cs, err = StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err = StartUpReceiverServer(serverBackend, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -216,7 +216,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 
 	// test if it's okay when account already exist but not logged in
 	require.NoError(s.T(), serverBackend.Logout())
-	cs, err = StartUpReceiverServer(serverBackend, Receiving, string(serverConfigBytes))
+	cs, err = StartUpReceiverServer(serverBackend, string(serverConfigBytes))
 	require.NoError(s.T(), err)
 	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -247,7 +247,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	}
 	configBytes, err := json.Marshal(config)
 	require.NoError(s.T(), err)
-	cs, err := StartUpSenderServer(serverBackend, Sending, string(configBytes))
+	cs, err := StartUpSenderServer(serverBackend, string(configBytes))
 	require.NoError(s.T(), err)
 
 	// generate some data for the server
@@ -308,7 +308,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.False(s.T(), clientMessenger.HasPairedDevices())
 
 	// repeat local pairing, we should expect no error after receiver logged in
-	cs, err = StartUpSenderServer(serverBackend, Sending, string(configBytes))
+	cs, err = StartUpSenderServer(serverBackend, string(configBytes))
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
@@ -317,7 +317,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 
 	// test if it's okay when account already exist but not logged in
 	require.NoError(s.T(), clientBackend.Logout())
-	cs, err = StartUpSenderServer(serverBackend, Sending, string(configBytes))
+	cs, err = StartUpSenderServer(serverBackend, string(configBytes))
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)

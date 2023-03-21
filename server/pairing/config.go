@@ -46,7 +46,6 @@ type ServerConfig struct {
 	EK       []byte           `json:"-"`
 	Cert     *tls.Certificate `json:"-"`
 	Hostname string           `json:"-"`
-	Mode     Mode             `json:"-"`
 }
 
 type ClientConfig struct{}
