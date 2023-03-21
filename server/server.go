@@ -79,7 +79,7 @@ func (s *Server) listenAndServe() {
 	s.StartTimeout(func() {
 		err := s.Stop()
 		if err != nil {
-			s.logger.Error("PairingServer termination fail", zap.Error(err))
+			s.logger.Error("server termination fail", zap.Error(err))
 		}
 	})
 

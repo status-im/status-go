@@ -2,26 +2,19 @@ package pairing
 
 import (
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"net"
 	"net/url"
 	"time"
 
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 )
-
-// TODO Reconcile duplicate function here and in server/certs.go
-//  https://github.com/status-im/status-go/issues/3300
-
-// TODO duped, but only used here
 
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()
@@ -30,51 +23,9 @@ func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
 
-// todo duped
-
-func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
-	c := &x509.Certificate{
-		SerialNumber:          sn,
-		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
-		NotBefore:             from,
-		NotAfter:              to,
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-
-	ip := net.ParseIP(hostname)
-	if ip != nil {
-		c.IPAddresses = []net.IP{ip}
-	} else {
-		c.DNSNames = []string{hostname}
-	}
-
-	return c
-}
-
-// todo duped
-
-func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
-	derBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
-	if err != nil {
-		return
-	}
-	certPem = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-
-	privBytes, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return
-	}
-	keyPem = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
-
-	return
-}
-
 func GenerateCertFromKey(pk *ecdsa.PrivateKey, from time.Time, hostname string) (tls.Certificate, []byte, error) {
-	cert := GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), hostname)
-	certPem, keyPem, err := GenerateX509PEMs(cert, pk)
+	cert := server.GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), hostname)
+	certPem, keyPem, err := server.GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
