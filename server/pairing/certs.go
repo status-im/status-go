@@ -21,12 +21,16 @@ import (
 // TODO Reconcile duplicate function here and in server/certs.go
 //  https://github.com/status-im/status-go/issues/3300
 
+// TODO duped, but only used here
+
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()
 	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
 
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
+
+// todo duped
 
 func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
 	c := &x509.Certificate{
@@ -49,6 +53,8 @@ func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Ce
 
 	return c
 }
+
+// todo duped
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
 	derBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)

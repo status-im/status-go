@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/server/servertest"
 	"github.com/status-im/status-go/t/utils"
 )
 
@@ -40,7 +41,7 @@ func TestPayloadMarshallerSuite(t *testing.T) {
 
 type PayloadMarshallerSuite struct {
 	suite.Suite
-	TestLoggerComponents
+	servertest.TestLoggerComponents
 
 	teardown func()
 

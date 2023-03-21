@@ -1,4 +1,5 @@
-package server
+// Package servertest provides utilities for server testing.
+package servertest
 
 import (
 	"crypto/ecdsa"
