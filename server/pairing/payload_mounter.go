@@ -22,6 +22,18 @@ type PayloadLoader interface {
 	Load() error
 }
 
+type BasePayloadMounter struct {
+	*PayloadLockPayload
+	*PayloadToSend
+}
+
+func NewBasePayloadMounter(e *PayloadEncryptor) *BasePayloadMounter {
+	return &BasePayloadMounter{
+		&PayloadLockPayload{e},
+		&PayloadToSend{e},
+	}
+}
+
 /*
 |--------------------------------------------------------------------------
 | AccountPayload
@@ -33,6 +45,8 @@ type PayloadLoader interface {
 
 // AccountPayloadMounter is responsible for the whole lifecycle of an AccountPayload
 type AccountPayloadMounter struct {
+	*BasePayloadMounter
+
 	logger                   *zap.Logger
 	accountPayload           *AccountPayload
 	encryptor                *PayloadEncryptor
@@ -45,6 +59,8 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
+	pe = pe.Renew()
+
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
 	apl, err := NewAccountPayloadLoader(p, config)
@@ -53,9 +69,10 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 	}
 
 	return &AccountPayloadMounter{
+		BasePayloadMounter:       NewBasePayloadMounter(pe),
 		logger:                   l,
 		accountPayload:           p,
-		encryptor:                pe.Renew(),
+		encryptor:                pe,
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
 		payloadLoader:            apl,
 	}, nil
@@ -85,14 +102,6 @@ func (apm *AccountPayloadMounter) Mount() error {
 	)
 
 	return apm.encryptor.encrypt(pb)
-}
-
-func (apm *AccountPayloadMounter) ToSend() []byte {
-	return apm.encryptor.getEncrypted()
-}
-
-func (apm *AccountPayloadMounter) LockPayload() {
-	apm.encryptor.lockPayload()
 }
 
 // AccountPayloadLoader is responsible for loading, parsing and validating AccountPayload data
@@ -150,18 +159,23 @@ func (apl *AccountPayloadLoader) Load() error {
 */
 
 type RawMessagePayloadMounter struct {
-	logger *zap.Logger
+	*BasePayloadMounter
 
+	logger    *zap.Logger
 	encryptor *PayloadEncryptor
 	loader    *RawMessageLoader
 }
 
 func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
 	l := logger.Named("RawMessagePayloadManager")
+
+	pe = pe.Renew()
+
 	return &RawMessagePayloadMounter{
-		logger:    l,
-		encryptor: pe.Renew(),
-		loader:    NewRawMessageLoader(backend, config),
+		BasePayloadMounter: NewBasePayloadMounter(pe),
+		logger:             l,
+		encryptor:          pe.Renew(),
+		loader:             NewRawMessageLoader(backend, config),
 	}
 }
 
@@ -171,14 +185,6 @@ func (r *RawMessagePayloadMounter) Mount() error {
 		return err
 	}
 	return r.encryptor.encrypt(r.loader.payload)
-}
-
-func (r *RawMessagePayloadMounter) ToSend() []byte {
-	return r.encryptor.getEncrypted()
-}
-
-func (r *RawMessagePayloadMounter) LockPayload() {
-	r.encryptor.lockPayload()
 }
 
 type RawMessageLoader struct {
@@ -212,16 +218,21 @@ func (r *RawMessageLoader) Load() (err error) {
 */
 
 type InstallationPayloadMounter struct {
+	*BasePayloadMounter
+
 	logger    *zap.Logger
 	encryptor *PayloadEncryptor
 	loader    *InstallationPayloadLoader
 }
 
 func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
+	pe = pe.Renew()
+
 	return &InstallationPayloadMounter{
-		logger:    logger.Named("InstallationPayloadManager"),
-		encryptor: pe.Renew(),
-		loader:    NewInstallationPayloadLoader(backend, deviceType),
+		BasePayloadMounter: NewBasePayloadMounter(pe),
+		logger:             logger.Named("InstallationPayloadManager"),
+		encryptor:          pe.Renew(),
+		loader:             NewInstallationPayloadLoader(backend, deviceType),
 	}
 }
 
@@ -231,14 +242,6 @@ func (i *InstallationPayloadMounter) Mount() error {
 		return err
 	}
 	return i.encryptor.encrypt(i.loader.payload)
-}
-
-func (i *InstallationPayloadMounter) ToSend() []byte {
-	return i.encryptor.getEncrypted()
-}
-
-func (i *InstallationPayloadMounter) LockPayload() {
-	i.encryptor.lockPayload()
 }
 
 type InstallationPayloadLoader struct {

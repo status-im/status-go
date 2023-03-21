@@ -29,6 +29,18 @@ type PayloadStorer interface {
 	Store() error
 }
 
+type BasePayloadReceiver struct {
+	*PayloadLockPayload
+	*PayloadReceived
+}
+
+func NewBaseBasePayloadReceiver(e *PayloadEncryptor) *BasePayloadReceiver {
+	return &BasePayloadReceiver{
+		&PayloadLockPayload{e},
+		&PayloadReceived{e},
+	}
+}
+
 /*
 |--------------------------------------------------------------------------
 | AccountPayload
@@ -40,6 +52,8 @@ type PayloadStorer interface {
 
 // AccountPayloadReceiver is responsible for the whole lifecycle of a AccountPayload
 type AccountPayloadReceiver struct {
+	*BasePayloadReceiver
+
 	logger                   *zap.Logger
 	accountPayload           *AccountPayload
 	encryptor                *PayloadEncryptor
@@ -48,9 +62,11 @@ type AccountPayloadReceiver struct {
 }
 
 // NewAccountPayloadReceiver generates a new and initialised AccountPayloadManager
-func NewAccountPayloadReceiver(encryptor *PayloadEncryptor, config *ReceiverConfig, logger *zap.Logger) (*AccountPayloadReceiver, error) {
+func NewAccountPayloadReceiver(e *PayloadEncryptor, config *ReceiverConfig, logger *zap.Logger) (*AccountPayloadReceiver, error) {
 	l := logger.Named("AccountPayloadManager")
 	l.Debug("fired", zap.Any("config", config))
+
+	e = e.Renew()
 
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
@@ -60,9 +76,10 @@ func NewAccountPayloadReceiver(encryptor *PayloadEncryptor, config *ReceiverConf
 	}
 
 	return &AccountPayloadReceiver{
+		BasePayloadReceiver:      NewBaseBasePayloadReceiver(e),
 		logger:                   l,
 		accountPayload:           p,
-		encryptor:                encryptor.Renew(),
+		encryptor:                e,
 		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
 		accountStorer:            accountPayloadRepository,
 	}, nil
@@ -94,14 +111,6 @@ func (apr *AccountPayloadReceiver) Receive(data []byte) error {
 	signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: apr.accountPayload.multiaccount})
 
 	return apr.accountStorer.Store()
-}
-
-func (apr *AccountPayloadReceiver) Received() []byte {
-	return apr.encryptor.getDecrypted()
-}
-
-func (apr *AccountPayloadReceiver) LockPayload() {
-	apr.encryptor.lockPayload()
 }
 
 // AccountPayloadStorer is responsible for parsing, validating and storing AccountPayload data
@@ -220,17 +229,23 @@ func (aps *AccountPayloadStorer) storeMultiAccount() error {
 */
 
 type RawMessagePayloadReceiver struct {
+	*BasePayloadReceiver
+
 	logger    *zap.Logger
 	encryptor *PayloadEncryptor
 	storer    *RawMessageStorer
 }
 
-func NewRawMessagePayloadReceiver(logger *zap.Logger, accountPayload *AccountPayload, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *RawMessagePayloadReceiver {
+func NewRawMessagePayloadReceiver(logger *zap.Logger, accountPayload *AccountPayload, e *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *RawMessagePayloadReceiver {
 	l := logger.Named("RawMessagePayloadManager")
+
+	e = e.Renew()
+
 	return &RawMessagePayloadReceiver{
-		logger:    l,
-		encryptor: encryptor.Renew(),
-		storer:    NewRawMessageStorer(backend, accountPayload, config),
+		BasePayloadReceiver: NewBaseBasePayloadReceiver(e),
+		logger:              l,
+		encryptor:           e,
+		storer:              NewRawMessageStorer(backend, accountPayload, config),
 	}
 }
 
@@ -241,14 +256,6 @@ func (r *RawMessagePayloadReceiver) Receive(data []byte) error {
 	}
 	r.storer.payload = r.Received()
 	return r.storer.Store()
-}
-
-func (r *RawMessagePayloadReceiver) Received() []byte {
-	return r.encryptor.getDecrypted()
-}
-
-func (r *RawMessagePayloadReceiver) LockPayload() {
-	r.encryptor.lockPayload()
 }
 
 type RawMessageStorer struct {
@@ -289,17 +296,23 @@ func (r *RawMessageStorer) Store() error {
 */
 
 type InstallationPayloadReceiver struct {
+	*BasePayloadReceiver
+
 	logger    *zap.Logger
 	encryptor *PayloadEncryptor
 	storer    *InstallationPayloadStorer
 }
 
-func NewInstallationPayloadReceiver(logger *zap.Logger, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadReceiver {
+func NewInstallationPayloadReceiver(logger *zap.Logger, e *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadReceiver {
 	l := logger.Named("InstallationPayloadManager")
+
+	e = e.Renew()
+
 	return &InstallationPayloadReceiver{
-		logger:    l,
-		encryptor: encryptor.Renew(),
-		storer:    NewInstallationPayloadStorer(backend, deviceType),
+		BasePayloadReceiver: NewBaseBasePayloadReceiver(e),
+		logger:              l,
+		encryptor:           e,
+		storer:              NewInstallationPayloadStorer(backend, deviceType),
 	}
 }
 
@@ -310,14 +323,6 @@ func (i *InstallationPayloadReceiver) Receive(data []byte) error {
 	}
 	i.storer.payload = i.encryptor.getDecrypted()
 	return i.storer.Store()
-}
-
-func (i *InstallationPayloadReceiver) Received() []byte {
-	return i.encryptor.getDecrypted()
-}
-
-func (i *InstallationPayloadReceiver) LockPayload() {
-	i.encryptor.lockPayload()
 }
 
 type InstallationPayloadStorer struct {
