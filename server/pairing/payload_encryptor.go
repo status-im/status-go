@@ -92,3 +92,27 @@ func (pem *PayloadEncryptor) getDecrypted() []byte {
 func (pem *PayloadEncryptor) lockPayload() {
 	pem.payload.lock()
 }
+
+type PayloadLockPayload struct {
+	*PayloadEncryptor
+}
+
+func (pl *PayloadLockPayload) LockPayload() {
+	pl.lockPayload()
+}
+
+type PayloadToSend struct {
+	*PayloadEncryptor
+}
+
+func (pts *PayloadToSend) ToSend() []byte {
+	return pts.getEncrypted()
+}
+
+type PayloadReceived struct {
+	*PayloadEncryptor
+}
+
+func (pr *PayloadReceived) Received() []byte {
+	return pr.getDecrypted()
+}
