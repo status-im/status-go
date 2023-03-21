@@ -6,6 +6,8 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/server/servertest"
 )
 
 func TestCerts(t *testing.T) {
@@ -14,8 +16,8 @@ func TestCerts(t *testing.T) {
 
 type CertsSuite struct {
 	suite.Suite
-	TestKeyComponents
-	TestCertComponents
+	servertest.TestKeyComponents
+	servertest.TestCertComponents
 }
 
 func (s *CertsSuite) SetupSuite() {
@@ -28,7 +30,7 @@ func (s *CertsSuite) Test_makeSerialNumberFromKey() {
 }
 
 func (s *CertsSuite) TestToECDSA() {
-	k := ToECDSA(base58.Decode(DB58))
+	k := ToECDSA(base58.Decode(servertest.DB58))
 	s.Require().NotNil(k.PublicKey.X)
 	s.Require().NotNil(k.PublicKey.Y)
 
@@ -37,7 +39,7 @@ func (s *CertsSuite) TestToECDSA() {
 	s.Require().Zero(k.D.Cmp(s.D))
 
 	b58 := base58.Encode(s.D.Bytes())
-	s.Require().Equal(DB58, b58)
+	s.Require().Equal(servertest.DB58, b58)
 }
 
 func (s *CertsSuite) TestGenerateX509Cert() {

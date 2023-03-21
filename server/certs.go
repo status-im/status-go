@@ -22,12 +22,16 @@ func makeRandomSerialNumber() (*big.Int, error) {
 	return rand.Int(rand.Reader, serialNumberLimit)
 }
 
+// TODO duped in pairing
+
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()
 	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
 
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
+
+// TODO duped in pairing
 
 func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
 	c := &x509.Certificate{
@@ -50,6 +54,8 @@ func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Ce
 
 	return c
 }
+
+// TODO duped in pairing
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
 	derBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)

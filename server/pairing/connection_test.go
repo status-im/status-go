@@ -5,7 +5,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	internalServer "github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/server/servertest"
 )
 
 var (
@@ -18,9 +19,9 @@ func TestConnectionParamsSuite(t *testing.T) {
 
 type ConnectionParamsSuite struct {
 	suite.Suite
-	TestKeyComponents
-	TestCertComponents
-	TestLoggerComponents
+	servertest.TestKeyComponents
+	servertest.TestCertComponents
+	servertest.TestLoggerComponents
 
 	server *BaseServer
 }
@@ -30,10 +31,10 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.SetupCertComponents(s.T())
 	s.SetupLoggerComponents()
 
-	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, internalServer.DefaultIP.String())
+	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, server.DefaultIP.String())
 	s.Require().NoError(err)
 
-	bs := internalServer.NewServer(&cert, internalServer.DefaultIP.String(), nil, s.Logger)
+	bs := server.NewServer(&cert, server.DefaultIP.String(), nil, s.Logger)
 	err = bs.SetPort(1337)
 	s.Require().NoError(err)
 
@@ -64,7 +65,7 @@ func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 	s.Require().NoError(err)
 
 	s.Require().Equal("https://127.0.0.1:1337", u.String())
-	s.Require().Equal(internalServer.DefaultIP.String(), u.Hostname())
+	s.Require().Equal(server.DefaultIP.String(), u.Hostname())
 	s.Require().Equal("1337", u.Port())
 
 	s.Require().True(cp.publicKey.Equal(&s.PK.PublicKey))

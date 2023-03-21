@@ -13,12 +13,13 @@ import (
 
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/server/servertest"
 )
 
 type QROpsTestSuite struct {
 	suite.Suite
-	TestKeyComponents
-	TestLoggerComponents
+	servertest.TestKeyComponents
+	servertest.TestLoggerComponents
 
 	server          *MediaServer
 	serverNoPort    *MediaServer

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/server/servertest"
 )
 
 const (
@@ -36,8 +37,8 @@ func TestServerURLSuite(t *testing.T) {
 
 type ServerURLSuite struct {
 	suite.Suite
-	TestKeyComponents
-	TestLoggerComponents
+	servertest.TestKeyComponents
+	servertest.TestLoggerComponents
 
 	server       *MediaServer
 	serverForQR  *MediaServer
