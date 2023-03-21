@@ -214,6 +214,11 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password st
 	return err
 }
 
+// Creates a random new mnemonic.
+func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
+	return api.manager.GetRandomMnemonic()
+}
+
 func (api *API) VerifyPassword(password string) bool {
 	address, err := api.db.GetChatAddress()
 	if err != nil {
