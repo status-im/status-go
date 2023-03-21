@@ -139,13 +139,9 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      request.BackupDisabledDataDir,
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: 6,
 		MailServerConfirmations:    true,
-		VerifyTransactionURL:       "",
-		VerifyENSURL:               "",
-		VerifyENSContractAddress:   "",
 		VerifyTransactionChainID:   1,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,
