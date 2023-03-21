@@ -25,10 +25,6 @@ func (s *CertsSuite) SetupSuite() {
 	s.SetupCertComponents(s.T())
 }
 
-func (s *CertsSuite) Test_makeSerialNumberFromKey() {
-	s.Require().Zero(makeSerialNumberFromKey(s.PK).Cmp(s.SN))
-}
-
 func (s *CertsSuite) TestToECDSA() {
 	k := ToECDSA(base58.Decode(servertest.DB58))
 	s.Require().NotNil(k.PublicKey.X)

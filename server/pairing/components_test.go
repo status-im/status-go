@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
-	"github.com/stretchr/testify/require"
 )
 
 type TestPairingServerComponents struct {

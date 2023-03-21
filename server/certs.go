@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -21,17 +20,6 @@ func makeRandomSerialNumber() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	return rand.Int(rand.Reader, serialNumberLimit)
 }
-
-// TODO duped in pairing
-
-func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
-	h := sha256.New()
-	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
-
-	return new(big.Int).SetBytes(h.Sum(nil))
-}
-
-// TODO duped in pairing
 
 func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
 	c := &x509.Certificate{
@@ -54,8 +42,6 @@ func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Ce
 
 	return c
 }
-
-// TODO duped in pairing
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
 	derBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
