@@ -90,6 +90,16 @@ func (m *Manager) AccountsGenerator() *generator.Generator {
 	return m.accountsGenerator
 }
 
+func (m *Manager) GetRandomMnemonic() (string, error) {
+	// generate mnemonic phrase
+	mn := extkeys.NewMnemonic()
+	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
+	if err != nil {
+		return "", fmt.Errorf("can not create mnemonic seed: %v", err)
+	}
+	return mnemonic, nil
+}
+
 // CreateAccount creates an internal geth account
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
