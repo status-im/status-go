@@ -20,6 +20,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -711,12 +712,16 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	return nil
 }
 
-func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) error {
+func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) error {
 
 	if err := request.Validate(); err != nil {
 		return err
 	}
 
+	return b.generateOrImportAccount(request.Mnemonic, &request.CreateAccount)
+}
+
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
 	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)); err != nil {
 		return err
 	}
@@ -728,23 +733,31 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return err
 	}
 
-	generator := b.accountManager.AccountsGenerator()
+	accountGenerator := b.accountManager.AccountsGenerator()
 
-	// generate 1(n) account with default mnemonic length and no passphrase
-	generatedAccountInfos, err := generator.Generate(defaultMnemonicLength, 1, "")
+	var info generator.GeneratedAccountInfo
+	if mnemonic == "" {
+		// generate 1(n) account with default mnemonic length and no passphrase
+		generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
+		info = generatedAccountInfos[0]
 
+		if err != nil {
+			return err
+		}
+	} else {
+
+		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
 	if err != nil {
 		return err
 	}
 
-	info := generatedAccountInfos[0]
-
-	derivedAddresses, err := generator.DeriveAddresses(info.ID, paths)
-	if err != nil {
-		return err
-	}
-
-	_, err = generator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
 	if err != nil {
 		return err
 	}
@@ -760,7 +773,11 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return err
 	}
 	settings.DisplayName = request.DisplayName
-	settings.Mnemonic = &info.Mnemonic
+
+	// If restoring an account, we don't set the mnemonic
+	if mnemonic == "" {
+		settings.Mnemonic = &info.Mnemonic
+	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
 	if err != nil {
@@ -808,6 +825,16 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	}
 
 	return nil
+
+}
+
+func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) error {
+
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	return b.generateOrImportAccount("", request)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

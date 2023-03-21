@@ -287,6 +287,31 @@ func CreateAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
+func RestoreAccountAndLogin(requestJSON string) string {
+	var request requests.RestoreAccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	api.RunAsync(func() error {
+		log.Debug("starting a node and restoring account")
+		err := statusBackend.RestoreAccountAndLogin(&request)
+		if err != nil {
+			log.Error("failed to restore account", "error", err)
+			return err
+		}
+		log.Debug("started a node, and restored account")
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
+
 // SaveAccountAndLogin saves account in status-go database..
 func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData string) string {
 	var account multiaccounts.Account

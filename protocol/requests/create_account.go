@@ -32,6 +32,10 @@ type CreateAccount struct {
 }
 
 func (c *CreateAccount) Validate() error {
+	return ValidateAccountCreationRequest(*c)
+}
+
+func ValidateAccountCreationRequest(c CreateAccount) error {
 	// TODO(cammellos): Add proper validation for password/displayname/etc
 	if len(c.DisplayName) == 0 {
 		return ErrCreateAccountInvalidDisplayName
