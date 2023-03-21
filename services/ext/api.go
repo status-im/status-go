@@ -728,10 +728,6 @@ func (api *PublicAPI) DeclineContactRequest(ctx context.Context, request *reques
 	return api.service.messenger.DeclineContactRequest(ctx, request)
 }
 
-func (api *PublicAPI) CancelOutgoingContactRequest(ctx context.Context, request *requests.CancelOutgoingContactRequest) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CancelOutgoingContactRequest(ctx, request)
-}
-
 func (api *PublicAPI) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptLatestContactRequestForContact(ctx, request)
 }
