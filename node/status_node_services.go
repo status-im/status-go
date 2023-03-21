@@ -473,10 +473,17 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 
 func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, openseaAPIKey string) common.StatusService {
 	if b.walletSrvc == nil {
+		var extService *ext.Service
+		if b.WakuV2ExtService() != nil {
+			extService = b.WakuV2ExtService().Service
+		} else if b.WakuExtService() != nil {
+			extService = b.WakuExtService().Service
+		}
 		b.walletSrvc = wallet.NewService(
 			b.appDB, accountsDB, b.rpcClient, accountsFeed, openseaAPIKey, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(),
 			b.stickersService(accountsDB),
+			extService,
 		)
 	}
 	return b.walletSrvc

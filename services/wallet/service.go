@@ -16,9 +16,11 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
@@ -51,6 +53,7 @@ func NewService(
 	config *params.NodeConfig,
 	ens *ens.Service,
 	stickers *stickers.Service,
+	nftMetadataProvider thirdparty.NFTMetadataProvider,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
@@ -69,6 +72,7 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
+	collectiblesManager := collectibles.NewManager(rpcClient, nftMetadataProvider, openseaAPIKey)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -78,7 +82,7 @@ func NewService(
 		transactionManager:    transactionManager,
 		transferController:    transferController,
 		cryptoOnRampManager:   cryptoOnRampManager,
-		openseaAPIKey:         openseaAPIKey,
+		collectiblesManager:   collectiblesManager,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
 		marketManager:         marketManager,
@@ -106,7 +110,7 @@ type Service struct {
 	feesManager           *FeeManager
 	marketManager         *market.Manager
 	started               bool
-	openseaAPIKey         string
+	collectiblesManager   *collectibles.Manager
 	gethManager           *account.GethManager
 	transactor            *transactions.Transactor
 	ens                   *ens.Service

@@ -295,12 +295,7 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 
 func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {
 	log.Debug("call to get opensea collections")
-	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.FetchAllCollectionsByOwner(owner)
+	return api.s.collectiblesManager.FetchAllCollectionsByOwner(chainID, owner)
 }
 
 // Kept for compatibility with mobile app
@@ -314,43 +309,22 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 
 func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to get opensea assets")
-	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.FetchAllAssetsByOwnerAndCollection(owner, collectionSlug, cursor, limit)
+	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
 func (api *API) GetOpenseaAssetsByOwnerWithCursor(ctx context.Context, chainID uint64, owner common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to FetchAllAssetsByOwner")
-	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.FetchAllAssetsByOwner(owner, cursor, limit)
+	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 }
 
 func (api *API) GetOpenseaAssetsByOwnerAndContractAddressWithCursor(ctx context.Context, chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByOwnerAndContractAddressWithCursor")
-	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.FetchAllAssetsByOwnerAndContractAddress(owner, contractAddresses, cursor, limit)
+	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []opensea.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
+func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []thirdparty.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
-
-	client, err := opensea.NewOpenseaClient(chainID, api.s.openseaAPIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.FetchAssetsByNFTUniqueID(uniqueIDs, limit)
+	return api.s.collectiblesManager.FetchAssetsByNFTUniqueID(chainID, uniqueIDs, limit)
 }
 
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
