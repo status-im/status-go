@@ -79,7 +79,6 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingSend() {
 	// Replace PairingServer.accountMounter with a MockPayloadMounter
 	pm := NewMockPayloadMounter(s.EphemeralAES)
 	s.SS.accountMounter = pm
-	s.SS.mode = Sending
 
 	err := s.SS.startSendingData()
 	s.Require().NoError(err)
@@ -127,8 +126,6 @@ func (s *PairingServerSuite) TestPairingServer_StartPairingReceive() {
 	pm := NewMockPayloadReceiver(s.EphemeralAES)
 	s.RS.accountReceiver = pm
 
-	s.RS.mode = Receiving
-
 	err := s.RS.startReceivingData()
 	s.Require().NoError(err)
 
@@ -172,7 +169,6 @@ func (s *PairingServerSuite) sendingSetup() *ReceiverClient {
 	// Replace PairingServer.PayloadManager with a MockPayloadReceiver
 	pm := NewMockPayloadMounter(s.EphemeralAES)
 	s.SS.accountMounter = pm
-	s.SS.mode = Sending
 
 	err := s.SS.startSendingData()
 	s.Require().NoError(err)
@@ -290,7 +286,6 @@ func makeThingToSay() (string, error) {
 }
 
 func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
-	s.SS.mode = Sending
 	s.SS.SetHandlers(server.HandlerPatternMap{"/hello": testHandler(s.T())})
 
 	err := s.SS.Start()

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	connectionString = "cs2:4FHRnp:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6:3"
+	connectionString = "cs2:4FHRnp:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
 )
 
 func TestConnectionParamsSuite(t *testing.T) {
@@ -42,7 +42,6 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 		Server: bs,
 		pk:     &s.PK.PublicKey,
 		ek:     s.AES,
-		mode:   Sending,
 	}
 }
 
@@ -58,8 +57,6 @@ func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 	cp := new(ConnectionParams)
 	err := cp.FromString(connectionString)
 	s.Require().NoError(err)
-
-	s.Require().Exactly(Sending, cp.serverMode)
 
 	u, err := cp.URL()
 	s.Require().NoError(err)

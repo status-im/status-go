@@ -31,9 +31,6 @@ type BaseServer struct {
 
 	pk *ecdsa.PublicKey
 	ek []byte
-	// TODO remove mode from pairing process
-	//  https://github.com/status-im/status-go/issues/3301
-	mode Mode
 }
 
 // NewBaseServer returns a *BaseServer init from the given *SenderServerConfig
@@ -53,7 +50,6 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 		challengeGiver: cg,
 		pk:             config.PK,
 		ek:             config.EK,
-		mode:           config.Mode,
 	}
 	bs.SetTimeout(config.Timeout)
 	return bs, nil
@@ -72,7 +68,7 @@ func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
 		netIP = netIP4
 	}
 
-	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek, s.mode), nil
+	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek), nil
 }
 
 func MakeServerConfig(config *ServerConfig) error {
@@ -158,7 +154,7 @@ func (s *SenderServer) startSendingData() error {
 }
 
 // MakeFullSenderServer generates a fully configured and randomly seeded SenderServer
-func MakeFullSenderServer(backend *api.GethStatusBackend, mode Mode, config *SenderServerConfig) (*SenderServer, error) {
+func MakeFullSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig) (*SenderServer, error) {
 	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
@@ -168,16 +164,16 @@ func MakeFullSenderServer(backend *api.GethStatusBackend, mode Mode, config *Sen
 	return NewSenderServer(backend, config)
 }
 
-// StartUpSenderServer generates a SenderServer, starts the sending server in the correct mode
+// StartUpSenderServer generates a SenderServer, starts the sending server
 // and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
-func StartUpSenderServer(backend *api.GethStatusBackend, mode Mode, configJSON string) (string, error) {
+func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
 	conf := NewSenderServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return "", err
 	}
 
-	ps, err := MakeFullSenderServer(backend, mode, conf)
+	ps, err := MakeFullSenderServer(backend, conf)
 	if err != nil {
 		return "", err
 	}
@@ -249,7 +245,7 @@ func (s *ReceiverServer) startReceivingData() error {
 }
 
 // MakeFullReceiverServer generates a fully configured and randomly seeded ReceiverServer
-func MakeFullReceiverServer(backend *api.GethStatusBackend, mode Mode, config *ReceiverServerConfig) (*ReceiverServer, error) {
+func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
 	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
@@ -264,16 +260,16 @@ func MakeFullReceiverServer(backend *api.GethStatusBackend, mode Mode, config *R
 	return NewReceiverServer(backend, config)
 }
 
-// StartUpReceiverServer generates a ReceiverServer, starts the sending server in the correct mode
+// StartUpReceiverServer generates a ReceiverServer, starts the sending server
 // and returns the ConnectionParams string to allow a SenderClient to make a successful connection.
-func StartUpReceiverServer(backend *api.GethStatusBackend, mode Mode, configJSON string) (string, error) {
+func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
 	conf := NewReceiverServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return "", err
 	}
 
-	ps, err := MakeFullReceiverServer(backend, mode, conf)
+	ps, err := MakeFullReceiverServer(backend, conf)
 	if err != nil {
 		return "", err
 	}

@@ -13,15 +13,9 @@ import (
 )
 
 type ConnectionParamVersion int
-type Mode int
 
 const (
 	Version1 ConnectionParamVersion = iota + 1
-)
-
-const (
-	Receiving Mode = iota + 1
-	Sending
 )
 
 const (
@@ -29,29 +23,27 @@ const (
 )
 
 type ConnectionParams struct {
-	version    ConnectionParamVersion
-	netIP      net.IP
-	port       int
-	publicKey  *ecdsa.PublicKey
-	aesKey     []byte
-	serverMode Mode
+	version   ConnectionParamVersion
+	netIP     net.IP
+	port      int
+	publicKey *ecdsa.PublicKey
+	aesKey    []byte
 }
 
-func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte, mode Mode) *ConnectionParams {
+func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte) *ConnectionParams {
 	cp := new(ConnectionParams)
 	cp.version = Version1
 	cp.netIP = netIP
 	cp.port = port
 	cp.publicKey = publicKey
 	cp.aesKey = aesKey
-	cp.serverMode = mode
 	return cp
 }
 
 // ToString generates a string required for generating a secure connection to another Status device.
 //
 // The returned string will look like below:
-//   - "cs2:4FHRnp:H6G:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6:2"
+//   - "cs2:4FHRnp:H6G:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
 //
 // Format bytes encoded into a base58 string, delimited by ":"
 //   - string type identifier
@@ -60,19 +52,14 @@ func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aes
 //   - port
 //   - ecdsa CompressedPublicKey
 //   - AES encryption key
-//   - server mode
 func (cp *ConnectionParams) ToString() string {
 	v := base58.Encode(new(big.Int).SetInt64(int64(cp.version)).Bytes())
 	ip := base58.Encode(cp.netIP)
 	p := base58.Encode(new(big.Int).SetInt64(int64(cp.port)).Bytes())
 	k := base58.Encode(elliptic.MarshalCompressed(cp.publicKey.Curve, cp.publicKey.X, cp.publicKey.Y))
 	ek := base58.Encode(cp.aesKey)
-	m := base58.Encode(new(big.Int).SetInt64(int64(cp.serverMode)).Bytes())
 
-	// TODO remove server mode from the connection string, rely on specific function calls rather than algorithmic orchestration
-	//  https://github.com/status-im/status-go/issues/3301
-
-	return fmt.Sprintf("%s%s:%s:%s:%s:%s:%s", connectionStringID, v, ip, p, k, ek, m)
+	return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ip, p, k, ek)
 }
 
 // FromString parses a connection params string required for to securely connect to another Status device.
@@ -87,7 +74,7 @@ func (cp *ConnectionParams) FromString(s string) error {
 		return fmt.Errorf("connection string doesn't begin with identifier '%s'", connectionStringID)
 	}
 
-	requiredParams := 6
+	requiredParams := 5
 
 	sData := strings.Split(s[2:], ":")
 	if len(sData) != requiredParams {
@@ -101,7 +88,6 @@ func (cp *ConnectionParams) FromString(s string) error {
 	cp.publicKey.X, cp.publicKey.Y = elliptic.UnmarshalCompressed(elliptic.P256(), base58.Decode(sData[3]))
 	cp.publicKey.Curve = elliptic.P256()
 	cp.aesKey = base58.Decode(sData[4])
-	cp.serverMode = Mode(new(big.Int).SetBytes(base58.Decode(sData[5])).Int64())
 
 	return cp.validate()
 }
@@ -127,12 +113,7 @@ func (cp *ConnectionParams) validate() error {
 		return err
 	}
 
-	err = cp.validateAESKey()
-	if err != nil {
-		return err
-	}
-
-	return cp.validateServerMode()
+	return cp.validateAESKey()
 }
 
 func (cp *ConnectionParams) validateVersion() error {
@@ -177,15 +158,6 @@ func (cp *ConnectionParams) validateAESKey() error {
 		return fmt.Errorf("AES key invalid length, expect length 32, received length '%d'", len(cp.aesKey))
 	}
 	return nil
-}
-
-func (cp *ConnectionParams) validateServerMode() error {
-	switch cp.serverMode {
-	case 0, Receiving, Sending:
-		return nil
-	default:
-		return fmt.Errorf("invalid server mode '%d'", cp.serverMode)
-	}
 }
 
 func (cp *ConnectionParams) URL() (*url.URL, error) {

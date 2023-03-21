@@ -1017,7 +1017,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
-	cs, err := pairing.StartUpReceiverServer(statusBackend, pairing.Receiving, configJSON)
+	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -1034,7 +1034,7 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
 	}
-	cs, err := pairing.StartUpSenderServer(statusBackend, pairing.Sending, configJSON)
+	cs, err := pairing.StartUpSenderServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
