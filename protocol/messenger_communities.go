@@ -732,20 +732,8 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	}
 
 	community, err := m.communitiesManager.AcceptRequestToJoin(request)
-	if err != nil && err != communities.ErrNoPermissionToJoin {
+	if err != nil {
 		return nil, err
-	}
-
-	if err == communities.ErrNoPermissionToJoin {
-		cancel := &requests.DeclineRequestToJoinCommunity{
-			ID: requestToJoin.ID,
-		}
-		response, err := m.DeclineRequestToJoinCommunity(cancel)
-		if err != nil {
-			return nil, err
-		}
-		response.AddCommunity(community)
-		return response, nil
 	}
 
 	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
