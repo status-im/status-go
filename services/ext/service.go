@@ -6,9 +6,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -24,6 +26,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
@@ -34,6 +37,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/anonmetrics"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
@@ -43,6 +47,7 @@ import (
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
@@ -56,6 +61,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
+	thirdparty.NFTMetadataProvider
 	messenger       *protocol.Messenger
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
@@ -506,4 +512,69 @@ func (s *Service) ConnectionChanged(state connection.State) {
 
 func (s *Service) Messenger() *protocol.Messenger {
 	return s.messenger
+}
+
+func tokenURIToCommunityID(tokenURI string) string {
+	tmpStr := strings.Split(tokenURI, "/")
+
+	// Community NFTs have a tokenURI of the form "compressedCommunityID/tokenID"
+	if len(tmpStr) != 2 {
+		return ""
+	}
+	compressedCommunityID := tmpStr[0]
+
+	hexCommunityID, err := multiformat.DeserializeCompressedKey(compressedCommunityID)
+	if err != nil {
+		return ""
+	}
+
+	pubKey, err := common.HexToPubkey(hexCommunityID)
+	if err != nil {
+		return ""
+	}
+
+	communityID := types.EncodeHex(crypto.CompressPubkey(pubKey))
+
+	return communityID
+}
+
+func (s *Service) CanProvideNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, tokenURI string) (bool, error) {
+	ret := tokenURI != "" && tokenURIToCommunityID(tokenURI) != ""
+	return ret, nil
+}
+
+func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, tokenURI string) (*thirdparty.NFTMetadata, error) {
+	if s.messenger == nil {
+		return nil, fmt.Errorf("messenger not ready")
+	}
+
+	communityID := tokenURIToCommunityID(tokenURI)
+
+	if communityID == "" {
+		return nil, fmt.Errorf("invalid tokenURI")
+	}
+
+	// Try to fetch metadata from Messenger communities
+	community, err := s.messenger.RequestCommunityInfoFromMailserver(communityID, true)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if community != nil {
+		tokensMetadata := community.CommunityTokensMetadata()
+
+		for _, tokenMetadata := range tokensMetadata {
+			contractAddresses := tokenMetadata.GetContractAddresses()
+			if contractAddresses[chainID] == id.ContractAddress.Hex() {
+				return &thirdparty.NFTMetadata{
+					Name:        tokenMetadata.GetName(),
+					Description: tokenMetadata.GetDescription(),
+					ImageURL:    tokenMetadata.GetImage(),
+				}, nil
+			}
+		}
+	}
+
+	return nil, nil
 }

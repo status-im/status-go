@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 const AssetLimit = 200
@@ -35,11 +36,6 @@ var BaseURLs = map[uint64]string{
 const ChainIDRequiringAPIKey = 1
 
 type TraitValue string
-
-type NFTUniqueID struct {
-	ContractAddress common.Address `json:"contractAddress"`
-	TokenID         bigint.BigInt  `json:"tokenID"`
-}
 
 func (st *TraitValue) UnmarshalJSON(b []byte) error {
 	var item interface{}
@@ -109,6 +105,7 @@ type Asset struct {
 	LastSale          LastSale       `json:"last_sale"`
 	SellOrders        []SellOrder    `json:"sell_orders"`
 	BackgroundColor   string         `json:"background_color"`
+	TokenURI          string         `json:"token_metadata"`
 }
 
 type CollectionTrait struct {
@@ -249,7 +246,7 @@ func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limi
 	return o.fetchAssets(queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []NFTUniqueID, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []thirdparty.NFTUniqueID, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{}
 
 	for _, uniqueID := range uniqueIDs {
