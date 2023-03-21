@@ -1227,14 +1227,6 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		}
 
 		if !hasPermission {
-			pk, err := common.HexToPubkey(dbRequest.PublicKey)
-			if err != nil {
-				return nil, err
-			}
-			err = m.markRequestToJoinAsCanceled(pk, community)
-			if err != nil {
-				return nil, err
-			}
 			return community, ErrNoPermissionToJoin
 		}
 
