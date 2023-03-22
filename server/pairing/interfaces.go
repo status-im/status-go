@@ -29,10 +29,10 @@ type HandlerServer interface {
 	GetLogger() *zap.Logger
 }
 
-type ProtobufMarshaler interface {
+type ProtobufMarshaller interface {
 	MarshalProtobuf() ([]byte, error)
 }
 
-type ProtobufUnmarshaler interface {
+type ProtobufUnmarshaller interface {
 	UnmarshalProtobuf([]byte) error
 }
