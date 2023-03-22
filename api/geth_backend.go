@@ -763,9 +763,10 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	}
 
 	account := multiaccounts.Account{
-		KeyUID:        info.KeyUID,
-		Name:          request.DisplayName,
-		KDFIterations: sqlite.ReducedKDFIterationsNumber,
+		KeyUID:             info.KeyUID,
+		Name:               request.DisplayName,
+		CustomizationColor: multiaccounts.CustomizationColor(request.CustomizationColor),
+		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
 	}
 
 	settings, err := defaultSettings(info, derivedAddresses, nil)

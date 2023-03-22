@@ -10,6 +10,7 @@
 // 1648646095_image_clock.up.sql (69B)
 // 1649317600_add_color_hash.up.sql (201B)
 // 1660238799_accounts_kdf.up.sql (115B)
+// 1679505708_add_customization_color.up.sql (78B)
 // doc.go (74B)
 
 package migrations
@@ -279,6 +280,26 @@ func _1660238799_accounts_kdfUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1679505708_add_customization_colorUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x4e\xce\x2f\xcd\x2b\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x2e\x2d\x2e\xc9\xcf\xcd\xac\x4a\x2c\xc9\xcc\xcf\x73\xce\xcf\xc9\x2f\x52\x08\x73\x0c\x72\xf6\x70\x0c\x52\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x2a\x28\xca\xcc\x4d\x2c\xaa\x54\xb2\xe6\x02\x04\x00\x00\xff\xff\x08\xb6\x89\xf4\x4e\x00\x00\x00")
+
+func _1679505708_add_customization_colorUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1679505708_add_customization_colorUpSql,
+		"1679505708_add_customization_color.up.sql",
+	)
+}
+
+func _1679505708_add_customization_colorUpSql() (*asset, error) {
+	bytes, err := _1679505708_add_customization_colorUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1679505708_add_customization_color.up.sql", size: 78, mode: os.FileMode(0644), modTime: time.Unix(1679506871, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0xe1, 0x3d, 0xaa, 0x5d, 0x35, 0x87, 0x8a, 0x8b, 0xe9, 0x4a, 0xa6, 0x7b, 0x85, 0xbc, 0x33, 0x11, 0xc7, 0x7d, 0x61, 0xac, 0x65, 0x59, 0xda, 0x32, 0x59, 0x68, 0x9d, 0xa1, 0x10, 0x7b, 0xa9}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -410,6 +431,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1660238799_accounts_kdf.up.sql": _1660238799_accounts_kdfUpSql,
 
+	"1679505708_add_customization_color.up.sql": _1679505708_add_customization_colorUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -464,7 +487,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1648646095_image_clock.up.sql":                     &bintree{_1648646095_image_clockUpSql, map[string]*bintree{}},
 	"1649317600_add_color_hash.up.sql":                  &bintree{_1649317600_add_color_hashUpSql, map[string]*bintree{}},
 	"1660238799_accounts_kdf.up.sql":                    &bintree{_1660238799_accounts_kdfUpSql, map[string]*bintree{}},
-	"doc.go":                                            &bintree{docGo, map[string]*bintree{}},
+	"1679505708_add_customization_color.up.sql":         &bintree{_1679505708_add_customization_colorUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

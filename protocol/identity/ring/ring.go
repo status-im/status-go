@@ -25,11 +25,11 @@ var (
 )
 
 type DrawRingParam struct {
-	Theme      Theme                    `json:"theme"`
-	ColorHash  multiaccounts.ColourHash `json:"colorHash"`
-	ImageBytes []byte                   `json:"imageBytes"`
-	Height     int                      `json:"height"`
-	Width      int                      `json:"width"`
+	Theme      Theme                   `json:"theme"`
+	ColorHash  multiaccounts.ColorHash `json:"colorHash"`
+	ImageBytes []byte                  `json:"imageBytes"`
+	Height     int                     `json:"height"`
+	Width      int                     `json:"width"`
 }
 
 func DrawRing(param *DrawRingParam) ([]byte, error) {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestGenerateFor(t *testing.T) {
-	checker := func(pubkey string, expected *multiaccounts.ColourHash) {
+	checker := func(pubkey string, expected *multiaccounts.ColorHash) {
 		colorhash, err := GenerateFor(pubkey)
 		require.NoError(t, err)
 		if !reflect.DeepEqual(colorhash, *expected) {
@@ -20,7 +20,7 @@ func TestGenerateFor(t *testing.T) {
 	}
 
 	checker("0x04e25da6994ea2dc4ac70727e07eca153ae92bf7609db7befb7ebdceaad348f4fc55bbe90abf9501176301db5aa103fc0eb3bc3750272a26c424a10887db2a7ea8",
-		&multiaccounts.ColourHash{{3, 30}, {2, 10}, {5, 5}, {3, 14}, {5, 4}, {4, 19}, {3, 16}, {4, 0}, {5, 28}, {4, 13}, {4, 15}})
+		&multiaccounts.ColorHash{{3, 30}, {2, 10}, {5, 5}, {3, 14}, {5, 4}, {4, 19}, {3, 16}, {4, 0}, {5, 28}, {4, 13}, {4, 15}})
 }
 
 func TestColorHashOfInvalidKey(t *testing.T) {
@@ -37,7 +37,7 @@ func TestColorHashOfInvalidKey(t *testing.T) {
 func TestColorHash(t *testing.T) {
 	alphabet := makeColorHashAlphabet(4, 4)
 
-	checker := func(valueStr string, expected *multiaccounts.ColourHash) {
+	checker := func(valueStr string, expected *multiaccounts.ColorHash) {
 		value := identity.ToBigInt(t, valueStr)
 		res := toColorHash(value, &alphabet, 4)
 		if !reflect.DeepEqual(res, *expected) {
@@ -45,14 +45,14 @@ func TestColorHash(t *testing.T) {
 		}
 	}
 
-	checker("0x0", &multiaccounts.ColourHash{{1, 0}})
-	checker("0x1", &multiaccounts.ColourHash{{1, 1}})
-	checker("0x4", &multiaccounts.ColourHash{{2, 0}})
-	checker("0xF", &multiaccounts.ColourHash{{4, 3}})
+	checker("0x0", &multiaccounts.ColorHash{{1, 0}})
+	checker("0x1", &multiaccounts.ColorHash{{1, 1}})
+	checker("0x4", &multiaccounts.ColorHash{{2, 0}})
+	checker("0xF", &multiaccounts.ColorHash{{4, 3}})
 
 	// oops, collision
-	checker("0xFF", &multiaccounts.ColourHash{{4, 3}, {4, 0}})
-	checker("0xFC", &multiaccounts.ColourHash{{4, 3}, {4, 0}})
+	checker("0xFF", &multiaccounts.ColorHash{{4, 3}, {4, 0}})
+	checker("0xFC", &multiaccounts.ColorHash{{4, 3}, {4, 0}})
 
-	checker("0xFFFF", &multiaccounts.ColourHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}})
+	checker("0xFFFF", &multiaccounts.ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}})
 }

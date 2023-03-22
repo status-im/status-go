@@ -34,13 +34,14 @@ message MultiAccount {
   string name = 1;
   int64 timestamp = 2;
   string identicon = 3;
-  repeated ColourHash color_hash = 4;
-  int64 colorId = 5;
+  repeated ColorHash color_hash = 4;
+  int64 color_id = 5;
   string keycard_pairing = 6;
   string key_uid = 7;
   repeated IdentityImage images = 8;
+  string customization_color = 9;
 
-  message ColourHash {
+  message ColorHash {
     repeated int64 index = 1;
   }
 

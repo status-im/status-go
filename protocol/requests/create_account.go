@@ -6,16 +6,16 @@ import (
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
 var ErrCreateAccountInvalidPassword = errors.New("create-account: invalid password")
-var ErrCreateAccountInvalidColor = errors.New("create-account: invalid color")
+var ErrCreateAccountInvalidCustomizationColor = errors.New("create-account: invalid customization color")
 var ErrCreateAccountInvalidRootKeystoreDir = errors.New("create-account: invalid root keystore directory")
 var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: invalid backup disabled data directory")
 var ErrCreateAccountInvalidLogFilePath = errors.New("create-account: invalid log file path")
 
 type CreateAccount struct {
-	DisplayName string `json:"displayName"`
-	Password    string `json:"password"`
-	ImagePath   string `json:"imagePath"`
-	Color       string `json:"color"`
+	DisplayName        string `json:"displayName"`
+	Password           string `json:"password"`
+	ImagePath          string `json:"imagePath"`
+	CustomizationColor string `json:"customizationColor"`
 	// RootKeystoreDir is the directory where keys are stored
 	RootKeystoreDir string `json:"rootKeystoreDir"`
 	// BackupDisabledDataDir is the directory where backup is disabled
@@ -45,8 +45,8 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 		return ErrCreateAccountInvalidPassword
 	}
 
-	if len(c.Color) == 0 {
-		return ErrCreateAccountInvalidColor
+	if len(c.CustomizationColor) == 0 {
+		return ErrCreateAccountInvalidCustomizationColor
 	}
 
 	if len(c.RootKeystoreDir) == 0 {
