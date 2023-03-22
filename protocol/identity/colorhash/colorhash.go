@@ -14,7 +14,7 @@ const (
 
 var colorHashAlphabet [][]int
 
-func GenerateFor(pubkey string) (hash multiaccounts.ColourHash, err error) {
+func GenerateFor(pubkey string) (hash multiaccounts.ColorHash, err error) {
 	if len(colorHashAlphabet) == 0 {
 		colorHashAlphabet = makeColorHashAlphabet(colorHashSegmentMaxLen, colorHashColorsCount)
 	}
@@ -48,10 +48,10 @@ func makeColorHashAlphabet(units, colors int) (res [][]int) {
 	return
 }
 
-func toColorHash(value *big.Int, alphabet *[][]int, colorsCount int) (hash multiaccounts.ColourHash) {
+func toColorHash(value *big.Int, alphabet *[][]int, colorsCount int) (hash multiaccounts.ColorHash) {
 	alphabetLen := len(*alphabet)
 	indexes := identity.ToBigBase(value, uint64(alphabetLen))
-	hash = make(multiaccounts.ColourHash, len(indexes))
+	hash = make(multiaccounts.ColorHash, len(indexes))
 	for i, v := range indexes {
 		hash[i] = [2]int{}
 		hash[i][0] = (*alphabet)[v][0]
