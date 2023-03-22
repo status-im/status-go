@@ -25,13 +25,40 @@ type PayloadLoader interface {
 type BasePayloadMounter struct {
 	*PayloadLockPayload
 	*PayloadToSend
+
+	payloadLoader     PayloadLoader
+	payloadMarshaller ProtobufMarshaller
+	encryptor         *PayloadEncryptor
 }
 
 func NewBasePayloadMounter(e *PayloadEncryptor) *BasePayloadMounter {
 	return &BasePayloadMounter{
-		&PayloadLockPayload{e},
-		&PayloadToSend{e},
+		PayloadLockPayload: &PayloadLockPayload{e},
+		PayloadToSend:      &PayloadToSend{e},
 	}
+}
+
+func (bpm *BasePayloadMounter) Mount() error {
+	var p []byte
+
+	err := bpm.payloadLoader.Load()
+	if err != nil {
+		return err
+	}
+
+	if bpm.payloadMarshaller != nil {
+		p, err = bpm.payloadMarshaller.MarshalProtobuf()
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(p) == 0 {
+		// TODO get payload from loader ... or make all mounters require a marshaller that implements:
+		//  `ProtobufMarshaller` and `ProtobufUnmarshaller`
+	}
+
+	return bpm.encryptor.encrypt(p)
 }
 
 /*
@@ -80,26 +107,15 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 
 // Mount loads and prepares the payload to be stored in the AccountPayloadLoader's state ready for later access
 func (apm *AccountPayloadMounter) Mount() error {
-	l := apm.logger.Named("Mount()")
-	l.Debug("fired")
-
 	err := apm.payloadLoader.Load()
 	if err != nil {
 		return err
 	}
-	l.Debug("after Load()")
 
 	pb, err := apm.accountPayloadMarshaller.MarshalProtobuf()
 	if err != nil {
 		return err
 	}
-	l.Debug(
-		"after MarshalProtobuf",
-		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.keys", apm.accountPayloadMarshaller.keys),
-		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.multiaccount", apm.accountPayloadMarshaller.multiaccount),
-		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apm.accountPayloadMarshaller.password),
-		zap.Binary("pb", pb),
-	)
 
 	return apm.encryptor.encrypt(pb)
 }

@@ -87,26 +87,15 @@ func NewAccountPayloadReceiver(e *PayloadEncryptor, config *ReceiverConfig, logg
 
 // Receive takes a []byte representing raw data, parses and stores the data
 func (apr *AccountPayloadReceiver) Receive(data []byte) error {
-	l := apr.logger.Named("Receive()")
-	l.Debug("fired")
-
 	err := apr.encryptor.decrypt(data)
 	if err != nil {
 		return err
 	}
-	l.Debug("after Decrypt")
 
 	err = apr.accountPayloadMarshaller.UnmarshalProtobuf(apr.Received())
 	if err != nil {
 		return err
 	}
-	l.Debug(
-		"after UnmarshalProtobuf",
-		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.keys", apr.accountPayloadMarshaller.keys),
-		zap.Any("accountPayloadMarshaller.accountPayloadMarshaller.multiaccount", apr.accountPayloadMarshaller.multiaccount),
-		zap.String("accountPayloadMarshaller.accountPayloadMarshaller.password", apr.accountPayloadMarshaller.password),
-		zap.Binary("accountPayloadMarshaller.Received()", apr.Received()),
-	)
 
 	signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: apr.accountPayload.multiaccount})
 
