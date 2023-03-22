@@ -80,6 +80,16 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	s.Require().NoError(err)
 
 	s.Require().NotNil(resp)
+	// check pending notification
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
+
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().False(resp.Contacts[0].mutual())
+
+	// check CR message
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
 
@@ -171,7 +181,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 2
 		},
 		"no messages",
 	)
@@ -180,10 +190,16 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	// Check activity center notification is of the right type
 	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+
 	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, true)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
+
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[1].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[1].Read, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[1].Accepted, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[1].Dismissed, false)
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
@@ -399,7 +415,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1 && len(r.Contacts) == 1
+			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 2 && len(r.Contacts) == 1
 		},
 		"no messages",
 	)
@@ -606,7 +622,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 2
 		},
 		"no messages",
 	)
@@ -683,9 +699,16 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err := s.m.SendContactRequest(context.Background(), request)
 	s.Require().NoError(err)
 
+	// Check CR message
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 1)
 	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
+
+	// Check activity center notification is of the right type
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
 
 	// Make sure it's not returned
 	contactRequests, _, err := s.m.PendingContactRequests("", 10)
@@ -701,7 +724,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -756,7 +779,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 2
 		},
 		"no messages",
 	)
@@ -764,7 +787,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Len(resp.ActivityCenterNotifications(), 2)
 	// We receive two messages, one for the default contact request, that
 	// is dispatched for backward compatibility, and one for the updated
 	// contact request that we sent
@@ -777,6 +800,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 		}
 	}
 	s.Require().NotNil(message)
+	s.Require().Equal(messageText, message.Text)
 	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
 
 	// Check activity center notification is of the right type
