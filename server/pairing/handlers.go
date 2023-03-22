@@ -183,9 +183,14 @@ func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.H
 
 func middlewareChallenge(cg *ChallengeGiver, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ce := cg.checkChallengeResponse(w, r)
-		if ce != nil {
-			http.Error(w, ce.Text, ce.HTTPCode)
+		err := cg.checkChallengeResponse(w, r)
+		if err != nil {
+			if cErr, ok := err.(*ChallengeError); ok {
+				http.Error(w, cErr.Text, cErr.HTTPCode)
+				return
+			}
+			cg.logger.Error("failed to checkChallengeResponse in middlewareChallenge", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
 
@@ -195,16 +200,22 @@ func middlewareChallenge(cg *ChallengeGiver, next http.Handler) http.HandlerFunc
 
 func handlePairingChallenge(cg *ChallengeGiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		challenge, ce := cg.getChallenge(w, r)
-		if ce != nil {
-			http.Error(w, ce.Text, ce.HTTPCode)
+		challenge, err := cg.getChallenge(w, r)
+		if err != nil {
+			if cErr, ok := err.(*ChallengeError); ok {
+				http.Error(w, cErr.Text, cErr.HTTPCode)
+				return
+			}
+			cg.logger.Error("failed to getChallenge in handlePairingChallenge", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/octet-stream")
-		_, err := w.Write(challenge)
+		_, err = w.Write(challenge)
 		if err != nil {
-			cg.logger.Error("handlePairingChallenge: _, err = w.Write(challenge)", zap.Error(err))
+			cg.logger.Error("failed to Write(challenge) in handlePairingChallenge", zap.Error(err))
+			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
 	}
