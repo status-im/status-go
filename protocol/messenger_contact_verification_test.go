@@ -135,7 +135,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 2
 		},
 		"no messages",
 	)

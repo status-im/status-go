@@ -266,6 +266,15 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 }
 
 func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
+	// Check if we already has CR for this contact
+	if contactRequest == nil {
+		request, err := m.persistence.MessageByID(defaultContactRequestID(contact.ID))
+		if err != nil && err != common.ErrRecordNotFound {
+			return err
+		}
+		contactRequest = request
+	}
+
 	if contactRequest != nil && contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
 		// Pull one from the db if there
 		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
@@ -351,6 +360,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			messageState.CurrentMessageState.WhisperTimestamp,
 			contact,
 			"Please add me to your contacts",
+			false,
 		)
 		if err != nil {
 			return err

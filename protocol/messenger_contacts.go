@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*MessengerResponse, error) {
+func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, syncing bool) (*MessengerResponse, error) {
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
 		m.logger.Error("could not find contact request message", zap.Error(err))
@@ -26,7 +26,7 @@ func (m *Messenger) acceptContactRequest(requestID string, syncing bool) (*Messe
 	m.logger.Info("acceptContactRequest")
 	// We send a contact update for compatibility with 0.90 desktop, once that's
 	// not an issue anymore, we can set the last bool flag to `false`
-	return m.addContact(contactRequest.From, "", "", "", contactRequest.ID, "", syncing, true, false)
+	return m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, true, false)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -35,7 +35,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	response, err := m.acceptContactRequest(request.ID.String(), false)
+	response, err := m.acceptContactRequest(ctx, request.ID.String(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +134,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	}
 
 	response, err := m.addContact(
+		ctx,
 		chatID,
 		"",
 		"",
@@ -142,7 +143,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		request.Message,
 		false,
 		false,
-		false,
+		true,
 	)
 	if err != nil {
 		return nil, err
@@ -167,22 +168,6 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	chatMessage := &common.Message{}
-	chatMessage.ChatId = chatID
-	chatMessage.Text = request.Message
-	chatMessage.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
-	chatMessage.ContactRequestState = common.ContactRequestStatePending
-
-	messageResponse, err := m.sendChatMessage(ctx, chatMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	err = response.Merge(messageResponse)
-	if err != nil {
-		return nil, err
 	}
 
 	return response, nil
@@ -256,7 +241,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	return response, nil
 }
 
-func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
+func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: pubKey})
 	if err != nil {
 		return nil, err
@@ -403,13 +388,17 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 	// Add outgoing contact request notification
 	if createOutgoingContactRequestNotification {
 		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-		contactRequest, err := m.generateContactRequest(clock, timestamp, contact, contactRequestText)
+		contactRequest, err := m.generateContactRequest(clock, timestamp, contact, contactRequestText, true)
 		if err != nil {
 			return nil, err
 		}
 
-		response.AddMessage(contactRequest)
-		err = m.persistence.SaveMessages([]*common.Message{contactRequest})
+		messageResponse, err := m.sendChatMessage(ctx, contactRequest)
+		if err != nil {
+			return nil, err
+		}
+
+		err = response.Merge(messageResponse)
 		if err != nil {
 			return nil, err
 		}
@@ -423,20 +412,24 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 
 	// Add contact
 	response.AddContact(contact)
-
 	return response, nil
 }
 
-func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string) (*common.Message, error) {
+func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string, outgoing bool) (*common.Message, error) {
 	if contact == nil {
 		return nil, errors.New("contact cannot be nil")
 	}
 
 	contactRequest := &common.Message{}
+	contactRequest.ChatId = contact.ID
 	contactRequest.WhisperTimestamp = timestamp
 	contactRequest.Seen = true
 	contactRequest.Text = text
-	contactRequest.From = contact.ID
+	if outgoing {
+		contactRequest.From = m.myHexIdentity()
+	} else {
+		contactRequest.From = contact.ID
+	}
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 	contactRequest.Clock = clock
@@ -459,7 +452,9 @@ func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact,
 		Message:   contactRequest,
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		ChatID:    contact.ID,
-		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		Read: contactRequest.ContactRequestState == common.ContactRequestStateAccepted ||
+			contactRequest.ContactRequestState == common.ContactRequestStateDismissed ||
+			contactRequest.ContactRequestState == common.ContactRequestStatePending,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 	}
@@ -477,6 +472,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 	}
 
 	return m.addContact(
+		ctx,
 		id,
 		request.ENSName,
 		request.Nickname,
@@ -939,6 +935,7 @@ func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, re
 	if err != nil {
 		return nil, err
 	}
+
 	if contactRequestID == "" {
 		contactRequestID = defaultContactRequestID(request.ID.String())
 	}
