@@ -55,7 +55,7 @@ func (api *API) toSendMessageResponse(response *protocol.MessengerResponse) (*Se
 	}
 
 	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
-	chat, err := api.toAPIChat(protocolChat, community, pubKey, false)
+	chat, err := api.toAPIChat(protocolChat, community, pubKey)
 	if err != nil {
 		return nil, err
 	}
