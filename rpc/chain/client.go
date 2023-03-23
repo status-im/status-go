@@ -142,8 +142,12 @@ func (c *ClientWithFallback) setIsConnected(value bool) {
 
 	} else {
 		c.consecutiveFailureCount = 0
+
 		if !c.IsConnected {
 			c.IsConnected = true
+			if c.WalletNotifier != nil {
+				c.WalletNotifier(c.ChainID, "up")
+			}
 		}
 	}
 }
