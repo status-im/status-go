@@ -43,7 +43,7 @@ func (api *API) CreateOneToOneChat(ctx context.Context, communityID types.HexByt
 		return nil, err
 	}
 
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 		}
 	}
 
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 }
 
 func (api *API) toGroupChatResponse(pubKey string, response *protocol.MessengerResponse) (*GroupChatResponse, error) {
-	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey, false)
+	chat, err := api.toAPIChat(response.Chats()[0], nil, pubKey)
 	if err != nil {
 		return nil, err
 	}

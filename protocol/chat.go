@@ -228,10 +228,6 @@ func (c *Chat) PrivateGroupChat() bool {
 	return c.ChatType == ChatTypePrivateGroupChat
 }
 
-func (c *Chat) IsActivePersonalChat() bool {
-	return c.Active && (c.OneToOne() || c.PrivateGroupChat() && c.Public()) && c.CommunityID == ""
-}
-
 func (c *Chat) CommunityChatID() string {
 	if c.ChatType != ChatTypeCommunityChat {
 		return c.ID
