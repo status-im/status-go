@@ -113,6 +113,12 @@ node-canary: ##@build Build P2P node canary using status-go deps
 		-o $(GOBIN)/node-canary ./cmd/node-canary/
 	@echo "Compilation done."
 
+verify-ens: ##@build Build verify-ens using status-go deps
+	go build -v \
+		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
+		-o $(GOBIN)/verify-ens ./cmd/verify-ens/
+	@echo "Compilation done."
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
