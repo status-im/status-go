@@ -837,6 +837,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 		ProfileImage:                  profileImage,
 		ContactRequestClock:           contact.ContactRequestLocalClock,
 		ContactRequestPropagatedState: contact.ContactRequestPropagatedState(),
+		PublicKey:                     contact.ID,
 	}
 	encodedMessage, err := proto.Marshal(contactUpdate)
 	if err != nil {

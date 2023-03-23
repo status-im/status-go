@@ -26,6 +26,32 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
+			publicKey, err := common.HexToPubkey(message.PublicKey)
+			if err != nil {
+				return err
+			}
+			var contact *Contact
+			if c, ok := state.AllContacts.Load(message.PublicKey); ok {
+				contact = c
+			} else {
+				c, err := buildContact(message.PublicKey, publicKey)
+				if err != nil {
+					m.logger.Info("failed to build contact", zap.Error(err))
+					continue
+				}
+				contact = c
+				state.AllContacts.Store(message.PublicKey, contact)
+			}
+			currentMessageState := &CurrentMessageState{
+				Message: protobuf.ChatMessage{
+					Clock: message.Clock,
+				},
+				MessageID:        " ", // make it not empty to bypass this validation: https://github.com/status-im/status-go/blob/7cd7430d3141b08f7c455d7918f4160ea8fd0559/protocol/messenger_handler.go#L325
+				WhisperTimestamp: message.Clock,
+				PublicKey:        publicKey,
+				Contact:          contact,
+			}
+			state.CurrentMessageState = currentMessageState
 			err = m.HandleContactUpdate(state, message)
 			if err != nil {
 				m.logger.Warn("failed to HandleContactUpdate when HandleSyncRawMessages", zap.Error(err))
