@@ -51,7 +51,11 @@ const maxArchiveSizeInBytes = 30000000
 
 var memberPermissionsCheckInterval = 1 * time.Hour
 
-var ErrTorrentTimedout = errors.New("torrent has timed out")
+// errors
+var (
+	ErrTorrentTimedout                 = errors.New("torrent has timed out")
+	ErrCommunityRequestAlreadyRejected = errors.New("that user was already rejected from the community")
+)
 
 type Manager struct {
 	persistence                    *Persistence
@@ -1275,6 +1279,20 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
 }
 
+func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community) (bool, error) {
+	declinedRequestsToJoin, err := m.persistence.DeclinedRequestsToJoinForCommunity(community.ID())
+	if err != nil {
+		return false, err
+	}
+
+	for _, req := range declinedRequestsToJoin {
+		if req.PublicKey == common.PubkeyToHex(signer) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
@@ -1282,6 +1300,14 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	}
 	if community == nil {
 		return nil, ErrOrgNotFound
+	}
+
+	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community)
+	if err != nil {
+		return nil, err
+	}
+	if isUserRejected {
+		return nil, ErrCommunityRequestAlreadyRejected
 	}
 
 	err = m.markRequestToJoinAsCanceled(signer, community)
@@ -1304,6 +1330,14 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 	if community == nil {
 		return nil, ErrOrgNotFound
+	}
+
+	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community)
+	if err != nil {
+		return nil, err
+	}
+	if isUserRejected {
+		return nil, ErrCommunityRequestAlreadyRejected
 	}
 
 	if err := community.ValidateRequestToJoin(signer, request); err != nil {
