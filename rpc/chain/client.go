@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+<<<<<<< HEAD
 	"strings"
+=======
+>>>>>>> 6fcba6e30 (feat: add buffer for status event)
 	"sync"
 	"time"
 
@@ -34,9 +37,10 @@ type ClientWithFallback struct {
 
 	WalletNotifier func(chainId uint64, message string)
 
-	IsConnected     bool
-	IsConnectedLock sync.RWMutex
-	LastCheckedAt   int64
+	IsConnected             bool
+	consecutiveFailureCount int
+	IsConnectedLock         sync.RWMutex
+	LastCheckedAt           int64
 }
 
 var vmErrors = []error{
@@ -70,13 +74,14 @@ func NewSimpleClient(main *rpc.Client, chainID uint64) *ClientWithFallback {
 	})
 
 	return &ClientWithFallback{
-		ChainID:       chainID,
-		main:          ethclient.NewClient(main),
-		fallback:      nil,
-		mainRPC:       main,
-		fallbackRPC:   nil,
-		IsConnected:   true,
-		LastCheckedAt: time.Now().Unix(),
+		ChainID:                 chainID,
+		main:                    ethclient.NewClient(main),
+		fallback:                nil,
+		mainRPC:                 main,
+		fallbackRPC:             nil,
+		IsConnected:             true,
+		consecutiveFailureCount: 0,
+		LastCheckedAt:           time.Now().Unix(),
 	}
 }
 
@@ -126,16 +131,21 @@ func (c *ClientWithFallback) setIsConnected(value bool) {
 	c.IsConnectedLock.Lock()
 	defer c.IsConnectedLock.Unlock()
 	c.LastCheckedAt = time.Now().Unix()
-	if value != c.IsConnected {
-		message := "down"
-		if value {
-			message = "up"
+	if !value {
+		c.consecutiveFailureCount += 1
+		if c.consecutiveFailureCount > 3 && c.IsConnected {
+			if c.WalletNotifier != nil {
+				c.WalletNotifier(c.ChainID, "down")
+			}
+			c.IsConnected = false
 		}
-		if c.WalletNotifier != nil {
-			c.WalletNotifier(c.ChainID, message)
+
+	} else {
+		c.consecutiveFailureCount = 0
+		if !c.IsConnected {
+			c.IsConnected = true
 		}
 	}
-	c.IsConnected = value
 }
 
 func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func() error) error {
