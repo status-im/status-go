@@ -22,7 +22,7 @@ type ConnectionParamsSuite struct {
 	TestCertComponents
 	TestLoggerComponents
 
-	server *Server
+	server *BaseServer
 }
 
 func (s *ConnectionParamsSuite) SetupSuite() {
@@ -37,7 +37,7 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	err = bs.SetPort(1337)
 	s.Require().NoError(err)
 
-	s.server = &Server{
+	s.server = &BaseServer{
 		Server: bs,
 		pk:     &s.PK.PublicKey,
 		ek:     s.AES,

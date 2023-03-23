@@ -69,6 +69,9 @@ func (cp *ConnectionParams) ToString() string {
 	ek := base58.Encode(cp.aesKey)
 	m := base58.Encode(new(big.Int).SetInt64(int64(cp.serverMode)).Bytes())
 
+	// TODO remove server mode from the connection string, rely on specific function calls rather than algorithmic orchestration
+	//  https://github.com/status-im/status-go/issues/3301
+
 	return fmt.Sprintf("%s%s:%s:%s:%s:%s:%s", connectionStringID, v, ip, p, k, ek, m)
 }
 
@@ -178,7 +181,7 @@ func (cp *ConnectionParams) validateAESKey() error {
 
 func (cp *ConnectionParams) validateServerMode() error {
 	switch cp.serverMode {
-	case Receiving, Sending:
+	case 0, Receiving, Sending:
 		return nil
 	default:
 		return fmt.Errorf("invalid server mode '%d'", cp.serverMode)

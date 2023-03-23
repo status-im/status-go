@@ -2,9 +2,9 @@ package pairing
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -20,21 +20,26 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type Client struct {
-	*http.Client
-	PayloadManager
-	rawMessagePayloadManager   *RawMessagePayloadManager
-	installationPayloadManager *InstallationPayloadManager
+/*
+|--------------------------------------------------------------------------
+| BaseClient
+|--------------------------------------------------------------------------
+|
+|
+|
+*/
 
-	baseAddress     *url.URL
-	certPEM         []byte
-	serverPK        *ecdsa.PublicKey
-	serverMode      Mode
+// BaseClient is responsible for lower level pairing.Client functionality common to dependent Client types
+type BaseClient struct {
+	*http.Client
 	serverCert      *x509.Certificate
+	encryptor       *PayloadEncryptor
+	baseAddress     *url.URL
 	serverChallenge []byte
 }
 
-func NewPairingClient(backend *api.GethStatusBackend, c *ConnectionParams, config *AccountPayloadManagerConfig) (*Client, error) {
+// NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
+func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	u, err := c.URL()
 	if err != nil {
 		return nil, err
@@ -44,10 +49,12 @@ func NewPairingClient(backend *api.GethStatusBackend, c *ConnectionParams, confi
 	if err != nil {
 		return nil, err
 	}
+
 	err = verifyCert(serverCert, c.publicKey)
 	if err != nil {
 		return nil, err
 	}
+
 	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCert.Raw})
 
 	rootCAs, err := x509.SystemCertPool()
@@ -71,117 +78,116 @@ func NewPairingClient(backend *api.GethStatusBackend, c *ConnectionParams, confi
 		return nil, err
 	}
 
-	logger := logutils.ZapLogger().Named("Client")
-	pm, err := NewAccountPayloadManager(c.aesKey, config, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	rmpm, err := NewRawMessagePayloadManager(logger, pm.accountPayload, c.aesKey, backend, config.GetNodeConfig(), config.GetSettingCurrentNetwork(), config.GetDeviceType())
-	if err != nil {
-		return nil, err
-	}
-
-	ipm, err := NewInstallationPayloadManager(logger, c.aesKey, backend, config.GetDeviceType())
-	if err != nil {
-		return nil, err
-	}
-	return &Client{
-		Client:                     &http.Client{Transport: tr, Jar: cj},
-		baseAddress:                u,
-		certPEM:                    certPem,
-		serverCert:                 serverCert,
-		serverPK:                   c.publicKey,
-		serverMode:                 c.serverMode,
-		PayloadManager:             pm,
-		rawMessagePayloadManager:   rmpm,
-		installationPayloadManager: ipm,
+	return &BaseClient{
+		Client:      &http.Client{Transport: tr, Jar: cj},
+		serverCert:  serverCert,
+		encryptor:   NewPayloadEncryptor(c.aesKey),
+		baseAddress: u,
 	}, nil
 }
 
-func (c *Client) PairAccount() error {
-	switch c.serverMode {
-	case Receiving:
-		return c.sendAccountData()
-	case Sending:
-		err := c.getChallenge()
-		if err != nil {
-			return err
-		}
-		return c.receiveAccountData()
-	default:
-		return fmt.Errorf("unrecognised server mode '%d'", c.serverMode)
-	}
-}
-
-func (c *Client) PairSyncDevice() error {
-	switch c.serverMode {
-	case Receiving:
-		return c.sendSyncDeviceData()
-	case Sending:
-		return c.receiveSyncDeviceData()
-	default:
-		return fmt.Errorf("unrecognised server mode '%d'", c.serverMode)
-	}
-}
-
-// PairInstallation transfer installation data from receiver to sender.
-// installation data from sender to receiver already processed within PairSyncDevice method on the receiver side.
-func (c *Client) PairInstallation() error {
-	switch c.serverMode {
-	case Receiving:
-		return c.receiveInstallationData()
-	case Sending:
-		return c.sendInstallationData()
-	default:
-		return fmt.Errorf("unrecognised server mode '%d'", c.serverMode)
-	}
-}
-
-func (c *Client) sendInstallationData() error {
-	err := c.installationPayloadManager.Mount()
+// getChallenge makes a call to the identified Server and receives a [32]byte challenge
+func (c *BaseClient) getChallenge() error {
+	c.baseAddress.Path = pairingChallenge
+	resp, err := c.Get(c.baseAddress.String())
 	if err != nil {
-		return err
-	}
-
-	c.baseAddress.Path = pairingReceiveInstallation
-	req, err := http.NewRequest(http.MethodPost, c.baseAddress.String(), bytes.NewBuffer(c.installationPayloadManager.ToSend()))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	if c.serverChallenge != nil {
-		ec, err := c.PayloadManager.EncryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[client] status not okay when sending installation data, status: %s", resp.Status)
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
-		return err
+		return fmt.Errorf("[client] status not ok when getting challenge, received '%s'", resp.Status)
 	}
 
-	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
+	return err
+}
+
+// doChallenge checks if there is a serverChallenge and encrypts the challenge using the shared AES key
+func (c *BaseClient) doChallenge(req *http.Request) error {
+	if c.serverChallenge != nil {
+		ec, err := c.encryptor.encryptPlain(c.serverChallenge)
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	}
 	return nil
 }
 
-func (c *Client) sendSyncDeviceData() error {
-	err := c.rawMessagePayloadManager.Mount()
+/*
+|--------------------------------------------------------------------------
+| SenderClient
+|--------------------------------------------------------------------------
+|
+| With AccountPayloadMounter, RawMessagePayloadMounter and InstallationPayloadMounterReceiver
+|
+*/
+
+// SenderClient is responsible for sending pairing data to a ReceiverServer
+type SenderClient struct {
+	*BaseClient
+	accountMounter      PayloadMounter
+	rawMessageMounter   *RawMessagePayloadMounter
+	installationMounter *InstallationPayloadMounterReceiver
+}
+
+// NewSenderClient returns a fully qualified SenderClient created with the incoming parameters
+func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
+	logger := logutils.ZapLogger().Named("SenderClient")
+	pe := NewPayloadEncryptor(c.aesKey)
+
+	bc, err := NewBaseClient(c)
+	if err != nil {
+		return nil, err
+	}
+
+	am, rmm, imr, err := NewPayloadMounters(logger, pe, backend, config.SenderConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SenderClient{
+		BaseClient:          bc,
+		accountMounter:      am,
+		rawMessageMounter:   rmm,
+		installationMounter: imr,
+	}, nil
+}
+
+func (c *SenderClient) sendAccountData() error {
+	err := c.accountMounter.Mount()
 	if err != nil {
 		return err
 	}
 
-	c.baseAddress.Path = pairingSyncDeviceReceive
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.rawMessagePayloadManager.ToSend()))
+	c.baseAddress.Path = pairingReceiveAccount
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.accountMounter.ToSend()))
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not ok when sending account data, received '%s'", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
+	}
+
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
+
+	c.accountMounter.LockPayload()
+	return nil
+}
+
+func (c *SenderClient) sendSyncDeviceData() error {
+	err := c.rawMessageMounter.Mount()
+	if err != nil {
+		return err
+	}
+
+	c.baseAddress.Path = pairingReceiveSyncDevice
+	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.rawMessageMounter.ToSend()))
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
 		return err
@@ -197,7 +203,7 @@ func (c *Client) sendSyncDeviceData() error {
 	return nil
 }
 
-func (c *Client) receiveInstallationData() error {
+func (c *SenderClient) receiveInstallationData() error {
 	c.baseAddress.Path = pairingSendInstallation
 	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
@@ -223,7 +229,7 @@ func (c *Client) receiveInstallationData() error {
 	}
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
 
-	err = c.installationPayloadManager.Receive(payload)
+	err = c.installationMounter.Receive(payload)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
@@ -232,89 +238,94 @@ func (c *Client) receiveInstallationData() error {
 	return nil
 }
 
-func (c *Client) receiveSyncDeviceData() error {
-	c.baseAddress.Path = pairingSyncDeviceSend
-	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
+// setupSendingClient creates a new SenderClient after parsing string inputs
+func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (*SenderClient, error) {
+	ccp := new(ConnectionParams)
+	err := ccp.FromString(cs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if c.serverChallenge != nil {
-		ec, err := c.PayloadManager.EncryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
-	}
-
-	resp, err := c.Do(req)
+	conf := NewSenderClientConfig()
+	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-		return err
+		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[client] status not ok when receiving sync device data, received '%s'", resp.Status)
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-		return err
-	}
+	conf.SenderConfig.DB = backend.GetMultiaccountDB()
 
-	payload, err := io.ReadAll(resp.Body)
-	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
-		return err
-	}
-	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionSyncDevice})
-
-	err = c.rawMessagePayloadManager.Receive(payload)
-	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionSyncDevice})
-		return err
-	}
-	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionSyncDevice})
-	return nil
+	return NewSenderClient(backend, ccp, conf)
 }
 
-func (c *Client) sendAccountData() error {
-	err := c.Mount()
+// StartUpSendingClient creates a SenderClient and triggers all `send` calls in sequence to the ReceiverServer
+func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+	c, err := setupSendingClient(backend, cs, configJSON)
 	if err != nil {
 		return err
 	}
-
-	c.baseAddress.Path = pairingReceiveAccount
-	resp, err := c.Post(c.baseAddress.String(), "application/octet-stream", bytes.NewBuffer(c.PayloadManager.ToSend()))
+	err = c.sendAccountData()
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
 		return err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[client] status not ok when sending account data, received '%s'", resp.Status)
-		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+	err = c.sendSyncDeviceData()
+	if err != nil {
 		return err
 	}
-
-	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
-
-	c.PayloadManager.LockPayload()
-	return nil
+	return c.receiveInstallationData()
 }
 
-func (c *Client) receiveAccountData() error {
+/*
+|--------------------------------------------------------------------------
+| ReceiverClient
+|--------------------------------------------------------------------------
+|
+| With AccountPayloadReceiver, RawMessagePayloadReceiver, InstallationPayloadMounterReceiver
+|
+*/
+
+// ReceiverClient is responsible for accepting pairing data to a SenderServer
+type ReceiverClient struct {
+	*BaseClient
+
+	accountReceiver      PayloadReceiver
+	rawMessageReceiver   *RawMessagePayloadReceiver
+	installationReceiver *InstallationPayloadMounterReceiver
+}
+
+// NewReceiverClient returns a fully qualified ReceiverClient created with the incoming parameters
+func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
+	bc, err := NewBaseClient(c)
+	if err != nil {
+		return nil, err
+	}
+
+	logger := logutils.ZapLogger().Named("ReceiverClient")
+	pe := NewPayloadEncryptor(c.aesKey)
+
+	ar, rmr, imr, err := NewPayloadReceivers(logger, pe, backend, config.ReceiverConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReceiverClient{
+		BaseClient:           bc,
+		accountReceiver:      ar,
+		rawMessageReceiver:   rmr,
+		installationReceiver: imr,
+	}, nil
+}
+
+func (c *ReceiverClient) receiveAccountData() error {
 	c.baseAddress.Path = pairingSendAccount
 	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	if c.serverChallenge != nil {
-		ec, err := c.PayloadManager.EncryptPlain(c.serverChallenge)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set(sessionChallenge, base58.Encode(ec))
+	err = c.doChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
+		return err
 	}
 
 	resp, err := c.Do(req)
@@ -336,7 +347,7 @@ func (c *Client) receiveAccountData() error {
 	}
 	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingAccount})
 
-	err = c.PayloadManager.Receive(payload)
+	err = c.accountReceiver.Receive(payload)
 	if err != nil {
 		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingAccount})
 		return err
@@ -345,56 +356,118 @@ func (c *Client) receiveAccountData() error {
 	return nil
 }
 
-func (c *Client) getChallenge() error {
-	c.baseAddress.Path = pairingChallenge
-	resp, err := c.Get(c.baseAddress.String())
+func (c *ReceiverClient) receiveSyncDeviceData() error {
+	c.baseAddress.Path = pairingSendSyncDevice
+	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
 	if err != nil {
+		return err
+	}
+
+	err = c.doChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("[client] status not ok when getting challenge, received '%s'", resp.Status)
+		err = fmt.Errorf("[client] status not ok when receiving sync device data, received '%s'", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
 	}
 
-	c.serverChallenge, err = ioutil.ReadAll(resp.Body)
-	return err
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionSyncDevice})
+
+	err = c.rawMessageReceiver.Receive(payload)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionSyncDevice})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionSyncDevice})
+	return nil
 }
 
-func StartUpPairingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupClient(backend, cs, configJSON)
+func (c *ReceiverClient) sendInstallationData() error {
+	err := c.installationReceiver.Mount()
 	if err != nil {
 		return err
 	}
-	err = c.PairAccount()
+
+	c.baseAddress.Path = pairingReceiveInstallation
+	req, err := http.NewRequest(http.MethodPost, c.baseAddress.String(), bytes.NewBuffer(c.installationReceiver.ToSend()))
 	if err != nil {
 		return err
 	}
-	err = c.PairSyncDevice()
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	err = c.doChallenge(req)
 	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
 		return err
 	}
-	return c.PairInstallation()
+
+	resp, err := c.Do(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not okay when sending installation data, status: %s", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
+		return err
+	}
+
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionPairingInstallation})
+	return nil
 }
 
-func setupClient(backend *api.GethStatusBackend, cs string, configJSON string) (*Client, error) {
+// setupReceivingClient creates a new ReceiverClient after parsing string inputs
+func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*ReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
 		return nil, err
 	}
 
-	conf, err := NewPayloadSourceForClient(configJSON, ccp.serverMode)
+	conf := NewReceiverClientConfig()
+	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return nil, err
 	}
 
-	accountPayloadManagerConfig := &AccountPayloadManagerConfig{DB: backend.GetMultiaccountDB(), PayloadSourceConfig: conf}
-	if ccp.serverMode == Sending {
-		updateLoggedInKeyUID(accountPayloadManagerConfig, backend)
-	}
-	c, err := NewPairingClient(backend, ccp, accountPayloadManagerConfig)
+	conf.ReceiverConfig.DB = backend.GetMultiaccountDB()
+
+	return NewReceiverClient(backend, ccp, conf)
+}
+
+// StartUpReceivingClient creates a ReceiverClient and triggers all `receive` calls in sequence to the SenderServer
+func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+	c, err := setupReceivingClient(backend, cs, configJSON)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return c, nil
+	err = c.getChallenge()
+	if err != nil {
+		return err
+	}
+	err = c.receiveAccountData()
+	if err != nil {
+		return err
+	}
+	err = c.receiveSyncDeviceData()
+	if err != nil {
+		return err
+	}
+	return c.sendInstallationData()
 }

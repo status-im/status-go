@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/asn1"
-
 	"math/big"
 	"net"
 	"testing"
@@ -90,7 +89,8 @@ type TestPairingServerComponents struct {
 	EphemeralAES []byte
 	OutboundIP   net.IP
 	Cert         tls.Certificate
-	PS           *Server
+	SS           *SenderServer
+	RS           *ReceiverServer
 }
 
 func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing.T) {
@@ -113,12 +113,16 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, time.Now(), tpsc.OutboundIP.String())
 	require.NoError(t, err)
 
-	tpsc.PS, err = NewPairingServer(nil, &Config{
-		PK:                          &tpsc.EphemeralPK.PublicKey,
-		EK:                          tpsc.EphemeralAES,
-		Cert:                        &tpsc.Cert,
-		Hostname:                    tpsc.OutboundIP.String(),
-		AccountPayloadManagerConfig: &AccountPayloadManagerConfig{}})
+	sc := &ServerConfig{
+		PK:       &tpsc.EphemeralPK.PublicKey,
+		EK:       tpsc.EphemeralAES,
+		Cert:     &tpsc.Cert,
+		Hostname: tpsc.OutboundIP.String(),
+	}
+
+	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{ServerConfig: sc, SenderConfig: &SenderConfig{}})
+	require.NoError(t, err)
+	tpsc.RS, err = NewReceiverServer(nil, &ReceiverServerConfig{ServerConfig: sc, ReceiverConfig: &ReceiverConfig{}})
 	require.NoError(t, err)
 }
 
@@ -130,22 +134,33 @@ func (tlc *TestLoggerComponents) SetupLoggerComponents() {
 	tlc.Logger = logutils.ZapLogger()
 }
 
-type MockEncryptOnlyPayloadManager struct {
-	*PayloadEncryptionManager
+type MockPayloadReceiver struct {
+	encryptor *PayloadEncryptor
 }
 
-func NewMockEncryptOnlyPayloadManager(aesKey []byte) (*MockEncryptOnlyPayloadManager, error) {
-	pem, err := NewPayloadEncryptionManager(aesKey, logutils.ZapLogger())
-	if err != nil {
-		return nil, err
-	}
-
-	return &MockEncryptOnlyPayloadManager{
-		pem,
-	}, nil
+func NewMockPayloadReceiver(aesKey []byte) *MockPayloadReceiver {
+	return &MockPayloadReceiver{NewPayloadEncryptor(aesKey)}
 }
 
-func (m *MockEncryptOnlyPayloadManager) Mount() error {
+func (m *MockPayloadReceiver) Receive(data []byte) error {
+	return m.encryptor.decrypt(data)
+}
+
+func (m *MockPayloadReceiver) Received() []byte {
+	return m.encryptor.getDecrypted()
+}
+
+func (m *MockPayloadReceiver) LockPayload() {}
+
+type MockPayloadMounter struct {
+	encryptor *PayloadEncryptor
+}
+
+func NewMockPayloadMounter(aesKey []byte) *MockPayloadMounter {
+	return &MockPayloadMounter{NewPayloadEncryptor(aesKey)}
+}
+
+func (m *MockPayloadMounter) Mount() error {
 	// Make a random payload
 	data := make([]byte, 32)
 	_, err := rand.Read(data)
@@ -153,9 +168,13 @@ func (m *MockEncryptOnlyPayloadManager) Mount() error {
 		return err
 	}
 
-	return m.Encrypt(data)
+	return m.encryptor.encrypt(data)
 }
 
-func (m *MockEncryptOnlyPayloadManager) Receive(data []byte) error {
-	return m.Decrypt(data)
+func (m *MockPayloadMounter) ToSend() []byte {
+	return m.encryptor.getEncrypted()
+}
+
+func (m *MockPayloadMounter) LockPayload() {
+	m.encryptor.lockPayload()
 }
