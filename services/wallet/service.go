@@ -34,8 +34,6 @@ const (
 	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
 )
 
-type BlockchainStatus = map[uint64]bool
-
 // NewService initializes service instance.
 func NewService(
 	db *sql.DB,
