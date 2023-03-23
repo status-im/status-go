@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"sync"
@@ -661,6 +662,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.C
 						Context: ctx,
 					}, accounts)
 					if err != nil {
+						fmt.Println(err)
 						log.Error("can't fetch chain balance", err)
 						return nil
 					}
@@ -685,6 +687,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.C
 							Context: ctx,
 						}, account, chunk)
 						if err != nil {
+							fmt.Println(err)
 							log.Error("can't fetch erc20 token balance", "account", account, "error", err)
 							return nil
 						}

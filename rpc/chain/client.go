@@ -182,9 +182,8 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 	}
 }
 
-func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fallback func() (any, error)) (any, error) {
+func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fallback func() (any, error), toggleIsConnected bool) (any, error) {
 	resultChan := make(chan CommandResult, 1)
-	c.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go(fmt.Sprintf("ethClient_%d", c.ChainID), func() error {
 		res, err := main()
 		if err != nil {
@@ -194,7 +193,9 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 			}
 			return err
 		}
-		c.setIsConnected(true)
+		if toggleIsConnected {
+			c.setIsConnected(true)
+		}
 		resultChan <- CommandResult{res1: res}
 		return nil
 	}, func(err error) error {
@@ -208,10 +209,14 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.setIsConnected(false)
+			if toggleIsConnected {
+				c.setIsConnected(false)
+			}
 			return err
 		}
-		c.setIsConnected(true)
+		if toggleIsConnected {
+			c.setIsConnected(true)
+		}
 		resultChan <- CommandResult{res1: res}
 		return nil
 	})
@@ -278,6 +283,7 @@ func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) 
 	block, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.BlockByHash(ctx, hash) },
 		func() (any, error) { return c.fallback.BlockByHash(ctx, hash) },
+		true,
 	)
 
 	if err != nil {
@@ -292,6 +298,7 @@ func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int)
 	block, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.BlockByNumber(ctx, number) },
 		func() (any, error) { return c.fallback.BlockByNumber(ctx, number) },
+		true,
 	)
 
 	if err != nil {
@@ -307,6 +314,7 @@ func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
 	number, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.BlockNumber(ctx) },
 		func() (any, error) { return c.fallback.BlockNumber(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -322,6 +330,7 @@ func (c *ClientWithFallback) PeerCount(ctx context.Context) (uint64, error) {
 	peerCount, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PeerCount(ctx) },
 		func() (any, error) { return c.fallback.PeerCount(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -336,6 +345,7 @@ func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash)
 	header, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.HeaderByHash(ctx, hash) },
 		func() (any, error) { return c.fallback.HeaderByHash(ctx, hash) },
+		false,
 	)
 
 	if err != nil {
@@ -350,6 +360,7 @@ func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int
 	header, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.HeaderByNumber(ctx, number) },
 		func() (any, error) { return c.fallback.HeaderByNumber(ctx, number) },
+		false,
 	)
 
 	if err != nil {
@@ -380,6 +391,7 @@ func (c *ClientWithFallback) TransactionSender(ctx context.Context, tx *types.Tr
 	address, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.TransactionSender(ctx, tx, block, index) },
 		func() (any, error) { return c.fallback.TransactionSender(ctx, tx, block, index) },
+		true,
 	)
 
 	return address.(common.Address), err
@@ -391,6 +403,7 @@ func (c *ClientWithFallback) TransactionCount(ctx context.Context, blockHash com
 	count, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.TransactionCount(ctx, blockHash) },
 		func() (any, error) { return c.fallback.TransactionCount(ctx, blockHash) },
+		true,
 	)
 
 	if err != nil {
@@ -406,6 +419,7 @@ func (c *ClientWithFallback) TransactionInBlock(ctx context.Context, blockHash c
 	transactions, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.TransactionInBlock(ctx, blockHash, index) },
 		func() (any, error) { return c.fallback.TransactionInBlock(ctx, blockHash, index) },
+		true,
 	)
 
 	if err != nil {
@@ -421,6 +435,7 @@ func (c *ClientWithFallback) TransactionReceipt(ctx context.Context, txHash comm
 	receipt, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.TransactionReceipt(ctx, txHash) },
 		func() (any, error) { return c.fallback.TransactionReceipt(ctx, txHash) },
+		true,
 	)
 
 	if err != nil {
@@ -436,6 +451,7 @@ func (c *ClientWithFallback) SyncProgress(ctx context.Context) (*ethereum.SyncPr
 	progress, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.SyncProgress(ctx) },
 		func() (any, error) { return c.fallback.SyncProgress(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -451,6 +467,7 @@ func (c *ClientWithFallback) SubscribeNewHead(ctx context.Context, ch chan<- *ty
 	sub, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.SubscribeNewHead(ctx, ch) },
 		func() (any, error) { return c.fallback.SubscribeNewHead(ctx, ch) },
+		true,
 	)
 
 	if err != nil {
@@ -466,6 +483,7 @@ func (c *ClientWithFallback) NetworkID(ctx context.Context) (*big.Int, error) {
 	networkID, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.NetworkID(ctx) },
 		func() (any, error) { return c.fallback.NetworkID(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -481,6 +499,7 @@ func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Addre
 	balance, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.BalanceAt(ctx, account, blockNumber) },
 		func() (any, error) { return c.fallback.BalanceAt(ctx, account, blockNumber) },
+		true,
 	)
 
 	if err != nil {
@@ -496,6 +515,7 @@ func (c *ClientWithFallback) StorageAt(ctx context.Context, account common.Addre
 	storage, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.StorageAt(ctx, account, key, blockNumber) },
 		func() (any, error) { return c.fallback.StorageAt(ctx, account, key, blockNumber) },
+		true,
 	)
 
 	if err != nil {
@@ -511,6 +531,7 @@ func (c *ClientWithFallback) CodeAt(ctx context.Context, account common.Address,
 	code, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.CodeAt(ctx, account, blockNumber) },
 		func() (any, error) { return c.fallback.CodeAt(ctx, account, blockNumber) },
+		true,
 	)
 
 	if err != nil {
@@ -526,6 +547,7 @@ func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address
 	nonce, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.NonceAt(ctx, account, blockNumber) },
 		func() (any, error) { return c.fallback.NonceAt(ctx, account, blockNumber) },
+		true,
 	)
 
 	if err != nil {
@@ -541,6 +563,7 @@ func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQu
 	logs, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.FilterLogs(ctx, q) },
 		func() (any, error) { return c.fallback.FilterLogs(ctx, q) },
+		true,
 	)
 
 	if err != nil {
@@ -556,6 +579,7 @@ func (c *ClientWithFallback) SubscribeFilterLogs(ctx context.Context, q ethereum
 	sub, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.SubscribeFilterLogs(ctx, q, ch) },
 		func() (any, error) { return c.fallback.SubscribeFilterLogs(ctx, q, ch) },
+		true,
 	)
 
 	if err != nil {
@@ -571,6 +595,7 @@ func (c *ClientWithFallback) PendingBalanceAt(ctx context.Context, account commo
 	balance, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingBalanceAt(ctx, account) },
 		func() (any, error) { return c.fallback.PendingBalanceAt(ctx, account) },
+		true,
 	)
 
 	if err != nil {
@@ -586,6 +611,7 @@ func (c *ClientWithFallback) PendingStorageAt(ctx context.Context, account commo
 	storage, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingStorageAt(ctx, account, key) },
 		func() (any, error) { return c.fallback.PendingStorageAt(ctx, account, key) },
+		true,
 	)
 
 	if err != nil {
@@ -601,6 +627,7 @@ func (c *ClientWithFallback) PendingCodeAt(ctx context.Context, account common.A
 	code, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingCodeAt(ctx, account) },
 		func() (any, error) { return c.fallback.PendingCodeAt(ctx, account) },
+		true,
 	)
 
 	if err != nil {
@@ -616,6 +643,7 @@ func (c *ClientWithFallback) PendingNonceAt(ctx context.Context, account common.
 	nonce, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingNonceAt(ctx, account) },
 		func() (any, error) { return c.fallback.PendingNonceAt(ctx, account) },
+		true,
 	)
 
 	if err != nil {
@@ -631,6 +659,7 @@ func (c *ClientWithFallback) PendingTransactionCount(ctx context.Context) (uint,
 	count, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingTransactionCount(ctx) },
 		func() (any, error) { return c.fallback.PendingTransactionCount(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -646,6 +675,7 @@ func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.Call
 	data, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.CallContract(ctx, msg, blockNumber) },
 		func() (any, error) { return c.fallback.CallContract(ctx, msg, blockNumber) },
+		true,
 	)
 
 	if err != nil {
@@ -661,6 +691,7 @@ func (c *ClientWithFallback) CallContractAtHash(ctx context.Context, msg ethereu
 	data, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.CallContractAtHash(ctx, msg, blockHash) },
 		func() (any, error) { return c.fallback.CallContractAtHash(ctx, msg, blockHash) },
+		true,
 	)
 
 	if err != nil {
@@ -676,6 +707,7 @@ func (c *ClientWithFallback) PendingCallContract(ctx context.Context, msg ethere
 	data, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.PendingCallContract(ctx, msg) },
 		func() (any, error) { return c.fallback.PendingCallContract(ctx, msg) },
+		true,
 	)
 
 	if err != nil {
@@ -691,6 +723,7 @@ func (c *ClientWithFallback) SuggestGasPrice(ctx context.Context) (*big.Int, err
 	gasPrice, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.SuggestGasPrice(ctx) },
 		func() (any, error) { return c.fallback.SuggestGasPrice(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -706,6 +739,7 @@ func (c *ClientWithFallback) SuggestGasTipCap(ctx context.Context) (*big.Int, er
 	tip, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.SuggestGasTipCap(ctx) },
 		func() (any, error) { return c.fallback.SuggestGasTipCap(ctx) },
+		true,
 	)
 
 	if err != nil {
@@ -721,6 +755,7 @@ func (c *ClientWithFallback) FeeHistory(ctx context.Context, blockCount uint64, 
 	feeHistory, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles) },
 		func() (any, error) { return c.fallback.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles) },
+		true,
 	)
 
 	if err != nil {
@@ -736,6 +771,7 @@ func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallM
 	estimate, err := c.makeCallSingleReturn(
 		func() (any, error) { return c.main.EstimateGas(ctx, msg) },
 		func() (any, error) { return c.fallback.EstimateGas(ctx, msg) },
+		true,
 	)
 
 	if err != nil {
