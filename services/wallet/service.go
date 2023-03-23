@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -33,6 +34,8 @@ const (
 	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
 )
 
+type BlockchainStatus = map[uint64]bool
+
 // NewService initializes service instance.
 func NewService(
 	db *sql.DB,
@@ -54,11 +57,29 @@ func NewService(
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: walletFeed,
 	}
+	blockchainStatus := make(map[uint64]string)
 	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
+		if len(blockchainStatus) == 0 {
+			networks, err := rpcClient.NetworkManager.Get(false)
+			if err != nil {
+				return
+			}
+
+			for _, network := range networks {
+				blockchainStatus[network.ChainID] = "up"
+			}
+		}
+
+		blockchainStatus[chainID] = message
+		encodedmessage, err := json.Marshal(blockchainStatus)
+		if err != nil {
+			return
+		}
+
 		walletFeed.Send(walletevent.Event{
 			Type:     EventBlockchainStatusChanged,
 			Accounts: []common.Address{},
-			Message:  message,
+			Message:  string(encodedmessage),
 			At:       time.Now().Unix(),
 			ChainID:  chainID,
 		})
