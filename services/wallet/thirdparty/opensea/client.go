@@ -106,20 +106,22 @@ type SellOrder struct {
 }
 
 type Asset struct {
-	ID                int            `json:"id"`
-	TokenID           *bigint.BigInt `json:"token_id"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description"`
-	Permalink         string         `json:"permalink"`
-	ImageThumbnailURL string         `json:"image_thumbnail_url"`
-	ImageURL          string         `json:"image_url"`
-	Contract          Contract       `json:"asset_contract"`
-	Collection        Collection     `json:"collection"`
-	Traits            []Trait        `json:"traits"`
-	LastSale          LastSale       `json:"last_sale"`
-	SellOrders        []SellOrder    `json:"sell_orders"`
-	BackgroundColor   string         `json:"background_color"`
-	TokenURI          string         `json:"token_metadata"`
+	ID                 int            `json:"id"`
+	TokenID            *bigint.BigInt `json:"token_id"`
+	Name               string         `json:"name"`
+	Description        string         `json:"description"`
+	Permalink          string         `json:"permalink"`
+	ImageThumbnailURL  string         `json:"image_thumbnail_url"`
+	ImageURL           string         `json:"image_url"`
+	AnimationURL       string         `json:"animation_url"`
+	AnimationMediaType string         `json:"animation_media_type"`
+	Contract           Contract       `json:"asset_contract"`
+	Collection         Collection     `json:"collection"`
+	Traits             []Trait        `json:"traits"`
+	LastSale           LastSale       `json:"last_sale"`
+	SellOrders         []SellOrder    `json:"sell_orders"`
+	BackgroundColor    string         `json:"background_color"`
+	TokenURI           string         `json:"token_metadata"`
 }
 
 type CollectionTrait struct {
@@ -213,6 +215,25 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 		break
 	}
 	return nil, fmt.Errorf("unsuccessful request: %d %s", statusCode, http.StatusText(statusCode))
+}
+
+func (o *HTTPClient) doContentTypeRequest(url string) (string, error) {
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := o.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error("failed to close head request body", "err", err)
+		}
+	}()
+
+	return resp.Header.Get("Content-Type"), nil
 }
 
 type Client struct {
@@ -401,6 +422,12 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 			for i := range asset.Traits {
 				asset.Traits[i].TraitType = strings.Replace(asset.Traits[i].TraitType, "_", " ", 1)
 				asset.Traits[i].Value = TraitValue(strings.Title(string(asset.Traits[i].Value)))
+			}
+			if len(asset.AnimationURL) > 0 {
+				asset.AnimationMediaType, err = o.client.doContentTypeRequest(asset.AnimationURL)
+				if err != nil {
+					asset.AnimationURL = ""
+				}
 			}
 			assets.Assets = append(assets.Assets, asset)
 		}
