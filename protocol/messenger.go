@@ -18,6 +18,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -1968,7 +1969,18 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message
 func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Message) (*MessengerResponse, error) {
 	var response MessengerResponse
 
+	generatedAlbumID, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, message := range messages {
+		if message.ContentType == protobuf.ChatMessage_IMAGE && len(messages) > 1 {
+			err = message.SetAlbumID(generatedAlbumID.String())
+			if err != nil {
+				return nil, err
+			}
+		}
 		messageResponse, err := m.SendChatMessage(ctx, message)
 		if err != nil {
 			return nil, err
@@ -1996,6 +2008,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
+
 	} else if len(message.CommunityID) != 0 {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
 		if err != nil {
