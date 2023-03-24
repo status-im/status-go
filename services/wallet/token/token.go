@@ -474,7 +474,7 @@ func (tm *Manager) GetBalance(ctx context.Context, client *chain.ClientWithFallb
 	return tm.GetTokenBalance(ctx, client, account, token)
 }
 
-func (tm *Manager) GetBalances(parent context.Context, clients []*chain.ClientWithFallback, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain.ClientWithFallback, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
@@ -604,7 +604,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.ClientWi
 	return response, group.Error()
 }
 
-func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.ClientWithFallback, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64]*chain.ClientWithFallback, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex

@@ -50,12 +50,14 @@ type TokenMarketValues struct {
 	ChangePct24hour float64 `json:"changePct24hour"`
 	Change24hour    float64 `json:"change24hour"`
 	Price           float64 `json:"price"`
+	HasError        bool    `json:"hasError"`
 }
 
 type ChainBalance struct {
-	Balance *big.Float     `json:"balance"`
-	Address common.Address `json:"address"`
-	ChainID uint64         `json:"chainId"`
+	Balance  *big.Float     `json:"balance"`
+	Address  common.Address `json:"address"`
+	ChainID  uint64         `json:"chainId"`
+	HasError bool           `json:"hasError"`
 }
 
 type Token struct {
@@ -195,8 +197,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		return nil
 	})
 
+	clients, err := r.rpcClient.EthClients(chainIDs)
 	group.Add(func(parent context.Context) error {
-		clients, err := r.rpcClient.EthClients(chainIDs)
 		if err != nil {
 			return err
 		}
@@ -230,10 +232,15 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 						big.NewFloat(math.Pow(10, float64(decimals))),
 					)
 				}
+				hasError := false
+				if client, ok := clients[token.ChainID]; ok {
+					hasError = !client.IsConnected
+				}
 				balancesPerChain[token.ChainID] = ChainBalance{
-					Balance: balance,
-					Address: token.Address,
-					ChainID: token.ChainID,
+					Balance:  balance,
+					Address:  token.Address,
+					ChainID:  token.ChainID,
+					HasError: hasError,
 				}
 			}
 
@@ -248,6 +255,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
 					Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
 					Price:           prices[symbol][currency],
+					HasError:        !r.marketManager.IsConnected,
 				}
 			}
 

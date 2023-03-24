@@ -144,14 +144,14 @@ func (c *Client) EthClient(chainID uint64) (*chain.ClientWithFallback, error) {
 	return client, nil
 }
 
-func (c *Client) EthClients(chainIDs []uint64) ([]*chain.ClientWithFallback, error) {
-	clients := make([]*chain.ClientWithFallback, 0)
+func (c *Client) EthClients(chainIDs []uint64) (map[uint64]*chain.ClientWithFallback, error) {
+	clients := make(map[uint64]*chain.ClientWithFallback, 0)
 	for _, chainID := range chainIDs {
 		client, err := c.getClientUsingCache(chainID)
 		if err != nil {
 			return nil, err
 		}
-		clients = append(clients, client)
+		clients[chainID] = client
 	}
 
 	return clients, nil
