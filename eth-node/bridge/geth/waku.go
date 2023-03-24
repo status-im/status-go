@@ -121,11 +121,6 @@ func (w *gethWakuWrapper) GetCurrentTime() time.Time {
 	return w.waku.CurrentTime()
 }
 
-// SetTimeSource assigns a particular source of time to a whisper object.
-func (w *gethWakuWrapper) SetTimeSource(timesource func() time.Time) {
-	w.waku.SetTimeSource(timesource)
-}
-
 func (w *gethWakuWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
 	events := make(chan wakucommon.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
