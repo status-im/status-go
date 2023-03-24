@@ -670,6 +670,9 @@ func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) 
 	if err != nil {
 		return nil, err
 	}
+	if hrCache == nil {
+		return nil, errors.New("no encryption key found for the community")
+	}
 
 	var dbHash []byte
 	if len(hrCache.Hash) == 0 {
