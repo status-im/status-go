@@ -732,7 +732,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			}()
 
 			for _, c := range adminCommunities {
-				if c.Joined() {
+				if c.Joined() && c.HasTokenPermissions() {
 					go m.communitiesManager.CheckMemberPermissionsPeriodically(c.ID())
 				}
 			}

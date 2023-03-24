@@ -1433,6 +1433,10 @@ func (o *Community) TokenPermissions() map[string]*protobuf.CommunityTokenPermis
 	return o.config.CommunityDescription.TokenPermissions
 }
 
+func (o *Community) HasTokenPermissions() bool {
+	return len(o.config.CommunityDescription.TokenPermissions) > 0
+}
+
 func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
 	permissions := make([]*protobuf.CommunityTokenPermission, 0)
 	for _, tokenPermission := range o.TokenPermissions() {
