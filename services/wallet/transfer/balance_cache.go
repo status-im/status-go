@@ -86,6 +86,9 @@ func (b *balanceCache) sortRanges(account common.Address) {
 }
 
 func (b *balanceCache) findNonceInRange(account common.Address, block *big.Int) *int64 {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+
 	for k := range b.sortedRanges[account] {
 		nr := b.sortedRanges[account][k]
 		cmpMin := nr.min.Cmp(block)
