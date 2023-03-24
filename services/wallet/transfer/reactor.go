@@ -61,7 +61,7 @@ func (r *Reactor) newControlCommand(chainClient *chain.ClientWithFallback, accou
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) start(chainClients []*chain.ClientWithFallback, accounts []common.Address) error {
+func (r *Reactor) start(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -88,7 +88,7 @@ func (r *Reactor) stop() {
 	r.group = nil
 }
 
-func (r *Reactor) restart(chainClients []*chain.ClientWithFallback, accounts []common.Address) error {
+func (r *Reactor) restart(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address) error {
 	r.stop()
 	return r.start(chainClients, accounts)
 }

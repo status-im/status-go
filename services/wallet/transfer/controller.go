@@ -119,7 +119,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 
 // watchAccountsChanges subscribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
-func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients []*chain.ClientWithFallback, initial []common.Address) error {
+func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor, chainClients map[uint64]*chain.ClientWithFallback, initial []common.Address) error {
 	accounts := make(chan []*accounts.Account, 1) // it may block if the rate of updates will be significantly higher
 	sub := accountFeed.Subscribe(accounts)
 	defer sub.Unsubscribe()

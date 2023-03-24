@@ -109,7 +109,7 @@ func NewService(
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
-		feed:                  accountFeed,
+		feed:                  walletFeed,
 		signals:               signals,
 		reader:                reader,
 		history:               history,
