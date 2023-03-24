@@ -107,8 +107,7 @@ type Waku interface {
 	// If a message does not match the bloom, it will tantamount to spam, and the peer will
 	// be disconnected.
 	BloomFilter() []byte
-	// SetTimeSource assigns a particular source of time to a whisper object.
-	SetTimeSource(timesource func() time.Time)
+
 	// GetCurrentTime returns current time.
 	GetCurrentTime() time.Time
 

@@ -61,7 +61,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -132,8 +131,6 @@ type Waku struct {
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
 
-	timeSource func() time.Time // source of time for waku
-
 	logger *zap.Logger
 
 	// NTP Synced timesource
@@ -166,13 +163,17 @@ func getUsableUDPPort() (int, error) {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, timesource *timesource.NTPTimeSource) (*Waku, error) {
+func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if ts == nil {
+		ts = timesource.Default()
 	}
 
 	cfg = setDefaults(cfg)
@@ -201,8 +202,8 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		dnsAddressCache:         make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:     &sync.RWMutex{},
 		storeMsgIDs:             make(map[gethcommon.Hash]bool),
+		timesource:              ts,
 		storeMsgIDsMu:           sync.RWMutex{},
-		timeSource:              time.Now,
 		logger:                  logger,
 		discV5BootstrapNodes:    cfg.DiscV5BootstrapNodes,
 	}
@@ -764,12 +765,7 @@ func (w *Waku) ConfirmationsEnabled() bool {
 
 // CurrentTime returns current time.
 func (w *Waku) CurrentTime() time.Time {
-	return w.timeSource()
-}
-
-// SetTimeSource assigns a particular source of time to a waku object.
-func (w *Waku) SetTimeSource(timesource func() time.Time) {
-	w.timeSource = timesource
+	return w.timesource.Now()
 }
 
 // APIs returns the RPC descriptors the Waku implementation offers
@@ -1489,10 +1485,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 }
 
 func (w *Waku) timestamp() int64 {
-	if w.timesource != nil {
-		return w.timesource.Now().UnixNano()
-	}
-	return utils.GetUnixEpoch()
+	return w.timesource.Now().UnixNano()
 }
 
 func (w *Waku) autoRelayPeerSource(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
