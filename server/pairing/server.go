@@ -172,6 +172,10 @@ func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (str
 	if err != nil {
 		return "", err
 	}
+	err = validateAndVerifyPassword(conf, conf.SenderConfig)
+	if err != nil {
+		return "", err
+	}
 
 	ps, err := MakeFullSenderServer(backend, conf)
 	if err != nil {
@@ -265,6 +269,10 @@ func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServ
 func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
 	conf := NewReceiverServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return "", err
+	}
+	err = validateAndVerifyNodeConfig(conf, conf.ReceiverConfig)
 	if err != nil {
 		return "", err
 	}

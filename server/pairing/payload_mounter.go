@@ -1,11 +1,6 @@
 package pairing
 
 import (
-	"fmt"
-	"io/fs"
-	"io/ioutil"
-	"path/filepath"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -126,7 +121,8 @@ func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountP
 }
 
 func (apl *AccountPayloadLoader) Load() error {
-	err := apl.loadKeys(apl.keystorePath)
+	apl.keys = make(map[string][]byte)
+	err := loadKeys(apl.keys, apl.keystorePath)
 	if err != nil {
 		return err
 	}
@@ -139,36 +135,6 @@ func (apl *AccountPayloadLoader) Load() error {
 	apl.multiaccount, err = apl.multiaccountsDB.GetAccount(apl.keyUID)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (apl *AccountPayloadLoader) loadKeys(keyStorePath string) error {
-	apl.keys = make(map[string][]byte)
-
-	fileWalker := func(path string, dirEntry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if dirEntry.IsDir() || filepath.Dir(path) != keyStorePath {
-			return nil
-		}
-
-		rawKeyFile, err := ioutil.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("invalid account key file: %v", err)
-		}
-
-		apl.keys[dirEntry.Name()] = rawKeyFile
-
-		return nil
-	}
-
-	err := filepath.WalkDir(keyStorePath, fileWalker)
-	if err != nil {
-		return fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
 
 	return nil

@@ -239,6 +239,10 @@ func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (
 	if err != nil {
 		return nil, err
 	}
+	err = validateAndVerifyPassword(conf, conf.SenderConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	conf.SenderConfig.DB = backend.GetMultiaccountDB()
 
@@ -434,6 +438,10 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 
 	conf := NewReceiverClientConfig()
 	err = json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return nil, err
+	}
+	err = validateAndVerifyNodeConfig(conf, conf.ReceiverConfig)
 	if err != nil {
 		return nil, err
 	}
