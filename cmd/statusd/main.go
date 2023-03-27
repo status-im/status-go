@@ -218,6 +218,7 @@ func main() {
 			protocol.WithPushNotificationServerConfig(&config.PushNotificationServerConfig),
 			protocol.WithDatabase(db),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
+			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithRPCClient(backend.StatusNode().RPCClient()),
 		}
 

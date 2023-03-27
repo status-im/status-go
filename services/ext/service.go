@@ -425,6 +425,7 @@ func buildMessengerOptions(
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
+		protocol.WithWalletConfig(&config.WalletConfig),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {
