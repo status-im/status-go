@@ -83,6 +83,7 @@ type config struct {
 	clusterConfig       params.ClusterConfig
 	browserDatabase     *browsers.Database
 	torrentConfig       *params.TorrentConfig
+	walletConfig        *params.WalletConfig
 	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
 
@@ -305,6 +306,13 @@ func WithHTTPServer(s *server.MediaServer) Option {
 func WithRPCClient(r *rpc.Client) Option {
 	return func(c *config) error {
 		c.rpcClient = r
+		return nil
+	}
+}
+
+func WithWalletConfig(wc *params.WalletConfig) Option {
+	return func(c *config) error {
+		c.walletConfig = wc
 		return nil
 	}
 }
