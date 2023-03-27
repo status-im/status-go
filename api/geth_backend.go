@@ -774,6 +774,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 	settings.DisplayName = request.DisplayName
+	settings.PreviewPrivacy = request.PreviewPrivacy
 
 	// If restoring an account, we don't set the mnemonic
 	if mnemonic == "" {

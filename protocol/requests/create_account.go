@@ -29,6 +29,7 @@ type CreateAccount struct {
 	LogLevel                 *string `json:"logLevel"`
 	LogFilePath              string  `json:"logFilePath"`
 	LogEnabled               bool    `json:"logEnabled"`
+	PreviewPrivacy           bool    `json:"previewPrivacy"`
 }
 
 func (c *CreateAccount) Validate() error {
