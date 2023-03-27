@@ -41,6 +41,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/swap"
+	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -80,6 +81,7 @@ type WakuNode struct {
 	peerConnector PeerConnectorService
 	discoveryV5   Service
 	peerExchange  Service
+	rendezvous    Service
 	filter        ReceptorService
 	filterV2Full  ReceptorService
 	filterV2Light Service
@@ -212,6 +214,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		return nil, err
 	}
 
+	w.rendezvous = rendezvous.NewRendezvous(w.host, w.opts.rendezvousDB, w.peerConnector, w.log)
 	w.relay = relay.NewWakuRelay(w.host, w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.filter = filter.NewWakuFilter(w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
 	w.filterV2Full = filterv2.NewWakuFilterFullnode(w.host, w.bcaster, w.timesource, w.log, w.opts.filterV2Opts...)
@@ -390,6 +393,13 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		}
 	}
 
+	if w.opts.enableRendezvous {
+		err := w.rendezvous.Start(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	if w.opts.enableRLN {
 		err = w.mountRlnRelay(ctx)
 		if err != nil {
@@ -414,6 +424,10 @@ func (w *WakuNode) Stop() {
 	defer w.protocolEventSub.Close()
 	defer w.identificationEventSub.Close()
 	defer w.addressChangesSub.Close()
+
+	if w.opts.enableRendezvous {
+		w.rendezvous.Stop()
+	}
 
 	w.relay.Stop()
 	w.lightPush.Stop()

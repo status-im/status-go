@@ -124,6 +124,11 @@ github.com/benbjohnson/immutable
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/berty/go-libp2p-rendezvous v0.4.1
+## explicit; go 1.18
+github.com/berty/go-libp2p-rendezvous
+github.com/berty/go-libp2p-rendezvous/db
+github.com/berty/go-libp2p-rendezvous/pb
 # github.com/bits-and-blooms/bitset v1.2.0
 ## explicit; go 1.14
 github.com/bits-and-blooms/bitset
@@ -305,6 +310,7 @@ github.com/godbus/dbus/v5
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
+github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 # github.com/golang-jwt/jwt/v4 v4.3.0
@@ -535,7 +541,7 @@ github.com/libp2p/go-libp2p/p2p/transport/webtransport
 # github.com/libp2p/go-libp2p-asn-util v0.2.0
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-pubsub v0.9.1
+# github.com/libp2p/go-libp2p-pubsub v0.9.3
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
@@ -971,7 +977,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.5.2-0.20230308135126-4b52983fc483
+# github.com/waku-org/go-waku v0.5.3-0.20230327132601-b540953f74e9
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -999,6 +1005,7 @@ github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts
 github.com/waku-org/go-waku/waku/v2/protocol/store
 github.com/waku-org/go-waku/waku/v2/protocol/store/pb
 github.com/waku-org/go-waku/waku/v2/protocol/swap
+github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
 # github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg

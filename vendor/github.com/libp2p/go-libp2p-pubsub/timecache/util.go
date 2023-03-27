@@ -9,7 +9,7 @@ import (
 var backgroundSweepInterval = time.Minute
 
 func background(ctx context.Context, lk sync.Locker, m map[string]time.Time) {
-	ticker := time.NewTimer(backgroundSweepInterval)
+	ticker := time.NewTicker(backgroundSweepInterval)
 	defer ticker.Stop()
 
 	for {

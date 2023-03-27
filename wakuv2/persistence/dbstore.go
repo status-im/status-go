@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -28,8 +29,8 @@ type DBStore struct {
 	maxMessages int
 	maxDuration time.Duration
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 }
 
 // DBOption is an optional setting that can be used to configure the DBStore
@@ -59,7 +60,6 @@ func WithRetentionPolicy(maxMessages int, maxDuration time.Duration) DBOption {
 func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 	result := new(DBStore)
 	result.log = log.Named("dbstore")
-	result.quit = make(chan struct{})
 
 	for _, opt := range options {
 		err := opt(result)
@@ -71,14 +71,18 @@ func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
 	return result, nil
 }
 
-func (d *DBStore) Start(timesource timesource.Timesource) error {
+func (d *DBStore) Start(ctx context.Context, timesource timesource.Timesource) error {
+	ctx, cancel := context.WithCancel(ctx)
+
+	d.cancel = cancel
+
 	err := d.cleanOlderRecords()
 	if err != nil {
 		return err
 	}
 
 	d.wg.Add(1)
-	go d.checkForOlderRecords(60 * time.Second)
+	go d.checkForOlderRecords(ctx, 60*time.Second)
 
 	return nil
 }
@@ -113,7 +117,7 @@ func (d *DBStore) cleanOlderRecords() error {
 	return nil
 }
 
-func (d *DBStore) checkForOlderRecords(t time.Duration) {
+func (d *DBStore) checkForOlderRecords(ctx context.Context, t time.Duration) {
 	defer d.wg.Done()
 
 	ticker := time.NewTicker(t)
@@ -121,7 +125,7 @@ func (d *DBStore) checkForOlderRecords(t time.Duration) {
 
 	for {
 		select {
-		case <-d.quit:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			err := d.cleanOlderRecords()
@@ -134,7 +138,11 @@ func (d *DBStore) checkForOlderRecords(t time.Duration) {
 
 // Stop closes a DB connection
 func (d *DBStore) Stop() {
-	d.quit <- struct{}{}
+	if d.cancel == nil {
+		return
+	}
+
+	d.cancel()
 	d.wg.Wait()
 	d.db.Close()
 }

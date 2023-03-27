@@ -79,7 +79,7 @@ type MessageProvider interface {
 	Query(query *pb.HistoryQuery) (*pb.Index, []persistence.StoredMessage, error)
 	Put(env *protocol.Envelope) error
 	MostRecentTimestamp() (int64, error)
-	Start(timesource timesource.Timesource) error
+	Start(ctx context.Context, timesource timesource.Timesource) error
 	Stop()
 	Count() (int, error)
 }
@@ -110,21 +110,21 @@ func (store *WakuStore) Start(ctx context.Context) error {
 		return nil
 	}
 
-	err := store.msgProvider.Start(store.timesource)
+	err := store.msgProvider.Start(ctx, store.timesource) // TODO: store protocol should not start a message provider
 	if err != nil {
 		store.log.Error("Error starting message provider", zap.Error(err))
 		return nil
 	}
 
 	store.started = true
-	store.ctx = ctx
+	store.ctx, store.cancel = context.WithCancel(ctx)
 	store.MsgC = make(chan *protocol.Envelope, 1024)
 
 	store.h.SetStreamHandlerMatch(StoreID_v20beta4, protocol.PrefixTextMatch(string(StoreID_v20beta4)), store.onRequest)
 
 	store.wg.Add(2)
-	go store.storeIncomingMessages(ctx)
-	go store.updateMetrics(ctx)
+	go store.storeIncomingMessages(store.ctx)
+	go store.updateMetrics(store.ctx)
 
 	store.log.Info("Store protocol started")
 
@@ -174,7 +174,7 @@ func (store *WakuStore) updateMetrics(ctx context.Context) {
 			} else {
 				metrics.RecordMessage(store.ctx, "stored", msgCount)
 			}
-		case <-store.quit:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -229,6 +229,12 @@ func (store *WakuStore) MessageChannel() chan *protocol.Envelope {
 
 // Stop closes the store message channel and removes the protocol stream handler
 func (store *WakuStore) Stop() {
+	if store.cancel == nil {
+		return
+	}
+
+	store.cancel()
+
 	store.started = false
 
 	if store.MsgC != nil {
@@ -236,8 +242,7 @@ func (store *WakuStore) Stop() {
 	}
 
 	if store.msgProvider != nil {
-		store.msgProvider.Stop()
-		store.quit <- struct{}{}
+		store.msgProvider.Stop() // TODO: StoreProtocol should not stop a message provider
 	}
 
 	if store.h != nil {

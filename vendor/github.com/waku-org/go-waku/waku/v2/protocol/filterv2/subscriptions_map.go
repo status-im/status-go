@@ -76,6 +76,37 @@ func (sub *SubscriptionsMap) NewSubscription(peerID peer.ID, topic string, conte
 	return details
 }
 
+func (sub *SubscriptionsMap) Has(peerID peer.ID, topic string, contentTopics []string) bool {
+	// Check if peer exits
+	peerSubscription, ok := sub.items[peerID]
+	if !ok {
+		return false
+	}
+
+	// Check if pubsub topic exists
+	subscriptions, ok := peerSubscription.subscriptionsPerTopic[topic]
+	if !ok {
+		return false
+	}
+
+	// Check if the content topic exists within the list of subscriptions for this peer
+	for _, ct := range contentTopics {
+		found := false
+		for _, subscription := range subscriptions {
+			_, exists := subscription.contentTopics[ct]
+			if exists {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (sub *SubscriptionsMap) Delete(subscription *SubscriptionDetails) error {
 	sub.Lock()
 	defer sub.Unlock()
@@ -116,7 +147,6 @@ func (s *SubscriptionDetails) closeC() {
 		s.closed = true
 		close(s.C)
 	})
-
 }
 
 func (s *SubscriptionDetails) Close() error {
@@ -185,6 +215,7 @@ func iterateSubscriptionSet(subscriptions SubscriptionSet, envelope *protocol.En
 			}
 
 			if !subscription.closed {
+				// TODO: consider pushing or dropping if subscription is not available
 				subscription.C <- envelope
 			}
 		}(subscription)
