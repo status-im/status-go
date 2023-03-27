@@ -39,8 +39,11 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &Client{
+	client := &HTTPClient{
 		client: srv.Client(),
+	}
+	opensea := &Client{
+		client: client,
 		url:    srv.URL,
 	}
 	res, err := opensea.FetchAllCollectionsByOwner(common.Address{1})
@@ -58,8 +61,11 @@ func TestFetchAllCollectionsByOwnerWithInValidJson(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &Client{
+	client := &HTTPClient{
 		client: srv.Client(),
+	}
+	opensea := &Client{
+		client: client,
 		url:    srv.URL,
 	}
 	res, err := opensea.FetchAllCollectionsByOwner(common.Address{1})
@@ -92,8 +98,11 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &Client{
+	client := &HTTPClient{
 		client: srv.Client(),
+	}
+	opensea := &Client{
+		client: client,
 		url:    srv.URL,
 	}
 	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", "", 200)
@@ -111,8 +120,11 @@ func TestFetchAllAssetsByOwnerAndCollectionInvalidJson(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	opensea := &Client{
+	client := &HTTPClient{
 		client: srv.Client(),
+	}
+	opensea := &Client{
+		client: client,
 		url:    srv.URL,
 	}
 	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", "", 200)
