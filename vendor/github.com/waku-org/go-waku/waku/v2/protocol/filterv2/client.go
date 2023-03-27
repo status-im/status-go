@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"sync"
@@ -81,9 +80,6 @@ func (wf *WakuFilterLightnode) Start(ctx context.Context) error {
 	wf.subscriptions = NewSubscriptionMap()
 
 	wf.h.SetStreamHandlerMatch(FilterPushID_v20beta1, protocol.PrefixTextMatch(string(FilterPushID_v20beta1)), wf.onRequest(ctx))
-
-	// wf.wg.Add(1)
-	// TODO: go wf.keepAliveSubscriptions(ctx)
 
 	wf.log.Info("filter protocol (light) started")
 
@@ -175,7 +171,8 @@ func (wf *WakuFilterLightnode) request(ctx context.Context, params *FilterSubscr
 	}
 
 	if filterSubscribeResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("filter err: %d, %s", filterSubscribeResponse.StatusCode, filterSubscribeResponse.StatusDesc)
+		err := NewFilterError(int(filterSubscribeResponse.StatusCode), filterSubscribeResponse.StatusDesc)
+		return &err
 	}
 
 	return nil
@@ -210,12 +207,16 @@ func (wf *WakuFilterLightnode) Subscribe(ctx context.Context, contentFilter Cont
 		return nil, err
 	}
 
-	return wf.FilterSubscription(params.selectedPeer, contentFilter), nil
+	return wf.subscriptions.NewSubscription(params.selectedPeer, contentFilter.Topic, contentFilter.ContentTopics), nil
 }
 
 // FilterSubscription is used to obtain an object from which you could receive messages received via filter protocol
-func (wf *WakuFilterLightnode) FilterSubscription(peerID peer.ID, contentFilter ContentFilter) *SubscriptionDetails {
-	return wf.subscriptions.NewSubscription(peerID, contentFilter.Topic, contentFilter.ContentTopics)
+func (wf *WakuFilterLightnode) FilterSubscription(peerID peer.ID, contentFilter ContentFilter) (*SubscriptionDetails, error) {
+	if !wf.subscriptions.Has(peerID, contentFilter.Topic, contentFilter.ContentTopics) {
+		return nil, errors.New("subscription does not exist")
+	}
+
+	return wf.subscriptions.NewSubscription(peerID, contentFilter.Topic, contentFilter.ContentTopics), nil
 }
 
 func (wf *WakuFilterLightnode) getUnsubscribeParameters(opts ...FilterUnsubscribeOption) (*FilterUnsubscribeParameters, error) {
@@ -230,6 +231,18 @@ func (wf *WakuFilterLightnode) getUnsubscribeParameters(opts ...FilterUnsubscrib
 	}
 
 	return params, nil
+}
+
+func (wf *WakuFilterLightnode) Ping(ctx context.Context, peerID peer.ID) error {
+	return wf.request(
+		ctx,
+		&FilterSubscribeParameters{selectedPeer: peerID},
+		pb.FilterSubscribeRequest_SUBSCRIBER_PING,
+		ContentFilter{})
+}
+
+func (wf *WakuFilterLightnode) IsSubscriptionAlive(ctx context.Context, subscription *SubscriptionDetails) error {
+	return wf.Ping(ctx, subscription.peerID)
 }
 
 // Unsubscribe is used to stop receiving messages from a peer that match a content filter

@@ -49,6 +49,7 @@ type WakuSwap interface {
 
 type WakuStore struct {
 	ctx        context.Context
+	cancel     context.CancelFunc
 	timesource timesource.Timesource
 	MsgC       chan *protocol.Envelope
 	wg         *sync.WaitGroup
@@ -56,7 +57,6 @@ type WakuStore struct {
 	log *zap.Logger
 
 	started bool
-	quit    chan struct{}
 
 	msgProvider MessageProvider
 	h           host.Host
@@ -71,7 +71,6 @@ func NewWakuStore(host host.Host, swap WakuSwap, p MessageProvider, timesource t
 	wakuStore.swap = swap
 	wakuStore.wg = &sync.WaitGroup{}
 	wakuStore.log = log.Named("store")
-	wakuStore.quit = make(chan struct{})
 	wakuStore.timesource = timesource
 
 	return wakuStore

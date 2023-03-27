@@ -29,6 +29,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
@@ -78,6 +79,9 @@ type WakuNodeParameters struct {
 	enableSwap      bool
 	resumeNodes     []multiaddr.Multiaddr
 	messageProvider store.MessageProvider
+
+	enableRendezvous bool
+	rendezvousDB     *rendezvous.DB
 
 	swapMode                int
 	swapDisconnectThreshold int
@@ -429,6 +433,16 @@ func WithWebsockets(address string, port int) WakuNodeOption {
 
 		params.multiAddr = append(params.multiAddr, wsMa)
 
+		return nil
+	}
+}
+
+// WithRendezvousServer is a WakuOption used to set the node as a rendezvous
+// point, using an specific storage for the peer information
+func WithRendezvousServer(db *rendezvous.DB) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableRendezvous = true
+		params.rendezvousDB = db
 		return nil
 	}
 }
