@@ -183,6 +183,10 @@ func updateKeypairNameAndLastDerivationIndexIfNeeded(db *sql.DB) error {
 		return err
 	}
 
+	if displayName == "" {
+		displayName = "Status"
+	}
+
 	var (
 		seedKeyPairIndex int
 		keyKeyPairIndex  int

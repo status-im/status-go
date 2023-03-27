@@ -74,6 +74,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	networks := json.RawMessage("{}")
 	s := settings.Settings{
 		Address:           types.HexToAddress(walletRootAddress),
+		DisplayName:       "UserDisplayName",
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress(walletRootAddress),
 		EIP1581Address:    types.HexToAddress(walletRootAddress),

@@ -29,6 +29,18 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.Config())
 	require.Nil(t, n.RPCClient())
 	require.Equal(t, 0, n.PeerCount())
+
+	db, stop, err := setupTestDB()
+	defer func() {
+		err := stop()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	require.NoError(t, err)
+	require.NotNil(t, db)
+	n.appDB = db
+
 	// start node
 	require.NoError(t, n.Start(config, nil))
 
@@ -73,7 +85,21 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 		DataDir:     dir,
 		KeyStoreDir: keyStoreDir,
 	}
-	n := New(nil)
+
+	n, stop1, stop2, err := createStatusNode()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			n.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
 
 	require.NoError(t, n.Start(&config, nil))
 	require.NoError(t, n.Stop())
@@ -95,7 +121,20 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	defer func() { require.NoError(t, peer.Close()) }()
 	peerURL := peer.Server().Self().URLv4()
 
-	n := New(nil)
+	n, stop1, stop2, err := createStatusNode()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			n.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
 
 	// checks before node is started
 	require.EqualError(t, n.AddPeer(peerURL), ErrNoRunningNode.Error())
@@ -127,7 +166,22 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 		// use custom address to test the all possibilities
 		AdvertiseAddr: "127.0.0.1",
 	}
-	n := New(nil)
+
+	n, stop1, stop2, err := createStatusNode()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			n.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
+
 	require.NoError(t, n.Start(&config, nil))
 	require.NotNil(t, n.discovery)
 	require.True(t, n.discovery.Running())
@@ -146,7 +200,22 @@ func TestStatusNodeStartDiscoveryManual(t *testing.T) {
 		// use custom address to test the all possibilities
 		AdvertiseAddr: "127.0.0.1",
 	}
-	n := New(nil)
+
+	n, stop1, stop2, err := createStatusNode()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			n.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
+
 	require.NoError(t, n.StartWithOptions(&config, StartOptions{}))
 	require.Nil(t, n.discovery)
 	// start discovery manually
@@ -161,7 +230,22 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		NoDiscovery: true,
 		ListenAddr:  "127.0.0.1:0",
 	}
-	n := New(nil)
+
+	n, stop1, stop2, err := createStatusNode()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			n.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			n.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
+
 	require.NoError(t, n.Start(&config, nil))
 	node, err := n.discoverNode()
 	require.NoError(t, err)
@@ -172,9 +256,24 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		AdvertiseAddr: "127.0.0.2",
 		ListenAddr:    "127.0.0.1:0",
 	}
-	n = New(nil)
-	require.NoError(t, n.Start(&config, nil))
-	node, err = n.discoverNode()
+
+	n1, stop11, stop12, err := createStatusNode()
+	defer func() {
+		err := stop11()
+		if err != nil {
+			n1.log.Error("stopping db", err)
+		}
+	}()
+	defer func() {
+		err := stop12()
+		if err != nil {
+			n1.log.Error("stopping multiaccount db", err)
+		}
+	}()
+	require.NoError(t, err)
+
+	require.NoError(t, n1.Start(&config, nil))
+	node, err = n1.discoverNode()
 	require.NoError(t, err)
 	require.Equal(t, net.ParseIP("127.0.0.2").To4(), node.IP())
 }

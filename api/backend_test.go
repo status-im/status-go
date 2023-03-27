@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -29,6 +31,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
 )
@@ -37,6 +40,7 @@ var (
 	networks     = json.RawMessage("{}")
 	testSettings = settings.Settings{
 		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		DisplayName:       "UserDisplayName",
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress("0xe1300f99fDF7346986CbC766903245087394ecd0"),
 		EIP1581Address:    types.HexToAddress("0xe1DDDE9235a541d1344550d969715CF43982de9f"),
@@ -52,10 +56,74 @@ var (
 		WalletRootAddress: types.HexToAddress("0xeB591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
 )
 
+func setupTestDB() (*sql.DB, func() error, error) {
+	tmpfile, err := ioutil.TempFile("", "tests")
+	if err != nil {
+		return nil, nil, err
+	}
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "tests", sqlite.ReducedKDFIterationsNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+	return db, func() error {
+		err := db.Close()
+		if err != nil {
+			return err
+		}
+		return os.Remove(tmpfile.Name())
+	}, nil
+}
+
+func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
+	tmpfile, err := ioutil.TempFile("", "tests")
+	if err != nil {
+		return nil, nil, err
+	}
+	db, err := multiaccounts.InitializeDB(tmpfile.Name())
+	if err != nil {
+		return nil, nil, err
+	}
+	return db, func() error {
+		err := db.Close()
+		if err != nil {
+			return err
+		}
+		return os.Remove(tmpfile.Name())
+	}, nil
+}
+
+func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, error) {
+	db, stop1, err := setupTestDB()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	backend := NewGethStatusBackend()
+	backend.StatusNode().SetAppDB(db)
+
+	ma, stop2, err := setupTestMultiDB()
+	backend.StatusNode().SetMultiaccountsDB(ma)
+
+	return backend, stop1, stop2, err
+}
+
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -90,7 +158,21 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	count := 3
@@ -118,7 +200,21 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 func TestBackendGettersConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -203,7 +299,21 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -279,7 +389,21 @@ func TestAppStateChange(t *testing.T) {
 func TestBlockedRPCMethods(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -319,7 +443,21 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 func TestStartStopMultipleTimes(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -338,7 +476,21 @@ func TestStartStopMultipleTimes(t *testing.T) {
 func TestHashTypedData(t *testing.T) {
 	utils.Init()
 
-	backend := NewGethStatusBackend()
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -651,15 +803,29 @@ func TestConvertAccount(t *testing.T) {
 	keyStoreDir := filepath.Join(rootDataDir, "keystore")
 
 	utils.Init()
-	backend := NewGethStatusBackend()
+
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	backend.rootDataDir = rootDataDir
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
 	config.DataDir = rootDataDir
 	config.KeyStoreDir = keyStoreDir
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	err = backend.StartNode(config)
 	require.NoError(t, err)
+	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+	require.NoError(t, backend.StartNode(config))
 	defer func() {
 		require.NoError(t, backend.StopNode())
 	}()
@@ -693,7 +859,7 @@ func TestConvertAccount(t *testing.T) {
 		PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
 		Path:      pathEIP1581Chat,
 		Wallet:    false,
-		Chat:      false,
+		Chat:      true,
 		Name:      "GeneratedAccount",
 	})
 
@@ -710,6 +876,7 @@ func TestConvertAccount(t *testing.T) {
 				KeyUID:      genAccInfo.KeyUID,
 				Wallet:      false,
 				Chat:        false,
+				Type:        accounts.AccountTypeGenerated,
 				Path:        p,
 				Name:        "derivacc" + p,
 				Hidden:      false,
@@ -730,6 +897,7 @@ func TestConvertAccount(t *testing.T) {
 
 	s := settings.Settings{
 		Address:           types.HexToAddress(masterAddress),
+		DisplayName:       "UserDisplayName",
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress(derivedAccounts[pathDefaultWalletAccount].Address),
 		EIP1581Address:    types.HexToAddress(derivedAccounts[pathEIP1581Root].Address),

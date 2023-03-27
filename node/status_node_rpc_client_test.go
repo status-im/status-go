@@ -93,6 +93,20 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	return statusNode, nil
 }
 
+func createStatusNode() (*StatusNode, func() error, func() error, error) {
+	db, stop1, err := setupTestDB()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	statusNode := New(nil)
+	statusNode.SetAppDB(db)
+
+	ma, stop2, err := setupTestMultiDB()
+	statusNode.SetMultiaccountsDB(ma)
+
+	return statusNode, stop1, stop2, err
+}
+
 func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	var err error
 
