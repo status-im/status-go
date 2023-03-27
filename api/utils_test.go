@@ -14,7 +14,23 @@ import (
 )
 
 func TestHashMessage(t *testing.T) {
-	backend := NewGethStatusBackend()
+	utils.Init()
+
+	backend, stop1, stop2, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
