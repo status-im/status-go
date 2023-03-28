@@ -35,9 +35,11 @@ var (
 	binanceChainMaxInitialRange       = big.NewInt(500000)
 	binanceChainErc20BatchSize        = big.NewInt(5000)
 	goerliErc20BatchSize              = big.NewInt(100000)
+	goerliErc20ArbitrumBatchSize      = big.NewInt(100000)
 	erc20BatchSize                    = big.NewInt(500000)
 	binancChainID                     = uint64(56)
 	goerliChainID                     = uint64(5)
+	goerliArbitrumChainID             = uint64(421613)
 	binanceTestChainID                = uint64(97)
 	numberOfBlocksCheckedPerIteration = 40
 )
@@ -120,6 +122,10 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 
 	if chainID == goerliChainID {
 		return goerliErc20BatchSize
+	}
+
+	if chainID == goerliArbitrumChainID {
+		return goerliErc20ArbitrumBatchSize
 	}
 
 	return erc20BatchSize

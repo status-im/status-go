@@ -504,7 +504,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients []*chain.ClientWi
 		if err == nil {
 			fetchChainBalance := false
 			var tokenChunks [][]common.Address
-			chunkSize := 100
+			chunkSize := 500
 			for i := 0; i < len(tokens); i += chunkSize {
 				end := i + chunkSize
 				if end > len(tokens) {
@@ -638,7 +638,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients []*chain.C
 		if err == nil {
 			fetchChainBalance := false
 			var tokenChunks [][]common.Address
-			chunkSize := 100
+			chunkSize := 500
 			for i := 0; i < len(tokens); i += chunkSize {
 				end := i + chunkSize
 				if end > len(tokens) {

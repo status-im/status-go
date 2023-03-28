@@ -54,7 +54,7 @@ func NewSimpleClient(main *rpc.Client, chainID uint64) *ClientWithFallback {
 
 func NewClient(main, fallback *rpc.Client, chainID uint64) *ClientWithFallback {
 	hystrix.ConfigureCommand(fmt.Sprintf("ethClient_%d", chainID), hystrix.CommandConfig{
-		Timeout:               10000,
+		Timeout:               20000,
 		MaxConcurrentRequests: 100,
 		SleepWindow:           300000,
 		ErrorPercentThreshold: 25,

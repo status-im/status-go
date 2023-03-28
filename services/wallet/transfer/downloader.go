@@ -451,24 +451,21 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 	start := time.Now()
 	log.Debug("get erc20 transfers in range", "from", from, "to", to)
 	headers := []*DBHeader{}
+	ctx := context.Background()
 	for _, address := range d.accounts {
-		ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 		outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,
 			ToBlock:   to,
 			Topics:    d.outboundTopics(address),
 		})
-		cancel()
 		if err != nil {
 			return nil, err
 		}
-		ctx, cancel = context.WithTimeout(parent, 5*time.Second)
 		inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,
 			ToBlock:   to,
 			Topics:    d.inboundTopics(address),
 		})
-		cancel()
 		if err != nil {
 			return nil, err
 		}
