@@ -114,6 +114,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		BanList                 []string                                      `json:"banList"`
 		TokenPermissions        map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
+		ActiveMembersCount      uint64                                        `json:"activeMembersCount"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -158,6 +159,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
+		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -217,6 +219,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		BanList                     []string                                      `json:"banList"`
 		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
+		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
 	}{
 		ID:                          o.ID(),
 		Admin:                       o.IsAdmin(),
@@ -271,6 +274,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
+		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
 
 		if o.config.CommunityDescription.Identity != nil {
 			communityItem.Name = o.Name()
@@ -1842,6 +1846,24 @@ func (o *Community) AddMemberWallet(memberID string, addresses []string) (*Commu
 	changes := o.emptyCommunityChanges()
 	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].WalletAccounts
 	return changes, nil
+}
+
+func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bool, err error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return false, ErrNotAdmin
+	}
+
+	if activeMembersCount == o.config.CommunityDescription.ActiveMembersCount {
+		return false, nil
+	}
+
+	o.config.CommunityDescription.ActiveMembersCount = activeMembersCount
+	o.increaseClock()
+
+	return true, nil
 }
 
 func emptyCommunityChanges() *CommunityChanges {

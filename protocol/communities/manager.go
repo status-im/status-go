@@ -3147,3 +3147,28 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, err
 func (m *Manager) UpdateCommunityTokenState(contractAddress string, deployState DeployState) error {
 	return m.persistence.UpdateCommunityTokenState(contractAddress, deployState)
 }
+
+func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembersCount uint64) error {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return ErrOrgNotFound
+	}
+
+	updated, err := community.SetActiveMembersCount(activeMembersCount)
+	if err != nil {
+		return err
+	}
+
+	if updated {
+		if err = m.persistence.SaveCommunity(community); err != nil {
+			return err
+		}
+
+		m.publish(&Subscription{Community: community})
+	}
+
+	return nil
+}

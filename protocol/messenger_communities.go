@@ -40,6 +40,9 @@ import (
 // 7 days interval
 var messageArchiveInterval = 7 * 24 * time.Hour
 
+// 1 day interval
+var updateActiveMembersInterval = 24 * time.Hour
+
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
@@ -225,6 +228,65 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			}
 		}
 	}()
+}
+
+func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
+	communitiesLastUpdated := make(map[string]int64)
+
+	// We check every 5 minutes if we need to update
+	ticker := time.NewTicker(5 * time.Minute)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				ownedCommunities, err := m.communitiesManager.Created()
+				if err != nil {
+					m.logger.Error("failed to update community active members count", zap.Error(err))
+				}
+
+				for _, community := range ownedCommunities {
+					lastUpdated, ok := communitiesLastUpdated[community.IDString()]
+					if !ok {
+						lastUpdated = 0
+					}
+
+					// If not enough time has passed since last update, we skip this
+					if time.Now().Unix()-lastUpdated < int64(updateActiveMembersInterval.Seconds()) {
+						continue
+					}
+
+					if err := m.updateCommunityActiveMembers(community.IDString()); err == nil {
+						communitiesLastUpdated[community.IDString()] = time.Now().Unix()
+
+						// Perf: ensure `updateCommunityActiveMembers` is not called few times in a row
+						// Next communities will be handled in subsequent ticks
+						break
+					} else {
+						m.logger.Error("failed to update community active members count", zap.Error(err))
+					}
+				}
+
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) updateCommunityActiveMembers(communityID string) error {
+	lastWeek := time.Now().AddDate(0, 0, -7).Unix()
+	count, err := m.persistence.CountActiveChattersInCommunity(communityID, lastWeek)
+	if err != nil {
+		return err
+	}
+
+	if err = m.communitiesManager.SetCommunityActiveMembersCount(communityID, uint64(count)); err != nil {
+		return err
+	}
+
+	m.logger.Debug("community active members updated", zap.String("communityID", communityID), zap.Uint("count", count))
+	return nil
 }
 
 func (m *Messenger) Communities() ([]*communities.Community, error) {
