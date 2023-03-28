@@ -1978,9 +1978,10 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	if err != nil {
 		return nil, err
 	}
-
+	messagesLength := len(messages)
 	for _, message := range messages {
 		if message.ContentType == protobuf.ChatMessage_IMAGE && len(messages) > 1 {
+			message.AlbumImagesCount = messagesLength
 			err = message.SetAlbumID(generatedAlbumID.String())
 			if err != nil {
 				return nil, err
