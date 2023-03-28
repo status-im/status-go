@@ -27,22 +27,9 @@ const (
 const AssetLimit = 200
 const CollectionLimit = 300
 
-<<<<<<< HEAD
 const RequestTimeout = 5 * time.Second
 const GetRequestRetryMaxCount = 15
 const GetRequestWaitTime = 300 * time.Millisecond
-=======
-const RequestRetryMaxCount = 1
-const RequestWaitTime = 300 * time.Millisecond
-
-var OpenseaClientInstances = make(map[uint64]*Client)
-
-var BaseURLs = map[uint64]string{
-	1: "https://api.opensea.io/api/v1",
-	4: "https://rinkeby-api.opensea.io/api/v1",
-	5: "https://testnets-api.opensea.io/api/v1",
-}
->>>>>>> 6173eabe7 (feat: add error on get wallet token)
 
 const ChainIDRequiringAPIKey = 1
 
