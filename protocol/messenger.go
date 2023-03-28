@@ -692,6 +692,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleEncryptionLayerSubscriptions(subscriptions)
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
+	m.updateCommunitiesActiveMembersPeriodically()
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()

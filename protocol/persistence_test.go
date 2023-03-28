@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"sort"
@@ -1623,4 +1624,61 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 1)
 	require.Equal(t, fetchedMessages[0], message1)
+}
+
+func TestCountActiveChattersInCommunity(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	channel1 := Chat{
+		ID:          "channel1",
+		Name:        "channel1",
+		CommunityID: "testCommunity",
+	}
+
+	channel2 := Chat{
+		ID:          "channel2",
+		Name:        "channel2",
+		CommunityID: "testCommunity",
+	}
+
+	require.NoError(t, p.SaveChat(channel1))
+	require.NoError(t, p.SaveChat(channel2))
+
+	fillChatWithMessages := func(chat *Chat, offset int) {
+		count := 5
+		var messages []*common.Message
+		for i := 0; i < count; i++ {
+			messages = append(messages, &common.Message{
+				ID:          fmt.Sprintf("%smsg%d", chat.Name, i),
+				LocalChatID: chat.ID,
+				ChatMessage: protobuf.ChatMessage{
+					Clock:     uint64(i),
+					Timestamp: uint64(i + offset),
+				},
+				From: fmt.Sprintf("user%d", i),
+			})
+		}
+		require.NoError(t, p.SaveMessages(messages))
+	}
+
+	// timestamp/user/msgID
+	// channel1: 0/user0/channel1msg0 1/user1/channel1msg1 2/user2/channel1msg2 3/user3/channel1msg3 4/user4/channel1msg4
+	// channel2: 3/user0/channel2msg0 4/user1/channel2msg1 5/user2/channel2msg2 6/user3/channel2msg3 7/user4/channel2msg4
+	fillChatWithMessages(&channel1, 0)
+	fillChatWithMessages(&channel2, 3)
+
+	checker := func(activeAfterTimestamp int64, expected uint) {
+		result, err := p.CountActiveChattersInCommunity("testCommunity", activeAfterTimestamp)
+		require.NoError(t, err)
+		require.Equal(t, expected, result)
+	}
+	checker(0, 5)
+	checker(3, 5)
+	checker(4, 4)
+	checker(5, 3)
+	checker(6, 2)
+	checker(7, 1)
+	checker(8, 0)
 }

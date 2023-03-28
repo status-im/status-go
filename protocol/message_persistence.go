@@ -973,6 +973,26 @@ func (db sqlitePersistence) AllChatIDsByCommunity(communityID string) ([]string,
 	return rst, nil
 }
 
+func (db sqlitePersistence) CountActiveChattersInCommunity(communityID string, activeAfterTimestamp int64) (uint, error) {
+	var activeChattersCount uint
+	err := db.db.QueryRow(
+		`
+			SELECT COUNT(DISTINCT source)
+			FROM user_messages
+			JOIN chats ON user_messages.local_chat_id = chats.id
+			WHERE chats.community_id = ?
+			AND user_messages.timestamp >= ?
+		`, communityID, activeAfterTimestamp).Scan(&activeChattersCount)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return activeChattersCount, nil
+}
+
 // PinnedMessageByChatID returns all pinned messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
