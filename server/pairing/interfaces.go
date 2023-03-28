@@ -5,10 +5,10 @@ import (
 )
 
 // PayloadMounterReceiver represents a struct that can:
-//  - mount payload data from a PayloadRepository or a PayloadLoader into memory (PayloadMounter.Mount)
-//  - prepare data to be sent encrypted (PayloadMounter.ToSend) via some transport
-//  - receive and prepare encrypted transport data (PayloadReceiver.Receive) to be stored
-//  - prepare the received (PayloadReceiver.Received) data to be stored to a PayloadRepository or a PayloadStorer
+//   - mount payload data from a PayloadRepository or a PayloadLoader into memory (PayloadMounter.Mount)
+//   - prepare data to be sent encrypted (PayloadMounter.ToSend) via some transport
+//   - receive and prepare encrypted transport data (PayloadReceiver.Receive) to be stored
+//   - prepare the received (PayloadReceiver.Received) data to be stored to a PayloadRepository or a PayloadStorer
 type PayloadMounterReceiver interface {
 	PayloadMounter
 	PayloadReceiver

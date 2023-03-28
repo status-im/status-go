@@ -164,9 +164,8 @@ func (s *ServerURLSuite) TestQRCodeGeneration() {
 	_ = rootCAs.AppendCertsFromPEM(certPem)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true, //nolint:all // MUST BE FALSE
-			RootCAs:            rootCAs,
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    rootCAs,
 		},
 	}
 

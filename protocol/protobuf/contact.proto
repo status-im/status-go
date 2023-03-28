@@ -17,6 +17,7 @@ message ContactUpdate {
   string display_name = 4;
   uint64 contact_request_clock = 5;
   ContactRequestPropagatedState contact_request_propagated_state = 6;
+  string public_key = 7;
 }
 
 message AcceptContactRequest {
