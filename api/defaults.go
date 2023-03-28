@@ -28,38 +28,42 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
-	settings := &settings.Settings{}
-	settings.Mnemonic = &generatedAccountInfo.Mnemonic
-	settings.KeyUID = generatedAccountInfo.KeyUID
-	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
-	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
+	s := &settings.Settings{}
+	s.Mnemonic = &generatedAccountInfo.Mnemonic
+	s.BackupEnabled = true
+	logLevel := "INFO"
+	s.LogLevel = &logLevel
+	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToContactsOnly
+	s.KeyUID = generatedAccountInfo.KeyUID
+	s.Address = types.HexToAddress(generatedAccountInfo.Address)
+	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
 
 	// Set chat key & name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
 	if err != nil {
 		return nil, err
 	}
-	settings.Name = name
-	settings.PublicKey = chatKeyString
+	s.Name = name
+	s.PublicKey = chatKeyString
 
-	settings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	settings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	settings.Mnemonic = mnemonic
+	s.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
+	s.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
+	s.Mnemonic = mnemonic
 
 	signingPhrase, err := buildSigningPhrase()
 	if err != nil {
 		return nil, err
 	}
-	settings.SigningPhrase = signingPhrase
+	s.SigningPhrase = signingPhrase
 
-	settings.SendPushNotifications = true
-	settings.InstallationID = uuid.New().String()
-	settings.UseMailservers = true
+	s.SendPushNotifications = true
+	s.InstallationID = uuid.New().String()
+	s.UseMailservers = true
 
-	settings.PreviewPrivacy = true
-	settings.Currency = "usd"
-	settings.ProfilePicturesVisibility = 1
-	settings.LinkPreviewRequestEnabled = true
+	s.PreviewPrivacy = true
+	s.Currency = "usd"
+	s.ProfilePicturesVisibility = 1
+	s.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
@@ -68,7 +72,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	settings.WalletVisibleTokens = &visibleTokenJSONRaw
+	s.WalletVisibleTokens = &visibleTokenJSONRaw
 
 	// TODO: fix this
 	networks := make([]map[string]string, 0)
@@ -77,10 +81,10 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	networkRawMessage := json.RawMessage(networksJSON)
-	settings.Networks = &networkRawMessage
-	settings.CurrentNetwork = "mainnet_rpc"
+	s.Networks = &networkRawMessage
+	s.CurrentNetwork = "mainnet_rpc"
 
-	return settings, nil
+	return s, nil
 }
 
 func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
@@ -88,7 +92,8 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogEnabled = request.LogEnabled
-	nodeConfig.LogFile = request.LogFilePath
+	nodeConfig.LogFile = "geth.log"
+	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
 
@@ -96,11 +101,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.LogLevel = *request.LogLevel
 	}
 
-	nodeConfig.APIModules = "wakuext,ext,waku"
-
-	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
-		Enabled: true,
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
+	if request.UpstreamConfig != "" {
+		nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
+			Enabled: true,
+			URL:     request.UpstreamConfig,
+		}
 	}
 
 	nodeConfig.Name = "StatusIM"
@@ -124,6 +129,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
 	nodeConfig.ClusterConfig.WakuNodes = nodes
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
+	nodeConfig.ListenAddr = ":0"
 
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
@@ -139,6 +145,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
+		BackupDisabledDataDir:      request.BackupDisabledDataDir,
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: 6,
 		MailServerConfirmations:    true,
