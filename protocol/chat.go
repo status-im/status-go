@@ -229,7 +229,7 @@ func (c *Chat) PrivateGroupChat() bool {
 }
 
 func (c *Chat) IsActivePersonalChat() bool {
-	return c.Active && (c.OneToOne() || c.PrivateGroupChat() && c.Public()) && c.CommunityID == ""
+	return c.Active && (c.OneToOne() || c.PrivateGroupChat() || c.Public()) && c.CommunityID == ""
 }
 
 func (c *Chat) CommunityChatID() string {
