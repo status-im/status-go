@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -31,6 +33,28 @@ type ClientWithFallback struct {
 
 	IsConnected   bool
 	LastCheckedAt int64
+}
+
+var vmErrors = []error{
+	vm.ErrOutOfGas,
+	vm.ErrCodeStoreOutOfGas,
+	vm.ErrDepth,
+	vm.ErrInsufficientBalance,
+	vm.ErrContractAddressCollision,
+	vm.ErrExecutionReverted,
+	vm.ErrMaxCodeSizeExceeded,
+	vm.ErrInvalidJump,
+	vm.ErrWriteProtection,
+	vm.ErrReturnDataOutOfBounds,
+	vm.ErrGasUintOverflow,
+	vm.ErrInvalidCode,
+	vm.ErrNonceUintOverflow,
+}
+
+type CommandResult struct {
+	res1    any
+	res2    any
+	vmError error
 }
 
 func NewSimpleClient(main *rpc.Client, chainID uint64) *ClientWithFallback {
@@ -82,16 +106,31 @@ func (c *ClientWithFallback) Close() {
 	}
 }
 
+func isVMError(err error) bool {
+	if strings.HasPrefix(err.Error(), "execution reverted") {
+		return true
+	}
+	for _, vmError := range vmErrors {
+		if err == vmError {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func() error) error {
-	output := make(chan struct{}, 1)
+	resultChan := make(chan CommandResult, 1)
 	c.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go(fmt.Sprintf("ethClient_%d", c.ChainID), func() error {
 		err := main()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+			}
 			return err
 		}
 		c.IsConnected = true
-		output <- struct{}{}
+		resultChan <- CommandResult{}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
@@ -104,12 +143,15 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 			return err
 		}
 		c.IsConnected = true
-		output <- struct{}{}
+		resultChan <- CommandResult{}
 		return nil
 	})
 
 	select {
-	case <-output:
+	case result := <-resultChan:
+		if result.vmError != nil {
+			return result.vmError
+		}
 		return nil
 	case err := <-errChan:
 		return err
@@ -117,15 +159,18 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 }
 
 func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fallback func() (any, error)) (any, error) {
-	resultChan := make(chan any, 1)
+	resultChan := make(chan CommandResult, 1)
 	c.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go(fmt.Sprintf("ethClient_%d", c.ChainID), func() error {
 		res, err := main()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+			}
 			return err
 		}
 		c.IsConnected = true
-		resultChan <- res
+		resultChan <- CommandResult{res1: res}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
@@ -138,28 +183,33 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 			return err
 		}
 		c.IsConnected = true
-		resultChan <- res
+		resultChan <- CommandResult{res1: res}
 		return nil
 	})
 	select {
 	case result := <-resultChan:
-		return result, nil
+		if result.vmError != nil {
+			return nil, result.vmError
+		}
+		return result.res1, nil
 	case err := <-errChan:
-
 		return nil, err
 	}
 }
 
 func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error), fallback func() (any, any, error)) (any, any, error) {
-	resultChan := make(chan []any, 1)
+	resultChan := make(chan CommandResult, 1)
 	c.LastCheckedAt = time.Now().Unix()
 	errChan := hystrix.Go(fmt.Sprintf("ethClient_%d", c.ChainID), func() error {
 		a, b, err := main()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+			}
 			return err
 		}
 		c.IsConnected = true
-		resultChan <- []any{a, b}
+		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
@@ -172,13 +222,16 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 			return err
 		}
 		c.IsConnected = true
-		resultChan <- []any{a, b}
+		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	})
 
 	select {
 	case result := <-resultChan:
-		return result[0], result[1], nil
+		if result.vmError != nil {
+			return nil, nil, result.vmError
+		}
+		return result.res1, result.res2, nil
 	case err := <-errChan:
 		return nil, nil, err
 	}
