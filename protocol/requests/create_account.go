@@ -25,11 +25,13 @@ type CreateAccount struct {
 	VerifyENSURL             *string `json:"verifyENSURL"`
 	VerifyENSContractAddress *string `json:"verifyENSContractAddress"`
 	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
+	UpstreamConfig           string  `json:"upstreamConfig"`
 	WakuV2Nameserver         *string `json:"wakuV2Nameserver"`
 	LogLevel                 *string `json:"logLevel"`
 	LogFilePath              string  `json:"logFilePath"`
 	LogEnabled               bool    `json:"logEnabled"`
 	PreviewPrivacy           bool    `json:"previewPrivacy"`
+	CurrentNetwork           string  `json:"currentNetwork"`
 }
 
 func (c *CreateAccount) Validate() error {
