@@ -132,14 +132,28 @@ func (tm *Manager) fetchTokens() {
 	tm.tokenList = nil
 	tm.tokenMap = nil
 
+	networks, err := tm.networkManager.Get(false)
+	if err != nil {
+		return
+	}
+
 	for _, store := range tm.stores {
 		tokens, err := store.GetTokens()
 		if err != nil {
 			log.Error("can't fetch tokens from store: %s", err)
 			continue
 		}
+		validTokens := make([]*Token, 0)
+		for _, token := range tokens {
+			for _, network := range networks {
+				if network.ChainID == token.ChainID {
+					validTokens = append(validTokens, token)
+					break
+				}
+			}
+		}
 
-		tm.tokenList = mergeTokenLists([][]*Token{tm.tokenList, tokens})
+		tm.tokenList = mergeTokenLists([][]*Token{tm.tokenList, validTokens})
 	}
 
 	tm.tokenMap = toTokenMap(tm.tokenList)
