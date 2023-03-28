@@ -792,7 +792,22 @@ func ColorID(pk string) string {
 func ValidateMnemonic(mnemonic string) string {
 	m := extkeys.NewMnemonic()
 	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
-	return makeJSONResponse(err)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	keyUID, err := statusBackend.GetKeyUIDByMnemonic(mnemonic)
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	response := &APIKeyUIDResponse{KeyUID: keyUID}
+	data, err := json.Marshal(response)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return string(data)
 }
 
 // DecompressPublicKey decompresses 33-byte compressed format to uncompressed 65-byte format.

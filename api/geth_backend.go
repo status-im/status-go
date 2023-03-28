@@ -721,6 +721,17 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 	return b.generateOrImportAccount(request.Mnemonic, &request.CreateAccount)
 }
 
+func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
+	accountGenerator := b.accountManager.AccountsGenerator()
+
+	info, err := accountGenerator.ImportMnemonic(mnemonic, "")
+	if err != nil {
+		return "", err
+	}
+
+	return info.KeyUID, nil
+}
+
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
 	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)); err != nil {
 		return err

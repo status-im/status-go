@@ -11,6 +11,11 @@ type APIResponse struct {
 	Error string `json:"error"`
 }
 
+// APIKeyUIDResponse
+type APIKeyUIDResponse struct {
+	KeyUID string `json:"keyUID"`
+}
+
 // APIDetailedResponse represents a generic response
 // with possible errors.
 type APIDetailedResponse struct {
