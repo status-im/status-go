@@ -133,7 +133,7 @@ func (c *ClientWithFallback) setIsConnected(value bool) {
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
 		c.consecutiveFailureCount += 1
-		if c.consecutiveFailureCount > 3 && c.IsConnected {
+		if c.consecutiveFailureCount > 1 && c.IsConnected {
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "down")
 			}
@@ -169,15 +169,19 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
+			c.setIsConnected(false)
 			return err
 		}
 
 		err = fallback()
 		if err != nil {
+<<<<<<< HEAD
 			if isVMError(err) {
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
+=======
+>>>>>>> fdaa1ce1b (fix: set is connected for chain without fallback)
 			c.setIsConnected(false)
 			return err
 		}
@@ -214,6 +218,7 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
+			c.setIsConnected(false)
 			return err
 		}
 
@@ -263,6 +268,7 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
+			c.setIsConnected(false)
 			return err
 		}
 
