@@ -38,18 +38,18 @@ func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *Raw
 	return err
 }
 
-func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) ([]byte, error) {
+func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rsm protobuf.SyncRawMessage, err error) {
 	messenger := s.backend.Messenger()
 	if messenger == nil {
-		return nil, fmt.Errorf("messenger is nil when PrepareRawMessage")
+		return rsm, fmt.Errorf("messenger is nil when PrepareRawMessage")
 	}
 
 	currentAccount, err := s.backend.GetActiveAccount()
 	if err != nil {
-		return nil, err
+		return
 	}
 	if keyUID != currentAccount.KeyUID {
-		return nil, fmt.Errorf("keyUID not equal")
+		return rsm, fmt.Errorf("keyUID not equal")
 	}
 
 	messenger.SetLocalPairing(true)
@@ -59,15 +59,15 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) ([]
 	rawMessageCollector := new(RawMessageCollector)
 	err = messenger.SyncDevices(context.TODO(), currentAccount.Name, currentAccount.Identicon, rawMessageCollector.dispatchMessage)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	err = s.CollectInstallationData(rawMessageCollector, deviceType)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	syncRawMessage := rawMessageCollector.convertToSyncRawMessage()
+	rsm = rawMessageCollector.convertToSyncRawMessage()
 
 	accountService := s.backend.StatusNode().AccountService()
 	var (
@@ -76,22 +76,22 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) ([]
 	)
 	subAccounts, err = accountService.GetAccountsByKeyUID(keyUID)
 	if err != nil {
-		return nil, err
+		return
 	}
-	syncRawMessage.SubAccountsJsonBytes, err = json.Marshal(subAccounts)
+	rsm.SubAccountsJsonBytes, err = json.Marshal(subAccounts)
 	if err != nil {
-		return nil, err
+		return
 	}
 	setting, err = accountService.GetSettings()
 	if err != nil {
-		return nil, err
+		return
 	}
-	syncRawMessage.SettingsJsonBytes, err = json.Marshal(setting)
+	rsm.SettingsJsonBytes, err = json.Marshal(setting)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	return proto.Marshal(syncRawMessage)
+	return
 }
 
 func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, rawMessagePayload []byte) error {

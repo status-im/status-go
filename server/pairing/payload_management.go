@@ -103,6 +103,21 @@ func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
 
+// RawMessagePayloadMarshaller is responsible for marshalling and unmarshalling raw message data
+type RawMessagePayloadMarshaller struct {
+	payload *protobuf.SyncRawMessage
+}
+
+func NewRawMessagePayloadMarshaller(payload *protobuf.SyncRawMessage) *RawMessagePayloadMarshaller {
+	return &RawMessagePayloadMarshaller{
+		payload: payload,
+	}
+}
+
+func (rmm *RawMessagePayloadMarshaller) MarshalProtobuf() ([]byte, error) {
+	return proto.Marshal(rmm.payload)
+}
+
 // InstallationPayloadMounterReceiver represents an InstallationPayload Repository
 type InstallationPayloadMounterReceiver struct {
 	*InstallationPayloadMounter

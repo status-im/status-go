@@ -1,11 +1,11 @@
 package pairing
 
 import (
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type PayloadMounter interface {
@@ -31,31 +31,26 @@ type BasePayloadMounter struct {
 	encryptor         *PayloadEncryptor
 }
 
-func NewBasePayloadMounter(e *PayloadEncryptor) *BasePayloadMounter {
+func NewBasePayloadMounter(loader PayloadLoader, marshaller ProtobufMarshaller, e *PayloadEncryptor) *BasePayloadMounter {
 	return &BasePayloadMounter{
 		PayloadLockPayload: &PayloadLockPayload{e},
 		PayloadToSend:      &PayloadToSend{e},
+		payloadLoader:      loader,
+		payloadMarshaller:  marshaller,
+		encryptor:          e,
 	}
 }
 
+// Mount loads and prepares the payload to be stored in the PayloadLoader's state ready for later access
 func (bpm *BasePayloadMounter) Mount() error {
-	var p []byte
-
 	err := bpm.payloadLoader.Load()
 	if err != nil {
 		return err
 	}
 
-	if bpm.payloadMarshaller != nil {
-		p, err = bpm.payloadMarshaller.MarshalProtobuf()
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(p) == 0 {
-		// TODO get payload from loader ... or make all mounters require a marshaller that implements:
-		//  `ProtobufMarshaller` and `ProtobufUnmarshaller`
+	p, err := bpm.payloadMarshaller.MarshalProtobuf()
+	if err != nil {
+		return err
 	}
 
 	return bpm.encryptor.encrypt(p)
@@ -73,12 +68,6 @@ func (bpm *BasePayloadMounter) Mount() error {
 // AccountPayloadMounter is responsible for the whole lifecycle of an AccountPayload
 type AccountPayloadMounter struct {
 	*BasePayloadMounter
-
-	logger                   *zap.Logger
-	accountPayload           *AccountPayload
-	encryptor                *PayloadEncryptor
-	accountPayloadMarshaller *AccountPayloadMarshaller
-	payloadLoader            PayloadLoader
 }
 
 // NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
@@ -96,28 +85,12 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 	}
 
 	return &AccountPayloadMounter{
-		BasePayloadMounter:       NewBasePayloadMounter(pe),
-		logger:                   l,
-		accountPayload:           p,
-		encryptor:                pe,
-		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
-		payloadLoader:            apl,
+		BasePayloadMounter: NewBasePayloadMounter(
+			apl,
+			NewPairingPayloadMarshaller(p, l),
+			pe,
+		),
 	}, nil
-}
-
-// Mount loads and prepares the payload to be stored in the AccountPayloadLoader's state ready for later access
-func (apm *AccountPayloadMounter) Mount() error {
-	err := apm.payloadLoader.Load()
-	if err != nil {
-		return err
-	}
-
-	pb, err := apm.accountPayloadMarshaller.MarshalProtobuf()
-	if err != nil {
-		return err
-	}
-
-	return apm.encryptor.encrypt(pb)
 }
 
 // AccountPayloadLoader is responsible for loading, parsing and validating AccountPayload data
@@ -176,51 +149,39 @@ func (apl *AccountPayloadLoader) Load() error {
 
 type RawMessagePayloadMounter struct {
 	*BasePayloadMounter
-
-	logger    *zap.Logger
-	encryptor *PayloadEncryptor
-	loader    *RawMessageLoader
 }
 
 func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
-	l := logger.Named("RawMessagePayloadManager")
-
 	pe = pe.Renew()
+	payload := new(protobuf.SyncRawMessage)
 
 	return &RawMessagePayloadMounter{
-		BasePayloadMounter: NewBasePayloadMounter(pe),
-		logger:             l,
-		encryptor:          pe.Renew(),
-		loader:             NewRawMessageLoader(backend, config),
+		BasePayloadMounter: NewBasePayloadMounter(
+			NewRawMessageLoader(backend, payload, config),
+			NewRawMessagePayloadMarshaller(payload),
+			pe,
+		),
 	}
-}
-
-func (r *RawMessagePayloadMounter) Mount() error {
-	err := r.loader.Load()
-	if err != nil {
-		return err
-	}
-	return r.encryptor.encrypt(r.loader.payload)
 }
 
 type RawMessageLoader struct {
-	payload               []byte
+	payload               *protobuf.SyncRawMessage
 	syncRawMessageHandler *SyncRawMessageHandler
 	keyUID                string
 	deviceType            string
 }
 
-func NewRawMessageLoader(backend *api.GethStatusBackend, config *SenderConfig) *RawMessageLoader {
+func NewRawMessageLoader(backend *api.GethStatusBackend, payload *protobuf.SyncRawMessage, config *SenderConfig) *RawMessageLoader {
 	return &RawMessageLoader{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
-		payload:               make([]byte, 0),
+		payload:               payload,
 		keyUID:                config.KeyUID,
 		deviceType:            config.DeviceType,
 	}
 }
 
 func (r *RawMessageLoader) Load() (err error) {
-	r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
+	*r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
 	return err
 }
 
@@ -235,39 +196,30 @@ func (r *RawMessageLoader) Load() (err error) {
 
 type InstallationPayloadMounter struct {
 	*BasePayloadMounter
-
-	logger    *zap.Logger
-	encryptor *PayloadEncryptor
-	loader    *InstallationPayloadLoader
 }
 
 func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
 	pe = pe.Renew()
+	payload := new(protobuf.SyncRawMessage)
 
 	return &InstallationPayloadMounter{
-		BasePayloadMounter: NewBasePayloadMounter(pe),
-		logger:             logger.Named("InstallationPayloadManager"),
-		encryptor:          pe.Renew(),
-		loader:             NewInstallationPayloadLoader(backend, deviceType),
+		BasePayloadMounter: NewBasePayloadMounter(
+			NewInstallationPayloadLoader(backend, payload, deviceType),
+			NewRawMessagePayloadMarshaller(payload),
+			pe,
+		),
 	}
-}
-
-func (i *InstallationPayloadMounter) Mount() error {
-	err := i.loader.Load()
-	if err != nil {
-		return err
-	}
-	return i.encryptor.encrypt(i.loader.payload)
 }
 
 type InstallationPayloadLoader struct {
-	payload               []byte
+	payload               *protobuf.SyncRawMessage
 	syncRawMessageHandler *SyncRawMessageHandler
 	deviceType            string
 }
 
-func NewInstallationPayloadLoader(backend *api.GethStatusBackend, deviceType string) *InstallationPayloadLoader {
+func NewInstallationPayloadLoader(backend *api.GethStatusBackend, payload *protobuf.SyncRawMessage, deviceType string) *InstallationPayloadLoader {
 	return &InstallationPayloadLoader{
+		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		deviceType:            deviceType,
 	}
@@ -279,8 +231,8 @@ func (r *InstallationPayloadLoader) Load() error {
 	if err != nil {
 		return err
 	}
-	r.payload, err = proto.Marshal(rawMessageCollector.convertToSyncRawMessage())
-	return err
+	*r.payload = rawMessageCollector.convertToSyncRawMessage()
+	return nil
 }
 
 /*
