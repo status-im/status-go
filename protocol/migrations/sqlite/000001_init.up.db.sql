@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS user_messages (
     command_state INT
 );
 
+CREATE INDEX idx_album_id on user_messages(local_chat_id, album_id);
 CREATE INDEX idx_source ON user_messages(source);
 CREATE INDEX idx_search_by_chat_id ON  user_messages(
     substr('0000000000000000000000000000000000000000000000000000000000000000' || clock_value, -64, 64) || id, chat_id, hide

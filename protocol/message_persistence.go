@@ -561,6 +561,16 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message,
 	return getMessageFromScanRows(db, rows)
 }
 
+func (db sqlitePersistence) albumMessages(chatID, albumID string) ([]*common.Message, error) {
+	query := db.buildMessagesQuery("WHERE m1.album_id = ? and m1.local_chat_id = ?")
+	rows, err := db.db.Query(query, albumID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return getMessagesFromScanRows(db, rows, false)
+}
+
 func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Message, error) {
 
 	where := `WHERE
@@ -580,6 +590,10 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Messa
 
 func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
 	return db.messageByID(nil, id)
+}
+
+func (db sqlitePersistence) AlbumMessages(chatID, albumID string) ([]*common.Message, error) {
+	return db.albumMessages(chatID, albumID)
 }
 
 func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error) {
