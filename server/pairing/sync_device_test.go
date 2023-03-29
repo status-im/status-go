@@ -363,13 +363,9 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
 	settings.WalletVisibleTokens = &visibleTokenJSONRaw
 
-	networks := make([]map[string]string, 0)
-	networksJSON, err := json.Marshal(networks)
-	if err != nil {
-		return nil, err
-	}
-	networkRawMessage := json.RawMessage(networksJSON)
-	settings.Networks = &networkRawMessage
+	networks := `[{"id":"goerli_rpc","chain-explorer-link":"https://goerli.etherscan.io/address/","name":"Goerli with upstream RPC","config":{"NetworkId":5,"DataDir":"/ethereum/goerli_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://goerli-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}},{"id":"mainnet_rpc","chain-explorer-link":"https://etherscan.io/address/","name":"Mainnet with upstream RPC","config":{"NetworkId":1,"DataDir":"/ethereum/mainnet_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}}]`
+	var networksRawMessage json.RawMessage = []byte(networks)
+	settings.Networks = &networksRawMessage
 	settings.CurrentNetwork = currentNetwork
 
 	return settings, nil
@@ -407,7 +403,7 @@ func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
-		BackupDisabledDataDir:      "",
+		BackupDisabledDataDir:      nodeConfig.DataDir,
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: 6,
 		MailServerConfirmations:    true,

@@ -10,26 +10,29 @@ import (
 
 type SenderConfig struct {
 	// SenderConfig.KeystorePath must end with keyUID
-	KeystorePath string `json:"keystorePath"`
+	KeystorePath string `json:"keystorePath" validate:"required,keystorepath"`
 	// DeviceType SendPairInstallation need this information
-	DeviceType string `json:"deviceType"`
+	DeviceType string `json:"deviceType" validate:"required"`
 
-	KeyUID   string `json:"keyUID"`
-	Password string `json:"password"`
+	KeyUID   string `json:"keyUID" validate:"required,keyuid"`
+	Password string `json:"password" validate:"required"`
 
 	DB *multiaccounts.Database `json:"-"`
 }
 
 type ReceiverConfig struct {
+	// nodeConfig is required, but we'll validate it separately
 	NodeConfig *params.NodeConfig `json:"nodeConfig"`
 
 	// ReceiverConfig.KeystorePath must not end with keyUID (because keyUID is not known yet)
-	KeystorePath string `json:"keystorePath"`
+	KeystorePath string `json:"keystorePath" validate:"required,not_end_keyuid"`
+
 	// DeviceType SendPairInstallation need this information
-	DeviceType    string `json:"deviceType"`
-	KDFIterations int    `json:"kdfIterations"`
+	DeviceType    string `json:"deviceType" validate:"required"`
+	KDFIterations int    `json:"kdfIterations" validate:"gte=0"`
+
 	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
-	SettingCurrentNetwork string `json:"settingCurrentNetwork"`
+	SettingCurrentNetwork string `json:"settingCurrentNetwork" validate:"required"`
 
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
@@ -37,7 +40,7 @@ type ReceiverConfig struct {
 
 type ServerConfig struct {
 	// Timeout the number of milliseconds after which the pairing server will automatically terminate
-	Timeout uint `json:"timeout"`
+	Timeout uint `json:"timeout" validate:"omitempty,gte=0"`
 
 	// Connection fields, not json (un)marshalled
 	// Required for the server, but MUST NOT come from client
@@ -51,23 +54,23 @@ type ServerConfig struct {
 type ClientConfig struct{}
 
 type SenderServerConfig struct {
-	SenderConfig *SenderConfig `json:"senderConfig"`
-	ServerConfig *ServerConfig `json:"serverConfig"`
+	SenderConfig *SenderConfig `json:"senderConfig" validate:"required"`
+	ServerConfig *ServerConfig `json:"serverConfig" validate:"omitempty,dive"`
 }
 
 type SenderClientConfig struct {
-	SenderConfig *SenderConfig `json:"senderConfig"`
+	SenderConfig *SenderConfig `json:"senderConfig" validate:"required"`
 	ClientConfig *ClientConfig `json:"clientConfig"`
 }
 
 type ReceiverClientConfig struct {
-	ReceiverConfig *ReceiverConfig `json:"receiverConfig"`
+	ReceiverConfig *ReceiverConfig `json:"receiverConfig" validate:"required"`
 	ClientConfig   *ClientConfig   `json:"clientConfig"`
 }
 
 type ReceiverServerConfig struct {
-	ReceiverConfig *ReceiverConfig `json:"receiverConfig"`
-	ServerConfig   *ServerConfig   `json:"serverConfig"`
+	ReceiverConfig *ReceiverConfig `json:"receiverConfig" validate:"required"`
+	ServerConfig   *ServerConfig   `json:"serverConfig" validate:"omitempty,dive"`
 }
 
 func NewSenderServerConfig() *SenderServerConfig {
