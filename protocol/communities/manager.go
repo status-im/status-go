@@ -1064,6 +1064,10 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+	if signer == nil {
+		return nil, errors.New("signer can't be nil")
+	}
+
 	id := crypto.CompressPubkey(signer)
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
