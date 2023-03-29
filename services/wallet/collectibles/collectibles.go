@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -15,10 +14,6 @@ import (
 )
 
 const requestTimeout = 5 * time.Second
-
-func erc721MetadataInterfaceID() [4]byte {
-	return [...]byte{0x5b, 0x5e, 0x13, 0x9f} // 0x5b5e139f
-}
 
 type Manager struct {
 	rpcClient        *rpc.Client
@@ -125,35 +120,6 @@ func isMetadataEmpty(asset opensea.Asset) bool {
 		asset.TokenURI == ""
 }
 
-func (o *Manager) supportsERC721Metadata(chainID uint64, contractAddress common.Address) (bool, error) {
-	backend, err := o.rpcClient.EthClient(chainID)
-	if err != nil {
-		return false, err
-	}
-
-	caller, err := collectibles.NewCollectiblesCaller(contractAddress, backend)
-	if err != nil {
-		return false, err
-	}
-
-	timeoutContext, timeoutCancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer timeoutCancel()
-
-	supports, err := caller.SupportsInterface(&bind.CallOpts{
-		Context: timeoutContext,
-	}, erc721MetadataInterfaceID())
-
-	if err != nil {
-		if strings.HasPrefix(err.Error(), vm.ErrExecutionReverted.Error()) {
-			// Contract doesn't support "SupportsInterface"
-			return false, nil
-		}
-		return false, err
-	}
-
-	return supports, nil
-}
-
 func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.NFTUniqueID) (string, error) {
 	backend, err := o.rpcClient.EthClient(chainID)
 	if err != nil {
@@ -168,9 +134,19 @@ func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.NFTUniqueID) (stri
 	timeoutContext, timeoutCancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer timeoutCancel()
 
-	return caller.TokenURI(&bind.CallOpts{
+	tokenURI, err := caller.TokenURI(&bind.CallOpts{
 		Context: timeoutContext,
 	}, id.TokenID.Int)
+
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "execution reverted") {
+			// Contract doesn't support "TokenURI" method
+			return "", nil
+		}
+		return "", err
+	}
+
+	return tokenURI, err
 }
 
 func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
@@ -181,39 +157,31 @@ func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
 				TokenID:         asset.TokenID,
 			}
 
-			supportsERC721Metadata, err := o.supportsERC721Metadata(chainID, id.ContractAddress)
+			tokenURI, err := o.fetchTokenURI(chainID, id)
 
 			if err != nil {
 				return err
 			}
 
-			if supportsERC721Metadata {
-				tokenURI, err := o.fetchTokenURI(chainID, id)
+			assets[idx].TokenURI = tokenURI
 
+			canProvide, err := o.metadataProvider.CanProvideNFTMetadata(chainID, id, tokenURI)
+
+			if err != nil {
+				return err
+			}
+
+			if canProvide {
+				metadata, err := o.metadataProvider.FetchNFTMetadata(chainID, id, tokenURI)
 				if err != nil {
 					return err
 				}
 
-				assets[idx].TokenURI = tokenURI
-
-				canProvide, err := o.metadataProvider.CanProvideNFTMetadata(chainID, id, tokenURI)
-
-				if err != nil {
-					return err
-				}
-
-				if canProvide {
-					metadata, err := o.metadataProvider.FetchNFTMetadata(chainID, id, tokenURI)
-					if err != nil {
-						return err
-					}
-
-					if metadata != nil {
-						assets[idx].Name = metadata.Name
-						assets[idx].Description = metadata.Description
-						assets[idx].Collection.ImageURL = metadata.ImageURL
-						assets[idx].ImageURL = metadata.ImageURL
-					}
+				if metadata != nil {
+					assets[idx].Name = metadata.Name
+					assets[idx].Description = metadata.Description
+					assets[idx].Collection.ImageURL = metadata.CollectionImageURL
+					assets[idx].ImageURL = metadata.ImageURL
 				}
 			}
 		}

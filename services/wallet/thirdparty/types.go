@@ -47,9 +47,10 @@ type NFTUniqueID struct {
 }
 
 type NFTMetadata struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	ImageURL    string `json:"image"`
+	Name               string `json:"name"`
+	Description        string `json:"description"`
+	CollectionImageURL string `json:"collection_image"`
+	ImageURL           string `json:"image"`
 }
 
 type NFTMetadataProvider interface {
