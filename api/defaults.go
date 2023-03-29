@@ -90,7 +90,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
-	nodeConfig.NetworkID = 1
+	nodeConfig.NetworkID = request.NetworkID
 	nodeConfig.LogEnabled = request.LogEnabled
 	nodeConfig.LogFile = "geth.log"
 	nodeConfig.LogDir = request.LogFilePath

@@ -32,6 +32,7 @@ type CreateAccount struct {
 	LogEnabled               bool    `json:"logEnabled"`
 	PreviewPrivacy           bool    `json:"previewPrivacy"`
 	CurrentNetwork           string  `json:"currentNetwork"`
+	NetworkID                uint64  `json:"networkId"`
 }
 
 func (c *CreateAccount) Validate() error {

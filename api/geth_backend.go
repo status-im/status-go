@@ -733,9 +733,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
-	if err := b.accountManager.InitKeystore(filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)); err != nil {
-		return err
-	}
+	keystoreDir := filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
@@ -768,6 +766,12 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 
+	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
+	// Initialize keystore dir with account
+	if err := b.accountManager.InitKeystore(userKeyStoreDir); err != nil {
+		return err
+	}
+
 	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
 	if err != nil {
 		return err
@@ -797,6 +801,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	if err != nil {
 		return err
 	}
+
+	nodeConfig.KeyStoreDir = userKeyStoreDir
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
@@ -986,6 +992,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	nodecfg *params.NodeConfig,
 	subaccs []*accounts.Account,
 ) error {
+	b.log.Info("node config", "config", nodecfg)
 	err := b.SaveAccount(account)
 	if err != nil {
 		return err
