@@ -569,9 +569,10 @@ func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, to
 			contractAddresses := tokenMetadata.GetContractAddresses()
 			if contractAddresses[chainID] == id.ContractAddress.Hex() {
 				return &thirdparty.NFTMetadata{
-					Name:        tokenMetadata.GetName(),
-					Description: tokenMetadata.GetDescription(),
-					ImageURL:    tokenMetadata.GetImage(),
+					Name:               tokenMetadata.GetName(),
+					Description:        tokenMetadata.GetDescription(),
+					CollectionImageURL: tokenMetadata.GetImage(),
+					ImageURL:           tokenMetadata.GetImage(),
 				}, nil
 			}
 		}
