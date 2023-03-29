@@ -96,7 +96,7 @@ func (api *API) SendMessage(ctx context.Context, communityID types.HexBytes, cha
 	return api.toSendMessageResponse(response)
 }
 
-func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chatID string, imagePaths []string, text string) (*SendMessageResponse, error) {
+func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chatID string, imagePaths []string, text string, responseTo string) (*SendMessageResponse, error) {
 	ensName, _ := api.s.accountsDB.GetPreferredUsername()
 
 	var messages []*common.Message
@@ -108,6 +108,7 @@ func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chat
 				ChatId:      chatID,
 				ContentType: protobuf.ChatMessage_IMAGE,
 				Text:        "Update to latest version to see a nice image here!",
+				ResponseTo:  responseTo,
 				EnsName:     ensName,
 			},
 			ImagePath: imagePath,
@@ -121,6 +122,7 @@ func (api *API) SendImages(ctx context.Context, communityID types.HexBytes, chat
 				ChatId:      chatID,
 				ContentType: isTextOrEmoji(text),
 				Text:        text,
+				ResponseTo:  responseTo,
 				EnsName:     ensName,
 			},
 		})
