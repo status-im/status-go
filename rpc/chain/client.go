@@ -126,6 +126,7 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 		if err != nil {
 			if isVMError(err) {
 				resultChan <- CommandResult{vmError: err}
+				return nil
 			}
 			return err
 		}
@@ -139,6 +140,10 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 
 		err = fallback()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+				return nil
+			}
 			c.IsConnected = false
 			return err
 		}
@@ -166,6 +171,7 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 		if err != nil {
 			if isVMError(err) {
 				resultChan <- CommandResult{vmError: err}
+				return nil
 			}
 			return err
 		}
@@ -179,6 +185,10 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 
 		res, err := fallback()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+				return nil
+			}
 			c.IsConnected = false
 			return err
 		}
@@ -186,6 +196,7 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 		resultChan <- CommandResult{res1: res}
 		return nil
 	})
+
 	select {
 	case result := <-resultChan:
 		if result.vmError != nil {
@@ -205,6 +216,7 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 		if err != nil {
 			if isVMError(err) {
 				resultChan <- CommandResult{vmError: err}
+				return nil
 			}
 			return err
 		}
@@ -218,6 +230,10 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 
 		a, b, err := fallback()
 		if err != nil {
+			if isVMError(err) {
+				resultChan <- CommandResult{vmError: err}
+				return nil
+			}
 			c.IsConnected = false
 			return err
 		}
