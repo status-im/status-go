@@ -1593,7 +1593,7 @@ func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
 
 	for chainID, erc721Tokens := range tokenRequirements {
-		client, err := opensea.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey)
+		client, err := opensea.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
 		if err != nil {
 			return nil, err
 		}

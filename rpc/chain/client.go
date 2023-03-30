@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-<<<<<<< HEAD
 	"strings"
-=======
->>>>>>> 6fcba6e30 (feat: add buffer for status event)
 	"sync"
 	"time"
 
@@ -175,13 +172,10 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 
 		err = fallback()
 		if err != nil {
-<<<<<<< HEAD
 			if isVMError(err) {
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-=======
->>>>>>> fdaa1ce1b (fix: set is connected for chain without fallback)
 			c.setIsConnected(false)
 			return err
 		}
@@ -218,7 +212,9 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
-			c.setIsConnected(false)
+			if toggleIsConnected {
+				c.setIsConnected(false)
+			}
 			return err
 		}
 

@@ -204,6 +204,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	group.Add(func(parent context.Context) error {
 		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
+			log.Info("tokenManager.GetBalancesByChain err", err)
 			return err
 		}
 		return nil
@@ -215,10 +216,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		return nil, ctx.Err()
 	}
 	err = group.Error()
-	if err != nil {
-		return nil, err
-	}
-
 	result := make(map[common.Address][]Token)
 	for _, address := range addresses {
 		for symbol, tokens := range getTokenBySymbols(allTokens) {
@@ -235,7 +232,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				}
 				hasError := false
 				if client, ok := clients[token.ChainID]; ok {
-					hasError = !client.IsConnected
+					hasError = err != nil || !client.IsConnected
 				}
 				balancesPerChain[token.ChainID] = ChainBalance{
 					Balance:  balance,
