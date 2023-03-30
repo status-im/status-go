@@ -13,7 +13,7 @@ import (
 )
 
 // syncSettings syncs all settings that are syncable
-func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64) (resultRaw []*common.RawMessage, resultSync []*protobuf.SyncSetting, errors []error) {
+func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultRaw []*common.RawMessage, resultSync []*protobuf.SyncSetting, errors []error) {
 	s, err := m.settings.GetSettings()
 	if err != nil {
 		errors = append(errors, err)
@@ -26,6 +26,11 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64) (resultRaw 
 
 	for _, sf := range settings.SettingFieldRegister {
 		if sf.CanSync(settings.FromStruct) {
+			// DisplayName is backed up via `protobuf.BackedUpProfile` message.
+			if prepareForBackup && sf.SyncProtobufFactory().SyncSettingProtobufType() == protobuf.SyncSetting_DISPLAY_NAME {
+				continue
+			}
+
 			// Pull clock from the db
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {
@@ -56,7 +61,7 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncSettings")
 
 	clock, _ := m.getLastClockWithRelatedChat()
-	rawMessages, _, errors := m.prepareSyncSettingsMessages(clock)
+	rawMessages, _, errors := m.prepareSyncSettingsMessages(clock, false)
 
 	if len(errors) != 0 {
 		// return just the first error, the others have been logged
