@@ -69,6 +69,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		image_payload,
 		image_type,
 		album_id,
+		album_images_count,
 		image_width,
 		image_height,
 		image_base64,
@@ -124,6 +125,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.image_payload,
 		m1.image_type,
 		COALESCE(m1.album_id, ""),
+		COALESCE(m1.album_images_count, 0),
 		COALESCE(m1.image_width, 0),
 		COALESCE(m1.image_height, 0),
 		COALESCE(m1.audio_duration_ms,0),
@@ -215,6 +217,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 	var contactVerificationState sql.NullInt64
+	var albumImagesCount sql.NullInt16
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -252,6 +255,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&image.Payload,
 		&image.Type,
 		&image.AlbumId,
+		&albumImagesCount,
 		&image.Width,
 		&image.Height,
 		&audio.DurationMs,
@@ -339,6 +343,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if contactVerificationState.Valid {
 		message.ContactVerificationState = common.ContactVerificationState(contactVerificationState.Int64)
+	}
+
+	if albumImagesCount.Valid {
+		message.AlbumImagesCount = int(albumImagesCount.Int16)
 	}
 
 	if quotedText.Valid {
@@ -490,6 +498,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		image.Payload,
 		image.Type,
 		image.AlbumId,
+		message.AlbumImagesCount,
 		image.Width,
 		image.Height,
 		message.Base64Image,

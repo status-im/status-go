@@ -116,6 +116,18 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.NoError(err)
 	response, err := s.m.SendChatMessages(context.Background(), album)
 	s.NoError(err)
+
+	// Check that album count was the number of the images sent
+	imagesCount := 0
+	for _, message := range response.Messages() {
+		if message.ContentType == protobuf.ChatMessage_IMAGE {
+			imagesCount++
+		}
+	}
+	for _, message := range response.Messages() {
+		s.Require().Equal(message.AlbumImagesCount, imagesCount)
+	}
+
 	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), messageCount)
