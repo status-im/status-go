@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -19,6 +20,8 @@ type Manager struct {
 	rpcClient        *rpc.Client
 	metadataProvider thirdparty.NFTMetadataProvider
 	openseaAPIKey    string
+	nftCache         map[uint64]map[string]opensea.Asset
+	nftCacheLock     sync.RWMutex
 }
 
 func NewManager(rpcClient *rpc.Client, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string) *Manager {
@@ -26,6 +29,7 @@ func NewManager(rpcClient *rpc.Client, metadataProvider thirdparty.NFTMetadataPr
 		rpcClient:        rpcClient,
 		metadataProvider: metadataProvider,
 		openseaAPIKey:    openseaAPIKey,
+		nftCache:         make(map[uint64]map[string]opensea.Asset),
 	}
 }
 
@@ -95,20 +99,30 @@ func (o *Manager) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cu
 }
 
 func (o *Manager) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdparty.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
-	client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
-	if err != nil {
-		return nil, err
+	assetContainer := new(opensea.AssetContainer)
+
+	idsToFetch := o.getIDsNotInCache(chainID, uniqueIDs)
+	if len(idsToFetch) > 0 {
+		client, err := opensea.NewOpenseaClient(chainID, o.openseaAPIKey)
+		if err != nil {
+			return nil, err
+		}
+
+		fetchedAssetContainer, err := client.FetchAssetsByNFTUniqueID(idsToFetch, limit)
+		if err != nil {
+			return nil, err
+		}
+
+		err = o.processAssets(chainID, fetchedAssetContainer.Assets)
+		if err != nil {
+			return nil, err
+		}
+
+		assetContainer.NextCursor = fetchedAssetContainer.NextCursor
+		assetContainer.PreviousCursor = fetchedAssetContainer.PreviousCursor
 	}
 
-	assetContainer, err := client.FetchAssetsByNFTUniqueID(uniqueIDs, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	err = o.processAssets(chainID, assetContainer.Assets)
-	if err != nil {
-		return nil, err
-	}
+	assetContainer.Assets = o.getCachedAssets(chainID, uniqueIDs)
 
 	return assetContainer, nil
 }
@@ -150,13 +164,20 @@ func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.NFTUniqueID) (stri
 }
 
 func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
-	for idx, asset := range assets {
-		if isMetadataEmpty(asset) {
-			id := thirdparty.NFTUniqueID{
-				ContractAddress: common.HexToAddress(asset.Contract.Address),
-				TokenID:         asset.TokenID,
-			}
+	o.nftCacheLock.Lock()
+	defer o.nftCacheLock.Unlock()
 
+	if _, ok := o.nftCache[chainID]; !ok {
+		o.nftCache[chainID] = make(map[string]opensea.Asset)
+	}
+
+	for idx, asset := range assets {
+		id := thirdparty.NFTUniqueID{
+			ContractAddress: common.HexToAddress(asset.Contract.Address),
+			TokenID:         asset.TokenID,
+		}
+
+		if isMetadataEmpty(asset) {
 			tokenURI, err := o.fetchTokenURI(chainID, id)
 
 			if err != nil {
@@ -185,7 +206,44 @@ func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
 				}
 			}
 		}
+
+		o.nftCache[chainID][id.HashKey()] = assets[idx]
 	}
 
 	return nil
+}
+
+func (o *Manager) getIDsNotInCache(chainID uint64, uniqueIDs []thirdparty.NFTUniqueID) []thirdparty.NFTUniqueID {
+	o.nftCacheLock.RLock()
+	defer o.nftCacheLock.RUnlock()
+
+	idsToFetch := make([]thirdparty.NFTUniqueID, 0, len(uniqueIDs))
+	if _, ok := o.nftCache[chainID]; !ok {
+		idsToFetch = uniqueIDs
+	} else {
+		for _, id := range uniqueIDs {
+			if _, ok := o.nftCache[chainID][id.HashKey()]; !ok {
+				idsToFetch = append(idsToFetch, id)
+			}
+		}
+	}
+	return idsToFetch
+}
+
+func (o *Manager) getCachedAssets(chainID uint64, uniqueIDs []thirdparty.NFTUniqueID) []opensea.Asset {
+	o.nftCacheLock.RLock()
+	defer o.nftCacheLock.RUnlock()
+
+	assets := make([]opensea.Asset, 0, len(uniqueIDs))
+
+	if _, ok := o.nftCache[chainID]; ok {
+		for _, id := range uniqueIDs {
+
+			if asset, ok := o.nftCache[chainID][id.HashKey()]; ok {
+				assets = append(assets, asset)
+			}
+		}
+	}
+
+	return assets
 }

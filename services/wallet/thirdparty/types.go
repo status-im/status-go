@@ -46,6 +46,10 @@ type NFTUniqueID struct {
 	TokenID         *bigint.BigInt `json:"tokenID"`
 }
 
+func (k *NFTUniqueID) HashKey() string {
+	return k.ContractAddress.String() + "+" + k.TokenID.String()
+}
+
 type NFTMetadata struct {
 	Name               string `json:"name"`
 	Description        string `json:"description"`
