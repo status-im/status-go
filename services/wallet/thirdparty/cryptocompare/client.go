@@ -51,7 +51,7 @@ func (c *Client) DoQuery(url string) (*http.Response, error) {
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	chunks := utils.ChunkSymbols(symbols)
+	chunks := utils.ChunkSymbols(symbols, 60)
 	result := make(map[string]map[string]float64)
 	realCurrencies := utils.RenameSymbols(currencies)
 	for _, smbls := range chunks {
@@ -113,32 +113,33 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 }
 
 func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	chunks := utils.ChunkSymbols(symbols)
 	realCurrency := utils.GetRealSymbol(currency)
-	realSymbols := utils.RenameSymbols(symbols)
 	item := map[string]thirdparty.TokenMarketValues{}
+	for _, smbls := range chunks {
+		realSymbols := utils.RenameSymbols(smbls)
+		url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", baseURL, strings.Join(realSymbols, ","), realCurrency)
+		resp, err := c.DoQuery(url)
+		if err != nil {
+			return item, err
+		}
+		defer resp.Body.Close()
 
-	url := fmt.Sprintf("%s/data/pricemultifull?fsyms=%s&tsyms=%s&extraParams=Status.im", baseURL, strings.Join(realSymbols, ","), realCurrency)
-	resp, err := c.DoQuery(url)
-	if err != nil {
-		return item, err
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return item, err
+		}
+
+		container := MarketValuesContainer{}
+		err = json.Unmarshal(body, &container)
+		if err != nil {
+			return item, err
+		}
+
+		for _, symbol := range smbls {
+			item[symbol] = container.Raw[utils.GetRealSymbol(symbol)][utils.GetRealSymbol(currency)]
+		}
 	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return item, err
-	}
-
-	container := MarketValuesContainer{}
-	err = json.Unmarshal(body, &container)
-	if err != nil {
-		return item, err
-	}
-
-	for _, symbol := range symbols {
-		item[symbol] = container.Raw[utils.GetRealSymbol(symbol)][utils.GetRealSymbol(currency)]
-	}
-
 	return item, nil
 }
 

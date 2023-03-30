@@ -22,7 +22,7 @@ func GetRealSymbol(symbol string) string {
 
 func ChunkSymbols(symbols []string, chunkSizeOptional ...int) [][]string {
 	var chunks [][]string
-	chunkSize := 20
+	chunkSize := 100
 	if len(chunkSizeOptional) > 0 {
 		chunkSize = chunkSizeOptional[0]
 	}
