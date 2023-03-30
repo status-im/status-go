@@ -120,7 +120,7 @@ func (rmm *RawMessagePayloadMarshaller) MarshalProtobuf() ([]byte, error) {
 
 // InstallationPayloadMounterReceiver represents an InstallationPayload Repository
 type InstallationPayloadMounterReceiver struct {
-	*InstallationPayloadMounter
+	PayloadMounter
 	*InstallationPayloadReceiver
 }
 
@@ -133,6 +133,6 @@ func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor *Payloa
 }
 
 func (i *InstallationPayloadMounterReceiver) LockPayload() {
-	i.InstallationPayloadMounter.LockPayload()
+	i.PayloadMounter.LockPayload()
 	i.InstallationPayloadReceiver.LockPayload()
 }
