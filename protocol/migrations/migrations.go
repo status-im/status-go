@@ -1787,7 +1787,7 @@ func _1680011500_add_album_images_countUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1680011500_add_album_images_count.up.sql", size: 71, mode: os.FileMode(0664), modTime: time.Unix(1680011510, 0)}
+	info := bindataFileInfo{name: "1680011500_add_album_images_count.up.sql", size: 71, mode: os.FileMode(0664), modTime: time.Unix(1680167411, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0x55, 0x99, 0x31, 0xcc, 0x80, 0x78, 0xc3, 0x51, 0x13, 0x63, 0x6f, 0x1a, 0xfd, 0x53, 0xd2, 0xf4, 0x13, 0x4b, 0xb2, 0x4f, 0x99, 0xb8, 0x7b, 0x7, 0x99, 0xb6, 0xab, 0x88, 0x2e, 0x7, 0x8}}
 	return a, nil
 }
