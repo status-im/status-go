@@ -143,7 +143,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 
 	// Create bob1
 	bob1 := s.m
-	err := bob1.SetDisplayName(bob1DisplayName, true)
+	err := bob1.SetDisplayName(bob1DisplayName)
 	s.Require().NoError(err)
 	bob1KeyUID := bob1.account.KeyUID
 	imagesExpected := fmt.Sprintf(`[{"keyUid":"%s","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"%s","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`,

@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/wakusync"
 )
@@ -73,24 +72,18 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return nil
 	}
 
-	dbDisplayNameClock, err := m.settings.GetSettingLastSynced(settings.DisplayName)
-	if err != nil {
-		return err
-	}
-
 	contentSet := false
 	response := wakusync.WakuBackedUpDataResponse{
 		Profile: &wakusync.BackedUpProfile{},
 	}
 
-	if dbDisplayNameClock < message.DisplayNameClock {
-		err = m.SetDisplayName(message.DisplayName, false)
-		if err != nil {
-			return err
-		}
-		contentSet = true
-		response.AddDisplayName(message.DisplayName)
+	err := m.SaveSyncDisplayName(message.DisplayName, message.DisplayNameClock)
+	if err != nil {
+		return err
 	}
+
+	contentSet = true
+	response.AddDisplayName(message.DisplayName)
 
 	syncWithBackedUpImages := false
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
@@ -152,6 +145,11 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 
 func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error {
 	if message == nil {
+		return nil
+	}
+
+	// DisplayName is recovered via `protobuf.BackedUpProfile` message
+	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME {
 		return nil
 	}
 

@@ -50,7 +50,7 @@ func ValidateDisplayName(displayName *string) error {
 	return nil
 }
 
-func (m *Messenger) SetDisplayName(displayName string, publishChange bool) error {
+func (m *Messenger) SetDisplayName(displayName string) error {
 	currDisplayName, err := m.settings.DisplayName()
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (m *Messenger) SetDisplayName(displayName string, publishChange bool) error
 		return err
 	}
 
-	m.account.Name = displayName // We might need to do the same when syncing settings?
+	m.account.Name = displayName
 	err = m.multiAccounts.SaveAccount(*m.account)
 	if err != nil {
 		return err
@@ -75,16 +75,22 @@ func (m *Messenger) SetDisplayName(displayName string, publishChange bool) error
 		return err
 	}
 
-	if publishChange {
-		err = m.resetLastPublishedTimeForChatIdentity()
-		if err != nil {
-			return err
-		}
-
-		return m.publishContactCode()
+	err = m.resetLastPublishedTimeForChatIdentity()
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return m.publishContactCode()
+}
+
+func (m *Messenger) SaveSyncDisplayName(displayName string, clock uint64) error {
+	err := m.settings.SaveSyncSetting(settings.DisplayName, displayName, clock)
+	if err != nil {
+		return err
+	}
+
+	m.account.Name = displayName
+	return m.multiAccounts.SaveAccount(*m.account)
 }
 
 func ValidateBio(bio *string) error {

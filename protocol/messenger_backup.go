@@ -89,7 +89,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	_, settings, errors := m.prepareSyncSettingsMessages(clock)
+	_, settings, errors := m.prepareSyncSettingsMessages(clock, true)
 	if len(errors) != 0 {
 		// return just the first error, the others have been logged
 		return 0, errors[0]

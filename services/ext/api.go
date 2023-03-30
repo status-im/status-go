@@ -833,7 +833,7 @@ func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, pi
 }
 
 func (api *PublicAPI) SetDisplayName(ctx context.Context, displayName string) error {
-	return api.service.messenger.SetDisplayName(displayName, true)
+	return api.service.messenger.SetDisplayName(displayName)
 }
 
 func (api *PublicAPI) MarkAsTrusted(ctx context.Context, contactID string) error {
