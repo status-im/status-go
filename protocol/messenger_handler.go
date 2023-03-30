@@ -1469,6 +1469,8 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 		return m.persistence.SaveEdit(editMessage)
 	}
 
+	originalMessageMentioned := originalMessage.Mentioned
+
 	chat, ok := m.allChats.Load(originalMessage.LocalChatID)
 	if !ok {
 		return errors.New("chat not found")
@@ -1507,6 +1509,14 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	if err != nil {
 		return err
 	}
+
+	editedMessageHasMentions := originalMessage.Mentioned
+
+	if editedMessageHasMentions && !originalMessageMentioned && !originalMessage.Seen {
+		// Increase unviewed count when the edited message has a mention and didn't have one before
+		m.updateUnviewedCounts(chat, originalMessage.Mentioned || originalMessage.Replied)
+	}
+
 	state.Response.AddMessage(originalMessage)
 	state.Response.AddChat(chat)
 
