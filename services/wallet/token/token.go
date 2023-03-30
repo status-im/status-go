@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"math/big"
 	"strconv"
 	"sync"
@@ -648,100 +647,76 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
-
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
-		if err == nil {
-			fetchChainBalance := false
-			var tokenChunks [][]common.Address
-			chunkSize := 500
-			for i := 0; i < len(tokens); i += chunkSize {
-				end := i + chunkSize
-				if end > len(tokens) {
-					end = len(tokens)
-				}
+		if err != nil {
+			return nil, err
+		}
 
-				tokenChunks = append(tokenChunks, tokens[i:end])
+		fetchChainBalance := false
+		var tokenChunks [][]common.Address
+		chunkSize := 500
+		for i := 0; i < len(tokens); i += chunkSize {
+			end := i + chunkSize
+			if end > len(tokens) {
+				end = len(tokens)
 			}
 
-			for _, token := range tokens {
-				if token == nativeChainAddress {
-					fetchChainBalance = true
-				}
+			tokenChunks = append(tokenChunks, tokens[i:end])
+		}
+
+		for _, token := range tokens {
+			if token == nativeChainAddress {
+				fetchChainBalance = true
 			}
-			if fetchChainBalance {
+		}
+		if fetchChainBalance {
+			group.Add(func(parent context.Context) error {
+				ctx, cancel := context.WithTimeout(parent, requestTimeout)
+				defer cancel()
+				res, err := ethScanContract.EtherBalances(&bind.CallOpts{
+					Context: ctx,
+				}, accounts)
+				if err != nil {
+
+					log.Error("can't fetch chain balance", err)
+					return nil
+				}
+				for idx, account := range accounts {
+					balance := new(big.Int)
+					balance.SetBytes(res[idx].Data)
+					updateBalance(client.ChainID, account, common.HexToAddress("0x"), balance)
+				}
+
+				return nil
+			})
+		}
+
+		for accountIdx := range accounts {
+			account := accounts[accountIdx]
+			for idx := range tokenChunks {
+				chunk := tokenChunks[idx]
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-					res, err := ethScanContract.EtherBalances(&bind.CallOpts{
+					res, err := ethScanContract.TokensBalance(&bind.CallOpts{
 						Context: ctx,
-					}, accounts)
+					}, account, chunk)
 					if err != nil {
-						fmt.Println(err)
-						log.Error("can't fetch chain balance", err)
+
+						log.Error("can't fetch erc20 token balance", "account", account, "error", err)
 						return nil
 					}
-					for idx, account := range accounts {
+
+					for idx, token := range chunk {
+						if !res[idx].Success {
+							continue
+						}
 						balance := new(big.Int)
 						balance.SetBytes(res[idx].Data)
-						updateBalance(client.ChainID, account, common.HexToAddress("0x"), balance)
+						updateBalance(client.ChainID, account, token, balance)
 					}
-
 					return nil
 				})
-			}
-
-			for accountIdx := range accounts {
-				account := accounts[accountIdx]
-				for idx := range tokenChunks {
-					chunk := tokenChunks[idx]
-					group.Add(func(parent context.Context) error {
-						ctx, cancel := context.WithTimeout(parent, requestTimeout)
-						defer cancel()
-						res, err := ethScanContract.TokensBalance(&bind.CallOpts{
-							Context: ctx,
-						}, account, chunk)
-						if err != nil {
-							fmt.Println(err)
-							log.Error("can't fetch erc20 token balance", "account", account, "error", err)
-							return nil
-						}
-
-						for idx, token := range chunk {
-							if !res[idx].Success {
-								continue
-							}
-							balance := new(big.Int)
-							balance.SetBytes(res[idx].Data)
-							updateBalance(client.ChainID, account, token, balance)
-						}
-						return nil
-					})
-				}
-			}
-		} else {
-			for tokenIdx := range tokens {
-				for accountIdx := range accounts {
-					// Below, we set account, token and client from idx on purpose to avoid override
-					account := accounts[accountIdx]
-					token := tokens[tokenIdx]
-					if !tm.inStore(token, client.ChainID) {
-						continue
-					}
-					client := clients[clientIdx]
-					group.Add(func(parent context.Context) error {
-						ctx, cancel := context.WithTimeout(parent, requestTimeout)
-						defer cancel()
-						balance, err := tm.GetBalance(ctx, client, account, token)
-
-						if err != nil {
-							log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
-
-							return nil
-						}
-						updateBalance(client.ChainID, account, token, balance)
-						return nil
-					})
-				}
 			}
 		}
 
