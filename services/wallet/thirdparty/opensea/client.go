@@ -154,6 +154,9 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 	retryCount := 0
 	statusCode := http.StatusOK
 
+	// Try to do the request without an apiKey first
+	tmpAPIKey := ""
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
@@ -162,8 +165,8 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-		if len(apiKey) > 0 {
-			req.Header.Set("X-API-KEY", apiKey)
+		if len(tmpAPIKey) > 0 {
+			req.Header.Set("X-API-KEY", tmpAPIKey)
 		}
 
 		resp, err := o.client.Do(req)
@@ -186,6 +189,15 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 				// sleep and retry
 				time.Sleep(GetRequestWaitTime)
 				retryCount++
+				continue
+			}
+			// break and error
+		case http.StatusForbidden:
+			// Request requires an apiKey, set it and retry
+			if tmpAPIKey == "" && apiKey != "" {
+				tmpAPIKey = apiKey
+				// sleep and retry
+				time.Sleep(GetRequestWaitTime)
 				continue
 			}
 			// break and error
