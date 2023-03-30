@@ -389,7 +389,7 @@ func (api *API) JoinChat(ctx context.Context, communityID types.HexBytes, chatID
 	return api.toAPIChat(response.Chats()[0], nil, pubKey, false)
 }
 
-func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string, onlyChat bool) (*Chat, error) {
+func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Community, pubKey string, skipPinnedMessages bool) (*Chat, error) {
 	chat := &Chat{
 		ID:                       strings.TrimPrefix(protocolChat.ID, protocolChat.CommunityID),
 		Name:                     protocolChat.Name,
@@ -426,7 +426,7 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		chat.Name = "" // Emptying since it contains non useful data
 	}
 
-	if !onlyChat {
+	if !skipPinnedMessages {
 		pinnedMessages, cursor, err := api.s.messenger.PinnedMessageByChatID(protocolChat.ID, "", -1)
 		if err != nil {
 			return nil, err
@@ -445,13 +445,11 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		return nil, err
 	}
 
-	if !onlyChat {
-		chatMembers, err := getChatMembers(protocolChat, community, pubKey)
-		if err != nil {
-			return nil, err
-		}
-		chat.Members = chatMembers
+	chatMembers, err := getChatMembers(protocolChat, community, pubKey)
+	if err != nil {
+		return nil, err
 	}
+	chat.Members = chatMembers
 
 	return chat, nil
 }
