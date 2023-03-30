@@ -677,7 +677,6 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 					Context: ctx,
 				}, accounts)
 				if err != nil {
-
 					log.Error("can't fetch chain balance", err)
 					return nil
 				}
@@ -702,7 +701,6 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 						Context: ctx,
 					}, account, chunk)
 					if err != nil {
-
 						log.Error("can't fetch erc20 token balance", "account", account, "error", err)
 						return nil
 					}

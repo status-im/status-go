@@ -245,11 +245,6 @@ func NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (*Client,
 	if err != nil {
 		return nil, err
 	}
-	if client, ok := OpenseaClientInstances[chainID]; ok {
-		if client.apiKey == tmpAPIKey {
-			return client, nil
-		}
-	}
 
 	openseaClient := &Client{
 		client:        OpenseaHTTPClient,
@@ -272,12 +267,14 @@ func (o *Client) setIsConnected(value bool) {
 		if value {
 			message = "up"
 		}
-		o.feed.Send(walletevent.Event{
-			Type:     EventCollectibleStatusChanged,
-			Accounts: []common.Address{},
-			Message:  message,
-			At:       time.Now().Unix(),
-		})
+		if o.feed != nil {
+			o.feed.Send(walletevent.Event{
+				Type:     EventCollectibleStatusChanged,
+				Accounts: []common.Address{},
+				Message:  message,
+				At:       time.Now().Unix(),
+			})
+		}
 	}
 	o.IsConnected = value
 }
