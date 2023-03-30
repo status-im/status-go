@@ -81,8 +81,18 @@ func LinkPreviewWhitelist() []Site {
 			ImageSite: false,
 		},
 		{
+			Title:     "YouTube Mobile",
+			Address:   "m.youtube.com",
+			ImageSite: false,
+		},
+		{
 			Title:     "Twitter",
 			Address:   "twitter.com",
+			ImageSite: false,
+		},
+		{
+			Title:     "Twitter Mobile",
+			Address:   "mobile.twitter.com",
 			ImageSite: false,
 		},
 		{
@@ -267,7 +277,7 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	hostname := strings.ToLower(u.Hostname())
 
 	switch hostname {
-	case "youtube.com", "youtu.be", "www.youtube.com":
+	case "youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com":
 		return GetYoutubePreviewData(link)
 	case "github.com", "our.status.im":
 		return GetGenericLinkPreviewData(link)
@@ -275,7 +285,7 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetGiphyPreviewData(link)
 	case "gph.is":
 		return GetGiphyShortURLPreviewData(link)
-	case "twitter.com":
+	case "twitter.com", "mobile.twitter.com":
 		return GetTwitterPreviewData(link)
 	case "media.tenor.com":
 		return FakeGenericImageLinkPreviewData("Tenor", link)
