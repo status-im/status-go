@@ -1,7 +1,6 @@
 package market
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -77,7 +76,6 @@ func (pm *Manager) makeCall(main func() (any, error), fallback func() (any, erro
 	errChan := hystrix.Go("marketClient", func() error {
 		res, err := main()
 		if err != nil {
-			fmt.Println("MARKET ERROR", err)
 			return err
 		}
 		pm.setIsConnected(true)
@@ -90,7 +88,6 @@ func (pm *Manager) makeCall(main func() (any, error), fallback func() (any, erro
 
 		res, err := fallback()
 		if err != nil {
-			fmt.Println("FALLBACK MARKET ERROR", err)
 			pm.setIsConnected(false)
 			return err
 		}
