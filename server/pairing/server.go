@@ -112,7 +112,7 @@ func MakeServerConfig(config *ServerConfig) error {
 type SenderServer struct {
 	*BaseServer
 	accountMounter      PayloadMounter
-	rawMessageMounter   *RawMessagePayloadMounter
+	rawMessageMounter   PayloadMounter
 	installationMounter *InstallationPayloadMounterReceiver
 }
 

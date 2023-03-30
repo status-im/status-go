@@ -65,13 +65,9 @@ func (bpm *BasePayloadMounter) Mount() error {
 |
 */
 
-// AccountPayloadMounter is responsible for the whole lifecycle of an AccountPayload
-type AccountPayloadMounter struct {
-	*BasePayloadMounter
-}
-
 // NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
-func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*AccountPayloadMounter, error) {
+// responsible for the whole lifecycle of an AccountPayload
+func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
 	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -84,13 +80,11 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 		return nil, err
 	}
 
-	return &AccountPayloadMounter{
-		BasePayloadMounter: NewBasePayloadMounter(
-			apl,
-			NewPairingPayloadMarshaller(p, l),
-			pe,
-		),
-	}, nil
+	return NewBasePayloadMounter(
+		apl,
+		NewPairingPayloadMarshaller(p, l),
+		pe,
+	), nil
 }
 
 // AccountPayloadLoader is responsible for loading, parsing and validating AccountPayload data
@@ -147,21 +141,17 @@ func (apl *AccountPayloadLoader) Load() error {
 |
 */
 
-type RawMessagePayloadMounter struct {
-	*BasePayloadMounter
-}
-
-func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *RawMessagePayloadMounter {
+// NewRawMessagePayloadMounter generates a new and initialised RawMessagePayloadMounter
+// responsible for the whole lifecycle of an RawMessagePayload
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *BasePayloadMounter {
 	pe = pe.Renew()
 	payload := new(protobuf.SyncRawMessage)
 
-	return &RawMessagePayloadMounter{
-		BasePayloadMounter: NewBasePayloadMounter(
-			NewRawMessageLoader(backend, payload, config),
-			NewRawMessagePayloadMarshaller(payload),
-			pe,
-		),
-	}
+	return NewBasePayloadMounter(
+		NewRawMessageLoader(backend, payload, config),
+		NewRawMessagePayloadMarshaller(payload),
+		pe,
+	)
 }
 
 type RawMessageLoader struct {
@@ -194,21 +184,17 @@ func (r *RawMessageLoader) Load() (err error) {
 |
 */
 
-type InstallationPayloadMounter struct {
-	*BasePayloadMounter
-}
-
-func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounter {
+// NewInstallationPayloadMounter generates a new and initialised InstallationPayloadMounter
+// responsible for the whole lifecycle of an InstallationPayload
+func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *BasePayloadMounter {
 	pe = pe.Renew()
 	payload := new(protobuf.SyncRawMessage)
 
-	return &InstallationPayloadMounter{
-		BasePayloadMounter: NewBasePayloadMounter(
-			NewInstallationPayloadLoader(backend, payload, deviceType),
-			NewRawMessagePayloadMarshaller(payload),
-			pe,
-		),
-	}
+	return NewBasePayloadMounter(
+		NewInstallationPayloadLoader(backend, payload, deviceType),
+		NewRawMessagePayloadMarshaller(payload),
+		pe,
+	)
 }
 
 type InstallationPayloadLoader struct {
@@ -244,7 +230,9 @@ func (r *InstallationPayloadLoader) Load() error {
 |
 */
 
-func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (*AccountPayloadMounter, *RawMessagePayloadMounter, *InstallationPayloadMounterReceiver, error) {
+// NewPayloadMounters returns PayloadMounter s configured to handle local pairing transfers of:
+//   - AccountPayload, RawMessagePayload and InstallationPayload
+func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, *InstallationPayloadMounterReceiver, error) {
 	am, err := NewAccountPayloadMounter(pe, config, logger)
 	if err != nil {
 		return nil, nil, nil, err

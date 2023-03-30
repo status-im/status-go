@@ -110,7 +110,7 @@ func (c *BaseClient) getChallenge() error {
 type SenderClient struct {
 	*BaseClient
 	accountMounter      PayloadMounter
-	rawMessageMounter   *RawMessagePayloadMounter
+	rawMessageMounter   PayloadMounter
 	installationMounter *InstallationPayloadMounterReceiver
 }
 
