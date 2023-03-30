@@ -198,10 +198,10 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	})
 
 	clients, err := r.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
 	group.Add(func(parent context.Context) error {
-		if err != nil {
-			return err
-		}
 		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
 			return err
@@ -218,6 +218,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	if err != nil {
 		return nil, err
 	}
+
 	result := make(map[common.Address][]Token)
 	for _, address := range addresses {
 		for symbol, tokens := range getTokenBySymbols(allTokens) {
