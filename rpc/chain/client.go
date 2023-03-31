@@ -34,10 +34,9 @@ type ClientWithFallback struct {
 
 	WalletNotifier func(chainId uint64, message string)
 
-	IsConnected             bool
-	consecutiveFailureCount int
-	IsConnectedLock         sync.RWMutex
-	LastCheckedAt           int64
+	IsConnected     bool
+	IsConnectedLock sync.RWMutex
+	LastCheckedAt   int64
 }
 
 var vmErrors = []error{
@@ -71,14 +70,13 @@ func NewSimpleClient(main *rpc.Client, chainID uint64) *ClientWithFallback {
 	})
 
 	return &ClientWithFallback{
-		ChainID:                 chainID,
-		main:                    ethclient.NewClient(main),
-		fallback:                nil,
-		mainRPC:                 main,
-		fallbackRPC:             nil,
-		IsConnected:             true,
-		consecutiveFailureCount: 0,
-		LastCheckedAt:           time.Now().Unix(),
+		ChainID:       chainID,
+		main:          ethclient.NewClient(main),
+		fallback:      nil,
+		mainRPC:       main,
+		fallbackRPC:   nil,
+		IsConnected:   true,
+		LastCheckedAt: time.Now().Unix(),
 	}
 }
 
@@ -129,7 +127,6 @@ func (c *ClientWithFallback) SetIsConnected(value bool) {
 	defer c.IsConnectedLock.Unlock()
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
-		c.consecutiveFailureCount += 1
 		if c.IsConnected {
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "down")
@@ -138,8 +135,6 @@ func (c *ClientWithFallback) SetIsConnected(value bool) {
 		}
 
 	} else {
-		c.consecutiveFailureCount = 0
-
 		if !c.IsConnected {
 			c.IsConnected = true
 			if c.WalletNotifier != nil {
