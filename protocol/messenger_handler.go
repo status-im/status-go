@@ -1786,7 +1786,36 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	} else if !receivedMessage.Seen {
 		// Increase unviewed count
-		m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
+		skipUpdateUnviewedCountForAlbums := false
+		if receivedMessage.ContentType == protobuf.ChatMessage_IMAGE {
+			image := receivedMessage.GetImage()
+
+			if image != nil && image.AlbumId != "" {
+				// Skip unviewed counts increasing for other messages from album if we have it in memory
+				for _, message := range state.Response.Messages() {
+					if receivedMessage.ContentType == protobuf.ChatMessage_IMAGE {
+						img := message.GetImage()
+						if img != nil && img.AlbumId != "" && img.AlbumId == image.AlbumId {
+							skipUpdateUnviewedCountForAlbums = true
+							break
+						}
+					}
+				}
+
+				if !skipUpdateUnviewedCountForAlbums {
+					messages, err := m.persistence.AlbumMessages(chat.ID, image.AlbumId)
+					if err != nil {
+						return err
+					}
+
+					// Skip unviewed counts increasing for other messages from album if we have it in db
+					skipUpdateUnviewedCountForAlbums = len(messages) > 0
+				}
+			}
+		}
+		if !skipUpdateUnviewedCountForAlbums {
+			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
+		}
 	}
 
 	contact := state.CurrentMessageState.Contact

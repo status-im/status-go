@@ -144,7 +144,57 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 	for _, message := range response.Messages() {
 		image := message.GetImage()
-		s.Require().NotNil(image)
-		s.Require().NotEmpty(image.AlbumId)
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
 	}
+}
+
+func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	const messageCount = 3
+	var album []*common.Message
+
+	for i := 0; i < messageCount; i++ {
+		outgoingMessage := buildImageWithoutAlbumIDMessage(s, *ourChat)
+		outgoingMessage.Mentioned = true
+		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
+		album = append(album, outgoingMessage)
+	}
+
+	err = s.m.SaveChat(ourChat)
+	s.NoError(err)
+	response, err := s.m.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), messageCount)
+
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), messageCount)
+
+	for _, message := range response.Messages() {
+		image := message.GetImage()
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
+	}
+
+	s.Require().Equal(uint(1), response.Chats()[0].UnviewedMessagesCount, "Just one unread message")
 }
