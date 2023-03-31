@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 

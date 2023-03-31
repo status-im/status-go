@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -46,7 +48,7 @@ func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string)
 }
 
 func setupTestPrice(t *testing.T, provider thirdparty.MarketDataProvider) *Manager {
-	return NewManager(provider, provider)
+	return NewManager(provider, provider, &event.Feed{})
 }
 
 func TestPrice(t *testing.T) {

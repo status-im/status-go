@@ -224,7 +224,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%scoins/markets?ids=%s&vs_currency=%s&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=1h%2C24h", baseURL, strings.Join(ids, ","), currency)
+	url := fmt.Sprintf("%scoins/markets?ids=%s&vs_currency=%s&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=%s", baseURL, strings.Join(ids, ","), currency, "1h%2C24h")
 
 	resp, err := c.DoQuery(url)
 	if err != nil {
