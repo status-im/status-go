@@ -205,14 +205,14 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 			}
 			return err
 		}
-		if true {
+		if toggleIsConnected {
 			c.SetIsConnected(true)
 		}
 		resultChan <- CommandResult{res1: res}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
-			if true {
+			if toggleIsConnected {
 				c.SetIsConnected(false)
 			}
 			return err
@@ -224,12 +224,12 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			if true {
+			if toggleIsConnected {
 				c.SetIsConnected(false)
 			}
 			return err
 		}
-		if true {
+		if toggleIsConnected {
 			c.SetIsConnected(true)
 		}
 		resultChan <- CommandResult{res1: res}
