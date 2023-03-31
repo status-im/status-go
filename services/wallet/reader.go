@@ -204,6 +204,9 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	group.Add(func(parent context.Context) error {
 		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 		if err != nil {
+			for _, client := range clients {
+				client.SetIsConnected(false)
+			}
 			log.Info("tokenManager.GetBalancesByChain err", err)
 			return err
 		}
