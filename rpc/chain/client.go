@@ -124,13 +124,13 @@ func isVMError(err error) bool {
 	return false
 }
 
-func (c *ClientWithFallback) setIsConnected(value bool) {
+func (c *ClientWithFallback) SetIsConnected(value bool) {
 	c.IsConnectedLock.Lock()
 	defer c.IsConnectedLock.Unlock()
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
 		c.consecutiveFailureCount += 1
-		if c.consecutiveFailureCount > 1 && c.IsConnected {
+		if c.IsConnected {
 			if c.WalletNotifier != nil {
 				c.WalletNotifier(c.ChainID, "down")
 			}
@@ -161,12 +161,12 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 			}
 			return err
 		}
-		c.setIsConnected(true)
+		c.SetIsConnected(true)
 		resultChan <- CommandResult{}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
-			c.setIsConnected(false)
+			c.SetIsConnected(false)
 			return err
 		}
 
@@ -176,7 +176,7 @@ func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func()
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.setIsConnected(false)
+			c.SetIsConnected(false)
 			return err
 		}
 		resultChan <- CommandResult{}
@@ -205,15 +205,15 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 			}
 			return err
 		}
-		if toggleIsConnected {
-			c.setIsConnected(true)
+		if true {
+			c.SetIsConnected(true)
 		}
 		resultChan <- CommandResult{res1: res}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
-			if toggleIsConnected {
-				c.setIsConnected(false)
+			if true {
+				c.SetIsConnected(false)
 			}
 			return err
 		}
@@ -224,13 +224,13 @@ func (c *ClientWithFallback) makeCallSingleReturn(main func() (any, error), fall
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			if toggleIsConnected {
-				c.setIsConnected(false)
+			if true {
+				c.SetIsConnected(false)
 			}
 			return err
 		}
-		if toggleIsConnected {
-			c.setIsConnected(true)
+		if true {
+			c.SetIsConnected(true)
 		}
 		resultChan <- CommandResult{res1: res}
 		return nil
@@ -259,12 +259,12 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 			}
 			return err
 		}
-		c.setIsConnected(true)
+		c.SetIsConnected(true)
 		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	}, func(err error) error {
 		if c.fallback == nil {
-			c.setIsConnected(false)
+			c.SetIsConnected(false)
 			return err
 		}
 
@@ -274,10 +274,10 @@ func (c *ClientWithFallback) makeCallDoubleReturn(main func() (any, any, error),
 				resultChan <- CommandResult{vmError: err}
 				return nil
 			}
-			c.setIsConnected(false)
+			c.SetIsConnected(false)
 			return err
 		}
-		c.setIsConnected(true)
+		c.SetIsConnected(true)
 		resultChan <- CommandResult{res1: a, res2: b}
 		return nil
 	})
