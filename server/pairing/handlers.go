@@ -24,9 +24,9 @@ const (
 // Account handling
 
 func handleReceiveAccount(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingAccount})
@@ -48,9 +48,9 @@ func handleReceiveAccount(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc
 }
 
 func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 		w.Header().Set("Content-Type", "application/octet-stream")
 		err := pm.Mount()
 		if err != nil {
@@ -76,9 +76,9 @@ func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
 // Device sync handling
 
 func handleParingSyncDeviceReceive(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionSyncDevice})
@@ -100,9 +100,9 @@ func handleParingSyncDeviceReceive(hs HandlerServer, pr PayloadReceiver) http.Ha
 }
 
 func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 		w.Header().Set("Content-Type", "application/octet-stream")
 
 		err := pm.Mount()
@@ -130,9 +130,9 @@ func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.Handl
 // Installation data handling
 
 func handleReceiveInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionPairingInstallation})
@@ -154,9 +154,9 @@ func handleReceiveInstallation(hs HandlerServer, pmr PayloadMounterReceiver) htt
 }
 
 func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.HandlerFunc {
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 	logger := hs.GetLogger()
 	return func(w http.ResponseWriter, r *http.Request) {
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 		w.Header().Set("Content-Type", "application/octet-stream")
 		err := pmr.Mount()
 		if err != nil {
