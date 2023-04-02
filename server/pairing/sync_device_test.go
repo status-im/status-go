@@ -326,33 +326,33 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
-	settings := &settings.Settings{}
-	settings.KeyUID = generatedAccountInfo.KeyUID
-	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
-	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
+	syncSettings := &settings.Settings{}
+	syncSettings.KeyUID = generatedAccountInfo.KeyUID
+	syncSettings.Address = types.HexToAddress(generatedAccountInfo.Address)
+	syncSettings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
 
 	// Set chat key & name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
 	if err != nil {
 		return nil, err
 	}
-	settings.Name = name
-	settings.PublicKey = chatKeyString
+	syncSettings.Name = name
+	syncSettings.PublicKey = chatKeyString
 
-	settings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	settings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	settings.Mnemonic = mnemonic
+	syncSettings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
+	syncSettings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
+	syncSettings.Mnemonic = mnemonic
 
-	settings.SigningPhrase = "balabala"
+	syncSettings.SigningPhrase = "balabala"
 
-	settings.SendPushNotifications = true
-	settings.InstallationID = uuid.New().String()
-	settings.UseMailservers = true
+	syncSettings.SendPushNotifications = true
+	syncSettings.InstallationID = uuid.New().String()
+	syncSettings.UseMailservers = true
 
-	settings.PreviewPrivacy = true
-	settings.Currency = "usd"
-	settings.ProfilePicturesVisibility = 1
-	settings.LinkPreviewRequestEnabled = true
+	syncSettings.PreviewPrivacy = true
+	syncSettings.Currency = "usd"
+	syncSettings.ProfilePicturesVisibility = 1
+	syncSettings.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
@@ -361,14 +361,14 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	settings.WalletVisibleTokens = &visibleTokenJSONRaw
+	syncSettings.WalletVisibleTokens = &visibleTokenJSONRaw
 
 	networks := `[{"id":"goerli_rpc","chain-explorer-link":"https://goerli.etherscan.io/address/","name":"Goerli with upstream RPC","config":{"NetworkId":5,"DataDir":"/ethereum/goerli_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://goerli-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}},{"id":"mainnet_rpc","chain-explorer-link":"https://etherscan.io/address/","name":"Mainnet with upstream RPC","config":{"NetworkId":1,"DataDir":"/ethereum/mainnet_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://eth-archival.gateway.pokt.network/v1/lb/3ef2018191814b7e1009b8d9"}}}]`
 	var networksRawMessage json.RawMessage = []byte(networks)
-	settings.Networks = &networksRawMessage
-	settings.CurrentNetwork = currentNetwork
+	syncSettings.Networks = &networksRawMessage
+	syncSettings.CurrentNetwork = currentNetwork
 
-	return settings, nil
+	return syncSettings, nil
 }
 
 func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error) {

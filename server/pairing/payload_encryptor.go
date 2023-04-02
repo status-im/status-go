@@ -17,9 +17,6 @@ func (ep *EncryptionPayload) lock() {
 	ep.locked = true
 }
 
-// TODO resolve the many cases of other structs simply wrapping their encryptor rather than embedding the functionality
-//  https://github.com/status-im/status-go/issues/3302
-
 // PayloadEncryptor is responsible for encrypting and decrypting payload data
 type PayloadEncryptor struct {
 	aesKey  []byte
@@ -93,6 +90,7 @@ func (pem *PayloadEncryptor) lockPayload() {
 	pem.payload.lock()
 }
 
+// PayloadLockPayload Embeds a *PayloadEncryptor to give all embedding structs EncryptionPayload Locking
 type PayloadLockPayload struct {
 	*PayloadEncryptor
 }
@@ -101,6 +99,8 @@ func (pl *PayloadLockPayload) LockPayload() {
 	pl.lockPayload()
 }
 
+// PayloadToSend Embeds a *PayloadEncryptor to give all embedding structs EncryptionPayload ToSend() functionality
+// Useful to securely implement the PayloadMounter interface
 type PayloadToSend struct {
 	*PayloadEncryptor
 }
@@ -109,6 +109,8 @@ func (pts *PayloadToSend) ToSend() []byte {
 	return pts.getEncrypted()
 }
 
+// PayloadReceived Embeds a *PayloadEncryptor to give all embedding structs EncryptionPayload Received() functionality
+// Useful to securely implement the PayloadReceiver interface
 type PayloadReceived struct {
 	*PayloadEncryptor
 }

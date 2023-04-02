@@ -28,6 +28,11 @@ func getPubKeyData(publicKey string) (*PublicKeyData, error) {
 }
 
 func ExtendStructWithPubKeyData(publicKey string, item any) (any, error) {
+	// If the public key is empty, do not attempt to extend the incoming item
+	if publicKey == "" {
+		return item, nil
+	}
+
 	pkd, err := getPubKeyData(publicKey)
 	if err != nil {
 		return nil, err

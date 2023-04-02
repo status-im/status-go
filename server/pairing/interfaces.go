@@ -25,6 +25,10 @@ type PayloadLocker interface {
 	LockPayload()
 }
 
+// TODO if this interface only gets a logger, then maybe remove the interface and change consuming function params
+//  to accept a *zap.logger
+//  https://github.com/status-im/status-go/issues/3370
+
 type HandlerServer interface {
 	GetLogger() *zap.Logger
 }
